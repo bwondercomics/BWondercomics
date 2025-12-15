@@ -1,0 +1,376 @@
+// Comic Reader Comments Integration (self-hosted)
+// Lightweight auth + comment UI backed by local API
+
+(() => {
+    'use strict';
+
+    let commentCtx = null;
+
+    const api = {
+        async session() {
+            const res = await fetch('/api/session', { cache: 'no-store', credentials: 'same-origin' });
+            if (!res.ok) throw new Error('Session check failed');
+            const data = await res.json();
+            return data.user || null;
+        },
+        async login(email, password) {
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Login failed');
+            return data.user;
+        },
+        async register(email, password, displayName, inviteCode) {
+            const res = await fetch('/api/register', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password, displayName, inviteCode })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Registration failed');
+            return data.user;
+        },
+        async logout() {
+            await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+        },
+        async fetchComments(targetId) {
+            const res = await fetch(`/api/comments?targetId=${encodeURIComponent(targetId)}`, {
+                cache: 'no-store',
+                credentials: 'same-origin'
+            });
+            if (!res.ok) throw new Error('Failed to load comments');
+            const data = await res.json();
+            return Array.isArray(data.comments) ? data.comments : [];
+        },
+        async postComment(targetId, message) {
+            const res = await fetch('/api/comments', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetId, message })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to post comment');
+            return data.comment;
+        }
+    };
+
+    const slugifyTarget = (raw = '') => {
+        const base = (raw || 'chapter').toString().trim();
+        const cleaned = base
+            .toLowerCase()
+            .replace(/[^a-z0-9._:-]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+        return (cleaned || 'chapter').slice(0, 120);
+    };
+
+    function getCurrentTargetId() {
+        const select = document.getElementById('chapter');
+        const rawValue = select ? (select.value || select.options[select.selectedIndex]?.value) : 'chapter-1';
+        return slugifyTarget(rawValue || 'chapter');
+    }
+
+    function init() {
+        const section = document.getElementById('comicCommentsSection');
+        if (!section) return;
+
+        section.innerHTML = `
+      <div class="comments-header">
+        <h3 class="comments-title">Discuss This Chapter</h3>
+      </div>
+      <div class="comments-body comic-comments-body">
+        <div class="comments-header">
+          <div class="auth-status"></div>
+          <button type="button" class="signout-btn" style="display: none;">Sign out</button>
+        </div>
+        <form class="auth-form">
+          <div class="auth-row">
+            <input class="auth-input" type="email" name="email" placeholder="Email" autocomplete="email" required />
+            <input class="auth-input" type="password" name="password" placeholder="Password (8+ chars)" autocomplete="current-password" required />
+            <input class="auth-input auth-display hidden" type="text" name="displayName" placeholder="Display name (optional)" autocomplete="name" />
+            <input class="auth-input auth-invite hidden" type="text" name="inviteCode" placeholder="Invite code (if required)" autocomplete="off" />
+          </div>
+          <div class="auth-actions-row">
+            <button type="submit" class="auth-submit">Sign in</button>
+            <button type="button" class="auth-toggle">Need an account? Register</button>
+          </div>
+          <div class="auth-error" aria-live="polite"></div>
+        </form>
+        <form class="comment-form disabled">
+          <textarea class="comment-textarea" name="comment" placeholder="Share your thoughts..." disabled></textarea>
+          <div class="comment-actions">
+            <button type="submit" class="comment-submit" disabled>Post Comment</button>
+            <span class="comment-hint">Login to post comments.</span>
+          </div>
+          <div class="comment-error" aria-live="polite"></div>
+        </form>
+        <div class="comments-list"></div>
+      </div>
+    `;
+
+        const ctx = {
+            section,
+            body: section.querySelector('.comments-body'),
+            authStatus: section.querySelector('.auth-status'),
+            signoutBtn: section.querySelector('.signout-btn'),
+            authForm: section.querySelector('.auth-form'),
+            authToggle: section.querySelector('.auth-toggle'),
+            authSubmit: section.querySelector('.auth-submit'),
+            authError: section.querySelector('.auth-error'),
+            emailInput: section.querySelector('input[type="email"]'),
+            passwordInput: section.querySelector('input[type="password"]'),
+            displayNameInput: section.querySelector('.auth-display'),
+            inviteInput: section.querySelector('.auth-invite'),
+            commentForm: section.querySelector('.comment-form'),
+            textarea: section.querySelector('.comment-textarea'),
+            submitBtn: section.querySelector('.comment-submit'),
+            commentHint: section.querySelector('.comment-hint'),
+            commentError: section.querySelector('.comment-error'),
+            listEl: section.querySelector('.comments-list'),
+            mode: 'login',
+            user: null,
+            targetId: getCurrentTargetId(),
+            collapsed: section.classList.contains('collapsed')
+        };
+
+        ctx.authForm.addEventListener('submit', (e) => handleAuthSubmit(e, ctx));
+        ctx.authToggle.addEventListener('click', () => toggleAuthMode(ctx));
+        ctx.signoutBtn.addEventListener('click', () => handleLogout(ctx));
+        ctx.commentForm.addEventListener('submit', (e) => handleCommentSubmit(e, ctx));
+        window.addEventListener('chapterChanged', () => handleChapterChange(ctx));
+
+        applyAuthMode(ctx);
+        refreshSession(ctx).finally(() => loadComments(ctx));
+        commentCtx = ctx;
+        syncCommentsToggleButton();
+    }
+
+    function applyAuthMode(ctx) {
+        const isLogin = ctx.mode === 'login';
+        if (ctx.authSubmit) ctx.authSubmit.textContent = isLogin ? 'Sign in' : 'Create account';
+        if (ctx.authToggle) ctx.authToggle.textContent = isLogin ? 'Need an account? Register' : 'Have an account? Sign in';
+        if (ctx.displayNameInput) ctx.displayNameInput.classList.toggle('hidden', isLogin);
+        if (ctx.inviteInput) ctx.inviteInput.classList.toggle('hidden', isLogin);
+    }
+
+    function syncCommentsToggleButton() {
+        const btn = document.getElementById('commentToggleBtn');
+        const panel = document.getElementById('comicCommentsSection');
+        if (!btn || !panel) return;
+        const collapsed = panel.classList.contains('collapsed');
+        btn.textContent = collapsed ? 'COMMENTS' : 'HIDE COMMENTS';
+        btn.setAttribute('aria-pressed', String(!collapsed));
+    }
+
+    function toggleReaderComments() {
+        const panel = document.getElementById('comicCommentsSection');
+        const btn = document.getElementById('commentToggleBtn');
+        if (!panel) return;
+
+        // Clear any legacy inline display styles so CSS + class toggles can work.
+        panel.style.display = '';
+
+        const willShow = panel.classList.contains('collapsed');
+        panel.classList.toggle('collapsed', !willShow);
+
+        if (commentCtx) {
+            commentCtx.collapsed = !willShow;
+        }
+
+        if (btn) {
+            btn.textContent = willShow ? 'HIDE COMMENTS' : 'COMMENTS';
+            btn.setAttribute('aria-pressed', String(willShow));
+        }
+
+        if (willShow) {
+            try {
+                panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } catch (err) { }
+            if (commentCtx) {
+                loadComments(commentCtx);
+            }
+        }
+    }
+
+    // Expose a global helper so the button can call it.
+    window.toggleReaderComments = toggleReaderComments;
+
+    function updateSectionForUser(ctx) {
+        const user = ctx.user;
+        if (user) {
+            ctx.authStatus.textContent = `Signed in as ${user.displayName || user.email}`;
+            ctx.authForm.style.display = 'none';
+            ctx.signoutBtn.style.display = 'inline-flex';
+            ctx.commentForm.classList.remove('disabled');
+            ctx.textarea.disabled = false;
+            ctx.submitBtn.disabled = false;
+            ctx.commentHint.textContent = 'Be kind. No spoilers or spam.';
+        } else {
+            ctx.authStatus.textContent = 'Sign in to discuss this chapter';
+            ctx.authForm.style.display = 'flex';
+            ctx.signoutBtn.style.display = 'none';
+            ctx.commentForm.classList.add('disabled');
+            ctx.textarea.disabled = true;
+            ctx.submitBtn.disabled = true;
+            ctx.commentHint.textContent = 'Login to post comments.';
+        }
+        ctx.authError.textContent = '';
+        ctx.commentError.textContent = '';
+        applyAuthMode(ctx);
+    }
+
+    async function refreshSession(ctx) {
+        try {
+            ctx.user = await api.session();
+        } catch {
+            ctx.user = null;
+        }
+        updateSectionForUser(ctx);
+    }
+
+	    async function handleAuthSubmit(event, ctx) {
+	        event.preventDefault();
+	        const email = ctx.emailInput.value.trim();
+	        const password = ctx.passwordInput.value;
+        const displayName = ctx.displayNameInput.value.trim();
+        const inviteCode = ctx.inviteInput ? ctx.inviteInput.value.trim() : '';
+        ctx.authError.textContent = '';
+
+        if (!email || !password) {
+            ctx.authError.textContent = 'Email and password are required.';
+            return;
+        }
+
+        ctx.authSubmit.disabled = true;
+	        try {
+	            ctx.user = ctx.mode === 'login'
+	                ? await api.login(email, password)
+	                : await api.register(email, password, displayName, inviteCode);
+	            ctx.emailInput.value = '';
+	            ctx.passwordInput.value = '';
+	            ctx.displayNameInput.value = '';
+	            if (ctx.inviteInput) ctx.inviteInput.value = '';
+	            updateSectionForUser(ctx);
+              try {
+                  window.dispatchEvent(new CustomEvent('bbSessionChanged', { detail: { user: ctx.user || null } }));
+              } catch (err) { }
+	        } catch (err) {
+	            ctx.authError.textContent = err.message || 'Authentication failed.';
+	        } finally {
+	            ctx.authSubmit.disabled = false;
+	        }
+	    }
+
+	    async function handleLogout(ctx) {
+	        try {
+	            await api.logout();
+	        } finally {
+	            ctx.user = null;
+	            updateSectionForUser(ctx);
+              try {
+                  window.dispatchEvent(new CustomEvent('bbSessionChanged', { detail: { user: null } }));
+              } catch (err) { }
+	        }
+	    }
+
+    async function handleCommentSubmit(event, ctx) {
+        event.preventDefault();
+        ctx.commentError.textContent = '';
+
+        if (!ctx.user) {
+            ctx.commentError.textContent = 'Please sign in to post.';
+            return;
+        }
+
+        const message = ctx.textarea.value.trim();
+        if (!message || message.length > 2000) {
+            ctx.commentError.textContent = 'Comment must be 1-2000 characters.';
+            return;
+        }
+
+        ctx.submitBtn.disabled = true;
+        try {
+            await api.postComment(ctx.targetId, message);
+            ctx.textarea.value = '';
+            await loadComments(ctx);
+        } catch (err) {
+            ctx.commentError.textContent = err.message || 'Failed to post comment.';
+        } finally {
+            ctx.submitBtn.disabled = !ctx.user;
+        }
+    }
+
+    function renderComments(listEl, comments) {
+        listEl.innerHTML = '';
+        if (!comments || comments.length === 0) {
+            listEl.innerHTML = '<div class="comment-empty">No comments yet. Start the discussion!</div>';
+            return;
+        }
+
+        comments.forEach(comment => {
+            const card = document.createElement('div');
+            card.className = 'comment-card';
+
+            const meta = document.createElement('div');
+            meta.className = 'comment-meta';
+
+            const author = document.createElement('span');
+            author.className = 'comment-author';
+            author.textContent = comment.displayName || 'Reader';
+
+            const timeEl = document.createElement('span');
+            timeEl.className = 'comment-time';
+            const date = comment.createdAt ? new Date(comment.createdAt) : null;
+            timeEl.textContent = date && !Number.isNaN(date) ? date.toLocaleString() : '';
+
+            meta.appendChild(author);
+            meta.appendChild(timeEl);
+
+            const body = document.createElement('p');
+            body.className = 'comment-body';
+            body.textContent = comment.message || '';
+
+            card.appendChild(meta);
+            card.appendChild(body);
+            listEl.appendChild(card);
+        });
+    }
+
+    async function loadComments(ctx) {
+        ctx.listEl.innerHTML = '<div class="comment-empty">Loading comments...</div>';
+        try {
+            ctx.targetId = getCurrentTargetId();
+            const comments = await api.fetchComments(ctx.targetId);
+            renderComments(ctx.listEl, comments);
+        } catch (err) {
+            ctx.listEl.innerHTML = `<div class="comment-empty">${err.message}</div>`;
+        }
+    }
+
+    function toggleAuthMode(ctx) {
+        try {
+            ctx.mode = ctx.mode === 'login' ? 'register' : 'login';
+            applyAuthMode(ctx);
+        } catch (err) {
+            if (ctx?.authError) {
+                ctx.authError.textContent = err?.message || 'Could not toggle auth mode.';
+            }
+        }
+    }
+
+    function handleChapterChange(ctx) {
+        ctx.targetId = getCurrentTargetId();
+        loadComments(ctx);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();

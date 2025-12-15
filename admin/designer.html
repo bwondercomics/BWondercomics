@@ -1,0 +1,1396 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battle Bros Page Designer</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Righteous&family=Roboto:wght@400;700&display=swap"
+        rel="stylesheet">
+    <style>
+        /* Default subtitles for header rotation */
+        /* Kept in JS too; this list is the single source we load into the textarea when missing in config */
+        :root {
+            --primary: #00d9ff;
+            --secondary: #ff00ea;
+            --accent: #ffed00;
+            --bg-dark: #0a0a12;
+            --bg-panel: #1a1a2e;
+            --text: #ffffff;
+            --success: #00ff88;
+            --danger: #ff3838;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Roboto', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes neonPulse {
+            0% {
+                box-shadow: 0 0 5px var(--primary), 0 0 10px var(--primary);
+            }
+
+            50% {
+                box-shadow: 0 0 10px var(--primary), 0 0 20px var(--primary);
+            }
+
+            100% {
+                box-shadow: 0 0 5px var(--primary), 0 0 10px var(--primary);
+            }
+        }
+
+        /* Header */
+        .header {
+            background: rgba(10, 10, 18, 0.95);
+            border-bottom: 2px solid var(--primary);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .title {
+            font-family: 'Bebas Neue', cursive;
+            font-size: 2rem;
+            color: var(--primary);
+            text-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
+            letter-spacing: 2px;
+        }
+
+        .nav {
+            display: flex;
+            gap: 15px;
+        }
+
+        /* Buttons */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            font-family: 'Bebas Neue', cursive;
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: var(--bg-dark);
+        }
+
+        .btn-primary:hover {
+            box-shadow: 0 0 20px var(--primary);
+        }
+
+        .btn-secondary {
+            background: transparent;
+            border: 2px solid var(--secondary);
+            color: var(--secondary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--secondary);
+            color: var(--bg-dark);
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: var(--bg-dark);
+        }
+
+        .btn-success:hover {
+            box-shadow: 0 0 20px var(--success);
+        }
+
+        .container {
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            border-bottom: 2px solid var(--primary);
+            padding-bottom: 10px;
+        }
+
+        .tab-btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 20px;
+            background: transparent;
+            border: 2px solid var(--primary);
+            color: var(--primary);
+            font-family: 'Bebas Neue';
+            font-size: 1.1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+        }
+
+        .tab-btn:hover {
+            background: rgba(0, 217, 255, 0.1);
+        }
+
+        .tab-btn.active {
+            background: var(--primary);
+            color: var(--bg-dark);
+            box-shadow: 0 0 15px var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease-out;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Sections */
+        .section {
+            background: var(--bg-panel);
+            border: 2px solid var(--primary);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-family: 'Bebas Neue';
+            font-size: 1.5rem;
+            color: var(--accent);
+            margin-bottom: 15px;
+        }
+
+        /* Forms */
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.9rem;
+            color: var(--primary);
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .form-input,
+        .form-textarea {
+            width: 100%;
+            background: var(--bg-dark);
+            border: 2px solid var(--primary);
+            color: var(--text);
+            padding: 10px;
+            font-family: 'Righteous';
+            font-size: 1rem;
+            border-radius: 5px;
+        }
+
+        .form-input:focus,
+        .form-textarea:focus {
+            outline: none;
+            box-shadow: 0 0 15px rgba(0, 217, 255, 0.5);
+        }
+
+        /* Color Picker */
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .color-input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .color-input {
+            width: 60px;
+            height: 40px;
+            border: 2px solid var(--primary);
+            cursor: pointer;
+            padding: 0;
+            background: none;
+        }
+
+        .color-text {
+            flex: 1;
+            background: var(--bg-dark);
+            border: 2px solid var(--primary);
+            color: var(--text);
+            padding: 8px;
+            font-family: monospace;
+            text-transform: uppercase;
+        }
+
+        /* Presets */
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .preset-btn {
+            padding: 12px;
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.1), rgba(255, 0, 234, 0.1));
+            border: 2px solid var(--primary);
+            color: var(--text);
+            font-family: 'Bebas Neue';
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .preset-btn:hover {
+            background: linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(255, 0, 234, 0.2));
+            box-shadow: 0 0 15px var(--primary);
+        }
+
+        /* Image Upload */
+        .upload-area {
+            border: 2px dashed var(--primary);
+            border-radius: 5px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: var(--bg-dark);
+        }
+
+        .upload-area:hover {
+            border-color: var(--accent);
+            background: rgba(255, 237, 0, 0.05);
+        }
+
+        .upload-area.drag-over {
+            border-color: var(--success);
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .preview-img {
+            max-width: 100%;
+            max-height: 200px;
+            margin-top: 10px;
+            border: 2px solid var(--primary);
+            display: none;
+        }
+
+        /* Button List */
+        .button-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .button-item {
+            display: grid;
+            grid-template-columns: 60px 1fr 2fr auto;
+            gap: 10px;
+            align-items: center;
+            padding: 10px;
+            background: var(--bg-dark);
+            border: 2px solid var(--primary);
+            border-radius: 5px;
+        }
+
+        .btn-remove {
+            background: var(--danger);
+            color: var(--text);
+            border: none;
+            padding: 6px 12px;
+            cursor: pointer;
+            border-radius: 3px;
+            font-size: 0.8rem;
+        }
+
+        .btn-remove:hover {
+            box-shadow: 0 0 10px var(--danger);
+        }
+
+        /* Layout Editor */
+        .layout-panel {
+            background: var(--bg-dark);
+            border: 2px solid var(--primary);
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: grab;
+            transition: all 0.3s;
+        }
+
+        .layout-panel:hover {
+            box-shadow: 0 0 15px rgba(0, 217, 255, 0.4);
+        }
+
+        .layout-panel.dragging {
+            opacity: 0.5;
+            cursor: grabbing;
+            border-color: var(--accent);
+        }
+
+        .layout-panel-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .layout-panel-name {
+            font-family: 'Bebas Neue';
+            font-size: 1.2rem;
+            color: var(--primary);
+        }
+
+        /* Toggle Switch */
+        .toggle-switch {
+            position: relative;
+            width: 60px;
+            height: 30px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: var(--bg-dark);
+            border: 2px solid var(--primary);
+            transition: 0.4s;
+            border-radius: 30px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background-color: var(--primary);
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        input:checked+.toggle-slider {
+            background-color: var(--success);
+            border-color: var(--success);
+        }
+
+        input:checked+.toggle-slider:before {
+            transform: translateX(26px);
+            background-color: var(--text);
+        }
+
+        /* Preview Frame */
+        .preview-frame {
+            width: 100%;
+            height: 600px;
+            border: 2px solid var(--primary);
+            background: white;
+            border-radius: 5px;
+            transition: width 0.3s ease;
+        }
+
+        /* Messages */
+        #messageArea {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+
+        .success-message {
+            background: var(--success);
+            color: var(--bg-dark);
+            padding: 15px 25px;
+            border-radius: 5px;
+            margin-top: 10px;
+            animation: fadeIn 0.3s ease-out;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            font-weight: bold;
+        }
+
+        .error-message {
+            background: var(--danger);
+            color: var(--text);
+            padding: 15px 25px;
+            border-radius: 5px;
+            margin-top: 10px;
+            animation: fadeIn 0.3s ease-out;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            font-weight: bold;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .nav {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .button-item {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <header class="header">
+        <h1 class="title">Battle Bros Page Designer</h1>
+        <nav class="nav">
+            <button class="btn btn-secondary" id="btnBackToAdmin">Back to Admin</button>
+            <button class="btn btn-secondary" id="btnResetConfig">Reset Draft</button>
+            <button class="btn btn-success" id="btnSave">Save Draft</button>
+            <button class="btn btn-primary" id="btnPublish">Publish</button>
+        </nav>
+    </header>
+
+    <div class="container">
+        <p style="color: var(--text); opacity: 0.8; margin-bottom: 20px;">
+            Design your comic reader visually - customize colors, layout, images, and content without touching code!
+        </p>
+
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="theme">Theme</button>
+            <button class="tab-btn" data-tab="content">Content</button>
+            <button class="tab-btn" data-tab="layout">Layout</button>
+            <button class="tab-btn" data-tab="preview">Preview</button>
+        </div>
+
+        <!-- Theme Tab -->
+        <div id="themeTab" class="tab-content active">
+            <div class="section">
+                <h2 class="section-title">Color Theme Editor</h2>
+
+                <div class="form-group">
+                    <label class="form-label">Quick Presets</label>
+                    <div class="preset-grid">
+                        <button class="preset-btn" data-preset="cyberpunk">Cyberpunk</button>
+                        <button class="preset-btn" data-preset="retro">Retro</button>
+                        <button class="preset-btn" data-preset="minimal">Minimal</button>
+                        <button class="preset-btn" data-preset="neon">Neon</button>
+                    </div>
+                </div>
+
+                <div class="color-grid">
+                    <div class="form-group">
+                        <label class="form-label">Primary Color</label>
+                        <div class="color-input-group">
+                            <input type="color" class="color-input" id="colorPrimary" value="#00d9ff">
+                            <input type="text" class="color-text" id="colorPrimaryText" value="#00d9ff">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Secondary Color</label>
+                        <div class="color-input-group">
+                            <input type="color" class="color-input" id="colorSecondary" value="#ff00ea">
+                            <input type="text" class="color-text" id="colorSecondaryText" value="#ff00ea">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Accent Color</label>
+                        <div class="color-input-group">
+                            <input type="color" class="color-input" id="colorAccent" value="#ffed00">
+                            <input type="text" class="color-text" id="colorAccentText" value="#ffed00">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Background Dark</label>
+                        <div class="color-input-group">
+                            <input type="color" class="color-input" id="colorBgDark" value="#0a0a12">
+                            <input type="text" class="color-text" id="colorBgDarkText" value="#0a0a12">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Background Panel</label>
+                        <div class="color-input-group">
+                            <input type="color" class="color-input" id="colorBgPanel" value="#1a1a2e">
+                            <input type="text" class="color-text" id="colorBgPanelText" value="#1a1a2e">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Text Color</label>
+                        <div class="color-input-group">
+                            <input type="color" class="color-input" id="colorText" value="#ffffff">
+                            <input type="text" class="color-text" id="colorTextText" value="#ffffff">
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Content Tab -->
+        <div id="contentTab" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">Header</h2>
+                <div class="form-group">
+                    <label class="form-label">Title</label>
+                    <input type="text" class="form-input" id="headerTitle" value="BATTLE BROS">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Subtitle Options (one per line)</label>
+                    <textarea class="form-textarea" id="headerSubtitles" rows="4"
+                        placeholder="Add multiple subtitles to rotate through on reload. The first line is also used as the default subtitle."></textarea>
+                </div>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">Left Panel</h2>
+                <div class="form-group">
+                    <label class="form-label">Top Text</label>
+                    <input type="text" class="form-input" id="leftTopText" value="TO GO EVEN FURTHER BEYOND">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Bottom Text</label>
+                    <textarea class="form-textarea" id="leftBottomText"
+                        rows="2">WANT TO SUPPORT THE COMIC? Buy the physical book at the bwondercomics store!</textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Image</label>
+                    <div class="upload-area" id="leftImageUpload">
+                        <input type="file" id="leftImageFile" accept="image/*" style="display: none;">
+                        <div>Click or drag image here</div>
+                        <img id="leftImagePreview" class="preview-img">
+                    </div>
+                    <input type="text" class="form-input" id="leftImageUrl" placeholder="Or enter image URL"
+                        style="margin-top: 10px;">
+                </div>
+            </div>
+
+            <div class="section">
+                <h2 class="section-title">Right Panel</h2>
+                <div class="form-group">
+                    <label class="form-label">Image</label>
+                    <div class="upload-area" id="rightImageUpload">
+                        <input type="file" id="rightImageFile" accept="image/*" style="display: none;">
+                        <div>Click or drag image here</div>
+                        <img id="rightImagePreview" class="preview-img">
+                    </div>
+                    <input type="text" class="form-input" id="rightImageUrl" placeholder="Or enter image URL"
+                        style="margin-top: 10px;">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Social Buttons</label>
+                    <div id="buttonsList" class="button-list"></div>
+                    <button class="btn btn-secondary" id="btnAddButton" style="margin-top: 10px;">+ Add Button</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Layout Tab -->
+        <div id="layoutTab" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">Layout Control</h2>
+                <p style="color: var(--text); opacity: 0.7; margin-bottom: 20px;">Drag panels to reorder, toggle
+                    visibility</p>
+                <div id="layoutPanels"></div>
+            </div>
+        </div>
+
+        <!-- Preview Tab -->
+        <div id="previewTab" class="tab-content">
+            <div class="section">
+                <h2 class="section-title">Live Preview</h2>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                    <button class="btn btn-secondary" id="btnRefreshPreview">Refresh</button>
+                    <button class="btn btn-secondary" id="btnPreviewDesktop">Desktop</button>
+                    <button class="btn btn-secondary" id="btnPreviewTablet">Tablet</button>
+                    <button class="btn btn-secondary" id="btnPreviewMobile">Mobile</button>
+                </div>
+                <iframe id="previewFrame" class="preview-frame" src="../index.html?preview=true"></iframe>
+            </div>
+        </div>
+
+        <div id="messageArea"></div>
+    </div>
+
+    <script>
+        (function () {
+            'use strict';
+
+	            const DEFAULT_SERIES_ID = 'battle-bros';
+	            const sanitizeSeriesId = (raw = '') => {
+	                const cleaned = String(raw)
+	                    .trim()
+	                    .toLowerCase()
+	                    .replace(/[^a-z0-9_-]+/g, '-')
+	                    .replace(/^-+|-+$/g, '');
+	                return cleaned.slice(0, 64);
+	            };
+
+	            const params = new URLSearchParams(window.location.search);
+	            const seriesId = sanitizeSeriesId(params.get('series') || '') || DEFAULT_SERIES_ID;
+
+	            const CONFIG_KEY = `battlebros_page_config:${seriesId}`;
+	            const GITHUB_TOKEN_KEY = 'battlebros_github_user_token';
+
+	            const FILE_URL = seriesId === DEFAULT_SERIES_ID
+	                ? 'page-config.json'
+	                : `series/${seriesId}/page-config.json`;
+	            const SAVE_FILENAME = seriesId === DEFAULT_SERIES_ID
+	                ? 'admin/page-config.json'
+	                : `admin/series/${seriesId}/page-config.json`;
+
+	            const GITHUB_CONFIG = {
+	                owner: 'bwondercomics',
+	                repo: 'battle-bros-reader-dev',
+	                branch: 'main',
+	                dataFile: SAVE_FILENAME
+	            };
+
+            const DEFAULT_BUTTONS = [
+                { id: 'btn1', icon: 'button icons/bluesky.webp', text: 'Bluesky', url: 'https://bsky.app/profile/bwondercomics.com' },
+                { id: 'btn2', icon: 'button icons/patrons.webp', text: 'Patreon', url: 'https://patreon.com/doylemelville2' },
+                { id: 'btn5', icon: 'button icons/discord.webp', text: 'Discord', url: 'https://discord.gg/your-server' },
+                { id: 'btn3', icon: 'button icons/artstation.webp', text: 'ArtStation', url: 'https://doyle-melvilleii.artstation.com' },
+                { id: 'btn4', icon: 'button icons/buyprint.webp', text: 'Buy Print', url: 'https://bwondercomics.bigcartel.com/product/battle-bros-volume-1' },
+                { id: 'comnet', icon: 'button icons/comicnet.webp', text: 'COM1C_NET', url: '#' }
+            ];
+
+	            let pageConfig = null;
+
+	            const previewFrame = document.getElementById('previewFrame');
+	            if (previewFrame) {
+	                previewFrame.src = `../index.html?preview=true&series=${encodeURIComponent(seriesId)}`;
+	            }
+
+            // --- Config Loading & Saving ---
+
+            async function loadConfig() {
+                try {
+                    let fileConfig = null;
+                    // Try to load from localStorage first (Draft)
+                    const savedDraft = localStorage.getItem(CONFIG_KEY);
+                    if (savedDraft) {
+                        pageConfig = JSON.parse(savedDraft);
+                        const hasSubtitles = Array.isArray(pageConfig?.content?.header?.subtitles);
+                        if (!hasSubtitles) {
+                            pageConfig = null; // force fallback if draft missing subtitles
+                        } else {
+                            showMessage('Loaded saved draft from browser storage.', 'success');
+                        }
+                    }
+                    if (!pageConfig) {
+                        // Fallback to file
+                        fileConfig = await loadFileConfig();
+                        pageConfig = fileConfig || await getDefaultConfig();
+                    } else {
+                        // We have a draft; load file to merge buttons if missing
+                        fileConfig = await loadFileConfig();
+                    }
+
+                    // Ensure buttons exist (merge from file or defaults)
+                    if (!pageConfig?.content?.rightPanel?.buttons || pageConfig.content.rightPanel.buttons.length === 0) {
+                        const fileButtons = fileConfig?.content?.rightPanel?.buttons;
+                        pageConfig.content.rightPanel.buttons = (fileButtons && fileButtons.length ? fileButtons : DEFAULT_BUTTONS).map(b => ({ ...b }));
+                    }
+                    applyConfigToUI();
+                } catch (error) {
+                    console.error('Error loading config:', error);
+                    pageConfig = await getDefaultConfig();
+                    applyConfigToUI();
+                }
+            }
+
+	            async function loadFileConfig() {
+	                try {
+	                    const response = await fetch(FILE_URL);
+	                    if (response.ok) {
+	                        return await response.json();
+	                    }
+	                } catch (e) {
+	                    console.warn(`Could not load ${FILE_URL}`, e);
+	                }
+	                return null;
+	            }
+
+            async function getDefaultConfig() {
+                // Return a safe default structure if file load fails
+                return {
+                    "layout": {
+                        "leftPanel": { "enabled": true, "order": 1 },
+                        "viewport": { "enabled": true, "order": 2 },
+                        "rightPanel": { "enabled": true, "order": 3 }
+                    },
+                    "theme": {
+                        "primary": "#00d9ff",
+                        "secondary": "#ff00ea",
+                        "accent": "#ffed00",
+                        "bgDark": "#0a0a12",
+                        "bgPanel": "#1a1a2e",
+                        "text": "#ffffff",
+                        "danger": "#ff3838"
+                    },
+                    "content": {
+                        "header": {
+                            "title": "BATTLE BROS",
+                            "subtitle": "",
+                            "subtitles": []
+                        },
+                        "leftPanel": { "topText": "TO GO EVEN FURTHER BEYOND", "bottomText": "WANT TO SUPPORT THE COMIC? Buy the physical book at the bwondercomics store!", "image": "" },
+                        "rightPanel": { "image": "", "buttons": DEFAULT_BUTTONS }
+                    },
+                    "presets": {} // Presets would normally be loaded from file
+                };
+            }
+
+            function applyConfigToUI() {
+                if (!pageConfig) return;
+
+                // Theme
+                if (pageConfig.theme) {
+                    setThemeColor('colorPrimary', pageConfig.theme.primary);
+                    setThemeColor('colorSecondary', pageConfig.theme.secondary);
+                    setThemeColor('colorAccent', pageConfig.theme.accent);
+                    setThemeColor('colorBgDark', pageConfig.theme.bgDark);
+                    setThemeColor('colorBgPanel', pageConfig.theme.bgPanel);
+                    setThemeColor('colorText', pageConfig.theme.text);
+                }
+
+                // Content
+                if (pageConfig.content) {
+                    document.getElementById('headerTitle').value = pageConfig.content.header.title || '';
+                    const subs = Array.isArray(pageConfig.content.header.subtitles) ? pageConfig.content.header.subtitles : [];
+                    document.getElementById('headerSubtitles').value = subs.join('\n');
+                    document.getElementById('leftTopText').value = pageConfig.content.leftPanel.topText || '';
+                    document.getElementById('leftBottomText').value = pageConfig.content.leftPanel.bottomText || '';
+
+                    updateImageInput('left', pageConfig.content.leftPanel.image);
+                    updateImageInput('right', pageConfig.content.rightPanel.image);
+
+                    renderButtons();
+                }
+
+                // Layout
+                renderLayoutPanels();
+            }
+
+            function setThemeColor(id, value) {
+                const el = document.getElementById(id);
+                const textEl = document.getElementById(id + 'Text');
+                if (el) el.value = value;
+                if (textEl) textEl.value = value;
+            }
+
+            function updateImageInput(side, value) {
+                const urlInput = document.getElementById(side + 'ImageUrl');
+                const preview = document.getElementById(side + 'ImagePreview');
+
+                if (urlInput) urlInput.value = value || '';
+
+                if (preview && value) {
+                    preview.src = value;
+                    preview.style.display = 'block';
+                } else if (preview) {
+                    preview.style.display = 'none';
+                }
+            }
+
+            function collectConfigFromUI() {
+                if (!pageConfig) return;
+
+                // Theme
+                pageConfig.theme.primary = document.getElementById('colorPrimaryText').value;
+                pageConfig.theme.secondary = document.getElementById('colorSecondaryText').value;
+                pageConfig.theme.accent = document.getElementById('colorAccentText').value;
+                pageConfig.theme.bgDark = document.getElementById('colorBgDarkText').value;
+                pageConfig.theme.bgPanel = document.getElementById('colorBgPanelText').value;
+                pageConfig.theme.text = document.getElementById('colorTextText').value;
+
+                // Content
+                pageConfig.content.header.title = document.getElementById('headerTitle').value;
+                const subtitlesRaw = document.getElementById('headerSubtitles').value;
+                const subtitleList = subtitlesRaw.split('\n').map(s => s.trim()).filter(Boolean);
+                pageConfig.content.header.subtitles = subtitleList;
+                pageConfig.content.header.subtitle = "";
+                pageConfig.content.leftPanel.topText = document.getElementById('leftTopText').value;
+                pageConfig.content.leftPanel.bottomText = document.getElementById('leftBottomText').value;
+                pageConfig.content.leftPanel.image = document.getElementById('leftImageUrl').value;
+                pageConfig.content.rightPanel.image = document.getElementById('rightImageUrl').value;
+
+                // Buttons are updated in real-time on the object
+                // Layout is updated in real-time on the object
+
+                pageConfig.lastUpdated = new Date().toISOString();
+            }
+
+            function broadcastUpdate() {
+                collectConfigFromUI();
+                const iframe = document.getElementById('previewFrame');
+                if (iframe && iframe.contentWindow) {
+                    iframe.contentWindow.postMessage({
+                        type: 'UPDATE_CONFIG',
+                        config: pageConfig
+                    }, '*');
+                }
+            }
+
+            // --- UI Interactions ---
+
+            // Tabs
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    btn.classList.add('active');
+                    document.getElementById(btn.dataset.tab + 'Tab').classList.add('active');
+                });
+            });
+
+            // Color Sync
+            function setupColorSync(colorId, textId) {
+                const colorInput = document.getElementById(colorId);
+                const textInput = document.getElementById(textId);
+
+                colorInput.addEventListener('input', () => {
+                    textInput.value = colorInput.value;
+                    broadcastUpdate();
+                });
+
+                textInput.addEventListener('input', () => {
+                    if (/^#[0-9A-F]{6}$/i.test(textInput.value)) {
+                        colorInput.value = textInput.value;
+                        broadcastUpdate();
+                    }
+                });
+            }
+
+            ['Primary', 'Secondary', 'Accent', 'BgDark', 'BgPanel', 'Text'].forEach(type => {
+                setupColorSync('color' + type, 'color' + type + 'Text');
+            });
+
+            // Presets
+            document.querySelectorAll('.preset-btn').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const presetName = btn.dataset.preset;
+                    try {
+                        const response = await fetch('page-config.json');
+                        const data = await response.json();
+                        if (data.presets && data.presets[presetName]) {
+                            pageConfig.theme = data.presets[presetName].theme;
+                            applyConfigToUI();
+                            broadcastUpdate();
+                            showMessage(`Applied ${data.presets[presetName].name} theme!`, 'success');
+                        }
+                    } catch (e) {
+                        console.error("Could not load presets", e);
+                    }
+                });
+            });
+
+            // Image Uploads
+            function setupImageUpload(uploadId, fileId, previewId, urlId) {
+                const uploadArea = document.getElementById(uploadId);
+                const fileInput = document.getElementById(fileId);
+                const preview = document.getElementById(previewId);
+                const urlInput = document.getElementById(urlId);
+
+                uploadArea.addEventListener('click', () => fileInput.click());
+
+                fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+
+                uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.add('drag-over');
+                });
+
+                uploadArea.addEventListener('dragleave', () => {
+                    uploadArea.classList.remove('drag-over');
+                });
+
+                uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    uploadArea.classList.remove('drag-over');
+                    handleFile(e.dataTransfer.files[0]);
+                });
+
+                function handleFile(file) {
+                    if (file && file.type.startsWith('image/')) {
+                        const reader = new FileReader();
+                        reader.onload = (e) => {
+                            const result = e.target.result;
+                            preview.src = result;
+                            preview.style.display = 'block';
+                            urlInput.value = result;
+                            broadcastUpdate();
+                        };
+                        reader.readAsDataURL(file);
+                    }
+                }
+            }
+
+            setupImageUpload('leftImageUpload', 'leftImageFile', 'leftImagePreview', 'leftImageUrl');
+            setupImageUpload('rightImageUpload', 'rightImageFile', 'rightImagePreview', 'rightImageUrl');
+
+            // Buttons (enhanced UI)
+            function renderButtons() {
+                const container = document.getElementById('buttonsList');
+                if (!container) return;
+                container.innerHTML = '';
+
+                if (!pageConfig.content.rightPanel.buttons) pageConfig.content.rightPanel.buttons = [];
+
+                if (!pageConfig.content.rightPanel.buttons.length) {
+                    const empty = document.createElement('div');
+                    empty.className = 'button-item';
+                    empty.textContent = 'No buttons yet. Add one below.';
+                    container.appendChild(empty);
+                    return;
+                }
+
+                pageConfig.content.rightPanel.buttons.forEach((btn, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'button-item';
+
+                    const iconInput = document.createElement('input');
+                    iconInput.type = 'text';
+                    iconInput.className = 'form-input';
+                    iconInput.placeholder = 'Icon (emoji, letter, or image path)';
+                    iconInput.value = btn.icon || '';
+                    iconInput.addEventListener('input', (e) => updateButton(index, 'icon', e.target.value));
+
+                    const textInput = document.createElement('input');
+                    textInput.type = 'text';
+                    textInput.className = 'form-input';
+                    textInput.placeholder = 'Button text';
+                    textInput.value = btn.text || '';
+                    textInput.addEventListener('input', (e) => updateButton(index, 'text', e.target.value));
+
+                    const urlInput = document.createElement('input');
+                    urlInput.type = 'text';
+                    urlInput.className = 'form-input';
+                    urlInput.placeholder = 'https://example.com';
+                    urlInput.value = btn.url || '';
+                    urlInput.addEventListener('input', (e) => updateButton(index, 'url', e.target.value));
+
+                    const actions = document.createElement('div');
+                    actions.style.display = 'flex';
+                    actions.style.gap = '6px';
+
+                    const upBtn = document.createElement('button');
+                    upBtn.type = 'button';
+                    upBtn.className = 'btn-remove';
+                    upBtn.textContent = '^';
+                    upBtn.title = 'Move up';
+                    upBtn.style.background = 'var(--primary)';
+                    upBtn.style.color = 'var(--bg-dark)';
+                    upBtn.disabled = index === 0;
+                    upBtn.addEventListener('click', () => moveButton(index, -1));
+
+                    const downBtn = document.createElement('button');
+                    downBtn.type = 'button';
+                    downBtn.className = 'btn-remove';
+                    downBtn.textContent = 'v';
+                    downBtn.title = 'Move down';
+                    downBtn.style.background = 'var(--primary)';
+                    downBtn.style.color = 'var(--bg-dark)';
+                    downBtn.disabled = index === (pageConfig.content.rightPanel.buttons.length - 1);
+                    downBtn.addEventListener('click', () => moveButton(index, 1));
+
+                    const removeBtn = document.createElement('button');
+                    removeBtn.type = 'button';
+                    removeBtn.className = 'btn-remove';
+                    removeBtn.textContent = 'Remove';
+                    removeBtn.addEventListener('click', () => removeButton(index));
+
+                    actions.appendChild(upBtn);
+                    actions.appendChild(downBtn);
+                    actions.appendChild(removeBtn);
+
+                    item.appendChild(iconInput);
+                    item.appendChild(textInput);
+                    item.appendChild(urlInput);
+                    item.appendChild(actions);
+                    container.appendChild(item);
+                });
+            }
+
+            window.updateButton = (index, field, value) => {
+                if (!pageConfig.content.rightPanel.buttons[index]) return;
+                pageConfig.content.rightPanel.buttons[index][field] = value;
+                broadcastUpdate();
+            };
+
+            function moveButton(index, direction) {
+                const buttons = pageConfig.content.rightPanel.buttons;
+                const target = index + direction;
+                if (target < 0 || target >= buttons.length) return;
+                const [btn] = buttons.splice(index, 1);
+                buttons.splice(target, 0, btn);
+                renderButtons();
+                broadcastUpdate();
+            }
+
+            window.removeButton = (index) => {
+                pageConfig.content.rightPanel.buttons.splice(index, 1);
+                renderButtons();
+                broadcastUpdate();
+            };
+
+            function addButton() {
+                if (!pageConfig.content.rightPanel.buttons) pageConfig.content.rightPanel.buttons = [];
+                pageConfig.content.rightPanel.buttons.push({
+                    id: `btn-${Date.now()}`,
+                    icon: '*',
+                    text: 'New Link',
+                    url: 'https://'
+                });
+                renderButtons();
+                broadcastUpdate();
+            }
+
+            document.getElementById('btnAddButton').addEventListener('click', addButton);
+
+            // Layout & Drag-and-Drop
+            function renderLayoutPanels() {
+                const container = document.getElementById('layoutPanels');
+                container.innerHTML = '';
+
+                const panels = [
+                    { key: 'leftPanel', name: 'Left Panel', icon: '<' },
+                    { key: 'viewport', name: 'Comic Viewer', icon: '[ ]' },
+                    { key: 'rightPanel', name: 'Right Panel', icon: '>' }
+                ];
+
+                // Sort by order
+                panels.sort((a, b) => pageConfig.layout[a.key].order - pageConfig.layout[b.key].order);
+
+                panels.forEach(panel => {
+                    const item = document.createElement('div');
+                    item.className = 'layout-panel';
+                    item.draggable = true;
+                    item.dataset.key = panel.key;
+
+                    const isEnabled = pageConfig.layout[panel.key].enabled;
+
+                    item.innerHTML = `
+                        <div class="layout-panel-info">
+                            <span style="font-size: 1.5rem;">${panel.icon}</span>
+                            <span class="layout-panel-name">${panel.name}</span>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" ${isEnabled ? 'checked' : ''} onchange="togglePanel('${panel.key}', this.checked)">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    `;
+
+                    // Add Drag Events
+                    item.addEventListener('dragstart', handleDragStart);
+                    item.addEventListener('dragover', handleDragOver);
+                    item.addEventListener('drop', handleDrop);
+                    item.addEventListener('dragenter', handleDragEnter);
+                    item.addEventListener('dragleave', handleDragLeave);
+                    item.addEventListener('dragend', handleDragEnd);
+
+                    container.appendChild(item);
+                });
+            }
+
+            window.togglePanel = (key, enabled) => {
+                pageConfig.layout[key].enabled = enabled;
+                broadcastUpdate();
+            };
+
+            // Drag & Drop Logic
+            let dragSrcEl = null;
+
+            function handleDragStart(e) {
+                this.style.opacity = '0.4';
+                dragSrcEl = this;
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/html', this.innerHTML);
+            }
+
+            function handleDragOver(e) {
+                if (e.preventDefault) e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                return false;
+            }
+
+            function handleDragEnter(e) {
+                this.classList.add('drag-over');
+            }
+
+            function handleDragLeave(e) {
+                this.classList.remove('drag-over');
+            }
+
+            function handleDrop(e) {
+                if (e.stopPropagation) e.stopPropagation();
+
+                if (dragSrcEl !== this) {
+                    // Swap DOM
+                    // Simple re-render is safer for state management
+
+                    // Calculate new order
+                    const container = document.getElementById('layoutPanels');
+                    const children = Array.from(container.children);
+                    const srcIndex = children.indexOf(dragSrcEl);
+                    const targetIndex = children.indexOf(this);
+
+                    // Update config
+                    const panels = [
+                    { key: 'leftPanel', name: 'Left Panel', icon: '<' },
+                    { key: 'viewport', name: 'Comic Viewer', icon: '[ ]' },
+                    { key: 'rightPanel', name: 'Right Panel', icon: '>' }
+                ];
+                    panels.splice(targetIndex, 0, movedItem);
+
+                    // Reassign orders
+                    panels.forEach((p, i) => {
+                        pageConfig.layout[p.key].order = i + 1;
+                    });
+
+                    renderLayoutPanels();
+                    broadcastUpdate();
+                }
+                return false;
+            }
+
+            function handleDragEnd(e) {
+                this.style.opacity = '1';
+                document.querySelectorAll('.layout-panel').forEach(item => {
+                    item.classList.remove('drag-over');
+                });
+            }
+
+            // Preview Controls
+            document.getElementById('btnRefreshPreview').addEventListener('click', () => {
+                const iframe = document.getElementById('previewFrame');
+                iframe.src = iframe.src;
+            });
+
+            document.getElementById('btnPreviewDesktop').addEventListener('click', () => setPreviewSize('100%'));
+            document.getElementById('btnPreviewTablet').addEventListener('click', () => setPreviewSize('768px'));
+            document.getElementById('btnPreviewMobile').addEventListener('click', () => setPreviewSize('375px'));
+
+            function setPreviewSize(width) {
+                const frame = document.getElementById('previewFrame');
+                frame.style.width = width;
+                if (width !== '100%') {
+                    frame.style.margin = '0 auto';
+                    frame.style.display = 'block';
+                } else {
+                    frame.style.margin = '0';
+                }
+            }
+
+            // Save & Publish
+            document.getElementById('btnSave').addEventListener('click', () => {
+                collectConfigFromUI();
+                localStorage.setItem(CONFIG_KEY, JSON.stringify(pageConfig));
+                showMessage('Draft saved to browser storage!', 'success');
+            });
+
+	            document.getElementById('btnPublish').addEventListener('click', async () => {
+	                collectConfigFromUI();
+	
+	                const btn = document.getElementById('btnPublish');
+	                const originalText = btn.innerHTML;
+	                btn.disabled = true;
+	                btn.innerHTML = 'Publishing...';
+	
+	                try {
+	                    const saveRes = await fetch('/api/save', {
+	                        method: 'POST',
+	                        credentials: 'same-origin',
+	                        headers: { 'Content-Type': 'application/json' },
+	                        body: JSON.stringify({ filename: SAVE_FILENAME, content: pageConfig })
+	                    });
+	                    if (!saveRes.ok) {
+	                        const data = await saveRes.json().catch(() => ({}));
+	                        throw new Error(data.error || `Failed to save ${SAVE_FILENAME}`);
+	                    }
+	                    showMessage(`Saved to ${SAVE_FILENAME}`, 'success');
+	
+	                    // Optional: publish to GitHub if a token is configured.
+	                    const token = localStorage.getItem(GITHUB_TOKEN_KEY);
+	                    if (token && confirm('Also publish this config to GitHub (updates GitHub Pages)?')) {
+	                        let sha = null;
+	                        try {
+	                            const currentFile = await fetch(
+	                                `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.dataFile}?ref=${GITHUB_CONFIG.branch}`,
+	                                {
+	                                    headers: {
+	                                        'Authorization': `Bearer ${token}`,
+	                                        'Accept': 'application/vnd.github.v3+json'
+	                                    }
+	                                }
+	                            );
+	                            if (currentFile.ok) {
+	                                const fileData = await currentFile.json();
+	                                sha = fileData.sha;
+	                            }
+	                        } catch (e) {
+	                            console.log('File may not exist yet, creating new file');
+	                        }
+	
+	                        const content = btoa(unescape(encodeURIComponent(JSON.stringify(pageConfig, null, 2))));
+	                        const response = await fetch(
+	                            `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.dataFile}`,
+	                            {
+	                                method: 'PUT',
+	                                headers: {
+	                                    'Authorization': `Bearer ${token}`,
+	                                    'Accept': 'application/vnd.github.v3+json',
+	                                    'Content-Type': 'application/json'
+	                                },
+	                                body: JSON.stringify({
+	                                    message: `Update page config via Designer - ${new Date().toISOString()}`,
+	                                    content: content,
+	                                    branch: GITHUB_CONFIG.branch,
+	                                    ...(sha && { sha: sha })
+	                                })
+	                            }
+	                        );
+	                        if (!response.ok) {
+	                            const errorData = await response.json().catch(() => ({}));
+	                            throw new Error(errorData.message || 'GitHub API Error');
+	                        }
+	                        showMessage('Published to GitHub.', 'success');
+	                    }
+	                } catch (error) {
+	                    console.error('Publish failed:', error);
+	                    showMessage('Publish failed: ' + error.message, 'error');
+	                    alert('Publish failed:\n' + error.message);
+	                } finally {
+	                    btn.disabled = false;
+	                    btn.innerHTML = originalText;
+	                }
+	            });
+
+            document.getElementById('btnBackToAdmin').addEventListener('click', () => {
+                window.location.href = 'index.html';
+            });
+
+            const resetBtn = document.getElementById('btnResetConfig');
+            if (resetBtn) {
+                resetBtn.addEventListener('click', () => {
+                    if (confirm('Reset designer to the saved file config and clear browser draft?')) {
+                        localStorage.removeItem(CONFIG_KEY);
+                        window.location.reload();
+                    }
+                });
+            }
+
+            function showMessage(text, type) {
+                const area = document.getElementById('messageArea');
+                area.innerHTML = `<div class="${type}-message">${text}</div>`;
+                setTimeout(() => area.innerHTML = '', 5000);
+            }
+
+            // Add listeners to text inputs for real-time updates
+            ['headerTitle', 'headerSubtitles', 'leftTopText', 'leftBottomText', 'leftImageUrl', 'rightImageUrl'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('input', broadcastUpdate);
+            });
+
+            // Listen for updates from Preview (WYSIWYG)
+            window.addEventListener('message', (event) => {
+                if (event.data.type === 'UPDATE_CONTENT') {
+                    // Update UI input
+                    const inputId = event.data.key;
+                    const value = event.data.value;
+                    const el = document.getElementById(inputId);
+                    if (el) {
+                        el.value = value;
+                        // Update config object but don't broadcast back to avoid loop
+                        if (inputId === 'headerTitle') pageConfig.content.header.title = value;
+                        if (inputId === 'headerSubtitle') pageConfig.content.header.subtitle = value;
+                        if (inputId === 'headerSubtitles') {
+                            const list = value.split('\n').map(s => s.trim()).filter(Boolean);
+                            pageConfig.content.header.subtitles = list;
+                        }
+                        if (inputId === 'leftTopText') pageConfig.content.leftPanel.topText = value;
+                        if (inputId === 'leftBottomText') pageConfig.content.leftPanel.bottomText = value;
+                    }
+                } else if (event.data.type === 'UPDATE_LAYOUT') {
+                    // Update layout config
+                    const newLayout = event.data.layout;
+                    if (newLayout) {
+                        if (newLayout.leftPanel) pageConfig.layout.leftPanel.order = newLayout.leftPanel.order;
+                        if (newLayout.viewport) pageConfig.layout.viewport.order = newLayout.viewport.order;
+                        if (newLayout.rightPanel) pageConfig.layout.rightPanel.order = newLayout.rightPanel.order;
+
+                        // Re-render layout panels in Designer UI
+                        renderLayoutPanels();
+                    }
+                }
+            });
+
+            // Init
+            loadConfig();
+
+        })();
+    </script>
+</body>
+
+</html>
+
+
+
+
+
+
+
+
+
+

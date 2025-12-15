@@ -1,0 +1,1713 @@
+﻿<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5" />
+  <title>Battle Bros Admin - Content Editor</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Righteous&family=Bebas+Neue&display=swap" rel="stylesheet" />
+
+  <style>
+    /* ==================== CSS VARIABLES ==================== */
+    :root {
+      --primary: #00d9ff;
+      --secondary: #ff00ea;
+      --accent: #ffed00;
+      --bg-dark: #0a0a12;
+      --bg-panel: #1a1a2e;
+      --text: #ffffff;
+      --danger: #ff3838;
+      --success: #00ff88;
+    }
+
+    /* ==================== RESET ==================== */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    /* ==================== ANIMATIONS ==================== */
+    @keyframes glitchText {
+
+      0%,
+      100% {
+        text-shadow: 2px 2px 0 var(--primary), -2px -2px 0 var(--secondary);
+      }
+
+      25% {
+        text-shadow: -2px 2px 0 var(--secondary), 2px -2px 0 var(--primary);
+      }
+
+      50% {
+        text-shadow: 2px -2px 0 var(--primary), -2px 2px 0 var(--secondary);
+      }
+
+      75% {
+        text-shadow: -2px -2px 0 var(--secondary), 2px 2px 0 var(--primary);
+      }
+    }
+
+    @keyframes scanline {
+      0% {
+        transform: translateY(-100%);
+      }
+
+      100% {
+        transform: translateY(100%);
+      }
+    }
+
+    @keyframes neonPulse {
+
+      0%,
+      100% {
+        box-shadow: 0 0 5px var(--primary), 0 0 10px var(--primary);
+      }
+
+      50% {
+        box-shadow: 0 0 10px var(--primary), 0 0 20px var(--primary);
+      }
+    }
+
+    @keyframes pixelShift {
+
+      0%,
+      100% {
+        transform: translate(0, 0);
+      }
+
+      25% {
+        transform: translate(2px, 0);
+      }
+
+      50% {
+        transform: translate(0, 2px);
+      }
+
+      75% {
+        transform: translate(-2px, 0);
+      }
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* ==================== BASE LAYOUT ==================== */
+    html,
+    body {
+      background: var(--bg-dark);
+      color: var(--text);
+      font-family: 'Righteous', cursive;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body {
+      background-image:
+        repeating-linear-gradient(0deg,
+          rgba(0, 217, 255, 0.03) 0px,
+          transparent 1px,
+          transparent 2px,
+          rgba(0, 217, 255, 0.03) 3px);
+      position: relative;
+    }
+
+    /* Scanline effect */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: linear-gradient(to bottom,
+          transparent 50%,
+          rgba(0, 217, 255, 0.05) 50%);
+      background-size: 100% 4px;
+      pointer-events: none;
+      z-index: 9999;
+      animation: scanline 8s linear infinite;
+    }
+
+    /* ==================== LOGIN SCREEN ==================== */
+    #loginScreen {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      padding: 20px;
+    }
+
+    .login-container {
+      background: var(--bg-panel);
+      border: 2px solid var(--primary);
+      border-radius: 10px;
+      padding: 40px;
+      max-width: 400px;
+      width: 100%;
+      box-shadow: 0 0 20px rgba(0, 217, 255, 0.3);
+      animation: fadeIn 0.5s ease-out;
+    }
+
+    .login-title {
+      font-family: 'Bebas Neue', cursive;
+      font-size: 2.5rem;
+      color: var(--primary);
+      text-align: center;
+      margin-bottom: 10px;
+      animation: glitchText 3s ease-in-out infinite;
+    }
+
+    .login-subtitle {
+      text-align: center;
+      color: var(--accent);
+      font-size: 0.9rem;
+      margin-bottom: 30px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .form-label {
+      font-size: 0.9rem;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .form-input {
+      background: var(--bg-dark);
+      border: 2px solid var(--primary);
+      color: var(--text);
+      padding: 12px 16px;
+      font-family: 'Righteous', cursive;
+      font-size: 1rem;
+      border-radius: 5px;
+      transition: all 0.3s ease;
+    }
+
+    .form-input:focus {
+      outline: none;
+      box-shadow: 0 0 15px rgba(0, 217, 255, 0.5);
+      animation: neonPulse 1s ease-in-out infinite;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: var(--bg-dark);
+      border: none;
+      padding: 14px 24px;
+      font-family: 'Bebas Neue', cursive;
+      font-size: 1.3rem;
+      letter-spacing: 2px;
+      cursor: pointer;
+      border-radius: 5px;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      font-weight: bold;
+    }
+
+    .btn-primary:hover {
+      background: var(--accent);
+      box-shadow: 0 0 20px rgba(255, 237, 0, 0.6);
+      transform: translateY(-2px);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .error-message {
+      background: var(--danger);
+      color: var(--text);
+      padding: 12px;
+      border-radius: 5px;
+      text-align: center;
+      font-size: 0.9rem;
+      animation: pixelShift 0.3s ease-in-out;
+    }
+
+    /* ==================== ADMIN DASHBOARD ==================== */
+    #adminDashboard {
+      display: none;
+      min-height: 100vh;
+    }
+
+    .admin-header {
+      background: var(--bg-panel);
+      border-bottom: 2px solid var(--primary);
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 15px;
+    }
+
+    .admin-title {
+      font-family: 'Bebas Neue', cursive;
+      font-size: 2rem;
+      color: var(--primary);
+      animation: glitchText 5s ease-in-out infinite;
+    }
+
+    .header-series {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 260px;
+      flex: 1;
+    }
+
+    .header-series-label {
+      font-size: 0.85rem;
+      color: var(--primary);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      opacity: 0.9;
+    }
+
+    .header-series-row {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .header-series-row .form-input {
+      max-width: 260px;
+      padding: 10px 12px;
+      min-height: 44px;
+    }
+
+    .header-series-row .nav-btn {
+      padding: 8px 12px;
+      min-height: 44px;
+      font-size: 1rem;
+    }
+
+    .admin-nav {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      align-items: stretch;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border: 2px solid var(--secondary);
+      color: var(--secondary);
+      padding: 8px 16px;
+      font-family: 'Righteous', cursive;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border-radius: 5px;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+    }
+
+    .btn-secondary:hover {
+      background: var(--secondary);
+      color: var(--bg-dark);
+      box-shadow: 0 0 15px rgba(255, 0, 234, 0.5);
+    }
+
+    .btn-logout {
+      background: transparent;
+      border: 2px solid var(--danger);
+      color: var(--danger);
+      padding: 8px 16px;
+      font-family: 'Righteous', cursive;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border-radius: 5px;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+    }
+
+    .btn-logout:hover {
+      background: var(--danger);
+      color: var(--text);
+      box-shadow: 0 0 15px rgba(255, 56, 56, 0.5);
+    }
+
+    /* Navigation button styling (placed after base button styles for override) */
+    .admin-nav .nav-btn {
+      position: relative;
+      border: 1px solid rgba(0, 217, 255, 0.6);
+      background: linear-gradient(135deg, rgba(0, 217, 255, 0.15), rgba(255, 0, 234, 0.1));
+      color: var(--text);
+      padding: 10px 14px;
+      min-height: 44px;
+      border-radius: 8px;
+      font-family: 'Bebas Neue', cursive;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+      box-shadow: 0 0 12px rgba(0, 217, 255, 0.25);
+      text-shadow: 0 0 6px rgba(0, 217, 255, 0.4);
+      overflow: hidden;
+    }
+
+    .admin-nav .nav-btn:hover {
+      transform: translateY(-1px);
+      border-color: var(--accent);
+      box-shadow: 0 0 18px rgba(255, 237, 0, 0.35);
+    }
+
+    .admin-nav .nav-btn.nav-btn--active {
+      border-color: var(--accent);
+      background: linear-gradient(135deg, rgba(255, 237, 0, 0.22), rgba(0, 217, 255, 0.12));
+      box-shadow: 0 0 22px rgba(255, 237, 0, 0.4);
+      text-shadow: 0 0 8px rgba(255, 237, 0, 0.45);
+    }
+
+    .admin-nav .nav-btn:active {
+      transform: translateY(0);
+    }
+
+    .admin-nav .nav-btn--primary {
+      background: linear-gradient(135deg, var(--primary), var(--accent));
+      color: var(--bg-dark);
+      border-color: var(--accent);
+      box-shadow: 0 0 16px rgba(255, 237, 0, 0.45);
+      text-shadow: none;
+    }
+
+    .admin-nav .nav-btn--danger {
+      border-color: var(--danger);
+      color: var(--danger);
+      background: linear-gradient(135deg, rgba(255, 56, 56, 0.12), rgba(255, 0, 234, 0.08));
+      box-shadow: 0 0 12px rgba(255, 56, 56, 0.25);
+    }
+
+    .admin-nav .nav-btn--danger:hover {
+      background: linear-gradient(135deg, rgba(255, 56, 56, 0.2), rgba(255, 237, 0, 0.1));
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    .admin-content {
+      padding: 30px 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .section {
+      background: var(--bg-panel);
+      border: 2px solid var(--primary);
+      border-radius: 10px;
+      padding: 30px;
+      margin-bottom: 30px;
+      box-shadow: 0 0 20px rgba(0, 217, 255, 0.2);
+    }
+
+    .section-title {
+      font-family: 'Bebas Neue', cursive;
+      font-size: 1.8rem;
+      color: var(--accent);
+      margin-bottom: 20px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+
+    .chapter-list {
+      display: flex;
+      flex-direction: column;
+      gap: 15px;
+    }
+
+    .chapter-item {
+      background: var(--bg-dark);
+      border: 2px solid var(--primary);
+      border-radius: 5px;
+      padding: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 15px;
+      transition: all 0.3s ease;
+    }
+
+    .chapter-item:hover {
+      box-shadow: 0 0 15px rgba(0, 217, 255, 0.4);
+      transform: translateX(5px);
+    }
+
+    .chapter-info {
+      flex: 1;
+      min-width: 200px;
+    }
+
+    .chapter-name {
+      font-size: 1.2rem;
+      color: var(--primary);
+      margin-bottom: 5px;
+    }
+
+    .chapter-meta {
+      font-size: 0.85rem;
+      color: var(--text);
+      opacity: 0.7;
+    }
+
+    .chapter-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn-small {
+      padding: 6px 12px;
+      font-size: 0.8rem;
+      border-radius: 3px;
+      border: none;
+      cursor: pointer;
+      font-family: 'Righteous', cursive;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+    }
+
+    .btn-edit {
+      background: var(--primary);
+      color: var(--bg-dark);
+    }
+
+    .btn-edit:hover {
+      box-shadow: 0 0 10px var(--primary);
+    }
+
+    .btn-delete {
+      background: transparent;
+      border: 1px solid var(--danger);
+      color: var(--danger);
+    }
+
+    .btn-delete:hover {
+      background: var(--danger);
+      color: var(--text);
+    }
+
+    .btn-add {
+      background: var(--accent);
+      color: var(--bg-dark);
+      padding: 12px 24px;
+      font-size: 1rem;
+      margin-top: 20px;
+    }
+
+    .btn-add:hover {
+      box-shadow: 0 0 20px var(--accent);
+    }
+
+    /* ==================== EDITOR MODAL ==================== */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(10, 10, 18, 0.95);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+    .modal.active {
+      display: flex;
+    }
+
+    .modal-content {
+      background: var(--bg-panel);
+      border: 2px solid var(--primary);
+      border-radius: 10px;
+      padding: 30px;
+      max-width: 600px;
+      width: 100%;
+      box-shadow: 0 0 30px rgba(0, 217, 255, 0.5);
+      animation: fadeIn 0.3s ease-out;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .modal-title {
+      font-family: 'Bebas Neue', cursive;
+      font-size: 1.8rem;
+      color: var(--primary);
+    }
+
+    .btn-close {
+      background: transparent;
+      border: none;
+      color: var(--danger);
+      font-size: 2rem;
+      cursor: pointer;
+      line-height: 1;
+      padding: 0;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .btn-close:hover {
+      color: var(--text);
+    }
+
+    .form-editor {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .page-list {
+      background: var(--bg-dark);
+      border: 2px solid var(--primary);
+      border-radius: 5px;
+      padding: 15px;
+      max-height: 300px;
+      overflow-y: auto;
+    }
+
+    .page-item {
+      background: var(--bg-panel);
+      border: 1px solid var(--primary);
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 3px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      cursor: grab;
+      transition: all 0.3s ease;
+    }
+
+    .page-item:active {
+      cursor: grabbing;
+    }
+
+    .page-item.dragging {
+      opacity: 0.5;
+      transform: scale(0.95);
+    }
+
+    .page-item.drag-over {
+      border-color: var(--accent);
+      background: rgba(255, 237, 0, 0.1);
+      transform: translateY(-2px);
+      box-shadow: 0 0 15px rgba(255, 237, 0, 0.4);
+    }
+
+    .page-path {
+      font-size: 0.85rem;
+      color: var(--text);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+    }
+
+    .page-number {
+      font-size: 0.85rem;
+      color: var(--primary);
+      font-weight: bold;
+      min-width: 30px;
+      pointer-events: none;
+    }
+
+    .drag-handle {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 22px;
+      padding: 0 6px 0 2px;
+      color: var(--primary);
+      opacity: 0.85;
+      cursor: grab;
+      user-select: none;
+      font-size: 1.1rem;
+      line-height: 1;
+    }
+
+    .drag-handle:active {
+      cursor: grabbing;
+    }
+
+    .page-list.is-move-mode .page-item {
+      cursor: pointer;
+    }
+
+    .page-list.is-move-mode .page-item:active {
+      cursor: pointer;
+    }
+
+    .page-list.is-move-mode .drag-handle {
+      opacity: 0.35;
+      cursor: default;
+    }
+
+    .page-list.is-move-mode .drag-handle:active {
+      cursor: default;
+    }
+
+    .page-actions {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+    }
+
+    .btn-move {
+      background: transparent;
+      border: 1px solid var(--primary);
+      color: var(--primary);
+      padding: 4px 8px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border-radius: 3px;
+      line-height: 1;
+      min-width: 28px;
+      transition: all 0.2s ease;
+    }
+
+    .btn-move:hover {
+      background: var(--primary);
+      color: var(--bg-dark);
+    }
+
+    .btn-move:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    .btn-remove {
+      background: transparent;
+      border: 1px solid var(--danger);
+      color: var(--danger);
+      padding: 4px 8px;
+      font-size: 0.7rem;
+      cursor: pointer;
+      border-radius: 3px;
+    }
+
+    .btn-remove:hover {
+      background: var(--danger);
+      color: var(--text);
+    }
+
+    .btn-add-page {
+      background: var(--accent);
+      color: var(--bg-dark);
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      margin-top: 10px;
+    }
+
+    .page-reorder-shell {
+      position: relative;
+    }
+
+    .page-reorder-shell.is-active {
+      --reorder-height: min(460px, 55vh);
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 300px;
+      gap: 14px;
+      align-items: stretch;
+      overflow: hidden;
+    }
+
+    .page-reorder-shell.is-active .page-list {
+      height: var(--reorder-height);
+      max-height: var(--reorder-height);
+      padding: 0 14px;
+      direction: rtl;
+    }
+
+    .page-reorder-shell.is-active .page-list > * {
+      direction: ltr;
+    }
+
+    .page-reorder-shell.is-active .page-actions {
+      display: none;
+    }
+
+    .page-reorder-shell.is-active .page-item {
+      cursor: pointer;
+    }
+
+    .page-reorder-shell.is-active .page-item:active {
+      cursor: pointer;
+    }
+
+    .page-item.is-selected {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(255, 237, 0, 0.25) inset;
+    }
+
+    .page-spacer {
+      pointer-events: none;
+    }
+
+    .page-preview {
+      position: relative;
+      background: rgba(0, 0, 0, 0.25);
+      border: 2px solid var(--primary);
+      border-radius: 10px;
+      padding: 12px;
+      box-shadow: 0 0 20px rgba(0, 217, 255, 0.18);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      height: var(--reorder-height, 300px);
+    }
+
+    .page-reorder-shell.is-active .page-preview {
+      display: flex !important;
+    }
+
+    .page-preview-frame {
+      flex: 1;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      background: #000;
+      overflow: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    #pagePreviewImg {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: #000;
+    }
+
+    .page-preview-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .btn-preview {
+      flex: 1;
+      padding: 12px 0;
+      border-radius: 8px;
+      border: 2px solid var(--primary);
+      background: rgba(0, 217, 255, 0.14);
+      color: var(--text);
+      font-family: 'Bebas Neue', cursive;
+      font-size: 1.4rem;
+      letter-spacing: 2px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      text-transform: uppercase;
+    }
+
+    .btn-preview:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 16px rgba(0, 217, 255, 0.35);
+    }
+
+    .btn-preview:active {
+      transform: translateY(0);
+    }
+
+    .btn-preview:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-preview:disabled:hover {
+      transform: none;
+      box-shadow: none;
+    }
+
+    .btn-preview.btn-insert {
+      border-color: var(--primary);
+    }
+
+    .btn-preview.btn-del {
+      border-color: var(--danger);
+      background: rgba(255, 56, 56, 0.14);
+      color: var(--danger);
+    }
+
+    .btn-preview.btn-del:hover {
+      background: rgba(255, 56, 56, 0.3);
+      box-shadow: 0 0 16px rgba(255, 56, 56, 0.35);
+    }
+
+    .insert-caret {
+      position: absolute;
+      left: -18px;
+      top: 50%;
+      transform: translateY(-50%) translateX(0);
+      width: 0;
+      height: 0;
+      border-top: 14px solid transparent;
+      border-bottom: 14px solid transparent;
+      border-right: 14px solid var(--accent);
+      filter: drop-shadow(0 0 10px rgba(255, 237, 0, 0.35));
+      pointer-events: none;
+      will-change: transform;
+      transition: transform 180ms ease-out;
+    }
+
+    .insert-caret::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 2000px;
+      height: 2px;
+      background: var(--accent);
+      opacity: 0.55;
+      transform: translateY(-1px);
+      box-shadow: 0 0 12px rgba(255, 237, 0, 0.18);
+      pointer-events: none;
+    }
+
+    .insert-caret.is-forward {
+      transform: translateY(-50%) translateX(-9px);
+    }
+
+    .page-preview-hint {
+      font-size: 0.82rem;
+      opacity: 0.75;
+      text-align: center;
+      letter-spacing: 0.3px;
+    }
+
+    .modal-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      margin-top: 20px;
+    }
+
+    .btn-save {
+      background: var(--success);
+      color: var(--bg-dark);
+      padding: 10px 24px;
+      font-size: 1rem;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+      font-family: 'Bebas Neue', cursive;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .btn-save:hover {
+      box-shadow: 0 0 20px var(--success);
+    }
+
+    .btn-cancel {
+      background: transparent;
+      border: 2px solid var(--text);
+      color: var(--text);
+      padding: 10px 24px;
+      font-size: 1rem;
+      cursor: pointer;
+      border-radius: 5px;
+      font-family: 'Bebas Neue', cursive;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .btn-cancel:hover {
+      background: var(--text);
+      color: var(--bg-dark);
+    }
+
+    /* ==================== PREVIEW SECTION ==================== */
+    .preview-container {
+      background: var(--bg-dark);
+      border: 2px solid var(--accent);
+      border-radius: 5px;
+      padding: 20px;
+      margin-top: 20px;
+    }
+
+    .preview-title {
+      font-family: 'Bebas Neue', cursive;
+      font-size: 1.3rem;
+      color: var(--accent);
+      margin-bottom: 15px;
+    }
+
+    .preview-data {
+      background: var(--bg-panel);
+      border: 1px solid var(--primary);
+      border-radius: 3px;
+      padding: 15px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: var(--primary);
+      overflow-x: auto;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .export-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .btn-copy {
+      background: var(--primary);
+      color: var(--bg-dark);
+    }
+
+    .btn-download {
+      background: var(--secondary);
+      color: var(--text);
+    }
+
+    .success-message {
+      background: var(--success);
+      color: var(--bg-dark);
+      padding: 12px;
+      border-radius: 5px;
+      text-align: center;
+      margin-top: 15px;
+      font-size: 0.9rem;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    /* ==================== IMAGE UPLOAD STYLES ==================== */
+    .upload-section {
+      background: var(--bg-dark);
+      border: 2px solid var(--accent);
+      border-radius: 5px;
+      padding: 15px;
+    }
+
+    .upload-area {
+      border: 2px dashed var(--primary);
+      border-radius: 5px;
+      padding: 20px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      background: var(--bg-panel);
+      min-height: 120px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .upload-area:hover {
+      border-color: var(--accent);
+      background: rgba(255, 237, 0, 0.05);
+    }
+
+    .upload-area.drag-over {
+      border-color: var(--success);
+      background: rgba(0, 255, 136, 0.1);
+      box-shadow: 0 0 20px rgba(0, 255, 136, 0.3);
+    }
+
+    .upload-prompt {
+      color: var(--primary);
+      pointer-events: none;
+    }
+
+    .upload-preview {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 10px;
+      margin-top: 15px;
+      width: 100%;
+    }
+
+    .preview-item {
+      position: relative;
+      border: 2px solid var(--primary);
+      border-radius: 5px;
+      overflow: hidden;
+      aspect-ratio: 1;
+      background: var(--bg-dark);
+    }
+
+    .preview-item img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .preview-item .preview-name {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: rgba(10, 10, 18, 0.9);
+      color: var(--text);
+      font-size: 0.7rem;
+      padding: 4px;
+      text-align: center;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .preview-item .preview-remove {
+      position: absolute;
+      top: 5px;
+      right: 5px;
+      background: var(--danger);
+      color: var(--text);
+      border: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 3px;
+      cursor: pointer;
+      font-size: 0.9rem;
+      line-height: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .preview-item .preview-remove:hover {
+      background: var(--text);
+      color: var(--danger);
+    }
+
+    .upload-progress {
+      margin-top: 15px;
+      background: var(--bg-panel);
+      border: 2px solid var(--primary);
+      border-radius: 5px;
+      padding: 15px;
+    }
+
+    .progress-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      font-size: 0.85rem;
+    }
+
+    .progress-bar-container {
+      flex: 1;
+      height: 20px;
+      background: var(--bg-dark);
+      border: 1px solid var(--primary);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .progress-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--primary), var(--accent));
+      transition: width 0.3s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      color: var(--bg-dark);
+      font-weight: bold;
+    }
+
+    .progress-status {
+      min-width: 80px;
+      text-align: right;
+    }
+
+    .progress-status.success {
+      color: var(--success);
+    }
+
+    .progress-status.error {
+      color: var(--danger);
+    }
+
+    /* ==================== UNSAVED CHANGES INDICATOR ==================== */
+    .unsaved-indicator {
+      background: var(--accent);
+      color: var(--bg-dark);
+      padding: 8px 16px;
+      border-radius: 5px;
+      font-size: 0.9rem;
+      font-weight: bold;
+      animation: neonPulse 2s ease-in-out infinite;
+    }
+
+    .page-list-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .page-list-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn-renumber {
+      background: var(--secondary);
+      color: var(--text);
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+      font-family: 'Righteous', cursive;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+    }
+
+    .btn-renumber:hover {
+      box-shadow: 0 0 15px var(--secondary);
+    }
+
+    .btn-renumber:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-move-mode {
+      background: transparent;
+      border: 2px solid var(--accent);
+      color: var(--accent);
+      padding: 8px 16px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border-radius: 5px;
+      font-family: 'Righteous', cursive;
+      transition: all 0.3s ease;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .btn-move-mode:hover {
+      box-shadow: 0 0 15px rgba(255, 237, 0, 0.35);
+      transform: translateY(-1px);
+    }
+
+    .btn-move-mode.is-active {
+      background: var(--accent);
+      color: var(--bg-dark);
+      box-shadow: 0 0 18px rgba(255, 237, 0, 0.45);
+    }
+
+    /* ==================== CONFIRMATION MODAL ==================== */
+    .confirm-modal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(10, 10, 18, 0.98);
+      z-index: 2000;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+    .confirm-modal.active {
+      display: flex;
+    }
+
+    .confirm-content {
+      background: var(--bg-panel);
+      border: 2px solid var(--accent);
+      border-radius: 10px;
+      padding: 30px;
+      max-width: 700px;
+      width: 100%;
+      box-shadow: 0 0 30px rgba(255, 237, 0, 0.5);
+      animation: fadeIn 0.3s ease-out;
+      max-height: 90vh;
+      overflow-y: auto;
+    }
+
+    .confirm-title {
+      font-family: 'Bebas Neue', cursive;
+      font-size: 1.8rem;
+      color: var(--accent);
+      margin-bottom: 15px;
+      text-align: center;
+    }
+
+    .confirm-message {
+      color: var(--text);
+      font-size: 0.95rem;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .changes-list {
+      background: var(--bg-dark);
+      border: 2px solid var(--primary);
+      border-radius: 5px;
+      padding: 15px;
+      max-height: 400px;
+      overflow-y: auto;
+      margin-bottom: 20px;
+    }
+
+    .change-item {
+      background: var(--bg-panel);
+      border: 1px solid var(--primary);
+      padding: 10px;
+      margin-bottom: 10px;
+      border-radius: 3px;
+      font-size: 0.85rem;
+    }
+
+    .change-from {
+      color: var(--danger);
+      margin-bottom: 5px;
+    }
+
+    .change-to {
+      color: var(--success);
+    }
+
+    .change-arrow {
+      color: var(--accent);
+      margin: 5px 0;
+    }
+
+    .confirm-actions {
+      display: flex;
+      gap: 10px;
+      justify-content: center;
+    }
+
+    .btn-confirm {
+      background: var(--success);
+      color: var(--bg-dark);
+      padding: 12px 32px;
+      font-size: 1.1rem;
+      border: none;
+      cursor: pointer;
+      border-radius: 5px;
+      font-family: 'Bebas Neue', cursive;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .btn-confirm:hover {
+      box-shadow: 0 0 20px var(--success);
+    }
+
+    .btn-confirm:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    /* ==================== RESPONSIVE ==================== */
+    @media (max-width: 768px) {
+      .admin-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .admin-title {
+        font-size: 1.5rem;
+      }
+
+      .header-series {
+        width: 100%;
+      }
+
+      .chapter-item {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .modal-content {
+        padding: 20px;
+      }
+
+      .login-container {
+        padding: 30px 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ==================== LOGIN SCREEN ==================== -->
+  <div id="loginScreen">
+    <div class="login-container">
+      <h1 class="login-title">ADMIN ACCESS</h1>
+      <p class="login-subtitle">Battle Bros Editor</p>
+      <form id="loginForm" class="login-form">
+        <div class="form-group">
+          <label class="form-label" for="loginEmail">Email</label>
+          <input type="email" id="loginEmail" class="form-input" placeholder="you@example.com" autocomplete="username" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label" for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password" autocomplete="current-password" required />
+        </div>
+        <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+          <button type="submit" class="btn-primary">Sign in</button>
+          <button type="button" class="btn-secondary" id="btnLogoutFromLogin">Log out</button>
+        </div>
+      </form>
+      <div id="loginError" style="display: none; margin-top: 15px;"></div>
+      <p style="margin-top: 14px; font-size: 0.9rem; opacity: 0.85;">Uses the same account system as comments. Admin role required.</p>
+    </div>
+  </div>
+
+  <!-- ==================== ADMIN DASHBOARD ==================== -->
+  <div id="adminDashboard">
+	    <header class="admin-header">
+	      <h1 class="admin-title">Battle Bros Admin</h1>
+	      <div class="header-series">
+	        <label class="header-series-label" for="seriesSelect">Active Series</label>
+	        <div class="header-series-row">
+	          <select id="seriesSelect" class="form-input"></select>
+	          <button class="btn-secondary nav-btn" id="btnAddSeries" type="button">New</button>
+	          <button class="btn-secondary nav-btn" id="btnEditSeries" type="button">Edit</button>
+	          <a class="btn-secondary nav-btn" id="btnOpenSeries" href="#" target="_blank" rel="noopener">Open Reader</a>
+	        </div>
+	      </div>
+	      <nav class="admin-nav">
+	        <button class="btn-secondary nav-btn" id="btnSettings">Settings</button>
+	        <button class="btn-secondary nav-btn" id="btnChapters" type="button">Chapters</button>
+	        <button class="btn-secondary nav-btn" id="btnBlog">Blog / Feed</button>
+	        <button class="btn-secondary nav-btn" id="btnMedia">Media</button>
+	        <button class="btn-secondary nav-btn" id="btnUsers" type="button">Users</button>
+	        <button class="btn-secondary nav-btn" id="btnDesigner" type="button">Page Designer</button>
+	        <button class="btn-secondary nav-btn" id="btnPreview">Preview Changes</button>
+	        <button class="btn-primary nav-btn nav-btn--primary" id="btnPublish">Publish to GitHub</button>
+	        <button class="btn-logout nav-btn nav-btn--danger" id="btnLogout">Logout</button>
+	      </nav>
+	    </header>
+
+	    <main class="admin-content">
+	      <!-- Chapter Management Section -->
+		      <section class="section" id="chaptersSection">
+		        <h2 class="section-title">Chapter Management</h2>
+        <div id="chapterList" class="chapter-list"></div>
+        <button class="btn-small btn-add" id="btnAddChapter">+ Add New Chapter</button>
+      </section>
+
+      <!-- Blog Management Section -->
+      <section class="section" id="blogSection" style="display: none;">
+        <h2 class="section-title">Blog / Feed Management</h2>
+
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label class="form-label">Status Message (Reader Header)</label>
+          <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+            <input type="text" id="statusMessageInput" class="form-input" placeholder="issue_7_friday"
+              style="max-width: 260px; padding: 10px 12px;">
+            <button class="btn-small btn-edit" id="btnSaveStatus" type="button">Save Status</button>
+            <div id="statusMessageStatus" class="success-message" style="display: none; margin: 0;"></div>
+          </div>
+          <p style="font-size: 0.85rem; opacity: 0.8; margin-top: 6px;">Appears next to the chapter selector on the
+            reader.</p>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 20px;">
+          <label class="form-label">Create New Post</label>
+          <input type="text" id="postTitle" class="form-input" placeholder="Post Title" style="margin-bottom: 10px;">
+          <input type="text" id="postImage" class="form-input"
+            placeholder="Image URL (e.g., issues-images/issue7/page1.png)" style="margin-bottom: 10px;">
+          <input type="file" id="postImageFile" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
+            style="margin-bottom: 10px;">
+          <input type="text" id="postImageTags" class="form-input" placeholder="Image tags (comma separated)"
+            style="margin-bottom: 10px;">
+          <button type="button" class="btn-secondary" id="btnMediaPicker" style="margin-bottom: 10px;">Choose from
+            Media</button>
+          <label class="form-label" for="postImageFocus">Image focal point (for thumbnails)</label>
+          <select id="postImageFocus" class="form-input" style="margin-bottom: 10px;">
+            <option value="center" selected>Center</option>
+            <option value="top">Top</option>
+            <option value="bottom">Bottom</option>
+            <option value="left">Left</option>
+            <option value="right">Right</option>
+            <option value="top left">Top Left</option>
+            <option value="top right">Top Right</option>
+            <option value="bottom left">Bottom Left</option>
+            <option value="bottom right">Bottom Right</option>
+          </select>
+          <div id="postToolbar" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+            <button type="button" class="btn-secondary rich-btn" data-cmd="bold">Bold</button>
+            <button type="button" class="btn-secondary rich-btn" data-cmd="italic">Italic</button>
+            <button type="button" class="btn-secondary rich-btn" data-cmd="underline">Underline</button>
+            <button type="button" class="btn-secondary rich-btn" data-cmd="insertUnorderedList">• List</button>
+            <button type="button" class="btn-secondary rich-btn" data-cmd="insertOrderedList">1. List</button>
+            <button type="button" class="btn-secondary rich-btn" data-cmd="formatBlock" data-value="h3">H3</button>
+            <button type="button" class="btn-secondary rich-btn" data-cmd="createLink">Link</button>
+            <button type="button" class="btn-secondary rich-btn" data-cmd="insertImage">Image</button>
+          </div>
+          <div id="postContent" class="form-input" contenteditable="true" aria-label="Post content"
+            style="min-height: 160px; margin-bottom: 10px; overflow: auto;"></div>
+          <label style="display: flex; align-items: center; gap: 8px; margin: 6px 0 12px;">
+            <input type="checkbox" id="postShare" checked>
+            <span style="font-size: 0.9rem; color: var(--text);">Send to RSS / Social automations</span>
+          </label>
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="btn-secondary" id="btnSaveDraft" type="button">Save Draft</button>
+            <button class="btn-primary" id="btnSavePost" type="button">Publish Post</button>
+          </div>
+          <div id="postStatus" class="success-message" style="display: none; margin-top: 10px;"></div>
+        </div>
+
+        <h3 class="section-title" style="font-size: 1.2rem; margin-top: 30px;">Recent Posts</h3>
+        <div id="postList" class="chapter-list"></div>
+      </section>
+
+      <!-- Preview/Export Section -->
+      <section class="section" id="previewSection" style="display: none;">
+        <h2 class="section-title">Preview & Export</h2>
+        <div class="preview-container">
+          <h3 class="preview-title">Chapter Data (JSON)</h3>
+          <pre id="previewData" class="preview-data"></pre>
+          <div class="export-actions">
+            <button class="btn-small btn-copy" id="btnCopy">Copy to Clipboard</button>
+            <button class="btn-small btn-download" id="btnDownload">Download JSON</button>
+          </div>
+          <div id="copySuccess" style="display: none;"></div>
+        </div>
+        <div class="preview-container" style="margin-top: 20px;">
+          <h3 class="preview-title">Comic Reader Preview</h3>
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
+            <label class="form-label" for="previewChapterSelect" style="margin: 0;">Chapter</label>
+            <select id="previewChapterSelect" class="form-input" style="max-width: 240px;"></select>
+            <div id="previewPageLabel" style="font-size: 0.9rem; opacity: 0.8;"></div>
+          </div>
+          <div id="previewEmpty" class="chapter-item" style="display: none;">No pages to preview.</div>
+          <div id="previewFrame"
+            style="position: relative; background: #0f1629; border: 1px solid var(--primary); border-radius: 8px; padding: 12px; display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <button class="btn-small btn-move" id="previewPrev" type="button">Prev</button>
+              <button class="btn-small btn-move" id="previewNext" type="button">Next</button>
+            </div>
+            <div style="width: 100%; max-height: 60vh; overflow: hidden; display: flex; justify-content: center;">
+              <img id="previewImg" src="" alt="Preview page"
+                style="max-width: 100%; max-height: 60vh; object-fit: contain; background: #0a0d1a; border-radius: 6px;" />
+            </div>
+          </div>
+        </div>
+        <p style="margin-top: 20px; color: var(--accent); font-size: 0.9rem;">
+          <strong>Instructions:</strong> Copy this JSON and replace the "chapters" object in index.html (around line
+          1762)
+        </p>
+        </p>
+      </section>
+
+	      <!-- Media Library Section -->
+	      <section class="section" id="mediaSection" style="display: none;">
+	        <h2 class="section-title">Media Library</h2>
+        <div class="form-group">
+          <label class="form-label">Add Media</label>
+          <input type="text" id="mediaPath" class="form-input"
+            placeholder="Image path or URL (e.g., chapters/01/01.png)" style="margin-bottom: 8px;">
+          <input type="text" id="mediaTags" class="form-input" placeholder="Tags (comma separated, e.g., cover,issue1)"
+            style="margin-bottom: 8px;">
+          <button class="btn-primary" id="btnAddMedia" type="button">Add to Library</button>
+          <button class="btn-secondary" id="btnSyncMedia" type="button" style="margin-left: 8px;">Sync from media
+            folder</button>
+          <div id="mediaStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
+        </div>
+        <div class="form-group" style="margin-top: 16px;">
+          <label class="form-label" for="mediaSearch">Search by tag</label>
+          <input type="text" id="mediaSearch" class="form-input" placeholder="e.g., cover" />
+        </div>
+	        <div id="mediaList" class="chapter-list" style="margin-top: 16px;"></div>
+	      </section>
+
+	      <!-- User Roles Section -->
+	      <section class="section" id="usersSection" style="display: none;">
+	        <h2 class="section-title">User Roles</h2>
+	        <p style="font-size: 0.9rem; opacity: 0.85; margin-bottom: 12px;">
+	          This uses the built-in account system (the same login used for comments). Only admins can change roles.
+	        </p>
+	        <button class="btn-secondary" id="btnRefreshUsers" type="button">Refresh Users</button>
+	        <div id="usersStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
+	        <div id="usersList" class="chapter-list" style="margin-top: 16px;"></div>
+	      </section>
+	    </main>
+	  </div>
+
+  <!-- ==================== EDIT CHAPTER MODAL ==================== -->
+  <div id="editModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="modalTitle">Edit Chapter</h2>
+        <button class="btn-close" id="btnCloseModal">&times;</button>
+      </div>
+      <form id="editForm" class="form-editor">
+	        <div class="form-group">
+	          <label class="form-label" for="chapterName">Chapter Name</label>
+	          <input type="text" id="chapterName" class="form-input" placeholder="e.g., Chapter 1" required />
+	        </div>
+
+	        <div class="form-group">
+	          <label class="form-label">Chapter Access</label>
+	          <label style="display:flex; align-items:center; gap:10px; font-size: 0.95rem;">
+	            <input type="checkbox" id="chapterPremium" />
+	            Premium only (requires a premium account to view)
+	          </label>
+	        </div>
+	
+	        <div class="form-group">
+		          <label class="form-label">Pages (Image Paths)</label>
+		          <div class="page-list-controls">
+		            <div id="unsavedIndicator" style="display: none;" class="unsaved-indicator">
+		              Unsaved Changes
+		            </div>
+		            <div class="page-list-actions">
+		              <button type="button" class="btn-move-mode" id="btnMoveMode">Move Pages</button>
+		              <button type="button" class="btn-renumber" id="btnRenumberPages">
+		                Renumber Pages
+		              </button>
+		            </div>
+		          </div>
+	          <div id="pageReorderShell" class="page-reorder-shell">
+	            <div id="pageList" class="page-list" aria-label="Page list"></div>
+	            <div id="pagePreviewPanel" class="page-preview" style="display: none;" aria-label="Selected page preview">
+	              <div class="insert-caret" id="insertCaret" aria-hidden="true"></div>
+	              <div class="page-preview-frame">
+	                <img id="pagePreviewImg" src="" alt="Selected page preview" />
+	              </div>
+	              <div class="page-preview-actions">
+	                <button type="button" class="btn-preview btn-insert" id="btnInsertPage">Insert</button>
+	                <button type="button" class="btn-preview btn-del" id="btnDeletePage">Del</button>
+	              </div>
+			              <div class="page-preview-hint">Scroll to aim the caret • Click outside the list to deselect.</div>
+			            </div>
+			          </div>
+	
+	          <!-- Upload Section -->
+	          <div class="upload-section" style="margin-top: 15px;">
+	            <label class="form-label">Upload New Images</label>
+            <div class="upload-area" id="uploadArea">
+              <input type="file" id="imageUpload" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" multiple
+                style="display: none;" />
+              <div class="upload-prompt" id="uploadPrompt">
+                <p>Click to browse or drag & drop images here</p>
+                <p style="font-size: 0.8rem; opacity: 0.7;">Supports: PNG, JPG, GIF, WebP</p>
+              </div>
+              <div id="uploadPreview" class="upload-preview"></div>
+            </div>
+            <button type="button" class="btn-small btn-add-page" id="btnUploadImages" style="display: none;">
+              Upload Selected Images
+            </button>
+            <div id="uploadProgress" class="upload-progress" style="display: none;"></div>
+          </div>
+
+          <!-- Manual Path Entry (keep existing) -->
+          <div style="margin-top: 15px;">
+            <button type="button" class="btn-small btn-add-page" id="btnAddPage">+ Add Manual Path</button>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" id="btnCancelEdit">Cancel</button>
+          <button type="submit" class="btn-save">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== SETTINGS MODAL ==================== -->
+  <div id="settingsModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">GitHub Settings</h2>
+        <button class="btn-close" id="btnCloseSettings">&times;</button>
+      </div>
+      <div class="form-editor">
+        <div class="form-group">
+          <label class="form-label">Your GitHub Personal Access Token</label>
+          <input type="password" id="githubToken" class="form-input" placeholder="ghp_xxxxxxxxxxxx" />
+          <p style="font-size: 0.8rem; color: var(--accent); margin-top: 5px;">
+            This token is stored in your browser only and never sent to the server.
+            <br>Create one at: <a href="https://github.com/settings/tokens" target="_blank"
+              style="color: var(--primary);">github.com/settings/tokens</a>
+            <br>Required scope: <strong>repo</strong>
+          </p>
+        </div>
+        <button class="btn-save" id="btnSaveToken">Save Token</button>
+        <div id="tokenSaveSuccess" style="display: none; margin-top: 10px;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ==================== RENUMBER CONFIRMATION MODAL ==================== -->
+  <div id="confirmModal" class="confirm-modal">
+    <div class="confirm-content">
+      <h2 class="confirm-title">Confirm Renumbering</h2>
+      <p class="confirm-message">
+        The following files will be renamed in GitHub. This operation cannot be undone.
+      </p>
+      <div id="changesList" class="changes-list"></div>
+      <div class="confirm-actions">
+        <button class="btn-cancel" id="btnCancelRenumber">Cancel</button>
+        <button class="btn-confirm" id="btnConfirmRenumber">Confirm & Rename Files</button>
+      </div>
+    </div>
+  </div>
+
+    </body>
+  <script type='module' src='app.js'></script>
+</html>
+

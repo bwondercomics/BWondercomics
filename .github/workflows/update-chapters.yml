@@ -1,0 +1,74 @@
+---
+name: Update Chapters from Admin Panel
+
+on:
+  push:
+    paths:
+      - 'admin/data.json'
+    branches:
+      - main
+      - feature/admin-panel
+      - 'copilot/**'
+
+permissions:
+  contents: write
+
+jobs:
+  update-chapters:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Read chapter data
+        id: read-data
+        run: |
+          echo "Reading admin/data.json..."
+          cat admin/data.json
+
+      - name: Update index.html with new chapter data
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Read the new chapter data
+            const adminData = JSON.parse(
+              fs.readFileSync('admin/data.json', 'utf8')
+            );
+            const newChapters = adminData.chapters;
+
+            // Read current index.html
+            let indexHtml = fs.readFileSync('index.html', 'utf8');
+
+            // Find and replace the chapters object
+            // Looking for: const chapters = { ... };
+            const chaptersRegex = /const chapters = \{[\s\S]*?\n  \};/;
+
+            const newChaptersString = 
+              `const chapters = ${JSON.stringify(newChapters, null, 4)};`;
+
+            indexHtml = indexHtml.replace(chaptersRegex, newChaptersString);
+
+            // Write updated index.html
+            fs.writeFileSync('index.html', indexHtml, 'utf8');
+
+            console.log(
+              '✅ Successfully updated index.html with new chapter data'
+            );
+
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add index.html
+          git diff --cached --quiet || git commit -m "🤖 Auto-update chapters from Admin Panel [$(date -u +'%Y-%m-%d %H:%M:%S UTC')]"
+          git push
+
+      - name: Deployment status
+        run: |
+          echo "✅ Deployment complete! GitHub Pages will rebuild."
+          echo "🌐 Changes will be live in 1-2 minutes"

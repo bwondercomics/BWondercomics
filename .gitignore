@@ -1,0 +1,14 @@
+.vs/
+node_modules/
+
+# Remark42 comment system
+.env
+remark42_data/
+data/
+comments/
+
+# Battle Bros server deployment (local secrets)
+deploy/battlebros.env
+
+# Battle Bros persistent server data (users/comments)
+var/

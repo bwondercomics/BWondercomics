@@ -1,0 +1,25 @@
+{
+    "name": "battle-bros-reader",
+    "version": "1.0.0",
+    "description": "Battle Bros comic reader",
+    "type": "module",
+    "scripts": {
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "test:ui": "vitest --ui",
+        "test:coverage": "vitest run --coverage"
+    },
+    "devDependencies": {
+        "@vitest/ui": "^1.0.4",
+        "happy-dom": "^12.10.3",
+        "prettier": "^3.7.4",
+        "vitest": "^1.0.4"
+    },
+    "keywords": [
+        "comic",
+        "reader",
+        "webcomic"
+    ],
+    "author": "Battle Bros Comics",
+    "license": "MIT"
+}

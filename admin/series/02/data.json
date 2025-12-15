@@ -1,0 +1,31 @@
+{
+  "chapters": {
+    "Chapter 1": [
+      "comics/02/chapters/01/01.png",
+      "comics/02/chapters/01/02.png",
+      "comics/02/chapters/01/03.png",
+      "comics/02/chapters/01/04.png",
+      "comics/02/chapters/01/05.png",
+      "comics/02/chapters/01/06.png",
+      "comics/02/chapters/01/07.png",
+      "comics/02/chapters/01/08.png",
+      "comics/02/chapters/01/09.png",
+      "comics/02/chapters/01/10.png",
+      "comics/02/chapters/01/11.png",
+      "comics/02/chapters/01/12.png"
+    ]
+  },
+  "chapterFolders": {
+    "Chapter 1": "comics/02/chapters/01",
+    "Chapter": "comics/02/chapters/chapter"
+  },
+  "chapterMeta": {
+    "Chapter 1": {
+      "premium": false
+    }
+  },
+  "statusMessage": "bbibi",
+  "premiumOnly": true,
+  "lastUpdated": "2025-12-15T13:43:22.009Z",
+  "publishedBy": "Admin Panel"
+}

@@ -1,0 +1,71 @@
+Here’s a quick how-it-works guide for the feed and admin, so you can wire it up on the main site.
+
+Feed System
+
+	Data: posts.json (array of { id, title, content, date, image }) at site root. Saved via admin POST to /api/save (handled by server.py).
+
+	RSS: server.py regenerates rss.xml whenever posts.json is saved.
+
+	Public pages:
+
+		feed.html fetches posts.json (no-cache), sorts newest-first, renders posts with safe HTML escaping, and links to rss.xml. Comment block is a placeholder—drop in Cusdis/Giscus embed where marked.
+		index.html right panel has “Latest Update” widget that fetches posts.json, picks the newest entry, and links to feed.html#<id>.
+		Assets: banner3.png is used as the right-panel background; latest widget/buttons have their own backgrounds.
+		Server
+
+	server.py extends SimpleHTTPRequestHandler.
+		POST /api/save with JSON body { filename, content } writes to disk (path normalized against repo root; blocks traversal). If filename == 'posts.json', RSS is regenerated.
+		Serves static files for GET as usual.
+	Admin (admin/index.html)
+
+	Auth: uses the site's account system (`/api/login`, `/api/session`) and requires an `admin` role.
+		Tabs/Sections:
+			Chapter Management (default view): Manage chapters and pages; edits saved to admin/data.json via /api/save (and also stored in localStorage for draft safety).
+			Blog / Feed: Hidden until you click “Blog / Feed”. Load existing posts from posts.json; add/edit/delete posts. Saving calls /api/save to update posts.json (triggers RSS). Post form fields: Title, Image URL, Content.
+			Preview/Export: Shows chapter JSON, copy/download.
+			Settings (modal): Store GitHub token (for legacy GitHub publish features).
+			Buttons:
+			“Blog / Feed” toggles the feed tab and loads posts.
+			“Publish Post” saves/updates post to posts.json.
+			“Publish to GitHub” is legacy; current local server persists directly to disk via /api/save.
+			What to plug in on main site
+
+		Ensure server.py (or equivalent backend) serves static files and accepts POST /api/save to write posts.json and admin/data.json, with RSS regeneration on posts.json save.
+			Place posts.json and rss.xml at site root; admin/data.json in admin/.
+			Keep feed.html at root; index.html expects posts.json at root for the Latest Update widget.
+			Add your comment provider snippet inside the placeholder in feed.html.
+			Optional: add favicon.ico to silence 404s.
+
+
+	Updates to other platforms are driven by the RSS feed:
+
+		When you save a post in the admin, it writes posts.json and server.py auto-regenerates rss.xml at the site root.
+		That RSS feed is what you hook into IFTTT/Zapier/Make/etc. to fan out to Twitter/Instagram/Bluesky (or any service that accepts an RSS trigger). Those services watch rss.xml and, on new items, run whatever action you configure.
+		No extra “push” happens from the site itself—publishing a post updates posts.json → regenerates rss.xml → your automation polls rss.xml and posts elsewhere.
+
+	Alternatives exist; tradeoffs are setup effort vs. cost:
+
+		GitHub Actions/Netlify/Cloudflare Workers cron: If your code is on GitHub (or a similar CI) you can schedule a job to fetch rss.xml and post via APIs. No extra cost, but you must wire API keys for each platform and write the posting script.
+		Self-hosted script/cron: A tiny server (or a Pi) polls rss.xml and posts via Twitter/Bluesky/Instagram APIs. Free except for the host; you maintain the code and tokens.
+		Platform-native crossposting: Some networks (e.g., Bluesky with a crossposter, Mastodon relays) or third-party crossposters can mirror from one account to another; depends on each platform’s tooling and may still have limits/fees.
+		Dedicated social tools: Buffer, Hootsuite, etc. can read RSS or let you schedule posts. Paid tiers; simpler setup.
+		If you want zero third-party SaaS, the GitHub Actions/worker/cron approach is the DIY path—just need to handle the platform APIs and secrets yourself.
+
+
+	Comments aren’t wired to any service yet—they’re just a placeholder box waiting for an embed:
+
+		On feed.html, there’s a “Comments” section at the bottom with a dashed box and text “Comment embed goes here.” That’s where you’d drop the snippet from a third-party service like Cusdis or Giscus. Nothing is loaded or stored locally; no backend exists for comments.
+		The main reader (index.html) doesn’t have comments at all.
+		To enable comments, pick a service and paste its embed code into the placeholder div in feed.html (adjust site origin/repo settings per their docs). If you want guidance for a specific provider, tell me which one.
+
+	Two easy options:
+
+		Cusdis (self-contained widget, privacy-friendly):
+		Go to cusdis.com, set up a site/app, grab the embed script/snippet.
+		Paste their <div id="cusdis_thread" ...></div> and script into the placeholder in feed.html (adjust host/app_id per their docs).
+		Done—comments store on Cusdis’ backend.
+		Giscus (GitHub Discussions):
+		Enable Discussions on your repo, install the Giscus app, configure repo/category.
+		Grab the <script src="https://giscus.app/client.js" ...></script> snippet from giscus.app with your repo/category IDs.
+		Paste it into the placeholder in feed.html. Users authenticate via GitHub; comments live in your repo’s Discussions.
+		Both are copy/paste embeds with a few config values. I can drop in either snippet if you tell me which service you prefer (and the repo/category or Cusdis app ID).

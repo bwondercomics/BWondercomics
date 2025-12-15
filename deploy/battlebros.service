@@ -1,0 +1,23 @@
+[Unit]
+Description=Battle Bros web server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=dbmelville
+Group=dbmelville
+WorkingDirectory=/srv/bwondercomics
+EnvironmentFile=/srv/bwondercomics/deploy/battlebros.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/usr/bin/python3 -u /srv/bwondercomics/server.py
+Restart=on-failure
+RestartSec=2
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

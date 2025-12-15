@@ -1,0 +1,20 @@
+[Unit]
+Description=Battle Bros data backup (users/comments)
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=dbmelville
+Group=dbmelville
+Environment=BACKUP_DEST=/mnt/archive/backups/battlebros
+Environment=DATA_PARENT=/srv/bwondercomics/var
+Environment=DATA_DIR_NAME=battlebros
+Environment=RETENTION_DAYS=30
+ExecStart=/bin/bash /srv/bwondercomics/deploy/battlebros-backup.sh
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/mnt/archive/backups/battlebros
+

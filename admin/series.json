@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "defaultSeriesId": "battle-bros",
+  "series": [
+    {
+      "id": "battle-bros",
+      "title": "Battle Bros",
+      "description": "Battle Bros comic reader",
+      "premiumOnly": false
+    },
+    {
+      "id": "02",
+      "title": "PYRE",
+      "description": "mystery spooky campus guy go girl",
+      "premiumOnly": true,
+      "coverImage": "comics/02/chapters/01/01.png"
+    }
+  ]
+}
