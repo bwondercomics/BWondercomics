@@ -1,0 +1,2 @@
+"""BWonderComics backend (FastAPI)."""
+

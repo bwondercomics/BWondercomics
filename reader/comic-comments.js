@@ -1,6 +1,8 @@
 // Comic Reader Comments Integration (self-hosted)
 // Lightweight auth + comment UI backed by local API
 
+import { getActiveSeriesId } from './series.js';
+
 (() => {
     'use strict';
 
@@ -57,6 +59,17 @@
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to post comment');
             return data.comment;
+        },
+        async moderateComment(targetId, commentId, action) {
+            const res = await fetch('/api/admin/comments', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ targetId, commentId, action })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || 'Moderation failed');
+            return data;
         }
     };
 
@@ -70,9 +83,16 @@
     };
 
     function getCurrentTargetId() {
+        const seriesId = (typeof getActiveSeriesId === 'function' ? getActiveSeriesId() : 'battle-bros') || 'battle-bros';
         const select = document.getElementById('chapter');
         const rawValue = select ? (select.value || select.options[select.selectedIndex]?.value) : 'chapter-1';
-        return slugifyTarget(rawValue || 'chapter');
+        const chapterSlug = slugifyTarget(rawValue || 'chapter');
+
+        const maxLen = 120;
+        const prefix = `${seriesId}:`;
+        const remaining = Math.max(1, maxLen - prefix.length);
+        const trimmedChapter = chapterSlug.slice(0, remaining).replace(/-+$/g, '') || 'chapter';
+        return `${seriesId}:${trimmedChapter}`.slice(0, maxLen);
     }
 
     function init() {
@@ -143,6 +163,10 @@
         ctx.signoutBtn.addEventListener('click', () => handleLogout(ctx));
         ctx.commentForm.addEventListener('submit', (e) => handleCommentSubmit(e, ctx));
         window.addEventListener('chapterChanged', () => handleChapterChange(ctx));
+        const chapterSelect = document.getElementById('chapter');
+        if (chapterSelect) {
+            chapterSelect.addEventListener('change', () => handleChapterChange(ctx));
+        }
 
         applyAuthMode(ctx);
         refreshSession(ctx).finally(() => loadComments(ctx));
@@ -247,36 +271,38 @@
         }
 
         ctx.authSubmit.disabled = true;
-	        try {
-	            ctx.user = ctx.mode === 'login'
-	                ? await api.login(email, password)
-	                : await api.register(email, password, displayName, inviteCode);
-	            ctx.emailInput.value = '';
-	            ctx.passwordInput.value = '';
-	            ctx.displayNameInput.value = '';
-	            if (ctx.inviteInput) ctx.inviteInput.value = '';
-	            updateSectionForUser(ctx);
-              try {
-                  window.dispatchEvent(new CustomEvent('bbSessionChanged', { detail: { user: ctx.user || null } }));
-              } catch (err) { }
-	        } catch (err) {
+		        try {
+		            ctx.user = ctx.mode === 'login'
+		                ? await api.login(email, password)
+		                : await api.register(email, password, displayName, inviteCode);
+		            ctx.emailInput.value = '';
+		            ctx.passwordInput.value = '';
+		            ctx.displayNameInput.value = '';
+		            if (ctx.inviteInput) ctx.inviteInput.value = '';
+		            updateSectionForUser(ctx);
+		            await loadComments(ctx);
+	              try {
+	                  window.dispatchEvent(new CustomEvent('bbSessionChanged', { detail: { user: ctx.user || null } }));
+	              } catch (err) { }
+		        } catch (err) {
 	            ctx.authError.textContent = err.message || 'Authentication failed.';
 	        } finally {
 	            ctx.authSubmit.disabled = false;
 	        }
 	    }
 
-	    async function handleLogout(ctx) {
-	        try {
-	            await api.logout();
-	        } finally {
-	            ctx.user = null;
-	            updateSectionForUser(ctx);
-              try {
-                  window.dispatchEvent(new CustomEvent('bbSessionChanged', { detail: { user: null } }));
-              } catch (err) { }
-	        }
-	    }
+		    async function handleLogout(ctx) {
+		        try {
+		            await api.logout();
+		        } finally {
+		            ctx.user = null;
+		            updateSectionForUser(ctx);
+		            await loadComments(ctx);
+	              try {
+	                  window.dispatchEvent(new CustomEvent('bbSessionChanged', { detail: { user: null } }));
+	              } catch (err) { }
+		        }
+		    }
 
     async function handleCommentSubmit(event, ctx) {
         event.preventDefault();
@@ -305,7 +331,9 @@
         }
     }
 
-    function renderComments(listEl, comments) {
+    function renderComments(ctx, comments) {
+        const listEl = ctx.listEl;
+        const isAdmin = !!(ctx.user && String(ctx.user.role || '').toLowerCase() === 'admin');
         listEl.innerHTML = '';
         if (!comments || comments.length === 0) {
             listEl.innerHTML = '<div class="comment-empty">No comments yet. Start the discussion!</div>';
@@ -313,23 +341,78 @@
         }
 
         comments.forEach(comment => {
+            const commentId = comment?.id;
             const card = document.createElement('div');
             card.className = 'comment-card';
+            if (comment?.hidden) card.classList.add('is-hidden');
 
             const meta = document.createElement('div');
             meta.className = 'comment-meta';
 
+            const metaLeft = document.createElement('div');
+            metaLeft.className = 'comment-meta-left';
+
             const author = document.createElement('span');
             author.className = 'comment-author';
             author.textContent = comment.displayName || 'Reader';
+
+            metaLeft.appendChild(author);
+
+            const metaRight = document.createElement('div');
+            metaRight.className = 'comment-meta-right';
 
             const timeEl = document.createElement('span');
             timeEl.className = 'comment-time';
             const date = comment.createdAt ? new Date(comment.createdAt) : null;
             timeEl.textContent = date && !Number.isNaN(date) ? date.toLocaleString() : '';
 
-            meta.appendChild(author);
-            meta.appendChild(timeEl);
+            metaRight.appendChild(timeEl);
+
+            if (isAdmin && commentId) {
+                const modActions = document.createElement('div');
+                modActions.className = 'comment-mod-actions';
+
+                const hideBtn = document.createElement('button');
+                hideBtn.type = 'button';
+                hideBtn.className = 'comment-mod-btn';
+                const isHidden = !!comment.hidden;
+                hideBtn.textContent = isHidden ? 'UNHIDE' : 'HIDE';
+                hideBtn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    ctx.commentError.textContent = '';
+                    try {
+                        await api.moderateComment(ctx.targetId, commentId, isHidden ? 'unhide' : 'hide');
+                        await loadComments(ctx);
+                    } catch (err) {
+                        ctx.commentError.textContent = err?.message || 'Moderation failed.';
+                    }
+                });
+
+                const deleteBtn = document.createElement('button');
+                deleteBtn.type = 'button';
+                deleteBtn.className = 'comment-mod-btn danger';
+                deleteBtn.textContent = 'DELETE';
+                deleteBtn.addEventListener('click', async (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    if (!confirm('Delete this comment?')) return;
+                    ctx.commentError.textContent = '';
+                    try {
+                        await api.moderateComment(ctx.targetId, commentId, 'delete');
+                        await loadComments(ctx);
+                    } catch (err) {
+                        ctx.commentError.textContent = err?.message || 'Moderation failed.';
+                    }
+                });
+
+                modActions.appendChild(hideBtn);
+                modActions.appendChild(deleteBtn);
+                metaRight.appendChild(modActions);
+            }
+
+            meta.appendChild(metaLeft);
+            meta.appendChild(metaRight);
 
             const body = document.createElement('p');
             body.className = 'comment-body';
@@ -346,7 +429,7 @@
         try {
             ctx.targetId = getCurrentTargetId();
             const comments = await api.fetchComments(ctx.targetId);
-            renderComments(ctx.listEl, comments);
+            renderComments(ctx, comments);
         } catch (err) {
             ctx.listEl.innerHTML = `<div class="comment-empty">${err.message}</div>`;
         }

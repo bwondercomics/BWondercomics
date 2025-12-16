@@ -165,6 +165,7 @@ async function saveToServer(filename, content) {
 
 const DEFAULT_SERIES_ID = "battle-bros";
 const ACTIVE_SERIES_KEY = "battlebros_admin_active_series";
+const ANALYTICS_URL_KEY = "bwondercomics_admin_umami_url";
 
 function sanitizeSeriesId(raw = "") {
   return String(raw)
@@ -217,6 +218,7 @@ function setActiveNav(active) {
     el.btnBlog,
     el.btnMedia,
     el.btnUsers,
+    el.btnAnalytics,
     el.btnPreview,
   ];
   navButtons.forEach((btn) => {
@@ -229,6 +231,7 @@ function hideAllSections() {
   if (el.chaptersSection) el.chaptersSection.style.display = "none";
   if (el.blogSection) el.blogSection.style.display = "none";
   if (el.previewSection) el.previewSection.style.display = "none";
+  if (el.analyticsSection) el.analyticsSection.style.display = "none";
   if (el.mediaSection) el.mediaSection.style.display = "none";
   if (el.usersSection) el.usersSection.style.display = "none";
 }
@@ -259,6 +262,51 @@ function showPreviewSection() {
     el.previewSection.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   setActiveNav(el.btnPreview);
+}
+
+function getDefaultAnalyticsUrl() {
+  return `${window.location.origin}/umami`;
+}
+
+function normalizeAnalyticsUrl(raw = "") {
+  const trimmed = String(raw || "").trim();
+  if (!trimmed) return getDefaultAnalyticsUrl();
+  if (trimmed.startsWith("/")) {
+    return `${window.location.origin}${trimmed}`.replace(/\/+$/g, "");
+  }
+  const withProto = trimmed.includes("://") ? trimmed : `http://${trimmed}`;
+  return withProto.replace(/\/+$/g, "");
+}
+
+function getAnalyticsUrl() {
+  return normalizeAnalyticsUrl(localStorage.getItem(ANALYTICS_URL_KEY) || "");
+}
+
+function setAnalyticsUrl(nextUrl) {
+  const normalized = normalizeAnalyticsUrl(nextUrl);
+  localStorage.setItem(ANALYTICS_URL_KEY, normalized);
+  return normalized;
+}
+
+function applyAnalyticsUrl(url, { forceReload = false } = {}) {
+  if (el.umamiUrlInput) el.umamiUrlInput.value = url;
+  if (el.btnAnalyticsOpen) el.btnAnalyticsOpen.href = url;
+  if (!el.analyticsFrame) return;
+
+  const nextSrc = forceReload
+    ? `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`
+    : url;
+  if (el.analyticsFrame.src !== nextSrc) el.analyticsFrame.src = nextSrc;
+}
+
+function showAnalyticsSection() {
+  hideAllSections();
+  if (el.analyticsSection) {
+    el.analyticsSection.style.display = "block";
+    el.analyticsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  setActiveNav(el.btnAnalytics);
+  applyAnalyticsUrl(getAnalyticsUrl());
 }
 
 async function loadSeriesIndex() {
@@ -1856,6 +1904,20 @@ function attachEventHandlers() {
     el.btnUsers.addEventListener("click", async () => {
       showUsersSection();
       await loadUsers();
+    });
+  }
+  if (el.btnAnalytics) {
+    el.btnAnalytics.addEventListener("click", showAnalyticsSection);
+  }
+  if (el.btnAnalyticsReload) {
+    el.btnAnalyticsReload.addEventListener("click", () => {
+      applyAnalyticsUrl(getAnalyticsUrl(), { forceReload: true });
+    });
+  }
+  if (el.umamiUrlInput) {
+    el.umamiUrlInput.addEventListener("change", (e) => {
+      const next = setAnalyticsUrl(e.target.value || "");
+      applyAnalyticsUrl(next, { forceReload: true });
     });
   }
   if (el.btnRefreshUsers) {

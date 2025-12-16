@@ -45,6 +45,7 @@ This document maps how the site loads, where data lives, and how the admin tools
 - Persistence: primary saves go through `server.py` endpoints; drafts also cached in `localStorage` for safety.
 
 ## Backend API (server.py)
+- Note: `server.py` is the legacy backend. The recommended backend is now FastAPI (`backend/`) + Postgres, which keeps the same `/api/*` contract so the existing admin UI continues to work.
 - Static file server plus POST endpoints (paths normalized with `safe_path` to avoid traversal):
   - `/api/save` → write `filename` with `content`; pretty-prints JSON; regenerates RSS when `posts.json` is saved.
   - `/api/upload-images` → base64 list → chapter folder, auto-numbered sequentially.

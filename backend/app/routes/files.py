@@ -1,0 +1,370 @@
+from __future__ import annotations
+
+import base64
+import json
+import os
+import re
+from typing import Any
+
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy.orm import Session
+
+from ..db import get_db
+from ..file_ops import ALLOWED_IMAGE_EXTENSIONS, extract_numbers, renumber_files, safe_path
+from ..models import User
+from ..rss import generate_rss
+from ..security import get_current_user
+from ..validation import is_admin_role
+
+
+router = APIRouter()
+
+
+def _require_admin(request: Request, db: Session) -> User | None:
+    user = get_current_user(db, request)
+    if not user or not is_admin_role(user.role):
+        return None
+    return user
+
+
+class SaveRequest(BaseModel):
+    filename: str
+    content: Any
+
+
+@router.post("/api/save")
+def save_file(payload: SaveRequest, request: Request, db: Session = Depends(get_db)):
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    filename = payload.filename
+    content = payload.content
+
+    if not filename or content is None:
+        return JSONResponse(status_code=400, content={"error": "Missing filename or content"})
+
+    if ".." in filename or filename.startswith(("/", "\\")):
+        return JSONResponse(status_code=403, content={"error": "Invalid filename"})
+
+    try:
+        file_path = safe_path(filename)
+    except ValueError:
+        return JSONResponse(status_code=403, content={"error": "Invalid path"})
+
+    file_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if filename.endswith(".json"):
+            file_path.write_text(json.dumps(content, indent=2), encoding="utf-8")
+        else:
+            file_path.write_text(str(content), encoding="utf-8")
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"error": str(exc)})
+
+    if filename == "posts.json":
+        try:
+            generate_rss(content if isinstance(content, list) else [])
+        except Exception as exc:
+            return JSONResponse(status_code=500, content={"error": f"Saved posts.json but RSS failed: {exc}"})
+
+    return {"status": "success", "message": f"Saved {filename}"}
+
+
+class CreateChapterRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    chapter_folder: str = Field(alias="chapterFolder")
+
+
+@router.post("/api/create-chapter")
+def create_chapter(payload: CreateChapterRequest, request: Request, db: Session = Depends(get_db)):
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    chapter_folder = (payload.chapter_folder or "").strip().strip("/")
+    if not chapter_folder:
+        return JSONResponse(status_code=400, content={"error": "chapterFolder is required"})
+
+    try:
+        dest_dir = safe_path(chapter_folder)
+        dest_dir.mkdir(parents=True, exist_ok=True)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"error": "Invalid chapter path"})
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"error": str(exc)})
+
+    return {"status": "ok", "folder": chapter_folder}
+
+
+class ListImagesRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    chapter_folder: str = Field(alias="chapterFolder")
+
+
+@router.post("/api/list-images")
+def list_images(payload: ListImagesRequest, request: Request, db: Session = Depends(get_db)):
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    chapter_folder = (payload.chapter_folder or "").strip().strip("/")
+    if not chapter_folder:
+        return JSONResponse(status_code=400, content={"error": "chapterFolder is required"})
+
+    try:
+        target_dir = safe_path(chapter_folder)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"error": "Invalid chapter path"})
+
+    if not target_dir.exists():
+        return {"paths": []}
+
+    files: list[str] = []
+    for name in os.listdir(target_dir):
+        ext = os.path.splitext(name)[1].lower()
+        if ext in ALLOWED_IMAGE_EXTENSIONS:
+            files.append(name)
+    files.sort(key=lambda n: (extract_numbers(n), n))
+    return {"paths": [f"{chapter_folder}/{name}" for name in files]}
+
+
+class UploadImageFile(BaseModel):
+    name: str
+    data: str
+
+
+class UploadImagesRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    chapter_folder: str = Field(alias="chapterFolder")
+    files: list[UploadImageFile]
+
+
+@router.post("/api/upload-images")
+def upload_images(payload: UploadImagesRequest, request: Request, db: Session = Depends(get_db)):
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    chapter_folder = (payload.chapter_folder or "").strip().strip("/")
+    files = payload.files or []
+
+    if not chapter_folder or not isinstance(files, list):
+        return JSONResponse(status_code=400, content={"error": "chapterFolder and files are required"})
+
+    try:
+        dest_dir = safe_path(chapter_folder)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"error": "Invalid chapter path"})
+
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    existing_numbers: list[int] = []
+    for name in os.listdir(dest_dir):
+        if os.path.splitext(name)[1].lower() in ALLOWED_IMAGE_EXTENSIONS:
+            num = extract_numbers(name)
+            if num >= 1:
+                existing_numbers.append(num)
+    next_number = max(existing_numbers) + 1 if existing_numbers else 1
+
+    stored_paths: list[str] = []
+    errors: list[dict[str, str]] = []
+
+    for idx, file_info in enumerate(files):
+        name = (file_info.name or f"file_{idx}").strip()
+        ext = os.path.splitext(name)[1].lower()
+        if ext not in ALLOWED_IMAGE_EXTENSIONS:
+            errors.append({"file": name, "error": "Unsupported file type"})
+            continue
+
+        b64_data = file_info.data
+        if not b64_data:
+            errors.append({"file": name, "error": "Missing data"})
+            continue
+
+        try:
+            raw = base64.b64decode(b64_data)
+        except Exception:
+            errors.append({"file": name, "error": "Invalid base64 data"})
+            continue
+
+        new_name = f"{next_number:02d}{ext}"
+        next_number += 1
+
+        try:
+            (dest_dir / new_name).write_bytes(raw)
+            stored_paths.append(f"{chapter_folder}/{new_name}")
+        except Exception as exc:
+            errors.append({"file": name, "error": str(exc)})
+
+    status = 200 if stored_paths else 400
+    return JSONResponse(status_code=status, content={"paths": stored_paths, "errors": errors})
+
+
+class DeleteImageRequest(BaseModel):
+    path: str
+
+
+@router.post("/api/delete-image")
+def delete_image(payload: DeleteImageRequest, request: Request, db: Session = Depends(get_db)):
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    rel_path = (payload.path or "").strip().strip("/")
+    if not rel_path:
+        return JSONResponse(status_code=400, content={"error": "path is required"})
+
+    try:
+        abs_path = safe_path(rel_path)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"error": "Invalid path"})
+
+    if not abs_path.exists():
+        return JSONResponse(status_code=404, content={"error": "File not found"})
+
+    try:
+        abs_path.unlink()
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"error": str(exc)})
+
+    return {"status": "deleted", "path": rel_path}
+
+
+class RenameImageRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    src: str = Field(alias="from")
+    dest: str = Field(alias="to")
+
+
+@router.post("/api/rename-image")
+def rename_image(payload: RenameImageRequest, request: Request, db: Session = Depends(get_db)):
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    src = (payload.src or "").strip().strip("/")
+    dest = (payload.dest or "").strip().strip("/")
+    if not src or not dest:
+        return JSONResponse(status_code=400, content={"error": "from and to are required"})
+
+    try:
+        abs_src = safe_path(src)
+        abs_dest = safe_path(dest)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"error": "Invalid path"})
+
+    if not abs_src.exists():
+        return JSONResponse(status_code=404, content={"error": "Source file not found"})
+    if abs_dest.exists():
+        return JSONResponse(status_code=409, content={"error": "Destination already exists"})
+
+    abs_dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        os.replace(abs_src, abs_dest)
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"error": str(exc)})
+
+    return {"status": "renamed", "from": src, "to": dest}
+
+
+class RenumberChapterRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    chapter_folder: str = Field(alias="chapterFolder")
+    order: list[str]
+
+
+@router.post("/api/renumber-chapter")
+def renumber_chapter(payload: RenumberChapterRequest, request: Request, db: Session = Depends(get_db)):
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    chapter_folder = (payload.chapter_folder or "").strip().strip("/")
+    order = payload.order or []
+    if not chapter_folder or not isinstance(order, list) or not order:
+        return JSONResponse(
+            status_code=400,
+            content={"error": "chapterFolder and non-empty order are required"},
+        )
+
+    try:
+        new_paths = renumber_files(chapter_folder, order)
+    except FileNotFoundError as exc:
+        return JSONResponse(status_code=404, content={"error": str(exc)})
+    except ValueError as exc:
+        message = str(exc)
+        if message.startswith("Unsupported file type"):
+            return JSONResponse(status_code=400, content={"error": message})
+        if message.startswith("chapterFolder"):
+            return JSONResponse(status_code=400, content={"error": message})
+        return JSONResponse(status_code=400, content={"error": message})
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"error": str(exc)})
+
+    return {"status": "renumbered", "paths": new_paths}
+
+
+class UploadMediaRequest(BaseModel):
+    file: UploadImageFile
+
+
+@router.post("/api/upload-media")
+def upload_media(payload: UploadMediaRequest, request: Request, db: Session = Depends(get_db)):
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    file_info = payload.file or UploadImageFile(name="", data="")
+    name = (file_info.name or "").strip()
+    b64_data = file_info.data
+    if not name or not b64_data:
+        return JSONResponse(status_code=400, content={"error": "file (name, data) is required"})
+
+    ext = os.path.splitext(name)[1].lower()
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        return JSONResponse(status_code=400, content={"error": "Unsupported file type"})
+
+    try:
+        raw = base64.b64decode(b64_data)
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid base64 data"})
+
+    dest_dir = safe_path("media")
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    base_name = re.sub(r"[^a-zA-Z0-9_-]", "_", os.path.splitext(name)[0]) or "media"
+    candidate = f"{base_name}{ext}"
+    counter = 1
+    while (dest_dir / candidate).exists():
+        candidate = f"{base_name}_{counter}{ext}"
+        counter += 1
+
+    dest_path = dest_dir / candidate
+    try:
+        dest_path.write_bytes(raw)
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"error": str(exc)})
+
+    return {"path": f"media/{candidate}"}
+
+
+@router.post("/api/list-media")
+def list_media(request: Request, db: Session = Depends(get_db)):
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    media_dir = safe_path("media")
+    if not media_dir.exists():
+        return {"paths": []}
+
+    base_dir = safe_path("").resolve()
+    paths: list[str] = []
+    for root, _dirs, files in os.walk(media_dir):
+        for name in files:
+            ext = os.path.splitext(name)[1].lower()
+            if ext in ALLOWED_IMAGE_EXTENSIONS:
+                rel = os.path.join(root, name)
+                rel_path = os.path.relpath(rel, base_dir).replace(os.sep, "/")
+                paths.append(rel_path)
+
+    paths.sort()
+    return {"paths": paths}

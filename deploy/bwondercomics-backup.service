@@ -1,0 +1,19 @@
+[Unit]
+Description=BWonderComics data backup (users/comments)
+After=local-fs.target
+
+[Service]
+Type=oneshot
+User=dbmelville
+Group=dbmelville
+Environment=BACKUP_DEST=/mnt/archive/backups/bwondercomics
+Environment=DATA_PARENT=/srv/bwondercomics/var
+Environment=DATA_DIR_NAME=bwondercomics
+Environment=RETENTION_DAYS=30
+ExecStart=/bin/bash /srv/bwondercomics/deploy/bwondercomics-backup.sh
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/mnt/archive/backups/bwondercomics

@@ -1,5 +1,8 @@
 .vs/
 node_modules/
+__pycache__/
+.venv/
+backend/.venv/
 
 # Remark42 comment system
 .env
@@ -9,6 +12,8 @@ comments/
 
 # Battle Bros server deployment (local secrets)
 deploy/battlebros.env
+deploy/umami.env
+deploy/bwondercomics.env
 
 # Battle Bros persistent server data (users/comments)
 var/

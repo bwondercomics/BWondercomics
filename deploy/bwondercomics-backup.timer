@@ -1,5 +1,5 @@
 [Unit]
-Description=Nightly BWonderComics data backup (legacy timer name: battlebros)
+Description=Nightly BWonderComics data backup
 
 [Timer]
 OnCalendar=*-*-* 03:00:00

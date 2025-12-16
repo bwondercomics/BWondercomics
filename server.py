@@ -1,5 +1,6 @@
 import http.server
 import socketserver
+import http.client
 import json
 import os
 import uuid
@@ -62,6 +63,21 @@ os.makedirs(DATA_DIR, exist_ok=True)
 os.makedirs(COMMENTS_DIR, exist_ok=True)
 
 DEFAULT_SERIES_ID = "battle-bros"
+
+# ----------------------- ANALYTICS (UMAMI) -----------------------
+UMAMI_WEBSITE_ID = (os.environ.get("UMAMI_WEBSITE_ID") or "").strip()
+UMAMI_BASE_URL = (os.environ.get("UMAMI_BASE_URL") or "").strip()
+try:
+    UMAMI_PORT = int(os.environ.get("UMAMI_PORT") or "3000")
+except ValueError:
+    UMAMI_PORT = 3000
+
+# Serve Umami under the same origin (default: /umami) so it can be embedded in /admin seamlessly.
+UMAMI_PROXY_PATH = (os.environ.get("UMAMI_PROXY_PATH") or "/umami").strip()
+if UMAMI_PROXY_PATH and not UMAMI_PROXY_PATH.startswith("/"):
+    UMAMI_PROXY_PATH = "/" + UMAMI_PROXY_PATH
+UMAMI_PROXY_PATH = (UMAMI_PROXY_PATH or "").rstrip("/")
+UMAMI_UPSTREAM = (os.environ.get("UMAMI_UPSTREAM") or f"http://127.0.0.1:{UMAMI_PORT}").strip().rstrip("/")
 
 
 def sanitize_series_id(value):
@@ -281,6 +297,44 @@ def sanitize_target(target_id):
     return target_id
 
 
+def _split_comment_target(target_id):
+    target_id = (target_id or '').strip()
+    if ':' not in target_id:
+        return DEFAULT_SERIES_ID, target_id
+    series_id, legacy_id = target_id.split(':', 1)
+    series_id = sanitize_series_id(series_id) or DEFAULT_SERIES_ID
+    return series_id, legacy_id.strip()
+
+
+def _comment_store_paths(target_id):
+    primary = safe_under(COMMENTS_DIR, f"{target_id}.json")
+    series_id, legacy_id = _split_comment_target(target_id)
+    if series_id == DEFAULT_SERIES_ID and legacy_id and legacy_id != target_id:
+        try:
+            legacy = safe_under(COMMENTS_DIR, f"{legacy_id}.json")
+        except ValueError:
+            legacy = None
+        return primary, legacy
+    return primary, None
+
+
+def load_comment_store(target_id, migrate_legacy=False):
+    primary_path, legacy_path = _comment_store_paths(target_id)
+    if os.path.exists(primary_path):
+        data = load_json_file(primary_path, [])
+        return data if isinstance(data, list) else [], primary_path
+
+    if legacy_path and os.path.exists(legacy_path):
+        data = load_json_file(legacy_path, [])
+        comments = data if isinstance(data, list) else []
+        if migrate_legacy and legacy_path != primary_path:
+            save_json_file(primary_path, comments)
+            return comments, primary_path
+        return comments, legacy_path
+
+    return [], primary_path
+
+
 def public_user(user):
     return {
         'id': user['id'],
@@ -305,6 +359,233 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 self.send_header(name, value)
         self.end_headers()
         self.wfile.write(json.dumps(payload).encode('utf-8'))
+
+    def _analytics_umami_base_url(self):
+        base_url = (UMAMI_BASE_URL or "").strip().rstrip("/")
+        if base_url:
+            return base_url
+
+        forwarded_proto = (self.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
+        proto = forwarded_proto if forwarded_proto in ("http", "https") else "http"
+
+        host = (self.headers.get("X-Forwarded-Host") or self.headers.get("Host") or "").split(",")[0].strip()
+        hostname = host
+        if host.startswith("[") and "]" in host:
+            hostname = host[1:host.index("]")]
+        elif ":" in host:
+            hostname = host.split(":", 1)[0]
+
+        hostname = hostname or "localhost"
+        return f"{proto}://{hostname}:{UMAMI_PORT}"
+
+    def handle_analytics_script(self):
+        website_id = UMAMI_WEBSITE_ID
+        if UMAMI_PROXY_PATH:
+            script_url = f"{UMAMI_PROXY_PATH}/script.js"
+        else:
+            base_url = self._analytics_umami_base_url()
+            script_url = f"{base_url}/script.js" if base_url else ""
+
+        payload = f"""(function(){{
+  var websiteId = {json.dumps(website_id)};
+  var src = {json.dumps(script_url)};
+  if (!websiteId || !src) return;
+  if (document.querySelector('script[data-website-id=\"' + websiteId + '\"]')) return;
+
+  var s = document.createElement('script');
+  s.async = true;
+  s.defer = true;
+  s.src = src;
+  s.setAttribute('data-website-id', websiteId);
+  document.head.appendChild(s);
+}})();
+"""
+
+        self.send_response(200)
+        self.send_header("Content-Type", "application/javascript; charset=utf-8")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(payload.encode("utf-8"))
+
+    def _is_umami_proxy_request(self):
+        if not UMAMI_PROXY_PATH:
+            return False
+        path_only = urlparse(self.path).path
+        return path_only == UMAMI_PROXY_PATH or path_only.startswith(UMAMI_PROXY_PATH + "/")
+
+    def _proxy_to_umami(self):
+        upstream_raw = (UMAMI_UPSTREAM or "").strip().rstrip("/")
+        if not upstream_raw:
+            self.send_response(502)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(b"Umami upstream not configured.\n")
+            return
+
+        upstream = urlparse(upstream_raw)
+        scheme = (upstream.scheme or "http").lower()
+        host = upstream.hostname or "127.0.0.1"
+        port = upstream.port or (443 if scheme == "https" else 80)
+        prefix = (upstream.path or "").rstrip("/")
+
+        incoming = urlparse(self.path)
+        incoming_path = incoming.path or "/"
+        incoming_query = f"?{incoming.query}" if incoming.query else ""
+
+        # Always strip our proxy prefix before forwarding to the upstream.
+        request_path = incoming_path
+        if UMAMI_PROXY_PATH and incoming_path.startswith(UMAMI_PROXY_PATH):
+            request_path = incoming_path[len(UMAMI_PROXY_PATH):] or "/"
+            if not request_path.startswith("/"):
+                request_path = "/" + request_path
+
+        request_target = request_path + incoming_query
+        target = (prefix + request_target) if prefix else request_target
+
+        hop_by_hop = {
+            "connection",
+            "keep-alive",
+            "proxy-authenticate",
+            "proxy-authorization",
+            "te",
+            "trailer",
+            "transfer-encoding",
+            "upgrade",
+        }
+
+        forward_headers = {}
+        for name, value in self.headers.items():
+            lname = name.lower()
+            if lname in hop_by_hop or lname == "host":
+                continue
+            forward_headers[name] = value
+        # Disable upstream compression so we can safely rewrite HTML/JS paths.
+        forward_headers.pop("Accept-Encoding", None)
+        forward_headers["Accept-Encoding"] = "identity"
+
+        forward_headers["X-Forwarded-Host"] = self.headers.get("Host", "")
+        existing_xff = self.headers.get("X-Forwarded-For", "")
+        client_ip = self.client_address[0] if self.client_address else ""
+        forward_headers["X-Forwarded-For"] = (existing_xff + ", " + client_ip).strip(", ") if existing_xff else client_ip
+        forwarded_proto = (self.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
+        forward_headers["X-Forwarded-Proto"] = forwarded_proto if forwarded_proto in ("http", "https") else "http"
+        if UMAMI_PROXY_PATH:
+            forward_headers["X-Forwarded-Prefix"] = UMAMI_PROXY_PATH
+            forward_headers["X-Forwarded-Uri"] = self.path
+
+        body = None
+        if self.command in ("POST", "PUT", "PATCH"):
+            try:
+                content_length = int(self.headers.get("Content-Length", 0))
+            except ValueError:
+                content_length = 0
+            if content_length:
+                body = self.rfile.read(content_length)
+
+        conn_cls = http.client.HTTPSConnection if scheme == "https" else http.client.HTTPConnection
+        try:
+            conn = conn_cls(host, port, timeout=30)
+            conn.request(self.command, target, body=body, headers=forward_headers)
+            resp = conn.getresponse()
+            resp_body = resp.read()
+        except Exception as exc:
+            self.send_response(502)
+            self.send_header("Content-Type", "text/plain; charset=utf-8")
+            self.end_headers()
+            self.wfile.write(f"Umami proxy error: {exc}\n".encode("utf-8"))
+            return
+        finally:
+            try:
+                conn.close()
+            except Exception:
+                pass
+
+        self.send_response(resp.status, resp.reason)
+
+        sent_xfo = False
+        content_type = ""
+        for name, value in resp.getheaders():
+            lname = name.lower()
+            if lname in hop_by_hop:
+                continue
+            if lname == "content-length":
+                continue
+            if lname == "content-type":
+                content_type = value or ""
+            if lname == "x-frame-options":
+                self.send_header("X-Frame-Options", "SAMEORIGIN")
+                sent_xfo = True
+                continue
+            if lname == "content-security-policy":
+                csp = value or ""
+                if "frame-ancestors" in csp:
+                    csp = re.sub(r"frame-ancestors[^;]*", "frame-ancestors 'self'", csp)
+                else:
+                    csp = (csp.rstrip("; ") + "; frame-ancestors 'self'").lstrip("; ")
+                self.send_header(name, csp)
+                continue
+            if lname == "location":
+                try:
+                    loc = urlparse(value)
+                    loc_path = loc.path or ""
+                    loc_query = ("?" + loc.query) if loc.query else ""
+                    loc_frag = ("#" + loc.fragment) if loc.fragment else ""
+
+                    if loc.scheme and loc.netloc and loc.hostname == host and (loc.port or (443 if loc.scheme == "https" else 80)) == port:
+                        value = loc_path + loc_query + loc_frag
+
+                    if UMAMI_PROXY_PATH and value.startswith("/"):
+                        # Map upstream prefix back to our proxy prefix.
+                        if prefix and loc_path and (loc_path == prefix or loc_path.startswith(prefix + "/")):
+                            loc_path = loc_path[len(prefix):] or "/"
+                            value = loc_path + loc_query + loc_frag
+                        if not (loc_path == UMAMI_PROXY_PATH or loc_path.startswith(UMAMI_PROXY_PATH + "/")):
+                            loc_path = UMAMI_PROXY_PATH + loc_path
+                            value = loc_path + loc_query + loc_frag
+                except Exception:
+                    pass
+                self.send_header(name, value)
+                continue
+            if lname == "set-cookie" and UMAMI_PROXY_PATH and isinstance(value, str):
+                # Keep Umami cookies scoped under /umami so they don't leak to the main site.
+                value = re.sub(r"(?i)(^|;\\s*)path=/($|;)", r"\\1Path=" + UMAMI_PROXY_PATH + r"\\2", value)
+                self.send_header(name, value)
+                continue
+
+            self.send_header(name, value)
+
+        if not sent_xfo:
+            self.send_header("X-Frame-Options", "SAMEORIGIN")
+
+        # Rewrite absolute URLs in Umami responses so everything stays under /umami
+        # (avoids collisions with this app's /api/* routes).
+        if UMAMI_PROXY_PATH and self.command != "HEAD" and resp_body and content_type:
+            ct = content_type.split(";", 1)[0].strip().lower()
+            if ct in ("text/html", "application/javascript", "text/css", "application/json", "text/plain"):
+                try:
+                    text = resp_body.decode("utf-8")
+                    prefix_path = UMAMI_PROXY_PATH
+
+                    for q in ('"', "'", "`"):
+                        text = text.replace(f"{q}/api/", f"{q}{prefix_path}/api/")
+                        text = text.replace(f"{q}/_next/", f"{q}{prefix_path}/_next/")
+                        text = text.replace(f"{q}/script.js", f"{q}{prefix_path}/script.js")
+
+                    text = re.sub(
+                        r'\\b(href|src|action)=([\"\\\'])/(?!' + re.escape(prefix_path.lstrip("/")) + r'(?:/|$))',
+                        r'\\1=\\2' + prefix_path + r'/',
+                        text,
+                    )
+
+                    resp_body = text.encode("utf-8")
+                except Exception:
+                    pass
+
+        self.send_header("Content-Length", "0" if self.command == "HEAD" else str(len(resp_body)))
+
+        self.end_headers()
+        if self.command != "HEAD":
+            self.wfile.write(resp_body)
 
     # ----------------------- AUTH HELPERS -----------------------
     def _get_users(self):
@@ -358,6 +639,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         try:
+            if self._is_umami_proxy_request():
+                self._proxy_to_umami()
+                return
+
             admin_only = {
                 '/api/save',
                 '/api/upload-images',
@@ -368,6 +653,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 '/api/create-chapter',
                 '/api/upload-media',
                 '/api/list-media',
+                '/api/admin/comments',
                 '/api/admin/users/role',
             }
             if self.path in admin_only and not self._require_admin():
@@ -399,6 +685,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                 self.handle_logout()
             elif self.path == '/api/comments':
                 self.handle_post_comment()
+            elif self.path == '/api/admin/comments':
+                self.handle_admin_moderate_comment()
             elif self.path == '/api/admin/users/role':
                 self.handle_admin_set_user_role()
             else:
@@ -409,6 +697,12 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             self._json(500, {'error': str(e)})
 
     def do_GET(self):
+        if self._is_umami_proxy_request():
+            self._proxy_to_umami()
+            return
+        if self.path == '/analytics.js':
+            self.handle_analytics_script()
+            return
         if self.path.startswith('/api/comments'):
             self.handle_get_comments()
             return
@@ -430,6 +724,9 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         super().do_GET()
 
     def do_HEAD(self):
+        if self._is_umami_proxy_request():
+            self._proxy_to_umami()
+            return
         if _is_premium_request_path(self.path):
             user = self._get_current_user()
             if not user or not is_premium_role(user.get('role')):
@@ -558,6 +855,66 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         target['role'] = role
         self._save_users(users)
         self._json(200, {'user': public_user(target)})
+
+    # ----------------------- ADMIN COMMENT MODERATION -----------------------
+    def handle_admin_moderate_comment(self):
+        admin = self._require_admin()
+        if not admin:
+            return
+
+        data = self._read_json()
+        action = (data.get('action') or '').strip().lower()
+        comment_id = (data.get('commentId') or '').strip()
+        target_id = data.get('targetId')
+
+        if action not in ('delete', 'hide', 'unhide'):
+            self._json(400, {'error': 'Invalid action'})
+            return
+        if not comment_id:
+            self._json(400, {'error': 'commentId is required'})
+            return
+
+        try:
+            target_id = sanitize_target(target_id)
+        except ValueError:
+            self._json(400, {'error': 'targetId is required'})
+            return
+
+        try:
+            comments, comments_path = load_comment_store(target_id, migrate_legacy=True)
+        except ValueError:
+            self._json(400, {'error': 'Invalid targetId'})
+            return
+
+        comment_index = None
+        for idx, comment in enumerate(comments):
+            if isinstance(comment, dict) and comment.get('id') == comment_id:
+                comment_index = idx
+                break
+
+        if comment_index is None:
+            self._json(404, {'error': 'Comment not found'})
+            return
+
+        if action == 'delete':
+            comments.pop(comment_index)
+        else:
+            comment = comments[comment_index]
+            if not isinstance(comment, dict):
+                self._json(500, {'error': 'Comment store corrupted'})
+                return
+
+            if action == 'hide':
+                comment['hidden'] = True
+                comment['hiddenBy'] = admin.get('id')
+                comment['hiddenAt'] = datetime.utcnow().isoformat() + 'Z'
+            elif action == 'unhide':
+                comment.pop('hidden', None)
+                comment.pop('hiddenBy', None)
+                comment.pop('hiddenAt', None)
+
+        save_json_file(comments_path, comments)
+        self._json(200, {'status': 'ok'})
 
     # ----------------------- JSON SAVE (existing) -----------------------
     def handle_save(self):
@@ -941,6 +1298,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         parsed = urlparse(self.path)
         params = parse_qs(parsed.query or '')
         target_id = params.get('targetId', [None])[0]
+        current_user = self._get_current_user()
+        is_admin = bool(current_user and (current_user.get('role') or '').lower() == 'admin')
         try:
             target_id = sanitize_target(target_id)
         except ValueError:
@@ -948,12 +1307,32 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         try:
-            comments_path = safe_under(COMMENTS_DIR, f"{target_id}.json")
+            comments, _comments_path = load_comment_store(target_id, migrate_legacy=False)
         except ValueError:
             self._json(400, {'error': 'Invalid targetId'})
             return
-        comments = load_json_file(comments_path, [])
-        self._json(200, {'comments': comments})
+        shaped = []
+        for comment in comments:
+            if not isinstance(comment, dict):
+                continue
+            hidden = bool(comment.get('hidden'))
+            shaped_comment = {
+                'id': comment.get('id'),
+                'displayName': comment.get('displayName') or 'User',
+                'message': comment.get('message') or '',
+                'createdAt': comment.get('createdAt')
+            }
+            if hidden:
+                shaped_comment['hidden'] = True
+                if not is_admin:
+                    shaped_comment['message'] = 'Comment removed by moderator'
+            if is_admin:
+                shaped_comment['userId'] = comment.get('userId')
+                if hidden:
+                    shaped_comment['hiddenBy'] = comment.get('hiddenBy')
+                    shaped_comment['hiddenAt'] = comment.get('hiddenAt')
+            shaped.append(shaped_comment)
+        self._json(200, {'comments': shaped})
 
     def handle_post_comment(self):
         user = self._get_current_user()
@@ -976,11 +1355,10 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
             return
 
         try:
-            comments_path = safe_under(COMMENTS_DIR, f"{target_id}.json")
+            comments, comments_path = load_comment_store(target_id, migrate_legacy=True)
         except ValueError:
             self._json(400, {'error': 'Invalid targetId'})
             return
-        comments = load_json_file(comments_path, [])
 
         new_comment = {
             'id': str(uuid.uuid4()),
@@ -995,7 +1373,7 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
         self._json(200, {'comment': new_comment})
 
 
-print(f"Starting Battle Bros Server on port {PORT}...")
+print(f"Starting BWonderComics Server on port {PORT}...")
 print(f"Bind host: {HOST or '0.0.0.0'}")
 print(f"Registration mode: {REGISTRATION_MODE}")
 print(f"Data dir: {DATA_DIR}")
@@ -1004,11 +1382,11 @@ print("Press Ctrl+C to stop.")
 
 os.chdir(BASE_DIR)
 
-class BattleBrosTCPServer(socketserver.TCPServer):
+class BWonderComicsTCPServer(socketserver.TCPServer):
     allow_reuse_address = True
 
 
-with BattleBrosTCPServer((HOST, PORT), CustomHandler) as httpd:
+with BWonderComicsTCPServer((HOST, PORT), CustomHandler) as httpd:
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

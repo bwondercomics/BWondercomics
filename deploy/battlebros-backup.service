@@ -1,5 +1,5 @@
 [Unit]
-Description=Battle Bros data backup (users/comments)
+Description=BWonderComics data backup (legacy unit name: battlebros)
 After=local-fs.target
 
 [Service]
@@ -17,4 +17,3 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/mnt/archive/backups/battlebros
-

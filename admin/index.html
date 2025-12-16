@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5" />
-  <title>Battle Bros Admin - Content Editor</title>
+  <title>BWonderComics Admin - Content Editor</title>
   <meta name="robots" content="noindex, nofollow" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -1352,13 +1352,31 @@
       box-shadow: 0 0 20px var(--success);
     }
 
-    .btn-confirm:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+	    .btn-confirm:disabled {
+	      opacity: 0.5;
+	      cursor: not-allowed;
+	    }
 
-    /* ==================== RESPONSIVE ==================== */
-    @media (max-width: 768px) {
+	    .analytics-controls {
+	      display: flex;
+	      gap: 10px;
+	      align-items: center;
+	      flex-wrap: wrap;
+	      justify-content: flex-start;
+	      margin-bottom: 12px;
+	    }
+
+	    .analytics-frame {
+	      width: 100%;
+	      height: 75vh;
+	      border: 1px solid var(--primary);
+	      border-radius: 10px;
+	      background: rgba(10, 10, 18, 0.8);
+	      box-shadow: 0 0 18px rgba(0, 217, 255, 0.12);
+	    }
+
+	    /* ==================== RESPONSIVE ==================== */
+	    @media (max-width: 768px) {
       .admin-header {
         flex-direction: column;
         align-items: flex-start;
@@ -1394,7 +1412,7 @@
   <div id="loginScreen">
     <div class="login-container">
       <h1 class="login-title">ADMIN ACCESS</h1>
-      <p class="login-subtitle">Battle Bros Editor</p>
+	      <p class="login-subtitle">BWonderComics Editor</p>
       <form id="loginForm" class="login-form">
         <div class="form-group">
           <label class="form-label" for="loginEmail">Email</label>
@@ -1417,7 +1435,7 @@
   <!-- ==================== ADMIN DASHBOARD ==================== -->
   <div id="adminDashboard">
 	    <header class="admin-header">
-	      <h1 class="admin-title">Battle Bros Admin</h1>
+		      <h1 class="admin-title">BWonderComics Admin</h1>
 	      <div class="header-series">
 	        <label class="header-series-label" for="seriesSelect">Active Series</label>
 	        <div class="header-series-row">
@@ -1427,17 +1445,18 @@
 	          <a class="btn-secondary nav-btn" id="btnOpenSeries" href="#" target="_blank" rel="noopener">Open Reader</a>
 	        </div>
 	      </div>
-	      <nav class="admin-nav">
-	        <button class="btn-secondary nav-btn" id="btnSettings">Settings</button>
-	        <button class="btn-secondary nav-btn" id="btnChapters" type="button">Chapters</button>
-	        <button class="btn-secondary nav-btn" id="btnBlog">Blog / Feed</button>
-	        <button class="btn-secondary nav-btn" id="btnMedia">Media</button>
-	        <button class="btn-secondary nav-btn" id="btnUsers" type="button">Users</button>
-	        <button class="btn-secondary nav-btn" id="btnDesigner" type="button">Page Designer</button>
-	        <button class="btn-secondary nav-btn" id="btnPreview">Preview Changes</button>
-	        <button class="btn-primary nav-btn nav-btn--primary" id="btnPublish">Publish to GitHub</button>
-	        <button class="btn-logout nav-btn nav-btn--danger" id="btnLogout">Logout</button>
-	      </nav>
+		      <nav class="admin-nav">
+		        <button class="btn-secondary nav-btn" id="btnSettings">Settings</button>
+		        <button class="btn-secondary nav-btn" id="btnChapters" type="button">Chapters</button>
+		        <button class="btn-secondary nav-btn" id="btnBlog">Blog / Feed</button>
+		        <button class="btn-secondary nav-btn" id="btnMedia">Media</button>
+		        <button class="btn-secondary nav-btn" id="btnUsers" type="button">Users</button>
+		        <button class="btn-secondary nav-btn" id="btnAnalytics" type="button">Analytics</button>
+		        <button class="btn-secondary nav-btn" id="btnDesigner" type="button">Page Designer</button>
+		        <button class="btn-secondary nav-btn" id="btnPreview">Preview Changes</button>
+		        <button class="btn-primary nav-btn nav-btn--primary" id="btnPublish">Publish to GitHub</button>
+		        <button class="btn-logout nav-btn nav-btn--danger" id="btnLogout">Logout</button>
+		      </nav>
 	    </header>
 
 	    <main class="admin-content">
@@ -1553,9 +1572,25 @@
         </p>
       </section>
 
-	      <!-- Media Library Section -->
-	      <section class="section" id="mediaSection" style="display: none;">
-	        <h2 class="section-title">Media Library</h2>
+      <!-- Analytics Section -->
+      <section class="section" id="analyticsSection" style="display: none;">
+        <h2 class="section-title">Analytics</h2>
+        <p style="font-size: 0.9rem; opacity: 0.85; margin-bottom: 12px;">
+          Embedded Umami dashboard for page views and sessions (served under this site at <code>/umami</code>).
+        </p>
+        <div class="analytics-controls">
+          <label class="form-label" for="umamiUrlInput" style="margin: 0;">Umami URL</label>
+          <input type="text" id="umamiUrlInput" class="form-input" placeholder="/umami"
+            style="max-width: 380px; padding: 10px 12px;" />
+          <button type="button" class="btn-secondary" id="btnAnalyticsReload">Reload</button>
+          <a class="btn-secondary" id="btnAnalyticsOpen" href="#" target="_blank" rel="noopener">Open in new tab</a>
+        </div>
+        <iframe id="analyticsFrame" class="analytics-frame" title="Umami analytics dashboard" loading="lazy"></iframe>
+      </section>
+
+      <!-- Media Library Section -->
+      <section class="section" id="mediaSection" style="display: none;">
+        <h2 class="section-title">Media Library</h2>
         <div class="form-group">
           <label class="form-label">Add Media</label>
           <input type="text" id="mediaPath" class="form-input"

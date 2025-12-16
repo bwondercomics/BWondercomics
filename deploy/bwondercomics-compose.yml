@@ -1,0 +1,43 @@
+services:
+  bwondercomics-db:
+    image: postgres:16-alpine
+    container_name: bwondercomics-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${BWC_DB_NAME:-bwondercomics}
+      POSTGRES_USER: ${BWC_DB_USER:-bwondercomics}
+      POSTGRES_PASSWORD: ${BWC_DB_PASSWORD}
+    ports:
+      - "127.0.0.1:${BWC_DB_PORT:-5433}:5432"
+    volumes:
+      - bwondercomics-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${BWC_DB_USER:-bwondercomics} -d ${BWC_DB_NAME:-bwondercomics}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  bwondercomics-api:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    container_name: bwondercomics-api
+    restart: unless-stopped
+    depends_on:
+      bwondercomics-db:
+        condition: service_healthy
+    env_file:
+      - ./bwondercomics.env
+    environment:
+      BWC_DB_HOST: bwondercomics-db
+      BWC_DB_PORT: 5432
+    ports:
+      - "${BWC_API_PORT:-8000}:8000"
+    user: "${BWC_UID:-1000}:${BWC_GID:-1000}"
+    working_dir: /srv/bwondercomics
+    volumes:
+      - ..:/srv/bwondercomics
+    command: ["uvicorn", "backend.app.main:app", "--host", "0.0.0.0", "--port", "8000", "--proxy-headers"]
+
+volumes:
+  bwondercomics-db:

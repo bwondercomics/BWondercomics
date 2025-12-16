@@ -247,6 +247,47 @@
   font-size: 0.95rem;
 }
 
+.comment-meta-left,
+.comment-meta-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.comment-mod-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.comment-mod-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: rgba(255, 255, 255, 0.9);
+  padding: 4px 8px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 800;
+  font-size: 0.75rem;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  transition: all 0.2s ease;
+}
+
+.comment-mod-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.comment-mod-btn.danger {
+  border-color: rgba(255, 45, 85, 0.8);
+  color: rgba(255, 45, 85, 0.95);
+}
+
+.comment-mod-btn.danger:hover {
+  background: rgba(255, 45, 85, 0.12);
+}
+
 .comment-author {
   color: var(--accent);
   font-weight: 700;
@@ -262,6 +303,15 @@
   white-space: pre-wrap;
   line-height: 1.5;
   color: rgba(255, 255, 255, 0.92);
+}
+
+.comment-card.is-hidden {
+  border-color: rgba(255, 237, 0, 0.35);
+}
+
+.comment-card.is-hidden .comment-body {
+  opacity: 0.85;
+  font-style: italic;
 }
 
 .comment-empty {
