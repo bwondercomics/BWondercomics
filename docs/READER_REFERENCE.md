@@ -5,7 +5,7 @@ This summarizes the reader runtime after modularization: what each file does, ke
 ## Data sources
 - `admin/data.json`: chapters map, order, statusMessage.
 - `admin/page-config.json`: optional theme/content overrides + subtitles.
-- `posts.json`: latest update widget.
+- `/api/posts/latest`: latest update widget (DB-backed; published-only + scheduling support).
 - `localStorage` key `battleBros_progress`: saved chapter/page.
 
 ## Module map
@@ -31,7 +31,7 @@ This summarizes the reader runtime after modularization: what each file does, ke
 2) `app.start()`:
    - `loadChapterData()` → sets chapters/order/statusMessage.
    - `loadPageConfig()` → sets subtitles (and other overrides via customization module).
-   - `loadLatestUpdate()` → fetches `posts.json`, passes to `renderLatestUpdate`.
+   - `loadLatestPost()` → fetches `/api/posts/latest`, passes to `renderLatestUpdate`.
    - Initializes elements, chapter select, status panel, email form, pointer/fullscreen/nav handlers.
    - Restores saved progress if present; renders current pages.
 3) User interactions:

@@ -1,4 +1,4 @@
-# Chapter Data Loading Implementation
+# Chapter Data Loading Implementation (archived)
 
 ## Overview
 The comic reader now loads chapter data dynamically from `admin/data.json` at runtime, ensuring the admin panel and reader stay in sync automatically.

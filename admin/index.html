@@ -1447,7 +1447,7 @@
 	      </div>
 		      <nav class="admin-nav">
 		        <button class="btn-secondary nav-btn" id="btnSettings">Settings</button>
-		        <button class="btn-secondary nav-btn" id="btnChapters" type="button">Chapters</button>
+		        <button class="btn-secondary nav-btn" id="btnChapters" type="button">Entries</button>
 		        <button class="btn-secondary nav-btn" id="btnBlog">Blog / Feed</button>
 		        <button class="btn-secondary nav-btn" id="btnMedia">Media</button>
 		        <button class="btn-secondary nav-btn" id="btnUsers" type="button">Users</button>
@@ -1460,11 +1460,11 @@
 	    </header>
 
 	    <main class="admin-content">
-	      <!-- Chapter Management Section -->
+		      <!-- Chapter Management Section -->
 		      <section class="section" id="chaptersSection">
-		        <h2 class="section-title">Chapter Management</h2>
+		        <h2 class="section-title" id="chaptersSectionTitle">Entries Management</h2>
         <div id="chapterList" class="chapter-list"></div>
-        <button class="btn-small btn-add" id="btnAddChapter">+ Add New Chapter</button>
+        <button class="btn-small btn-add" id="btnAddChapter">+ Add New Entry</button>
       </section>
 
       <!-- Blog Management Section -->
@@ -1479,7 +1479,7 @@
             <button class="btn-small btn-edit" id="btnSaveStatus" type="button">Save Status</button>
             <div id="statusMessageStatus" class="success-message" style="display: none; margin: 0;"></div>
           </div>
-          <p style="font-size: 0.85rem; opacity: 0.8; margin-top: 6px;">Appears next to the chapter selector on the
+          <p style="font-size: 0.85rem; opacity: 0.8; margin-top: 6px;">Appears next to the entry selector on the
             reader.</p>
         </div>
 
@@ -1494,28 +1494,31 @@
             style="margin-bottom: 10px;">
           <button type="button" class="btn-secondary" id="btnMediaPicker" style="margin-bottom: 10px;">Choose from
             Media</button>
-          <label class="form-label" for="postImageFocus">Image focal point (for thumbnails)</label>
-          <select id="postImageFocus" class="form-input" style="margin-bottom: 10px;">
-            <option value="center" selected>Center</option>
-            <option value="top">Top</option>
-            <option value="bottom">Bottom</option>
-            <option value="left">Left</option>
-            <option value="right">Right</option>
-            <option value="top left">Top Left</option>
-            <option value="top right">Top Right</option>
-            <option value="bottom left">Bottom Left</option>
-            <option value="bottom right">Bottom Right</option>
-          </select>
-          <div id="postToolbar" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
-            <button type="button" class="btn-secondary rich-btn" data-cmd="bold">Bold</button>
-            <button type="button" class="btn-secondary rich-btn" data-cmd="italic">Italic</button>
-            <button type="button" class="btn-secondary rich-btn" data-cmd="underline">Underline</button>
-            <button type="button" class="btn-secondary rich-btn" data-cmd="insertUnorderedList">• List</button>
-            <button type="button" class="btn-secondary rich-btn" data-cmd="insertOrderedList">1. List</button>
-            <button type="button" class="btn-secondary rich-btn" data-cmd="formatBlock" data-value="h3">H3</button>
-            <button type="button" class="btn-secondary rich-btn" data-cmd="createLink">Link</button>
-            <button type="button" class="btn-secondary rich-btn" data-cmd="insertImage">Image</button>
-          </div>
+	          <label class="form-label" for="postImageFocus">Image focal point (for thumbnails)</label>
+	          <select id="postImageFocus" class="form-input" style="margin-bottom: 10px;">
+	            <option value="center" selected>Center</option>
+	            <option value="top">Top</option>
+	            <option value="bottom">Bottom</option>
+	            <option value="left">Left</option>
+	            <option value="right">Right</option>
+	            <option value="top left">Top Left</option>
+	            <option value="top right">Top Right</option>
+	            <option value="bottom left">Bottom Left</option>
+	            <option value="bottom right">Bottom Right</option>
+	          </select>
+	          <label class="form-label" for="postPublishAt">Publish date/time (optional)</label>
+	          <input type="datetime-local" id="postPublishAt" class="form-input" style="margin-bottom: 10px;">
+	          <p style="font-size: 0.85rem; opacity: 0.8; margin: -4px 0 10px;">Leave blank to publish now. Set a future time to schedule.</p>
+	          <div id="postToolbar" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+	            <button type="button" class="btn-secondary rich-btn" data-cmd="bold">Bold</button>
+	            <button type="button" class="btn-secondary rich-btn" data-cmd="italic">Italic</button>
+	            <button type="button" class="btn-secondary rich-btn" data-cmd="underline">Underline</button>
+	            <button type="button" class="btn-secondary rich-btn" data-cmd="insertUnorderedList">• List</button>
+	            <button type="button" class="btn-secondary rich-btn" data-cmd="insertOrderedList">1. List</button>
+	            <button type="button" class="btn-secondary rich-btn" data-cmd="formatBlock" data-value="h3">H3</button>
+	            <button type="button" class="btn-secondary rich-btn" data-cmd="createLink">Link</button>
+	            <button type="button" class="btn-secondary rich-btn" data-cmd="insertImage">Image</button>
+	          </div>
           <div id="postContent" class="form-input" contenteditable="true" aria-label="Post content"
             style="min-height: 160px; margin-bottom: 10px; overflow: auto;"></div>
           <label style="display: flex; align-items: center; gap: 8px; margin: 6px 0 12px;">
@@ -1537,7 +1540,7 @@
       <section class="section" id="previewSection" style="display: none;">
         <h2 class="section-title">Preview & Export</h2>
         <div class="preview-container">
-          <h3 class="preview-title">Chapter Data (JSON)</h3>
+          <h3 class="preview-title">Entry Data (JSON)</h3>
           <pre id="previewData" class="preview-data"></pre>
           <div class="export-actions">
             <button class="btn-small btn-copy" id="btnCopy">Copy to Clipboard</button>
@@ -1548,7 +1551,7 @@
         <div class="preview-container" style="margin-top: 20px;">
           <h3 class="preview-title">Comic Reader Preview</h3>
           <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 10px;">
-            <label class="form-label" for="previewChapterSelect" style="margin: 0;">Chapter</label>
+            <label class="form-label" for="previewChapterSelect" id="previewEntryLabel" style="margin: 0;">Entry</label>
             <select id="previewChapterSelect" class="form-input" style="max-width: 240px;"></select>
             <div id="previewPageLabel" style="font-size: 0.9rem; opacity: 0.8;"></div>
           </div>
@@ -1626,17 +1629,17 @@
   <div id="editModal" class="modal">
     <div class="modal-content">
       <div class="modal-header">
-        <h2 class="modal-title" id="modalTitle">Edit Chapter</h2>
+        <h2 class="modal-title" id="modalTitle">Edit Entry</h2>
         <button class="btn-close" id="btnCloseModal">&times;</button>
       </div>
       <form id="editForm" class="form-editor">
 	        <div class="form-group">
-	          <label class="form-label" for="chapterName">Chapter Name</label>
-	          <input type="text" id="chapterName" class="form-input" placeholder="e.g., Chapter 1" required />
+	          <label class="form-label" for="chapterName" id="entryNameLabel">Entry Name</label>
+	          <input type="text" id="chapterName" class="form-input" placeholder="e.g., Entry 1" required />
 	        </div>
 
 	        <div class="form-group">
-	          <label class="form-label">Chapter Access</label>
+	          <label class="form-label" id="entryAccessLabel">Entry Access</label>
 	          <label style="display:flex; align-items:center; gap:10px; font-size: 0.95rem;">
 	            <input type="checkbox" id="chapterPremium" />
 	            Premium only (requires a premium account to view)

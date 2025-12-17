@@ -1,4 +1,4 @@
-# Next Steps: From Fresh Ubuntu Server to Running Remark42
+# Next Steps: From Fresh Ubuntu Server to Running Remark42 (archived)
 
 ## Your Current Setup ✅
 - Ubuntu Server installed (headless, no GUI)

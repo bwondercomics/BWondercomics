@@ -1,6 +1,6 @@
 Real access control: replace the placeholder password with proper auth so you can safely deploy the admin.
 
-Backup/export safety: one-click download of posts.json and admin/data.json (plus images manifest), and an easy restore path.
+Backup/export safety: one-click download of posts.json and admin/data.json (plus images manifest), and an easy restore path. (archived)
 
 Post “broadcast” controls: keep the RSS/social toggle you just added, plus a clear draft/published state so you can stage posts without accidental pushes.
 

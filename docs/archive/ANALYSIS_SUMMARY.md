@@ -1,4 +1,4 @@
-# Battle Bros Comic Analysis - Executive Summary
+# Battle Bros Comic Analysis - Executive Summary (archived)
 
 ## Quick Facts
 - **Genre**: Cyberpunk/Urban Sci-Fi

@@ -1,4 +1,4 @@
-# Remark42 Comment System Setup Guide
+# Remark42 Comment System Setup Guide (archived)
 
 > Note: The site now ships with a built-in auth + comments API. Use this guide only if you still want to run Remark42 instead of the native system.
 

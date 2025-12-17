@@ -32,7 +32,9 @@ export async function loadChapterData(seriesId) {
       chapterOrder: normalized.order,
       statusMessage: data.statusMessage || '',
       chapterMeta: data.chapterMeta && typeof data.chapterMeta === 'object' ? data.chapterMeta : {},
-      premiumOnly: !!data.premiumOnly
+      premiumOnly: !!data.premiumOnly,
+      unitLabelSingular: String(data.unitLabelSingular || '').trim() || 'Chapter',
+      unitLabelPlural: String(data.unitLabelPlural || '').trim() || 'Chapters'
     };
   } catch (error) {
     console.error('Failed to load chapter data:', error);
@@ -72,7 +74,7 @@ export async function loadPageConfig(setSubtitlesFn, seriesId) {
 }
 
 /**
- * Loads the latest post from posts.json for the "Latest Update" widget
+ * Loads the latest post from /api/posts/latest for the "Latest Update" widget
  * Displays loading state and handles errors gracefully
  * @async
  * @returns {Promise<Object|null>} Latest post object sorted by date, or null if none available
@@ -84,27 +86,17 @@ export async function loadLatestPost() {
   body.innerHTML = '<div class="latest-loading">Loading...</div>';
 
   try {
-    const response = await fetch('posts.json', { cache: 'no-cache' });
+    const response = await fetch('/api/posts/latest', { cache: 'no-store' });
     if (!response.ok) throw new Error('Failed to load latest post');
-    const posts = await response.json();
+    const data = await response.json().catch(() => ({}));
+    const post = data && typeof data === 'object' ? data.post : null;
 
-    if (!Array.isArray(posts) || posts.length === 0) {
+    if (!post) {
       body.innerHTML = '<div class="latest-empty">No updates yet.</div>';
       return null;
     }
 
-    const filtered = posts.filter(
-      (p) => (p.status || 'published') !== 'draft',
-    );
-    if (!filtered.length) {
-      body.innerHTML = '<div class="latest-empty">No updates yet.</div>';
-      return null;
-    }
-
-    const latest = [...filtered].sort(
-      (a, b) => new Date(b.date || 0) - new Date(a.date || 0),
-    )[0];
-    return latest;
+    return post;
   } catch (error) {
     console.error('Latest update widget error:', error);
     body.innerHTML = '<div class="latest-empty" style="color: var(--danger);">Could not load updates.</div>';

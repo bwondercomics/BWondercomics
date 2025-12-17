@@ -20,10 +20,12 @@ const domTemplate = `
   <input id="postImage" />
   <input id="postImageFile" type="file" />
   <input id="postImageTags" />
+  <input id="postPublishAt" />
   <button id="btnMediaPicker"></button>
   <textarea id="postContent"></textarea>
   <input id="postShare" type="checkbox" />
   <button id="btnSavePost"></button>
+  <button id="btnSaveDraft"></button>
   <div id="postList"></div>
   <div id="postStatus"></div>
   <button id="btnPreview"></button>
@@ -83,13 +85,15 @@ describe("admin app smoke", () => {
     }
 
     // Stub fetch for all admin endpoints
-    vi.stubGlobal("fetch", async (url) => {
+    vi.stubGlobal("fetch", async (url, init = {}) => {
       const okResp = (body) => ({
         ok: true,
         json: async () => body,
         text: async () => JSON.stringify(body),
         status: 200,
       });
+
+      const method = String(init?.method || "GET").toUpperCase();
 
       if (typeof url === "string") {
         if (url.endsWith("data.json"))
@@ -98,7 +102,32 @@ describe("admin app smoke", () => {
             chapterFolders: {},
             statusMessage: "",
           });
-        if (url.endsWith("posts.json")) return okResp([]);
+        if (url.includes("/api/admin/posts")) {
+          if (method === "GET") return okResp({ posts: [] });
+          if (method === "POST") {
+            const payload = init?.body ? JSON.parse(init.body) : {};
+            return okResp({
+              post: {
+                id: "uuid-123",
+                title: payload.title || "Smoke Post",
+                content: payload.content || "Some content",
+                image: payload.image || "",
+                imageTags: payload.imageTags || [],
+                imageFocus: payload.imageFocus || "center",
+                date: new Date().toISOString(),
+                share: payload.share !== false,
+                status: payload.status || "published",
+                updatedAt: new Date().toISOString(),
+              },
+            });
+          }
+          if (method === "PUT") {
+            const payload = init?.body ? JSON.parse(init.body) : {};
+            return okResp({ post: { id: "uuid-123", ...payload, date: new Date().toISOString() } });
+          }
+          if (method === "DELETE") return okResp({ status: "ok" });
+          return okResp({ posts: [] });
+        }
         if (url.endsWith("media.json")) return okResp([]);
         if (url.includes("/api/list-images")) return okResp({ paths: [] });
         if (url.includes("/api/list-media")) return okResp({ paths: [] });

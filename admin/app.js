@@ -3,7 +3,6 @@ import {
   GITHUB_TOKEN_KEY,
   GITHUB_CONFIG,
   API_ENDPOINT,
-  POSTS_FILE,
   MEDIA_FILE,
 } from "./config.js";
 import { el } from "./dom.js";
@@ -167,6 +166,45 @@ const DEFAULT_SERIES_ID = "battle-bros";
 const ACTIVE_SERIES_KEY = "battlebros_admin_active_series";
 const ANALYTICS_URL_KEY = "bwondercomics_admin_umami_url";
 
+function defaultUnitLabelsForSeries(seriesId) {
+  const id = sanitizeSeriesId(seriesId) || DEFAULT_SERIES_ID;
+  if (id === DEFAULT_SERIES_ID) return { singular: "Issue", plural: "Issues" };
+  return { singular: "Chapter", plural: "Chapters" };
+}
+
+function getActiveSeriesMeta() {
+  const id = getActiveSeriesId();
+  const list = state.seriesIndex?.series || [];
+  return list.find((s) => s && s.id === id) || null;
+}
+
+function getUnitLabels() {
+  const current = getActiveSeriesMeta();
+  const defaults = defaultUnitLabelsForSeries(getActiveSeriesId());
+  const singular = String(current?.unitLabelSingular || "").trim() || defaults.singular;
+  const plural = String(current?.unitLabelPlural || "").trim() || defaults.plural;
+  return { singular: singular.slice(0, 30), plural: plural.slice(0, 30) };
+}
+
+function applyUnitLabels() {
+  const { singular, plural } = getUnitLabels();
+
+  if (el.btnChapters) el.btnChapters.textContent = plural;
+  const title = document.getElementById("chaptersSectionTitle");
+  if (title) title.textContent = `${plural} Management`;
+  if (el.btnAddChapter) el.btnAddChapter.textContent = `+ Add New ${singular}`;
+
+  const previewLabel = document.getElementById("previewEntryLabel");
+  if (previewLabel) previewLabel.textContent = singular;
+
+  const nameLabel = document.getElementById("entryNameLabel");
+  if (nameLabel) nameLabel.textContent = `${singular} Name`;
+  if (el.chapterName) el.chapterName.placeholder = `e.g., ${singular} 1`;
+
+  const accessLabel = document.getElementById("entryAccessLabel");
+  if (accessLabel) accessLabel.textContent = `${singular} Access`;
+}
+
 function sanitizeSeriesId(raw = "") {
   return String(raw)
     .trim()
@@ -205,6 +243,7 @@ const chaptersApi = createChaptersApi({
   saveToServer,
   showSuccess,
   showError,
+  getUnitLabels,
   getDataFileUrl: getChaptersDataFileUrl,
   getSaveFilename: getChaptersSaveFilename,
   getChaptersRoot: getChaptersRoot,
@@ -378,8 +417,9 @@ async function switchSeries(nextIdRaw) {
   if (nextId === getActiveSeriesId()) return;
 
   if (state.hasUnsavedChanges) {
+    const { plural } = getUnitLabels();
     const proceed = window.confirm(
-      "You have unsaved chapter changes. Switch series anyway?",
+      `You have unsaved changes in ${plural}. Switch series anyway?`,
     );
     if (!proceed) {
       renderSeriesSelect();
@@ -393,6 +433,7 @@ async function switchSeries(nextIdRaw) {
   await chaptersApi.loadChapters();
   chaptersApi.renderStatusMessageInput();
   chaptersApi.renderChapterList();
+  applyUnitLabels();
   updateSeriesLinks();
   showChaptersSection();
 }
@@ -408,12 +449,24 @@ async function createNewSeries() {
 
   const title = (prompt("Series title:", id) || id).trim();
   const premiumOnly = window.confirm("Should this series be premium-only?");
+  const defaults = defaultUnitLabelsForSeries(id);
+  const unitLabelSingular =
+    (prompt("Entry label (singular):", defaults.singular) || defaults.singular).trim();
+  const unitLabelPlural =
+    (prompt("Entry label (plural):", defaults.plural) || defaults.plural).trim();
 
   const nextIndex = {
     ...state.seriesIndex,
     series: [
       ...(state.seriesIndex.series || []),
-      { id, title, description: "", premiumOnly },
+      {
+        id,
+        title,
+        description: "",
+        premiumOnly,
+        unitLabelSingular,
+        unitLabelPlural,
+      },
     ],
   };
 
@@ -465,6 +518,7 @@ async function createNewSeries() {
   state.seriesIndex = nextIndex;
   await switchSeries(id);
   renderSeriesSelect();
+  applyUnitLabels();
   alert(`Created series "${title}" (${id}).`);
 }
 
@@ -496,6 +550,14 @@ async function editActiveSeries() {
         "Series is currently PUBLIC.\n\nOK = make premium-only\nCancel = keep public",
       );
 
+  const defaults = defaultUnitLabelsForSeries(id);
+  const unitLabelSingular = (
+    prompt("Entry label (singular):", current.unitLabelSingular || defaults.singular) || defaults.singular
+  ).trim();
+  const unitLabelPlural = (
+    prompt("Entry label (plural):", current.unitLabelPlural || defaults.plural) || defaults.plural
+  ).trim();
+
   const nextIndex = {
     ...state.seriesIndex,
     series: seriesList.map((s) =>
@@ -506,6 +568,8 @@ async function editActiveSeries() {
               title: title.trim() || id,
               description: description.trim(),
               premiumOnly,
+              unitLabelSingular,
+              unitLabelPlural,
             };
             const cover = String(coverImage || "").trim();
             if (cover) next.coverImage = cover;
@@ -529,29 +593,28 @@ async function editActiveSeries() {
 
   renderSeriesSelect();
   updateSeriesLinks();
+  applyUnitLabels();
   alert("Series updated.");
 }
 
 // ---------------- BLOG / POSTS ----------------
-function getPostsUrl() {
-  return POSTS_FILE.startsWith("/") ? POSTS_FILE : `/${POSTS_FILE}`;
+const POSTS_API = "/api/admin/posts";
+
+function isoToDateTimeLocal(iso = "") {
+  const value = String(iso || "").trim();
+  if (!value) return "";
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return "";
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
 }
 
-async function persistPosts() {
-  state.posts = [...state.posts].sort(
-    (a, b) => new Date(b.date || 0) - new Date(a.date || 0),
-  );
-  try {
-    await saveToServer(POSTS_FILE, state.posts);
-    setPostStatus("Post saved and feed updated.");
-  } catch (error) {
-    console.error("Failed to save posts:", error);
-    setPostStatus(
-      "Failed to save posts to disk. Copy your text before refreshing.",
-      true,
-    );
-    throw error;
-  }
+function dateTimeLocalToIso(raw = "") {
+  const value = String(raw || "").trim();
+  if (!value) return "";
+  const dt = new Date(value);
+  if (Number.isNaN(dt.getTime())) return "";
+  return dt.toISOString();
 }
 
 function setPostStatus(message, isError = false) {
@@ -572,6 +635,7 @@ function resetPostForm() {
   if (el.postImageFile) el.postImageFile.value = "";
   if (el.postImageTags) el.postImageTags.value = "";
   if (el.postImageFocus) el.postImageFocus.value = "center";
+  if (el.postPublishAt) el.postPublishAt.value = "";
   if (el.postContent) el.postContent.innerHTML = "";
   el.postShare.checked = true;
   el.btnSavePost.textContent = "Publish Post";
@@ -619,6 +683,8 @@ function renderPosts() {
     const statusLabel =
       post.status === "draft"
         ? '<span style="color: var(--accent); font-size: 0.85rem;">Draft</span>'
+        : post.status === "scheduled"
+          ? '<span style="color: var(--primary); font-size: 0.85rem;">Scheduled</span>'
         : '<span style="color: var(--success); font-size: 0.85rem;">Published</span>';
     const shareLabel =
       post.share === false
@@ -656,27 +722,36 @@ function renderPosts() {
 
 async function loadPosts() {
   try {
-    const response = await fetch(getPostsUrl(), { cache: "no-cache" });
-    if (!response.ok) throw new Error("Failed to load posts.json");
-    const data = await response.json();
-    state.posts = Array.isArray(data)
-      ? data.map((p) => ({
-          ...p,
-          status: p.status || "published",
-          imageFocus: p.imageFocus || "center",
-          share: p.share !== false,
-          imageTags: Array.isArray(p.imageTags)
-            ? p.imageTags
-            : parseTags(p.imageTags || ""),
-        }))
-      : [];
+    const response = await fetch(POSTS_API, {
+      cache: "no-store",
+      credentials: "same-origin",
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(
+        data.error ||
+          "Unable to load posts. Make sure you are signed in as an admin (via comments login).",
+      );
+    }
+    const posts = Array.isArray(data.posts) ? data.posts : [];
+    state.posts = posts
+      .filter((p) => p && typeof p === "object")
+      .map((p) => ({
+        ...p,
+        status: p.status || "published",
+        imageFocus: p.imageFocus || "center",
+        share: p.share !== false,
+        imageTags: Array.isArray(p.imageTags)
+          ? p.imageTags
+          : parseTags(p.imageTags || ""),
+      }));
     renderPosts();
   } catch (error) {
     console.error("Error loading posts:", error);
     state.posts = [];
     renderPosts();
     setPostStatus(
-      "Could not load existing posts. Create a new one to get started.",
+      error.message || "Could not load existing posts. Create a new one to get started.",
       true,
     );
   }
@@ -694,6 +769,9 @@ function loadLocalDraft() {
       el.postImage.value = draft.image || "";
       if (el.postImageTags) {
         el.postImageTags.value = (draft.imageTags || []).join(", ");
+      }
+      if (el.postPublishAt && draft.publishAt) {
+        el.postPublishAt.value = String(draft.publishAt || "");
       }
       if (el.postContent) {
         el.postContent.innerHTML = draft.content || "";
@@ -715,6 +793,7 @@ function populatePostForm(postId) {
   if (el.postImageTags)
     el.postImageTags.value = (post.imageTags || []).join(", ");
   if (el.postImageFocus) el.postImageFocus.value = post.imageFocus || "center";
+  if (el.postPublishAt) el.postPublishAt.value = isoToDateTimeLocal(post.date || "");
   if (el.postContent) el.postContent.innerHTML = post.content || "";
   el.postShare.checked = post.share !== false;
   el.btnSavePost.textContent = "Update Post";
@@ -745,9 +824,20 @@ async function deletePost(postId) {
   });
 
   try {
+    const response = await fetch(`${POSTS_API}/${encodeURIComponent(postId)}`, {
+      method: "DELETE",
+      credentials: "same-origin",
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result.error || "Failed to delete post");
+    }
     state.posts = state.posts.filter((p) => p.id !== postId);
-    await persistPosts();
     renderPosts();
+    setPostStatus("Post deleted.");
+  } catch (error) {
+    console.error("Failed to delete post:", error);
+    setPostStatus(error.message || "Failed to delete post.", true);
   } finally {
     state.isDeletingPost = false;
     el.postList.querySelectorAll(".btn-delete").forEach((btn) => {
@@ -756,21 +846,17 @@ async function deletePost(postId) {
   }
 }
 
-function generatePostId() {
-  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
-  return `post-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
-}
-
 async function savePost(options = {}) {
-  const status = options.status || "published";
+  const requestedStatus = options.status || "published";
   const title = el.postTitle.value.trim();
   const imageTags = parseTags(el.postImageTags?.value || "");
   const imageFocus = el.postImageFocus?.value || "center";
-  const rawContent = (el.postContent?.innerHTML || "").trim();
+  const rawContent = (el.postContent?.innerHTML || el.postContent?.value || "").trim();
   const content = sanitizeHtml(rawContent);
   const share = el.postShare.checked;
   let image = el.postImage.value.trim();
   const uploadFile = el.postImageFile?.files?.[0];
+  const publishAtIso = dateTimeLocalToIso(el.postPublishAt?.value || "");
 
   if (!title || !content) {
     setPostStatus("Title and content are required.", true);
@@ -806,38 +892,25 @@ async function savePost(options = {}) {
   }
 
   const now = new Date().toISOString();
+  let status = requestedStatus;
+  if (status === "published" && publishAtIso) {
+    const dt = new Date(publishAtIso);
+    if (!Number.isNaN(dt.getTime()) && dt.getTime() > Date.now()) {
+      status = "scheduled";
+    }
+  }
   const safeShare = status === "draft" ? false : share;
 
-  if (state.editingPostId) {
-    const idx = state.posts.findIndex((p) => p.id === state.editingPostId);
-    if (idx !== -1) {
-      state.posts[idx] = {
-        ...state.posts[idx],
-        title,
-        image,
-      imageTags,
-      imageFocus,
-      content,
-      date: state.posts[idx].date || now,
-      share: safeShare,
-      status,
-      updatedAt: now,
-      };
-    }
-  } else {
-    state.posts.unshift({
-      id: generatePostId(),
-      title,
-      image,
-      imageTags,
-      imageFocus,
-      content,
-      date: now,
-      share: safeShare,
-      status,
-      updatedAt: now,
-    });
-  }
+  const payload = {
+    title,
+    image,
+    imageTags,
+    imageFocus,
+    content,
+    date: publishAtIso || null,
+    share: safeShare,
+    status,
+  };
 
   try {
     localStorage.setItem(
@@ -850,20 +923,58 @@ async function savePost(options = {}) {
         share: safeShare,
         status,
         imageFocus,
+        publishAt: el.postPublishAt?.value || "",
       }),
     );
   } catch (e) {
     console.warn("Could not persist draft locally", e);
   }
 
-  await persistPosts();
-  renderPosts();
-  resetPostForm();
-  if (status === "draft") {
-    setPostStatus("Draft saved.");
-  } else {
-    setPostStatus("Post saved.");
-    localStorage.removeItem(POST_DRAFT_KEY);
+  try {
+    const url = state.editingPostId
+      ? `${POSTS_API}/${encodeURIComponent(state.editingPostId)}`
+      : POSTS_API;
+    const method = state.editingPostId ? "PUT" : "POST";
+    const response = await fetch(url, {
+      method,
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || "Failed to save post");
+    const saved = result.post;
+    if (!saved) throw new Error("Server did not return post");
+
+    const normalized = {
+      ...saved,
+      status: saved.status || "published",
+      imageFocus: saved.imageFocus || "center",
+      share: saved.share !== false,
+      imageTags: Array.isArray(saved.imageTags)
+        ? saved.imageTags
+        : parseTags(saved.imageTags || ""),
+    };
+
+    const idx = state.posts.findIndex((p) => p.id === normalized.id);
+    if (idx !== -1) state.posts[idx] = normalized;
+    else state.posts.unshift(normalized);
+
+    renderPosts();
+    resetPostForm();
+
+    if (normalized.status === "draft") {
+      setPostStatus("Draft saved.");
+    } else if (normalized.status === "scheduled") {
+      setPostStatus("Post scheduled.");
+      localStorage.removeItem(POST_DRAFT_KEY);
+    } else {
+      setPostStatus("Post published.");
+      localStorage.removeItem(POST_DRAFT_KEY);
+    }
+  } catch (error) {
+    console.error("Failed to save post:", error);
+    setPostStatus(error.message || "Failed to save post.", true);
   }
 }
 

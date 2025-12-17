@@ -39,7 +39,7 @@ Modify `/admin/index.html` to support GitHub integration:
    - Shows progress: "Committing → Running workflow → Deploying → Done!"
 
 ### Phase 2: GitHub Actions Workflow
-Create `.github/workflows/update-chapters.yml`:
+Create `.github/workflows/update-chapters.yml` (deprecated):
 
 **Trigger**: When `admin/data.json` is modified on `feature/admin-panel` or `main` branch
 
@@ -179,7 +179,7 @@ async function publishToGitHub(chaptersData) {
 - Add "Settings" button in header for token management
 - Add publish status indicator
 
-### 2. GitHub Actions Workflow (`.github/workflows/update-chapters.yml`)
+### 2. GitHub Actions Workflow (`.github/workflows/update-chapters.yml`) (deprecated)
 
 ```yaml
 name: Update Chapters from Admin Panel
@@ -442,7 +442,7 @@ If something goes wrong:
 ## Files to Create/Modify
 
 ### New Files
-1. `.github/workflows/update-chapters.yml` - GitHub Actions workflow
+1. `.github/workflows/update-chapters.yml` - GitHub Actions workflow (deprecated)
 2. `admin/data.json` - Chapter data file
 3. `admin/GITHUB_AUTO_DEPLOY_SPEC.md` - This document
 

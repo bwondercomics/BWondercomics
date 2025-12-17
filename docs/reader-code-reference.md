@@ -6,7 +6,7 @@ This guide maps the reader-side modules, their responsibilities, and how they co
 - `reader/app.js` — Composition root; wires modules together, bootstraps data load, kicks off render, and binds global events.
 - `reader/config.js` — Constants for storage keys, debounce timings, UI thresholds (e.g., two-page breakpoints), and default options.
 - `reader/dom.js` — Centralized DOM lookups; a single source of element references used across modules.
-- `reader/data.js` — Fetches `admin/data.json`, `posts.json`, and `admin/page-config.json`; normalizes status message, chapter folders, and optional theming overrides.
+- `reader/data.js` — Fetches `admin/data.json`, `admin/page-config.json`, and `/api/posts/latest`; normalizes chapter metadata and page-config overrides.
 - `reader/state.js` — Single state container: current chapter/page, zoom, fit mode, progress persistence (localStorage), and derived helpers (e.g., `isTwoPageMode`).
 - `reader/render.js` — Renders pages into the stage, applies fit/zoom transforms, preloads images, and updates UI labels/buttons.
 - `reader/controls.js` — Keyboard and click navigation (prev/next, first/last, toggle two-page, reset zoom, fullscreen), debounce helpers, and guard rails when zoomed.
@@ -14,7 +14,7 @@ This guide maps the reader-side modules, their responsibilities, and how they co
 - `reader/fullscreen.js` — Cross-browser fullscreen enter/exit and button state sync.
 - `reader/gallery.js` — Cover gallery overlay (chapter grid), selection, and smooth scroll to current chapter.
 - `reader/overlays.js` — Shortcuts modal, help overlays, and shared show/hide helpers.
-- `reader/latest.js` — “Latest update” widget fed by `posts.json`, with share flag handling and date formatting.
+- `reader/latest.js` — Renders the “Latest update” widget from the post returned by `/api/posts/latest`.
 - `reader/email.js` — Formspree-powered signup form submission with inline success/error feedback.
 - `reader/customization.js` — Public `window.BattleBros` API (set subtitle, set subtitle list, random subtitle) and dynamic theme/app bar updates.
 - `reader/chapters.js` — Chapter metadata helpers: sort chapters, derive page arrays, next/prev chapter lookup.
@@ -23,7 +23,7 @@ This guide maps the reader-side modules, their responsibilities, and how they co
 ## Execution Flow (high level)
 ```mermaid
 flowchart TD
-  A[startup] --> B[load data.json + posts.json + page-config.json]
+  A[startup] --> B[load data.json + page-config.json + /api/posts/latest]
   B --> C[populate state (chapters, folders, status)]
   C --> D[render initial chapter/page]
   D --> E[attach controls + pointer + fullscreen listeners]
@@ -66,7 +66,7 @@ flowchart TD
 
 ## Data Sources
 - `admin/data.json` — Chapters, chapterFolders, statusMessage.
-- `posts.json` — Feed entries for the “Latest update” widget.
+- `/api/posts/latest` — DB-backed latest blog post for the “Latest update” widget.
 - `admin/page-config.json` — Optional theming, header/panel content, button list, and layout ordering.
 - `localStorage` — Reading progress (`battleBros_progress` via `config`).
 

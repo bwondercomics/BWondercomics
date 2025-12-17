@@ -1,5 +1,5 @@
 [Unit]
-Description=BWonderComics data backup (legacy unit name: battlebros)
+Description=LEGACY BWonderComics data backup (legacy unit name: battlebros)
 After=local-fs.target
 
 [Service]
@@ -10,7 +10,7 @@ Environment=BACKUP_DEST=/mnt/archive/backups/battlebros
 Environment=DATA_PARENT=/srv/bwondercomics/var
 Environment=DATA_DIR_NAME=battlebros
 Environment=RETENTION_DAYS=30
-ExecStart=/bin/bash /srv/bwondercomics/deploy/battlebros-backup.sh
+ExecStart=/bin/bash /srv/bwondercomics/deploy/legacy/battlebros-backup.sh
 
 NoNewPrivileges=true
 PrivateTmp=true

@@ -1,5 +1,5 @@
 [Unit]
-Description=BWonderComics web server (legacy unit name: battlebros, user)
+Description=LEGACY BWonderComics web server (legacy unit name: battlebros, user; deprecated)
 After=network-online.target
 Wants=network-online.target
 
@@ -8,7 +8,7 @@ Type=simple
 WorkingDirectory=/srv/bwondercomics
 EnvironmentFile=/srv/bwondercomics/deploy/battlebros.env
 Environment=PYTHONUNBUFFERED=1
-ExecStart=/usr/bin/python3 -u /srv/bwondercomics/server.py
+ExecStart=/usr/bin/python3 -u /srv/bwondercomics/legacy/server.py
 Restart=on-failure
 RestartSec=2
 

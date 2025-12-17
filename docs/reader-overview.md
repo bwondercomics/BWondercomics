@@ -4,7 +4,7 @@ This document summarizes how the reader portion of the site is organized, what e
 
 ## Entry Point and Data
 - `reader/app.js` bootstraps config/state, fetches content, wires UI handlers, and kicks off rendering.
-- Data sources: chapter images under `chapters/`, plus `media.json`, `posts.json`, and optionally `admin/data.json` for published chapter metadata.
+- Data sources: chapter images under `chapters/`, `admin/data.json` (chapters + status + metadata), `admin/page-config.json` (theme/content overrides), and `/api/posts/latest` for the “latest update” widget.
 
 ## Modules
 - `reader/config.js` — Tunables for layout/zoom, keyboard settings, debounce intervals; includes `TWO_PAGE_ASPECT_RATIO` (0.714).
@@ -23,7 +23,7 @@ This document summarizes how the reader portion of the site is organized, what e
 - `reader/email.js` — Builds share/email link data from the current page/chapter.
 
 ## Runtime Flow
-1) `app.js` init: load config/state → fetch chapters/media/posts → render initial page(s).
+1) `app.js` init: load config/state → fetch chapters + page config + latest post → render initial page(s).
 2) Controls: UI/keyboard/gesture handlers update `state` → `render` redraws → `gallery`/overlays sync to the new state.
 3) Persistence: `state.saveProgress` writes chapter/page to `localStorage`; errors are caught so reading is not blocked.
 4) Layout: `render` chooses single vs two-page mode based on the aspect ratio threshold (`TWO_PAGE_ASPECT_RATIO`) and fit/zoom rules; uses preloading to reduce flicker.

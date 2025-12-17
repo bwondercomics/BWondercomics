@@ -1,4 +1,4 @@
-# Deploying Remark42 to Ubuntu Server
+# Deploying Remark42 to Ubuntu Server (archived)
 
 ## Quick Setup for Your Ubuntu Server
 

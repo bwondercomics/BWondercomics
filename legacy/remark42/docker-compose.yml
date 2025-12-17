@@ -1,3 +1,4 @@
+## LEGACY: Remark42 stack (deprecated; native comments now live in `backend/`).
 version: '3.8'
 
 services:

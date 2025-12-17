@@ -3,7 +3,7 @@
 This repo includes a backend for serving the BWonderComics site and providing API endpoints for the admin panel (saving JSON, uploads, and auth/comments).
 
 Recommended backend: FastAPI + Postgres (`backend/`, `deploy/bwondercomics-db-compose.yml`).
-Legacy backend: single-file Python server (`server.py`) with JSON-on-disk auth/comments.
+Legacy backend: single-file Python server (`legacy/server.py`) with JSON-on-disk auth/comments (units in `deploy/legacy/`).
 
 ## Quick Start (LAN)
 
@@ -13,14 +13,14 @@ Legacy backend: single-file Python server (`server.py`) with JSON-on-disk auth/c
 
 ```bash
 cd /srv/bwondercomics
-docker compose -f deploy/bwondercomics-compose.yml --env-file deploy/bwondercomics.env up -d --build
-docker compose -f deploy/bwondercomics-compose.yml --env-file deploy/bwondercomics.env exec bwondercomics-api alembic -c backend/alembic.ini upgrade head
+docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-compose.yml up -d --build
+docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-compose.yml exec bwondercomics-api alembic -c backend/alembic.ini upgrade head
 ```
 
 (Optional legacy import)
 
 ```bash
-docker compose -f deploy/bwondercomics-compose.yml --env-file deploy/bwondercomics.env exec bwondercomics-api python -m backend.app.import_legacy
+docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-compose.yml exec bwondercomics-api python -m backend.app.import_legacy
 ```
 
 Open:
@@ -45,7 +45,7 @@ Edit `deploy/bwondercomics.env` and set at least:
 
 ```bash
 cd /srv/bwondercomics
-docker compose -f deploy/bwondercomics-db-compose.yml --env-file deploy/bwondercomics.env up -d
+docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-db-compose.yml up -d
 ```
 
 3) Install backend deps:
@@ -94,9 +94,9 @@ Use the included units:
 - `deploy/bwondercomics-api.service` (system)
 - `deploy/bwondercomics-api.user.service` (user)
 
-Note: stop the legacy `bwondercomics` service first if it's running, since both bind port `8000`.
+Note: stop any legacy `bwondercomics`/`battlebros` service first if it's running, since both bind port `8000`.
 
-## Legacy `server.py` (JSON-on-disk)
+## Legacy `legacy/server.py` (JSON-on-disk)
 
 1) Create the persistent data dir (users + comments):
 
@@ -123,7 +123,7 @@ cd /srv/bwondercomics
 set -a
 . ./deploy/bwondercomics.env
 set +a
-python3 server.py
+python3 legacy/server.py
 ```
 
 Open:
@@ -137,7 +137,7 @@ Open:
 1) Install the unit:
 
 ```bash
-sudo cp /srv/bwondercomics/deploy/bwondercomics.service /etc/systemd/system/bwondercomics.service
+sudo cp /srv/bwondercomics/deploy/legacy/bwondercomics.service /etc/systemd/system/bwondercomics.service
 sudo systemctl daemon-reload
 ```
 
@@ -160,7 +160,7 @@ sudo journalctl -u bwondercomics -f
 
 ```bash
 mkdir -p ~/.config/systemd/user
-cp /srv/bwondercomics/deploy/bwondercomics.user.service ~/.config/systemd/user/bwondercomics.service
+cp /srv/bwondercomics/deploy/legacy/bwondercomics.user.service ~/.config/systemd/user/bwondercomics.service
 systemctl --user daemon-reload
 systemctl --user enable --now bwondercomics.service
 ```
@@ -217,7 +217,7 @@ Backups land in `/mnt/archive/backups/bwondercomics/` and old backups are pruned
 
 ## Analytics (Umami)
 
-This runs Umami locally (Postgres + Umami) and injects the tracker into the main site pages (`/`, `/feed.html`, `/media.html`, `/comics.html`) via `/analytics.js` served by `server.py`.
+This runs Umami locally (Postgres + Umami) and injects the tracker into the main site pages via `/analytics.js` served by the FastAPI backend.
 
 1) Create the Umami env file:
 
@@ -233,7 +233,7 @@ Edit `deploy/umami.env` and set `UMAMI_DB_PASSWORD` + `UMAMI_APP_SECRET` (genera
 
 ```bash
 cd /srv/bwondercomics
-docker compose -f deploy/umami-compose.yml --env-file deploy/umami.env up -d
+docker compose --env-file deploy/umami.env -f deploy/umami-compose.yml up -d
 ```
 
 3) Open Umami:
@@ -249,29 +249,20 @@ Edit `deploy/bwondercomics.env` and set:
 UMAMI_WEBSITE_ID=<paste-website-id>
 ```
 
-5) Restart the server so `/analytics.js` picks up the Website ID:
+5) Restart the backend so `/analytics.js` picks up the Website ID:
 
 ```bash
-sudo systemctl restart bwondercomics
+docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-compose.yml restart bwondercomics-api
 ```
 
 Notes:
-- By default, `server.py` proxies Umami at `/umami`, so the admin panel can embed it and the tracker can load from the same origin.
+- By default, the backend proxies Umami at `/umami`, so the admin panel can embed it and the tracker can load from the same origin.
 - If you want to hide port `3000` from the LAN, set `UMAMI_BIND=127.0.0.1` in `deploy/umami.env`, and set `UMAMI_UPSTREAM=http://127.0.0.1:3000` in `deploy/bwondercomics.env`.
 - When you go live, you’ll usually put Umami behind a reverse proxy (e.g. `stats.bwondercomics.com`) and set `UMAMI_BASE_URL=https://stats.bwondercomics.com`.
 
 ## Migrating from legacy `battlebros` names
 
-If you already installed the older unit/env names, you can migrate without losing data:
-
-```bash
-cd /srv/bwondercomics
-cp deploy/battlebros.env deploy/bwondercomics.env
-sudo cp deploy/bwondercomics.service /etc/systemd/system/bwondercomics.service
-sudo systemctl daemon-reload
-sudo systemctl disable --now battlebros
-sudo systemctl enable --now bwondercomics
-```
+If you already installed older unit/env names, see `deploy/legacy/` for the legacy units and update paths to `legacy/server.py`.
 
 If your existing data lives in `/srv/bwondercomics/var/battlebros`, either keep it (leave `DATA_ROOT` pointed there) or move it and update `DATA_ROOT`:
 

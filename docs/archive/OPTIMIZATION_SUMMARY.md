@@ -1,4 +1,4 @@
-# Battle Bros Comic Reader - Optimization Summary
+# Battle Bros Comic Reader - Optimization Summary (archived)
 
 ## What Was Done
 

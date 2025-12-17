@@ -1,4 +1,4 @@
-# Refactor Roadmap (Reader + Admin)
+# Refactor Roadmap (Reader + Admin) (archived)
 
 Goal: modularize the monolithic HTML-embedded JS without adding a heavy build step. Use native ES modules (`<script type="module">`) and keep CSS/HTML largely intact.
 

@@ -1,4 +1,4 @@
-# Battle Bros Comic Reader - Comprehensive Optimization Report
+# Battle Bros Comic Reader - Comprehensive Optimization Report (archived)
 
 **Date**: October 29, 2024  
 **Reviewer**: ComicBot (AI Comic Reader Specialist)  

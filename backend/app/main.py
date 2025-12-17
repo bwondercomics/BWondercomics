@@ -5,6 +5,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
+from starlette.responses import RedirectResponse
 from starlette.responses import Response
 from uuid import UUID
 
@@ -13,6 +14,8 @@ from .routes import files as file_routes
 from .routes import admin as admin_routes
 from .routes import auth as auth_routes
 from .routes import comments as comments_routes
+from .routes import posts as posts_routes
+from .routes import series_json as series_json_routes
 from .premium import is_premium_request_path
 from .umami_proxy import proxy_to_umami
 from .security import verify_token
@@ -29,7 +32,16 @@ async def handle_validation_error(_request: Request, _exc: RequestValidationErro
 
 @app.middleware("http")
 async def premium_gate(request: Request, call_next):
-    if is_premium_request_path(request.url.path):
+    from .db import SessionLocal
+
+    def _check_premium() -> bool:
+        db = SessionLocal()
+        try:
+            return is_premium_request_path(db, request.url.path)
+        finally:
+            db.close()
+
+    if await run_in_threadpool(_check_premium):
         token = request.cookies.get(settings.session_cookie_name)
         payload = verify_token(token)
         uid = payload.get("uid") if payload else None
@@ -70,12 +82,22 @@ async def premium_gate(request: Request, call_next):
 app.include_router(auth_routes.router)
 app.include_router(comments_routes.router)
 app.include_router(admin_routes.router)
+app.include_router(posts_routes.router)
+app.include_router(series_json_routes.router)
 app.include_router(file_routes.router)
 
 
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
+
+
+@app.get("/series/{series_id}/")
+def series_alias(series_id: str):
+    from .premium import sanitize_series_id
+
+    sid = sanitize_series_id(series_id)
+    return RedirectResponse(url=f"/index.html?series={sid}", status_code=307)
 
 
 @app.get("/analytics.js")

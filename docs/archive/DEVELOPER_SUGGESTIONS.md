@@ -1,4 +1,4 @@
-# Developer Suggestions Checklist
+# Developer Suggestions Checklist (archived)
 
 - Harden admin auth: server-side auth/session tokens, HTTPS-only cookies, rate-limit login; drop hardcoded password and avoid storing secrets in localStorage.
 - Clarify writes in production: decide on a write path (small backend or GitHub Actions) because `server.py` writes don’t work on static hosting; document the deployment flow.

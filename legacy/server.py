@@ -1,3 +1,8 @@
+"""Legacy single-file backend (deprecated).
+
+Kept for reference only. Use `backend/` (FastAPI + Postgres) for the current stack.
+"""
+
 import http.server
 import socketserver
 import http.client

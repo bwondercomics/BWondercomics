@@ -1,4 +1,4 @@
-# Battle Bros Comic - Visual Content Analysis
+# Battle Bros Comic - Visual Content Analysis (archived)
 
 ## Executive Summary
 

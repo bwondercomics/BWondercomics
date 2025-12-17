@@ -16,6 +16,7 @@ from ..file_ops import ALLOWED_IMAGE_EXTENSIONS, extract_numbers, renumber_files
 from ..models import User
 from ..rss import generate_rss
 from ..security import get_current_user
+from ..series_store import apply_series_data_save, apply_series_index_save
 from ..validation import is_admin_role
 
 
@@ -47,6 +48,31 @@ def save_file(payload: SaveRequest, request: Request, db: Session = Depends(get_
 
     if ".." in filename or filename.startswith(("/", "\\")):
         return JSONResponse(status_code=403, content={"error": "Invalid filename"})
+
+    # Virtual JSON endpoints backed by Postgres (hard cut; no disk writes).
+    if filename == "admin/series.json":
+        try:
+            apply_series_index_save(db, content)
+        except ValueError as exc:
+            return JSONResponse(status_code=400, content={"error": str(exc)})
+        return {"status": "success", "message": "Saved admin/series.json (database)"}
+
+    if filename == "admin/data.json":
+        try:
+            apply_series_data_save(db, "battle-bros", content)
+        except ValueError as exc:
+            return JSONResponse(status_code=400, content={"error": str(exc)})
+        return {"status": "success", "message": "Saved admin/data.json (database)"}
+
+    if filename.startswith("admin/series/") and filename.endswith("/data.json"):
+        parts = filename.split("/")
+        if len(parts) >= 4:
+            series_id = parts[2]
+            try:
+                apply_series_data_save(db, series_id, content)
+            except ValueError as exc:
+                return JSONResponse(status_code=400, content={"error": str(exc)})
+            return {"status": "success", "message": f"Saved {filename} (database)"}
 
     try:
         file_path = safe_path(filename)

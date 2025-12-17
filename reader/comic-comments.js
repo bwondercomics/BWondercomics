@@ -167,6 +167,11 @@ import { getActiveSeriesId } from './series.js';
         if (chapterSelect) {
             chapterSelect.addEventListener('change', () => handleChapterChange(ctx));
         }
+        window.addEventListener('unitLabelChanged', (event) => {
+            const singular = String(event?.detail?.singular || '').trim();
+            const titleEl = section.querySelector('.comments-title');
+            if (titleEl) titleEl.textContent = `Discuss This ${singular || 'Chapter'}`;
+        });
 
         applyAuthMode(ctx);
         refreshSession(ctx).finally(() => loadComments(ctx));

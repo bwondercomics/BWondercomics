@@ -1,4 +1,5 @@
 #!/bin/bash
+# LEGACY backup script (battlebros)
 set -euo pipefail
 
 BACKUP_DEST="${BACKUP_DEST:-/mnt/archive/backups/battlebros}"
@@ -18,4 +19,3 @@ if [[ "${RETENTION_DAYS}" =~ ^[0-9]+$ ]] && [[ "${RETENTION_DAYS}" -gt 0 ]]; the
 fi
 
 echo "Wrote ${outfile}"
-

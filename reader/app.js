@@ -64,6 +64,48 @@ import { getActiveSeriesId } from "./series.js";
   let statusMessage = "";
   let chapterMeta = {};
   let premiumOnly = false;
+  let unitLabelSingular = "Chapter";
+  let unitLabelPlural = "Chapters";
+
+  function getUnitLabels() {
+    const singular = String(unitLabelSingular || "").trim() || "Chapter";
+    const plural = String(unitLabelPlural || "").trim() || `${singular}s`;
+    return { singular, plural };
+  }
+
+  function applyUnitLabels() {
+    const { singular, plural } = getUnitLabels();
+    const singularUpper = singular.toUpperCase();
+    const pluralUpper = plural.toUpperCase();
+
+    const commentsTitle = document.querySelector(
+      "#comicCommentsSection .comments-title",
+    );
+    if (commentsTitle) commentsTitle.textContent = `Discuss This ${singular}`;
+
+    const endTitle = document.querySelector("#chapterEndOverlay h2");
+    if (endTitle) endTitle.textContent = `${singularUpper} COMPLETE`;
+
+    const endBody = document.querySelector("#chapterEndOverlay p");
+    if (endBody) {
+      endBody.textContent = `You've reached the end of this ${singular.toLowerCase()}! Ready for more?`;
+    }
+
+    const nextBtn = document.getElementById("nextChapterBtn");
+    if (nextBtn) nextBtn.textContent = `Next ${singular}`;
+
+    const restartBtn = document.getElementById("restartChapterBtn");
+    if (restartBtn) restartBtn.textContent = `Restart ${singular}`;
+
+    const galleryTitle = document.querySelector("#galleryOverlay h2");
+    if (galleryTitle) galleryTitle.textContent = `${singularUpper} GALLERY`;
+
+    window.dispatchEvent(
+      new CustomEvent("unitLabelChanged", {
+        detail: { singular, plural, singularUpper, pluralUpper },
+      }),
+    );
+  }
 
   // ==================== PROGRESS PERSISTENCE ====================
 
@@ -318,11 +360,11 @@ import { getActiveSeriesId } from "./series.js";
       const viewport = document.getElementById("viewport");
       if (viewport) {
         const message = premiumOnly
-          ? "This series is premium-only. Sign in with a premium account to view chapters."
-          : "No chapters found for this series yet.";
+          ? `This series is premium-only. Sign in with a premium account to view ${getUnitLabels().plural.toLowerCase()}.`
+          : `No ${getUnitLabels().plural.toLowerCase()} found for this series yet.`;
         viewport.innerHTML = `
           <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:24px;text-align:center;gap:10px;">
-            <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--accent);letter-spacing:2px;">NO CHAPTERS</div>
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--accent);letter-spacing:2px;">NO ${getUnitLabels().plural.toUpperCase()}</div>
             <div style="max-width:560px;line-height:1.6;opacity:0.95;">${message}</div>
           </div>
         `;
@@ -362,6 +404,9 @@ import { getActiveSeriesId } from "./series.js";
         statusMessage = data.statusMessage;
         chapterMeta = data.chapterMeta || {};
         premiumOnly = !!data.premiumOnly;
+        unitLabelSingular = data.unitLabelSingular || "Chapter";
+        unitLabelPlural = data.unitLabelPlural || "Chapters";
+        applyUnitLabels();
         console.log(`Chapter data loaded for series: ${seriesId}`);
       }
     } catch (err) {

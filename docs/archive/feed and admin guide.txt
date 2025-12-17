@@ -1,4 +1,4 @@
-Here’s a quick how-it-works guide for the feed and admin, so you can wire it up on the main site.
+Here’s a quick how-it-works guide for the feed and admin, so you can wire it up on the main site. (archived)
 
 Feed System
 

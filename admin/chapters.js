@@ -18,6 +18,7 @@ export function createChaptersApi({
   saveToServer,
   showSuccess,
   showError,
+  getUnitLabels,
   getDataFileUrl,
   getSaveFilename,
   getChaptersRoot,
@@ -28,6 +29,18 @@ export function createChaptersApi({
   const getDataUrl = () => (typeof getDataFileUrl === 'function' ? getDataFileUrl() : 'data.json');
   const getSaveFile = () => (typeof getSaveFilename === 'function' ? getSaveFilename() : 'admin/data.json');
   const getStorage = () => (typeof getStorageKey === 'function' ? getStorageKey() : STORAGE_KEY);
+  const labels = () => {
+    const fallback = { singular: 'Chapter', plural: 'Chapters' };
+    if (typeof getUnitLabels !== 'function') return fallback;
+    try {
+      const got = getUnitLabels() || {};
+      const singular = String(got.singular || '').trim() || fallback.singular;
+      const plural = String(got.plural || '').trim() || fallback.plural;
+      return { singular, plural };
+    } catch {
+      return fallback;
+    }
+  };
 
   let selectedPageIndex = null;
   let insertGutterIndex = 0;
@@ -442,12 +455,12 @@ export function createChaptersApi({
     try {
       await saveToServer(getSaveFile(), payload);
       if (showMessage && showSuccess) {
-        showSuccess('Chapters saved to disk.');
+        showSuccess(`Saved ${labels().plural}.`);
       }
     } catch (error) {
       console.error('Save chapters failed:', error);
       if (showError) {
-        showError('Failed to save chapters to disk. A draft is stored in your browser.');
+        showError(`Failed to save ${labels().plural}. A draft is stored in your browser.`);
       }
     }
   }
@@ -675,7 +688,7 @@ export function createChaptersApi({
     setMoveModeEnabled(false, { rerender: false });
     clearSelection({ rerender: false });
     state.currentEditingChapter = chapterName;
-    el.modalTitle.textContent = 'Edit Chapter';
+    el.modalTitle.textContent = `Edit ${labels().singular}`;
     el.chapterName.value = chapterName;
     if (el.chapterPremium) {
       el.chapterPremium.checked = !!(state.chapterMeta?.[chapterName]?.premium);
@@ -689,7 +702,7 @@ export function createChaptersApi({
     setMoveModeEnabled(false, { rerender: false });
     clearSelection({ rerender: false });
     state.currentEditingChapter = '';
-    el.modalTitle.textContent = 'Add New Chapter';
+    el.modalTitle.textContent = `Add New ${labels().singular}`;
     el.chapterName.value = '';
     if (el.chapterPremium) el.chapterPremium.checked = false;
     renderPageList([]);
@@ -708,7 +721,7 @@ export function createChaptersApi({
   async function saveChapterEdit() {
     const newName = getActiveChapterName();
     if (!newName) {
-      alert('Chapter name is required');
+      alert(`${labels().singular} name is required`);
       return;
     }
 

@@ -10,5 +10,4 @@ export const GITHUB_CONFIG = {
 };
 
 export const API_ENDPOINT = '/api/save';
-export const POSTS_FILE = 'posts.json';
 export const MEDIA_FILE = 'media.json';

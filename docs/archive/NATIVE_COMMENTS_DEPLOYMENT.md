@@ -1,4 +1,4 @@
-# Deploying Built-In Auth + Comments
+# Deploying Built-In Auth + Comments (archived)
 
 This project includes a lightweight self-hosted account + comments system in `server.py`.
 

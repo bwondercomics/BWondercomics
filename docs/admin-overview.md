@@ -4,7 +4,7 @@ This document covers the admin panel (content editor) architecture, data flow, a
 
 ## Entry Point and Shared Modules
 - `admin/app.js` — Main script; initializes the UI and wires up chapters/posts/media/designer tools.
-- `admin/config.js` — Constants: storage keys, GitHub repo/branch/file info, API endpoints, filenames (`posts.json`, `media.json`).
+- `admin/config.js` — Constants: storage keys, GitHub repo/branch/file info, API endpoints (used for JSON-on-disk saves).
 - `admin/dom.js` — Centralized DOM lookups for forms, buttons, lists, modals, and status elements.
 
 ## Feature Areas
@@ -12,15 +12,20 @@ This document covers the admin panel (content editor) architecture, data flow, a
 - Chapter management: Load/save chapters; add/edit/delete; reconcile pages with disk via `/api/list-images`; reorder pages (drag/drop and up/down); renumber flow with confirmation.
 - Page ops: Add/remove pages; ensure chapter folder creation via `/api/create-chapter`; delete images via `/api/delete-image`.
 - Status message: Editable site-wide status stored with chapters.
-- Blog/updates: CRUD for posts (`posts.json`), share flag, image + tags reuse, date formatting, preview text.
+- Blog/updates: CRUD for posts via the DB-backed API (`/api/admin/posts`), with draft/scheduled/published and a “publish date/time” field.
 - Media library: Load/save `media.json`; search/filter by tags/path; sync with disk via `/api/list-media`; apply media to posts; tag propagation from posts.
 - Preview/export: Chapter preview image navigation; JSON export/copy; share data assembly.
 - GitHub publish: Uses personal access token from localStorage to PUT `admin/data.json` to the configured repo/branch; fetches SHA if file exists; warns/alerts on failures.
 - UI: Modals for chapter edit, settings (token), renumber confirmation; indicators for unsaved changes; smooth scroll to sections.
 
 ## Data Paths and Persistence
-- Reads: `admin/data.json` (chapters + folders + status), `posts.json`, `media.json`; image paths under `chapters/`.
-- Writes (server): `/api/save` for `admin/data.json`, `posts.json`, `media.json`; `/api/create-chapter`, `/api/delete-image`, `/api/list-images`, `/api/list-media`.
+- Reads: `admin/data.json`/`admin/series/<id>/data.json` (DB-backed JSON views for chapters + folders + status), `media.json`; image paths under `chapters/`.
+- Writes (server):
+  - Chapters (DB): `/api/save` for `admin/data.json` and `admin/series/<id>/data.json` writes to Postgres (no disk write).
+  - Series index (DB): `/api/save` for `admin/series.json` writes to Postgres (no disk write).
+  - Media (disk): `/api/save` for `media.json`
+  - Posts (DB): `/api/admin/posts` (create/update/delete)
+  - Files/folders: `/api/create-chapter`, `/api/delete-image`, `/api/list-images`, `/api/list-media`
 - Local cache: `localStorage` (`STORAGE_KEY`) for draft chapters/status; GitHub token in `localStorage` (`GITHUB_TOKEN_KEY`).
 
 ## Runtime Flow (High Level)
@@ -38,7 +43,7 @@ flowchart TD
   D --> E[render dashboard]
   E --> F{User action}
   F -->|chapter CRUD/reorder| G[update chapters + save draft/server]
-  F -->|posts CRUD| H[update posts.json]
+  F -->|posts CRUD| H[call /api/admin/posts]
   F -->|media CRUD/sync| I[update media.json + sync disk]
   F -->|preview/export| J[render preview/copy/download]
   F -->|publish| K[PUT admin/data.json via GitHub API]
