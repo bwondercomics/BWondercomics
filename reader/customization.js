@@ -179,7 +179,7 @@
             if (!hasComnet) {
               buttons.push({
                 id: "comnet",
-                icon: "button%20icons/comicnet.webp",
+                icon: "assets/button-icons/comicnet.webp",
                 text: "COM1C_NET",
                 url: "#",
               });

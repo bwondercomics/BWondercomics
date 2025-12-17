@@ -66,37 +66,37 @@
                                        "buttons":  [
                                                        {
                                                            "id":  "btn1",
-                                                           "icon":  "button%20icons/bluesky.webp",
+                                                           "icon":  "assets/button-icons/bluesky.webp",
                                                            "text":  "Bluesky",
                                                            "url":  "https://bsky.app/profile/bwondercomics.com"
                                                        },
                                                        {
                                                            "id":  "btn2",
-                                                           "icon":  "button%20icons/patrons.webp",
+                                                           "icon":  "assets/button-icons/patrons.webp",
                                                            "text":  "Patreon",
                                                            "url":  "https://patreon.com/doylemelville2"
                                                        },
                                                        {
                                                            "id":  "btn5",
-                                                           "icon":  "button%20icons/discord.webp",
+                                                           "icon":  "assets/button-icons/discord.webp",
                                                            "text":  "Discord",
                                                            "url":  "https://discord.gg/your-server"
                                                        },
                                                        {
                                                            "id":  "btn3",
-                                                           "icon":  "button%20icons/artstation.webp",
+                                                           "icon":  "assets/button-icons/artstation.webp",
                                                            "text":  "ArtStation",
                                                            "url":  "https://doyle-melvilleii.artstation.com"
                                                        },
                                                        {
                                                            "id":  "btn4",
-                                                           "icon":  "button%20icons/buyprint.webp",
+                                                           "icon":  "assets/button-icons/buyprint.webp",
                                                            "text":  "Buy Print",
                                                            "url":  "https://bwondercomics.bigcartel.com/product/battle-bros-volume-1"
                                                        },
                                                        {
                                                            "id":  "comnet",
-                                                           "icon":  "button%20icons/comicnet.webp",
+                                                           "icon":  "assets/button-icons/comicnet.webp",
                                                            "text":  "COM1C_NET",
                                                            "url":  "#"
                                                        }

@@ -1,38 +1,38 @@
-# Battle Bros Admin Overview
+# BWonderComics Admin Overview
 
 This document covers the admin panel (content editor) architecture, data flow, and major features. Current code is being modularized; `admin/app.js` remains the primary entry point, with shared constants in `admin/config.js` and DOM references in `admin/dom.js`.
 
 ## Entry Point and Shared Modules
 - `admin/app.js` — Main script; initializes the UI and wires up chapters/posts/media/designer tools.
-- `admin/config.js` — Constants: storage keys, GitHub repo/branch/file info, API endpoints (used for JSON-on-disk saves).
+- `admin/config.js` — Constants: storage keys and API endpoints.
 - `admin/dom.js` — Centralized DOM lookups for forms, buttons, lists, modals, and status elements.
 
 ## Feature Areas
 - Auth/session: Uses the site's account system (`/api/login`, `/api/session`) and requires an `admin` role.
-- Chapter management: Load/save chapters; add/edit/delete; reconcile pages with disk via `/api/list-images`; reorder pages (drag/drop and up/down); renumber flow with confirmation.
+- Entry management (chapters/issues/etc): Load/save entries; add/edit/delete; reconcile pages with disk via `/api/list-images`; reorder pages (drag/drop and up/down); renumber flow with confirmation.
 - Page ops: Add/remove pages; ensure chapter folder creation via `/api/create-chapter`; delete images via `/api/delete-image`.
 - Status message: Editable site-wide status stored with chapters.
 - Blog/updates: CRUD for posts via the DB-backed API (`/api/admin/posts`), with draft/scheduled/published and a “publish date/time” field.
 - Media library: Load/save `media.json`; search/filter by tags/path; sync with disk via `/api/list-media`; apply media to posts; tag propagation from posts.
 - Preview/export: Chapter preview image navigation; JSON export/copy; share data assembly.
-- GitHub publish: Uses personal access token from localStorage to PUT `admin/data.json` to the configured repo/branch; fetches SHA if file exists; warns/alerts on failures.
-- UI: Modals for chapter edit, settings (token), renumber confirmation; indicators for unsaved changes; smooth scroll to sections.
+- UI: Modals for entry edit and renumber confirmation; indicators for unsaved changes; smooth scroll to sections.
+- Series settings: Each series can set its own singular/plural label (e.g., `Issue/Issues`, `Chapter/Chapters`) stored in `admin/series.json` and used across admin + reader UI.
 
 ## Data Paths and Persistence
-- Reads: `admin/data.json`/`admin/series/<id>/data.json` (DB-backed JSON views for chapters + folders + status), `media.json`; image paths under `chapters/`.
+- Reads: `admin/data.json`/`admin/series/<id>/data.json` (DB-backed JSON views for chapters + folders + status), `media.json`; image paths under `chapters/` and `comics/<seriesId>/chapters/`.
 - Writes (server):
   - Chapters (DB): `/api/save` for `admin/data.json` and `admin/series/<id>/data.json` writes to Postgres (no disk write).
   - Series index (DB): `/api/save` for `admin/series.json` writes to Postgres (no disk write).
   - Media (disk): `/api/save` for `media.json`
   - Posts (DB): `/api/admin/posts` (create/update/delete)
   - Files/folders: `/api/create-chapter`, `/api/delete-image`, `/api/list-images`, `/api/list-media`
-- Local cache: `localStorage` (`STORAGE_KEY`) for draft chapters/status; GitHub token in `localStorage` (`GITHUB_TOKEN_KEY`).
+- Local cache: `localStorage` (`STORAGE_KEY`) for draft chapters/status.
 
 ## Runtime Flow (High Level)
 1) `init` attaches handlers, upload handlers, checks session; shows login or dashboard.
 2) Dashboard load: fetch chapters → render list; fetch posts → render; fetch media → sync with disk → render.
-3) User actions: chapter CRUD/reorder, posts CRUD, media CRUD/sync, previews, exports, publish.
-4) Persistence: localStorage draft save on chapter updates; server saves on explicit actions; GitHub publish on request.
+3) User actions: entry CRUD/reorder, posts CRUD, media CRUD/sync, previews, exports.
+4) Persistence: localStorage draft save on entry updates; server saves (DB + disk) on explicit actions.
 
 ## Visual Flow (Admin)
 ```mermaid
@@ -46,8 +46,6 @@ flowchart TD
   F -->|posts CRUD| H[call /api/admin/posts]
   F -->|media CRUD/sync| I[update media.json + sync disk]
   F -->|preview/export| J[render preview/copy/download]
-  F -->|publish| K[PUT admin/data.json via GitHub API]
-  K --> L[GitHub Action deploys site]
 ```
 
 ### Chapter Edit/Save Flow
@@ -65,22 +63,7 @@ flowchart LR
   Q --> R[refresh chapter list + clear unsaved]
 ```
 
-### GitHub Publish Sequence
-```mermaid
-sequenceDiagram
-  participant AdminUI
-  participant GitHub
-  AdminUI->>AdminUI: read localStorage token
-  AdminUI-->>AdminUI: prompt if missing
-  AdminUI->>GitHub: GET contents admin/data.json (branch)
-  GitHub-->>AdminUI: 200 with sha OR 404
-  AdminUI->>GitHub: PUT admin/data.json (Base64 content, sha if present)
-  GitHub-->>AdminUI: 201/200 success
-  AdminUI-->>AdminUI: notify user (Published!)
-  Note right of GitHub: GitHub Actions deploys site
-```
-
 ## Near-Term Modularization Targets
-- Split `admin/app.js` by concern: auth/session, chapters/pages, posts/blog, media library, preview/export, GitHub/publish, utilities.
+- Split `admin/app.js` by concern: auth/session, chapters/pages, posts/blog, media library, preview/export, utilities.
 - Centralize helpers (escape/tag parsing/sorting) into a small utilities module.
-- Add happy-dom/Vitest coverage for core flows (chapter reorder/save, post save, media sync mapping, publish payload shape).
+- Add happy-dom/Vitest coverage for core flows (chapter reorder/save, post save, media sync mapping).

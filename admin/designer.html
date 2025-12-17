@@ -680,7 +680,6 @@
 	            const seriesId = sanitizeSeriesId(params.get('series') || '') || DEFAULT_SERIES_ID;
 
 	            const CONFIG_KEY = `battlebros_page_config:${seriesId}`;
-	            const GITHUB_TOKEN_KEY = 'battlebros_github_user_token';
 
 	            const FILE_URL = seriesId === DEFAULT_SERIES_ID
 	                ? 'page-config.json'
@@ -689,20 +688,13 @@
 	                ? 'admin/page-config.json'
 	                : `admin/series/${seriesId}/page-config.json`;
 
-	            const GITHUB_CONFIG = {
-	                owner: 'bwondercomics',
-	                repo: 'battle-bros-reader-dev',
-	                branch: 'main',
-	                dataFile: SAVE_FILENAME
-	            };
-
             const DEFAULT_BUTTONS = [
-                { id: 'btn1', icon: 'button icons/bluesky.webp', text: 'Bluesky', url: 'https://bsky.app/profile/bwondercomics.com' },
-                { id: 'btn2', icon: 'button icons/patrons.webp', text: 'Patreon', url: 'https://patreon.com/doylemelville2' },
-                { id: 'btn5', icon: 'button icons/discord.webp', text: 'Discord', url: 'https://discord.gg/your-server' },
-                { id: 'btn3', icon: 'button icons/artstation.webp', text: 'ArtStation', url: 'https://doyle-melvilleii.artstation.com' },
-                { id: 'btn4', icon: 'button icons/buyprint.webp', text: 'Buy Print', url: 'https://bwondercomics.bigcartel.com/product/battle-bros-volume-1' },
-                { id: 'comnet', icon: 'button icons/comicnet.webp', text: 'COM1C_NET', url: '#' }
+                { id: 'btn1', icon: 'assets/button-icons/bluesky.webp', text: 'Bluesky', url: 'https://bsky.app/profile/bwondercomics.com' },
+                { id: 'btn2', icon: 'assets/button-icons/patrons.webp', text: 'Patreon', url: 'https://patreon.com/doylemelville2' },
+                { id: 'btn5', icon: 'assets/button-icons/discord.webp', text: 'Discord', url: 'https://discord.gg/your-server' },
+                { id: 'btn3', icon: 'assets/button-icons/artstation.webp', text: 'ArtStation', url: 'https://doyle-melvilleii.artstation.com' },
+                { id: 'btn4', icon: 'assets/button-icons/buyprint.webp', text: 'Buy Print', url: 'https://bwondercomics.bigcartel.com/product/battle-bros-volume-1' },
+                { id: 'comnet', icon: 'assets/button-icons/comicnet.webp', text: 'COM1C_NET', url: '#' }
             ];
 
 	            let pageConfig = null;
@@ -1260,53 +1252,6 @@
 	                        throw new Error(data.error || `Failed to save ${SAVE_FILENAME}`);
 	                    }
 	                    showMessage(`Saved to ${SAVE_FILENAME}`, 'success');
-	
-	                    // Optional: publish to GitHub if a token is configured.
-	                    const token = localStorage.getItem(GITHUB_TOKEN_KEY);
-	                    if (token && confirm('Also publish this config to GitHub (updates GitHub Pages)?')) {
-	                        let sha = null;
-	                        try {
-	                            const currentFile = await fetch(
-	                                `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.dataFile}?ref=${GITHUB_CONFIG.branch}`,
-	                                {
-	                                    headers: {
-	                                        'Authorization': `Bearer ${token}`,
-	                                        'Accept': 'application/vnd.github.v3+json'
-	                                    }
-	                                }
-	                            );
-	                            if (currentFile.ok) {
-	                                const fileData = await currentFile.json();
-	                                sha = fileData.sha;
-	                            }
-	                        } catch (e) {
-	                            console.log('File may not exist yet, creating new file');
-	                        }
-	
-	                        const content = btoa(unescape(encodeURIComponent(JSON.stringify(pageConfig, null, 2))));
-	                        const response = await fetch(
-	                            `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${GITHUB_CONFIG.dataFile}`,
-	                            {
-	                                method: 'PUT',
-	                                headers: {
-	                                    'Authorization': `Bearer ${token}`,
-	                                    'Accept': 'application/vnd.github.v3+json',
-	                                    'Content-Type': 'application/json'
-	                                },
-	                                body: JSON.stringify({
-	                                    message: `Update page config via Designer - ${new Date().toISOString()}`,
-	                                    content: content,
-	                                    branch: GITHUB_CONFIG.branch,
-	                                    ...(sha && { sha: sha })
-	                                })
-	                            }
-	                        );
-	                        if (!response.ok) {
-	                            const errorData = await response.json().catch(() => ({}));
-	                            throw new Error(errorData.message || 'GitHub API Error');
-	                        }
-	                        showMessage('Published to GitHub.', 'success');
-	                    }
 	                } catch (error) {
 	                    console.error('Publish failed:', error);
 	                    showMessage('Publish failed: ' + error.message, 'error');

@@ -1,6 +1,7 @@
 # Docs index
 
 Recommended starting points:
+- `docs/SYSTEM_OVERVIEW.md` (how the parts work together)
 - `docs/ARCHITECTURE.md` (what runs where)
 - `deploy/README.md` (how to run it on a server)
 - `docs/admin-overview.md` (admin panel behavior)

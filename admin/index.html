@@ -1446,7 +1446,6 @@
 	        </div>
 	      </div>
 		      <nav class="admin-nav">
-		        <button class="btn-secondary nav-btn" id="btnSettings">Settings</button>
 		        <button class="btn-secondary nav-btn" id="btnChapters" type="button">Entries</button>
 		        <button class="btn-secondary nav-btn" id="btnBlog">Blog / Feed</button>
 		        <button class="btn-secondary nav-btn" id="btnMedia">Media</button>
@@ -1454,7 +1453,6 @@
 		        <button class="btn-secondary nav-btn" id="btnAnalytics" type="button">Analytics</button>
 		        <button class="btn-secondary nav-btn" id="btnDesigner" type="button">Page Designer</button>
 		        <button class="btn-secondary nav-btn" id="btnPreview">Preview Changes</button>
-		        <button class="btn-primary nav-btn nav-btn--primary" id="btnPublish">Publish to GitHub</button>
 		        <button class="btn-logout nav-btn nav-btn--danger" id="btnLogout">Logout</button>
 		      </nav>
 	    </header>
@@ -1569,9 +1567,7 @@
           </div>
         </div>
         <p style="margin-top: 20px; color: var(--accent); font-size: 0.9rem;">
-          <strong>Instructions:</strong> Copy this JSON and replace the "chapters" object in index.html (around line
-          1762)
-        </p>
+          <strong>Note:</strong> This section is for preview/export/backup. Saving entries and posts persists directly to the server.
         </p>
       </section>
 
@@ -1706,36 +1702,12 @@
     </div>
   </div>
 
-  <!-- ==================== SETTINGS MODAL ==================== -->
-  <div id="settingsModal" class="modal">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 class="modal-title">GitHub Settings</h2>
-        <button class="btn-close" id="btnCloseSettings">&times;</button>
-      </div>
-      <div class="form-editor">
-        <div class="form-group">
-          <label class="form-label">Your GitHub Personal Access Token</label>
-          <input type="password" id="githubToken" class="form-input" placeholder="ghp_xxxxxxxxxxxx" />
-          <p style="font-size: 0.8rem; color: var(--accent); margin-top: 5px;">
-            This token is stored in your browser only and never sent to the server.
-            <br>Create one at: <a href="https://github.com/settings/tokens" target="_blank"
-              style="color: var(--primary);">github.com/settings/tokens</a>
-            <br>Required scope: <strong>repo</strong>
-          </p>
-        </div>
-        <button class="btn-save" id="btnSaveToken">Save Token</button>
-        <div id="tokenSaveSuccess" style="display: none; margin-top: 10px;"></div>
-      </div>
-    </div>
-  </div>
-
   <!-- ==================== RENUMBER CONFIRMATION MODAL ==================== -->
   <div id="confirmModal" class="confirm-modal">
     <div class="confirm-content">
       <h2 class="confirm-title">Confirm Renumbering</h2>
       <p class="confirm-message">
-        The following files will be renamed in GitHub. This operation cannot be undone.
+        The following files will be renamed on disk. This operation cannot be undone.
       </p>
       <div id="changesList" class="changes-list"></div>
       <div class="confirm-actions">

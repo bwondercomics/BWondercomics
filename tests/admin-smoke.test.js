@@ -13,7 +13,6 @@ const domTemplate = `
   <button id="btnSaveStatus"></button>
   <div id="statusMessageStatus"></div>
   <button id="btnLogout"></button>
-  <button id="btnSettings"></button>
   <button id="btnBlog"></button>
   <div class="section"></div>
   <input id="postTitle" />
@@ -29,7 +28,6 @@ const domTemplate = `
   <div id="postList"></div>
   <div id="postStatus"></div>
   <button id="btnPreview"></button>
-  <button id="btnPublish"></button>
   <div id="previewSection"></div>
   <pre id="previewData"></pre>
   <button id="btnCopy"></button>
@@ -59,11 +57,6 @@ const domTemplate = `
   <button id="btnAddPage"></button>
   <button id="btnCloseModal"></button>
   <button id="btnCancelEdit"></button>
-  <div id="settingsModal"></div>
-  <button id="btnCloseSettings"></button>
-  <input id="githubToken" />
-  <button id="btnSaveToken"></button>
-  <div id="tokenSaveSuccess"></div>
   <button id="btnRenumberPages"></button>
   <div id="unsavedIndicator"></div>
   <div id="confirmModal"></div>
@@ -133,9 +126,6 @@ describe("admin app smoke", () => {
         if (url.includes("/api/list-media")) return okResp({ paths: [] });
         if (url.includes("/api/create-chapter")) return okResp({});
         if (url.includes("/api/renumber-chapter")) return okResp({ paths: [] });
-        if (url.includes("api.github.com/repos") && url.includes("contents/")) {
-          return okResp({ sha: "abc123" });
-        }
         if (url.includes("/api/save")) return okResp({});
       }
       return okResp({});
@@ -215,33 +205,6 @@ describe("admin app smoke", () => {
     expect(mediaSection.style.display).toBe("block");
     expect(document.getElementById("mediaList").textContent).toContain(
       "No media found",
-    );
-  });
-
-  it("fires publish flow with stubbed GitHub API", async () => {
-    vi.resetModules();
-    await import("../admin/app.js");
-    await waitTick();
-
-    // fake auth
-    document.getElementById("loginScreen").style.display = "none";
-    document.getElementById("adminDashboard").style.display = "block";
-
-    // preset a token so publish continues
-    localStorage.setItem("battlebros_github_user_token", "test-token");
-
-    // stub confirm to auto-approve
-    vi.stubGlobal("confirm", () => true);
-
-    // click publish
-    document.getElementById("btnPublish").click();
-    await waitTick();
-    await waitTick();
-    await waitTick();
-
-    // publish button should restore text (default label from DOM template is empty; check it's not "Publishing...")
-    expect(document.getElementById("btnPublish").textContent).not.toBe(
-      "Publishing...",
     );
   });
 });

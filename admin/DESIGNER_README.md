@@ -6,15 +6,8 @@ The Page Designer is a standalone visual editor that lets you customize your Bat
 
 ## 🚀 Quick Start
 
-1. **Start your local server:**
-   ```bash
-   cd c:\Users\dbmel\battle-bros-reader-dev
-   .\start-server.bat
-   ```
-
-2. **Access the Designer:**
-   - Open http://localhost:8000/admin/designer.html
-   - Or from the admin panel, click "🎨 Page Designer"
+1. Start the site stack (see `deploy/README.md`).
+2. Open `http://localhost:8000/admin/designer.html` (or click **Page Designer** from the admin panel).
 
 ## ✨ Features
 
@@ -57,13 +50,15 @@ The Page Designer is a standalone visual editor that lets you customize your Bat
 
 ### Publish
 - Click "🚀 Publish" to make changes live
-- Currently saves JSON to download
-- **TODO**: GitHub integration coming soon
+- Saves to the server via `POST /api/save`:
+  - Default series: `admin/page-config.json`
+  - Other series: `admin/series/<id>/page-config.json`
 
 ## 📁 Files
 
 - `admin/designer.html` - The visual designer tool
-- `admin/page-config.json` - Page configuration data
+- `admin/page-config.json` - Default series page configuration
+- `admin/series/<id>/page-config.json` - Per-series page configuration
 - Main reader will load this config automatically
 
 ## 🎯 How It Works
@@ -144,7 +139,6 @@ The Page Designer is a standalone visual editor that lets you customize your Bat
 
 ## 🚀 Next Steps
 
-- [ ] Implement GitHub publishing
 - [ ] Add image optimization
 - [ ] Add undo/redo functionality
 - [ ] Add export/import config feature
@@ -152,8 +146,8 @@ The Page Designer is a standalone visual editor that lets you customize your Bat
 
 ## 📝 Notes
 
-- This is a client-side tool (no server required)
-- All changes are stored in browser until published
+- Publishing requires the backend to be running (and an admin session cookie).
+- Draft changes are stored in the browser until published.
 - Safe to experiment - original files unchanged until publish
 - Works best in modern browsers (Chrome, Firefox, Edge, Safari)
 

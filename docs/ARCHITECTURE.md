@@ -4,11 +4,13 @@ This repo is “static-first”: the site is plain HTML/CSS/JS, and a small back
 
 ## Components
 - Frontend (static): `index.html`, `feed.html`, `media.html`, `comics.html`, plus `reader/` + `admin/` JS modules.
+- Static assets (site chrome): `assets/` (icons, banners, UI images used by the site/theme).
 - Backend (dynamic): FastAPI app in `backend/` (Docker-friendly).
 - Database: Postgres (recommended) for users, comments, and posts.
 
 ## Data sources
-- Chapters/entries + status message: Postgres (served to the frontend as DB-backed JSON at `admin/data.json` and `admin/series/<id>/data.json`).
+- Series + entries (including per-series entry labels) + status message: Postgres (served to the frontend as DB-backed JSON at `admin/data.json` and `admin/series/<id>/data.json`).
+- Entry page images: on disk under `chapters/` (default series) and `comics/<seriesId>/chapters/` (other series).
 - Blog/feed posts: Postgres `posts` table (supports draft/scheduled/published).
 - Comments + accounts: Postgres (`users`, `comments` tables).
 - Media library: `media.json` + files under `media/` (still JSON-on-disk for now).

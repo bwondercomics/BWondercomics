@@ -19,4 +19,4 @@ Static-first comic site (no build step) + a proper backend for the “dynamic st
 - Deployment: `deploy/README.md`
 
 ## Static hosting
-The frontend can still be deployed statically (GitHub Pages workflow exists), but you only get the full feature set when the backend is running.
+The frontend can be served statically, but you only get the full feature set when the backend is running.

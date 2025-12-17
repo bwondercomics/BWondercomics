@@ -1,7 +1,5 @@
 import {
   STORAGE_KEY,
-  GITHUB_TOKEN_KEY,
-  GITHUB_CONFIG,
   API_ENDPOINT,
   MEDIA_FILE,
 } from "./config.js";
@@ -1496,124 +1494,6 @@ function downloadJSON() {
   URL.revokeObjectURL(url);
 }
 
-// ---------------- GITHUB ----------------
-function showSettingsModal() {
-  el.settingsModal.classList.add("active");
-  const token = localStorage.getItem(GITHUB_TOKEN_KEY);
-  if (token) el.githubToken.value = token;
-}
-
-function hideSettingsModal() {
-  el.settingsModal.classList.remove("active");
-}
-
-function saveGitHubToken() {
-  const token = el.githubToken.value.trim();
-  if (!token) {
-    alert("Please enter a valid GitHub token");
-    return;
-  }
-  localStorage.setItem(GITHUB_TOKEN_KEY, token);
-  el.tokenSaveSuccess.textContent = "Token saved successfully!";
-  el.tokenSaveSuccess.className = "success-message";
-  el.tokenSaveSuccess.style.display = "block";
-  setTimeout(() => {
-    el.tokenSaveSuccess.style.display = "none";
-    hideSettingsModal();
-  }, 2000);
-}
-
-async function publishToGitHub() {
-  const token = localStorage.getItem(GITHUB_TOKEN_KEY);
-  if (!token) {
-    if (
-      confirm("GitHub token not found. Would you like to configure it now?")
-    ) {
-      showSettingsModal();
-    }
-    return;
-  }
-
-  if (!confirm("Publish changes to GitHub? This updates the live website."))
-    return;
-
-  const publishBtn = el.btnPublish;
-  const originalText = publishBtn.textContent;
-  const targetFile = getChaptersSaveFilename();
-
-  try {
-    publishBtn.disabled = true;
-    publishBtn.textContent = "Publishing...";
-
-    const dataToCommit = {
-      chapters: state.chapters,
-      chapterFolders: state.chapterFolders,
-      chapterMeta: state.chapterMeta,
-      statusMessage: state.statusMessage,
-      premiumOnly: !!state.premiumOnly,
-      lastUpdated: new Date().toISOString(),
-      publishedBy: "Admin Panel",
-    };
-
-    let sha = null;
-    try {
-      const currentFile = await fetch(
-        `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${targetFile}?ref=${GITHUB_CONFIG.branch}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/vnd.github.v3+json",
-          },
-        },
-      );
-      if (currentFile.ok) {
-        const fileData = await currentFile.json();
-        sha = fileData.sha;
-      }
-    } catch (e) {
-      console.log("File may not exist yet, creating new file");
-    }
-
-    const content = btoa(
-      unescape(encodeURIComponent(JSON.stringify(dataToCommit, null, 2))),
-    );
-
-    const response = await fetch(
-      `https://api.github.com/repos/${GITHUB_CONFIG.owner}/${GITHUB_CONFIG.repo}/contents/${targetFile}`,
-      {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/vnd.github.v3+json",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: `Update chapters via Admin Panel - ${new Date().toISOString()}`,
-          content,
-          branch: GITHUB_CONFIG.branch,
-          ...(sha && { sha }),
-        }),
-      },
-    );
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        `GitHub API error: ${response.status} - ${errorData.message || "Unknown error"}`,
-      );
-    }
-
-    publishBtn.textContent = "Published!";
-    alert("Published successfully! GitHub Action will deploy shortly.");
-  } catch (error) {
-    console.error("Publish error:", error);
-    alert("Publish failed. Please ensure your token has repo permissions.");
-  } finally {
-    publishBtn.textContent = originalText;
-    publishBtn.disabled = false;
-  }
-}
-
 // ---------------- UPLOAD ----------------
 function initUploadHandlers() {
   const uploadArea = document.getElementById("uploadArea");
@@ -2072,12 +1952,6 @@ function attachEventHandlers() {
     });
   }
 
-  // GitHub
-  el.btnSettings.addEventListener("click", showSettingsModal);
-  el.btnCloseSettings.addEventListener("click", hideSettingsModal);
-  el.btnSaveToken.addEventListener("click", saveGitHubToken);
-  el.btnPublish.addEventListener("click", publishToGitHub);
-
   // Renumber
   if (el.btnRenumberPages) {
     el.btnRenumberPages.addEventListener("click", renumberPages);
@@ -2086,9 +1960,6 @@ function attachEventHandlers() {
   // Close modals on backdrop
   el.editModal.addEventListener("click", (e) => {
     if (e.target === el.editModal) chaptersApi.hideModal();
-  });
-  el.settingsModal.addEventListener("click", (e) => {
-    if (e.target === el.settingsModal) hideSettingsModal();
   });
 }
 
