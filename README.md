@@ -3,11 +3,11 @@
 Static-first comic site (no build step) + a proper backend for the “dynamic stuff” (auth, comments, post scheduling, RSS, uploads, analytics proxy).
 
 ## Quick start (Docker)
-1) Copy env:
-   - `cp deploy/bwondercomics.env.example deploy/bwondercomics.env`
+1) Create env:
+   - `make env` (then fill in secrets in `deploy/bwondercomics.env`)
 2) Start the stack:
-   - `docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-compose.yml up -d --build`
-   - `docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-compose.yml exec bwondercomics-api alembic -c backend/alembic.ini upgrade head`
+   - `make up`
+   - `make migrate`
 3) Open:
    - `http://localhost:8000/` (site)
    - `http://localhost:8000/admin/` (admin)

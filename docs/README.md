@@ -2,6 +2,7 @@
 
 Recommended starting points:
 - `docs/SYSTEM_OVERVIEW.md` (how the parts work together)
+- `docs/OPERATIONS.md` (runbook + maintenance shortcuts)
 - `docs/ARCHITECTURE.md` (what runs where)
 - `deploy/README.md` (how to run it on a server)
 - `docs/admin-overview.md` (admin panel behavior)
