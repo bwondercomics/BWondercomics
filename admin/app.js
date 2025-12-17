@@ -537,7 +537,7 @@ async function editActiveSeries() {
   if (description === null) return;
 
   const coverImage = prompt(
-    "Series cover image path (optional).\n\nExamples:\n- banner3.png\n- comics/02/cover.png\n\nLeave blank to auto-pick the first accessible page in the library.",
+    "Series cover image path (optional).\n\nExamples:\n- assets/banner3.png\n- comics/02/cover.png\n\nLeave blank to auto-pick the first accessible page in the library.",
     current.coverImage || "",
   );
   if (coverImage === null) return;

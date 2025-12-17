@@ -268,8 +268,8 @@ Create this file to initialize the workflow:
       "chapters/01/06.png",
       "chapters/01/07.png",
       "chapters/01/08.png",
-      "banner1.png",
-      "banner2.png"
+      "assets/banner1.png",
+      "assets/banner2.png"
     ],
     "Chapter 2": [
       "chapters/02/01.png",

@@ -36,10 +36,10 @@
       leftPanel: {
         topText: "TO GO EVEN FURTHER BEYOND",
         bottomText: SUPPORT_TEXT_HTML,
-        image: "bookturn.gif"
+        image: "assets/bookturn.gif"
       },
       rightPanel: {
-        image: "banner3.png",
+        image: "assets/banner3.png",
         buttons: [
           { icon: "B", text: "Bluesky", url: "https://bsky.app/profile/bwondercomics.com" },
           { icon: "P", text: "Patreon", url: "https://patreon.com/doylemelville2" },

@@ -54,14 +54,14 @@
                     "leftPanel":  {
                                       "topText":  "TO GO EVEN FURTHER BEYOND",
                                       "bottomText":  "WANT TO SUPPORT THE COMIC? Buy the physical book at the bwondercomics store!",
-                                      "image":  "bookturn.gif",
+                                      "image":  "assets/bookturn.gif",
                                       "imageAlt":  "Battle Bros Volume 1 - Get the physical comic!",
                                       "emailLabel":  "JOIN THE EMAIL LIST!",
                                       "emailCta":  "Occasional dispatches from the Bros: updates, art, thatâ€™s it.",
                                       "emailAction":  "https://formspree.io/f/xjkjkvla"
                                   },
                     "rightPanel":  {
-                                       "image":  "banner3.png",
+                                       "image":  "assets/banner3.png",
                                        "imageAlt":  "Right illustration preview",
                                        "buttons":  [
                                                        {

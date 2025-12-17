@@ -9,7 +9,7 @@
   "orientation": "any",
   "icons": [
     {
-      "src": "panel.png",
+      "src": "assets/panel.png",
       "sizes": "any",
       "type": "image/png",
       "purpose": "any maskable"
@@ -18,7 +18,7 @@
   "categories": ["entertainment", "books"],
   "screenshots": [
     {
-      "src": "banner1.png",
+      "src": "assets/banner1.png",
       "sizes": "any",
       "type": "image/png"
     }

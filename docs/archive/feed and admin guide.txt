@@ -10,7 +10,7 @@ Feed System
 
 		feed.html fetches posts.json (no-cache), sorts newest-first, renders posts with safe HTML escaping, and links to rss.xml. Comment block is a placeholder—drop in Cusdis/Giscus embed where marked.
 		index.html right panel has “Latest Update” widget that fetches posts.json, picks the newest entry, and links to feed.html#<id>.
-		Assets: banner3.png is used as the right-panel background; latest widget/buttons have their own backgrounds.
+		Assets: assets/banner3.png is used as the right-panel background; latest widget/buttons have their own backgrounds.
 		Server
 
 	server.py extends SimpleHTTPRequestHandler.
