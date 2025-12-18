@@ -150,6 +150,9 @@ if settings.umami_proxy_path:
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
     )
     async def umami_proxy(request: Request, rest: str = ""):
+        if request.method in {"GET", "HEAD"} and request.url.path == settings.umami_proxy_path:
+            return RedirectResponse(url=f"{settings.umami_proxy_path}/", status_code=307)
+
         method = request.method.upper()
         incoming_path = request.url.path
         incoming_query = f"?{request.url.query}" if request.url.query else ""

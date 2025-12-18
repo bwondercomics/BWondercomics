@@ -46,13 +46,34 @@ def _rewrite_umami_response_body(body: bytes, content_type: str, prefix_path: st
         text = text.replace(f"{q}/_next/", f"{q}{prefix_path}/_next/")
         text = text.replace(f"{q}/script.js", f"{q}{prefix_path}/script.js")
 
-    text = re.sub(
-        r"\\b(href|src|action)=([\"\\\'])/(?!"
-        + re.escape(prefix_path.lstrip("/"))
-        + r"(?:/|$))",
-        r"\\1=\\2" + prefix_path + r"/",
-        text,
-    )
+    prefix_re = re.escape(prefix_path.lstrip("/"))
+
+    if ct != "text/html":
+        # Umami's Next.js app uses absolute paths for client-side routes like "/websites".
+        # Prefix quoted absolute paths so navigation stays within the proxy path.
+        #
+        # NOTE: Avoid rewriting HTML self-closing tags like `..."/>` by requiring a
+        # path segment start after the slash.
+        text = re.sub(
+            rf'(["\'`])/(?!/)(?!{prefix_re}(?:/|$))(?=[A-Za-z0-9_])',
+            rf"\1{prefix_path}/",
+            text,
+        )
+
+        if ct == "text/css":
+            # Handle CSS url(/...) references (with or without quotes).
+            text = re.sub(
+                rf'(?i)\burl\((["\']?)/(?!/)(?!{prefix_re}(?:/|$))(?=[A-Za-z0-9_])',
+                rf"url(\1{prefix_path}/",
+                text,
+            )
+
+    if ct == "text/html":
+        text = re.sub(
+            rf'\b(href|src|action)=(["\'])/(?!/)(?!{prefix_re}(?:/|$))',
+            rf"\1=\2{prefix_path}/",
+            text,
+        )
     return text.encode("utf-8")
 
 
@@ -209,4 +230,3 @@ def proxy_to_umami(
         resp_body = b""
 
     return resp_status, resp_reason or "", out_headers, resp_body
-

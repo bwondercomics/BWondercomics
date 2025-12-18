@@ -162,7 +162,7 @@ async function saveToServer(filename, content) {
 
 const DEFAULT_SERIES_ID = "battle-bros";
 const ACTIVE_SERIES_KEY = "battlebros_admin_active_series";
-const ANALYTICS_URL_KEY = "bwondercomics_admin_umami_url";
+const ANALYTICS_ENDPOINT = "/api/admin/analytics/summary";
 
 function defaultUnitLabelsForSeries(seriesId) {
   const id = sanitizeSeriesId(seriesId) || DEFAULT_SERIES_ID;
@@ -301,39 +301,74 @@ function showPreviewSection() {
   setActiveNav(el.btnPreview);
 }
 
-function getDefaultAnalyticsUrl() {
-  return `${window.location.origin}/umami`;
+function formatStat(value) {
+  if (value === null || value === undefined) return "—";
+  const num = Number(value);
+  if (Number.isNaN(num)) return "—";
+  return num.toLocaleString("en-US");
 }
 
-function normalizeAnalyticsUrl(raw = "") {
-  const trimmed = String(raw || "").trim();
-  if (!trimmed) return getDefaultAnalyticsUrl();
-  if (trimmed.startsWith("/")) {
-    return `${window.location.origin}${trimmed}`.replace(/\/+$/g, "");
+function setAnalyticsValue(target, value) {
+  if (!target) return;
+  target.textContent = formatStat(value);
+}
+
+function setAnalyticsStatus(message, isError = false) {
+  if (!el.analyticsStatus) return;
+  el.analyticsStatus.textContent = message || "";
+  el.analyticsStatus.style.display = message ? "block" : "none";
+  el.analyticsStatus.className = isError ? "error-message" : "success-message";
+}
+
+function renderAnalyticsSummary(summary) {
+  const ranges = summary?.ranges || {};
+  const last24h = ranges.last24h || {};
+  const last7d = ranges.last7d || {};
+
+  setAnalyticsValue(el.statViews24h, last24h.pageviews);
+  setAnalyticsValue(el.statVisitors24h, last24h.visitors);
+  setAnalyticsValue(el.statViews7d, last7d.pageviews);
+  setAnalyticsValue(el.statVisitors7d, last7d.visitors);
+
+  const ts = summary?.generatedAt ? new Date(summary.generatedAt) : null;
+  const tsText = ts ? ts.toLocaleString() : "just now";
+  const siteNote = summary?.websiteId ? ` for site ${summary.websiteId}` : "";
+  setAnalyticsStatus(`Updated ${tsText}${siteNote}.`);
+}
+
+function clearAnalyticsSummary() {
+  setAnalyticsValue(el.statViews24h, null);
+  setAnalyticsValue(el.statVisitors24h, null);
+  setAnalyticsValue(el.statViews7d, null);
+  setAnalyticsValue(el.statVisitors7d, null);
+}
+
+async function loadAnalyticsSummary({ showLoading = true } = {}) {
+  if (showLoading) setAnalyticsStatus("Loading analytics…");
+  try {
+    const res = await fetch(ANALYTICS_ENDPOINT, { cache: "no-store" });
+    let payload = null;
+    try {
+      payload = await res.json();
+    } catch (err) {
+      payload = null;
+    }
+
+    if (!res.ok) {
+      const errorText =
+        (payload && typeof payload === "object" && payload.error) ||
+        `HTTP ${res.status}`;
+      throw new Error(errorText);
+    }
+
+    renderAnalyticsSummary(payload || {});
+  } catch (err) {
+    clearAnalyticsSummary();
+    setAnalyticsStatus(
+      `Analytics error: ${err?.message || "Unable to load Umami stats."}`,
+      true,
+    );
   }
-  const withProto = trimmed.includes("://") ? trimmed : `http://${trimmed}`;
-  return withProto.replace(/\/+$/g, "");
-}
-
-function getAnalyticsUrl() {
-  return normalizeAnalyticsUrl(localStorage.getItem(ANALYTICS_URL_KEY) || "");
-}
-
-function setAnalyticsUrl(nextUrl) {
-  const normalized = normalizeAnalyticsUrl(nextUrl);
-  localStorage.setItem(ANALYTICS_URL_KEY, normalized);
-  return normalized;
-}
-
-function applyAnalyticsUrl(url, { forceReload = false } = {}) {
-  if (el.umamiUrlInput) el.umamiUrlInput.value = url;
-  if (el.btnAnalyticsOpen) el.btnAnalyticsOpen.href = url;
-  if (!el.analyticsFrame) return;
-
-  const nextSrc = forceReload
-    ? `${url}${url.includes("?") ? "&" : "?"}t=${Date.now()}`
-    : url;
-  if (el.analyticsFrame.src !== nextSrc) el.analyticsFrame.src = nextSrc;
 }
 
 function showAnalyticsSection() {
@@ -343,7 +378,7 @@ function showAnalyticsSection() {
     el.analyticsSection.scrollIntoView({ behavior: "smooth", block: "start" });
   }
   setActiveNav(el.btnAnalytics);
-  applyAnalyticsUrl(getAnalyticsUrl());
+  loadAnalyticsSummary({ showLoading: true });
 }
 
 async function loadSeriesIndex() {
@@ -1900,16 +1935,8 @@ function attachEventHandlers() {
   if (el.btnAnalytics) {
     el.btnAnalytics.addEventListener("click", showAnalyticsSection);
   }
-  if (el.btnAnalyticsReload) {
-    el.btnAnalyticsReload.addEventListener("click", () => {
-      applyAnalyticsUrl(getAnalyticsUrl(), { forceReload: true });
-    });
-  }
-  if (el.umamiUrlInput) {
-    el.umamiUrlInput.addEventListener("change", (e) => {
-      const next = setAnalyticsUrl(e.target.value || "");
-      applyAnalyticsUrl(next, { forceReload: true });
-    });
+  if (el.btnAnalyticsRefresh) {
+    el.btnAnalyticsRefresh.addEventListener("click", () => loadAnalyticsSummary({ showLoading: true }));
   }
   if (el.btnRefreshUsers) {
     el.btnRefreshUsers.addEventListener("click", async () => {

@@ -12,6 +12,13 @@ def _env_bool(name: str, default: bool = False) -> bool:
     return str(raw).strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+def _in_docker() -> bool:
+    try:
+        return Path("/.dockerenv").exists()
+    except Exception:
+        return False
+
+
 @dataclass(frozen=True)
 class Settings:
     base_dir: Path
@@ -29,6 +36,9 @@ class Settings:
     umami_proxy_path: str
     umami_upstream: str
     umami_port: int
+    umami_api_token: str
+    umami_api_username: str
+    umami_api_password: str
 
 
 def load_settings() -> Settings:
@@ -66,11 +76,15 @@ def load_settings() -> Settings:
     if umami_proxy_path and not umami_proxy_path.startswith("/"):
         umami_proxy_path = "/" + umami_proxy_path
     umami_proxy_path = (umami_proxy_path or "").rstrip("/")
-    umami_upstream = (os.environ.get("UMAMI_UPSTREAM") or "http://127.0.0.1:3000").strip().rstrip("/")
+    default_umami_upstream = "http://umami:3000" if _in_docker() else "http://127.0.0.1:3000"
+    umami_upstream = (os.environ.get("UMAMI_UPSTREAM") or default_umami_upstream).strip().rstrip("/")
     try:
         umami_port = int(os.environ.get("UMAMI_PORT") or "3000")
     except ValueError:
         umami_port = 3000
+    umami_api_token = (os.environ.get("UMAMI_API_TOKEN") or "").strip()
+    umami_api_username = (os.environ.get("UMAMI_API_USERNAME") or "").strip()
+    umami_api_password = (os.environ.get("UMAMI_API_PASSWORD") or "").strip()
 
     return Settings(
         base_dir=base_dir,
@@ -88,6 +102,9 @@ def load_settings() -> Settings:
         umami_proxy_path=umami_proxy_path,
         umami_upstream=umami_upstream,
         umami_port=umami_port,
+        umami_api_token=umami_api_token,
+        umami_api_username=umami_api_username,
+        umami_api_password=umami_api_password,
     )
 
 

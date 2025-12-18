@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import time
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
@@ -12,6 +13,8 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..models import Comment, User
 from ..security import get_current_user, public_user
+from ..settings import settings
+from ..umami_api import UmamiAPIError, fetch_umami_stats
 from ..validation import is_admin_role, sanitize_target
 
 
@@ -124,3 +127,30 @@ def admin_moderate_comment(payload: ModerateCommentRequest, request: Request, db
     db.commit()
     return {"status": "ok"}
 
+
+@router.get("/api/admin/analytics/summary")
+def admin_analytics_summary(request: Request, db: Session = Depends(get_db)):
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    now_ms = int(time.time() * 1000)
+    ranges = {
+        "last24h": (now_ms - 24 * 60 * 60 * 1000, now_ms),
+        "last7d": (now_ms - 7 * 24 * 60 * 60 * 1000, now_ms),
+    }
+
+    try:
+        stats = fetch_umami_stats(ranges)
+    except UmamiAPIError as exc:
+        status = exc.status or 502
+        return JSONResponse(status_code=status, content={"error": str(exc)})
+
+    return {
+        "source": "umami",
+        "websiteId": settings.umami_website_id,
+        "ranges": {
+            name: {**(stats.get(name, {}) or {}), "start": start, "end": end}
+            for name, (start, end) in ranges.items()
+        },
+        "generatedAt": datetime.now(timezone.utc).isoformat(),
+    }

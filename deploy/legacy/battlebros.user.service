@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=simple
 WorkingDirectory=/srv/bwondercomics
-EnvironmentFile=/srv/bwondercomics/deploy/battlebros.env
+EnvironmentFile=/srv/bwondercomics/deploy/legacy/battlebros.env
 Environment=PYTHONUNBUFFERED=1
 ExecStart=/usr/bin/python3 -u /srv/bwondercomics/legacy/server.py
 Restart=on-failure

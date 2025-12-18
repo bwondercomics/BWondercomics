@@ -48,7 +48,9 @@ The FastAPI app serves both:
 ## Analytics
 If Umami is enabled, the backend serves:
 - `GET /analytics.js` (injects the Umami tracker script)
-- `/umami/*` proxy (so the tracker + admin embed can be same-origin)
+- `/umami/*` proxy (so the tracker + admin API calls can be same-origin)
+Admin analytics pulls Umami stats via API (no embedded dashboard).
+In Docker, Umami runs as an optional compose profile (`analytics`) alongside the main stack.
 
 ## Legacy / compatibility
 - `posts.json` is treated as a legacy seed: the backend can import it into Postgres.

@@ -577,8 +577,8 @@ class CustomHandler(http.server.SimpleHTTPRequestHandler):
                         text = text.replace(f"{q}/script.js", f"{q}{prefix_path}/script.js")
 
                     text = re.sub(
-                        r'\\b(href|src|action)=([\"\\\'])/(?!' + re.escape(prefix_path.lstrip("/")) + r'(?:/|$))',
-                        r'\\1=\\2' + prefix_path + r'/',
+                        r'\b(href|src|action)=(["\'])/(?!/)(?!' + re.escape(prefix_path.lstrip("/")) + r'(?:/|$))',
+                        r'\1=\2' + prefix_path + r'/',
                         text,
                     )
 

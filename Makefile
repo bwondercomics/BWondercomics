@@ -1,4 +1,4 @@
-.PHONY: help env check-env up down restart ps logs api-logs db-logs migrate api-sh psql backup backup-db backup-files restore-db restore-files
+.PHONY: help env check-env up down restart ps logs api-logs db-logs migrate api-sh psql backup backup-db backup-files restore-db restore-files up-analytics analytics-up analytics-stop analytics-logs
 
 ENV_FILE ?= deploy/bwondercomics.env
 COMPOSE_FILE ?= deploy/bwondercomics-compose.yml
@@ -10,9 +10,11 @@ help:
 	@echo "BWonderComics shortcuts"
 	@echo ""
 	@echo "  make up              Start/rebuild stack"
+	@echo "  make up-analytics     Start stack + Umami"
 	@echo "  make migrate         Run DB migrations"
 	@echo "  make logs            Tail all logs"
 	@echo "  make api-logs         Tail API logs"
+	@echo "  make analytics-logs   Tail Umami logs"
 	@echo "  make ps              Show container status"
 	@echo ""
 	@echo "  make backup           Backup DB + files to $(BACKUP_DIR)/"
@@ -34,6 +36,15 @@ check-env:
 up: check-env
 	$(COMPOSE) up -d --build
 
+up-analytics: check-env
+	$(COMPOSE) --profile analytics up -d --build
+
+analytics-up: check-env
+	$(COMPOSE) --profile analytics up -d umami umami-db
+
+analytics-stop: check-env
+	$(COMPOSE) stop umami umami-db
+
 down: check-env
 	$(COMPOSE) down
 
@@ -48,6 +59,9 @@ logs: check-env
 
 api-logs: check-env
 	$(COMPOSE) logs -f --tail=200 bwondercomics-api
+
+analytics-logs: check-env
+	$(COMPOSE) logs -f --tail=200 umami
 
 db-logs: check-env
 	$(COMPOSE) logs -f --tail=200 bwondercomics-db

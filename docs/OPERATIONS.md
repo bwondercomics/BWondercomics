@@ -33,6 +33,17 @@ If you don’t have `make`, run the equivalent commands shown in `Makefile`.
 3. Run migrations: `make migrate`
 4. Optional: tail logs: `make api-logs`
 
+### Enable analytics (Umami)
+1. In `deploy/bwondercomics.env`, set:
+   - `UMAMI_DB_PASSWORD` (generate: `openssl rand -hex 24`)
+   - `UMAMI_APP_SECRET` (generate: `openssl rand -hex 32`)
+   - `UMAMI_API_USERNAME` and `UMAMI_API_PASSWORD` (Umami user for the admin analytics API; create a read-only account)
+2. Start Umami: `make analytics-up` (or `make up-analytics` on a fresh server)
+3. Open:
+   - Umami via the site proxy: `http://localhost:8000/umami/`
+   - Admin analytics summary: `http://localhost:8000/admin/` → **Analytics** (shows counts fetched from Umami; no embedded dashboard)
+4. After creating a site in Umami, set `UMAMI_WEBSITE_ID=...` in `deploy/bwondercomics.env`, then run `make restart`.
+
 ### Back up everything that matters
 The project has two kinds of “state”:
 - **Database state (Postgres)**: users, comments, posts, series, entries
