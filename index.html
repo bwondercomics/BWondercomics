@@ -2410,17 +2410,17 @@
           aria-hidden="true"></span>
       </div>
       <select id="chapter" aria-label="Select chapter"></select>
-		      <div class="nav-links">
-		        <button id="galleryBtn" class="nav-link" aria-label="Open Cover Gallery" title="Cover Gallery">
-		          COVERS
-		        </button>
-		        <a class="nav-link" href="comics.html">Comics</a>
-		        <a class="nav-link" href="media.html">Media</a>
-            <a class="nav-link admin-link" id="adminNavLink" href="admin/" target="_blank" rel="noopener noreferrer"
-              style="display:none;">Admin</a>
-		      </div>
-		    </div>
-		  </header>
+      <div class="nav-links">
+        <button id="galleryBtn" class="nav-link" aria-label="Open Cover Gallery" title="Cover Gallery">
+          COVERS
+        </button>
+        <a class="nav-link" href="comics.html">Comics</a>
+        <a class="nav-link" href="media.html">Media</a>
+        <a class="nav-link admin-link" id="adminNavLink" href="admin/" target="_blank" rel="noopener noreferrer"
+          style="display:none;">Admin</a>
+      </div>
+    </div>
+  </header>
 
   <!-- ==================== MAIN VIEWER ==================== -->
   <main>
@@ -2431,8 +2431,8 @@
           <div class="left-panel-text-top">TO GO EVEN FURTHER BEYOND</div>
           <div class="preview" id="leftPreview" aria-hidden="false">
             <picture>
-              <img class="panel-preview-img" src="assets/bookturn.gif" alt="Battle Bros Volume 1 - Get the physical comic!"
-                id="bookTurnPromo" />
+              <img class="panel-preview-img" src="assets/bookturn.gif"
+                alt="Battle Bros Volume 1 - Get the physical comic!" id="bookTurnPromo" />
             </picture>
             <div class="preview-arrow" aria-hidden="true"></div>
           </div>
@@ -2540,53 +2540,53 @@
           <h3 class="comments-title">Discuss This Chapter</h3>
           <div class="comment-placeholder">Loading comments...</div>
         </div>
-        </div>
-
       </div>
-      <!-- End viewer-content-wrapper -->
 
-      <!-- Right Preview Panel -->
-      <aside class="side-panel right" id="rightPanel">
-        <div class="latest-update" id="latestUpdate">
-          <div class="latest-heading-row">
-            <div class="latest-heading">BWC FEED</div>
-            <div class="latest-author">DOYLE MELVILLE II</div>
-          </div>
-          <div class="latest-body" id="latestBody">
-            <div class="latest-loading">Loading...</div>
-          </div>
+    </div>
+    <!-- End viewer-content-wrapper -->
+
+    <!-- Right Preview Panel -->
+    <aside class="side-panel right" id="rightPanel">
+      <div class="latest-update" id="latestUpdate">
+        <div class="latest-heading-row">
+          <div class="latest-heading">BWC FEED</div>
+          <div class="latest-author">DOYLE MELVILLE II</div>
         </div>
+        <div class="latest-body" id="latestBody">
+          <div class="latest-loading">Loading...</div>
+        </div>
+      </div>
 
-        <div class="right-stack">
-          <div class="preview" id="rightPreview" aria-hidden="false">
-            <picture>
-              <source srcset="assets/banner3.png" type="image/webp" />
-              <img class="panel-preview-img" src="assets/banner3.png" alt="Right illustration preview" />
-            </picture>
-          </div>
-          <div class="panel-buttons" id="dynamicButtons">
-            <div class="comicnet-panel" id="comicNetPanel">
-              <h4>Indie Comics</h4>
-              <div class="comicnet-list">
-                <div class="comicnet-item">
-                  <a class="comicnet-link" href="https://www.steve-hogan.com/comics" target="_blank"
-                    rel="noopener noreferrer">
-                    <img class="comicnet-avatar" src="com1cshare/steve.jpg" alt="Steve Hogan cover" />
-                    <span>MILKY ZEST by Steve Hogan</span>
-                  </a>
-                </div>
-                <div class="comicnet-item">
-                  <a class="comicnet-link" href="https://kideastwood.blogspot.com/" target="_blank"
-                    rel="noopener noreferrer">
-                    <img class="comicnet-avatar" src="com1cshare/connor.jpg" alt="Connor Tierney cover" />
-                    <span>KID EASTWOOD by Connor Tierney</span>
-                  </a>
-                </div>
+      <div class="right-stack">
+        <div class="preview" id="rightPreview" aria-hidden="false">
+          <picture>
+            <source srcset="assets/banner3.png" type="image/webp" />
+            <img class="panel-preview-img" src="assets/banner3.png" alt="Right illustration preview" />
+          </picture>
+        </div>
+        <div class="panel-buttons" id="dynamicButtons">
+          <div class="comicnet-panel" id="comicNetPanel">
+            <h4>Indie Comics</h4>
+            <div class="comicnet-list">
+              <div class="comicnet-item">
+                <a class="comicnet-link" href="https://www.steve-hogan.com/comics" target="_blank"
+                  rel="noopener noreferrer">
+                  <img class="comicnet-avatar" src="com1cshare/steve.jpg" alt="Steve Hogan cover" />
+                  <span>MILKY ZEST by Steve Hogan</span>
+                </a>
+              </div>
+              <div class="comicnet-item">
+                <a class="comicnet-link" href="https://kideastwood.blogspot.com/" target="_blank"
+                  rel="noopener noreferrer">
+                  <img class="comicnet-avatar" src="com1cshare/connor.jpg" alt="Connor Tierney cover" />
+                  <span>KID EASTWOOD by Connor Tierney</span>
+                </a>
               </div>
             </div>
           </div>
         </div>
-    </div>
+      </div>
+      </div>
     </aside>
     </div>
   </main>
@@ -2664,7 +2664,7 @@
 
   <script type="module" src="reader/app.js"></script>
   <script type="module" src="reader/customization.js"></script>
-  <script type="module" src="reader/comic-comments.js"></script>
+  <!-- comic-comments.js now loads on-demand when user clicks comments button -->
   <script>
     // Wrap button text characters so hover can animate each letter
     (() => {
@@ -2703,8 +2703,11 @@
 
   </script>
   <script>
-    // Reader comments toggle button (robust fallback)
+    // Reader comments toggle button with code splitting
     (() => {
+      let commentsModuleLoaded = false;
+      let commentsModuleLoading = false;
+
       const bind = () => {
         const btn = document.getElementById("commentToggleBtn");
         const panel = document.getElementById("comicCommentsSection");
@@ -2722,8 +2725,32 @@
           }
         };
 
-        btn.addEventListener("click", (e) => {
+        const loadCommentsModule = async () => {
+          if (commentsModuleLoaded) return;
+          if (commentsModuleLoading) return;
+
+          commentsModuleLoading = true;
+          try {
+            // Code splitting: dynamic import of comments module
+            await import('./reader/comic-comments.js');
+            commentsModuleLoaded = true;
+          } catch (err) {
+            console.error('Failed to load comments module:', err);
+          } finally {
+            commentsModuleLoading = false;
+          }
+        };
+
+        btn.addEventListener("click", async (e) => {
           e.preventDefault();
+
+          // Load module if opening comments for first time
+          const willShow = panel.classList.contains("collapsed");
+          if (willShow && !commentsModuleLoaded) {
+            await loadCommentsModule();
+          }
+
+          // Toggle comments
           if (typeof window.toggleReaderComments === "function") {
             try {
               window.toggleReaderComments();
