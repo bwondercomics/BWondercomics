@@ -181,6 +181,7 @@ if settings.umami_proxy_path:
         return response
 
 
-# Keep the site static-first: mount the repository root as the web root.
-# API routes take precedence because this mount is registered last.
-app.mount("/", StaticFiles(directory=str(settings.base_dir), html=True), name="static")
+# Serve production-built files from dist/ directory
+# Use 'npm run build' to generate optimized files
+# For development, use 'npm run dev' instead (runs on port 3000)
+app.mount("/", StaticFiles(directory=str(settings.base_dir / "dist"), html=True), name="static")

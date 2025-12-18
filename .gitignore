@@ -17,3 +17,10 @@ deploy/bwondercomics.env
 
 # Battle Bros persistent server data (users/comments)
 var/
+
+# Vite build output and cache
+dist/
+dist-ssr/
+*.local
+.vite/
+node_modules/.vite/

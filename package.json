@@ -4,6 +4,9 @@
     "description": "Battle Bros comic reader",
     "type": "module",
     "scripts": {
+        "dev": "vite",
+        "build": "vite build",
+        "preview": "vite preview",
         "test": "vitest run",
         "test:watch": "vitest",
         "test:ui": "vitest --ui",
@@ -17,6 +20,8 @@
         "@vitest/ui": "^1.0.4",
         "happy-dom": "^12.10.3",
         "prettier": "^3.7.4",
+        "terser": "^5.44.1",
+        "vite": "^5.4.11",
         "vitest": "^1.0.4"
     },
     "keywords": [
