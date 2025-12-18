@@ -29,18 +29,60 @@ import {
   goToNextChapter,
   changeChapter,
 } from "./overlays.js";
-import {
-  renderGallery,
-  toggleGallery,
-  attachGalleryButton,
-} from "./gallery.js";
-import {
-  showControlsBar,
-  onFullscreenChange,
-  toggleFullscreen,
-  handleMouseEnterControls,
-  handleMouseLeaveControls,
-} from "./fullscreen.js";
+
+// Code splitting: Lazy load gallery and fullscreen modules on-demand
+let galleryModule = null;
+let fullscreenModule = null;
+
+async function loadGalleryModule() {
+  if (!galleryModule) {
+    galleryModule = await import("./gallery.js");
+  }
+  return galleryModule;
+}
+
+async function loadFullscreenModule() {
+  if (!fullscreenModule) {
+    fullscreenModule = await import("./fullscreen.js");
+  }
+  return fullscreenModule;
+}
+
+// Wrapper functions that load modules on-demand
+async function renderGallery(...args) {
+  const mod = await loadGalleryModule();
+  return mod.renderGallery(...args);
+}
+
+async function attachGalleryButton() {
+  const mod = await loadGalleryModule();
+  return mod.attachGalleryButton();
+}
+
+async function toggleFullscreen() {
+  const mod = await loadFullscreenModule();
+  return mod.toggleFullscreen();
+}
+
+async function onFullscreenChange(...args) {
+  const mod = await loadFullscreenModule();
+  return mod.onFullscreenChange(...args);
+}
+
+async function showControlsBar() {
+  const mod = await loadFullscreenModule();
+  return mod.showControlsBar();
+}
+
+async function handleMouseEnterControls() {
+  const mod = await loadFullscreenModule();
+  return mod.handleMouseEnterControls();
+}
+
+async function handleMouseLeaveControls() {
+  const mod = await loadFullscreenModule();
+  return mod.handleMouseLeaveControls();
+}
 import { renderLatestUpdate } from "./latest.js";
 import { initEmailSignupForm } from "./email.js";
 import { getActiveSeriesId } from "./series.js";

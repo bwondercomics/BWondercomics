@@ -14,6 +14,22 @@ const VOLUME_EXCLUSIVES = [
   },
 ];
 
+// Intersection Observer for lazy loading gallery thumbnails
+const imageObserver = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const img = entry.target;
+      if (img.dataset.src) {
+        img.src = img.dataset.src;
+        img.removeAttribute('data-src');
+        imageObserver.unobserve(img);
+      }
+    }
+  });
+}, {
+  rootMargin: '50px' // Start loading 50px before image enters viewport
+});
+
 function getChapterNumber(chapterName = "") {
   const match = String(chapterName).match(/(\d+)/);
   return match ? match[1] : "";
@@ -79,9 +95,16 @@ export function renderGallery(chapterOrder, chapters, options = {}) {
 
     const thumb = document.createElement("img");
     thumb.className = "chapter-thumb";
-    thumb.src = coverUrl;
+    // Use data-src for lazy loading via Intersection Observer
+    thumb.dataset.src = coverUrl;
     thumb.alt = name;
-    thumb.loading = "lazy";
+    // Lightweight placeholder (1x1 transparent pixel)
+    thumb.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='150'%3E%3Crect width='100' height='150' fill='%23111'/%3E%3C/svg%3E";
+
+    // Observe for lazy loading
+    if (imageObserver) {
+      imageObserver.observe(thumb);
+    }
 
     const info = document.createElement("div");
     info.className = "chapter-info";
@@ -107,9 +130,13 @@ export function renderGallery(chapterOrder, chapters, options = {}) {
 
     const thumb = document.createElement("img");
     thumb.className = "chapter-thumb";
-    thumb.src = cover.image;
+    thumb.dataset.src = cover.image;
     thumb.alt = cover.title;
-    thumb.loading = "lazy";
+    thumb.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='150'%3E%3Crect width='100' height='150' fill='%23111'/%3E%3C/svg%3E";
+
+    if (imageObserver) {
+      imageObserver.observe(thumb);
+    }
 
     const info = document.createElement("div");
     info.className = "chapter-info";
@@ -141,9 +168,14 @@ export function renderGallery(chapterOrder, chapters, options = {}) {
 
     const thumb = document.createElement("img");
     thumb.className = "chapter-thumb";
-    if (coverUrl) thumb.src = coverUrl;
+    if (coverUrl) thumb.dataset.src = coverUrl;
     thumb.alt = name;
-    thumb.loading = "lazy";
+    thumb.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='150'%3E%3Crect width='100' height='150' fill='%23111'/%3E%3C/svg%3E";
+
+    if (imageObserver && coverUrl) {
+      imageObserver.observe(thumb);
+    }
+
     thumb.onerror = () => {
       // Keep the card usable even if no public cover exists.
       thumb.removeAttribute("src");

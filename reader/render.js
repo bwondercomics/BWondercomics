@@ -92,6 +92,10 @@ export function loadImage(imgEl, spinnerEl, url) {
   const pageNum = state.pages.indexOf(url) + 1;
   imgEl.alt = `${state.currentChapter} - page ${pageNum}`;
 
+  // Performance: Add lazy loading and async decoding
+  imgEl.loading = 'eager'; // Eager loading for comic pages (user is actively reading)
+  imgEl.decoding = 'async'; // Async decoding prevents blocking the main thread
+
   imgEl.src = url;
 
   preloadImage(url).catch(() => { });
