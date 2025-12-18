@@ -546,7 +546,7 @@ async function createNewSeries() {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ chapterFolder: `comics/${id}/chapters` }),
-  }).catch(() => {});
+  }).catch(() => { });
 
   state.seriesIndex = nextIndex;
   await switchSeries(id);
@@ -577,11 +577,11 @@ async function editActiveSeries() {
 
   const premiumOnly = current.premiumOnly
     ? window.confirm(
-        "Series is currently PREMIUM-ONLY.\n\nOK = keep premium-only\nCancel = make public",
-      )
+      "Series is currently PREMIUM-ONLY.\n\nOK = keep premium-only\nCancel = make public",
+    )
     : window.confirm(
-        "Series is currently PUBLIC.\n\nOK = make premium-only\nCancel = keep public",
-      );
+      "Series is currently PUBLIC.\n\nOK = make premium-only\nCancel = keep public",
+    );
 
   const defaults = defaultUnitLabelsForSeries(id);
   const unitLabelSingular = (
@@ -596,19 +596,19 @@ async function editActiveSeries() {
     series: seriesList.map((s) =>
       s && s.id === id
         ? (() => {
-            const next = {
-              ...s,
-              title: title.trim() || id,
-              description: description.trim(),
-              premiumOnly,
-              unitLabelSingular,
-              unitLabelPlural,
-            };
-            const cover = String(coverImage || "").trim();
-            if (cover) next.coverImage = cover;
-            else delete next.coverImage;
-            return next;
-          })()
+          const next = {
+            ...s,
+            title: title.trim() || id,
+            description: description.trim(),
+            premiumOnly,
+            unitLabelSingular,
+            unitLabelPlural,
+          };
+          const cover = String(coverImage || "").trim();
+          if (cover) next.coverImage = cover;
+          else delete next.coverImage;
+          return next;
+        })()
         : s,
     ),
   };
@@ -718,7 +718,7 @@ function renderPosts() {
         ? '<span style="color: var(--accent); font-size: 0.85rem;">Draft</span>'
         : post.status === "scheduled"
           ? '<span style="color: var(--primary); font-size: 0.85rem;">Scheduled</span>'
-        : '<span style="color: var(--success); font-size: 0.85rem;">Published</span>';
+          : '<span style="color: var(--success); font-size: 0.85rem;">Published</span>';
     const shareLabel =
       post.share === false
         ? '<span style="color: var(--danger); font-size: 0.85rem;">Not broadcasting</span>'
@@ -763,7 +763,7 @@ async function loadPosts() {
     if (!response.ok) {
       throw new Error(
         data.error ||
-          "Unable to load posts. Make sure you are signed in as an admin (via comments login).",
+        "Unable to load posts. Make sure you are signed in as an admin (via comments login).",
       );
     }
     const posts = Array.isArray(data.posts) ? data.posts : [];
@@ -1048,10 +1048,10 @@ async function loadMedia() {
     const data = await response.json();
     state.mediaItems = Array.isArray(data)
       ? data.map((m) => ({
-          id: m.id || generateMediaId(),
-          path: m.path || "",
-          tags: Array.isArray(m.tags) ? m.tags : parseTags(m.tags || ""),
-        }))
+        id: m.id || generateMediaId(m.path),
+        path: m.path || "",
+        tags: Array.isArray(m.tags) ? m.tags : parseTags(m.tags || ""),
+      }))
       : [];
   } catch (error) {
     console.warn("Error loading media.json, starting empty:", error);
@@ -1188,7 +1188,7 @@ async function loadUsers() {
     if (!res.ok) {
       throw new Error(
         data.error ||
-          "Unable to load users. Make sure you are signed in as an admin (via comments login).",
+        "Unable to load users. Make sure you are signed in as an admin (via comments login).",
       );
     }
     const users = Array.isArray(data.users) ? data.users : [];
@@ -1294,7 +1294,7 @@ async function syncMediaFromDisk(showMessage = true) {
         }
       } else {
         state.mediaItems.push({
-          id: generateMediaId(),
+          id: generateMediaId(p),
           path: p,
           tags: mergeTags([], inferredTags, postTags),
         });
@@ -1329,7 +1329,7 @@ async function upsertMediaEntry(path, tags = []) {
     existing.tags = merged;
   } else {
     state.mediaItems.push({
-      id: generateMediaId(),
+      id: generateMediaId(path),
       path,
       tags: normalizedTags,
     });
@@ -1351,7 +1351,7 @@ async function addMediaItem() {
     existing.tags = tags;
     setMediaStatus("Updated existing media tags.");
   } else {
-    state.mediaItems.push({ id: generateMediaId(), path, tags });
+    state.mediaItems.push({ id: generateMediaId(path), path, tags });
     setMediaStatus("Added media item.");
   }
 

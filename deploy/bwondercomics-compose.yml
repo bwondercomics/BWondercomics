@@ -1,7 +1,6 @@
 services:
   bwondercomics-db:
     image: postgres:16-alpine
-    container_name: bwondercomics-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${BWC_DB_NAME:-bwondercomics}
@@ -21,7 +20,6 @@ services:
     build:
       context: ..
       dockerfile: backend/Dockerfile
-    container_name: bwondercomics-api
     restart: unless-stopped
     depends_on:
       bwondercomics-db:
@@ -41,7 +39,6 @@ services:
 
   umami-db:
     image: postgres:16-alpine
-    container_name: umami-db
     restart: unless-stopped
     profiles: ["analytics"]
     environment:
@@ -58,7 +55,6 @@ services:
 
   umami:
     image: ghcr.io/umami-software/umami:postgresql-latest
-    container_name: umami
     restart: unless-stopped
     profiles: ["analytics"]
     init: true

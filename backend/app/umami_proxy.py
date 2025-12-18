@@ -48,7 +48,7 @@ def _rewrite_umami_response_body(body: bytes, content_type: str, prefix_path: st
 
     prefix_re = re.escape(prefix_path.lstrip("/"))
 
-    if ct != "text/html":
+    if ct not in ("text/html", "application/javascript"):
         # Umami's Next.js app uses absolute paths for client-side routes like "/websites".
         # Prefix quoted absolute paths so navigation stays within the proxy path.
         #

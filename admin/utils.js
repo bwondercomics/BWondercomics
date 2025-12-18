@@ -88,9 +88,35 @@ export function pagesEqual(a = [], b = []) {
   return true;
 }
 
-export function generateMediaId() {
-  if (window.crypto?.randomUUID) {
-    return window.crypto.randomUUID();
+/**
+ * Generate a simple hash from a string (FNV-1a algorithm)
+ */
+function simpleHash(str) {
+  let hash = 2166136261; // FNV offset basis
+  for (let i = 0; i < str.length; i++) {
+    hash ^= str.charCodeAt(i);
+    hash *= 16777619; // FNV prime
   }
-  return `media-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  return (hash >>> 0).toString(16); // Convert to unsigned 32-bit hex
 }
+
+/**
+ * Generate a stable media ID based on the file path.
+ * Same path always produces the same ID.
+ */
+export function generateMediaId(path = '') {
+  if (!path) {
+    // Fallback to random ID if no path provided
+    if (window.crypto?.randomUUID) {
+      return window.crypto.randomUUID();
+    }
+    return `media-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
+  }
+
+  // Generate a stable hash from the path
+  const hash = simpleHash(path);
+  // Sanitize the filename for use in ID
+  const filename = path.split('/').pop().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+  return `media-${filename}-${hash}`;
+}
+
