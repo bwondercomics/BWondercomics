@@ -1,10 +1,12 @@
 ﻿import { getActiveSeriesId, getSeriesPageConfigPath } from './series.js';
+import { logger } from './logger.js';
+import { STORAGE } from './constants.js';
 
 (function () {
   'use strict';
 
   const seriesId = getActiveSeriesId();
-  const CONFIG_KEY = `battlebros_page_config:${seriesId}`;
+  const CONFIG_KEY = `${STORAGE.CONFIG_KEY_PREFIX}${seriesId}`;
 
   // Default config matches original HTML
   const SUPPORT_TEXT_HTML = `<span class="bubble-em">WANT TO SUPPORT THE COMIC?</span>
@@ -58,7 +60,7 @@
       const response = await fetch(configPath);
       if (response.ok) {
         config = await response.json();
-        console.log(`Loaded config from ${configPath}`);
+        logger.log(`Loaded config from ${configPath}`);
       }
 
       // Only use localStorage draft if file doesn't exist or fails to load
@@ -66,7 +68,7 @@
         const draft = localStorage.getItem(CONFIG_KEY);
         if (draft) {
           config = JSON.parse(draft);
-          console.log('Loaded config from localStorage draft (file not found)');
+          logger.log('Loaded config from localStorage draft (file not found)');
         }
       }
     } catch (e) {

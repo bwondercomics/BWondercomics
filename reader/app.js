@@ -5,6 +5,7 @@ import {
   sanitizeChapters,
 } from "./chapters.js";
 import { state, saveProgress, loadProgress } from "./state.js";
+import { logger } from "./logger.js";
 import { loadChapterData, loadPageConfig, loadLatestPost } from "./data.js";
 import { el, initElements } from "./dom.js";
 import { renderStatusPanel, render } from "./render.js";
@@ -388,7 +389,7 @@ import { getActiveSeriesId } from "./series.js";
     attachEventHandlers();
     render();
 
-    console.log("? Battle Bros Reader initialized");
+    logger.log("🎬 Battle Bros Reader initialized");
   }
 
   // ==================== START ====================
@@ -407,7 +408,7 @@ import { getActiveSeriesId } from "./series.js";
         unitLabelSingular = data.unitLabelSingular || "Chapter";
         unitLabelPlural = data.unitLabelPlural || "Chapters";
         applyUnitLabels();
-        console.log(`Chapter data loaded for series: ${seriesId}`);
+        logger.log(`Chapter data loaded for series: ${seriesId}`);
       }
     } catch (err) {
       handleDataLoadError(err);

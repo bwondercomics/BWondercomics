@@ -4,6 +4,7 @@
  */
 
 import { CONFIG } from './config.js';
+import { STORAGE } from './constants.js';
 
 /**
  * Global application state object
@@ -61,7 +62,7 @@ export function saveProgress(stateObj = state) {
       page: stateObj.pageIndex,
       timestamp: Date.now()
     };
-    localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(STORAGE.PROGRESS_KEY, JSON.stringify(data));
   } catch (e) {
     console.warn('Failed to save progress:', e);
   }
@@ -73,7 +74,7 @@ export function saveProgress(stateObj = state) {
  */
 export function loadProgress() {
   try {
-    const json = localStorage.getItem(CONFIG.STORAGE_KEY);
+    const json = localStorage.getItem(STORAGE.PROGRESS_KEY);
     return json ? JSON.parse(json) : null;
   } catch (e) {
     return null;

@@ -5,6 +5,7 @@
 
 import { sanitizeChapters } from './chapters.js';
 import { getSeriesDataPath, getSeriesPageConfigPath } from './series.js';
+import { logger } from './logger.js';
 
 /**
  * Loads chapter data from admin/data.json
@@ -61,7 +62,7 @@ export async function loadPageConfig(setSubtitlesFn, seriesId) {
 
     if (config.content && config.content.header && Array.isArray(config.content.header.subtitles)) {
       setSubtitlesFn(config.content.header.subtitles);
-      console.log(`? Page config loaded from ${configPath}`);
+      logger.log(`✓ Page config loaded from ${configPath}`);
     } else {
       console.warn('No subtitles found in page-config.json');
     }
