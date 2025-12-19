@@ -144,6 +144,30 @@ export function createChaptersApi({
     if (rerender) renderPageList(state.currentPages || []);
   }
 
+  function scrollToCenter(index) {
+    if (!el.pageList) return;
+    const item = el.pageList.querySelector(`.page-item[data-index="${index}"]`);
+    if (!item) return;
+
+    // Calculate center position targets
+    const itemRect = item.getBoundingClientRect();
+    const listRect = el.pageList.getBoundingClientRect();
+    // Use offsetTop directly as pageList is the positioned container
+    const relativeTop = item.offsetTop;
+    const perfectCenter = relativeTop - (listRect.height / 2) + (itemRect.height / 2);
+
+    // "Nudge" logic: Move only 25% of the way to the center
+    // This gives tactile feedback of selection without losing context
+    const currentScroll = el.pageList.scrollTop;
+    const diff = perfectCenter - currentScroll;
+    const nudgeAmount = diff * 0.25;
+
+    el.pageList.scrollTo({
+      top: Math.max(0, currentScroll + nudgeAmount),
+      behavior: 'smooth'
+    });
+  }
+
   function selectPage(index) {
     if (!isValidIndex(index, state.currentPages || [])) return;
     setMoveModeEnabled(true, { rerender: false });
@@ -151,17 +175,74 @@ export function createChaptersApi({
     setReorderUiActive(true);
     wheelTargetIndex = null;
     renderPageList(state.currentPages || []);
+
+    // Nudge/Center the selected item
+    window.requestAnimationFrame(() => scrollToCenter(index));
   }
 
   function handleReorderShellClick(event) {
     if (!isReorderActive()) return;
     const target = event.target instanceof Element ? event.target : null;
     if (!target) return;
+
+    // Allow dragging to not trigger deselect
+    if (isDragClickLocked()) return;
+
     if (target.closest('.page-item')) return;
     if (target.closest('#pageList')) return;
     if (target.closest('#btnInsertPage') || target.closest('#btnDeletePage')) return;
     clearSelection();
   }
+
+  // --- Drag to Scroll Logic ---
+  let isDraggingScroll = false;
+  let dragStartY = 0;
+  let dragStartScrollTop = 0;
+  let dragReleaseAt = 0;
+  const dragScrollThreshold = 5;
+  const dragClickLockoutMs = 200;
+
+  function isDragClickLocked() {
+    if (isDraggingScroll) return true;
+    if (!dragReleaseAt) return false;
+    return (Date.now() - dragReleaseAt) < dragClickLockoutMs;
+  }
+
+  function initDragToScroll() {
+    if (!el.pageList) return;
+
+    el.pageList.addEventListener('mousedown', (e) => {
+      if (!moveModeEnabled) return;
+      isDraggingScroll = false;
+      dragStartY = e.clientY;
+      dragStartScrollTop = el.pageList.scrollTop;
+
+      // We don't preventDefault here so clicks can still register if no drag happens
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!moveModeEnabled || dragStartY === 0) return;
+
+      const deltaY = e.clientY - dragStartY;
+      if (!isDraggingScroll && Math.abs(deltaY) <= dragScrollThreshold) return;
+      isDraggingScroll = true; // Threshold passed, consider it a drag
+      el.pageList.scrollTop = dragStartScrollTop - deltaY;
+    });
+
+    window.addEventListener('mouseup', () => {
+      if (!moveModeEnabled) return;
+      if (isDraggingScroll) {
+        dragReleaseAt = Date.now();
+      }
+      dragStartY = 0;
+      dragStartScrollTop = 0;
+      setTimeout(() => {
+        isDraggingScroll = false;
+      }, dragClickLockoutMs);
+    });
+  }
+  // Initialize once
+  initDragToScroll();
 
   function handleReorderResize() {
     if (!isReorderActive()) return;
@@ -333,6 +414,16 @@ export function createChaptersApi({
     selectedPageIndex = target;
     renderPageList(pages);
     markUnsaved();
+
+    // Trigger Shimmy
+    window.setTimeout(() => {
+      const item = el.pageList.querySelector(`.page-item[data-index="${target}"]`);
+      if (item) {
+        item.classList.add('just-moved');
+        // Remove class after animation plays to allow re-trigger
+        setTimeout(() => item.classList.remove('just-moved'), 500);
+      }
+    }, 50);
   }
 
   async function deleteSelectedPage() {
@@ -530,7 +621,10 @@ export function createChaptersApi({
 
       if (active) {
         item.classList.toggle('is-selected', index === selectedPageIndex);
-        item.addEventListener('click', () => selectPage(index));
+        item.addEventListener('click', () => {
+          if (isDragClickLocked()) return;
+          selectPage(index);
+        });
         item.innerHTML = `
           <span class="page-number">#${index + 1}</span>
           <span class="page-path">${escapeHtml(path)}</span>
@@ -540,7 +634,11 @@ export function createChaptersApi({
         item.draggable = allowDrag;
 
         if (moveModeEnabled) {
-          item.addEventListener('click', () => selectPage(index));
+          item.addEventListener('click', (e) => {
+            // If we are currently dragging, OR we just finished dragging, do not select
+            if (isDragClickLocked()) return;
+            selectPage(index);
+          });
         } else {
           item.addEventListener('dblclick', () => selectPage(index));
 
@@ -594,6 +692,7 @@ export function createChaptersApi({
             <button type="button" class="btn-remove" data-index="${index}" data-path="${escapeHtml(path)}">Remove</button>
           </div>
         `;
+
 
         const pageActions = item.querySelector('.page-actions');
         if (pageActions) {
@@ -781,7 +880,7 @@ export function createChaptersApi({
     const wasReorderActive = isReorderActive();
     const previousSelected = selectedPageIndex;
     const targetPath = imagePath || state.currentPages[index];
-    const rootPrefix = `${String(getRoot() || 'chapters').replace(/\\/+$/g, '')}/`;
+    const rootPrefix = `${String(getRoot() || 'chapters').replace(/\/+$/, '')}/`;
     if (targetPath && targetPath.startsWith(rootPrefix)) {
       try {
         const response = await fetch('/api/delete-image', {

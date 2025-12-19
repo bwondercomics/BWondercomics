@@ -142,6 +142,43 @@
       animation: scanline 8s linear infinite;
     }
 
+    /* ==================== MOVE MODE VISUALS ==================== */
+    @keyframes shimmy {
+      0% {
+        transform: translateY(0);
+      }
+
+      25% {
+        transform: translateY(-4px);
+      }
+
+      50% {
+        transform: translateY(3px);
+      }
+
+      75% {
+        transform: translateY(-2px);
+      }
+
+      100% {
+        transform: translateY(0);
+      }
+    }
+
+    .just-moved {
+      animation: shimmy 0.4s ease-in-out;
+      border-color: var(--success) !important;
+      box-shadow: 0 0 15px rgba(0, 255, 136, 0.4) !important;
+    }
+
+    .page-list.is-move-mode {
+      cursor: grab;
+    }
+
+    .page-list.is-move-mode:active {
+      cursor: grabbing;
+    }
+
     /* ==================== LOGIN SCREEN ==================== */
     #loginScreen {
       display: flex;
@@ -765,7 +802,7 @@
       direction: rtl;
     }
 
-    .page-reorder-shell.is-active .page-list > * {
+    .page-reorder-shell.is-active .page-list>* {
       direction: ltr;
     }
 
@@ -893,10 +930,11 @@
       border-top: 14px solid transparent;
       border-bottom: 14px solid transparent;
       border-right: 14px solid var(--accent);
-      filter: drop-shadow(0 0 10px rgba(255, 237, 0, 0.35));
+      filter: drop-shadow(0 0 8px #ffed00) drop-shadow(0 0 15px #ffed00);
       pointer-events: none;
       will-change: transform;
-      transition: transform 180ms ease-out;
+      transition: transform 120ms cubic-bezier(0.1, 0.7, 0.1, 1);
+      z-index: 10;
     }
 
     .insert-caret::after {
@@ -907,7 +945,8 @@
       width: 2000px;
       height: 2px;
       background: var(--accent);
-      opacity: 0.55;
+      opacity: 0.8;
+      box-shadow: 0 0 8px #ffed00;
       transform: translateY(-1px);
       box-shadow: 0 0 12px rgba(255, 237, 0, 0.18);
       pointer-events: none;
@@ -1352,57 +1391,57 @@
       box-shadow: 0 0 20px var(--success);
     }
 
-	    .btn-confirm:disabled {
-	      opacity: 0.5;
-	      cursor: not-allowed;
-	    }
+    .btn-confirm:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
 
-	    .analytics-actions {
-	      display: flex;
-	      gap: 10px;
-	      align-items: center;
-	      flex-wrap: wrap;
-	      margin-bottom: 8px;
-	    }
+    .analytics-actions {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      flex-wrap: wrap;
+      margin-bottom: 8px;
+    }
 
-	    .analytics-grid {
-	      display: grid;
-	      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-	      gap: 14px;
-	      margin-top: 8px;
-	    }
+    .analytics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+      margin-top: 8px;
+    }
 
-	    .analytics-card {
-	      background: rgba(10, 10, 18, 0.85);
-	      border: 1px solid var(--primary);
-	      border-radius: 10px;
-	      padding: 14px 16px;
-	      box-shadow: 0 0 18px rgba(0, 217, 255, 0.12);
-	    }
+    .analytics-card {
+      background: rgba(10, 10, 18, 0.85);
+      border: 1px solid var(--primary);
+      border-radius: 10px;
+      padding: 14px 16px;
+      box-shadow: 0 0 18px rgba(0, 217, 255, 0.12);
+    }
 
-	    .analytics-label {
-	      font-size: 0.9rem;
-	      letter-spacing: 0.4px;
-	      opacity: 0.85;
-	      margin-bottom: 6px;
-	      text-transform: uppercase;
-	    }
+    .analytics-label {
+      font-size: 0.9rem;
+      letter-spacing: 0.4px;
+      opacity: 0.85;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
 
-	    .analytics-value {
-	      font-size: 2.4rem;
-	      font-weight: 700;
-	      color: var(--accent);
-	      line-height: 1.2;
-	    }
+    .analytics-value {
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: var(--accent);
+      line-height: 1.2;
+    }
 
-	    .analytics-sub {
-	      font-size: 0.95rem;
-	      opacity: 0.85;
-	      margin-top: 6px;
-	    }
+    .analytics-sub {
+      font-size: 0.95rem;
+      opacity: 0.85;
+      margin-top: 6px;
+    }
 
-	    /* ==================== RESPONSIVE ==================== */
-	    @media (max-width: 768px) {
+    /* ==================== RESPONSIVE ==================== */
+    @media (max-width: 768px) {
       .admin-header {
         flex-direction: column;
         align-items: flex-start;
@@ -1438,15 +1477,17 @@
   <div id="loginScreen">
     <div class="login-container">
       <h1 class="login-title">ADMIN ACCESS</h1>
-	      <p class="login-subtitle">BWonderComics Editor</p>
+      <p class="login-subtitle">BWonderComics Editor</p>
       <form id="loginForm" class="login-form">
         <div class="form-group">
           <label class="form-label" for="loginEmail">Email</label>
-          <input type="email" id="loginEmail" class="form-input" placeholder="you@example.com" autocomplete="username" required />
+          <input type="email" id="loginEmail" class="form-input" placeholder="you@example.com" autocomplete="username"
+            required />
         </div>
         <div class="form-group">
           <label class="form-label" for="loginPassword">Password</label>
-          <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password" autocomplete="current-password" required />
+          <input type="password" id="loginPassword" class="form-input" placeholder="Enter your password"
+            autocomplete="current-password" required />
         </div>
         <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
           <button type="submit" class="btn-primary">Sign in</button>
@@ -1454,39 +1495,40 @@
         </div>
       </form>
       <div id="loginError" style="display: none; margin-top: 15px;"></div>
-      <p style="margin-top: 14px; font-size: 0.9rem; opacity: 0.85;">Uses the same account system as comments. Admin role required.</p>
+      <p style="margin-top: 14px; font-size: 0.9rem; opacity: 0.85;">Uses the same account system as comments. Admin
+        role required.</p>
     </div>
   </div>
 
   <!-- ==================== ADMIN DASHBOARD ==================== -->
   <div id="adminDashboard">
-	    <header class="admin-header">
-		      <h1 class="admin-title">BWonderComics Admin</h1>
-	      <div class="header-series">
-	        <label class="header-series-label" for="seriesSelect">Active Series</label>
-	        <div class="header-series-row">
-	          <select id="seriesSelect" class="form-input"></select>
-	          <button class="btn-secondary nav-btn" id="btnAddSeries" type="button">New</button>
-	          <button class="btn-secondary nav-btn" id="btnEditSeries" type="button">Edit</button>
-	          <a class="btn-secondary nav-btn" id="btnOpenSeries" href="#" target="_blank" rel="noopener">Open Reader</a>
-	        </div>
-	      </div>
-		      <nav class="admin-nav">
-		        <button class="btn-secondary nav-btn" id="btnChapters" type="button">Entries</button>
-		        <button class="btn-secondary nav-btn" id="btnBlog">Blog / Feed</button>
-		        <button class="btn-secondary nav-btn" id="btnMedia">Media</button>
-		        <button class="btn-secondary nav-btn" id="btnUsers" type="button">Users</button>
-		        <button class="btn-secondary nav-btn" id="btnAnalytics" type="button">Analytics</button>
-		        <button class="btn-secondary nav-btn" id="btnDesigner" type="button">Page Designer</button>
-		        <button class="btn-secondary nav-btn" id="btnPreview">Preview Changes</button>
-		        <button class="btn-logout nav-btn nav-btn--danger" id="btnLogout">Logout</button>
-		      </nav>
-	    </header>
+    <header class="admin-header">
+      <h1 class="admin-title">BWonderComics Admin</h1>
+      <div class="header-series">
+        <label class="header-series-label" for="seriesSelect">Active Series</label>
+        <div class="header-series-row">
+          <select id="seriesSelect" class="form-input"></select>
+          <button class="btn-secondary nav-btn" id="btnAddSeries" type="button">New</button>
+          <button class="btn-secondary nav-btn" id="btnEditSeries" type="button">Edit</button>
+          <a class="btn-secondary nav-btn" id="btnOpenSeries" href="#" target="_blank" rel="noopener">Open Reader</a>
+        </div>
+      </div>
+      <nav class="admin-nav">
+        <button class="btn-secondary nav-btn" id="btnChapters" type="button">Entries</button>
+        <button class="btn-secondary nav-btn" id="btnBlog">Blog / Feed</button>
+        <button class="btn-secondary nav-btn" id="btnMedia">Media</button>
+        <button class="btn-secondary nav-btn" id="btnUsers" type="button">Users</button>
+        <button class="btn-secondary nav-btn" id="btnAnalytics" type="button">Analytics</button>
+        <button class="btn-secondary nav-btn" id="btnDesigner" type="button">Page Designer</button>
+        <button class="btn-secondary nav-btn" id="btnPreview">Preview Changes</button>
+        <button class="btn-logout nav-btn nav-btn--danger" id="btnLogout">Logout</button>
+      </nav>
+    </header>
 
-	    <main class="admin-content">
-		      <!-- Chapter Management Section -->
-		      <section class="section" id="chaptersSection">
-		        <h2 class="section-title" id="chaptersSectionTitle">Entries Management</h2>
+    <main class="admin-content">
+      <!-- Chapter Management Section -->
+      <section class="section" id="chaptersSection">
+        <h2 class="section-title" id="chaptersSectionTitle">Entries Management</h2>
         <div id="chapterList" class="chapter-list"></div>
         <button class="btn-small btn-add" id="btnAddChapter">+ Add New Entry</button>
       </section>
@@ -1518,31 +1560,32 @@
             style="margin-bottom: 10px;">
           <button type="button" class="btn-secondary" id="btnMediaPicker" style="margin-bottom: 10px;">Choose from
             Media</button>
-	          <label class="form-label" for="postImageFocus">Image focal point (for thumbnails)</label>
-	          <select id="postImageFocus" class="form-input" style="margin-bottom: 10px;">
-	            <option value="center" selected>Center</option>
-	            <option value="top">Top</option>
-	            <option value="bottom">Bottom</option>
-	            <option value="left">Left</option>
-	            <option value="right">Right</option>
-	            <option value="top left">Top Left</option>
-	            <option value="top right">Top Right</option>
-	            <option value="bottom left">Bottom Left</option>
-	            <option value="bottom right">Bottom Right</option>
-	          </select>
-	          <label class="form-label" for="postPublishAt">Publish date/time (optional)</label>
-	          <input type="datetime-local" id="postPublishAt" class="form-input" style="margin-bottom: 10px;">
-	          <p style="font-size: 0.85rem; opacity: 0.8; margin: -4px 0 10px;">Leave blank to publish now. Set a future time to schedule.</p>
-	          <div id="postToolbar" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
-	            <button type="button" class="btn-secondary rich-btn" data-cmd="bold">Bold</button>
-	            <button type="button" class="btn-secondary rich-btn" data-cmd="italic">Italic</button>
-	            <button type="button" class="btn-secondary rich-btn" data-cmd="underline">Underline</button>
-	            <button type="button" class="btn-secondary rich-btn" data-cmd="insertUnorderedList">• List</button>
-	            <button type="button" class="btn-secondary rich-btn" data-cmd="insertOrderedList">1. List</button>
-	            <button type="button" class="btn-secondary rich-btn" data-cmd="formatBlock" data-value="h3">H3</button>
-	            <button type="button" class="btn-secondary rich-btn" data-cmd="createLink">Link</button>
-	            <button type="button" class="btn-secondary rich-btn" data-cmd="insertImage">Image</button>
-	          </div>
+          <label class="form-label" for="postImageFocus">Image focal point (for thumbnails)</label>
+          <select id="postImageFocus" class="form-input" style="margin-bottom: 10px;">
+            <option value="center" selected>Center</option>
+            <option value="top">Top</option>
+            <option value="bottom">Bottom</option>
+            <option value="left">Left</option>
+            <option value="right">Right</option>
+            <option value="top left">Top Left</option>
+            <option value="top right">Top Right</option>
+            <option value="bottom left">Bottom Left</option>
+            <option value="bottom right">Bottom Right</option>
+          </select>
+          <label class="form-label" for="postPublishAt">Publish date/time (optional)</label>
+          <input type="datetime-local" id="postPublishAt" class="form-input" style="margin-bottom: 10px;">
+          <p style="font-size: 0.85rem; opacity: 0.8; margin: -4px 0 10px;">Leave blank to publish now. Set a future
+            time to schedule.</p>
+          <div id="postToolbar" style="display:flex; flex-wrap:wrap; gap:6px; margin-bottom:6px;">
+            <button type="button" class="btn-secondary rich-btn" data-cmd="bold">Bold</button>
+            <button type="button" class="btn-secondary rich-btn" data-cmd="italic">Italic</button>
+            <button type="button" class="btn-secondary rich-btn" data-cmd="underline">Underline</button>
+            <button type="button" class="btn-secondary rich-btn" data-cmd="insertUnorderedList">• List</button>
+            <button type="button" class="btn-secondary rich-btn" data-cmd="insertOrderedList">1. List</button>
+            <button type="button" class="btn-secondary rich-btn" data-cmd="formatBlock" data-value="h3">H3</button>
+            <button type="button" class="btn-secondary rich-btn" data-cmd="createLink">Link</button>
+            <button type="button" class="btn-secondary rich-btn" data-cmd="insertImage">Image</button>
+          </div>
           <div id="postContent" class="form-input" contenteditable="true" aria-label="Post content"
             style="min-height: 160px; margin-bottom: 10px; overflow: auto;"></div>
           <label style="display: flex; align-items: center; gap: 8px; margin: 6px 0 12px;">
@@ -1593,7 +1636,8 @@
           </div>
         </div>
         <p style="margin-top: 20px; color: var(--accent); font-size: 0.9rem;">
-          <strong>Note:</strong> This section is for preview/export/backup. Saving entries and posts persists directly to the server.
+          <strong>Note:</strong> This section is for preview/export/backup. Saving entries and posts persists directly
+          to the server.
         </p>
       </section>
 
@@ -1639,21 +1683,21 @@
           <label class="form-label" for="mediaSearch">Search by tag</label>
           <input type="text" id="mediaSearch" class="form-input" placeholder="e.g., cover" />
         </div>
-	        <div id="mediaList" class="chapter-list" style="margin-top: 16px;"></div>
-	      </section>
+        <div id="mediaList" class="chapter-list" style="margin-top: 16px;"></div>
+      </section>
 
-	      <!-- User Roles Section -->
-	      <section class="section" id="usersSection" style="display: none;">
-	        <h2 class="section-title">User Roles</h2>
-	        <p style="font-size: 0.9rem; opacity: 0.85; margin-bottom: 12px;">
-	          This uses the built-in account system (the same login used for comments). Only admins can change roles.
-	        </p>
-	        <button class="btn-secondary" id="btnRefreshUsers" type="button">Refresh Users</button>
-	        <div id="usersStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
-	        <div id="usersList" class="chapter-list" style="margin-top: 16px;"></div>
-	      </section>
-	    </main>
-	  </div>
+      <!-- User Roles Section -->
+      <section class="section" id="usersSection" style="display: none;">
+        <h2 class="section-title">User Roles</h2>
+        <p style="font-size: 0.9rem; opacity: 0.85; margin-bottom: 12px;">
+          This uses the built-in account system (the same login used for comments). Only admins can change roles.
+        </p>
+        <button class="btn-secondary" id="btnRefreshUsers" type="button">Refresh Users</button>
+        <div id="usersStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
+        <div id="usersList" class="chapter-list" style="margin-top: 16px;"></div>
+      </section>
+    </main>
+  </div>
 
   <!-- ==================== EDIT CHAPTER MODAL ==================== -->
   <div id="editModal" class="modal">
@@ -1663,50 +1707,50 @@
         <button class="btn-close" id="btnCloseModal">&times;</button>
       </div>
       <form id="editForm" class="form-editor">
-	        <div class="form-group">
-	          <label class="form-label" for="chapterName" id="entryNameLabel">Entry Name</label>
-	          <input type="text" id="chapterName" class="form-input" placeholder="e.g., Entry 1" required />
-	        </div>
+        <div class="form-group">
+          <label class="form-label" for="chapterName" id="entryNameLabel">Entry Name</label>
+          <input type="text" id="chapterName" class="form-input" placeholder="e.g., Entry 1" required />
+        </div>
 
-	        <div class="form-group">
-	          <label class="form-label" id="entryAccessLabel">Entry Access</label>
-	          <label style="display:flex; align-items:center; gap:10px; font-size: 0.95rem;">
-	            <input type="checkbox" id="chapterPremium" />
-	            Premium only (requires a premium account to view)
-	          </label>
-	        </div>
-	
-	        <div class="form-group">
-		          <label class="form-label">Pages (Image Paths)</label>
-		          <div class="page-list-controls">
-		            <div id="unsavedIndicator" style="display: none;" class="unsaved-indicator">
-		              Unsaved Changes
-		            </div>
-		            <div class="page-list-actions">
-		              <button type="button" class="btn-move-mode" id="btnMoveMode">Move Pages</button>
-		              <button type="button" class="btn-renumber" id="btnRenumberPages">
-		                Renumber Pages
-		              </button>
-		            </div>
-		          </div>
-	          <div id="pageReorderShell" class="page-reorder-shell">
-	            <div id="pageList" class="page-list" aria-label="Page list"></div>
-	            <div id="pagePreviewPanel" class="page-preview" style="display: none;" aria-label="Selected page preview">
-	              <div class="insert-caret" id="insertCaret" aria-hidden="true"></div>
-	              <div class="page-preview-frame">
-	                <img id="pagePreviewImg" src="" alt="Selected page preview" />
-	              </div>
-	              <div class="page-preview-actions">
-	                <button type="button" class="btn-preview btn-insert" id="btnInsertPage">Insert</button>
-	                <button type="button" class="btn-preview btn-del" id="btnDeletePage">Del</button>
-	              </div>
-			              <div class="page-preview-hint">Scroll to aim the caret • Click outside the list to deselect.</div>
-			            </div>
-			          </div>
-	
-	          <!-- Upload Section -->
-	          <div class="upload-section" style="margin-top: 15px;">
-	            <label class="form-label">Upload New Images</label>
+        <div class="form-group">
+          <label class="form-label" id="entryAccessLabel">Entry Access</label>
+          <label style="display:flex; align-items:center; gap:10px; font-size: 0.95rem;">
+            <input type="checkbox" id="chapterPremium" />
+            Premium only (requires a premium account to view)
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Pages (Image Paths)</label>
+          <div class="page-list-controls">
+            <div id="unsavedIndicator" style="display: none;" class="unsaved-indicator">
+              Unsaved Changes
+            </div>
+            <div class="page-list-actions">
+              <button type="button" class="btn-move-mode" id="btnMoveMode">Move Pages</button>
+              <button type="button" class="btn-renumber" id="btnRenumberPages">
+                Renumber Pages
+              </button>
+            </div>
+          </div>
+          <div id="pageReorderShell" class="page-reorder-shell">
+            <div id="pageList" class="page-list" aria-label="Page list"></div>
+            <div id="pagePreviewPanel" class="page-preview" style="display: none;" aria-label="Selected page preview">
+              <div class="insert-caret" id="insertCaret" aria-hidden="true"></div>
+              <div class="page-preview-frame">
+                <img id="pagePreviewImg" src="" alt="Selected page preview" />
+              </div>
+              <div class="page-preview-actions">
+                <button type="button" class="btn-preview btn-insert" id="btnInsertPage">Insert</button>
+                <button type="button" class="btn-preview btn-del" id="btnDeletePage">Del</button>
+              </div>
+              <div class="page-preview-hint">Scroll to aim the caret • Click outside the list to deselect.</div>
+            </div>
+          </div>
+
+          <!-- Upload Section -->
+          <div class="upload-section" style="margin-top: 15px;">
+            <label class="form-label">Upload New Images</label>
             <div class="upload-area" id="uploadArea">
               <input type="file" id="imageUpload" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp" multiple
                 style="display: none;" />
@@ -1751,7 +1795,7 @@
     </div>
   </div>
 
-    </body>
-  <script type='module' src='app.js'></script>
-</html>
+</body>
+<script type='module' src='app.js'></script>
 
+</html>
