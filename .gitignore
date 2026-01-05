@@ -14,6 +14,7 @@ comments/
 deploy/battlebros.env
 deploy/umami.env
 deploy/bwondercomics.env
+namecheap-ddns.env.example
 
 # Battle Bros persistent server data (users/comments)
 var/
