@@ -1,6 +1,6 @@
 # System overview (how it fits together)
 
-This repo is a “static-first” comics site: the frontend is plain HTML/CSS/JS, and a small FastAPI backend adds the dynamic pieces (auth, comments, admin write APIs, scheduling + RSS, premium gating, analytics proxy).
+This repo serves a plain HTML/CSS/JS frontend, with a FastAPI backend adding dynamic pieces (auth, comments, admin write APIs, scheduling + RSS, premium gating, analytics proxy).
 
 ## What runs where
 - **Static frontend** (served at `/`): `index.html` (reader shell), `feed.html`, `media.html`, `comics.html`, plus JS modules under `reader/` and `admin/`.
@@ -14,10 +14,10 @@ This repo is a “static-first” comics site: the frontend is plain HTML/CSS/JS
 - **Entry pages**: ordered image paths for each entry (images live on disk; paths are stored in DB).
 - **Posts**: feed/blog updates (draft/scheduled/published + optional share flag for RSS/social).
 - **Users + comments**: accounts + comment threads (with roles for admin/premium).
-- **Media library**: `media.json` + files under `media/` (tagged library used by admin/tools; still JSON-on-disk).
+- **Media library**: Postgres table for the media index + files under `media/` (tagged library used by admin/tools).
 
 ## Routing + contracts (why the frontend still works)
-The backend intentionally serves **DB-backed JSON at the legacy file paths** so the existing reader/admin can keep using the same URLs:
+The backend serves **DB-backed JSON at the existing file paths** so the reader/admin can keep using the same URLs:
 - `GET /admin/series.json` → series list (DB-backed)
 - `GET /admin/data.json` → default series entries (DB-backed)
 - `GET /admin/series/<id>/data.json` → per-series entries (DB-backed)
@@ -33,7 +33,7 @@ The admin “save JSON” flow is also kept, but is intercepted and written to P
 3. Reader fetches:
    - `admin/series.json` (series list + labels)
    - `admin/data.json` or `admin/series/<id>/data.json` (entries + page paths + status + labels)
-   - `admin/page-config.json` or `admin/series/<id>/page-config.json` (theme/panel content)
+   - `admin/page-config.json` or `admin/series/<id>/page-config.json` (theme/panel content; DB-backed)
    - `GET /api/posts/latest` (latest update widget)
 4. Reader renders pages from the paths in the data JSON.
 
@@ -41,7 +41,7 @@ The admin “save JSON” flow is also kept, but is intercepted and written to P
 1. Admin opens `/admin/` and signs in (must be an `admin` role).
 2. Admin edits series settings (including the per-series entry label).
 3. Admin creates/edits entries, uploads pages, reorders pages, and saves.
-4. Admin writes go through `/api/save` (DB-backed for series/entries; disk-backed for `media.json`).
+4. Admin writes go through `/api/save` (DB-backed for series, entries, media index, and page configs).
 
 ### 3) Posts + RSS
 - Admin CRUD happens at `/api/admin/posts`.
@@ -63,4 +63,3 @@ The admin “save JSON” flow is also kept, but is intercepted and written to P
 - Series/entry JSON views and DB save logic: `backend/app/series_store.py`, `backend/app/routes/series_json.py`, `backend/app/routes/files.py`
 - Reader boot + behavior: `reader/app.js`, `reader/data.js`, `reader/series.js`
 - Admin boot + behavior: `admin/app.js`, `admin/chapters.js`
-

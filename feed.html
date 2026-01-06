@@ -898,6 +898,14 @@
       return section;
     }
 
+    function withCacheBust(url, stamp) {
+      const raw = String(url || '').trim();
+      if (!raw) return '';
+      if (raw.includes('?')) return raw;
+      const token = String(stamp || '').trim();
+      return token ? `${raw}?v=${encodeURIComponent(token)}` : raw;
+    }
+
     function renderPost(post) {
       const article = document.createElement('article');
       article.className = 'post';
@@ -936,7 +944,7 @@
         if (post.imageFocus) {
           img.style.objectPosition = post.imageFocus;
         }
-        img.src = post.image;
+        img.src = withCacheBust(post.image, post.updatedAt || post.date);
         img.alt = post.title || 'Update image';
         img.loading = 'lazy';
         article.appendChild(img);

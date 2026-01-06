@@ -4,6 +4,14 @@ export function latestPreviewText(text = '') {
   return condensed.length > 120 ? `${condensed.slice(0, 120)}...` : condensed;
 }
 
+function withCacheBust(url, stamp) {
+  const raw = String(url || '').trim();
+  if (!raw) return '';
+  if (raw.includes('?')) return raw;
+  const token = String(stamp || '').trim();
+  return token ? `${raw}?v=${encodeURIComponent(token)}` : raw;
+}
+
 export function renderLatestUpdate(post) {
   const body = document.getElementById('latestBody');
   if (!body) return;
@@ -13,7 +21,7 @@ export function renderLatestUpdate(post) {
   const thumb = document.createElement(post.image ? 'img' : 'div');
   thumb.className = post.image ? 'latest-thumb' : 'latest-thumb placeholder';
   if (post.image) {
-    thumb.src = post.image;
+    thumb.src = withCacheBust(post.image, post.updatedAt || post.date);
     thumb.alt = post.title || 'Latest update image';
     thumb.loading = 'lazy';
     if (post.imageFocus) {

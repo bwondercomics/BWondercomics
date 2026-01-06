@@ -6,7 +6,7 @@ This guide maps the reader-side modules, their responsibilities, and how they co
 - `reader/app.js` — Composition root; wires modules together, bootstraps data load, kicks off render, and binds global events.
 - `reader/config.js` — Constants for storage keys, debounce timings, UI thresholds (e.g., two-page breakpoints), and default options.
 - `reader/dom.js` — Centralized DOM lookups; a single source of element references used across modules.
-- `reader/data.js` — Fetches `admin/data.json`, `admin/page-config.json`, and `/api/posts/latest`; normalizes chapter metadata and page-config overrides.
+- `reader/data.js` — Fetches `/admin/data.json`, `/admin/page-config.json` (DB-backed), and `/api/posts/latest`; normalizes chapter metadata and page-config overrides.
 - `reader/state.js` — Single state container: current chapter/page, zoom, fit mode, progress persistence (localStorage), and derived helpers (e.g., `isTwoPageMode`).
 - `reader/render.js` — Renders pages into the stage, applies fit/zoom transforms, preloads images, and updates UI labels/buttons.
 - `reader/controls.js` — Keyboard and click navigation (prev/next, first/last, toggle two-page, reset zoom, fullscreen), debounce helpers, and guard rails when zoomed.
@@ -23,7 +23,7 @@ This guide maps the reader-side modules, their responsibilities, and how they co
 ## Execution Flow (high level)
 ```mermaid
 flowchart TD
-  A[startup] --> B[load data.json + page-config.json + /api/posts/latest]
+  A[startup] --> B[load admin/data.json + admin/page-config.json + /api/posts/latest]
   B --> C[populate state (chapters, folders, status)]
   C --> D[render initial chapter/page]
   D --> E[attach controls + pointer + fullscreen listeners]
@@ -54,7 +54,7 @@ flowchart TD
   - Clamps scale and translate using `transform` utilities to keep content on screen.
 - **data.js**
   - Fetches JSON with `cache: 'no-store'` to avoid stale content.
-  - Normalizes status message, chapter folder mapping, and optional theme/layout overrides from `page-config.json`.
+- Normalizes status message, chapter folder mapping, and optional theme/layout overrides from `admin/page-config.json`.
   - Exposes a unified `loadAll()` that `app.js` uses at startup.
 - **latest.js**
   - Selects the newest post (by date) where `share !== false`.
@@ -67,7 +67,7 @@ flowchart TD
 ## Data Sources
 - `admin/data.json` — Chapters, chapterFolders, statusMessage.
 - `/api/posts/latest` — DB-backed latest blog post for the “Latest update” widget.
-- `admin/page-config.json` — Optional theming, header/panel content, button list, and layout ordering.
+- `admin/page-config.json` — Optional theming, header/panel content, button list, and layout ordering (DB-backed).
 - `localStorage` — Reading progress (`battleBros_progress` via `config`).
 
 ## Persistence & Progress
@@ -83,7 +83,7 @@ flowchart TD
   - Chapter sorting and normalization
 
 ## Common Extension Points
-- Add a new header button: extend `page-config.json` buttons; `customization.js` renders them at startup.
+- Add a new header button: extend `admin/page-config.json` buttons; `customization.js` renders them at startup.
 - Change theme/branding: adjust `admin/page-config.json` theme vars; `customization.js` applies to CSS variables.
 - Integrate comments: `feed.html` placeholder can host a third-party embed; reader code is unaffected.
 

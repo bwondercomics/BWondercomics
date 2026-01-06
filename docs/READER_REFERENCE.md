@@ -4,7 +4,7 @@ This summarizes the reader runtime after modularization: what each file does, ke
 
 ## Data sources
 - `admin/data.json`: chapters map, order, statusMessage.
-- `admin/page-config.json`: optional theme/content overrides + subtitles.
+- `admin/page-config.json`: optional theme/content overrides + subtitles (DB-backed).
 - `/api/posts/latest`: latest update widget (DB-backed; published-only + scheduling support).
 - `localStorage` key `battleBros_progress`: saved chapter/page.
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
@@ -15,7 +14,6 @@ from ..db import get_db
 from ..models import Post, User
 from ..rss import build_rss_xml
 from ..security import get_current_user
-from ..settings import settings
 from ..validation import is_admin_role
 
 
@@ -90,70 +88,6 @@ def _promote_due_scheduled(db: Session, now: datetime) -> None:
         db.commit()
 
 
-def _import_legacy_posts(db: Session, now: datetime) -> int:
-    path = settings.base_dir / "posts.json"
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return 0
-    except Exception:
-        return 0
-
-    if not isinstance(raw, list):
-        return 0
-
-    imported = 0
-    for item in raw:
-        if not isinstance(item, dict):
-            continue
-        try:
-            pid = UUID(str(item.get("id") or ""))
-        except Exception:
-            continue
-
-        if db.get(Post, pid):
-            continue
-
-        title = str(item.get("title") or "").strip()
-        content = str(item.get("content") or "").strip()
-        if not title or not content:
-            continue
-
-        status = _normalize_status(str(item.get("status") or "published"))
-        publish_at = _parse_dt(str(item.get("date") or "")) or now
-        status, publish_at = _coerce_status(status, publish_at, now, require_date_for_scheduled=False)
-
-        image = str(item.get("image") or "").strip() or None
-        image_focus = str(item.get("imageFocus") or "center").strip() or "center"
-        image_tags = _normalize_tags(item.get("imageTags"))
-        share = bool(item.get("share", True))
-        if status == "draft":
-            share = False
-
-        updated_at = _parse_dt(str(item.get("updatedAt") or "")) or now
-        created_at = _parse_dt(str(item.get("createdAt") or "")) or publish_at or now
-
-        post = Post(
-            id=pid,
-            title=title[:200],
-            content=content,
-            image=image,
-            image_tags=image_tags,
-            image_focus=image_focus[:20],
-            share=share,
-            status=status,
-            publish_at=publish_at,
-            created_at=created_at,
-            updated_at=updated_at,
-        )
-        db.add(post)
-        imported += 1
-
-    if imported:
-        db.commit()
-    return imported
-
-
 @router.get("/api/posts")
 def list_public_posts(
     limit: int = Query(default=50, ge=1, le=200),
@@ -161,7 +95,6 @@ def list_public_posts(
     db: Session = Depends(get_db),
 ):
     now = datetime.now(timezone.utc)
-    _import_legacy_posts(db, now)
     _promote_due_scheduled(db, now)
 
     stmt = (
@@ -178,7 +111,6 @@ def list_public_posts(
 @router.get("/api/posts/latest")
 def latest_public_post(db: Session = Depends(get_db)):
     now = datetime.now(timezone.utc)
-    _import_legacy_posts(db, now)
     _promote_due_scheduled(db, now)
 
     post = db.scalar(select(Post).where(Post.status == "published").order_by(Post.publish_at.desc()).limit(1))
@@ -188,7 +120,6 @@ def latest_public_post(db: Session = Depends(get_db)):
 @router.get("/rss.xml")
 def rss_xml(request: Request, db: Session = Depends(get_db)):
     now = datetime.now(timezone.utc)
-    _import_legacy_posts(db, now)
     _promote_due_scheduled(db, now)
 
     posts = db.scalars(
@@ -229,7 +160,6 @@ def admin_list_posts(request: Request, db: Session = Depends(get_db)):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     now = datetime.now(timezone.utc)
-    _import_legacy_posts(db, now)
     _promote_due_scheduled(db, now)
 
     posts = db.scalars(select(Post).order_by(Post.publish_at.desc())).all()

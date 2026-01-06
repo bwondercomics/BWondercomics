@@ -51,14 +51,14 @@ The Page Designer is a standalone visual editor that lets you customize your Bat
 ### Publish
 - Click "🚀 Publish" to make changes live
 - Saves to the server via `POST /api/save`:
-  - Default series: `admin/page-config.json`
-  - Other series: `admin/series/<id>/page-config.json`
+  - Default series: `/admin/page-config.json` (DB-backed)
+  - Other series: `/admin/series/<id>/page-config.json` (DB-backed)
 
 ## 📁 Files
 
 - `admin/designer.html` - The visual designer tool
-- `admin/page-config.json` - Default series page configuration
-- `admin/series/<id>/page-config.json` - Per-series page configuration
+- `/admin/page-config.json` - Default series page configuration (DB-backed)
+- `/admin/series/<id>/page-config.json` - Per-series page configuration (DB-backed)
 - Main reader will load this config automatically
 
 ## 🎯 How It Works
@@ -66,7 +66,7 @@ The Page Designer is a standalone visual editor that lets you customize your Bat
 1. **Edit** your page using the visual tools
 2. **Preview** changes in the live iframe
 3. **Save Draft** to localStorage (temporary)
-4. **Publish** to update `page-config.json` (permanent)
+4. **Publish** to update the DB-backed page config (permanent)
 5. Main reader at `/index.html` loads the config automatically
 
 ## 🔧 Configuration Structure

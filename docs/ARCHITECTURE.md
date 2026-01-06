@@ -1,6 +1,6 @@
 # BWonderComics architecture
 
-This repo is “static-first”: the site is plain HTML/CSS/JS, and a small backend adds the dynamic pieces you can’t do on a purely static host (auth, comments, scheduling, admin write APIs, RSS, analytics proxy).
+This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic pieces you can’t do on a purely static host (auth, comments, scheduling, admin write APIs, RSS, analytics proxy).
 
 ## Components
 - Frontend (static): `index.html`, `feed.html`, `media.html`, `comics.html`, plus `reader/` + `admin/` JS modules.
@@ -13,7 +13,8 @@ This repo is “static-first”: the site is plain HTML/CSS/JS, and a small back
 - Entry page images: on disk under `chapters/` (default series) and `comics/<seriesId>/chapters/` (other series).
 - Blog/feed posts: Postgres `posts` table (supports draft/scheduled/published).
 - Comments + accounts: Postgres (`users`, `comments` tables).
-- Media library: `media.json` + files under `media/` (still JSON-on-disk for now).
+- Media library: Postgres table (index + tags) with files under `media/` on disk.
+- Page configs: Postgres table, served at `/admin/page-config.json` and `/admin/series/<id>/page-config.json`.
 
 ## Runtime routing
 The FastAPI app serves both:
@@ -52,7 +53,5 @@ If Umami is enabled, the backend serves:
 Admin analytics pulls Umami stats via API (no embedded dashboard).
 In Docker, Umami runs as an optional compose profile (`analytics`) alongside the main stack.
 
-## Legacy / compatibility
-- `posts.json` is treated as a legacy seed: the backend can import it into Postgres.
-- The old JSON chapter files are treated as a seed; the backend imports them into Postgres and then serves DB-backed JSON at the same paths.
-- The legacy single-file backend lives at `legacy/server.py` (deprecated).
+## Data seeding
+- The JSON chapter files are treated as a seed; the backend imports them into Postgres and then serves DB-backed JSON at the same paths.

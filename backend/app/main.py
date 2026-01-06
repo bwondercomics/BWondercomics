@@ -181,6 +181,11 @@ if settings.umami_proxy_path:
         return response
 
 
+# Serve uploaded media and chapter assets even when the main site is built into dist/
+app.mount("/media", StaticFiles(directory=str(settings.base_dir / "media")), name="media")
+app.mount("/chapters", StaticFiles(directory=str(settings.base_dir / "chapters")), name="chapters")
+app.mount("/comics", StaticFiles(directory=str(settings.base_dir / "comics")), name="comics")
+
 # Serve production-built files from dist/ directory
 # Use 'npm run build' to generate optimized files
 # For development, use 'npm run dev' instead (runs on port 3000)

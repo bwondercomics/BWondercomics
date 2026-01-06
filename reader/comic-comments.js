@@ -452,7 +452,9 @@ import { getActiveSeriesId } from './series.js';
     }
 
     function handleChapterChange(ctx) {
-        ctx.targetId = getCurrentTargetId();
+        const nextTargetId = getCurrentTargetId();
+        if (nextTargetId === ctx.targetId) return;
+        ctx.targetId = nextTargetId;
         loadComments(ctx);
     }
 

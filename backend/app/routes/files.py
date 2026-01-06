@@ -4,23 +4,87 @@ import base64
 import json
 import os
 import re
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
+from ..content_store import apply_media_items_save, get_page_config, list_media_items, save_page_config
 from ..db import get_db
 from ..file_ops import ALLOWED_IMAGE_EXTENSIONS, extract_numbers, renumber_files, safe_path
 from ..models import User
-from ..rss import generate_rss
+from ..series_store import sanitize_series_id
+from ..settings import settings
 from ..security import get_current_user
 from ..series_store import apply_series_data_save, apply_series_index_save
 from ..validation import is_admin_role
 
 
 router = APIRouter()
+
+
+def _safe_rel_path(raw: str) -> Path | None:
+    rel = (raw or "").strip().lstrip("/")
+    if not rel:
+        return None
+    rel_path = Path(rel)
+    if ".." in rel_path.parts:
+        return None
+    return rel_path
+
+
+def _candidate_file(root: Path, rel_path: Path) -> Path | None:
+    root = root.resolve()
+    candidate = (root / rel_path).resolve()
+    if not candidate.is_relative_to(root):
+        return None
+    if candidate.is_file():
+        return candidate
+    return None
+
+
+@router.get("/assets/{asset_path:path}")
+def legacy_assets(asset_path: str):
+    rel_path = _safe_rel_path(asset_path)
+    if rel_path is None:
+        return JSONResponse(status_code=404, content={"error": "Asset not found"})
+
+    dist_dir = settings.base_dir / "dist"
+    candidates = [
+        _candidate_file(dist_dir / "assets", rel_path),
+        _candidate_file(dist_dir, rel_path),
+        _candidate_file(settings.base_dir / "assets", rel_path),
+    ]
+    for match in candidates:
+        if match:
+            return FileResponse(match)
+
+    return JSONResponse(status_code=404, content={"error": "Asset not found"})
+
+
+@router.get("/admin/page-config.json")
+def legacy_page_config(db: Session = Depends(get_db)):
+    data = get_page_config(db, None)
+    if data is None:
+        return JSONResponse(status_code=404, content={"error": "page-config.json not found"})
+    return JSONResponse(content=data)
+
+
+@router.get("/admin/series/{series_id}/page-config.json")
+def legacy_series_page_config(series_id: str, db: Session = Depends(get_db)):
+    sid = sanitize_series_id(series_id)
+    data = get_page_config(db, sid)
+    if data is None:
+        return JSONResponse(status_code=404, content={"error": "page-config.json not found"})
+    return JSONResponse(content=data)
+
+
+@router.get("/media.json")
+def legacy_media_index(db: Session = Depends(get_db)):
+    return JSONResponse(content=list_media_items(db))
 
 
 def _require_admin(request: Request, db: Session) -> User | None:
@@ -49,6 +113,12 @@ def save_file(payload: SaveRequest, request: Request, db: Session = Depends(get_
     if ".." in filename or filename.startswith(("/", "\\")):
         return JSONResponse(status_code=403, content={"error": "Invalid filename"})
 
+    if filename == "posts.json":
+        return JSONResponse(
+            status_code=400,
+            content={"error": "posts.json is no longer supported. Use /api/admin/posts instead."},
+        )
+
     # Virtual JSON endpoints backed by Postgres (hard cut; no disk writes).
     if filename == "admin/series.json":
         try:
@@ -74,6 +144,30 @@ def save_file(payload: SaveRequest, request: Request, db: Session = Depends(get_
                 return JSONResponse(status_code=400, content={"error": str(exc)})
             return {"status": "success", "message": f"Saved {filename} (database)"}
 
+    if filename == "admin/page-config.json":
+        try:
+            save_page_config(db, None, content)
+        except ValueError as exc:
+            return JSONResponse(status_code=400, content={"error": str(exc)})
+        return {"status": "success", "message": "Saved admin/page-config.json (database)"}
+
+    if filename.startswith("admin/series/") and filename.endswith("/page-config.json"):
+        parts = filename.split("/")
+        if len(parts) >= 4:
+            series_id = parts[2]
+            try:
+                save_page_config(db, series_id, content)
+            except ValueError as exc:
+                return JSONResponse(status_code=400, content={"error": str(exc)})
+            return {"status": "success", "message": f"Saved {filename} (database)"}
+
+    if filename == "media.json":
+        try:
+            apply_media_items_save(db, content)
+        except ValueError as exc:
+            return JSONResponse(status_code=400, content={"error": str(exc)})
+        return {"status": "success", "message": "Saved media.json (database)"}
+
     try:
         file_path = safe_path(filename)
     except ValueError:
@@ -87,12 +181,6 @@ def save_file(payload: SaveRequest, request: Request, db: Session = Depends(get_
             file_path.write_text(str(content), encoding="utf-8")
     except Exception as exc:
         return JSONResponse(status_code=500, content={"error": str(exc)})
-
-    if filename == "posts.json":
-        try:
-            generate_rss(content if isinstance(content, list) else [])
-        except Exception as exc:
-            return JSONResponse(status_code=500, content={"error": f"Saved posts.json but RSS failed: {exc}"})
 
     return {"status": "success", "message": f"Saved {filename}"}
 

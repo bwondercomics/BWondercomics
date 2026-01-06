@@ -401,6 +401,13 @@
         : [];
     }
 
+    function withCacheBust(url) {
+      const raw = String(url || '').trim();
+      if (!raw) return '';
+      if (raw.includes('?')) return raw;
+      return `${raw}?v=1`;
+    }
+
     function renderTags() {
       tagsBar.innerHTML = '';
       const allTags = Array.from(new Set(mediaItems.flatMap(m => normalizeTags(m.tags || [])))).sort();
@@ -457,7 +464,7 @@
         const img = document.createElement('img');
         img.loading = 'lazy';
         img.alt = item.path || 'Media item';
-        img.src = item.path || '';
+        img.src = withCacheBust(item.path);
         img.onerror = () => { img.style.opacity = '0.3'; };
         img.addEventListener('click', () => openLightbox(filtered, index));
         card.appendChild(img);
@@ -508,7 +515,7 @@
     function updateLightbox() {
       if (currentIndex < 0 || currentIndex >= mediaItems.length) return closeLightbox();
       const item = mediaItems[currentIndex];
-      lightboxImg.src = item.path || '';
+      lightboxImg.src = withCacheBust(item.path);
       lightboxImg.alt = item.path || 'Media item';
       const tags = normalizeTags(item.tags || []);
       lightboxMeta.textContent = `${item.path || ''}${tags.length ? ' • ' + tags.join(', ') : ''}`;
@@ -522,7 +529,7 @@
 
     async function loadMedia() {
       try {
-        const response = await fetch('media.json', { cache: 'no-cache' });
+        const response = await fetch('/media.json', { cache: 'no-cache' });
         if (!response.ok) throw new Error('Failed to load media.json');
         const data = await response.json();
         mediaItems = Array.isArray(data) ? data : [];

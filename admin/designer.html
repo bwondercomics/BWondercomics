@@ -682,8 +682,8 @@
 	            const CONFIG_KEY = `battlebros_page_config:${seriesId}`;
 
 	            const FILE_URL = seriesId === DEFAULT_SERIES_ID
-	                ? 'page-config.json'
-	                : `series/${seriesId}/page-config.json`;
+	                ? '/admin/page-config.json'
+	                : `/admin/series/${seriesId}/page-config.json`;
 	            const SAVE_FILENAME = seriesId === DEFAULT_SERIES_ID
 	                ? 'admin/page-config.json'
 	                : `admin/series/${seriesId}/page-config.json`;
@@ -914,7 +914,7 @@
                 btn.addEventListener('click', async () => {
                     const presetName = btn.dataset.preset;
                     try {
-                        const response = await fetch('page-config.json');
+                        const response = await fetch('/admin/page-config.json');
                         const data = await response.json();
                         if (data.presets && data.presets[presetName]) {
                             pageConfig.theme = data.presets[presetName].theme;

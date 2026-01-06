@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-import json
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -29,15 +27,6 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _load_json(path: Path, default):
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return default
-    except Exception:
-        return default
-
-
 def _extract_sort_index(title: str, folder_path: str, fallback: int) -> int:
     candidates: list[str] = []
     if folder_path:
@@ -60,108 +49,22 @@ def ensure_seeded(db: Session) -> None:
     if have_series and have_entries:
         return
 
-    base = settings.base_dir
-    series_index_path = base / "admin" / "series.json"
-    series_index = _load_json(series_index_path, {})
-    raw_series = series_index.get("series") if isinstance(series_index, dict) else None
-    if not isinstance(raw_series, list):
-        raw_series = []
-
-    default_id = sanitize_series_id(series_index.get("defaultSeriesId") if isinstance(series_index, dict) else None)
-    if not any(isinstance(s, dict) and sanitize_series_id(s.get("id")) == default_id for s in raw_series):
-        raw_series.insert(0, {"id": DEFAULT_SERIES_ID, "title": "Battle Bros", "description": "", "premiumOnly": False})
-
     if not have_series:
-        seen: set[str] = set()
-        for item in raw_series:
-            if not isinstance(item, dict):
-                continue
-            sid = sanitize_series_id(item.get("id"))
-            if sid in seen or not SERIES_ID_RE.match(sid):
-                continue
-            seen.add(sid)
-            series = Series(
-                id=sid,
-                title=str(item.get("title") or sid)[:200],
-                description=str(item.get("description") or ""),
-                cover_image=str(item.get("coverImage") or "").strip() or None,
-                premium_only=bool(item.get("premiumOnly")),
-                status_message="",
-                unit_label_singular="Issue" if sid == DEFAULT_SERIES_ID else "Chapter",
-                unit_label_plural="Issues" if sid == DEFAULT_SERIES_ID else "Chapters",
-                active=True,
-                created_at=_now(),
-                updated_at=_now(),
-            )
-            db.add(series)
-
-        db.commit()
-
-    if have_entries:
-        return
-
-    # Import entries/pages from existing admin data.json files.
-    for series in db.scalars(select(Series).where(Series.active.is_(True))).all():
-        if series.id == DEFAULT_SERIES_ID:
-            data_path = base / "admin" / "data.json"
-        else:
-            data_path = base / "admin" / "series" / series.id / "data.json"
-        raw = _load_json(data_path, {})
-        if not isinstance(raw, dict):
-            continue
-
-        series.status_message = str(raw.get("statusMessage") or "")[:200]
-        series.premium_only = bool(raw.get("premiumOnly")) if "premiumOnly" in raw else series.premium_only
+        series = Series(
+            id=DEFAULT_SERIES_ID,
+            title="Battle Bros",
+            description="",
+            cover_image=None,
+            premium_only=False,
+            status_message="",
+            unit_label_singular="Issue",
+            unit_label_plural="Issues",
+            active=True,
+            created_at=_now(),
+            updated_at=_now(),
+        )
         db.add(series)
-
-        chapters = raw.get("chapters") if isinstance(raw.get("chapters"), dict) else {}
-        chapter_folders = raw.get("chapterFolders") if isinstance(raw.get("chapterFolders"), dict) else {}
-        chapter_meta = raw.get("chapterMeta") if isinstance(raw.get("chapterMeta"), dict) else {}
-
-        fallback_index = 0
-        for title, pages in chapters.items():
-            if not isinstance(title, str) or not title.strip():
-                continue
-            page_list = [p for p in (pages or []) if isinstance(p, str) and p.strip()]
-            folder_path = str(chapter_folders.get(title) or "").strip().strip("/")
-            premium_only = False
-            meta = chapter_meta.get(title)
-            if isinstance(meta, dict):
-                premium_only = bool(meta.get("premium"))
-
-            sort_index = _extract_sort_index(title, folder_path, fallback_index)
-            fallback_index += 1
-
-            entry = Entry(
-                id=uuid4(),
-                series_id=series.id,
-                title=title.strip()[:200],
-                display_number=None,
-                folder_path=folder_path,
-                premium_only=premium_only,
-                status="published",
-                publish_at=_now(),
-                sort_index=sort_index,
-                created_at=_now(),
-                updated_at=_now(),
-            )
-            db.add(entry)
-            db.flush()
-
-            for idx, path in enumerate(page_list):
-                db.add(
-                    EntryPage(
-                        id=uuid4(),
-                        entry_id=entry.id,
-                        sort_index=idx,
-                        path=path.strip(),
-                        alt_text=None,
-                        created_at=_now(),
-                        updated_at=_now(),
-                    )
-                )
-
-    db.commit()
+        db.commit()
 
 
 def series_index_payload(db: Session) -> dict[str, Any]:

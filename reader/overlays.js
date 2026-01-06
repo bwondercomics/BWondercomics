@@ -44,4 +44,7 @@ export function changeChapter(name, chapters) {
   state.pan = { x: 0, y: 0 };
   render();
   saveProgress(state);
+  if (typeof window !== 'undefined' && typeof window.CustomEvent === 'function') {
+    window.dispatchEvent(new CustomEvent('chapterChanged', { detail: { chapter: name } }));
+  }
 }

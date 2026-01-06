@@ -24,4 +24,3 @@ def admin_default_series_data(db: Session = Depends(get_db)):
 @router.get("/admin/series/{series_id}/data.json")
 def admin_series_data(series_id: str, db: Session = Depends(get_db)):
     return JSONResponse(content=series_data_payload(db, series_id))
-

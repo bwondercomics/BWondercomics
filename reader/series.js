@@ -16,11 +16,10 @@ export function getActiveSeriesId() {
 
 export function getSeriesDataPath(seriesId = DEFAULT_SERIES_ID) {
   const id = sanitizeSeriesId(seriesId) || DEFAULT_SERIES_ID;
-  return id === DEFAULT_SERIES_ID ? 'admin/data.json' : `admin/series/${id}/data.json`;
+  return id === DEFAULT_SERIES_ID ? '/admin/data.json' : `/admin/series/${id}/data.json`;
 }
 
 export function getSeriesPageConfigPath(seriesId = DEFAULT_SERIES_ID) {
   const id = sanitizeSeriesId(seriesId) || DEFAULT_SERIES_ID;
-  return id === DEFAULT_SERIES_ID ? 'admin/page-config.json' : `admin/series/${id}/page-config.json`;
+  return id === DEFAULT_SERIES_ID ? '/admin/page-config.json' : `/admin/series/${id}/page-config.json`;
 }
-

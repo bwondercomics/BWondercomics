@@ -271,7 +271,7 @@
     }
 
     async function loadSeriesIndex() {
-      const res = await fetch('admin/series.json', { cache: 'no-store' });
+      const res = await fetch('/admin/series.json', { cache: 'no-store' });
       if (!res.ok) throw new Error('Could not load admin/series.json');
       const data = await res.json();
       const series = Array.isArray(data.series) ? data.series : [];
@@ -292,8 +292,8 @@
 
     function getSeriesDataUrl(seriesId) {
       const id = String(seriesId || '').trim();
-      if (!id) return 'admin/data.json';
-      return id === DEFAULT_SERIES_ID ? 'admin/data.json' : `admin/series/${encodeURIComponent(id)}/data.json`;
+      if (!id) return '/admin/data.json';
+      return id === DEFAULT_SERIES_ID ? '/admin/data.json' : `/admin/series/${encodeURIComponent(id)}/data.json`;
     }
 
     async function inferCoverFromSeriesData(series, { canAccess, premium }) {

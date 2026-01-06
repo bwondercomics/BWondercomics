@@ -2,6 +2,7 @@ import {
   STORAGE_KEY,
   API_ENDPOINT,
   MEDIA_FILE,
+  MEDIA_URL,
 } from "./config.js";
 import { el } from "./dom.js";
 import { checkSession, login, logout } from "./auth.js";
@@ -223,7 +224,7 @@ function getChaptersRoot() {
 
 function getChaptersDataFileUrl() {
   const id = getActiveSeriesId();
-  return id === DEFAULT_SERIES_ID ? "data.json" : `series/${id}/data.json`;
+  return id === DEFAULT_SERIES_ID ? "/admin/data.json" : `/admin/series/${id}/data.json`;
 }
 
 function getChaptersSaveFilename() {
@@ -383,7 +384,7 @@ function showAnalyticsSection() {
 
 async function loadSeriesIndex() {
   try {
-    const res = await fetch("series.json", { cache: "no-store" });
+    const res = await fetch("/admin/series.json", { cache: "no-store" });
     if (!res.ok) throw new Error("Failed to load series.json");
     const data = await res.json();
     const series = Array.isArray(data.series) ? data.series : [];
@@ -509,7 +510,7 @@ async function createNewSeries() {
 
   const defaultPageConfig = await (async () => {
     try {
-      const res = await fetch("page-config.json", { cache: "no-store" });
+      const res = await fetch("/admin/page-config.json", { cache: "no-store" });
       if (!res.ok) throw new Error("missing");
       const cfg = await res.json();
       return cfg && typeof cfg === "object" ? cfg : {};
@@ -1043,7 +1044,7 @@ function bindRichTextToolbar() {
 // ---------------- MEDIA ----------------
 async function loadMedia() {
   try {
-    const response = await fetch(MEDIA_FILE, { cache: "no-cache" });
+    const response = await fetch(MEDIA_URL, { cache: "no-cache" });
     if (!response.ok) throw new Error("Failed to load media.json");
     const data = await response.json();
     state.mediaItems = Array.isArray(data)

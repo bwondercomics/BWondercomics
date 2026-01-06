@@ -106,7 +106,8 @@ export function loadImage(imgEl, spinnerEl, url) {
  * Preloads up to CONFIG.PRELOAD_AHEAD pages ahead of current position
  */
 export function preloadUpcoming() {
-  const startIdx = state.pageIndex + 2;
+  const step = canShowTwoPages() ? 2 : 1;
+  const startIdx = state.pageIndex + step;
   const endIdx = Math.min(state.pages.length, startIdx + CONFIG.PRELOAD_AHEAD);
 
   for (let i = startIdx; i < endIdx; i++) {

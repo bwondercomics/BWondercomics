@@ -46,8 +46,8 @@ If you don’t have `make`, run the equivalent commands shown in `Makefile`.
 
 ### Back up everything that matters
 The project has two kinds of “state”:
-- **Database state (Postgres)**: users, comments, posts, series, entries
-- **File state (on disk)**: comic page images (`chapters/`, `comics/*/chapters/`), media library files (`media/`), and page configs (`admin/*page-config.json`)
+- **Database state (Postgres)**: users, comments, posts, series, entries, media index, page configs
+- **File state (on disk)**: comic page images (`chapters/`, `comics/*/chapters/`), media library files (`media/`)
 
 Run:
 - `make backup` (writes to `var/backups/` by default)
@@ -63,12 +63,7 @@ DB restore and file restore are destructive by nature.
 - Uploaded images live in the repo tree:
   - Default series pages: `chapters/`
   - Other series pages: `comics/<seriesId>/chapters/`
-- Page designer configs:
-  - Default series: `admin/page-config.json`
-  - Other series: `admin/series/<seriesId>/page-config.json`
-- Media library:
-  - Files: `media/`
-  - Index: `media.json`
+- Media library files live under `media/` (index + tags are stored in Postgres).
 
 ## Common issues
 - **Admin says “not an admin”**: the first registered account becomes `admin`; after that, an existing admin must promote roles in the **Users** section.

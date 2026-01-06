@@ -9,6 +9,6 @@ Recommended starting points:
 - `docs/reader-overview.md` (reader behavior)
 
 Notes:
-- The site is static-first (no build step), but features like auth/comments/scheduling require the backend in `backend/`.
+- The frontend is plain HTML/CSS/JS, but features like auth/comments/scheduling require the backend in `backend/`.
 - Older “analysis/notes” docs are in `docs/archive/`.
 
