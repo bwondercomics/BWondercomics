@@ -207,6 +207,7 @@ def run_ops_command(command_id: str, request: Request, db: Session, confirm: boo
 
 
 @router.get("/api/admin/ops")
+@router.get("/api/admin/diagnostics/ops")
 def list_ops(request: Request, db: Session = Depends(get_db)):
     if not require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
@@ -233,6 +234,7 @@ def run_command_alias(payload: RunCommandRequest, request: Request, db: Session 
 
 @router.get("/api/admin/ops-history")
 @router.get("/api/admin/ops/history")
+@router.get("/api/admin/diagnostics/ops-history")
 def ops_history(request: Request, db: Session = Depends(get_db), limit: int = 50):
     if not require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})

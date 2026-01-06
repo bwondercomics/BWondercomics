@@ -115,6 +115,7 @@ def diagnostics_health(request: Request, db: Session = Depends(get_db)):
 
 
 @router.get("/api/admin/diagnostics/db-stats")
+@router.get("/api/admin/diagnostics/database-stats")
 def diagnostics_db_stats(request: Request, db: Session = Depends(get_db)):
     if not require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
