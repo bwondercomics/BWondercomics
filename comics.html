@@ -233,6 +233,8 @@
 </head>
 
 <body>
+  <script type="module" src="reader/safe-mode.js"></script>
+  <script type="module" src="reader/live-tracking.js"></script>
   <header>
     <div class="brand">
       <h1>BWONDERCOMICS</h1>
@@ -250,7 +252,7 @@
   </main>
 
   <script type="module">
-// Comics library: load series metadata and render access-aware cards.
+    // Comics library: load series metadata and render access-aware cards.
     const statusEl = document.getElementById('status');
     const gridEl = document.getElementById('grid');
     // Default series lives at the public data.json endpoint.
@@ -457,7 +459,7 @@
 
     main();
   </script>
-<script>
+  <script>
     // Load the analytics loader without Vite bundling it.
     (() => {
       const script = document.createElement("script");

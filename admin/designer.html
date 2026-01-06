@@ -35,6 +35,16 @@
             min-height: 100vh;
         }
 
+        body.is-embedded .header {
+            display: none;
+        }
+
+body.is-embedded .container {
+    padding-top: 10px;
+    max-width: 100%;
+    width: 100%;
+}
+
         /* Animations */
         @keyframes fadeIn {
             from {
@@ -661,7 +671,8 @@
 
         <div id="messageArea"></div>
     </div>
-<script>
+
+    <script>
         (function () {
             'use strict';
 

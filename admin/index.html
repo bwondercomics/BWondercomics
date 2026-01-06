@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 
 <head>
@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Righteous&family=Bebas+Neue&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="diagnostics.css" />
 
   <style>
     /* ==================== CSS VARIABLES ==================== */
@@ -142,6 +143,14 @@
       animation: scanline 8s linear infinite;
     }
 
+    body.admin-scanlines-off {
+      background-image: none;
+    }
+
+    body.admin-scanlines-off::before {
+      display: none;
+    }
+
     /* ==================== MOVE MODE VISUALS ==================== */
     @keyframes shimmy {
       0% {
@@ -229,6 +238,12 @@
       gap: 8px;
     }
 
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+    }
+
     .form-label {
       font-size: 0.9rem;
       color: var(--primary);
@@ -251,6 +266,11 @@
       outline: none;
       box-shadow: 0 0 15px rgba(0, 217, 255, 0.5);
       animation: neonPulse 1s ease-in-out infinite;
+    }
+
+    .form-input[disabled] {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
 
     .btn-primary {
@@ -291,18 +311,70 @@
     /* ==================== ADMIN DASHBOARD ==================== */
     #adminDashboard {
       display: none;
+    }
+
+    .admin-shell {
       min-height: 100vh;
+      display: grid;
+      grid-template-areas: "header header" "nav content";
+      grid-template-columns: 240px minmax(0, 1fr);
+      grid-template-rows: auto 1fr;
+    }
+
+    .admin-shell.admin-layout--right {
+      grid-template-areas: "header header" "content nav";
+      grid-template-columns: minmax(0, 1fr) 240px;
+    }
+
+    .admin-shell.admin-layout--top {
+      grid-template-areas: "header" "nav" "content";
+      grid-template-columns: 1fr;
+      grid-template-rows: auto auto 1fr;
+    }
+
+    .admin-shell.nav-collapsed.admin-layout--left {
+      grid-template-columns: 0 minmax(0, 1fr);
+    }
+
+    .admin-shell.nav-collapsed.admin-layout--right {
+      grid-template-columns: minmax(0, 1fr) 0;
+    }
+
+    .admin-shell.nav-collapsed.admin-layout--top {
+      grid-template-areas: "header" "content";
+      grid-template-rows: auto 1fr;
+    }
+
+    .admin-shell.nav-collapsed .admin-nav {
+      width: 0;
+      padding: 0;
+      border: 0;
+      overflow: hidden;
+    }
+
+    .admin-shell.admin-layout--top.nav-collapsed .admin-nav {
+      display: none;
     }
 
     .admin-header {
+      grid-area: header;
       background: var(--bg-panel);
       border-bottom: 2px solid var(--primary);
       padding: 20px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
       flex-wrap: wrap;
-      gap: 15px;
+      gap: 16px;
+    }
+
+    .admin-header-main {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex: 1;
+      flex-wrap: wrap;
+      min-width: 0;
     }
 
     .admin-title {
@@ -347,12 +419,110 @@
       font-size: 1rem;
     }
 
+    .nav-toggle {
+      width: 44px;
+      height: 44px;
+      border-radius: 8px;
+      border: 2px solid var(--primary);
+      background: rgba(0, 217, 255, 0.08);
+      display: inline-flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 5px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 0 10px rgba(0, 217, 255, 0.25);
+    }
+
+    .nav-toggle span {
+      width: 20px;
+      height: 2px;
+      background: var(--primary);
+      box-shadow: 0 0 6px rgba(0, 217, 255, 0.6);
+    }
+
+    .nav-toggle:hover {
+      background: rgba(0, 217, 255, 0.18);
+      box-shadow: 0 0 16px rgba(0, 217, 255, 0.35);
+    }
+
     .admin-nav {
+      grid-area: nav;
       display: flex;
-      gap: 10px;
+      flex-direction: column;
+      gap: 16px;
+      padding: 16px;
+      background: var(--bg-panel);
+      border-right: 2px solid var(--primary);
+      min-width: 0;
+    }
+
+    .admin-shell.admin-layout--left .admin-nav,
+    .admin-shell.admin-layout--right .admin-nav {
+      position: sticky;
+      top: 0;
+      align-self: start;
+      max-height: 100vh;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+
+    .admin-layout--right .admin-nav {
+      border-right: 0;
+      border-left: 2px solid var(--primary);
+    }
+
+    .admin-layout--top .admin-nav {
+      flex-direction: row;
       flex-wrap: wrap;
-      justify-content: flex-end;
-      align-items: stretch;
+      align-items: center;
+      justify-content: space-between;
+      border-right: 0;
+      border-left: 0;
+      border-bottom: 2px solid var(--primary);
+    }
+
+    .admin-nav-main,
+    .admin-nav-footer {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .admin-nav-footer {
+      margin-top: auto;
+    }
+
+    .nav-dropout {
+      position: relative;
+      width: 100%;
+    }
+
+    .admin-layout--top .nav-dropout {
+      width: auto;
+    }
+
+    .admin-layout--top .admin-nav-main,
+    .admin-layout--top .admin-nav-footer {
+      flex-direction: row;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .admin-layout--top .admin-nav-footer {
+      margin-top: 0;
+      margin-left: auto;
+    }
+
+    .admin-nav .nav-btn {
+      width: 100%;
+      justify-content: flex-start;
+    }
+
+    .admin-layout--top .admin-nav .nav-btn {
+      width: auto;
+      justify-content: center;
     }
 
     .btn-secondary {
@@ -454,10 +624,157 @@
       border-color: var(--accent);
     }
 
+    .nav-btn-icon {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    .nav-btn-label {
+      flex: 1;
+      text-align: left;
+    }
+
+    .admin-settings-panel {
+      border: 1px solid var(--secondary);
+      border-radius: 10px;
+      padding: 12px;
+      background: rgba(10, 10, 18, 0.9);
+      box-shadow: 0 0 18px rgba(255, 0, 234, 0.15);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .admin-innernet-panel {
+      position: absolute;
+      top: 0;
+      left: calc(100% + 14px);
+      min-width: 220px;
+      max-width: 320px;
+      border: 1px solid rgba(0, 217, 255, 0.65);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(10, 10, 18, 0.95);
+      box-shadow: 0 0 22px rgba(0, 217, 255, 0.25);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      z-index: 30;
+    }
+
+    .admin-innernet-panel[hidden] {
+      display: none;
+    }
+
+    .admin-layout--right .admin-innernet-panel {
+      left: auto;
+      right: calc(100% + 14px);
+    }
+
+    .admin-layout--top .admin-innernet-panel {
+      top: calc(100% + 10px);
+      left: 0;
+      right: auto;
+    }
+
+    .innernet-item {
+      border: 1px solid rgba(255, 237, 0, 0.25);
+      border-radius: 10px;
+      padding: 10px;
+      background: rgba(10, 10, 18, 0.8);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .innernet-name {
+      font-family: 'Bebas Neue', cursive;
+      letter-spacing: 1px;
+      color: var(--accent);
+      font-size: 1rem;
+      text-transform: uppercase;
+    }
+
+    .innernet-meta {
+      font-size: 0.75rem;
+      opacity: 0.75;
+    }
+
+    .innernet-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .admin-settings-panel[hidden] {
+      display: none;
+    }
+
+    .admin-settings-panel .form-input {
+      min-width: 180px;
+    }
+
+    .settings-title {
+      font-family: 'Bebas Neue', cursive;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent);
+      font-size: 1.1rem;
+    }
+
+    .settings-label {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--primary);
+    }
+
+    .settings-note {
+      font-size: 0.8rem;
+      opacity: 0.75;
+    }
+
+    .bluesky-char-counter {
+      font-size: 0.8rem;
+      opacity: 0.75;
+    }
+
+    .bluesky-char-counter.is-muted {
+      opacity: 0.45;
+    }
+
+    .bluesky-char-counter.is-over {
+      color: var(--danger);
+      opacity: 1;
+    }
+
+    .settings-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: var(--text);
+    }
+
+    .settings-toggle input {
+      accent-color: var(--primary);
+    }
+
     .admin-content {
+      grid-area: content;
       padding: 30px 20px;
       max-width: 1200px;
       margin: 0 auto;
+      min-width: 0;
+    }
+
+    .admin-shell.admin-designer-open .admin-content {
+      max-width: 3600px;
+      width: 100%;
     }
 
     .section {
@@ -476,6 +793,501 @@
       margin-bottom: 20px;
       text-transform: uppercase;
       letter-spacing: 2px;
+    }
+
+    /* ==================== DASHBOARD ==================== */
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .dashboard-subtitle {
+      font-size: 0.9rem;
+      opacity: 0.75;
+      margin-top: 4px;
+    }
+
+    .dashboard-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .dashboard-metrics {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .dashboard-metric-card {
+      background: var(--bg-dark);
+      border: 1px solid rgba(0, 217, 255, 0.6);
+      border-radius: 8px;
+      padding: 14px 16px;
+      box-shadow: 0 0 12px rgba(0, 217, 255, 0.15);
+      min-height: 90px;
+    }
+
+    .dashboard-metric-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--primary);
+    }
+
+    .dashboard-metric-value {
+      font-size: 1.4rem;
+      color: var(--text);
+      margin-top: 6px;
+    }
+
+    .dashboard-metric-sub {
+      font-size: 0.75rem;
+      opacity: 0.75;
+      margin-top: 6px;
+    }
+
+    .dashboard-grid {
+      display: grid;
+      gap: 18px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .dashboard-card {
+      background: rgba(10, 10, 18, 0.75);
+      border: 1px solid rgba(0, 217, 255, 0.45);
+      border-radius: 10px;
+      padding: 18px;
+      box-shadow: 0 0 18px rgba(0, 217, 255, 0.15);
+    }
+
+    .dashboard-card--wide {
+      grid-column: span 2;
+    }
+
+    .dashboard-card-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-family: 'Bebas Neue', cursive;
+      font-size: 1.2rem;
+      color: var(--accent);
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+
+    .dashboard-pill {
+      background: var(--primary);
+      color: var(--bg-dark);
+      font-size: 0.65rem;
+      padding: 2px 8px;
+      border-radius: 999px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .dashboard-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .dashboard-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      background: rgba(10, 10, 18, 0.85);
+      border: 1px solid rgba(0, 217, 255, 0.35);
+      border-radius: 8px;
+    }
+
+    .dashboard-item--warn {
+      border-color: rgba(255, 237, 0, 0.6);
+    }
+
+    .dashboard-item--success {
+      border-color: rgba(0, 255, 136, 0.6);
+    }
+
+    .dashboard-item--danger {
+      border-color: rgba(255, 56, 56, 0.7);
+    }
+
+    .dashboard-item-main {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .dashboard-item-title {
+      font-size: 0.95rem;
+      color: var(--primary);
+    }
+
+    .dashboard-item-meta {
+      font-size: 0.8rem;
+      opacity: 0.75;
+      margin-top: 4px;
+    }
+
+    .premium-code-value {
+      font-family: 'JetBrains Mono', 'Courier New', monospace;
+      letter-spacing: 1px;
+      font-size: 1rem;
+      color: var(--accent);
+    }
+
+    .premium-code-meta {
+      font-size: 0.75rem;
+      opacity: 0.75;
+      margin-top: 4px;
+    }
+
+    .premium-code-actions {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .dashboard-item-time {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      opacity: 0.7;
+      white-space: nowrap;
+    }
+
+    .dashboard-tag {
+      display: inline-flex;
+      align-items: center;
+      font-size: 0.65rem;
+      padding: 2px 6px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-right: 6px;
+      background: rgba(0, 217, 255, 0.2);
+      color: var(--primary);
+      border: 1px solid rgba(0, 217, 255, 0.5);
+    }
+
+    .dashboard-tag--accent {
+      background: rgba(255, 237, 0, 0.2);
+      color: var(--accent);
+      border-color: rgba(255, 237, 0, 0.6);
+    }
+
+    .dashboard-tag--success {
+      background: rgba(0, 255, 136, 0.2);
+      color: var(--success);
+      border-color: rgba(0, 255, 136, 0.6);
+    }
+
+    .dashboard-tag--danger {
+      background: rgba(255, 56, 56, 0.15);
+      color: var(--danger);
+      border-color: rgba(255, 56, 56, 0.6);
+    }
+
+    .dashboard-empty {
+      font-size: 0.85rem;
+      opacity: 0.7;
+      padding: 10px 12px;
+      border: 1px dashed rgba(0, 217, 255, 0.35);
+      border-radius: 8px;
+      text-align: center;
+    }
+
+    .dashboard-mini-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .dashboard-mini-card {
+      background: rgba(10, 10, 18, 0.9);
+      border: 1px solid rgba(0, 217, 255, 0.4);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+
+    .dashboard-mini-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--primary);
+    }
+
+    .dashboard-mini-value {
+      font-size: 1.1rem;
+      margin-top: 6px;
+    }
+
+    .dashboard-mini-sub {
+      font-size: 0.75rem;
+      opacity: 0.75;
+      margin-top: 4px;
+    }
+
+    .dashboard-status {
+      font-size: 0.8rem;
+      opacity: 0.7;
+      margin-top: 10px;
+    }
+
+    .social-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .social-tab.is-active {
+      border-color: var(--accent);
+      color: var(--accent);
+      box-shadow: 0 0 10px rgba(255, 237, 0, 0.18);
+    }
+
+    .social-panel[hidden] {
+      display: none;
+    }
+
+    .social-profile-card {
+      display: grid;
+      gap: 12px;
+      padding: 16px;
+      border-radius: 10px;
+      border: 2px solid rgba(0, 217, 255, 0.35);
+      background: rgba(10, 10, 18, 0.65);
+    }
+
+    .social-profile {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .social-avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 12px;
+      border: 2px solid rgba(0, 217, 255, 0.4);
+      background: #05050a;
+      background-size: cover;
+      background-position: center;
+      display: grid;
+      place-items: center;
+      font-family: "Bebas Neue", cursive;
+      font-size: 1.4rem;
+      color: var(--accent);
+      letter-spacing: 1px;
+    }
+
+    .social-avatar.is-empty {
+      background-image: none;
+    }
+
+    .social-profile-name {
+      font-family: "Bebas Neue", cursive;
+      font-size: 1.4rem;
+      color: var(--accent);
+      letter-spacing: 1px;
+    }
+
+    .social-profile-handle {
+      color: var(--primary);
+      font-size: 0.95rem;
+    }
+
+    .social-profile-link {
+      display: inline-flex;
+      margin-top: 4px;
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.85rem;
+    }
+
+    .social-profile-link:hover {
+      text-decoration: underline;
+    }
+
+    .social-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+    }
+
+    .social-stat-card {
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid rgba(255, 237, 0, 0.3);
+      background: rgba(10, 10, 18, 0.7);
+    }
+
+    .social-stat-label {
+      font-size: 0.75rem;
+      letter-spacing: 0.7px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .social-stat-value {
+      font-size: 1.3rem;
+      color: var(--accent);
+      margin-top: 6px;
+    }
+
+    .social-notifications {
+      margin-top: 16px;
+    }
+
+    .social-note {
+      display: grid;
+      grid-template-columns: 40px minmax(0, 1fr) auto;
+      gap: 10px;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 217, 255, 0.25);
+      background: rgba(10, 10, 18, 0.75);
+    }
+
+    .social-note.is-unread {
+      border-color: rgba(255, 237, 0, 0.6);
+      box-shadow: 0 0 12px rgba(255, 237, 0, 0.15);
+    }
+
+    .social-note + .social-note {
+      margin-top: 8px;
+    }
+
+    .social-note-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 217, 255, 0.35);
+      background: #05050a;
+      background-size: cover;
+      background-position: center;
+      display: grid;
+      place-items: center;
+      color: var(--accent);
+      font-size: 0.9rem;
+    }
+
+    .social-note-avatar.is-empty {
+      background-image: none;
+    }
+
+    .social-note-title {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      font-size: 0.95rem;
+    }
+
+    .social-note-author {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    .social-note-author:hover {
+      text-decoration: underline;
+    }
+
+    .social-note-reason {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--primary);
+    }
+
+    .social-note-text {
+      font-size: 0.85rem;
+      opacity: 0.85;
+      margin-top: 4px;
+      line-height: 1.3;
+    }
+
+    .social-note-time {
+      font-size: 0.75rem;
+      color: var(--primary);
+      white-space: nowrap;
+    }
+
+    .social-placeholder {
+      padding: 20px;
+      border-radius: 10px;
+      border: 2px dashed rgba(255, 237, 0, 0.35);
+      color: rgba(255, 255, 255, 0.75);
+      text-align: center;
+      margin-top: 16px;
+    }
+
+    .moderation-filters {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin: 10px 0 18px;
+      align-items: end;
+    }
+
+    .moderation-filters>div {
+      min-width: 0;
+    }
+
+    .moderation-filters .form-input {
+      width: 100%;
+      box-sizing: border-box;
+    }
+
+    .moderation-actions {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+      flex-wrap: wrap;
+      grid-column: 1 / -1;
+      justify-content: flex-end;
+    }
+
+    .moderation-comment {
+      align-items: flex-start;
+    }
+
+    .moderation-message {
+      margin-top: 8px;
+      font-size: 0.95rem;
+      white-space: pre-wrap;
+    }
+
+    .moderation-meta {
+      font-size: 0.8rem;
+      opacity: 0.75;
+    }
+
+    .moderation-results {
+      font-size: 0.85rem;
+      opacity: 0.7;
+      margin-top: 6px;
+    }
+
+    @media (max-width: 980px) {
+      .dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .dashboard-card--wide {
+        grid-column: span 1;
+      }
     }
 
     .chapter-list {
@@ -1034,6 +1846,32 @@
       overflow-y: auto;
     }
 
+    /* ==================== DESIGNER SECTION ==================== */
+    .designer-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+
+    .designer-frame {
+      width: 100%;
+      min-height: 70vh;
+      height: min(80vh, 900px);
+      border: 1px solid var(--primary);
+      border-radius: 8px;
+      background: #0f1629;
+      overflow: hidden;
+      display: block;
+    }
+
+    .designer-note {
+      font-size: 0.9rem;
+      opacity: 0.8;
+      margin-top: 10px;
+    }
+
     .export-actions {
       display: flex;
       gap: 10px;
@@ -1419,6 +2257,23 @@
       box-shadow: 0 0 18px rgba(0, 217, 255, 0.12);
     }
 
+    .analytics-grid--compact {
+      grid-template-columns: repeat(4, minmax(150px, 1fr));
+      max-width: 100%;
+    }
+
+    .analytics-grid--compact .analytics-card {
+      padding: 10px 12px;
+    }
+
+    .analytics-grid--compact .analytics-label {
+      font-size: 0.75rem;
+    }
+
+    .analytics-grid--compact .analytics-value {
+      font-size: 1.7rem;
+    }
+
     .analytics-label {
       font-size: 0.9rem;
       letter-spacing: 0.4px;
@@ -1440,11 +2295,494 @@
       margin-top: 6px;
     }
 
+    .analytics-pages {
+      margin-top: 18px;
+      border-top: 1px solid rgba(0, 217, 255, 0.2);
+      padding-top: 14px;
+    }
+
+    .analytics-pages-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .analytics-pages-title {
+      font-family: 'Bebas Neue', cursive;
+      font-size: 1.1rem;
+      letter-spacing: 1px;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    .analytics-pages-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .analytics-pages-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .analytics-pages-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 12px;
+      border: 1px solid rgba(0, 217, 255, 0.35);
+      border-radius: 8px;
+      background: rgba(10, 10, 18, 0.75);
+      box-shadow: 0 0 12px rgba(0, 217, 255, 0.12);
+    }
+
+    .analytics-page-path {
+      font-size: 0.95rem;
+      color: var(--text);
+      word-break: break-all;
+      flex: 1;
+    }
+
+    .analytics-page-views {
+      font-size: 1rem;
+      color: var(--primary);
+      font-weight: 600;
+      min-width: 80px;
+      text-align: right;
+    }
+
+    .analytics-pages-empty {
+      padding: 12px;
+      border: 1px dashed rgba(0, 217, 255, 0.4);
+      border-radius: 8px;
+      text-align: center;
+      opacity: 0.8;
+    }
+
+    .analytics-reader {
+      margin-top: 18px;
+      border-top: 1px solid rgba(0, 217, 255, 0.2);
+      padding-top: 16px;
+    }
+
+    .analytics-reader-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+      margin-top: 12px;
+    }
+
+    .analytics-reader-card {
+      background: rgba(10, 10, 18, 0.85);
+      border: 1px solid rgba(255, 0, 234, 0.35);
+      border-radius: 10px;
+      padding: 12px;
+      box-shadow: 0 0 14px rgba(255, 0, 234, 0.12);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-height: 120px;
+    }
+
+    .analytics-reader-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .analytics-reader-title {
+      font-family: 'Bebas Neue', cursive;
+      font-size: 1rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--secondary);
+    }
+
+    .analytics-reader-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 8px 10px;
+      border: 1px solid rgba(255, 0, 234, 0.25);
+      border-radius: 8px;
+      background: rgba(10, 10, 18, 0.7);
+      cursor: pointer;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .analytics-reader-item:hover {
+      border-color: rgba(255, 237, 0, 0.7);
+      box-shadow: 0 0 10px rgba(255, 237, 0, 0.2);
+    }
+
+    .analytics-reader-label {
+      font-size: 0.9rem;
+      color: var(--text);
+      word-break: break-word;
+      flex: 1;
+    }
+
+    .analytics-reader-sub {
+      margin-top: 4px;
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.7);
+      letter-spacing: 0.3px;
+    }
+
+    .analytics-reader-value {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--secondary);
+      min-width: 80px;
+      text-align: right;
+    }
+
+    .analytics-detail {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .analytics-detail-controls {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .analytics-detail-select {
+      min-width: 140px;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+    }
+
+    .analytics-detail-back {
+      align-self: flex-start;
+      font-size: 0.75rem;
+      padding: 6px 10px;
+      letter-spacing: 1px;
+    }
+
+    .analytics-detail-title {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--secondary);
+    }
+
+    .analytics-detail-label {
+      font-size: 0.95rem;
+      color: var(--accent);
+      word-break: break-word;
+    }
+
+    .analytics-detail-range {
+      font-size: 0.8rem;
+      opacity: 0.75;
+    }
+
+    .analytics-detail-meta {
+      margin-top: 4px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .analytics-detail-meta-item {
+      flex: 1 1 200px;
+      border: 1px solid rgba(0, 217, 255, 0.2);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: rgba(10, 10, 18, 0.6);
+    }
+
+    .analytics-detail-meta-label {
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      opacity: 0.7;
+    }
+
+    .analytics-detail-meta-value {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-top: 4px;
+    }
+
+    .analytics-detail-meta-note {
+      margin-top: 6px;
+      font-size: 0.8rem;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .analytics-detail-chart {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 6px;
+    }
+
+    .analytics-detail-bars {
+      --bar-gap: 4px;
+      display: flex;
+      align-items: flex-end;
+      gap: var(--bar-gap);
+      height: 140px;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 0, 234, 0.35);
+      background: rgba(10, 10, 18, 0.7);
+      overflow: hidden;
+    }
+
+    .analytics-detail-bar {
+      width: 100%;
+      background-color: transparent;
+      background-image:
+        repeating-linear-gradient(0deg,
+          rgba(0, 255, 136, 0.25) 0,
+          rgba(0, 255, 136, 0.25) 1px,
+          transparent 1px,
+          transparent 6px),
+        repeating-linear-gradient(90deg,
+          rgba(0, 255, 136, 0.2) 0,
+          rgba(0, 255, 136, 0.2) 1px,
+          transparent 1px,
+          transparent 8px);
+      border: 1px solid rgba(0, 255, 136, 0.85);
+      box-shadow:
+        0 0 8px rgba(0, 255, 136, 0.35),
+        inset 0 0 6px rgba(0, 255, 136, 0.2);
+      border-radius: 6px 6px 3px 3px;
+      transition: height 0.2s ease;
+    }
+
+    .analytics-detail-bar-wrap {
+      flex: 1;
+      min-width: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+      height: 100%;
+    }
+
+    .analytics-detail-bar-body {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 6px;
+      position: relative;
+    }
+
+    .analytics-detail-bar-body::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: calc(var(--bar-gap) / -2);
+      width: 1px;
+      background: rgba(255, 237, 0, 0.25);
+    }
+
+    .analytics-detail-bar-wrap:first-child .analytics-detail-bar-body::before {
+      display: none;
+    }
+
+    .analytics-detail-bar-count {
+      font-size: 0.7rem;
+      color: var(--success);
+      letter-spacing: 0.5px;
+      text-align: center;
+      min-height: 0.9rem;
+    }
+
+    .analytics-detail-bar-slot {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      align-items: flex-end;
+    }
+
+    .analytics-detail-bar-time {
+      font-size: 0.65rem;
+      color: rgba(255, 255, 255, 0.7);
+      letter-spacing: 0.4px;
+      text-align: center;
+      min-height: 0.85rem;
+    }
+
+    .analytics-detail-axis {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      opacity: 0.7;
+    }
+
+    .analytics-detail-empty {
+      padding: 10px;
+      border: 1px dashed rgba(255, 0, 234, 0.4);
+      border-radius: 8px;
+      text-align: center;
+      opacity: 0.8;
+    }
+
+    .analytics-live {
+      margin-top: 18px;
+      border-top: 1px solid rgba(0, 217, 255, 0.2);
+      padding-top: 16px;
+    }
+
+    .moderation-live {
+      margin-top: 0;
+      border-top: none;
+      padding-top: 0;
+      margin-bottom: 18px;
+    }
+
+    .analytics-live-chart {
+      margin-top: 10px;
+      border: 1px solid rgba(0, 217, 255, 0.2);
+      border-radius: 10px;
+      background: rgba(10, 10, 18, 0.7);
+      padding: 12px;
+    }
+
+    .analytics-live-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .analytics-live-count {
+      font-family: 'Bebas Neue', cursive;
+      font-size: 1.1rem;
+      letter-spacing: 1px;
+      color: var(--accent);
+      text-transform: uppercase;
+    }
+
+    .analytics-live-range {
+      font-size: 0.8rem;
+      opacity: 0.75;
+    }
+
+    .analytics-live-graph {
+      margin-top: 10px;
+      height: 140px;
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 255, 136, 0.35);
+      background: rgba(10, 10, 18, 0.65);
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .analytics-live-canvas {
+      width: 100%;
+      height: 100px;
+      display: block;
+    }
+
+    .analytics-live-axis {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      letter-spacing: 0.4px;
+      color: rgba(255, 255, 255, 0.7);
+      text-transform: uppercase;
+    }
+
+    .analytics-live-ticker {
+      margin-top: 12px;
+      border: 1px solid rgba(255, 0, 234, 0.35);
+      border-radius: 10px;
+      background: rgba(10, 10, 18, 0.65);
+      overflow: hidden;
+    }
+
+    .analytics-live-track {
+      display: inline-flex;
+      gap: 10px;
+      padding: 10px 12px;
+      white-space: nowrap;
+    }
+
+    .analytics-live-card {
+      flex: 0 0 auto;
+      min-width: 220px;
+      max-width: 280px;
+      border: 1px solid rgba(255, 0, 234, 0.3);
+      border-radius: 8px;
+      padding: 10px;
+      background: rgba(10, 10, 18, 0.8);
+      box-shadow: 0 0 10px rgba(255, 0, 234, 0.12);
+    }
+
+    .analytics-live-card-title {
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--secondary);
+    }
+
+    .analytics-live-card-meta {
+      font-size: 0.75rem;
+      opacity: 0.7;
+      margin-top: 4px;
+    }
+
+    .analytics-live-card-row {
+      font-size: 0.8rem;
+      margin-top: 6px;
+      line-height: 1.3;
+    }
+
+    @media (max-width: 1100px) {
+      .analytics-grid--compact {
+        grid-template-columns: repeat(2, minmax(150px, 1fr));
+      }
+    }
+
+    @media (max-width: 640px) {
+      .analytics-grid--compact {
+        grid-template-columns: 1fr;
+      }
+    }
+
     /* ==================== RESPONSIVE ==================== */
     @media (max-width: 768px) {
       .admin-header {
         flex-direction: column;
         align-items: flex-start;
+      }
+
+      .admin-header-main {
+        width: 100%;
+      }
+
+      .admin-nav {
+        padding: 12px;
+      }
+
+      .admin-layout--top .admin-nav-footer {
+        margin-left: 0;
       }
 
       .admin-title {
@@ -1466,6 +2804,38 @@
 
       .login-container {
         padding: 30px 20px;
+      }
+    }
+
+    @media (max-width: 768px) and (orientation: portrait) {
+      .admin-shell.admin-layout--left {
+        grid-template-columns: 72px minmax(0, 1fr);
+      }
+
+      .admin-shell.admin-layout--right {
+        grid-template-columns: minmax(0, 1fr) 72px;
+      }
+
+      .admin-nav {
+        padding: 12px 10px;
+        gap: 12px;
+      }
+
+      .admin-nav .nav-btn {
+        justify-content: center;
+        padding: 10px;
+      }
+
+      .nav-btn-label {
+        display: none;
+      }
+
+      .admin-layout--top .admin-nav {
+        justify-content: center;
+      }
+
+      .admin-layout--top .admin-nav-footer {
+        margin-left: 0;
       }
     }
   </style>
@@ -1501,32 +2871,298 @@
   </div>
 
   <!-- ==================== ADMIN DASHBOARD ==================== -->
-  <div id="adminDashboard">
+  <div id="adminDashboard" class="admin-shell admin-layout--left">
     <header class="admin-header">
-      <h1 class="admin-title">BWonderComics Admin</h1>
-      <div class="header-series">
-        <label class="header-series-label" for="seriesSelect">Active Series</label>
-        <div class="header-series-row">
-          <select id="seriesSelect" class="form-input"></select>
-          <button class="btn-secondary nav-btn" id="btnAddSeries" type="button">New</button>
-          <button class="btn-secondary nav-btn" id="btnEditSeries" type="button">Edit</button>
-          <a class="btn-secondary nav-btn" id="btnOpenSeries" href="#" target="_blank" rel="noopener">Open Reader</a>
+      <button class="nav-toggle" id="adminNavToggle" type="button" aria-label="Toggle navigation"
+        aria-controls="adminNav" aria-expanded="true">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <div class="admin-header-main">
+        <h1 class="admin-title">BWonderComics Admin</h1>
+        <div class="header-series">
+          <label class="header-series-label" for="seriesSelect">Active Series</label>
+          <div class="header-series-row">
+            <select id="seriesSelect" class="form-input"></select>
+            <button class="btn-secondary nav-btn" id="btnAddSeries" type="button">New</button>
+            <button class="btn-secondary nav-btn" id="btnEditSeries" type="button">Edit</button>
+            <a class="btn-secondary nav-btn" id="btnOpenSeries" href="#" target="_blank" rel="noopener">Open Reader</a>
+          </div>
         </div>
       </div>
-      <nav class="admin-nav">
-        <button class="btn-secondary nav-btn" id="btnChapters" type="button">Entries</button>
-        <button class="btn-secondary nav-btn" id="btnBlog">Blog / Feed</button>
-        <button class="btn-secondary nav-btn" id="btnMedia">Media</button>
-        <button class="btn-secondary nav-btn" id="btnUsers" type="button">Users</button>
-        <button class="btn-secondary nav-btn" id="btnAnalytics" type="button">Analytics</button>
-        <button class="btn-secondary nav-btn" id="btnDesigner" type="button">Page Designer</button>
-        <button class="btn-secondary nav-btn" id="btnPreview">Preview Changes</button>
-        <button class="btn-logout nav-btn nav-btn--danger" id="btnLogout">Logout</button>
-      </nav>
     </header>
 
+    <nav class="admin-nav" id="adminNav" aria-label="Admin navigation">
+      <div class="admin-nav-main">
+        <button class="btn-secondary nav-btn" id="btnDashboard" type="button">
+          <span class="nav-btn-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <path fill="currentColor" d="M3 3h8v8H3V3zm10 0h8v5h-8V3zM3 13h8v8H3v-8zm10-3h8v11h-8V10z" />
+            </svg>
+          </span>
+          <span class="nav-btn-label">Dashboard</span>
+        </button>
+        <button class="btn-secondary nav-btn" id="btnChapters" type="button">
+          <span class="nav-btn-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <path fill="currentColor" d="M4 6h16v2H4zM4 11h16v2H4zM4 16h16v2H4z" />
+            </svg>
+          </span>
+          <span class="nav-btn-label">Entries</span>
+        </button>
+        <button class="btn-secondary nav-btn" id="btnBlog" type="button">
+          <span class="nav-btn-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <path fill="currentColor"
+                d="M4 4c9.94 0 18 8.06 18 18h-4c0-7.73-6.27-14-14-14V4zm0 7c6.08 0 11 4.92 11 11h-4c0-3.87-3.13-7-7-7v-4zm2 8a2 2 0 1 0 0 4 2 2 0 0 0 0-4z" />
+            </svg>
+          </span>
+          <span class="nav-btn-label">Blog / Feed</span>
+        </button>
+        <button class="btn-secondary nav-btn" id="btnSocial" type="button">
+          <span class="nav-btn-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <path fill="currentColor"
+                d="M4 6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H9l-5 4V6z" />
+            </svg>
+          </span>
+          <span class="nav-btn-label">Social</span>
+        </button>
+        <button class="btn-secondary nav-btn" id="btnMedia" type="button">
+          <span class="nav-btn-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <path fill="currentColor"
+                d="M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5zm2 0v14h12V5H6zm2 10 2.5-3 2 2.5L15 11l3 4H8z" />
+            </svg>
+          </span>
+          <span class="nav-btn-label">Media</span>
+        </button>
+        <button class="btn-secondary nav-btn" id="btnUsers" type="button">
+          <span class="nav-btn-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <path fill="currentColor"
+                d="M12 12a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm0 2c-4.42 0-8 2.24-8 5v2h16v-2c0-2.76-3.58-5-8-5z" />
+            </svg>
+          </span>
+          <span class="nav-btn-label">Users</span>
+        </button>
+        <button class="btn-secondary nav-btn" id="btnModeration" type="button">
+          <span class="nav-btn-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <path fill="currentColor"
+                d="M12 2 4 5v6c0 5.25 3.4 9.5 8 11 4.6-1.5 8-5.75 8-11V5l-8-3zm0 17.9c-3.2-1.2-5.5-4.3-5.5-8.1V6.4L12 4.2l5.5 2.2v5.4c0 3.8-2.3 6.9-5.5 8.1z" />
+            </svg>
+          </span>
+          <span class="nav-btn-label">Moderation</span>
+        </button>
+        <button class="btn-secondary nav-btn" id="btnAnalytics" type="button">
+          <span class="nav-btn-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <path fill="currentColor" d="M5 3h2v18H5V3zm6 6h2v12h-2V9zm6-4h2v16h-2V5z" />
+            </svg>
+          </span>
+          <span class="nav-btn-label">Analytics</span>
+        </button>
+        <button class="btn-secondary nav-btn" id="btnDesigner" type="button">
+          <span class="nav-btn-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <path fill="currentColor"
+                d="M14.06 9.02 4 19.08V22h2.92l10.06-10.06-2.92-2.92zm2.12-2.12 2.92 2.92 1.59-1.59a1.5 1.5 0 0 0 0-2.12l-.8-.8a1.5 1.5 0 0 0-2.12 0l-1.59 1.59z" />
+            </svg>
+          </span>
+          <span class="nav-btn-label">Page Designer</span>
+        </button>
+        <button class="btn-secondary nav-btn" id="btnPreview" type="button">
+          <span class="nav-btn-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <path fill="currentColor"
+                d="M12 5c-5 0-9.27 3.11-11 7 1.73 3.89 6 7 11 7s9.27-3.11 11-7c-1.73-3.89-6-7-11-7zm0 11a4 4 0 1 1 4-4 4 4 0 0 1-4 4z" />
+            </svg>
+          </span>
+          <span class="nav-btn-label">Preview Changes</span>
+        </button>
+        <button class="btn-secondary nav-btn" id="btnDiagnostics" type="button">
+          <span class="nav-btn-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <path fill="currentColor"
+                d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4zM2.4 11.1c-1.5-1.5-1.5-3.9 0-5.4l2.4 2.4 3-3-2.4-2.4c1.5-1.5 3.9-1.5 5.4 0 1.5 1.5 1.5 3.9 0 5.4l-3-3-3 3 2.4 2.4c-1.5 1.5-3.9 1.5-5.4 0z" />
+            </svg>
+          </span>
+          <span class="nav-btn-label">Diagnostics</span>
+        </button>
+      </div>
+      <div class="admin-nav-footer">
+        <div class="nav-dropout">
+          <button class="btn-secondary nav-btn nav-btn--settings" id="btnInnerNet" type="button">
+            <span class="nav-btn-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+                <path fill="currentColor"
+                  d="M12 2a7 7 0 0 1 6.93 6H22v2h-3.07a7 7 0 0 1 0 4H22v2h-3.07A7 7 0 1 1 12 2zm0 2a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm-1 2h2v2h-2V6zm0 4h2v2h-2v-2z" />
+              </svg>
+            </span>
+            <span class="nav-btn-label">Inner-Net</span>
+          </button>
+          <div class="admin-innernet-panel" id="innerNetPanel" hidden>
+            <div class="settings-title">Inner-Net</div>
+            <div class="innernet-item">
+              <div class="innernet-name">gÜntErest</div>
+              <div class="innernet-meta">Target: <span id="innerNetTarget">loading...</span></div>
+              <div class="innernet-actions">
+                <a class="btn-secondary" href="/api/admin/inner-net/gunterest/" target="_blank"
+                  rel="noopener noreferrer">Open</a>
+              </div>
+            </div>
+          </div>
+        </div>
+        <button class="btn-secondary nav-btn nav-btn--settings" id="btnSettings" type="button">
+          <span class="nav-btn-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <path fill="currentColor"
+                d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.08 7.08 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.75 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.14.24.43.34.69.22l2.39-.96c.5.4 1.05.71 1.63.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.26.12.55.02.69-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" />
+            </svg>
+          </span>
+          <span class="nav-btn-label">Settings</span>
+        </button>
+        <div class="admin-settings-panel" id="adminSettingsPanel" hidden>
+          <div class="settings-title">Settings</div>
+          <label class="settings-label" for="navLayoutSelect">Navigation layout</label>
+          <select id="navLayoutSelect" class="form-input">
+            <option value="left">Sidebar (Left)</option>
+            <option value="right">Sidebar (Right)</option>
+            <option value="top">Top Bar</option>
+          </select>
+          <p class="settings-note">Switch navigation to left, right, or top.</p>
+          <label class="settings-label" for="scanlinesToggle">Scanlines</label>
+          <label class="settings-toggle">
+            <input type="checkbox" id="scanlinesToggle" />
+            <span>Animated scanlines</span>
+          </label>
+          <p class="settings-note">Disable the scanline overlay and background pattern.</p>
+          <label class="settings-label" for="countViewsToggle">Count my views</label>
+          <label class="settings-toggle">
+            <input type="checkbox" id="countViewsToggle" />
+            <span>Count my views</span>
+          </label>
+          <p class="settings-note">When off, your browser won't be tracked in analytics.</p>
+          <label class="settings-label" for="safeModeToggle">Safe mode redirect</label>
+          <label class="settings-toggle">
+            <input type="checkbox" id="safeModeToggle" />
+            <span>Redirect visitors to safe.bwondercomics.com</span>
+          </label>
+          <p class="settings-note">When enabled, public pages redirect to the safe-mode site.</p>
+        </div>
+        <button class="btn-logout nav-btn nav-btn--danger" id="btnLogout">
+          <span class="nav-btn-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <path fill="currentColor"
+                d="M10 4h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-8v-2h8V6h-8V4zm-1.59 4.59L12.83 12l-4.42 3.41L7 14l2.5-2H4v-2h5.5L7 8l1.41-1.41z" />
+            </svg>
+          </span>
+          <span class="nav-btn-label">Logout</span>
+        </button>
+      </div>
+    </nav>
+
     <main class="admin-content">
-      <!-- Chapter Management Section -->
+      <!-- Dashboard Section -->
+      <section class="section" id="dashboardSection" style="display: none;">
+        <div class="dashboard-header">
+          <div>
+            <h2 class="section-title">Dashboard</h2>
+            <p class="dashboard-subtitle">At-a-glance status, signals, and schedule.</p>
+          </div>
+          <div class="dashboard-actions">
+            <button class="btn-secondary" id="btnDashboardRefresh" type="button">Refresh</button>
+            <div id="dashboardStatus" class="success-message" style="display: none; margin: 0;"></div>
+          </div>
+        </div>
+
+        <div class="dashboard-metrics">
+          <div class="dashboard-metric-card">
+            <div class="dashboard-metric-label">Scheduled Posts</div>
+            <div class="dashboard-metric-value" id="dashScheduledCount">-</div>
+            <div class="dashboard-metric-sub" id="dashScheduledNext">Next: -</div>
+          </div>
+          <div class="dashboard-metric-card">
+            <div class="dashboard-metric-label">Draft Posts</div>
+            <div class="dashboard-metric-value" id="dashDraftCount">-</div>
+            <div class="dashboard-metric-sub">Not yet scheduled</div>
+          </div>
+          <div class="dashboard-metric-card">
+            <div class="dashboard-metric-label">Recent Comments (7d)</div>
+            <div class="dashboard-metric-value" id="dashCommentCount">-</div>
+            <div class="dashboard-metric-sub" id="dashCommentLatest">Latest: -</div>
+          </div>
+          <div class="dashboard-metric-card">
+            <div class="dashboard-metric-label">New Accounts (7d)</div>
+            <div class="dashboard-metric-value" id="dashUserCount">-</div>
+            <div class="dashboard-metric-sub" id="dashUserLatest">Latest: -</div>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="dashboard-card dashboard-card--wide">
+            <div class="dashboard-card-title">
+              <span>Notifications</span>
+              <span class="dashboard-pill" id="dashNotificationCount">0</span>
+            </div>
+            <div id="dashNotifications" class="dashboard-list"></div>
+            <div id="dashNotificationsEmpty" class="dashboard-empty">No notifications yet.</div>
+          </div>
+
+          <div class="dashboard-card">
+            <div class="dashboard-card-title">Analytics Snapshot</div>
+            <div class="dashboard-mini-grid">
+              <div class="dashboard-mini-card">
+                <div class="dashboard-mini-label">Pageviews 24h</div>
+                <div class="dashboard-mini-value" id="dashViews24h">-</div>
+                <div class="dashboard-mini-sub">Visitors <span id="dashVisitors24h">-</span></div>
+              </div>
+              <div class="dashboard-mini-card">
+                <div class="dashboard-mini-label">Pageviews 7d</div>
+                <div class="dashboard-mini-value" id="dashViews7d">-</div>
+                <div class="dashboard-mini-sub">Visitors <span id="dashVisitors7d">-</span></div>
+              </div>
+            </div>
+            <div class="dashboard-mini-grid" style="margin-top: 12px;">
+              <div class="dashboard-mini-card">
+                <div class="dashboard-mini-label">Entry Reads</div>
+                <div class="dashboard-mini-value" id="dashEntryReads">-</div>
+              </div>
+              <div class="dashboard-mini-card">
+                <div class="dashboard-mini-label">Entry Finishes</div>
+                <div class="dashboard-mini-value" id="dashEntryFinishes">-</div>
+              </div>
+              <div class="dashboard-mini-card">
+                <div class="dashboard-mini-label">Finish Rate</div>
+                <div class="dashboard-mini-value" id="dashFinishRate">-</div>
+              </div>
+              <div class="dashboard-mini-card">
+                <div class="dashboard-mini-label">Avg Stop Page</div>
+                <div class="dashboard-mini-value" id="dashAvgStopPage">-</div>
+              </div>
+            </div>
+            <div id="dashAnalyticsStatus" class="dashboard-status">Waiting for analytics.</div>
+          </div>
+
+          <div class="dashboard-card">
+            <div class="dashboard-card-title">Connections</div>
+            <div id="dashConnectionsList" class="dashboard-list"></div>
+          </div>
+
+          <div class="dashboard-card dashboard-card--wide">
+            <div class="dashboard-card-title">
+              <span>Active Schedule</span>
+              <span class="dashboard-pill" id="dashScheduleCount">0</span>
+            </div>
+            <div id="dashScheduleList" class="dashboard-list"></div>
+            <div id="dashScheduleEmpty" class="dashboard-empty">No scheduled items yet.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Entry Management Section -->
       <section class="section" id="chaptersSection">
         <h2 class="section-title" id="chaptersSectionTitle">Entries Management</h2>
         <div id="chapterList" class="chapter-list"></div>
@@ -1540,7 +3176,7 @@
         <div class="form-group" style="margin-bottom: 20px;">
           <label class="form-label">Status Message (Reader Header)</label>
           <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-            <input type="text" id="statusMessageInput" class="form-input" placeholder="issue_7_friday"
+            <input type="text" id="statusMessageInput" class="form-input" placeholder="entry_7_friday"
               style="max-width: 260px; padding: 10px 12px;">
             <button class="btn-small btn-edit" id="btnSaveStatus" type="button">Save Status</button>
             <div id="statusMessageStatus" class="success-message" style="display: none; margin: 0;"></div>
@@ -1551,7 +3187,8 @@
 
         <div class="form-group" style="margin-bottom: 20px;">
           <label class="form-label">Create New Post</label>
-          <input type="text" id="postTitle" class="form-input" placeholder="Post Title" style="margin-bottom: 10px;">
+          <input type="text" id="postTitle" class="form-input" placeholder="Post Title (optional)"
+            style="margin-bottom: 10px;">
           <input type="text" id="postImage" class="form-input"
             placeholder="Image URL (e.g., issues-images/issue7/page1.png)" style="margin-bottom: 10px;">
           <input type="file" id="postImageFile" accept="image/png,image/jpeg,image/jpg,image/gif,image/webp"
@@ -1592,6 +3229,34 @@
             <input type="checkbox" id="postShare" checked>
             <span style="font-size: 0.9rem; color: var(--text);">Send to RSS / Social automations</span>
           </label>
+          <label style="display: flex; align-items: center; gap: 8px; margin: 0 0 6px;">
+            <input type="checkbox" id="postShareBluesky">
+            <span style="font-size: 0.9rem; color: var(--text);">Send to Bluesky</span>
+          </label>
+          <div id="blueskyCharCounter" class="bluesky-char-counter" style="margin: 0 0 8px;">
+            Bluesky text: 0/300 (title + content)
+          </div>
+          <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 12px;">
+            <span class="settings-note" id="blueskyStatusNote">Bluesky not connected.</span>
+            <button class="btn-secondary" id="btnBlueskyConnect" type="button">Connect Bluesky</button>
+          </div>
+          <div id="blueskyCredentialsForm"
+            style="display: none; background: var(--bg-dark); padding: 16px; border-radius: 6px; margin-bottom: 12px;">
+            <label class="form-label">Bluesky Handle</label>
+            <input type="text" id="blueskyHandle" class="form-input" placeholder="yourhandle.bsky.social"
+              style="margin-bottom: 10px;">
+            <label class="form-label">App Password</label>
+            <input type="password" id="blueskyAppPassword" class="form-input" placeholder="xxxx-xxxx-xxxx-xxxx"
+              style="margin-bottom: 10px;">
+            <p style="font-size: 0.85rem; opacity: 0.7; margin: 0 0 10px;">Get an app password from <a
+                href="https://bsky.app/settings/app-passwords" target="_blank"
+                style="color: var(--primary);">bsky.app/settings/app-passwords</a></p>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-primary" id="btnBlueskySubmit" type="button">Save & Connect</button>
+              <button class="btn-secondary" id="btnBlueskyCancel" type="button">Cancel</button>
+            </div>
+            <div id="blueskyConnectStatus" class="success-message" style="display: none; margin-top: 10px;"></div>
+          </div>
           <div style="display: flex; gap: 10px; flex-wrap: wrap;">
             <button class="btn-secondary" id="btnSaveDraft" type="button">Save Draft</button>
             <button class="btn-primary" id="btnSavePost" type="button">Publish Post</button>
@@ -1603,11 +3268,96 @@
         <div id="postList" class="chapter-list"></div>
       </section>
 
+      <!-- Social Section -->
+      <section class="section" id="socialSection" style="display: none;">
+        <div class="dashboard-header">
+          <div>
+            <h2 class="section-title">Social</h2>
+            <p class="dashboard-subtitle">Notifications and connection stats for socials.</p>
+          </div>
+          <div class="dashboard-actions">
+            <button class="btn-secondary" id="btnSocialRefresh" type="button">Refresh</button>
+            <div id="socialStatus" class="success-message" style="display: none; margin: 0;"></div>
+          </div>
+        </div>
+
+        <div class="social-tabs" id="socialTabs" role="tablist">
+          <button class="btn-secondary social-tab is-active" data-social-tab="bluesky" type="button" role="tab"
+            aria-selected="true">Bluesky</button>
+          <button class="btn-secondary social-tab" data-social-tab="instagram" type="button" role="tab"
+            aria-selected="false">Instagram</button>
+          <button class="btn-secondary social-tab" data-social-tab="tumblr" type="button" role="tab"
+            aria-selected="false">Tumblr</button>
+          <button class="btn-secondary social-tab" data-social-tab="discord" type="button" role="tab"
+            aria-selected="false">Discord</button>
+        </div>
+
+        <div class="social-panel" data-social-panel="bluesky" role="tabpanel">
+          <div class="social-profile-card">
+            <div class="social-profile">
+              <div class="social-avatar is-empty" id="socialBlueskyAvatar" aria-hidden="true">B</div>
+              <div>
+                <div class="social-profile-name" id="socialBlueskyName">Bluesky</div>
+                <div class="social-profile-handle" id="socialBlueskyHandle">@bluesky</div>
+                <a class="social-profile-link" id="socialBlueskyProfileLink" href="https://bsky.app" target="_blank"
+                  rel="noopener">Bluesky profile</a>
+              </div>
+            </div>
+            <div class="social-stats">
+              <div class="social-stat-card">
+                <div class="social-stat-label">New Followers</div>
+                <div class="social-stat-value" id="socialBlueskyNewFollowers">0</div>
+              </div>
+              <div class="social-stat-card">
+                <div class="social-stat-label">New Unfollowed</div>
+                <div class="social-stat-value" id="socialBlueskyNewUnfollowed">0</div>
+              </div>
+              <div class="social-stat-card">
+                <div class="social-stat-label">Followers</div>
+                <div class="social-stat-value" id="socialBlueskyFollowers">-</div>
+              </div>
+              <div class="social-stat-card">
+                <div class="social-stat-label">Following</div>
+                <div class="social-stat-value" id="socialBlueskyFollowing">-</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-note" id="socialBlueskyStatusNote" style="margin-top: 10px;">
+            Bluesky not connected.
+          </div>
+
+          <div class="dashboard-card dashboard-card--wide social-notifications">
+            <div class="dashboard-card-title">
+              <span>Notifications</span>
+              <span class="dashboard-pill" id="socialBlueskyNotificationCount">0</span>
+            </div>
+            <div id="socialBlueskyNotifications" class="dashboard-list"></div>
+            <div id="socialBlueskyNotificationsEmpty" class="dashboard-empty">No notifications yet.</div>
+          </div>
+        </div>
+
+        <div class="social-panel" data-social-panel="instagram" role="tabpanel" hidden>
+          <div class="social-placeholder">Instagram updates coming soon.</div>
+        </div>
+        <div class="social-panel" data-social-panel="tumblr" role="tabpanel" hidden>
+          <div class="social-placeholder">Tumblr updates coming soon.</div>
+        </div>
+        <div class="social-panel" data-social-panel="discord" role="tabpanel" hidden>
+          <div class="social-placeholder">Discord updates coming soon.</div>
+        </div>
+      </section>
+
+      <!-- Page Designer Section -->
+      <section class="section" id="designerSection" style="display: none;">
+        <iframe id="designerFrame" class="designer-frame" title="Page Designer" loading="lazy"></iframe>
+      </section>
+
       <!-- Preview/Export Section -->
       <section class="section" id="previewSection" style="display: none;">
         <h2 class="section-title">Preview & Export</h2>
         <div class="preview-container">
-          <h3 class="preview-title">Entry Data (JSON)</h3>
+          <h3 class="preview-title">Entry Data (Database)</h3>
           <pre id="previewData" class="preview-data"></pre>
           <div class="export-actions">
             <button class="btn-small btn-copy" id="btnCopy">Copy to Clipboard</button>
@@ -1636,8 +3386,8 @@
           </div>
         </div>
         <p style="margin-top: 20px; color: var(--accent); font-size: 0.9rem;">
-          <strong>Note:</strong> This section is for preview/export/backup. Saving entries and posts persists directly
-          to the server.
+          <strong>Note:</strong> This section shows the live database payload used by the reader. Copy/Download exports
+          the current DB snapshot.
         </p>
       </section>
 
@@ -1649,6 +3399,10 @@
         </p>
         <div class="analytics-actions">
           <button type="button" class="btn-secondary" id="btnAnalyticsRefresh">Refresh</button>
+          <label class="settings-toggle">
+            <input type="checkbox" id="analyticsCountViewsToggle" />
+            <span>Count my views</span>
+          </label>
           <div id="analyticsStatus" class="success-message" style="display: none; margin: 0;"></div>
         </div>
         <div class="analytics-grid">
@@ -1661,6 +3415,106 @@
             <div class="analytics-label">Pageviews (7d)</div>
             <div class="analytics-value" id="statViews7d">—</div>
             <div class="analytics-sub">Visitors <span id="statVisitors7d">—</span></div>
+          </div>
+        </div>
+        <div class="analytics-grid analytics-grid--compact" style="margin-top: 14px;">
+          <div class="analytics-card">
+            <div class="analytics-label">Entry Reads</div>
+            <div class="analytics-value" id="statEntryReads">—</div>
+          </div>
+          <div class="analytics-card">
+            <div class="analytics-label">Entry Finishes</div>
+            <div class="analytics-value" id="statEntryFinishes">—</div>
+          </div>
+          <div class="analytics-card">
+            <div class="analytics-label">Finish Rate</div>
+            <div class="analytics-value" id="statFinishRate">—</div>
+          </div>
+          <div class="analytics-card">
+            <div class="analytics-label">Avg Stop Page</div>
+            <div class="analytics-value" id="statAvgStopPage">—</div>
+          </div>
+        </div>
+        <div class="analytics-pages">
+          <div class="analytics-pages-header">
+            <div class="analytics-pages-title">Page Reads</div>
+            <div class="analytics-pages-controls">
+              <label class="settings-label" for="analyticsPagesRange">Range</label>
+              <select id="analyticsPagesRange" class="form-input">
+                <option value="24h">Last 24h</option>
+                <option value="7d" selected>Last 7d</option>
+                <option value="30d">Last 30d</option>
+              </select>
+            </div>
+          </div>
+          <div id="analyticsPagesStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
+          <div id="analyticsPagesList" class="analytics-pages-list"></div>
+        </div>
+
+        <!-- NEW: Referrers & Events -->
+        <div class="analytics-traffic"
+          style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 24px; margin-bottom: 24px;">
+          <div class="analytics-pages">
+            <div class="analytics-pages-header">
+              <div class="analytics-pages-title">Top Referrers</div>
+            </div>
+            <div id="analyticsReferrersList" class="analytics-pages-list" style="min-height: 150px;"></div>
+          </div>
+          <div class="analytics-pages">
+            <div class="analytics-pages-header">
+              <div class="analytics-pages-title">Top Events (Clicks)</div>
+            </div>
+            <div id="analyticsEventsList" class="analytics-pages-list" style="min-height: 150px;"></div>
+          </div>
+        </div>
+        <div class="analytics-reader">
+          <div class="analytics-pages-header">
+            <div class="analytics-pages-title">Reader Analytics</div>
+            <div class="analytics-pages-controls">
+              <label class="settings-label" for="analyticsReaderSeries">Series</label>
+              <select id="analyticsReaderSeries" class="form-input">
+                <option value="all" selected>All series</option>
+              </select>
+              <label class="settings-label" for="analyticsReaderRange">Range</label>
+              <select id="analyticsReaderRange" class="form-input">
+                <option value="24h">Last 24h</option>
+                <option value="7d" selected>Last 7d</option>
+                <option value="30d">Last 30d</option>
+              </select>
+            </div>
+          </div>
+          <div id="analyticsReaderStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
+          <div class="analytics-reader-grid">
+            <div class="analytics-reader-card">
+              <div class="analytics-reader-heading">
+                <div class="analytics-reader-title">Entry Reads</div>
+              </div>
+              <div id="analyticsEntryReads"></div>
+            </div>
+            <div class="analytics-reader-card">
+              <div class="analytics-reader-heading">
+                <div class="analytics-reader-title">Series Reads</div>
+              </div>
+              <div id="analyticsSeriesReads"></div>
+            </div>
+            <div class="analytics-reader-card">
+              <div class="analytics-reader-heading">
+                <div class="analytics-reader-title">Entry Finishes</div>
+              </div>
+              <div id="analyticsEntryCompletes"></div>
+            </div>
+            <div class="analytics-reader-card">
+              <div class="analytics-reader-heading">
+                <div class="analytics-reader-title">Series Finishes</div>
+              </div>
+              <div id="analyticsSeriesCompletes"></div>
+            </div>
+            <div class="analytics-reader-card">
+              <div class="analytics-reader-heading">
+                <div class="analytics-reader-title">Stop Page (per entry)</div>
+              </div>
+              <div id="analyticsEntryStops"></div>
+            </div>
           </div>
         </div>
       </section>
@@ -1694,9 +3548,374 @@
         </p>
         <button class="btn-secondary" id="btnRefreshUsers" type="button">Refresh Users</button>
         <div id="usersStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
-        <div id="usersList" class="chapter-list" style="margin-top: 16px;"></div>
+        <div class="dashboard-grid" style="margin-top: 16px;">
+          <div class="dashboard-card dashboard-card--wide">
+            <div class="dashboard-card-title">
+              <span>Users</span>
+              <span id="usersCount" class="dashboard-pill">0</span>
+            </div>
+            <div id="usersList" class="chapter-list"></div>
+          </div>
+          <div class="dashboard-card dashboard-card--wide">
+            <div class="dashboard-card-title">
+              <span>Email List</span>
+              <span id="emailListCount" class="dashboard-pill">0</span>
+            </div>
+            <div id="emailList" class="chapter-list"></div>
+            <div id="emailListEmpty" class="dashboard-empty">No email subscribers yet.</div>
+          </div>
+          <div class="dashboard-card dashboard-card--wide">
+            <div class="dashboard-card-title">
+              <span>Premium Codes</span>
+              <span id="premiumCodesCount" class="dashboard-pill">0</span>
+            </div>
+            <div class="form-group" style="margin-top: 6px;">
+              <label class="form-label" for="premiumCodesCountInput">Generate codes</label>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+                <input type="number" id="premiumCodesCountInput" class="form-input" min="1" max="50" value="1"
+                  style="max-width: 120px;" />
+                <input type="text" id="premiumCodesNote" class="form-input" placeholder="Note (optional)"
+                  style="flex: 1; min-width: 180px;" />
+                <button class="btn-secondary" id="btnGeneratePremiumCodes" type="button">Generate</button>
+              </div>
+              <div id="premiumCodesStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
+            </div>
+            <div id="premiumCodesList" class="chapter-list" style="margin-top: 12px;"></div>
+            <div id="premiumCodesEmpty" class="dashboard-empty">No premium codes yet.</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Moderation Section -->
+      <section class="section" id="moderationSection" style="display: none;">
+        <div class="dashboard-header">
+          <div>
+            <h2 class="section-title">Moderation</h2>
+            <p class="dashboard-subtitle">Review comments, manage bans, and censor words.</p>
+          </div>
+          <div class="dashboard-actions">
+            <button class="btn-secondary" id="btnModerationRefresh" type="button">Refresh</button>
+            <div id="moderationStatus" class="success-message" style="display: none; margin: 0;"></div>
+          </div>
+        </div>
+
+        <div class="analytics-live moderation-live">
+          <div class="analytics-pages-header">
+            <div class="analytics-pages-title">Live Visitors</div>
+            <div class="analytics-pages-controls">
+              <label class="settings-label" for="liveVisitorsRange">Window</label>
+              <select id="liveVisitorsRange" class="form-input">
+                <option value="30" selected>Last 30m</option>
+                <option value="60">Last 1h</option>
+                <option value="120">Last 2h</option>
+                <option value="360">Last 6h</option>
+                <option value="720">Last 12h</option>
+                <option value="1440">Last 24h</option>
+              </select>
+              <button class="btn-secondary" id="btnLiveVisitorsZoomOut" type="button">-</button>
+              <button class="btn-secondary" id="btnLiveVisitorsZoomIn" type="button">+</button>
+              <button class="btn-secondary" id="btnLiveVisitorsRefresh" type="button">Refresh</button>
+            </div>
+          </div>
+          <div id="liveVisitorsStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
+          <div class="analytics-live-chart">
+            <div class="analytics-live-meta">
+              <div class="analytics-live-count"><span id="liveVisitorsCount">0</span> Visitors in window</div>
+              <div class="analytics-live-range" id="liveVisitorsRangeLabel">Last 30m</div>
+            </div>
+            <div class="analytics-live-graph">
+              <canvas id="liveVisitorsChart" class="analytics-live-canvas" role="img"
+                aria-label="Live visitor activity"></canvas>
+              <div class="analytics-live-axis">
+                <span id="liveVisitorsAxisStart">-30m</span>
+                <span>Now</span>
+              </div>
+            </div>
+          </div>
+          <div class="analytics-live-ticker" id="liveVisitorsTicker">
+            <div class="analytics-live-track" id="liveVisitorsTrack"></div>
+          </div>
+        </div>
+
+        <div class="moderation-filters">
+          <div>
+            <label class="form-label" for="moderationSearch">Search</label>
+            <input type="text" id="moderationSearch" class="form-input" placeholder="Find a comment or phrase">
+          </div>
+          <div>
+            <label class="form-label" for="moderationTargetType">Target Type</label>
+            <select id="moderationTargetType" class="form-input">
+              <option value="">All targets</option>
+              <option value="chapter">Entries</option>
+              <option value="post">Feed posts</option>
+              <option value="user">User threads</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="moderationTargetId">Target ID</label>
+            <input type="text" id="moderationTargetId" class="form-input" placeholder="post:<id> or series:entry-1"
+              list="moderationTargetList">
+            <datalist id="moderationTargetList"></datalist>
+          </div>
+          <div>
+            <label class="form-label" for="moderationUserFilter">User</label>
+            <select id="moderationUserFilter" class="form-input">
+              <option value="">All users</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="moderationStatusFilter">Status</label>
+            <select id="moderationStatusFilter" class="form-input">
+              <option value="all">All</option>
+              <option value="visible">Visible</option>
+              <option value="hidden">Hidden</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label" for="moderationSort">Sort</label>
+            <select id="moderationSort" class="form-input">
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+            </select>
+          </div>
+          <div class="moderation-actions">
+            <button class="btn-secondary" id="btnModerationApply" type="button">Apply Filters</button>
+            <button class="btn-secondary" id="btnModerationClear" type="button">Clear</button>
+          </div>
+        </div>
+
+        <div class="dashboard-grid">
+          <div class="dashboard-card dashboard-card--wide">
+            <div class="dashboard-card-title">Comments</div>
+            <div id="moderationResults" class="moderation-results"></div>
+            <div id="moderationCommentsList" class="chapter-list" style="margin-top: 12px;"></div>
+            <div id="moderationCommentsEmpty" class="dashboard-empty">No comments found.</div>
+          </div>
+
+          <div class="dashboard-card">
+            <div class="dashboard-card-title">Banned Users</div>
+            <div id="moderationBannedUsersList" class="chapter-list" style="margin-top: 12px;"></div>
+            <div id="moderationBannedUsersEmpty" class="dashboard-empty">No banned users.</div>
+          </div>
+
+          <div class="dashboard-card">
+            <div class="dashboard-card-title">Banned IPs</div>
+            <div class="form-group" style="margin-top: 12px;">
+              <label class="form-label" for="moderationIpInput">Add IP ban</label>
+              <input type="text" id="moderationIpInput" class="form-input" placeholder="203.0.113.12">
+              <button class="btn-secondary" id="btnModerationBanIp" type="button" style="margin-top: 8px;">Ban
+                IP</button>
+            </div>
+            <div id="moderationBannedIpsList" class="chapter-list" style="margin-top: 12px;"></div>
+            <div id="moderationBannedIpsEmpty" class="dashboard-empty">No banned IPs.</div>
+          </div>
+
+          <div class="dashboard-card">
+            <div class="dashboard-card-title">
+              <span>Censored Words</span>
+              <button class="btn-secondary" id="moderationWordsToggle" type="button"
+                style="padding: 4px 10px; font-size: 0.75rem;">Show</button>
+            </div>
+            <div id="moderationWordsBody" style="display: none;">
+              <div class="form-group" style="margin-top: 12px;">
+                <label class="form-label" for="moderationWordInput">Add censored phrase</label>
+                <input type="text" id="moderationWordInput" class="form-input"
+                  placeholder="phrase or word (comma-separated)">
+                <button class="btn-secondary" id="btnModerationAddWord" type="button" style="margin-top: 8px;">Add
+                  Phrase</button>
+              </div>
+              <div id="moderationWordsList" class="chapter-list" style="margin-top: 12px;"></div>
+              <div id="moderationWordsEmpty" class="dashboard-empty">No censored words yet.</div>
+            </div>
+          </div>
+
+          <div class="dashboard-card">
+            <div class="dashboard-card-title">Comment Limits</div>
+            <p class="settings-note" style="margin-bottom: 12px;">Set any limit to 0 to disable it.</p>
+            <div class="form-group">
+              <label class="form-label" for="moderationLimitMinInterval">Min seconds between comments</label>
+              <input type="text" inputmode="numeric" id="moderationLimitMinInterval" class="form-input"
+                placeholder="15">
+            </div>
+            <div class="form-group" style="margin-top: 12px;">
+              <label class="form-label" for="moderationLimitRateWindow">Rate window (seconds)</label>
+              <input type="text" inputmode="numeric" id="moderationLimitRateWindow" class="form-input"
+                placeholder="600">
+            </div>
+            <div class="form-group" style="margin-top: 12px;">
+              <label class="form-label" for="moderationLimitMaxUser">Max comments per user (per window)</label>
+              <input type="text" inputmode="numeric" id="moderationLimitMaxUser" class="form-input" placeholder="10">
+            </div>
+            <div class="form-group" style="margin-top: 12px;">
+              <label class="form-label" for="moderationLimitMaxIp">Max comments per IP (per window)</label>
+              <input type="text" inputmode="numeric" id="moderationLimitMaxIp" class="form-input" placeholder="25">
+            </div>
+            <div class="form-group" style="margin-top: 12px;">
+              <label class="form-label" for="moderationLimitDuplicateWindow">Duplicate window (seconds)</label>
+              <input type="text" inputmode="numeric" id="moderationLimitDuplicateWindow" class="form-input"
+                placeholder="600">
+            </div>
+            <button class="btn-secondary" id="btnModerationSaveLimits" type="button" style="margin-top: 12px;">
+              Save Limits
+            </button>
+            <div id="moderationLimitsStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Diagnostics Section -->
+      <section class="section diagnostics-panel" id="diagnosticsSection" style="display: none;">
+        <div class="diagnostics-header">
+          <h2>🔧 System Diagnostics & Troubleshooting</h2>
+          <button class="btn-primary" id="diagnostics-refresh">🔄 Refresh All</button>
+        </div>
+
+        <div class="diagnostics-section">
+          <h3>System Health</h3>
+          <div id="health-status"></div>
+        </div>
+
+        <div class="diagnostics-section">
+          <h3>Database Statistics</h3>
+          <div id="database-stats"></div>
+        </div>
+
+        <div class="diagnostics-section">
+          <h3>Database Overview</h3>
+          <div id="db-insights"></div>
+        </div>
+
+        <div class="diagnostics-section">
+          <h3>Deployment & Services</h3>
+          <div id="deploy-status"></div>
+          <div id="service-status"></div>
+        </div>
+
+        <div class="diagnostics-section">
+          <h3>Backups</h3>
+          <div id="backups-status"></div>
+        </div>
+
+        <div class="diagnostics-section">
+          <h3>Live Logs</h3>
+          <div class="logs-controls">
+            <div class="logs-control">
+              <label class="form-label" for="logs-service">Service</label>
+              <select id="logs-service" class="form-input">
+                <option value="bwondercomics-api">API</option>
+                <option value="bwondercomics-db">Database</option>
+                <option value="caddy">Caddy</option>
+                <option value="umami">Umami</option>
+                <option value="umami-db">Umami DB</option>
+                <option value="all">All services</option>
+              </select>
+            </div>
+            <div class="logs-control">
+              <label class="form-label" for="logs-tail">Tail (lines)</label>
+              <input type="number" id="logs-tail" class="form-input" min="0" max="1000" value="200" />
+            </div>
+            <div class="logs-control logs-control--checkbox">
+              <label class="settings-toggle">
+                <input type="checkbox" id="logs-autoscroll" checked />
+                <span>Auto-scroll</span>
+              </label>
+            </div>
+            <div class="logs-actions">
+              <button class="btn-primary" id="logs-start">Start</button>
+              <button class="btn-secondary" id="logs-stop" disabled>Stop</button>
+              <button class="btn-secondary" id="logs-clear">Clear</button>
+            </div>
+          </div>
+          <div id="logs-status" class="logs-status"></div>
+          <pre id="logs-output" class="logs-output"></pre>
+        </div>
+
+        <div class="diagnostics-section">
+          <h3>Test Suite</h3>
+          <div id="test-status"></div>
+        </div>
+
+        <div class="diagnostics-section">
+          <h3>Operations</h3>
+          <div id="ops-commands"></div>
+        </div>
+
+        <div class="diagnostics-section">
+          <h3>Operations History</h3>
+          <div id="ops-history"></div>
+        </div>
+
+        <div class="diagnostics-section">
+          <h3>Configuration</h3>
+          <div id="configuration"></div>
+        </div>
       </section>
     </main>
+  </div>
+
+  <div id="diagnostics-refresh-indicator" class="refresh-indicator" role="status" aria-live="polite" aria-atomic="true">
+    Refreshing...
+  </div>
+
+  <!-- ==================== SERIES MODAL ==================== -->
+  <div id="seriesModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title" id="seriesModalTitle">Series Editor</h2>
+        <button class="btn-close" id="seriesModalClose" type="button">&times;</button>
+      </div>
+      <div id="seriesModalStatus" class="success-message" style="display: none; margin: 0 0 12px;"></div>
+      <form id="seriesForm" class="form-editor">
+        <div class="form-group">
+          <label class="form-label" for="seriesIdInput">Series ID</label>
+          <input type="text" id="seriesIdInput" class="form-input" placeholder="battle-bros" required />
+          <div class="settings-note">
+            Used in URLs and folders (letters, numbers, dashes, underscores).
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="seriesTitleInput">Title</label>
+          <input type="text" id="seriesTitleInput" class="form-input" placeholder="Battle Bros" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="seriesDescriptionInput">Description</label>
+          <textarea id="seriesDescriptionInput" class="form-input" rows="3"
+            placeholder="Short description shown in listings."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="seriesCoverInput">Cover Image Path</label>
+          <input type="text" id="seriesCoverInput" class="form-input" placeholder="assets/banner3.png" />
+          <div class="settings-note">
+            Leave blank to auto-pick the first accessible page in the library.
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Entry Labels</label>
+          <div class="form-row">
+            <input type="text" id="seriesUnitSingular" class="form-input" placeholder="Entry" />
+            <input type="text" id="seriesUnitPlural" class="form-input" placeholder="Entries" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Access</label>
+          <label style="display:flex; align-items:center; gap:10px; font-size: 0.95rem;">
+            <input type="checkbox" id="seriesPremiumOnly" />
+            Premium-only (requires a premium account to view)
+          </label>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" id="seriesModalCancel">Cancel</button>
+          <button type="submit" class="btn-save" id="seriesModalSave">Save Series</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <!-- ==================== EDIT CHAPTER MODAL ==================== -->
@@ -1713,11 +3932,53 @@
         </div>
 
         <div class="form-group">
+          <label class="form-label" for="entryDisplayNumber">Entry Number (optional)</label>
+          <input type="number" id="entryDisplayNumber" class="form-input" placeholder="7" min="0" step="1" />
+        </div>
+
+        <div class="form-group">
           <label class="form-label" id="entryAccessLabel">Entry Access</label>
           <label style="display:flex; align-items:center; gap:10px; font-size: 0.95rem;">
             <input type="checkbox" id="chapterPremium" />
             Premium only (requires a premium account to view)
           </label>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="entryStatus">Entry Status</label>
+          <select id="entryStatus" class="form-input">
+            <option value="published">Published</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="draft">Draft</option>
+          </select>
+
+          <label class="form-label" for="entryPublishAt" style="margin-top: 12px;">Publish Date/Time</label>
+          <input type="datetime-local" id="entryPublishAt" class="form-input" />
+
+          <label style="display:flex; align-items:center; gap:10px; font-size: 0.95rem; margin-top: 8px;">
+            <input type="checkbox" id="entryComingSoon" />
+            Show as "Coming Soon" in the reader (scheduled only)
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Release Actions</label>
+          <label style="display:flex; align-items:center; gap:10px; font-size: 0.95rem;">
+            <input type="checkbox" id="entryAutoPost" />
+            Auto-post to Blog/Feed on release
+          </label>
+          <label style="display:flex; align-items:center; gap:10px; font-size: 0.95rem; margin-top: 6px;">
+            <input type="checkbox" id="entryShareBluesky" />
+            Share to Bluesky (requires auto-post)
+          </label>
+          <label class="form-label" for="entryPostTitle" style="margin-top: 10px;">Release Post Title (optional)</label>
+          <input type="text" id="entryPostTitle" class="form-input" placeholder="Leave blank for the default title" />
+          <label class="form-label" for="entryPostContent" style="margin-top: 10px;">Release Post Content
+            (optional)</label>
+          <textarea id="entryPostContent" class="form-input" rows="4"
+            placeholder="Leave blank to use the default release post."></textarea>
+          <p style="font-size: 0.85rem; opacity: 0.8; margin-top: 6px;">If blank, a default release post is generated.
+          </p>
         </div>
 
         <div class="form-group">
@@ -1781,6 +4042,7 @@
   </div>
 
   <!-- ==================== RENUMBER CONFIRMATION MODAL ==================== -->
+
   <div id="confirmModal" class="confirm-modal">
     <div class="confirm-content">
       <h2 class="confirm-title">Confirm Renumbering</h2>
@@ -1797,5 +4059,6 @@
 
 </body>
 <script type='module' src='app.js'></script>
+<script type='module' src='diagnostics.js'></script>
 
 </html>

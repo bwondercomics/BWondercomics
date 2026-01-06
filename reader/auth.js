@@ -79,16 +79,23 @@ export class AuthManager {
      * @param {string} password - User password
      * @param {string} displayName - Display name
      * @param {string} inviteCode - Optional invite code
+     * @param {boolean} emailOptIn - Email list opt-in
      * @returns {Promise<Object>} User object on success
      * @throws {Error} On registration failure
      */
-    async register(email, password, displayName, inviteCode = '') {
+    async register(email, password, displayName, inviteCode = '', emailOptIn = false) {
         try {
             const response = await fetch(API.ENDPOINTS.REGISTER, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
-                body: JSON.stringify({ email, password, display_name: displayName, invite_code: inviteCode })
+                body: JSON.stringify({
+                    email,
+                    password,
+                    display_name: displayName,
+                    invite_code: inviteCode,
+                    email_opt_in: Boolean(emailOptIn)
+                })
             });
 
             if (!response.ok) {
@@ -170,7 +177,7 @@ export class AuthManager {
      * @returns {boolean}
      */
     isPremium() {
-        return ['admin', 'premium'].includes(this.user?.role);
+        return ['admin', 'premium'].includes(this.user?.role) || !!this.user?.premiumActive;
     }
 
     /**

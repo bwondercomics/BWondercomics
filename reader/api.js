@@ -116,7 +116,7 @@ export async function apiDelete(url, options = {}) {
  */
 export async function fetchComments(targetId) {
     try {
-        const data = await apiGet(`${API.ENDPOINTS.COMMENTS}?targetId=${encodeURIComponent(targetId)}`);
+        const data = await apiGet(`${API.ENDPOINTS.COMMENTS}?target_id=${encodeURIComponent(targetId)}`);
         return data.comments || [];
     } catch (err) {
         logger.error('Failed to fetch comments:', err);
@@ -132,7 +132,7 @@ export async function fetchComments(targetId) {
  */
 export async function postComment(targetId, message) {
     return apiPost(API.ENDPOINTS.COMMENTS, {
-        targetId: targetId,
+        target_id: targetId,
         message: message
     });
 }
