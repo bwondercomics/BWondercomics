@@ -6,7 +6,6 @@
 // ==================== STORAGE ====================
 export const STORAGE = {
     PROGRESS_KEY: 'battleBros_progress', // localStorage key for reading progress
-    CONFIG_KEY_PREFIX: 'battlebros_page_config:', // prefix for page config keys
     THEME_KEY: 'battlebros_theme', // localStorage key for theme preferences
 };
 
@@ -19,6 +18,12 @@ export const API = {
         LOGOUT: '/api/logout',
         REGISTER: '/api/register',
         COMMENTS: '/api/comments',
+        USER_SETTINGS: '/api/user/settings',
+        USER_EMAIL_OPT: '/api/user/email-opt',
+        USER_DELETE_COMMENTS: '/api/user/comments/delete',
+        USER_COMMENTS: '/api/user/comments',
+        USER_DELETE_ACCOUNT: '/api/user/account',
+        USER_REDEEM_PREMIUM: '/api/user/premium/redeem',
         POSTS_LATEST: '/api/posts/latest',
         POSTS: '/api/posts',
         SAVE: '/api/save',

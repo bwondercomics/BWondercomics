@@ -2665,7 +2665,7 @@
   <script type="module" src="reader/app.js"></script>
   <script type="module" src="reader/customization.js"></script>
   <!-- comic-comments.js now loads on-demand when user clicks comments button -->
-  <script>
+<script>
     // Wrap button text characters so hover can animate each letter
     (() => {
       const wrapLetters = (el) => {
@@ -2684,6 +2684,7 @@
       const observeButtons = () => {
         const container = document.querySelector(".panel-buttons");
         if (!container) return;
+        // Keep new buttons animated if the list changes at runtime.
         const observer = new MutationObserver(() => wrapAll());
         observer.observe(container, { childList: true, subtree: true });
       };
@@ -2702,18 +2703,16 @@
     })();
 
   </script>
-  <script>
-    // Reader comments toggle button with code splitting
+<script>
+    // Reader comments toggle button
     (() => {
-      let commentsModuleLoaded = false;
-      let commentsModuleLoading = false;
-
       const bind = () => {
         const btn = document.getElementById("commentToggleBtn");
         const panel = document.getElementById("comicCommentsSection");
         if (!btn || !panel) return;
 
         const fallbackToggle = () => {
+          // Minimal toggle to avoid blocking the button if comments script fails.
           const willShow = panel.classList.contains("collapsed");
           panel.classList.toggle("collapsed", !willShow);
           btn.textContent = willShow ? "HIDE COMMENTS" : "COMMENTS";
@@ -2725,30 +2724,8 @@
           }
         };
 
-        const loadCommentsModule = async () => {
-          if (commentsModuleLoaded) return;
-          if (commentsModuleLoading) return;
-
-          commentsModuleLoading = true;
-          try {
-            // Code splitting: dynamic import of comments module
-            await import('./reader/comic-comments.js');
-            commentsModuleLoaded = true;
-          } catch (err) {
-            console.error('Failed to load comments module:', err);
-          } finally {
-            commentsModuleLoading = false;
-          }
-        };
-
         btn.addEventListener("click", async (e) => {
           e.preventDefault();
-
-          // Load module if opening comments for first time
-          const willShow = panel.classList.contains("collapsed");
-          if (willShow && !commentsModuleLoaded) {
-            await loadCommentsModule();
-          }
 
           // Toggle comments
           if (typeof window.toggleReaderComments === "function") {
@@ -2770,7 +2747,15 @@
       }
     })();
   </script>
-  <script defer src="/analytics.js"></script>
+<script>
+    // Load the analytics loader without Vite bundling it.
+    (() => {
+      const script = document.createElement("script");
+      script.defer = true;
+      script.src = "/analytics.js";
+      document.head.appendChild(script);
+    })();
+  </script>
 </body>
 
 </html>

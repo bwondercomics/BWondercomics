@@ -1,3 +1,4 @@
+// Pointer + gesture handling (pan, pinch zoom, swipe navigation).
 import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { el } from './dom.js';
@@ -11,6 +12,7 @@ function getDistance(a, b) {
 }
 
 export function initPointerHandlers() {
+  // Central hookup for mouse/touch/pen interactions.
   if (el.stage) el.stage.addEventListener('pointerdown', onPointerDown);
   window.addEventListener('pointermove', onPointerMove);
   window.addEventListener('pointerup', onPointerUp);
@@ -37,6 +39,7 @@ export function initPointerHandlers() {
 }
 
 function onPointerDown(e) {
+  // Track pointers for drag/pinch interactions and taps.
   try {
     e.target.setPointerCapture(e.pointerId);
   } catch (err) { }
@@ -75,6 +78,7 @@ function onPointerDown(e) {
 }
 
 function onPointerMove(e) {
+  // Apply pan/zoom transforms based on pointer count.
   if (!state.pointers.has(e.pointerId)) return;
 
   state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -111,6 +115,7 @@ function onPointerMove(e) {
 }
 
 function onPointerUp(e) {
+  // Finish gestures, handle swipes, reset pointer state.
   try {
     e.target.releasePointerCapture(e.pointerId);
   } catch (err) { }

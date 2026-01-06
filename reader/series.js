@@ -1,3 +1,4 @@
+// Series helpers: sanitize query param and map to DB-backed endpoints.
 export const DEFAULT_SERIES_ID = 'battle-bros';
 
 export function sanitizeSeriesId(raw = '') {
@@ -10,16 +11,21 @@ export function sanitizeSeriesId(raw = '') {
 }
 
 export function getActiveSeriesId() {
+  // Resolve active series from URL query, defaulting to the main series.
   const params = new URLSearchParams(window.location.search);
   return sanitizeSeriesId(params.get('series') || '') || DEFAULT_SERIES_ID;
 }
 
 export function getSeriesDataPath(seriesId = DEFAULT_SERIES_ID) {
+  // DB-backed chapters JSON endpoint.
   const id = sanitizeSeriesId(seriesId) || DEFAULT_SERIES_ID;
-  return id === DEFAULT_SERIES_ID ? '/admin/data.json' : `/admin/series/${id}/data.json`;
+  return id === DEFAULT_SERIES_ID ? 'data.json' : `series/${id}/data.json`;
 }
 
 export function getSeriesPageConfigPath(seriesId = DEFAULT_SERIES_ID) {
+  // DB-backed page config JSON endpoint.
   const id = sanitizeSeriesId(seriesId) || DEFAULT_SERIES_ID;
-  return id === DEFAULT_SERIES_ID ? '/admin/page-config.json' : `/admin/series/${id}/page-config.json`;
+  return id === DEFAULT_SERIES_ID
+    ? 'page-config.json'
+    : `series/${id}/page-config.json`;
 }

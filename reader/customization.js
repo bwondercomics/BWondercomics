@@ -1,13 +1,11 @@
-﻿import { getActiveSeriesId, getSeriesPageConfigPath } from './series.js';
+// Page customization: applies DB-backed page config.
+import { getActiveSeriesId, getSeriesPageConfigPath } from './series.js';
 import { logger } from './logger.js';
-import { STORAGE } from './constants.js';
 
 (function () {
   'use strict';
 
   const seriesId = getActiveSeriesId();
-  const CONFIG_KEY = `${STORAGE.CONFIG_KEY_PREFIX}${seriesId}`;
-
   // Default config matches original HTML
   const SUPPORT_TEXT_HTML = `<span class="bubble-em">WANT TO SUPPORT THE COMIC?</span>
               <span class="bubble-bold">Buy the physical book</span> at the
@@ -55,21 +53,13 @@ import { STORAGE } from './constants.js';
   async function initCustomization() {
     let config = null;
     try {
-      // Try loading from file FIRST (so published changes are always visible)
       const configPath = getSeriesPageConfigPath(seriesId);
-      const response = await fetch(configPath);
+      const response = await fetch(configPath, { cache: 'no-store' });
       if (response.ok) {
         config = await response.json();
         logger.log(`Loaded config from ${configPath}`);
-      }
-
-      // Only use localStorage draft if file doesn't exist or fails to load
-      if (!config) {
-        const draft = localStorage.getItem(CONFIG_KEY);
-        if (draft) {
-          config = JSON.parse(draft);
-          logger.log('Loaded config from localStorage draft (file not found)');
-        }
+      } else {
+        logger.warn(`No page config found at ${configPath}`);
       }
     } catch (e) {
       console.warn('Failed to load config, using defaults', e);

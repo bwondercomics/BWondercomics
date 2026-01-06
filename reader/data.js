@@ -3,13 +3,13 @@
  * Handles fetching and parsing chapter data, page config, and latest posts
  */
 
-import { sanitizeChapters } from './chapters.js';
+import { sanitizeChapters, sortChapterNamesWithMeta } from './chapters.js';
 import { getSeriesDataPath, getSeriesPageConfigPath } from './series.js';
 import { logger } from './logger.js';
 
 /**
- * Loads chapter data from admin/data.json
- * Fetches chapter list, page URLs, and status message from the admin panel
+ * Loads chapter data from the public series endpoint
+ * Fetches chapter list, page URLs, and status message from the database-backed API
  * @async
  * @returns {Promise<{chapters: Object, chapterOrder: string[], statusMessage: string}>} Normalized chapter data
  * @throws {Error} If fetch fails or data structure is invalid
@@ -28,14 +28,16 @@ export async function loadChapterData(seriesId) {
     }
 
     const normalized = sanitizeChapters(data.chapters);
+    const chapterMeta = data.chapterMeta && typeof data.chapterMeta === 'object' ? data.chapterMeta : {};
+    const orderedNames = sortChapterNamesWithMeta(Object.keys(normalized.chapters), chapterMeta);
     return {
       chapters: normalized.chapters,
-      chapterOrder: normalized.order,
+      chapterOrder: orderedNames,
       statusMessage: data.statusMessage || '',
-      chapterMeta: data.chapterMeta && typeof data.chapterMeta === 'object' ? data.chapterMeta : {},
+      chapterMeta,
       premiumOnly: !!data.premiumOnly,
-      unitLabelSingular: String(data.unitLabelSingular || '').trim() || 'Chapter',
-      unitLabelPlural: String(data.unitLabelPlural || '').trim() || 'Chapters'
+      unitLabelSingular: String(data.unitLabelSingular || '').trim() || 'Entry',
+      unitLabelPlural: String(data.unitLabelPlural || '').trim() || 'Entries'
     };
   } catch (error) {
     console.error('Failed to load chapter data:', error);
@@ -44,7 +46,7 @@ export async function loadChapterData(seriesId) {
 }
 
 /**
- * Loads page configuration from admin/page-config.json
+ * Loads page configuration from the public page-config endpoint
  * Applies custom subtitles and theme overrides if available
  * @async
  * @param {Function} setSubtitlesFn - Callback function to set subtitles in the UI

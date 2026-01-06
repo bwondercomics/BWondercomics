@@ -7,11 +7,11 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import select
+from sqlalchemy import distinct, func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import Comment, User
+from ..models import Comment, User, VisitorEvent
 from ..security import get_current_user, public_user
 from ..settings import settings
 from ..umami_api import UmamiAPIError, fetch_umami_stats
@@ -139,15 +139,41 @@ def admin_analytics_summary(request: Request, db: Session = Depends(get_db)):
         "last7d": (now_ms - 7 * 24 * 60 * 60 * 1000, now_ms),
     }
 
+    warning = ""
+    source = "umami"
     try:
         stats = fetch_umami_stats(ranges)
     except UmamiAPIError as exc:
-        status = exc.status or 502
-        return JSONResponse(status_code=status, content={"error": str(exc)})
+        source = "local"
+        warning = str(exc)
+        stats = {}
+        for name, (start, end) in ranges.items():
+            start_dt = datetime.fromtimestamp(start / 1000, tz=timezone.utc)
+            end_dt = datetime.fromtimestamp(end / 1000, tz=timezone.utc)
+            pageviews = db.scalar(
+                select(func.count()).select_from(VisitorEvent).where(
+                    VisitorEvent.created_at >= start_dt,
+                    VisitorEvent.created_at <= end_dt,
+                )
+            ) or 0
+            visitors = db.scalar(
+                select(func.count(distinct(VisitorEvent.visitor_id))).where(
+                    VisitorEvent.created_at >= start_dt,
+                    VisitorEvent.created_at <= end_dt,
+                )
+            ) or 0
+            stats[name] = {
+                "pageviews": int(pageviews),
+                "visitors": int(visitors),
+                "sessions": None,
+                "bounces": None,
+                "totaltime": None,
+            }
 
     return {
-        "source": "umami",
+        "source": source,
         "websiteId": settings.umami_website_id,
+        **({"warning": warning} if warning else {}),
         "ranges": {
             name: {**(stats.get(name, {}) or {}), "start": start, "end": end}
             for name, (start, end) in ranges.items()

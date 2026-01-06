@@ -2,6 +2,8 @@ import { el } from "./dom.js";
 import { state } from "./state.js";
 import { changeChapter as changeChapterFromOverlays } from "./overlays.js";
 
+// Entry gallery overlay with lazy-loaded thumbnails and promo cards.
+
 const VOLUME_LINK =
   "https://bwondercomics.bigcartel.com/product/battle-bros-volume-1";
 const VOLUME_EXCLUSIVES = [
@@ -14,7 +16,7 @@ const VOLUME_EXCLUSIVES = [
   },
 ];
 
-// Intersection Observer for lazy loading gallery thumbnails
+// Lazy-load gallery thumbnails as they enter the viewport.
 const imageObserver = new IntersectionObserver((entries) => {
   entries.forEach(entry => {
     if (entry.isIntersecting) {
@@ -30,21 +32,25 @@ const imageObserver = new IntersectionObserver((entries) => {
   rootMargin: '50px' // Start loading 50px before image enters viewport
 });
 
-function getChapterNumber(chapterName = "") {
-  const match = String(chapterName).match(/(\d+)/);
-  return match ? match[1] : "";
-}
-
 function getLockedCoverUrl(chapterName, meta) {
   if (meta && typeof meta === "object") {
     const configured = (meta.coverImage || meta.cover || "").toString().trim();
     if (configured) return configured;
   }
-
-  // Legacy fallback: reuse existing public covers if present (optional).
-  const num = getChapterNumber(chapterName);
-  if (num) return `chapters/patreonCh/${num}cover.png`;
   return "";
+}
+
+function getDisplayNumber(meta) {
+  if (!meta || typeof meta !== "object") return null;
+  const raw = meta.displayNumber;
+  const parsed = Number.isFinite(raw) ? raw : parseInt(raw, 10);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatEntryLabel(name, meta, unitLabel) {
+  const displayNumber = getDisplayNumber(meta);
+  if (displayNumber == null) return name;
+  return `${unitLabel} ${displayNumber} - ${name}`;
 }
 
 function openCommentsPanel() {
@@ -62,6 +68,7 @@ function openCommentsPanel() {
   }
 }
 
+// Build the gallery grid for available and locked chapters.
 export function renderGallery(chapterOrder, chapters, options = {}) {
   const grid = document.getElementById("galleryGrid");
   if (!grid) return;
@@ -70,6 +77,7 @@ export function renderGallery(chapterOrder, chapters, options = {}) {
 
   const lockedChapters = Array.isArray(options.lockedChapters) ? options.lockedChapters : [];
   const chapterMeta = options.chapterMeta && typeof options.chapterMeta === "object" ? options.chapterMeta : {};
+  const unitLabel = options.unitLabelSingular || "Entry";
 
   const names = chapterOrder.length ? chapterOrder : Object.keys(chapters);
   let cardIndex = 0;
@@ -79,6 +87,9 @@ export function renderGallery(chapterOrder, chapters, options = {}) {
     if (!pages || pages.length === 0) return;
 
     const coverUrl = pages[0];
+    const meta = chapterMeta?.[name];
+    const isPatron = !!meta?.premium;
+    const displayTitle = formatEntryLabel(name, meta, unitLabel);
 
     const card = document.createElement("div");
     card.className = "chapter-card";
@@ -89,9 +100,12 @@ export function renderGallery(chapterOrder, chapters, options = {}) {
 
     card.onclick = () => {
       if (el.chapter) el.chapter.value = name;
-      changeChapterFromOverlays(name, chapters);
+      changeChapterFromOverlays(name, chapters, chapterMeta);
       toggleGallery();
     };
+
+    const thumbWrap = document.createElement("div");
+    thumbWrap.className = "chapter-thumb-wrap";
 
     const thumb = document.createElement("img");
     thumb.className = "chapter-thumb";
@@ -106,19 +120,29 @@ export function renderGallery(chapterOrder, chapters, options = {}) {
       imageObserver.observe(thumb);
     }
 
+    thumbWrap.appendChild(thumb);
+
+    if (isPatron) {
+      const badge = document.createElement("div");
+      badge.className = "patron-badge";
+      badge.textContent = "Patron";
+      thumbWrap.appendChild(badge);
+    }
+
     const info = document.createElement("div");
     info.className = "chapter-info";
 
     const title = document.createElement("div");
     title.className = "chapter-title";
-    title.textContent = name;
+    title.textContent = displayTitle;
 
     info.appendChild(title);
-    card.appendChild(thumb);
+    card.appendChild(thumbWrap);
     card.appendChild(info);
     grid.appendChild(card);
   });
 
+  // Append a promo card for merch or special volume releases.
   const addPromoCard = (cover, variantClass, badgeText) => {
     const card = document.createElement("div");
     card.className = `chapter-card ${variantClass}`;
@@ -127,6 +151,9 @@ export function renderGallery(chapterOrder, chapters, options = {}) {
     card.onclick = () => {
       window.open(cover.href, "_blank", "noopener,noreferrer");
     };
+
+    const thumbWrap = document.createElement("div");
+    thumbWrap.className = "chapter-thumb-wrap";
 
     const thumb = document.createElement("img");
     thumb.className = "chapter-thumb";
@@ -151,7 +178,8 @@ export function renderGallery(chapterOrder, chapters, options = {}) {
 
     info.appendChild(title);
     info.appendChild(badge);
-    card.appendChild(thumb);
+    thumbWrap.appendChild(thumb);
+    card.appendChild(thumbWrap);
     card.appendChild(info);
     grid.appendChild(card);
   };
@@ -159,12 +187,16 @@ export function renderGallery(chapterOrder, chapters, options = {}) {
   lockedChapters.forEach((name) => {
     const meta = chapterMeta?.[name];
     const coverUrl = getLockedCoverUrl(name, meta);
+    const displayTitle = formatEntryLabel(name, meta, unitLabel);
 
     const card = document.createElement("div");
     card.className = "chapter-card premium-card locked";
     card.style.setProperty("--card-index", cardIndex++);
 
     card.onclick = () => openCommentsPanel();
+
+    const thumbWrap = document.createElement("div");
+    thumbWrap.className = "chapter-thumb-wrap";
 
     const thumb = document.createElement("img");
     thumb.className = "chapter-thumb";
@@ -186,15 +218,16 @@ export function renderGallery(chapterOrder, chapters, options = {}) {
 
     const title = document.createElement("div");
     title.className = "chapter-title";
-    title.textContent = name;
+    title.textContent = displayTitle;
 
     const badge = document.createElement("div");
-    badge.className = "premium-badge";
-    badge.textContent = "Premium • Sign in to unlock";
+    badge.className = "patron-badge";
+    badge.textContent = "Patron";
 
     info.appendChild(title);
-    info.appendChild(badge);
-    card.appendChild(thumb);
+    thumbWrap.appendChild(thumb);
+    thumbWrap.appendChild(badge);
+    card.appendChild(thumbWrap);
     card.appendChild(info);
     grid.appendChild(card);
   });
@@ -209,6 +242,7 @@ export function renderGallery(chapterOrder, chapters, options = {}) {
   }
 }
 
+// Toggle the gallery overlay visibility.
 export function toggleGallery() {
   const overlay = document.getElementById("galleryOverlay");
   if (overlay) {
@@ -216,9 +250,17 @@ export function toggleGallery() {
   }
 }
 
+// Wire the gallery button click handler once the DOM is ready.
 export function attachGalleryButton() {
   const galleryBtn = document.getElementById("galleryBtn");
   if (galleryBtn) galleryBtn.addEventListener("click", toggleGallery);
+
+  const overlay = document.getElementById("galleryOverlay");
+  if (overlay) {
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) toggleGallery();
+    });
+  }
 }
 
 // changeChapter handled via imported alias; no local implementation

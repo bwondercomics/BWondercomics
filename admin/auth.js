@@ -25,6 +25,7 @@ function setLoginError(message = "") {
 }
 
 async function getSessionUser() {
+  // Read the current session (cookie-based) to detect admin access.
   const res = await fetch("/api/session", {
     cache: "no-store",
     credentials: "same-origin",
@@ -35,6 +36,7 @@ async function getSessionUser() {
 }
 
 export async function checkSession(showDashboard) {
+  // Gate admin UI behind admin role.
   try {
     const user = await getSessionUser();
     if (isAdminUser(user)) {
@@ -58,6 +60,7 @@ export async function checkSession(showDashboard) {
 }
 
 export async function login(email, password, showDashboard) {
+  // Login via API and show dashboard on admin role.
   try {
     setLoginError("");
     const res = await fetch("/api/login", {
@@ -91,6 +94,7 @@ export async function login(email, password, showDashboard) {
 }
 
 export async function logout() {
+  // Clear session cookie server-side and reset the admin UI.
   try {
     await fetch("/api/logout", {
       method: "POST",

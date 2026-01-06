@@ -12,10 +12,19 @@ from uuid import UUID
 from .settings import settings
 from .routes import files as file_routes
 from .routes import admin as admin_routes
+from .routes import admin_analytics as admin_analytics_routes
+from .routes import admin_comments as admin_comments_routes
+from .routes import admin_diagnostics as admin_diagnostics_routes
+from .routes import admin_moderation as admin_moderation_routes
+from .routes import admin_ops as admin_ops_routes
+from .routes import admin_premium as admin_premium_routes
+from .routes import admin_social as admin_social_routes
 from .routes import auth as auth_routes
 from .routes import comments as comments_routes
 from .routes import posts as posts_routes
 from .routes import series_json as series_json_routes
+from .routes import tracking as tracking_routes
+from .routes import user as user_routes
 from .premium import is_premium_request_path
 from .umami_proxy import proxy_to_umami
 from .security import verify_token
@@ -82,8 +91,17 @@ async def premium_gate(request: Request, call_next):
 app.include_router(auth_routes.router)
 app.include_router(comments_routes.router)
 app.include_router(admin_routes.router)
+app.include_router(admin_analytics_routes.router)
+app.include_router(admin_comments_routes.router)
+app.include_router(admin_moderation_routes.router)
+app.include_router(admin_premium_routes.router)
+app.include_router(admin_social_routes.router)
+app.include_router(admin_diagnostics_routes.router)
+app.include_router(admin_ops_routes.router)
 app.include_router(posts_routes.router)
 app.include_router(series_json_routes.router)
+app.include_router(tracking_routes.router)
+app.include_router(user_routes.router)
 app.include_router(file_routes.router)
 
 

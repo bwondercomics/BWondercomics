@@ -661,8 +661,7 @@
 
         <div id="messageArea"></div>
     </div>
-
-    <script>
+<script>
         (function () {
             'use strict';
 
@@ -677,13 +676,17 @@
 	            };
 
 	            const params = new URLSearchParams(window.location.search);
+	            const isEmbedded = params.get('embed') === '1' || window !== window.parent;
+	            if (isEmbedded) {
+	                document.body.classList.add('is-embedded');
+	            }
 	            const seriesId = sanitizeSeriesId(params.get('series') || '') || DEFAULT_SERIES_ID;
 
 	            const CONFIG_KEY = `battlebros_page_config:${seriesId}`;
 
 	            const FILE_URL = seriesId === DEFAULT_SERIES_ID
-	                ? '/admin/page-config.json'
-	                : `/admin/series/${seriesId}/page-config.json`;
+	                ? '/page-config.json'
+	                : `/series/${seriesId}/page-config.json`;
 	            const SAVE_FILENAME = seriesId === DEFAULT_SERIES_ID
 	                ? 'admin/page-config.json'
 	                : `admin/series/${seriesId}/page-config.json`;
@@ -702,6 +705,28 @@
 	            const previewFrame = document.getElementById('previewFrame');
 	            if (previewFrame) {
 	                previewFrame.src = `../index.html?preview=true&series=${encodeURIComponent(seriesId)}`;
+	            }
+
+	            const notifyParentSize = () => {
+	                if (!isEmbedded) return;
+	                const height = document.documentElement.scrollHeight || document.body.scrollHeight || 0;
+	                if (height <= 0) return;
+	                window.parent.postMessage(
+	                    { type: 'designer:resize', height },
+	                    window.location.origin
+	                );
+	            };
+
+	            if (isEmbedded) {
+	                window.addEventListener('load', () => {
+	                    notifyParentSize();
+	                    setTimeout(notifyParentSize, 250);
+	                });
+	                window.addEventListener('resize', notifyParentSize);
+	                if (window.ResizeObserver) {
+	                    const observer = new ResizeObserver(() => notifyParentSize());
+	                    observer.observe(document.documentElement);
+	                }
 	            }
 
             // --- Config Loading & Saving ---
@@ -914,7 +939,7 @@
                 btn.addEventListener('click', async () => {
                     const presetName = btn.dataset.preset;
                     try {
-                        const response = await fetch('/admin/page-config.json');
+                        const response = await fetch('/page-config.json');
                         const data = await response.json();
                         if (data.presets && data.presets[presetName]) {
                             pageConfig.theme = data.presets[presetName].theme;

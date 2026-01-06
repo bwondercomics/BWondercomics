@@ -47,7 +47,7 @@ export function sortPagesByFilename(pages = []) {
 
 /**
  * Converts a chapter name to a sanitized folder path
- * @param {string} name - Chapter name to sanitize
+ * @param {string} name - Entry name to sanitize
  * @param {string} chaptersRoot - Root directory for chapters
  * @returns {string} Sanitized folder path
  */
@@ -60,8 +60,8 @@ export function sanitizeFolderFromName(name = '', chaptersRoot = 'chapters') {
 
 /**
  * Infers the folder path from page paths by finding the most common directory
- * @param {string} name - Chapter name
- * @param {Object} chapters - Chapters data object
+ * @param {string} name - Entry name
+ * @param {Object} chapters - Entries data object
  * @param {string[]} currentPages - Current page paths
  * @param {string} chaptersRoot - Root directory for chapters
  * @returns {string|null} Inferred folder path or null if not found
@@ -83,10 +83,10 @@ export function inferFolderFromPages(name, chapters = {}, currentPages = [], cha
 
 /**
  * Ensures a chapter has a folder path, creating one if needed
- * Uses inference, legacy numbering, or generates a unique path
- * @param {string} name - Chapter name
+ * Uses inference, numeric naming, or generates a unique path
+ * @param {string} name - Entry name
  * @param {Object} chapterFolders - Mapping of chapter names to folder paths
- * @param {Object} chapters - Chapters data object
+ * @param {Object} chapters - Entries data object
  * @param {string[]} currentPages - Current page paths
  * @param {string} chaptersRoot - Root directory for chapters
  * @returns {string} Folder path for the chapter
@@ -101,9 +101,9 @@ export function ensureChapterFolder(name = '', chapterFolders = {}, chapters = {
   }
 
   const existing = new Set(Object.values(chapterFolders || {}));
-  const legacyNumber = name.match(/\d+/)?.[0];
+  const numberMatch = name.match(/\d+/)?.[0];
   const root = String(chaptersRoot || 'chapters').replace(/\/+$/g, '');
-  let base = legacyNumber ? `${root}/${legacyNumber.padStart(2, '0')}` : sanitizeFolderFromName(name, root);
+  let base = numberMatch ? `${root}/${numberMatch.padStart(2, '0')}` : sanitizeFolderFromName(name, root);
   let candidate = base;
   let counter = 1;
   while (existing.has(candidate)) {
@@ -117,14 +117,14 @@ export function ensureChapterFolder(name = '', chapterFolders = {}, chapters = {
  * Gets the folder path for a chapter, ensuring one exists
  * @param {string} chapterName - Name of the chapter
  * @param {Object} chapterFolders - Mapping of chapter names to folder paths
- * @param {Object} chapters - Chapters data object
+ * @param {Object} chapters - Entries data object
  * @param {string[]} currentPages - Current page paths
  * @param {string} chaptersRoot - Root directory for chapters
  * @returns {string} Folder path for the chapter
  */
 export function getChapterFolder(chapterName = '', chapterFolders = {}, chapters = {}, currentPages = [], chaptersRoot = 'chapters') {
   if (chapterFolders[chapterName]) return chapterFolders[chapterName];
-  return ensureChapterFolder(chapterName || 'Chapter', chapterFolders, chapters, currentPages, chaptersRoot);
+  return ensureChapterFolder(chapterName || 'Entry', chapterFolders, chapters, currentPages, chaptersRoot);
 }
 
 /**
@@ -190,3 +190,24 @@ export function generateMediaId(path = '') {
   return `media-${filename}-${hash}`;
 }
 
+/**
+ * Reads a File as a base64 payload (without the data URL prefix).
+ * @param {File} file - File to read
+ * @returns {Promise<string>} Base64-encoded content
+ */
+export function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result;
+      if (typeof result !== 'string') {
+        reject(new Error('Unexpected file reader result'));
+        return;
+      }
+      const base64 = result.split(',')[1] || '';
+      resolve(base64);
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}

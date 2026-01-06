@@ -2,6 +2,7 @@ import { CONFIG } from './config.js';
 import { state, saveProgress } from './state.js';
 import { el } from './dom.js';
 import { render, isTwoPageMode } from './render.js';
+import { markEntryComplete, resetEntryCompletion } from './analytics.js';
 
 /**
  * Navigate to the previous page(s)
@@ -9,6 +10,7 @@ import { render, isTwoPageMode } from './render.js';
  */
 export function prevPage() {
   if (state.isTransitioning) return;
+  if (!state.pages.length) return;
 
   const step = isTwoPageMode() ? 2 : 1;
   const newIndex = Math.max(0, state.pageIndex - step);
@@ -29,6 +31,7 @@ export function prevPage() {
  */
 export function nextPage() {
   if (state.isTransitioning) return;
+  if (!state.pages.length) return;
 
   const twoPageMode = isTwoPageMode();
   const total = state.pages.length;
@@ -61,12 +64,14 @@ export function restartChapter() {
   state.pageIndex = 0;
   render();
   saveProgress(state);
+  resetEntryCompletion();
   hideEndOfChapter();
 }
 
 export function showEndOfChapter() {
   const overlay = document.getElementById('chapterEndOverlay');
   if (overlay) {
+    markEntryComplete();
     overlay.classList.add('active');
   }
 }

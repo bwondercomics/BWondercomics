@@ -20,6 +20,11 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(60), nullable=False)
     password_hash: Mapped[str] = mapped_column(String(200), nullable=False)
     role: Mapped[str] = mapped_column(String(20), nullable=False, default="user")
+    banned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    banned_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    banned_reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    email_opt_in: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    email_opt_in_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
@@ -32,10 +37,45 @@ class Comment(Base):
     display_name: Mapped[str] = mapped_column(String(60), nullable=False)
     message: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
     hidden: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     hidden_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
     hidden_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class EmailSubscriber(Base):
+    __tablename__ = "email_subscribers"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    email: Mapped[str] = mapped_column(String(120), unique=True, index=True, nullable=False)
+    source: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    opted_in_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class PremiumCode(Base):
+    __tablename__ = "premium_codes"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code: Mapped[str] = mapped_column(String(80), unique=True, index=True, nullable=False)
+    note: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    redeemed_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    redeemed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    redeemed_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+
+
+class PremiumCodeRedemption(Base):
+    __tablename__ = "premium_code_redemptions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    code_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("premium_codes.id"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    redeemed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    redeemed_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
 
 
 class Post(Base):
@@ -48,6 +88,9 @@ class Post(Base):
     image_tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     image_focus: Mapped[str] = mapped_column(String(20), nullable=False, default="center")
     share: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    share_bluesky: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    bluesky_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    bluesky_posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="published")
     publish_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -141,3 +184,108 @@ class EntryPage(Base):
     )
 
     entry: Mapped[Entry] = relationship(back_populates="pages")
+
+
+class BannedIP(Base):
+    __tablename__ = "banned_ips"
+
+    ip_address: Mapped[str] = mapped_column(String(64), primary_key=True)
+    reason: Mapped[str | None] = mapped_column(Text, nullable=True)
+    banned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    banned_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+
+class CensoredWord(Base):
+    __tablename__ = "censored_words"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    phrase: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+
+
+class CommentLimit(Base):
+    __tablename__ = "comment_limits"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    min_interval_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rate_window_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=60)
+    max_per_window_user: Mapped[int] = mapped_column(Integer, nullable=False, default=10)
+    max_per_window_ip: Mapped[int] = mapped_column(Integer, nullable=False, default=25)
+    duplicate_window_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    updated_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
+    updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class AdminOpsRun(Base):
+    __tablename__ = "admin_ops_runs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    command_id: Mapped[str] = mapped_column(String(80), nullable=False)
+    label: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="running")
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    exit_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    output: Mapped[str | None] = mapped_column(Text, nullable=True)
+    output_truncated: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    user_email: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    disrupts_api: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+
+
+class SocialAccount(Base):
+    __tablename__ = "social_accounts"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    provider: Mapped[str] = mapped_column(String(40), nullable=False, unique=True, index=True)
+    handle: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    did: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    access_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    refresh_token: Mapped[str | None] = mapped_column(Text, nullable=True)
+    pds_url: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class VisitorSession(Base):
+    __tablename__ = "visitor_sessions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    visitor_id: Mapped[str] = mapped_column(String(120), unique=True, index=True, nullable=False)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    origin: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    referrer: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    path: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    title: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    series_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    entry_title: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    entry_label: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    page_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    entries_read: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    series_read: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    hit_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class VisitorEvent(Base):
+    __tablename__ = "visitor_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    visitor_id: Mapped[str] = mapped_column(String(120), index=True, nullable=False)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    origin: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    referrer: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    path: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    title: Mapped[str | None] = mapped_column(String(300), nullable=True)
+    series_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    entry_title: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    entry_label: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    page_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

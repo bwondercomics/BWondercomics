@@ -1,16 +1,16 @@
 /**
- * Chapter utility functions for the Battle Bros comic reader
- * Handles chapter name parsing, sorting, and data normalization
+ * Entry utility functions for the Battle Bros comic reader
+ * Handles entry name parsing, sorting, and data normalization
  */
 
 import { CHAPTER_NUMBER_PATTERN } from './config.js';
 
 /**
- * Extracts the numeric chapter number from a chapter name string
- * @param {string} [name=''] - Chapter name (e.g., "Chapter 5" or "chapter 10")
- * @returns {number|null} The extracted chapter number, or null if no number found
+ * Extracts the numeric entry number from an entry name string
+ * @param {string} [name=''] - Entry name (e.g., "Entry 5" or "entry 10")
+ * @returns {number|null} The extracted entry number, or null if no number found
  * @example
- * extractChapterNumber("Chapter 5") // returns 5
+ * extractChapterNumber("Entry 5") // returns 5
  * extractChapterNumber("Bonus") // returns null
  */
 export function extractChapterNumber(name = '') {
@@ -19,13 +19,13 @@ export function extractChapterNumber(name = '') {
 }
 
 /**
- * Sorts chapter names numerically by their chapter number
- * Non-numbered chapters are sorted to the end alphabetically
- * @param {string[]} [names=[]] - Array of chapter names to sort
- * @returns {string[]} Sorted array of chapter names
+ * Sorts entry names numerically by their entry number
+ * Non-numbered entries are sorted to the end alphabetically
+ * @param {string[]} [names=[]] - Array of entry names to sort
+ * @returns {string[]} Sorted array of entry names
  * @example
- * sortChapterNames(["Chapter 10", "Chapter 2", "Bonus"])
- * // returns ["Chapter 2", "Chapter 10", "Bonus"]
+ * sortChapterNames(["Entry 10", "Entry 2", "Bonus"])
+ * // returns ["Entry 2", "Entry 10", "Bonus"]
  */
 export function sortChapterNames(names = []) {
   return [...names].sort((a, b) => {
@@ -40,14 +40,37 @@ export function sortChapterNames(names = []) {
   });
 }
 
+export function sortChapterNamesWithMeta(names = [], meta = {}) {
+  const withNumbers = [];
+  const withoutNumbers = [];
+
+  names.forEach((name) => {
+    const rawNumber = meta?.[name]?.displayNumber;
+    const parsed = Number.isFinite(rawNumber) ? rawNumber : parseInt(rawNumber, 10);
+    const displayNumber = Number.isFinite(parsed) ? parsed : null;
+    if (displayNumber != null) {
+      withNumbers.push({ name, displayNumber });
+    } else {
+      withoutNumbers.push(name);
+    }
+  });
+
+  withNumbers.sort((a, b) => {
+    if (a.displayNumber !== b.displayNumber) return a.displayNumber - b.displayNumber;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  });
+
+  return [...withNumbers.map((item) => item.name), ...sortChapterNames(withoutNumbers)];
+}
+
 /**
- * Normalizes and validates chapter data from admin/data.json
- * Filters out empty chapters, removes duplicates, and creates a sorted chapter order
- * @param {Object.<string, string[]>} [rawChapters={}] - Raw chapters object with chapter names as keys and page arrays as values
- * @returns {{chapters: Object.<string, string[]>, order: string[]}} Normalized chapters object and sorted order array
+ * Normalizes and validates entry data from the series data endpoint
+ * Filters out empty entries, removes duplicates, and creates a sorted entry order
+ * @param {Object.<string, string[]>} [rawChapters={}] - Raw entries object with entry names as keys and page arrays as values
+ * @returns {{chapters: Object.<string, string[]>, order: string[]}} Normalized entries object and sorted order array
  * @example
- * sanitizeChapters({ "Chapter 1": ["page1.png"], "Empty": [] })
- * // returns { chapters: { "Chapter 1": ["page1.png"] }, order: ["Chapter 1"] }
+ * sanitizeChapters({ "Entry 1": ["page1.png"], "Empty": [] })
+ * // returns { chapters: { "Entry 1": ["page1.png"] }, order: ["Entry 1"] }
  */
 export function sanitizeChapters(rawChapters = {}) {
   const clean = {};
@@ -59,7 +82,7 @@ export function sanitizeChapters(rawChapters = {}) {
 
     const key = trimmed.toLowerCase();
     if (seen.has(key)) {
-      console.warn(`Duplicate chapter name ignored: ${trimmed}`);
+      console.warn(`Duplicate entry name ignored: ${trimmed}`);
       return;
     }
 

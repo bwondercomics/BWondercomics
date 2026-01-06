@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import and_, select, update
 from sqlalchemy.orm import Session
 
+from ..bluesky import BlueskyError, BlueskyPost
 from ..db import get_db
 from ..models import Post, User
 from ..rss import build_rss_xml
@@ -73,6 +74,8 @@ def _post_to_dict(post: Post) -> dict[str, Any]:
         "content": post.content,
         "date": _iso_z(post.publish_at),
         "share": bool(post.share),
+        "shareBluesky": bool(post.share_bluesky),
+        "blueskyError": post.bluesky_error or "",
         "status": post.status,
         "updatedAt": _iso_z(post.updated_at),
     }
@@ -86,6 +89,45 @@ def _promote_due_scheduled(db: Session, now: datetime) -> None:
     )
     if getattr(result, "rowcount", 0):
         db.commit()
+
+    _maybe_share_due_bluesky(db, now)
+
+
+def _maybe_share_due_bluesky(db: Session, now: datetime) -> None:
+    candidates = db.scalars(
+        select(Post).where(
+            Post.status == "published",
+            Post.share.is_(True),
+            Post.share_bluesky.is_(True),
+            Post.publish_at <= now,
+            Post.bluesky_posted_at.is_(None),
+        )
+    ).all()
+
+    if not candidates:
+        return
+
+    for post in candidates:
+        _share_post_to_bluesky(db, post)
+
+    db.commit()
+
+
+def _share_post_to_bluesky(db: Session, post: Post) -> None:
+    if not post.share or not post.share_bluesky or post.status != "published":
+        post.bluesky_error = None
+        return
+
+    if post.bluesky_posted_at:
+        return
+
+    try:
+        payload = BlueskyPost.from_post(post)
+        payload.publish(db)
+        post.bluesky_error = None
+        post.bluesky_posted_at = datetime.now(timezone.utc)
+    except BlueskyError as exc:
+        post.bluesky_error = str(exc)
 
 
 @router.get("/api/posts")
@@ -175,6 +217,7 @@ class PostUpsertRequest(BaseModel):
     image_tags: list[str] | str | None = Field(default=None, alias="imageTags")
     image_focus: str | None = Field(default=None, alias="imageFocus")
     share: bool = True
+    share_bluesky: bool | None = Field(default=None, alias="shareBluesky")
     status: str | None = None
     date: str | None = None
 
@@ -222,8 +265,12 @@ def admin_create_post(payload: PostUpsertRequest, request: Request, db: Session 
     image_focus = (payload.image_focus or "center").strip() or "center"
     image_tags = _normalize_tags(payload.image_tags)
     share = bool(payload.share)
+    share_bluesky = bool(payload.share_bluesky)
     if status == "draft":
         share = False
+        share_bluesky = False
+    if not share:
+        share_bluesky = False
 
     post = Post(
         id=uuid4(),
@@ -233,6 +280,7 @@ def admin_create_post(payload: PostUpsertRequest, request: Request, db: Session 
         image_tags=image_tags,
         image_focus=image_focus[:20],
         share=share,
+        share_bluesky=share_bluesky,
         status=status,
         publish_at=publish_at,
         created_at=now,
@@ -241,6 +289,8 @@ def admin_create_post(payload: PostUpsertRequest, request: Request, db: Session 
     db.add(post)
     db.commit()
     db.refresh(post)
+    _share_post_to_bluesky(db, post)
+    db.commit()
     return {"post": _post_to_dict(post)}
 
 
@@ -275,8 +325,12 @@ def admin_update_post(post_id: str, payload: PostUpsertRequest, request: Request
     image_focus = (payload.image_focus or post.image_focus or "center").strip() or "center"
     image_tags = _normalize_tags(payload.image_tags) if payload.image_tags is not None else list(post.image_tags or [])
     share = bool(payload.share)
+    share_bluesky = bool(payload.share_bluesky) if payload.share_bluesky is not None else post.share_bluesky
     if status == "draft":
         share = False
+        share_bluesky = False
+    if not share:
+        share_bluesky = False
 
     post.title = title[:200]
     post.content = content
@@ -284,6 +338,7 @@ def admin_update_post(post_id: str, payload: PostUpsertRequest, request: Request
     post.image_tags = image_tags
     post.image_focus = image_focus[:20]
     post.share = share
+    post.share_bluesky = share_bluesky
     post.status = status
     post.publish_at = publish_at
     post.updated_at = now
@@ -291,6 +346,8 @@ def admin_update_post(post_id: str, payload: PostUpsertRequest, request: Request
     db.add(post)
     db.commit()
     db.refresh(post)
+    _share_post_to_bluesky(db, post)
+    db.commit()
     return {"post": _post_to_dict(post)}
 
 

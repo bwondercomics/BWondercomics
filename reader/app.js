@@ -1,3 +1,4 @@
+// Reader bootstrap: loads data, binds UI, and wires view state.
 import { CONFIG } from "./config.js";
 import {
   extractChapterNumber,
@@ -9,6 +10,7 @@ import { logger } from "./logger.js";
 import { loadChapterData, loadPageConfig, loadLatestPost } from "./data.js";
 import { el, initElements } from "./dom.js";
 import { renderStatusPanel, render } from "./render.js";
+import { initReaderAnalytics, setActiveEntry } from "./analytics.js";
 import {
   prevPage,
   nextPage,
@@ -30,7 +32,7 @@ import {
   changeChapter,
 } from "./overlays.js";
 
-// Code splitting: Lazy load gallery and fullscreen modules on-demand
+// Code splitting: lazy load heavier modules on demand.
 let galleryModule = null;
 let fullscreenModule = null;
 
@@ -84,6 +86,7 @@ async function handleMouseLeaveControls() {
   return mod.handleMouseLeaveControls();
 }
 import { renderLatestUpdate } from "./latest.js";
+import { initRightPanelFeed } from "./feed-panel.js";
 import { initEmailSignupForm } from "./email.js";
 import { getActiveSeriesId } from "./series.js";
 
@@ -100,20 +103,44 @@ import { getActiveSeriesId } from "./series.js";
     setInitialSubtitle();
   }
 
-  // ==================== CHAPTER DATA ====================
-  // Chapter data is loaded dynamically from admin/data.json
+  // ==================== ENTRY DATA ====================
+  // Entry data is loaded dynamically from the series data endpoint
   let chapters = {};
   let chapterOrder = [];
   let statusMessage = "";
   let chapterMeta = {};
   let premiumOnly = false;
-  let unitLabelSingular = "Chapter";
-  let unitLabelPlural = "Chapters";
+  let unitLabelSingular = "Entry";
+  let unitLabelPlural = "Entries";
+  let chapterSelectBound = false;
 
   function getUnitLabels() {
-    const singular = String(unitLabelSingular || "").trim() || "Chapter";
+    const singular = String(unitLabelSingular || "").trim() || "Entry";
     const plural = String(unitLabelPlural || "").trim() || `${singular}s`;
     return { singular, plural };
+  }
+
+  function getEntryDisplayNumber(name) {
+    const rawNumber = chapterMeta?.[name]?.displayNumber;
+    const parsed = Number.isFinite(rawNumber) ? rawNumber : parseInt(rawNumber, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function formatEntryLabel(name) {
+    if (!name) return "";
+    const displayNumber = getEntryDisplayNumber(name);
+    const meta = chapterMeta?.[name] || {};
+    const baseLabel = displayNumber == null
+      ? name
+      : `${getUnitLabels().singular} ${displayNumber} - ${name}`;
+    const isComingSoon = !!meta.comingSoon || String(meta.status || "").toLowerCase() === "scheduled";
+    return isComingSoon ? `${baseLabel} (Coming Soon)` : baseLabel;
+  }
+
+  function formatEntryTrackingLabel(name) {
+    const displayNumber = getEntryDisplayNumber(name);
+    if (displayNumber == null) return "";
+    return `${getUnitLabels().singular} ${displayNumber}`;
   }
 
   function applyUnitLabels() {
@@ -165,19 +192,266 @@ import { getActiveSeriesId } from "./series.js";
     if (!el.chapter) return;
 
     const names = chapterOrder.length ? chapterOrder : Object.keys(chapters);
+    el.chapter.innerHTML = "";
 
     names.forEach((name) => {
       const option = document.createElement("option");
       option.value = name;
       option.textContent = name;
+      const displayNumber = getEntryDisplayNumber(name);
+      if (displayNumber != null) {
+        option.dataset.displayNumber = String(displayNumber);
+        const trackingLabel = formatEntryTrackingLabel(name);
+        if (trackingLabel) option.dataset.entryLabel = trackingLabel;
+      }
       el.chapter.appendChild(option);
     });
+
+    buildChapterSelectMenu(names);
+    bindChapterSelectEvents();
+    syncChapterSelectDisplay();
+  }
+
+  function getChapterSelectElements() {
+    return {
+      wrap: document.getElementById("chapterSelect"),
+      trigger: document.getElementById("chapterSelectTrigger"),
+      name: document.getElementById("chapterSelectName"),
+      patron: document.getElementById("chapterSelectPatron"),
+      menu: document.getElementById("chapterSelectMenu"),
+    };
+  }
+
+  function setChapterMenuOpen(isOpen) {
+    const { trigger, menu } = getChapterSelectElements();
+    if (!trigger || !menu) return;
+    menu.classList.toggle("open", isOpen);
+    trigger.setAttribute("aria-expanded", isOpen ? "true" : "false");
+  }
+
+  function buildChapterSelectMenu(names) {
+    const { menu } = getChapterSelectElements();
+    if (!menu) return;
+    menu.innerHTML = "";
+
+    names.forEach((name) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "chapter-option";
+      button.dataset.value = name;
+      button.setAttribute("role", "option");
+      button.setAttribute("aria-selected", "false");
+
+      const label = document.createElement("span");
+      label.className = "chapter-option-name";
+      label.textContent = formatEntryLabel(name);
+      button.appendChild(label);
+
+      if (chapterMeta?.[name]?.premium) {
+        const patron = document.createElement("span");
+        patron.className = "chapter-option-patron";
+        patron.textContent = "Patron";
+        button.appendChild(patron);
+      }
+
+      button.addEventListener("click", () => {
+        if (el.chapter) {
+          el.chapter.value = name;
+          el.chapter.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        setChapterMenuOpen(false);
+      });
+
+      menu.appendChild(button);
+    });
+  }
+
+  function syncChapterSelectDisplay() {
+    const { name, patron, menu } = getChapterSelectElements();
+    if (!name || !el.chapter) return;
+    const value = el.chapter.value || "";
+    name.textContent = value ? formatEntryLabel(value) : getUnitLabels().singular;
+    const isPatron = !!chapterMeta?.[value]?.premium;
+    if (patron) {
+      patron.style.display = isPatron ? "inline-flex" : "none";
+    }
+    if (menu) {
+      menu.querySelectorAll(".chapter-option").forEach((option) => {
+        const selected = option.dataset.value === value;
+        option.setAttribute("aria-selected", selected ? "true" : "false");
+        option.classList.toggle("is-selected", selected);
+      });
+    }
+  }
+
+  function bindChapterSelectEvents() {
+    if (chapterSelectBound) return;
+    const { wrap, trigger, menu } = getChapterSelectElements();
+    if (!wrap || !trigger || !menu) return;
+
+    trigger.addEventListener("click", (event) => {
+      event.stopPropagation();
+      setChapterMenuOpen(!menu.classList.contains("open"));
+    });
+
+    menu.addEventListener("click", (event) => {
+      event.stopPropagation();
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!wrap.contains(event.target)) {
+        setChapterMenuOpen(false);
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        setChapterMenuOpen(false);
+      }
+    });
+
+    chapterSelectBound = true;
   }
 
   // ==================== COVER GALLERY ====================
 
   // Gallery helpers moved to reader/gallery.js
   // ==================== EVENT HANDLERS ====================
+
+  async function getGifLoopDuration(src) {
+    try {
+      const res = await fetch(src, { cache: "force-cache" });
+      if (!res.ok) return null;
+      const buffer = await res.arrayBuffer();
+      const data = new Uint8Array(buffer);
+      if (data.length < 13) return null;
+      const header = String.fromCharCode(data[0], data[1], data[2]);
+      if (header !== "GIF") return null;
+
+      let idx = 6;
+      const packed = data[idx + 4];
+      idx += 7;
+      if (packed & 0x80) {
+        const gctSize = 3 * (1 << ((packed & 0x07) + 1));
+        idx += gctSize;
+      }
+
+      let pendingDelay = 0;
+      let totalDelay = 0;
+
+      while (idx < data.length) {
+        const blockId = data[idx++];
+        if (blockId === 0x3b) break;
+        if (blockId === 0x21) {
+          const label = data[idx++];
+          if (label === 0xf9) {
+            const blockSize = data[idx++];
+            if (blockSize === 4 && idx + 4 <= data.length) {
+              idx++; // packed fields
+              pendingDelay = data[idx] + (data[idx + 1] << 8);
+              idx += 2;
+              idx++; // transparent index
+            } else {
+              idx += blockSize;
+            }
+            if (data[idx] === 0x00) idx++;
+          } else {
+            while (idx < data.length) {
+              const size = data[idx++];
+              if (size === 0) break;
+              idx += size;
+            }
+          }
+        } else if (blockId === 0x2c) {
+          idx += 8;
+          if (idx >= data.length) break;
+          const packedFields = data[idx++];
+          if (packedFields & 0x80) {
+            const lctSize = 3 * (1 << ((packedFields & 0x07) + 1));
+            idx += lctSize;
+          }
+          idx++; // LZW min code size
+          while (idx < data.length) {
+            const size = data[idx++];
+            if (size === 0) break;
+            idx += size;
+          }
+          const delay = pendingDelay || 10;
+          totalDelay += delay;
+          pendingDelay = 0;
+        } else {
+          break;
+        }
+      }
+
+      return totalDelay ? totalDelay * 10 : null;
+    } catch (err) {
+      return null;
+    }
+  }
+
+  function captureStaticFrame(img, src) {
+    return new Promise((resolve) => {
+      const loader = new Image();
+      loader.onload = () => {
+        try {
+          const width = loader.naturalWidth || loader.width;
+          const height = loader.naturalHeight || loader.height;
+          if (!width || !height) {
+            resolve(null);
+            return;
+          }
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            resolve(null);
+            return;
+          }
+          ctx.drawImage(loader, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/png"));
+        } catch (err) {
+          resolve(null);
+        }
+      };
+      loader.onerror = () => resolve(null);
+      loader.src = src;
+    });
+  }
+
+  async function initBookTurnGif(img) {
+    const gifSrc = img.getAttribute("src");
+    if (!gifSrc) return;
+
+    const [loopDuration, staticSrc] = await Promise.all([
+      getGifLoopDuration(gifSrc),
+      captureStaticFrame(img, gifSrc),
+    ]);
+    const durationMs = loopDuration || 2000;
+    const stillSrc = staticSrc || "";
+    let isPlaying = false;
+    let timerId = null;
+
+    const stopPlayback = () => {
+      isPlaying = false;
+      if (stillSrc) img.src = stillSrc;
+    };
+
+    const playLoops = (loops) => {
+      if (isPlaying) return;
+      isPlaying = true;
+      img.src = gifSrc;
+      if (timerId) clearTimeout(timerId);
+      timerId = setTimeout(stopPlayback, durationMs * loops);
+    };
+
+    playLoops(5);
+
+    img.addEventListener("mouseenter", () => {
+      if (!isPlaying) playLoops(3);
+    });
+  }
 
   function attachEventHandlers() {
     // Book turn promo click handler
@@ -190,7 +464,9 @@ import { getActiveSeriesId } from "./series.js";
           "noopener,noreferrer",
         );
       });
+      initBookTurnGif(bookTurnPromo);
     }
+    initRightPanelFeed();
 
     // Navigation buttons
     if (el.prevBtn) el.prevBtn.addEventListener("click", prevPage);
@@ -291,7 +567,7 @@ import { getActiveSeriesId } from "./series.js";
 
     if (el.chapter) {
       el.chapter.addEventListener("change", (e) => {
-        changeChapter(e.target.value, chapters);
+        changeChapter(e.target.value, chapters, chapterMeta);
       });
     }
 
@@ -318,7 +594,7 @@ import { getActiveSeriesId } from "./series.js";
 
     if (nextChapterBtn) {
       nextChapterBtn.addEventListener("click", () =>
-        goToNextChapter(chapterOrder, chapters),
+        goToNextChapter(chapterOrder, chapters, chapterMeta),
       );
     }
     if (restartChapterBtn) {
@@ -389,6 +665,7 @@ import { getActiveSeriesId } from "./series.js";
   function init() {
     initElements();
     initChapterSelect();
+    initReaderAnalytics();
     // renderGallery(); // Loaded on open
     setInitialSubtitle();
     renderStatusPanel(statusMessage || "ready", statusTimerRef);
@@ -425,8 +702,14 @@ import { getActiveSeriesId } from "./series.js";
       state.pages = chapters[firstChapter] || [];
       state.pageIndex = 0;
     }
+    state.entryMeta = chapterMeta?.[state.currentChapter] || null;
+    setActiveEntry();
 
     if (el.chapter) el.chapter.value = state.currentChapter;
+    syncChapterSelectDisplay();
+    window.dispatchEvent(
+      new CustomEvent("chapterChanged", { detail: { chapter: state.currentChapter } }),
+    );
 
     attachEventHandlers();
     render();
@@ -447,10 +730,10 @@ import { getActiveSeriesId } from "./series.js";
         statusMessage = data.statusMessage;
         chapterMeta = data.chapterMeta || {};
         premiumOnly = !!data.premiumOnly;
-        unitLabelSingular = data.unitLabelSingular || "Chapter";
-        unitLabelPlural = data.unitLabelPlural || "Chapters";
+        unitLabelSingular = data.unitLabelSingular || "Entry";
+        unitLabelPlural = data.unitLabelPlural || "Entries";
         applyUnitLabels();
-        logger.log(`Chapter data loaded for series: ${seriesId}`);
+        logger.log(`Entry data loaded for series: ${seriesId}`);
       }
     } catch (err) {
       handleDataLoadError(err);
@@ -473,7 +756,8 @@ import { getActiveSeriesId } from "./series.js";
     }
 
     const role = (sessionUser?.role || "").toString().toLowerCase();
-    const isPremiumUser = role === "admin" || role === "premium";
+    const isPremiumUser =
+      role === "admin" || role === "premium" || !!sessionUser?.premiumActive;
     const adminNavLink = document.getElementById("adminNavLink");
     if (adminNavLink) {
       adminNavLink.style.display = role === "admin" ? "inline-flex" : "none";
@@ -501,7 +785,11 @@ import { getActiveSeriesId } from "./series.js";
       chapterOrder = filteredOrder;
     }
 
-    renderGallery(chapterOrder, chapters, { lockedChapters, chapterMeta: fullChapterMeta });
+    renderGallery(chapterOrder, chapters, {
+      lockedChapters,
+      chapterMeta: fullChapterMeta,
+      unitLabelSingular,
+    });
     await loadPageConfig(setSubtitles, seriesId);
     loadLatestUpdate();
     init();
@@ -514,6 +802,10 @@ import { getActiveSeriesId } from "./series.js";
     if (adminNavLink) {
       adminNavLink.style.display = role === "admin" ? "inline-flex" : "none";
     }
+  });
+
+  window.addEventListener("chapterChanged", () => {
+    syncChapterSelectDisplay();
   });
 
   if (

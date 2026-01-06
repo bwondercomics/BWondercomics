@@ -533,12 +533,20 @@
     </div>
 
   </div>
-
-    <script>
+<script>
+    // Feed page: load posts and attach per-post comments.
+    const backToComicBtn = document.getElementById('backToComicBtn');
+    if (backToComicBtn && window.history.length > 1) {
+      backToComicBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        window.history.back();
+      });
+    }
     const feedContainer = document.getElementById('feedContainer');
     const commentContexts = [];
     const authState = { user: null };
 
+    // API helpers for auth + comments.
     const api = {
       async session() {
         const res = await fetch('/api/session', { cache: 'no-store', credentials: 'same-origin' });
@@ -557,12 +565,12 @@
         if (!res.ok) throw new Error(data.error || 'Login failed');
         return data.user;
       },
-      async register(email, password, displayName, inviteCode) {
+      async register(email, password, displayName, inviteCode, emailOptIn) {
         const res = await fetch('/api/register', {
           method: 'POST',
           credentials: 'same-origin',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, displayName, inviteCode })
+          body: JSON.stringify({ email, password, displayName, inviteCode, emailOptIn })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Registration failed');
@@ -593,6 +601,7 @@
       }
     };
 
+    // Turn a post id/title into a stable comment thread id.
     const slugifyTarget = (raw = '') => {
       const base = (raw || 'post').toString().trim();
       const cleaned = base
@@ -602,6 +611,7 @@
       return (cleaned || 'post').slice(0, 120);
     };
 
+    // Allowlist sanitizer for post HTML so the feed stays safe.
     function sanitizeContent(html = '') {
       const parser = new DOMParser();
       const doc = parser.parseFromString(html, 'text/html');
@@ -654,6 +664,7 @@
       return doc.body.innerHTML;
     }
 
+    // Update cached auth state and refresh all comment panels.
     function setUser(user) {
       authState.user = user || null;
       updateAllCommentSections();
@@ -663,14 +674,17 @@
       commentContexts.forEach(ctx => updateSectionForUser(ctx));
     }
 
+    // Toggle login/register UI modes.
     function applyAuthMode(ctx) {
       const isLogin = ctx.mode === 'login';
       if (ctx.authSubmit) ctx.authSubmit.textContent = isLogin ? 'Sign in' : 'Create account';
       if (ctx.authToggle) ctx.authToggle.textContent = isLogin ? 'Need an account? Register' : 'Have an account? Sign in';
       if (ctx.displayNameInput) ctx.displayNameInput.classList.toggle('hidden', isLogin);
       if (ctx.inviteInput) ctx.inviteInput.classList.toggle('hidden', isLogin);
+      if (ctx.emailOptInRow) ctx.emailOptInRow.classList.toggle('hidden', isLogin);
     }
 
+    // Collapse or expand the comments panel for a post.
     function setCollapsed(ctx, collapsed) {
       ctx.collapsed = collapsed;
       ctx.section.classList.toggle('collapsed', collapsed);
@@ -678,6 +692,7 @@
       ctx.toggleBtn.setAttribute('aria-expanded', String(!collapsed));
     }
 
+    // Update the section based on current auth status.
     function updateSectionForUser(ctx) {
       const user = authState.user;
       if (user) {
@@ -702,12 +717,14 @@
       applyAuthMode(ctx);
     }
 
+    // Handle login/register submissions.
     async function handleAuthSubmit(event, ctx) {
       event.preventDefault();
       const email = ctx.emailInput.value.trim();
       const password = ctx.passwordInput.value;
       const displayName = ctx.displayNameInput.value.trim();
       const inviteCode = ctx.inviteInput.value.trim();
+      const emailOptIn = ctx.emailOptInInput ? ctx.emailOptInInput.checked : false;
       ctx.authError.textContent = '';
 
       if (!email || !password) {
@@ -720,12 +737,13 @@
       try {
         const user = ctx.mode === 'login'
           ? await api.login(email, password)
-          : await api.register(email, password, displayName, inviteCode);
+          : await api.register(email, password, displayName, inviteCode, emailOptIn);
         setUser(user);
         ctx.emailInput.value = '';
         ctx.passwordInput.value = '';
         ctx.displayNameInput.value = '';
         ctx.inviteInput.value = '';
+        if (ctx.emailOptInInput) ctx.emailOptInInput.checked = false;
       } catch (err) {
         ctx.authError.textContent = err.message || 'Authentication failed.';
       } finally {
@@ -733,6 +751,7 @@
       }
     }
 
+    // Sign out and reset UI state.
     async function handleLogout() {
       try {
         await api.logout();
@@ -741,6 +760,7 @@
       }
     }
 
+    // Post a new comment and refresh the thread.
     async function handleCommentSubmit(event, ctx) {
       event.preventDefault();
       ctx.commentError.textContent = '';
@@ -768,6 +788,7 @@
       }
     }
 
+    // Render a list of comments into the thread list.
     function renderComments(listEl, comments) {
       listEl.innerHTML = '';
       if (!comments || comments.length === 0) {
@@ -804,6 +825,7 @@
       });
     }
 
+    // Fetch comments for a specific thread.
     async function loadComments(ctx) {
       try {
         const comments = await api.fetchComments(ctx.targetId);
@@ -813,6 +835,7 @@
       }
     }
 
+    // Build the comments panel UI for a single post.
     function createCommentSection(targetId) {
       const section = document.createElement('div');
       section.className = 'comments-section collapsed';
@@ -836,6 +859,10 @@
             <input class="auth-input auth-display hidden" type="text" name="displayName" placeholder="Display name (optional)" autocomplete="name" />
             <input class="auth-input auth-invite hidden" type="text" name="inviteCode" placeholder="Invite code (if required)" autocomplete="off" />
             </div>
+            <label class="auth-check auth-email hidden">
+              <input type="checkbox" class="auth-email-optin" name="emailOptIn" />
+              <span>Join the email list.</span>
+            </label>
             <div class="auth-actions-row">
               <button type="submit" class="auth-submit">Sign in</button>
               <button type="button" class="auth-toggle">Need an account? Register</button>
@@ -868,6 +895,8 @@
         passwordInput: section.querySelector('input[type="password"]'),
         displayNameInput: section.querySelector('.auth-display'),
         inviteInput: section.querySelector('.auth-invite'),
+        emailOptInRow: section.querySelector('.auth-email'),
+        emailOptInInput: section.querySelector('.auth-email-optin'),
         signoutBtn: section.querySelector('.signout-btn'),
         commentForm: section.querySelector('.comment-form'),
         textarea: section.querySelector('.comment-textarea'),
@@ -898,19 +927,12 @@
       return section;
     }
 
-    function withCacheBust(url, stamp) {
-      const raw = String(url || '').trim();
-      if (!raw) return '';
-      if (raw.includes('?')) return raw;
-      const token = String(stamp || '').trim();
-      return token ? `${raw}?v=${encodeURIComponent(token)}` : raw;
-    }
-
+    // Render a feed post card and append its comment section.
     function renderPost(post) {
       const article = document.createElement('article');
       article.className = 'post';
-      const targetId = slugifyTarget(post.id || post.title || 'post');
-      article.id = targetId;
+      const targetId = slugifyTarget(`post:${post.id || post.title || 'post'}`);
+      article.id = targetId.replace(/:/g, '-');
 
       const header = document.createElement('div');
       header.className = 'post-header';
@@ -923,7 +945,9 @@
 
       const title = document.createElement('h2');
       title.className = 'post-title';
-      title.textContent = post.title || 'Untitled';
+      const titleText = (post.title || '').trim();
+      title.textContent = titleText || 'Update';
+      if (!titleText) title.classList.add('is-placeholder');
 
       const date = document.createElement('div');
       date.className = 'post-date';
@@ -944,8 +968,8 @@
         if (post.imageFocus) {
           img.style.objectPosition = post.imageFocus;
         }
-        img.src = withCacheBust(post.image, post.updatedAt || post.date);
-        img.alt = post.title || 'Update image';
+        img.src = post.image;
+        img.alt = titleText || 'Update image';
         img.loading = 'lazy';
         article.appendChild(img);
       }
@@ -971,6 +995,7 @@
       feedContainer.appendChild(article);
     }
 
+    // Load posts from the API and render the feed.
     async function loadFeed() {
       try {
         const response = await fetch('/api/posts', { cache: 'no-store' });
@@ -1000,6 +1025,7 @@
       }
     }
 
+    // Bootstrap auth and feed data on load.
     async function bootstrap() {
       try {
         const user = await api.session();
@@ -1013,7 +1039,15 @@
 
     bootstrap();
   </script>
-  <script defer src="/analytics.js"></script>
+<script>
+    // Load the analytics loader without Vite bundling it.
+    (() => {
+      const script = document.createElement("script");
+      script.defer = true;
+      script.src = "/analytics.js";
+      document.head.appendChild(script);
+    })();
+  </script>
 </body>
 
 </html>

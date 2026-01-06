@@ -368,8 +368,8 @@
       <div class="lightbox-meta" id="lightboxMeta"></div>
     </div>
   </div>
-
-  <script>
+<script>
+    // Media library: filterable grid with lightbox navigation.
     const grid = document.getElementById('grid');
     const tagsBar = document.getElementById('tagsBar');
     const searchInput = document.getElementById('search');
@@ -385,6 +385,7 @@
     let activeTag = '';
     let currentIndex = -1;
 
+    // Show or hide the error banner.
     function setError(message) {
       if (!errorEl) return;
       if (message) {
@@ -395,19 +396,14 @@
       }
     }
 
+    // Normalize tags to lowercase strings for filtering.
     function normalizeTags(tags) {
       return Array.isArray(tags)
         ? tags.map(t => String(t).trim().toLowerCase()).filter(Boolean)
         : [];
     }
 
-    function withCacheBust(url) {
-      const raw = String(url || '').trim();
-      if (!raw) return '';
-      if (raw.includes('?')) return raw;
-      return `${raw}?v=1`;
-    }
-
+    // Render the tag filter pills.
     function renderTags() {
       tagsBar.innerHTML = '';
       const allTags = Array.from(new Set(mediaItems.flatMap(m => normalizeTags(m.tags || [])))).sort();
@@ -436,6 +432,7 @@
       });
     }
 
+    // Render the grid based on tag + search filters.
     function renderGrid() {
       grid.innerHTML = '';
       const term = (searchInput.value || '').trim().toLowerCase();
@@ -461,13 +458,16 @@
       filtered.forEach((item, index) => {
         const card = document.createElement('div');
         card.className = 'card';
+        const media = document.createElement('div');
+        media.className = 'card-media';
         const img = document.createElement('img');
         img.loading = 'lazy';
         img.alt = item.path || 'Media item';
-        img.src = withCacheBust(item.path);
+        img.src = item.path || '';
         img.onerror = () => { img.style.opacity = '0.3'; };
         img.addEventListener('click', () => openLightbox(filtered, index));
-        card.appendChild(img);
+        media.appendChild(img);
+        card.appendChild(media);
 
         const body = document.createElement('div');
         body.className = 'card-body';
@@ -499,6 +499,7 @@
       });
     }
 
+    // Open the lightbox scoped to the current filtered list.
     function openLightbox(list, index) {
       if (!list.length) return;
       mediaItems = list; // scoped to filtered set so nav respects search/tag filter
@@ -507,42 +508,47 @@
       lightbox.classList.add('active');
     }
 
+    // Close the lightbox and reset navigation state.
     function closeLightbox() {
       lightbox.classList.remove('active');
       currentIndex = -1;
     }
 
+    // Update the lightbox image and metadata.
     function updateLightbox() {
       if (currentIndex < 0 || currentIndex >= mediaItems.length) return closeLightbox();
       const item = mediaItems[currentIndex];
-      lightboxImg.src = withCacheBust(item.path);
+      lightboxImg.src = item.path || '';
       lightboxImg.alt = item.path || 'Media item';
       const tags = normalizeTags(item.tags || []);
       lightboxMeta.textContent = `${item.path || ''}${tags.length ? ' • ' + tags.join(', ') : ''}`;
     }
 
+    // Move forward or backward through the filtered list.
     function goNext(delta) {
       if (currentIndex < 0) return;
       currentIndex = (currentIndex + delta + mediaItems.length) % mediaItems.length;
       updateLightbox();
     }
 
+    // Load media metadata from media.json and render the UI.
     async function loadMedia() {
       try {
-        const response = await fetch('/media.json', { cache: 'no-cache' });
-        if (!response.ok) throw new Error('Failed to load media.json');
+        const response = await fetch('media.json', { cache: 'no-cache' });
+        if (!response.ok) throw new Error('Failed to load media library');
         const data = await response.json();
         mediaItems = Array.isArray(data) ? data : [];
         setError('');
       } catch (error) {
         console.error(error);
         mediaItems = [];
-        setError('Media library could not be loaded. Add items via the admin to generate media.json.');
+        setError('Media library could not be loaded. Add items via the admin to populate it.');
       }
       renderTags();
       renderGrid();
     }
 
+    // UI event hooks for filters and lightbox controls.
     searchInput.addEventListener('input', renderGrid);
     lightbox.addEventListener('click', (e) => {
       if (e.target === lightbox) closeLightbox();
@@ -557,8 +563,24 @@
       if (e.key === 'ArrowRight') goNext(1);
     });
     loadMedia();
+
+    const backToComicBtn = document.getElementById('backToComicBtn');
+    if (backToComicBtn && window.history.length > 1) {
+      backToComicBtn.addEventListener('click', (event) => {
+        event.preventDefault();
+        window.history.back();
+      });
+    }
   </script>
-  <script defer src="/analytics.js"></script>
+<script>
+    // Load the analytics loader without Vite bundling it.
+    (() => {
+      const script = document.createElement("script");
+      script.defer = true;
+      script.src = "/analytics.js";
+      document.head.appendChild(script);
+    })();
+  </script>
 </body>
 
 </html>

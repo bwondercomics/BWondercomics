@@ -1,15 +1,9 @@
+// Latest update widget helpers for the reader sidebar.
 export function latestPreviewText(text = '') {
+  // Strip HTML and truncate to a short summary.
   const condensed = text.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
   if (!condensed) return 'No summary yet.';
   return condensed.length > 120 ? `${condensed.slice(0, 120)}...` : condensed;
-}
-
-function withCacheBust(url, stamp) {
-  const raw = String(url || '').trim();
-  if (!raw) return '';
-  if (raw.includes('?')) return raw;
-  const token = String(stamp || '').trim();
-  return token ? `${raw}?v=${encodeURIComponent(token)}` : raw;
 }
 
 export function renderLatestUpdate(post) {
@@ -18,18 +12,19 @@ export function renderLatestUpdate(post) {
 
   body.innerHTML = '';
 
+  const titleText = (post.title || '').trim();
   const thumb = document.createElement(post.image ? 'img' : 'div');
   thumb.className = post.image ? 'latest-thumb' : 'latest-thumb placeholder';
   if (post.image) {
-    thumb.src = withCacheBust(post.image, post.updatedAt || post.date);
-    thumb.alt = post.title || 'Latest update image';
+    thumb.src = post.image;
+    thumb.alt = titleText || 'Latest update image';
     thumb.loading = 'lazy';
     if (post.imageFocus) {
       thumb.style.objectPosition = post.imageFocus;
       thumb.style.objectFit = 'cover';
     }
   } else {
-    thumb.textContent = 'No image';
+    thumb.textContent = titleText || 'Update';
   }
 
   const meta = document.createElement('div');
@@ -41,7 +36,8 @@ export function renderLatestUpdate(post) {
 
   const name = document.createElement('div');
   name.className = 'latest-name';
-  name.textContent = post.title || 'Untitled update';
+  name.textContent = titleText || 'Update';
+  if (!titleText) name.classList.add('is-placeholder');
 
   const date = document.createElement('div');
   date.className = 'latest-date';
@@ -54,17 +50,35 @@ export function renderLatestUpdate(post) {
   preview.className = 'latest-preview';
   preview.textContent = latestPreviewText(post.content || '');
 
-  const link = document.createElement('a');
-  link.className = 'latest-link';
-  link.href = `feed.html#${post.id || ''}`;
-  link.textContent = 'Open feed';
-  link.setAttribute('aria-label', 'Open feed for latest update');
+  const actions = document.createElement('div');
+  actions.className = 'latest-actions';
+
+  const feedHref = post.id ? `feed.html#${post.id}` : 'feed.html';
+  const feedLink = document.createElement('a');
+  feedLink.className = 'latest-link latest-link--left';
+  feedLink.href = feedHref;
+  feedLink.textContent = 'Open feed';
+  feedLink.setAttribute('aria-label', 'Open feed for latest update');
+
+  const topFeedLink = document.getElementById('rightPanelOpenFeed');
+  if (topFeedLink) {
+    topFeedLink.href = feedHref;
+  }
+
+  const mediaLink = document.createElement('a');
+  mediaLink.className = 'latest-link latest-link--right';
+  mediaLink.href = 'media.html';
+  mediaLink.textContent = 'Media';
+  mediaLink.setAttribute('aria-label', 'Open media library');
+
+  actions.appendChild(feedLink);
+  actions.appendChild(mediaLink);
 
   meta.appendChild(label);
   meta.appendChild(name);
   meta.appendChild(date);
   meta.appendChild(preview);
-  meta.appendChild(link);
+  meta.appendChild(actions);
 
   body.appendChild(thumb);
   body.appendChild(meta);

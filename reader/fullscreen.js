@@ -1,3 +1,4 @@
+// Fullscreen toggles + auto-hiding controls.
 import { CONFIG } from './config.js';
 import { el } from './dom.js';
 import { state } from './state.js';
@@ -7,6 +8,7 @@ let hideTimer = null;
 let mouseOverControls = false;
 
 export function showControlsBar() {
+  // Keep topbar/controls visible, then auto-hide after a delay.
   if (el.topbar) el.topbar.classList.remove('hidden');
   if (el.controls) el.controls.classList.remove('hidden');
 
@@ -26,6 +28,7 @@ export function showControlsBar() {
 }
 
 export function onFullscreenChange() {
+  // Sync UI when entering/exiting fullscreen and refit the viewport.
   if (document.fullscreenElement) {
     document.body.classList.add('fullscreen-active');
     if (el.fullscreenBtn) el.fullscreenBtn.textContent = 'EXIT';
@@ -59,6 +62,7 @@ export function onFullscreenChange() {
 }
 
 export function toggleFullscreen() {
+  // Request or exit fullscreen mode.
   if (!document.fullscreenElement) {
     document.documentElement.requestFullscreen().catch(() => { });
   } else {

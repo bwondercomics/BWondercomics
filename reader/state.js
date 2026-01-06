@@ -13,6 +13,7 @@ import { STORAGE } from './constants.js';
  * @property {string} currentChapter - Name of the currently displayed chapter
  * @property {string[]} pages - Array of image URLs for the current chapter
  * @property {number} pageIndex - Current page index (0-based)
+ * @property {Object|null} entryMeta - Metadata for the current entry (status, comingSoon, etc)
  * @property {number} scale - Current zoom scale factor
  * @property {{x: number, y: number}} pan - Current pan offset in pixels
  * @property {Map} pointers - Active pointer/touch events
@@ -33,6 +34,7 @@ export const state = {
   currentChapter: '',
   pages: [],
   pageIndex: 0,
+  entryMeta: null,
   scale: 1,
   pan: { x: 0, y: 0 },
   pointers: new Map(),

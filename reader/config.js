@@ -44,4 +44,4 @@ export const CONFIG = {
   SWIPE_TIMEOUT: 500
 };
 
-export const CHAPTER_NUMBER_PATTERN = /chapter\s+(\d+)/i;
+export const CHAPTER_NUMBER_PATTERN = /(?:entry|issue|chapter)\s*(\d+)/i;

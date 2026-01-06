@@ -9,7 +9,7 @@ import {
 } from './utils.js';
 
 /**
- * Chapter management logic extracted from app.js for reuse and readability.
+ * Entry management logic extracted from app.js for reuse and readability.
  * All state is passed in by reference so the main app remains the source of truth.
  */
 export function createChaptersApi({
@@ -30,7 +30,7 @@ export function createChaptersApi({
   const getSaveFile = () => (typeof getSaveFilename === 'function' ? getSaveFilename() : 'admin/data.json');
   const getStorage = () => (typeof getStorageKey === 'function' ? getStorageKey() : STORAGE_KEY);
   const labels = () => {
-    const fallback = { singular: 'Chapter', plural: 'Chapters' };
+    const fallback = { singular: 'Entry', plural: 'Entries' };
     if (typeof getUnitLabels !== 'function') return fallback;
     try {
       const got = getUnitLabels() || {};
@@ -41,6 +41,66 @@ export function createChaptersApi({
       return fallback;
     }
   };
+
+  const STATUS_VALUES = new Set(['published', 'scheduled', 'draft']);
+  const normalizeEntryStatus = (raw) => {
+    const value = String(raw || '').trim().toLowerCase();
+    return STATUS_VALUES.has(value) ? value : 'published';
+  };
+
+  const isoToDateTimeLocal = (iso = '') => {
+    const value = String(iso || '').trim();
+    if (!value) return '';
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
+  };
+
+  const dateTimeLocalToIso = (raw = '') => {
+    const value = String(raw || '').trim();
+    if (!value) return '';
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return '';
+    return dt.toISOString();
+  };
+
+  const formatDateTime = (value) => {
+    if (!value) return '';
+    const dt = new Date(value);
+    if (Number.isNaN(dt.getTime())) return '';
+    return dt.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  };
+
+  function syncEntryScheduleFields() {
+    const status = normalizeEntryStatus(el.entryStatus?.value);
+    const isScheduled = status === 'scheduled';
+    const isDraft = status === 'draft';
+    const autoPostEnabled = !!el.entryAutoPost?.checked && !isDraft;
+
+    if (el.entryPublishAt) {
+      el.entryPublishAt.disabled = isDraft;
+      if (isDraft) el.entryPublishAt.value = '';
+    }
+    if (el.entryComingSoon) {
+      el.entryComingSoon.disabled = !isScheduled;
+      if (!isScheduled) el.entryComingSoon.checked = false;
+    }
+    if (el.entryAutoPost) {
+      el.entryAutoPost.disabled = isDraft;
+      if (isDraft) el.entryAutoPost.checked = false;
+    }
+    if (el.entryShareBluesky) {
+      el.entryShareBluesky.disabled = !autoPostEnabled;
+      if (!autoPostEnabled) el.entryShareBluesky.checked = false;
+    }
+    if (el.entryPostTitle) {
+      el.entryPostTitle.disabled = !autoPostEnabled;
+    }
+    if (el.entryPostContent) {
+      el.entryPostContent.disabled = !autoPostEnabled;
+    }
+  }
 
   let selectedPageIndex = null;
   let insertGutterIndex = 0;
@@ -456,7 +516,19 @@ export function createChaptersApi({
     setMoveModeEnabled(moveModeEnabled, { rerender: false });
   }
 
+  if (el.entryStatus) {
+    el.entryStatus.addEventListener('change', () => {
+      syncEntryScheduleFields();
+    });
+  }
+  if (el.entryAutoPost) {
+    el.entryAutoPost.addEventListener('change', () => {
+      syncEntryScheduleFields();
+    });
+  }
+
   async function loadChapters() {
+    // Load DB-backed chapter data; fall back to local drafts if API fails.
     try {
       const response = await fetch(getDataUrl());
       if (response.ok) {
@@ -518,6 +590,7 @@ export function createChaptersApi({
   }
 
   async function saveChapters(showMessage = false) {
+    // Persist chapters to localStorage (draft) and DB via /api/save.
     try {
       localStorage.setItem(
         getStorage(),
@@ -585,6 +658,7 @@ export function createChaptersApi({
   }
 
   function renderPageList(pages) {
+    // Render the current page list, wiring drag/drop and move-mode behaviors.
     if (!el.pageList) return;
 
     const previousScrollTop = el.pageList.scrollTop;
@@ -618,6 +692,7 @@ export function createChaptersApi({
       const item = document.createElement('div');
       item.className = 'page-item';
       item.dataset.index = index;
+      item.dataset.path = path;
 
       if (active) {
         item.classList.toggle('is-selected', index === selectedPageIndex);
@@ -789,9 +864,37 @@ export function createChaptersApi({
     state.currentEditingChapter = chapterName;
     el.modalTitle.textContent = `Edit ${labels().singular}`;
     el.chapterName.value = chapterName;
+    const meta = state.chapterMeta?.[chapterName] || {};
     if (el.chapterPremium) {
-      el.chapterPremium.checked = !!(state.chapterMeta?.[chapterName]?.premium);
+      el.chapterPremium.checked = !!meta.premium;
     }
+    if (el.entryDisplayNumber) {
+      const value = meta.displayNumber;
+      el.entryDisplayNumber.value =
+        Number.isFinite(value) ? String(value) : "";
+    }
+    if (el.entryStatus) {
+      el.entryStatus.value = normalizeEntryStatus(meta.status);
+    }
+    if (el.entryPublishAt) {
+      el.entryPublishAt.value = isoToDateTimeLocal(meta.publishAt);
+    }
+    if (el.entryComingSoon) {
+      el.entryComingSoon.checked = !!meta.comingSoon;
+    }
+    if (el.entryAutoPost) {
+      el.entryAutoPost.checked = !!meta.autoPost;
+    }
+    if (el.entryShareBluesky) {
+      el.entryShareBluesky.checked = !!meta.shareBluesky;
+    }
+    if (el.entryPostTitle) {
+      el.entryPostTitle.value = String(meta.releasePostTitle || '');
+    }
+    if (el.entryPostContent) {
+      el.entryPostContent.value = String(meta.releasePostContent || '');
+    }
+    syncEntryScheduleFields();
     const combined = await reconcileChapterPages(chapterName);
     renderPageList(sortPagesByFilename(combined));
     showModal();
@@ -804,6 +907,15 @@ export function createChaptersApi({
     el.modalTitle.textContent = `Add New ${labels().singular}`;
     el.chapterName.value = '';
     if (el.chapterPremium) el.chapterPremium.checked = false;
+    if (el.entryDisplayNumber) el.entryDisplayNumber.value = '';
+    if (el.entryStatus) el.entryStatus.value = 'published';
+    if (el.entryPublishAt) el.entryPublishAt.value = '';
+    if (el.entryComingSoon) el.entryComingSoon.checked = false;
+    if (el.entryAutoPost) el.entryAutoPost.checked = false;
+    if (el.entryShareBluesky) el.entryShareBluesky.checked = false;
+    if (el.entryPostTitle) el.entryPostTitle.value = '';
+    if (el.entryPostContent) el.entryPostContent.value = '';
+    syncEntryScheduleFields();
     renderPageList([]);
     showModal();
   }
@@ -818,6 +930,7 @@ export function createChaptersApi({
   }
 
   async function saveChapterEdit() {
+    syncCurrentPagesFromDom();
     const newName = getActiveChapterName();
     if (!newName) {
       alert(`${labels().singular} name is required`);
@@ -856,12 +969,54 @@ export function createChaptersApi({
 
     state.chapters[newName] = pages;
     const premiumFlag = !!el.chapterPremium?.checked;
+    const rawDisplayNumber = el.entryDisplayNumber?.value ?? "";
+    const trimmedDisplayNumber = String(rawDisplayNumber).trim();
+    let displayNumber = null;
+    if (trimmedDisplayNumber) {
+      const parsed = Number.parseInt(trimmedDisplayNumber, 10);
+      if (Number.isFinite(parsed) && parsed >= 0) {
+        displayNumber = parsed;
+      } else {
+        alert("Entry number must be a non-negative whole number.");
+        return;
+      }
+    }
+    const status = normalizeEntryStatus(el.entryStatus?.value);
+    const publishAtIso = dateTimeLocalToIso(el.entryPublishAt?.value ?? "");
+    const comingSoon = status === 'scheduled' && !!el.entryComingSoon?.checked;
+    const autoPost = !!el.entryAutoPost?.checked;
+    const shareBluesky = autoPost && !!el.entryShareBluesky?.checked;
+    const releasePostTitle = String(el.entryPostTitle?.value || '').trim();
+    const releasePostContent = String(el.entryPostContent?.value || '').trim();
     state.chapterMeta = state.chapterMeta || {};
-    state.chapterMeta[newName] = { ...(state.chapterMeta[newName] || {}), premium: premiumFlag };
+    state.chapterMeta[newName] = {
+      ...(state.chapterMeta[newName] || {}),
+      premium: premiumFlag,
+      displayNumber,
+      status,
+      publishAt: publishAtIso,
+      comingSoon,
+      autoPost,
+      shareBluesky,
+      releasePostTitle,
+      releasePostContent,
+    };
     await saveChapters();
     renderChapterList();
     clearUnsaved();
     hideModal();
+  }
+
+  function syncCurrentPagesFromDom() {
+    if (!el.pageList) return;
+    const items = Array.from(el.pageList.querySelectorAll('.page-item'));
+    if (!items.length) return;
+    const pages = items
+      .map((item) => item.dataset.path || item.querySelector('.page-path')?.textContent || '')
+      .map((value) => String(value || '').trim())
+      .filter(Boolean);
+    if (!pages.length) return;
+    state.currentPages = pages;
   }
 
   function addPage() {
@@ -917,15 +1072,47 @@ export function createChaptersApi({
   function renderChapterList() {
     el.chapterList.innerHTML = '';
     const chapterNames = Object.keys(state.chapters).filter(name => name && name !== 'undefined');
-    chapterNames.forEach(name => {
+    const sortedNames = chapterNames
+      .map(name => {
+        const displayNumber = state.chapterMeta?.[name]?.displayNumber;
+        return { name, displayNumber };
+      })
+      .sort((a, b) => {
+        const aNum = Number.isFinite(a.displayNumber) ? a.displayNumber : null;
+        const bNum = Number.isFinite(b.displayNumber) ? b.displayNumber : null;
+        if (aNum != null && bNum != null && aNum !== bNum) return aNum - bNum;
+        if (aNum != null && bNum == null) return -1;
+        if (aNum == null && bNum != null) return 1;
+        return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+      })
+      .map(item => item.name);
+    sortedNames.forEach(name => {
       const pages = state.chapters[name];
-      const isPremium = !!(state.chapterMeta?.[name]?.premium);
+      const meta = state.chapterMeta?.[name] || {};
+      const isPremium = !!meta.premium;
+      const status = normalizeEntryStatus(meta.status);
+      const publishAtLabel = formatDateTime(meta.publishAt);
+      const statusLabel = status === 'draft'
+        ? 'Draft'
+        : status === 'scheduled'
+          ? (publishAtLabel ? `Scheduled - ${publishAtLabel}` : 'Scheduled')
+          : 'Published';
+      const comingSoonLabel = status === 'scheduled' && meta.comingSoon ? 'Coming soon' : '';
+      const displayNumber = Number.isFinite(meta.displayNumber)
+        ? meta.displayNumber
+        : null;
+      const displayLabel = displayNumber != null
+        ? `${labels().singular} ${displayNumber} - ${name}`
+        : name;
+      const metaParts = [`${pages.length} pages`, statusLabel];
+      if (isPremium) metaParts.push('Premium');
+      if (comingSoonLabel) metaParts.push(comingSoonLabel);
       const item = document.createElement('div');
       item.className = 'chapter-item';
       item.innerHTML = `
         <div class="chapter-info">
-          <div class="chapter-name">${escapeHtml(name)}</div>
-          <div class="chapter-meta">${pages.length} pages${isPremium ? ' • Premium' : ''}</div>
+          <div class="chapter-name">${escapeHtml(displayLabel)}</div>
+          <div class="chapter-meta">${escapeHtml(metaParts.join(' | '))}</div>
         </div>
         <div class="chapter-actions">
           <button class="btn-small btn-edit" data-chapter="${escapeHtml(name)}">Edit</button>

@@ -82,6 +82,42 @@ def legacy_series_page_config(series_id: str, db: Session = Depends(get_db)):
     return JSONResponse(content=data)
 
 
+@router.get("/api/admin/page-config")
+@router.get("/api/admin/page-config.json")
+def api_page_config(db: Session = Depends(get_db)):
+    data = get_page_config(db, None)
+    if data is None:
+        return JSONResponse(status_code=404, content={"error": "page-config.json not found"})
+    return JSONResponse(content=data)
+
+
+@router.get("/api/admin/series/{series_id}/page-config")
+@router.get("/api/admin/series/{series_id}/page-config.json")
+def api_series_page_config(series_id: str, db: Session = Depends(get_db)):
+    sid = sanitize_series_id(series_id)
+    data = get_page_config(db, sid)
+    if data is None:
+        return JSONResponse(status_code=404, content={"error": "page-config.json not found"})
+    return JSONResponse(content=data)
+
+
+@router.get("/page-config.json")
+def public_page_config(db: Session = Depends(get_db)):
+    data = get_page_config(db, None)
+    if data is None:
+        return JSONResponse(status_code=404, content={"error": "page-config.json not found"})
+    return JSONResponse(content=data)
+
+
+@router.get("/series/{series_id}/page-config.json")
+def public_series_page_config(series_id: str, db: Session = Depends(get_db)):
+    sid = sanitize_series_id(series_id)
+    data = get_page_config(db, sid)
+    if data is None:
+        return JSONResponse(status_code=404, content={"error": "page-config.json not found"})
+    return JSONResponse(content=data)
+
+
 @router.get("/media.json")
 def legacy_media_index(db: Session = Depends(get_db)):
     return JSONResponse(content=list_media_items(db))

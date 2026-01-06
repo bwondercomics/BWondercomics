@@ -1,6 +1,8 @@
+// Centralized DOM cache for reader elements.
 export const el = {};
 
 export function initElements() {
+  // Cache DOM nodes once to avoid repeated lookups.
   el.chapter = document.getElementById('chapter');
   el.stageWrap = document.getElementById('stageWrap');
   el.stage = document.getElementById('stage');
@@ -30,4 +32,42 @@ export function initElements() {
   el.edgeLeftBtn = document.getElementById('edgeLeftBtn');
   el.edgeRightBtn = document.getElementById('edgeRightBtn');
   el.subtitle = document.getElementById('subtitle');
+}
+
+/**
+ * Lightweight hyperscript helper for creating DOM elements.
+ * @param {string} tag - Tag name (e.g. 'div')
+ * @param {object} [props] - Attributes/properties (e.g. { className: 'foo', onClick: ... })
+ * @param {Array|string|Node} [children] - Child nodes or text
+ * @returns {HTMLElement}
+ */
+export function h(tag, props = {}, children = []) {
+  const el = document.createElement(tag);
+  if (props) {
+    for (const [key, val] of Object.entries(props)) {
+      if (key === 'className' || key === 'class') {
+        el.className = val;
+      } else if (key === 'style' && typeof val === 'object') {
+        Object.assign(el.style, val);
+      } else if (key.startsWith('on') && typeof val === 'function') {
+        const eventName = key.substring(2).toLowerCase();
+        el.addEventListener(eventName, val);
+      } else if (key === 'dataset' && typeof val === 'object') {
+        Object.assign(el.dataset, val);
+      } else if (val === true) {
+        el.setAttribute(key, '');
+      } else if (val !== false && val != null) {
+        el.setAttribute(key, val);
+      }
+    }
+  }
+  const kids = Array.isArray(children) ? children : [children];
+  for (const kid of kids) {
+    if (typeof kid === 'string' || typeof kid === 'number') {
+      el.textContent = String(kid); // Safer than appendChild text node for simple cases
+    } else if (kid instanceof Node) {
+      el.appendChild(kid);
+    }
+  }
+  return el;
 }

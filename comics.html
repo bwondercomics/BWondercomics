@@ -250,15 +250,19 @@
   </main>
 
   <script type="module">
+// Comics library: load series metadata and render access-aware cards.
     const statusEl = document.getElementById('status');
     const gridEl = document.getElementById('grid');
+    // Default series lives at the public data.json endpoint.
     const DEFAULT_SERIES_ID = 'battle-bros';
 
+    // Premium access is granted to admin or premium roles.
     const isPremiumUser = (user) => {
       const role = (user && user.role) ? String(user.role).toLowerCase() : '';
       return role === 'admin' || role === 'premium';
     };
 
+    // Load the current session for access gating.
     async function loadSession() {
       try {
         const res = await fetch('/api/session', { cache: 'no-store', credentials: 'same-origin' });
@@ -270,14 +274,16 @@
       }
     }
 
+    // Load the list of series from the public series.json endpoint.
     async function loadSeriesIndex() {
-      const res = await fetch('/admin/series.json', { cache: 'no-store' });
-      if (!res.ok) throw new Error('Could not load admin/series.json');
+      const res = await fetch('/series.json', { cache: 'no-store' });
+      if (!res.ok) throw new Error('Could not load /series.json');
       const data = await res.json();
       const series = Array.isArray(data.series) ? data.series : [];
       return { defaultSeriesId: data.defaultSeriesId || 'battle-bros', series };
     }
 
+    // Sanitize cover URLs to avoid unsafe or malformed paths.
     function normalizeCoverUrl(raw) {
       const value = String(raw || '').trim();
       if (!value) return null;
@@ -290,12 +296,14 @@
       return `/${value.replace(/^\.\//, '')}`;
     }
 
+    // Resolve the per-series data JSON location.
     function getSeriesDataUrl(seriesId) {
       const id = String(seriesId || '').trim();
-      if (!id) return '/admin/data.json';
-      return id === DEFAULT_SERIES_ID ? '/admin/data.json' : `/admin/series/${encodeURIComponent(id)}/data.json`;
+      if (!id) return '/data.json';
+      return id === DEFAULT_SERIES_ID ? '/data.json' : `/series/${encodeURIComponent(id)}/data.json`;
     }
 
+    // Use the first readable page as a fallback cover image.
     async function inferCoverFromSeriesData(series, { canAccess, premium }) {
       if (!canAccess) return null;
 
@@ -322,12 +330,14 @@
       return null;
     }
 
+    // Prefer configured covers, otherwise infer from chapter data.
     async function resolveCover(series, opts) {
       const configured = normalizeCoverUrl(series.coverImage || series.cover || '');
       if (configured) return configured;
       return inferCoverFromSeriesData(series, opts);
     }
 
+    // Build a series card with access-aware actions.
     function renderCard(series, canAccess) {
       const card = document.createElement('div');
       card.className = canAccess ? 'card' : 'card card--locked';
@@ -404,6 +414,7 @@
       return card;
     }
 
+    // Resolve and attach a cover image asynchronously.
     async function attachCover(card, series, opts) {
       const img = card.querySelector('img[data-cover="1"]');
       const placeholder = card.querySelector('.cover-placeholder');
@@ -420,6 +431,7 @@
       }
     }
 
+    // Fetch user + series data, then render the grid.
     async function main() {
       try {
         const [user, seriesIndex] = await Promise.all([loadSession(), loadSeriesIndex()]);
@@ -445,7 +457,15 @@
 
     main();
   </script>
-  <script defer src="/analytics.js"></script>
+<script>
+    // Load the analytics loader without Vite bundling it.
+    (() => {
+      const script = document.createElement("script");
+      script.defer = true;
+      script.src = "/analytics.js";
+      document.head.appendChild(script);
+    })();
+  </script>
 </body>
 
 </html>
