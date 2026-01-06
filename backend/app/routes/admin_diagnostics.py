@@ -5,6 +5,7 @@ import os
 import platform
 import subprocess
 from datetime import datetime, timezone
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -93,6 +94,48 @@ def _dist_info() -> dict:
     return {
         "exists": True,
         "lastModifiedAt": iso_z(datetime.fromtimestamp(latest, tz=timezone.utc)) if latest else None,
+    }
+
+
+def _test_suites() -> dict:
+    tests_dir = settings.base_dir / "tests"
+    if not tests_dir.exists():
+        return {
+            "available": False,
+            "count": 0,
+            "suites": [],
+            "message": "Tests folder not found.",
+        }
+
+    files = sorted(
+        [p for p in tests_dir.rglob("*.test.js") if p.is_file()],
+        key=lambda p: str(p),
+    )
+    if not files:
+        return {
+            "available": False,
+            "count": 0,
+            "suites": [],
+            "message": "No tests found.",
+        }
+
+    runner_available = settings.admin_commands_enabled and "tests" in OPS_COMMANDS
+    runner_message = "Runner enabled" if runner_available else "Command runner disabled."
+    suite = {
+        "id": "frontend",
+        "label": "Frontend",
+        "description": "Vitest suite",
+        "available": True,
+        "runner_available": runner_available,
+        "runner_message": runner_message,
+        "count": len(files),
+        "test_files": [str(p.relative_to(settings.base_dir)) for p in files],
+    }
+    return {
+        "available": True,
+        "count": len(files),
+        "suites": [suite],
+        "message": "",
     }
 
 
@@ -286,23 +329,28 @@ def diagnostics_test_status(request: Request, db: Session = Depends(get_db)):
     if not require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
+    suite_info = _test_suites()
+
     run = db.scalar(
         select(AdminOpsRun)
         .where(AdminOpsRun.command_id.in_(["tests"]))
         .order_by(AdminOpsRun.started_at.desc())
         .limit(1)
     )
-    if not run:
-        return {"status": "idle"}
+    status = "idle" if not run else run.status
 
     return {
-        "status": run.status,
-        "startedAt": iso_z(run.started_at),
-        "finishedAt": iso_z(run.finished_at),
-        "exitCode": run.exit_code,
-        "output": run.output or "",
-        "outputTruncated": bool(run.output_truncated),
-        "errorMessage": run.error_message or "",
+        "status": status,
+        "available": suite_info["available"],
+        "message": suite_info["message"],
+        "count": suite_info["count"],
+        "suites": suite_info["suites"],
+        "startedAt": iso_z(run.started_at) if run else None,
+        "finishedAt": iso_z(run.finished_at) if run else None,
+        "exitCode": run.exit_code if run else None,
+        "output": run.output or "" if run else "",
+        "outputTruncated": bool(run.output_truncated) if run else False,
+        "errorMessage": run.error_message or "" if run else "",
     }
 
 

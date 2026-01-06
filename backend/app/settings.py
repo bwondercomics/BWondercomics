@@ -30,6 +30,7 @@ class Settings:
     registration_mode: str
     invite_code: str
     cookie_secure: bool
+    admin_commands_enabled: bool
     database_url: str
     umami_website_id: str
     umami_base_url: str
@@ -56,6 +57,7 @@ def load_settings() -> Settings:
     registration_mode = (os.environ.get("REGISTRATION_MODE") or "open").strip().lower()
     invite_code = (os.environ.get("INVITE_CODE") or "").strip()
     cookie_secure = _env_bool("COOKIE_SECURE", default=False)
+    admin_commands_enabled = _env_bool("ADMIN_COMMANDS_ENABLED", default=False)
 
     database_url = (os.environ.get("DATABASE_URL") or "").strip()
     if not database_url:
@@ -96,6 +98,7 @@ def load_settings() -> Settings:
         registration_mode=registration_mode,
         invite_code=invite_code,
         cookie_secure=cookie_secure,
+        admin_commands_enabled=admin_commands_enabled,
         database_url=database_url,
         umami_website_id=umami_website_id,
         umami_base_url=umami_base_url,

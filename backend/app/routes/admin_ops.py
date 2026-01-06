@@ -176,6 +176,8 @@ def run_ops_command(command_id: str, request: Request, db: Session, confirm: boo
     admin = require_admin(request, db)
     if not admin:
         return {"error": "Admin access required"}, 403
+    if not settings.admin_commands_enabled:
+        return {"error": "Command runner disabled"}, 403
 
     info = OPS_COMMANDS.get(command_id)
     if not info:
@@ -212,7 +214,12 @@ def list_ops(request: Request, db: Session = Depends(get_db)):
     if not require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    return {"commands": [_describe_command(cmd_id) for cmd_id in OPS_COMMANDS.keys()]}
+    message = "" if settings.admin_commands_enabled else "Command runner disabled."
+    return {
+        "commands": [_describe_command(cmd_id) for cmd_id in OPS_COMMANDS.keys()],
+        "enabled": settings.admin_commands_enabled,
+        "message": message,
+    }
 
 
 @router.post("/api/admin/ops/run")

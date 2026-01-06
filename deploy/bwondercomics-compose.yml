@@ -67,6 +67,26 @@ services:
     ports:
       - "${UMAMI_BIND:-127.0.0.1}:${UMAMI_PORT:-3000}:3000"
 
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ../dist:/srv/bwondercomics/dist:ro
+      - ../chapters:/srv/bwondercomics/chapters:ro
+      - ../media:/srv/bwondercomics/media:ro
+      - ../assets:/srv/bwondercomics/assets:ro
+      - ..:/srv/bwondercomics/root:ro
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+      - ../var/log/caddy:/var/log/caddy
+
 volumes:
   bwondercomics-db:
   umami-db:
+  caddy-data:
+  caddy-config:

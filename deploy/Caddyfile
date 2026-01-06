@@ -1,0 +1,28 @@
+bwondercomics.com {
+	encode gzip
+	reverse_proxy /api/* bwondercomics-api:8000
+	reverse_proxy /data.json bwondercomics-api:8000
+	reverse_proxy /series.json bwondercomics-api:8000
+	reverse_proxy /page-config.json bwondercomics-api:8000
+	reverse_proxy /series/* bwondercomics-api:8000
+	reverse_proxy /media.json bwondercomics-api:8000
+	
+	handle /chapters/* {
+		root * /srv/bwondercomics
+		file_server
+	}
+	
+	handle /media/* {
+		root * /srv/bwondercomics
+		file_server
+	}
+
+	handle /assets/* {
+		root * /srv/bwondercomics
+		try_files /dist{path} {path}
+		file_server
+	}
+	
+	root * /srv/bwondercomics/dist
+	file_server
+}
