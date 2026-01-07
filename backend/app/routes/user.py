@@ -28,6 +28,11 @@ class RedeemPremiumRequest(BaseModel):
     code: str
 
 
+class EmailSubscribeRequest(BaseModel):
+    email: str
+    source: str | None = None
+
+
 def _iso_z(dt: datetime | None) -> str | None:
     if not dt:
         return None
@@ -64,6 +69,41 @@ def _user_payload(user: User, premium_active: bool) -> dict:
 
 def _require_user(request: Request, db: Session) -> User | None:
     return get_current_user(db, request)
+
+
+@router.post("/api/email/subscribe")
+def subscribe_email(payload: EmailSubscribeRequest, request: Request, db: Session = Depends(get_db)):
+    email = (payload.email or "").strip().lower()
+    if not email or "@" not in email or len(email) > 120:
+        return JSONResponse(status_code=400, content={"error": "Valid email is required"})
+
+    source = (payload.source or "").strip()[:80] or "homepage"
+    now = datetime.now(timezone.utc)
+
+    subscriber = db.scalar(select(EmailSubscriber).where(EmailSubscriber.email == email))
+    if not subscriber:
+        subscriber = EmailSubscriber(
+            id=uuid4(),
+            email=email,
+            source=source,
+            ip_address=_client_ip(request),
+            opted_in_at=now,
+        )
+        db.add(subscriber)
+    else:
+        subscriber.opted_in_at = now
+        subscriber.source = source or subscriber.source
+        if not subscriber.ip_address:
+            subscriber.ip_address = _client_ip(request)
+
+    user = db.scalar(select(User).where(User.email == email))
+    if user:
+        user.email_opt_in = True
+        user.email_opt_in_at = now
+        db.add(user)
+
+    db.commit()
+    return {"ok": True}
 
 
 @router.get("/api/user/settings")

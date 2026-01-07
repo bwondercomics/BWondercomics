@@ -103,6 +103,33 @@ import { getActiveSeriesId } from "./series.js";
     setInitialSubtitle();
   }
 
+  // ==================== PATRON WELCOME ====================
+  const PATRON_WELCOME_DURATION_MS = 20000;
+  let patronWelcomeTimer = null;
+
+  function updatePatronWelcome(user) {
+    const label = document.getElementById("patronWelcome");
+    if (!label) return;
+
+    const role = (user?.role || "").toString().toLowerCase();
+    const isPremium =
+      role === "admin" || role === "premium" || !!user?.premiumActive;
+    if (!isPremium) {
+      label.classList.remove("is-visible");
+      return;
+    }
+
+    label.textContent = "WELCOME PATRON";
+    label.classList.add("is-visible");
+    if (patronWelcomeTimer) {
+      window.clearTimeout(patronWelcomeTimer);
+    }
+    patronWelcomeTimer = window.setTimeout(() => {
+      label.classList.remove("is-visible");
+      patronWelcomeTimer = null;
+    }, PATRON_WELCOME_DURATION_MS);
+  }
+
   // ==================== ENTRY DATA ====================
   // Entry data is loaded dynamically from the series data endpoint
   let chapters = {};
@@ -755,6 +782,8 @@ import { getActiveSeriesId } from "./series.js";
       sessionUser = null;
     }
 
+    updatePatronWelcome(sessionUser);
+
     const role = (sessionUser?.role || "").toString().toLowerCase();
     const isPremiumUser =
       role === "admin" || role === "premium" || !!sessionUser?.premiumActive;
@@ -802,6 +831,7 @@ import { getActiveSeriesId } from "./series.js";
     if (adminNavLink) {
       adminNavLink.style.display = role === "admin" ? "inline-flex" : "none";
     }
+    updatePatronWelcome(user);
   });
 
   window.addEventListener("chapterChanged", () => {

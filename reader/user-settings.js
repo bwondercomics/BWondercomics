@@ -20,7 +20,6 @@ import { API } from "./constants.js";
   const redeemBtn = document.getElementById("userSettingsRedeem");
   const premiumStatus = document.getElementById("userSettingsPremiumStatus");
   const supporterBadge = document.getElementById("userSettingsSupporterBadge");
-  const supporterToast = document.getElementById("supporterToast");
   const commentCountEl = document.getElementById("userSettingsCommentCount");
   const commentsList = document.getElementById("userSettingsCommentsList");
   const commentsEmpty = document.getElementById("userSettingsCommentsEmpty");
@@ -32,7 +31,6 @@ import { API } from "./constants.js";
   let commentsOffset = 0;
   const commentsLimit = 15;
   let currentUser = null;
-  let supporterToastTimer = null;
 
   if (!overlay || !openBtn) return;
 
@@ -64,19 +62,6 @@ import { API } from "./constants.js";
   function showContent() {
     if (authSection) authSection.style.display = "none";
     if (contentSection) contentSection.style.display = "block";
-  }
-
-  function showSupporterToast() {
-    if (!supporterToast) return;
-    supporterToast.classList.add("is-visible");
-    supporterToast.setAttribute("aria-hidden", "false");
-    if (supporterToastTimer) {
-      clearTimeout(supporterToastTimer);
-    }
-    supporterToastTimer = setTimeout(() => {
-      supporterToast.classList.remove("is-visible");
-      supporterToast.setAttribute("aria-hidden", "true");
-    }, 5000);
   }
 
   async function fetchJson(url, options = {}) {
@@ -266,9 +251,6 @@ import { API } from "./constants.js";
       loginPassword.value = "";
       await loadSettings();
       setStatus("Signed in.");
-      if (currentUser?.premiumActive) {
-        showSupporterToast();
-      }
     } catch (err) {
       setStatus(err.message || "Sign in failed.", true);
     }
@@ -305,9 +287,6 @@ import { API } from "./constants.js";
       updateUserView(data.user, undefined);
       setStatus("Premium access activated.");
       dispatchSession(data.user);
-      if (data.user?.premiumActive) {
-        showSupporterToast();
-      }
     } catch (err) {
       setStatus(err.message || "Failed to redeem code.", true);
     }
@@ -342,10 +321,6 @@ import { API } from "./constants.js";
     currentUser = null;
     currentCommentCount = 0;
     if (supporterBadge) supporterBadge.style.display = "none";
-    if (supporterToast) {
-      supporterToast.classList.remove("is-visible");
-      supporterToast.setAttribute("aria-hidden", "true");
-    }
     if (commentCountEl) commentCountEl.textContent = "You have 0 comments.";
     if (commentsList) commentsList.innerHTML = "";
     setCommentsEmpty(true);

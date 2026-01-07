@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import EmailSubscriber, PremiumCode, PremiumCodeRedemption, User
-from .admin_utils import iso_z, require_admin
+from .admin_utils import client_ip, iso_z, require_admin
 
 
 router = APIRouter()
@@ -41,6 +41,13 @@ class PremiumCodeDeactivateRequest(BaseModel):
 
     code_id: str | None = Field(default=None, alias="codeId")
     id: str | None = None
+
+
+class EmailSubscriberCreateRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    email: str
+    source: str | None = None
 
 
 def _generate_code(length: int = 10) -> str:
@@ -79,6 +86,96 @@ def list_email_subscribers(
         ],
         "total": int(total),
     }
+
+
+@router.post("/api/admin/email-subscribers")
+def create_email_subscriber(
+    payload: EmailSubscriberCreateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    admin = require_admin(request, db)
+    if not admin:
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    email = (payload.email or "").strip().lower()
+    if not email or "@" not in email or len(email) > 120:
+        return JSONResponse(status_code=400, content={"error": "Valid email is required"})
+
+    source = (payload.source or "").strip()[:80] or "admin"
+    now = datetime.now(timezone.utc)
+
+    subscriber = db.scalar(select(EmailSubscriber).where(EmailSubscriber.email == email))
+    if not subscriber:
+        subscriber = EmailSubscriber(
+            id=uuid4(),
+            email=email,
+            source=source,
+            ip_address=client_ip(request),
+            opted_in_at=now,
+        )
+        db.add(subscriber)
+    else:
+        subscriber.opted_in_at = now
+        subscriber.source = source or subscriber.source
+        if not subscriber.ip_address:
+            subscriber.ip_address = client_ip(request)
+
+    user = db.scalar(select(User).where(User.email == email))
+    if user:
+        user.email_opt_in = True
+        user.email_opt_in_at = now
+        db.add(user)
+
+    db.commit()
+    db.refresh(subscriber)
+
+    return {
+        "subscriber": {
+            "id": str(subscriber.id),
+            "email": subscriber.email,
+            "source": subscriber.source or "",
+            "ipAddress": subscriber.ip_address or "",
+            "optedInAt": iso_z(subscriber.opted_in_at),
+        }
+    }
+
+
+@router.delete("/api/admin/email-subscribers/{subscriber_id}")
+def delete_email_subscriber(
+    subscriber_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    admin = require_admin(request, db)
+    if not admin:
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    sub_id_raw = (subscriber_id or "").strip()
+    if not sub_id_raw:
+        return JSONResponse(status_code=400, content={"error": "subscriberId is required"})
+
+    try:
+        sub_id = UUID(sub_id_raw)
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid subscriberId"})
+
+    subscriber = db.get(EmailSubscriber, sub_id)
+    if not subscriber:
+        return JSONResponse(status_code=404, content={"error": "Subscriber not found"})
+
+    email = subscriber.email
+    db.delete(subscriber)
+
+    user = db.scalar(select(User).where(User.email == email))
+    if user:
+        user.email_opt_in = False
+        user.email_opt_in_at = None
+        db.add(user)
+
+    db.commit()
+
+    return {"status": "ok"}
 
 
 @router.get("/api/admin/premium-codes")

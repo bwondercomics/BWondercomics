@@ -2,6 +2,7 @@ import { el } from "./dom.js";
 import { escapeHtml } from "./utils.js";
 
 const EMAIL_SUBSCRIBERS_ENDPOINT = "/api/admin/email-subscribers";
+const USER_DELETE_ENDPOINT = "/api/admin/users";
 const PREMIUM_CODES_ENDPOINT = "/api/admin/premium-codes";
 const PREMIUM_CODES_GENERATE_ENDPOINT = "/api/admin/premium-codes/generate";
 
@@ -35,6 +36,18 @@ function createUsersManager({ hideAllSections, setActiveNav } = {}) {
   function setEmailListEmpty(isEmpty) {
     if (!el.emailListEmpty) return;
     el.emailListEmpty.style.display = isEmpty ? "block" : "none";
+  }
+
+  function setEmailListStatus(message, isError = false) {
+    if (!el.emailListStatus) return;
+    el.emailListStatus.textContent = message || "";
+    el.emailListStatus.style.display = message ? "block" : "none";
+    el.emailListStatus.style.background = isError
+      ? "var(--danger)"
+      : "var(--success)";
+    el.emailListStatus.style.color = isError
+      ? "var(--text)"
+      : "var(--bg-dark)";
   }
 
   function setPremiumCodesCount(count) {
@@ -122,6 +135,9 @@ function createUsersManager({ hideAllSections, setActiveNav } = {}) {
           <button class="btn-small btn-edit" type="button" data-save-role="${escapeHtml(
             u.id,
           )}">Save</button>
+          <button class="btn-danger" type="button" data-delete-user="${escapeHtml(
+            u.id,
+          )}">Delete</button>
         </div>
       `;
       el.usersList.appendChild(item);
@@ -153,6 +169,28 @@ function createUsersManager({ hideAllSections, setActiveNav } = {}) {
         }
       });
     });
+
+    el.usersList.querySelectorAll("[data-delete-user]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const userId = btn.getAttribute("data-delete-user");
+        if (!userId) return;
+        const ok = confirm("Delete this account? This cannot be undone.");
+        if (!ok) return;
+        try {
+          const res = await fetch(`${USER_DELETE_ENDPOINT}/${userId}`, {
+            method: "DELETE",
+            credentials: "same-origin",
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || "Failed to delete user.");
+          setUsersStatus("User deleted.");
+          await loadUsersList();
+          await loadEmailSubscribers();
+        } catch (err) {
+          setUsersStatus(err.message || "Failed to delete user.", true);
+        }
+      });
+    });
   }
 
   function renderEmailSubscribers(subscribers = []) {
@@ -180,8 +218,35 @@ function createUsersManager({ hideAllSections, setActiveNav } = {}) {
           <div class="chapter-name">${escapeHtml(sub.email || "Subscriber")}</div>
           <div class="chapter-meta" style="opacity:0.75;">${escapeHtml(metaText)}</div>
         </div>
+        <div class="chapter-actions" style="gap: 8px; flex-wrap: wrap;">
+          <button class="btn-danger" type="button" data-delete-subscriber="${escapeHtml(
+            sub.id,
+          )}">Remove</button>
+        </div>
       `;
       el.emailList.appendChild(item);
+    });
+
+    el.emailList.querySelectorAll("[data-delete-subscriber]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const subId = btn.getAttribute("data-delete-subscriber");
+        if (!subId) return;
+        const ok = confirm("Remove this email subscriber?");
+        if (!ok) return;
+        try {
+          const res = await fetch(`${EMAIL_SUBSCRIBERS_ENDPOINT}/${subId}`, {
+            method: "DELETE",
+            credentials: "same-origin",
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || "Failed to remove subscriber.");
+          setEmailListStatus("Subscriber removed.");
+          await loadEmailSubscribers();
+          await loadUsersList();
+        } catch (err) {
+          setEmailListStatus(err.message || "Failed to remove subscriber.", true);
+        }
+      });
     });
   }
 
@@ -345,6 +410,33 @@ function createUsersManager({ hideAllSections, setActiveNav } = {}) {
     }
   }
 
+  async function addEmailSubscriber() {
+    if (!el.emailListInput) return;
+    const email = (el.emailListInput.value || "").trim();
+    const source = (el.emailListSource?.value || "").trim();
+    if (!email) {
+      setEmailListStatus("Email is required.", true);
+      return;
+    }
+    try {
+      const res = await fetch(EMAIL_SUBSCRIBERS_ENDPOINT, {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, source }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Failed to add subscriber.");
+      setEmailListStatus("Subscriber added.");
+      el.emailListInput.value = "";
+      if (el.emailListSource) el.emailListSource.value = "";
+      await loadEmailSubscribers();
+      await loadUsersList();
+    } catch (err) {
+      setEmailListStatus(err.message || "Failed to add subscriber.", true);
+    }
+  }
+
   async function loadPremiumCodes() {
     if (!el.premiumCodesList) return;
     el.premiumCodesList.innerHTML = "";
@@ -405,6 +497,18 @@ function createUsersManager({ hideAllSections, setActiveNav } = {}) {
 
   async function loadUsers() {
     await Promise.all([loadUsersList(), loadEmailSubscribers(), loadPremiumCodes()]);
+  }
+
+  if (el.btnEmailListAdd) {
+    el.btnEmailListAdd.addEventListener("click", addEmailSubscriber);
+  }
+  if (el.emailListInput) {
+    el.emailListInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addEmailSubscriber();
+      }
+    });
   }
 
   return {

@@ -10,7 +10,7 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import User
+from ..models import EmailSubscriber, User
 from ..security import (
     cookie_secure_for_request,
     hash_password,
@@ -37,6 +37,7 @@ class RegisterRequest(BaseModel):
     password: str
     display_name: str | None = Field(default=None, alias="displayName")
     invite_code: str | None = Field(default=None, alias="inviteCode")
+    email_opt_in: bool = Field(default=False, alias="emailOptIn")
 
 
 def _set_session_cookie(response: JSONResponse, token: str, secure: bool) -> None:
@@ -53,6 +54,11 @@ def _set_session_cookie(response: JSONResponse, token: str, secure: bool) -> Non
 
 def _clear_session_cookie(response: JSONResponse) -> None:
     response.delete_cookie(key=settings.session_cookie_name, path="/")
+
+def _client_ip(request: Request) -> str:
+    if request.client and request.client.host:
+        return request.client.host
+    return ""
 
 
 @router.get("/api/session")
@@ -87,6 +93,7 @@ def register(payload: RegisterRequest, request: Request, db: Session = Depends(g
     password = payload.password or ""
     display_name = (payload.display_name or "").strip() or (email.split("@")[0] if "@" in email else "User")
     invite_code = (payload.invite_code or "").strip()
+    email_opt_in = bool(payload.email_opt_in)
 
     if not email or "@" not in email or len(email) > 120:
         return JSONResponse(status_code=400, content={"error": "Valid email is required"})
@@ -116,14 +123,35 @@ def register(payload: RegisterRequest, request: Request, db: Session = Depends(g
     user_count = db.scalar(select(func.count()).select_from(User)) or 0
     role = "admin" if (user_count or 0) == 0 else "user"
 
+    now = datetime.now(timezone.utc)
     user = User(
         email=email,
         display_name=display_name[:60],
         password_hash=hash_password(password),
         role=role,
-        created_at=datetime.now(timezone.utc),
+        created_at=now,
     )
+    if email_opt_in:
+        user.email_opt_in = True
+        user.email_opt_in_at = now
     db.add(user)
+    if email_opt_in:
+        subscriber = db.scalar(select(EmailSubscriber).where(EmailSubscriber.email == email))
+        if not subscriber:
+            db.add(
+                EmailSubscriber(
+                    email=email,
+                    source="account",
+                    ip_address=_client_ip(request),
+                    opted_in_at=now,
+                )
+            )
+        else:
+            subscriber.opted_in_at = now
+            if not subscriber.source:
+                subscriber.source = "account"
+            if not subscriber.ip_address:
+                subscriber.ip_address = _client_ip(request)
     db.commit()
     db.refresh(user)
 
