@@ -7,11 +7,13 @@ const ANALYTICS_ENDPOINT = "/api/admin/analytics/summary";
 const READER_ANALYTICS_ENDPOINT = "/api/admin/analytics/reader";
 const BLUESKY_NOTIFICATIONS_ENDPOINT = "/api/admin/bluesky/notifications";
 const BLUESKY_STATUS_ENDPOINT = "/api/admin/bluesky/status";
+const TODOS_ENDPOINT = "/api/admin/todos";
 
 const RECENT_DAYS = 7;
 const NOTIFICATION_LIMIT = 8;
 const SCHEDULE_LIMIT = 6;
 const BLUESKY_LIMIT = 6;
+const TODO_LIMIT = 20;
 
 const CONNECTIONS = [
   {
@@ -116,6 +118,19 @@ function setAnalyticsStatus(message, isError = false) {
   if (!el.dashAnalyticsStatus) return;
   el.dashAnalyticsStatus.textContent = message;
   el.dashAnalyticsStatus.style.color = isError ? "var(--danger)" : "inherit";
+}
+
+function setTodoStatus(message, isError = false) {
+  if (!el.dashTodoStatus) return;
+  el.dashTodoStatus.textContent = message || "";
+  el.dashTodoStatus.style.display = message ? "block" : "none";
+  el.dashTodoStatus.style.background = isError ? "var(--danger)" : "var(--success)";
+  el.dashTodoStatus.style.color = isError ? "var(--text)" : "var(--bg-dark)";
+  if (message) {
+    setTimeout(() => {
+      if (el.dashTodoStatus) el.dashTodoStatus.style.display = "none";
+    }, 3000);
+  }
 }
 
 function clearList(target, emptyEl) {
@@ -405,6 +420,118 @@ function renderConnections(status = {}) {
   renderList(el.dashConnectionsList, null, connections, buildListItem);
 }
 
+async function deleteTodo(todoId) {
+  if (!todoId) return;
+  const ok = confirm("Remove this todo?");
+  if (!ok) return;
+  try {
+    const res = await fetch(`${TODOS_ENDPOINT}/${todoId}`, {
+      method: "DELETE",
+      credentials: "same-origin",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Failed to remove todo.");
+    setTodoStatus("Todo removed.");
+    await loadTodos();
+  } catch (err) {
+    setTodoStatus(err.message || "Failed to remove todo.", true);
+  }
+}
+
+function buildTodoItem(todo) {
+  const row = document.createElement("div");
+  row.className = "dashboard-item";
+
+  const main = document.createElement("div");
+  main.className = "dashboard-item-main";
+
+  const title = document.createElement("div");
+  title.className = "dashboard-item-title";
+  title.textContent = todo.body || "Todo";
+  main.appendChild(title);
+
+  const meta = document.createElement("div");
+  meta.className = "dashboard-item-meta";
+  const author = todo.createdByName || todo.createdByEmail;
+  const metaParts = [];
+  if (author) metaParts.push(`By ${author}`);
+  if (todo.createdAt) metaParts.push(formatDateTime(todo.createdAt));
+  meta.textContent = metaParts.length ? metaParts.join(" • ") : "Added.";
+  main.appendChild(meta);
+
+  row.appendChild(main);
+
+  const actions = document.createElement("div");
+  actions.className = "dashboard-item-actions";
+
+  if (todo.createdAt) {
+    const time = document.createElement("div");
+    time.className = "dashboard-item-time";
+    time.textContent = formatRelativeTime(todo.createdAt);
+    actions.appendChild(time);
+  }
+
+  const removeBtn = document.createElement("button");
+  removeBtn.className = "btn-small btn-delete";
+  removeBtn.type = "button";
+  removeBtn.textContent = "Remove";
+  removeBtn.addEventListener("click", () => deleteTodo(todo.id));
+  actions.appendChild(removeBtn);
+
+  row.appendChild(actions);
+  return row;
+}
+
+function renderTodos(todos = []) {
+  if (!el.dashTodoList) return;
+  el.dashTodoList.innerHTML = "";
+  if (el.dashTodoCount) el.dashTodoCount.textContent = String(todos.length);
+  if (!todos.length) {
+    if (el.dashTodoEmpty) el.dashTodoEmpty.style.display = "block";
+    return;
+  }
+  if (el.dashTodoEmpty) el.dashTodoEmpty.style.display = "none";
+  todos.forEach((todo) => {
+    el.dashTodoList.appendChild(buildTodoItem(todo));
+  });
+}
+
+async function loadTodos() {
+  if (!el.dashTodoList) return;
+  try {
+    const data = await fetchJson(`${TODOS_ENDPOINT}?limit=${TODO_LIMIT}`);
+    const todos = Array.isArray(data.todos) ? data.todos : [];
+    renderTodos(todos);
+  } catch (err) {
+    renderTodos([]);
+    setTodoStatus(err.message || "Todo feed unavailable.", true);
+  }
+}
+
+async function addTodo() {
+  if (!el.dashTodoInput) return;
+  const body = (el.dashTodoInput.value || "").trim();
+  if (!body) {
+    setTodoStatus("Todo text is required.", true);
+    return;
+  }
+  try {
+    const res = await fetch(TODOS_ENDPOINT, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ body }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "Failed to add todo.");
+    setTodoStatus("Todo added.");
+    el.dashTodoInput.value = "";
+    await loadTodos();
+  } catch (err) {
+    setTodoStatus(err.message || "Failed to add todo.", true);
+  }
+}
+
 function createDashboard({ hideAllSections, setActiveNav, loadPosts } = {}) {
   function showDashboardSection() {
     if (hideAllSections) hideAllSections();
@@ -431,6 +558,7 @@ function createDashboard({ hideAllSections, setActiveNav, loadPosts } = {}) {
         readerResult,
         blueskyResult,
         blueskyStatusResult,
+        todosResult,
       ] =
         await Promise.allSettled([
           fetchJson(`${COMMENTS_ENDPOINT}?limit=${NOTIFICATION_LIMIT * 2}`),
@@ -439,6 +567,7 @@ function createDashboard({ hideAllSections, setActiveNav, loadPosts } = {}) {
           fetchJson(`${READER_ANALYTICS_ENDPOINT}?range=7d`),
           fetchJson(`${BLUESKY_NOTIFICATIONS_ENDPOINT}?limit=${BLUESKY_LIMIT}`),
           fetchJson(BLUESKY_STATUS_ENDPOINT),
+          fetchJson(`${TODOS_ENDPOINT}?limit=${TODO_LIMIT}`),
         ]);
 
       const comments =
@@ -467,6 +596,10 @@ function createDashboard({ hideAllSections, setActiveNav, loadPosts } = {}) {
         blueskyConnected = Boolean(blueskyResult.value?.connected);
       }
       const blueskyHandle = String(blueskyStatus?.handle || "");
+      const todos =
+        todosResult.status === "fulfilled" && Array.isArray(todosResult.value?.todos)
+          ? todosResult.value.todos
+          : [];
 
       updateMetrics(posts, comments, users);
       renderNotifications({
@@ -478,6 +611,7 @@ function createDashboard({ hideAllSections, setActiveNav, loadPosts } = {}) {
       });
       renderSchedule(posts);
       renderConnections({ blueskyConnected, blueskyHandle });
+      renderTodos(todos);
 
       const summaryOk = analyticsResult.status === "fulfilled";
       const readerOk = readerResult.status === "fulfilled";
@@ -512,6 +646,19 @@ function createDashboard({ hideAllSections, setActiveNav, loadPosts } = {}) {
     clearList(el.dashNotifications, el.dashNotificationsEmpty);
     clearList(el.dashScheduleList, el.dashScheduleEmpty);
     clearList(el.dashConnectionsList, null);
+    clearList(el.dashTodoList, el.dashTodoEmpty);
+  }
+
+  if (el.btnDashTodoAdd) {
+    el.btnDashTodoAdd.addEventListener("click", addTodo);
+  }
+  if (el.dashTodoInput) {
+    el.dashTodoInput.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        addTodo();
+      }
+    });
   }
 
   return {

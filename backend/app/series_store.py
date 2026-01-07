@@ -117,7 +117,10 @@ def series_data_payload(db: Session, series_id: str) -> dict[str, Any]:
         chapters[entry.title] = [p.path for p in pages]
         if entry.folder_path:
             chapter_folders[entry.title] = entry.folder_path
-        chapter_meta[entry.title] = {"premium": bool(entry.premium_only)}
+        meta = {"premium": bool(entry.premium_only)}
+        if entry.display_number is not None:
+            meta["displayNumber"] = int(entry.display_number)
+        chapter_meta[entry.title] = meta
 
     return {
         "chapters": chapters,
@@ -242,6 +245,18 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
 
         meta = chapter_meta.get(raw_title) or chapter_meta.get(title) or {}
         premium_only = bool(meta.get("premium")) if isinstance(meta, dict) else False
+        display_number = None
+        if isinstance(meta, dict):
+            raw_display = meta.get("displayNumber")
+            if raw_display is None:
+                raw_display = meta.get("display_number")
+            if raw_display is not None and raw_display != "":
+                try:
+                    parsed = int(raw_display)
+                except (TypeError, ValueError):
+                    parsed = None
+                if parsed is not None and parsed >= 0:
+                    display_number = parsed
 
         entry = db.scalar(select(Entry).where(Entry.series_id == sid, Entry.title == title))
         if not entry:
@@ -249,19 +264,30 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
                 id=uuid4(),
                 series_id=sid,
                 title=title[:200],
-                display_number=None,
+                display_number=display_number,
                 folder_path=folder_path,
                 premium_only=premium_only,
                 status="published",
                 publish_at=_now(),
-                sort_index=_extract_sort_index(title, folder_path, fallback_index),
+                sort_index=display_number if display_number is not None else _extract_sort_index(
+                    title,
+                    folder_path,
+                    fallback_index,
+                ),
                 created_at=_now(),
                 updated_at=_now(),
             )
         else:
             entry.folder_path = folder_path
             entry.premium_only = premium_only
-            entry.sort_index = _extract_sort_index(title, folder_path, entry.sort_index or fallback_index)
+            if display_number is not None:
+                entry.display_number = display_number
+            effective_display = display_number if display_number is not None else entry.display_number
+            entry.sort_index = (
+                effective_display
+                if effective_display is not None
+                else _extract_sort_index(title, folder_path, entry.sort_index or fallback_index)
+            )
             entry.updated_at = _now()
 
         fallback_index += 1

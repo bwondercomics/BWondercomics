@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 import time
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import delete, distinct, func, select, text, update
@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import (
+    AdminTodo,
     BannedIP,
     CensoredWord,
     Comment,
@@ -90,6 +91,10 @@ def admin_set_user_role(payload: SetUserRoleRequest, request: Request, db: Sessi
     return {"user": public_user(target)}
 
 
+class AdminTodoCreateRequest(BaseModel):
+    body: str
+
+
 @router.delete("/api/admin/users/{user_id}")
 def admin_delete_user(user_id: str, request: Request, db: Session = Depends(get_db)):
     admin = _require_admin(request, db)
@@ -159,10 +164,105 @@ def admin_delete_user(user_id: str, request: Request, db: Session = Depends(get_
         .where(VisitorEvent.user_id == target.id)
         .values(user_id=None)
     )
+    db.execute(
+        update(AdminTodo)
+        .where(AdminTodo.created_by == target.id)
+        .values(created_by=None)
+    )
     db.execute(text("DELETE FROM personal_feed_items WHERE user_id = :uid"), {"uid": target.id})
     db.execute(delete(EmailSubscriber).where(EmailSubscriber.email == target.email))
 
     db.delete(target)
+    db.commit()
+
+    return {"status": "ok"}
+
+
+@router.get("/api/admin/todos")
+def admin_list_todos(
+    request: Request,
+    db: Session = Depends(get_db),
+    limit: int = Query(30, ge=1, le=200),
+):
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    rows = db.execute(
+        select(AdminTodo, User.email, User.display_name)
+        .outerjoin(User, AdminTodo.created_by == User.id)
+        .order_by(AdminTodo.created_at.desc())
+        .limit(limit)
+    ).all()
+
+    todos = []
+    for todo, email, display_name in rows:
+        todos.append(
+            {
+                "id": str(todo.id),
+                "body": todo.body,
+                "createdAt": iso_z(todo.created_at),
+                "createdByEmail": email or "",
+                "createdByName": display_name or "",
+            }
+        )
+
+    return {"todos": todos}
+
+
+@router.post("/api/admin/todos")
+def admin_create_todo(
+    payload: AdminTodoCreateRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    admin = _require_admin(request, db)
+    if not admin:
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    body = (payload.body or "").strip()
+    if not body:
+        return JSONResponse(status_code=400, content={"error": "Todo text is required"})
+    if len(body) > 500:
+        body = body[:500]
+
+    todo = AdminTodo(
+        body=body,
+        created_by=admin.id,
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(todo)
+    db.commit()
+    db.refresh(todo)
+
+    return {
+        "todo": {
+            "id": str(todo.id),
+            "body": todo.body,
+            "createdAt": iso_z(todo.created_at),
+            "createdByEmail": admin.email,
+            "createdByName": admin.display_name,
+        }
+    }
+
+
+@router.delete("/api/admin/todos/{todo_id}")
+def admin_delete_todo(todo_id: str, request: Request, db: Session = Depends(get_db)):
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    raw = (todo_id or "").strip()
+    if not raw:
+        return JSONResponse(status_code=400, content={"error": "todoId is required"})
+    try:
+        todo_uuid = UUID(raw)
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid todoId"})
+
+    todo = db.get(AdminTodo, todo_uuid)
+    if not todo:
+        return JSONResponse(status_code=404, content={"error": "Todo not found"})
+
+    db.delete(todo)
     db.commit()
 
     return {"status": "ok"}
