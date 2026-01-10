@@ -133,6 +133,85 @@ Content:
 - `GET /api/posts`, `/api/posts/latest`
 - `GET /series.json`, `/data.json`, `/page-config.json` (proxy to API)
 
+## Reader Analytics (In Progress - NEEDS DEBUGGING)
+
+### What Works
+- Visitor tracking: `POST /api/track/visitor` is recording events (4500+ in DB)
+- Live analytics showing active visitors
+- API endpoints responding (200 OK)
+
+### What's Broken
+**Admin Portal → Analytics → Reader Analytics shows "Unknown" for all entries instead of actual titles**
+
+### Work Completed (Staged, Not Committed)
+File: `backend/app/routes/admin_analytics.py`
+
+**Session 1:** Fixed API response format mismatch
+- Changed `/api/admin/analytics/reader` response structure to match frontend expectations
+- Split `entries[]` into `entryViews[]`, `entryCompletions[]`, `entryStops[]`, `seriesViews[]`
+- Renamed fields: `totalReads` → `entryReadsTotal`, `totalFinishes` → `entryFinishesTotal`
+- Added overall stats: `finishRate`, `avgStopPage`
+
+**Session 2:** Changed matching logic from titles to display_number
+- Added `_extract_display_number()` helper to parse numbers from labels like `"battle-bros | Entry 5"` → `5`
+- Changed entry lookup from `(series_id, normalized_title)` to `(series_id, display_number)`
+- Updated event processing to extract display_number and use it for matching
+- Display actual entry titles from DB instead of visitor event labels
+
+### Data Format Reference
+**Frontend sends to tracking endpoint:**
+```javascript
+entryLabel: "battle-bros | Entry 5"  // format: "{seriesId} | {unitLabel} {displayNumber}"
+entryTitle: "Entry 5"
+seriesId: "battle-bros"
+```
+
+**Database schema:**
+```sql
+-- visitor_events table
+series_id: "battle-bros"
+entry_label: "battle-bros | Entry 5"
+entry_title: "Entry 5"
+
+-- entries table
+series_id: "battle-bros"
+display_number: 5
+title: "ISSUE 5"  -- display-only string, can be changed
+```
+
+### Architecture Principle
+**Titles are display-only.** Entry identification must use `(series_id, display_number)`, never rely on title string matching.
+
+### Still Shows "Unknown" - Debugging Next Steps
+1. **Verify display_number is set:** Check if `entries.display_number` is NULL
+   ```sql
+   SELECT id, series_id, display_number, title FROM entries WHERE series_id = 'battle-bros';
+   ```
+
+2. **Test extraction function:** Check what display numbers are extracted from actual visitor event data
+   ```python
+   # In API container
+   from backend.app.routes.admin_analytics import _extract_display_number
+   _extract_display_number("battle-bros | Entry 5")  # Should return 5
+   ```
+
+3. **Check actual event labels:** Verify format matches expectations
+   ```sql
+   SELECT DISTINCT entry_label, entry_title FROM visitor_events LIMIT 20;
+   ```
+
+4. **Test API response:** Query endpoint with auth to see actual output
+   ```bash
+   # Needs authenticated session cookie
+   curl -b cookies.txt http://localhost:8001/api/admin/analytics/reader?range=7d
+   ```
+
+5. **Possible issues:**
+   - `display_number` might be NULL on entries
+   - Label format in DB might differ from expected `"series-id | Entry N"` pattern
+   - Regex might not match the actual format
+   - May need fallback logic for entries without display_number
+
 ## Known Pitfalls
 - Do not reintroduce legacy static data sources or old root HTML files as a data store. The DB is the source of truth.
 - Caddyfile edits can break routing; validate after edits and restart Caddy.
@@ -144,6 +223,7 @@ Content:
 - Email signup endpoint wired to DB.
 - Patron welcome label exists in header and fades after 20s (yellow label).
 - Entry display numbers persist in DB and are used for sorting when present.
+- Comment target IDs were remapped from legacy formats (e.g., `battle-bros:issue-*`, `battle-bros:chapter-*`, bare UUIDs) to the new scheme: `battle-bros:entry-<display_number>` and `post:<uuid>`.
 
 ## Future Goals / Intent
 - Keep one source of truth (DB) and avoid legacy/static data sources.

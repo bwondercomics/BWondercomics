@@ -286,21 +286,29 @@ def admin_reader_analytics(
         label = entry_stat["entryTitle"] or f"Entry {entry_stat['displayNumber']}"
 
         entry_views.append({
-            "entryLabel": label,
+            "label": label,  # Frontend normalizer expects 'label'
+            "value": label,  # Also used as value for detail requests
+            "entryLabel": label,  # Keep for compatibility
             "count": reads,
             "seriesId": sid,
             "seriesTitle": entry_stat["seriesTitle"] or "",
         })
 
         entry_completions.append({
+            "label": label,
+            "value": label,
             "entryLabel": label,
             "count": finishes,
+            "completionRate": round(finish_rate, 4),  # Frontend expects completionRate
             "finishRate": round(finish_rate, 4),
             "seriesId": sid,
         })
 
         entry_stops.append({
+            "label": label,
+            "value": label,
             "entryLabel": label,
+            "page": round(avg_stop, 2),  # Frontend expects 'page' for display
             "avgStopPage": round(avg_stop, 2),
             "pageCount": page_count,
             "seriesId": sid,
@@ -308,18 +316,39 @@ def admin_reader_analytics(
 
         # Aggregate by series
         if sid not in series_aggregates:
+            series_title = entry_stat["seriesTitle"] or sid or "Unknown Series"
             series_aggregates[sid] = {
+                "label": series_title,  # Frontend normalizer expects 'label'
+                "value": sid,  # Series ID as value for filtering
                 "seriesId": sid,
-                "seriesTitle": entry_stat["seriesTitle"] or "",
+                "seriesTitle": series_title,
                 "count": 0,
+                "finishes": 0,
             }
         series_aggregates[sid]["count"] += reads
+        series_aggregates[sid]["finishes"] += finishes
 
     # Sort by count descending
     entry_views.sort(key=lambda x: x.get("count", 0), reverse=True)
     entry_completions.sort(key=lambda x: x.get("count", 0), reverse=True)
     entry_stops.sort(key=lambda x: x.get("avgStopPage", 0), reverse=True)
     series_views = sorted(series_aggregates.values(), key=lambda x: x.get("count", 0), reverse=True)
+
+    # Build series completions from aggregates
+    series_completions = []
+    for agg in series_aggregates.values():
+        reads = agg.get("count", 0)
+        finishes = agg.get("finishes", 0)
+        rate = (finishes / reads) if reads else 0
+        series_completions.append({
+            "label": agg.get("label", ""),
+            "value": agg.get("value", ""),
+            "seriesId": agg.get("seriesId", ""),
+            "seriesTitle": agg.get("seriesTitle", ""),
+            "count": finishes,
+            "completionRate": round(rate, 4),
+        })
+    series_completions.sort(key=lambda x: x.get("count", 0), reverse=True)
 
     # Calculate overall stats
     overall_finish_rate = (total_finishes / total_reads) if total_reads else 0
@@ -336,6 +365,7 @@ def admin_reader_analytics(
         "entryCompletions": entry_completions,
         "entryStops": entry_stops,
         "seriesViews": series_views,
+        "seriesCompletions": series_completions,
     }
 
 
@@ -344,68 +374,103 @@ def admin_reader_series_analytics(
     request: Request,
     db: Session = Depends(get_db),
     days: int = Query(90, ge=1, le=365),
-    range: str = Query(None),
+    time_range: str = Query(None, alias="range"),
+    event: str = Query(""),
+    prop: str = Query("", alias="property"),
+    value: str = Query(""),
+    points: int = Query(12, ge=1, le=100),
 ):
     if not require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     # Convert range parameter to days if provided
-    if range:
-        if range == "24h":
+    if time_range:
+        if time_range == "24h":
             days = 1
-        elif range == "7d":
+        elif time_range == "7d":
             days = 7
-        elif range == "30d":
+        elif time_range == "30d":
             days = 30
-        elif range == "90d":
+        elif time_range == "90d":
             days = 90
 
     now = datetime.now(timezone.utc)
     start = now - timedelta(days=days)
 
-    series_map = {s.id: s.title for s in db.scalars(select(Series)).all()}
+    # Determine bucket size based on time range
+    total_seconds = int((now - start).total_seconds())
+    bucket_seconds = max(3600, total_seconds // points)  # Minimum 1 hour buckets
 
-    events = db.execute(
-        select(
-            VisitorEvent.visitor_id,
-            VisitorEvent.series_id,
-            VisitorEvent.entry_label,
-            VisitorEvent.entry_title,
-            VisitorEvent.page_number,
-        )
-        .where(VisitorEvent.created_at >= start)
-    ).all()
+    # Build query with optional property filtering
+    query = select(
+        VisitorEvent.created_at,
+        VisitorEvent.entry_title,
+        VisitorEvent.entry_label,
+        VisitorEvent.series_id,
+    ).where(VisitorEvent.created_at >= start)
 
-    per_series: dict[str, dict] = defaultdict(lambda: {"readsByVisitor": set(), "maxPageByVisitor": {}, "eventCount": 0})
+    # Apply property-based filtering if specified
+    if prop and value:
+        normalized_value = value.strip()
+        if prop == "entryLabel":
+            # Match by entry title (displayed as entryLabel in frontend)
+            # Extract display number from the filter value
+            display_num = _extract_display_number(normalized_value)
+            if display_num is not None:
+                # Filter events that match this display number
+                # We'll filter in Python after fetching to match the main endpoint logic
+                pass
+            else:
+                # Fallback: match entry_title or entry_label directly
+                query = query.where(
+                    (VisitorEvent.entry_title == normalized_value) |
+                    (VisitorEvent.entry_label == normalized_value)
+                )
+        elif prop == "seriesId":
+            query = query.where(VisitorEvent.series_id == normalized_value)
 
-    for visitor_id, series_id, entry_label, entry_title, page_number in events:
-        sid = series_id or "unknown"
-        per_series[sid]["eventCount"] += 1
-        if visitor_id:
-            per_series[sid]["readsByVisitor"].add(visitor_id)
-            if page_number is not None:
-                current_max = per_series[sid]["maxPageByVisitor"].get(visitor_id, 0)
-                per_series[sid]["maxPageByVisitor"][visitor_id] = max(current_max, int(page_number))
+    events = db.execute(query).all()
 
-    payload = []
-    for sid, data in per_series.items():
-        reads = len(data["readsByVisitor"])
-        max_pages = list(data["maxPageByVisitor"].values())
-        avg_stop = (sum(max_pages) / len(max_pages)) if max_pages else 0
-        payload.append(
-            {
-                "seriesId": sid,
-                "seriesTitle": series_map.get(sid) or "",
-                "reads": reads,
-                "avgStopPage": round(avg_stop, 2),
-                "eventCount": int(data["eventCount"]),
-            }
-        )
+    # Apply display_number filtering if needed (Python-side)
+    filtered_events = []
+    if prop == "entryLabel" and value:
+        target_display_num = _extract_display_number(value.strip())
+        if target_display_num is not None:
+            for created_at, entry_title, entry_label, series_id in events:
+                event_display_num = _extract_display_number(entry_label) or _extract_display_number(entry_title)
+                if event_display_num == target_display_num:
+                    filtered_events.append((created_at, entry_title, entry_label, series_id))
+            events = filtered_events
+        # If no display_num extracted, events already filtered by DB query
 
-    payload.sort(key=lambda item: (item.get("reads") or 0), reverse=True)
+    # Create time buckets
+    buckets: dict[int, int] = defaultdict(int)
+    for created_at, *_ in events:
+        # Calculate bucket index
+        seconds_since_start = int((created_at - start).total_seconds())
+        bucket_index = seconds_since_start // bucket_seconds
+        buckets[bucket_index] += 1
+
+    # Build response with time-series data
+    series = []
+    for i in range(points):
+        bucket_start = start + timedelta(seconds=i * bucket_seconds)
+        bucket_end = start + timedelta(seconds=(i + 1) * bucket_seconds)
+        if bucket_end > now:
+            bucket_end = now
+
+        count = buckets.get(i, 0)
+        series.append({
+            "start": iso_z(bucket_start),
+            "end": iso_z(bucket_end),
+            "count": count,
+        })
+
+        if bucket_end >= now:
+            break
 
     return {
         "generatedAt": iso_z(now),
         "windowDays": days,
-        "series": payload,
+        "series": series,
     }
