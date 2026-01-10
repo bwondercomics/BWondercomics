@@ -895,8 +895,8 @@ export function createChaptersApi({
       el.entryPostContent.value = String(meta.releasePostContent || '');
     }
     syncEntryScheduleFields();
-    const combined = await reconcileChapterPages(chapterName);
-    renderPageList(sortPagesByFilename(combined));
+    const combined = normalizePages(state.chapters[chapterName] || []);
+    renderPageList(combined);
     showModal();
   }
 
@@ -1023,7 +1023,6 @@ export function createChaptersApi({
     const path = prompt(`Enter image path (e.g., ${getRoot()}/01/01.png):`);
     if (path) {
       state.currentPages.push(path.trim());
-      state.currentPages = sortPagesByFilename(state.currentPages);
       renderPageList(state.currentPages);
       markUnsaved();
     }

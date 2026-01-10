@@ -241,10 +241,9 @@ function createUploadManager({
       if (!response.ok) throw new Error(result.error || "Upload failed");
 
       const newPaths = result.paths || [];
-      state.currentPages = sortPagesByFilename([
-        ...state.currentPages,
-        ...newPaths,
-      ]);
+      state.currentPages = state.currentPages.length
+        ? [...state.currentPages, ...newPaths]
+        : sortPagesByFilename([...state.currentPages, ...newPaths]);
       chaptersApi?.renderPageList(state.currentPages);
       chaptersApi?.markUnsaved();
       clearSelectedFiles();
