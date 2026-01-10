@@ -9,7 +9,8 @@ This document is a concise handoff for new threads/agents. It captures how the s
   - Admin UI: `admin/`
 - Backend: `backend/` (FastAPI + SQLAlchemy)
 - Built frontend: `dist/` (served in production)
-- Media/content: `media/`, `chapters/`
+- Frontend build snapshots: `var/releases/dist-YYYYMMDD-HHMMSS.tar.gz`
+- Media/content: `media/`, `chapters/`, `comics/<seriesId>/chapters/`
 - Deploy config: `deploy/bwondercomics-compose.yml`, `deploy/Caddyfile`, `deploy/bwondercomics.env`
 
 ## Services (Docker Compose)
@@ -37,28 +38,29 @@ Ports are configurable via env in `deploy/bwondercomics.env`. Example running ma
 - Fail2ban config lives in `deploy/fail2ban/`
 - Namecheap DDNS env files in `deploy/namecheap-ddns.env*`
 
+Note: Some older docs reference `/srv/bwondercomics`; the live repo is `/srv/bw-quality`.
+
 ## Start/Restart Commands
 From repo root:
 ```
 docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-compose.yml up -d
 docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-compose.yml restart bwondercomics-api
 ```
-If `docker compose` doesn’t see running containers, use the container name:
+If `docker compose` does not see running containers, use the container name:
 ```
 docker restart bwondercomics-bwondercomics-api-1
 ```
-
-Machine reboot depends on host OS (not in repo). If you have access, use the standard system reboot command for that host.
+Machine reboot depends on host OS (not in repo). After reboot, verify services with `docker compose ps` and run `up -d` if needed.
 
 ## Caddy Routing (deploy/Caddyfile)
 - Proxies `/api/*` to `bwondercomics-api:8000`
 - Proxies `/data.json`, `/series.json`, `/page-config.json`, `/media.json`, `/series/*` to the API
 - Serves static:
-  - `/assets/*` from `dist/assets` (falls back to repo `/assets`)
+  - `/assets/*` from `dist/assets` (fallback to repo `/assets`)
   - `/media/*` and `/chapters/*` from filesystem
   - `/` root from `dist/`
 
-If the site turns into plain text or missing CSS/JS, confirm the `/assets/*` handler is correct and Caddy is running.
+If the site turns into plain text or missing CSS/JS, confirm the `/assets/*` handler is correct and Caddy is running. The Caddyfile is sensitive to formatting; validate after edits.
 
 ## Frontend Workflow
 - Edit source files in `reader/`, `admin/`, `assets/`, and top-level HTML files.
@@ -84,20 +86,33 @@ Key tables:
 - `posts`, `media_items`
 - `page_configs`, `series`, `entries`, `entry_pages`
 - `banned_ips`, `censored_words`, `comment_limits`
-- `admin_ops_runs`
+- `admin_ops_runs`, `admin_todos`
 - `social_accounts`
 - `visitor_sessions`, `visitor_events`
+
+## Entry Pages Ordering (Admin)
+- Entry page order is stored in DB; saving an entry preserves the order as arranged in the UI.
+- Uploads auto-sort only when the entry has no existing pages; otherwise new pages append at the bottom.
+- Avoid renumber/sync unless you intentionally want to rename or rescan files.
+- `entry_pages.path` should be web-relative like `chapters/09/01.png` (not an absolute `/srv/...` path).
 
 ## Email List (Two Paths)
 1) Account opt-in:
    - Endpoint: `POST /api/user/email-opt`
    - Writes `users.email_opt_in` and `email_subscribers`
 2) Left panel signup (public form):
-   - Endpoint: `POST /api/email/subscribe` (added)
+   - Endpoint: `POST /api/email/subscribe`
    - Writes `email_subscribers` and syncs `users.email_opt_in` if the email matches a user
 
 Admin email list uses:
 - `GET /api/admin/email-subscribers`
+
+Admin can add/remove email subscribers and delete users in the Users panel.
+
+## Admin Todo Feed
+- Dashboard has a DB-backed Todo Feed block.
+- API: `GET /api/admin/todos`, `POST /api/admin/todos`, `DELETE /api/admin/todos/{id}`
+- Stored in `admin_todos` table.
 
 ## Key API Endpoints (examples)
 Auth/session:
@@ -119,14 +134,16 @@ Content:
 - `GET /series.json`, `/data.json`, `/page-config.json` (proxy to API)
 
 ## Known Pitfalls
-- Don’t reintroduce legacy “wanna-be DB” files (old static JSON/HTML data sources). The DB is the source of truth.
+- Do not reintroduce legacy static data sources or old root HTML files as a data store. The DB is the source of truth.
 - Caddyfile edits can break routing; validate after edits and restart Caddy.
 - Changing Docker volumes can accidentally create a new empty DB volume. Double-check volume names before restarts.
+- Absolute filesystem paths in `entry_pages` will not render in the reader.
 
-## Current Status (as of this snapshot)
-- Last reported: site online; main UI and admin mostly working.
-- Left panel email signup now has a real backend endpoint.
+## Current Status (snapshot)
+- Site online; main UI and admin mostly working.
+- Email signup endpoint wired to DB.
 - Patron welcome label exists in header and fades after 20s (yellow label).
+- Entry display numbers persist in DB and are used for sorting when present.
 
 ## Future Goals / Intent
 - Keep one source of truth (DB) and avoid legacy/static data sources.

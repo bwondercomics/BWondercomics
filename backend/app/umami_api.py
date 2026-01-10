@@ -170,3 +170,58 @@ def fetch_umami_stats(ranges_ms: dict[str, tuple[int, int]]) -> dict[str, dict[s
                 raise
 
     return stats
+
+
+def _fetch_metrics_once(website_id: str, start_ms: int, end_ms: int, metric_type: str, token: str, limit: int = 10) -> list[dict]:
+    query = urlencode({
+        "startAt": int(start_ms),
+        "endAt": int(end_ms),
+        "type": metric_type,
+        "limit": limit,
+    })
+    status, _headers, body = _http_request(
+        "GET",
+        f"/api/websites/{website_id}/metrics?{query}",
+        headers={
+            "Accept": "application/json",
+            "Authorization": f"Bearer {token}",
+        },
+    )
+
+    if status != 200:
+        detail = _extract_error_message(body)
+        message = f"Umami metrics request failed (status {status})"
+        if detail:
+            message = f"{message}: {detail}"
+        raise UmamiAPIError(message, status=status)
+
+    data = _parse_json(body)
+    if not isinstance(data, list):
+        return []
+
+    return data
+
+
+def fetch_umami_metrics(start_ms: int, end_ms: int, metric_type: str = "referrer", limit: int = 10) -> list[dict]:
+    website_id = (settings.umami_website_id or "").strip()
+    if not website_id:
+        raise UmamiAPIError("UMAMI_WEBSITE_ID is not configured", status=503)
+
+    token = (settings.umami_api_token or "").strip()
+    allow_login = bool(settings.umami_api_username and settings.umami_api_password)
+    if not token and not allow_login:
+        raise UmamiAPIError(
+            "Umami API credentials are not configured. Set UMAMI_API_TOKEN or UMAMI_API_USERNAME and UMAMI_API_PASSWORD.",
+            status=503,
+        )
+
+    current_token = token or _login_for_token()
+
+    try:
+        return _fetch_metrics_once(website_id, start_ms, end_ms, metric_type, current_token, limit)
+    except UmamiAPIError as exc:
+        if exc.status == 401 and allow_login:
+            current_token = _login_for_token()
+            return _fetch_metrics_once(website_id, start_ms, end_ms, metric_type, current_token, limit)
+        else:
+            raise

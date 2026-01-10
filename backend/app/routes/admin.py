@@ -26,7 +26,7 @@ from ..models import (
 )
 from ..security import get_current_user, public_user
 from ..settings import settings
-from ..umami_api import UmamiAPIError, fetch_umami_stats
+from ..umami_api import UmamiAPIError, fetch_umami_stats, fetch_umami_metrics
 from ..validation import is_admin_role, sanitize_target
 from .admin_utils import iso_z
 
@@ -337,8 +337,25 @@ def admin_analytics_summary(request: Request, db: Session = Depends(get_db)):
 
     warning = ""
     source = "umami"
+    referrers = []
+    events = []
+
     try:
         stats = fetch_umami_stats(ranges)
+
+        # Fetch referrers and events for the 7-day window
+        try:
+            start_7d, end_7d = ranges["last7d"]
+            referrers_data = fetch_umami_metrics(start_7d, end_7d, metric_type="referrer", limit=10)
+            events_data = fetch_umami_metrics(start_7d, end_7d, metric_type="event", limit=10)
+
+            # Transform to frontend format: [{x: "label", y: count}, ...]
+            referrers = [{"x": item.get("x", ""), "y": item.get("y", 0)} for item in referrers_data if item.get("x")]
+            events = [{"x": item.get("x", ""), "y": item.get("y", 0)} for item in events_data if item.get("x")]
+        except UmamiAPIError:
+            # If metrics fail, continue with empty arrays
+            pass
+
     except UmamiAPIError as exc:
         source = "local"
         warning = str(exc)
@@ -374,5 +391,7 @@ def admin_analytics_summary(request: Request, db: Session = Depends(get_db)):
             name: {**(stats.get(name, {}) or {}), "start": start, "end": end}
             for name, (start, end) in ranges.items()
         },
+        "referrers": referrers,
+        "events": events,
         "generatedAt": datetime.now(timezone.utc).isoformat(),
     }

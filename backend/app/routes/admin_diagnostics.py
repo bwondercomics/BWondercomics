@@ -21,6 +21,7 @@ from ..models import (
     EntryPage,
     MediaItem,
     Post,
+    PremiumCode,
     Series,
     User,
 )
@@ -74,26 +75,63 @@ def _git_info() -> dict:
         except Exception:
             return ""
 
+    commit = _run(["git", "rev-parse", "HEAD"])
+    ref = _run(["git", "symbolic-ref", "HEAD"])
+    status = "dirty" if _run(["git", "status", "--porcelain"]) else "clean"
+
     return {
-        "commit": _run(["git", "rev-parse", "HEAD"]),
-        "branch": _run(["git", "rev-parse", "--abbrev-ref", "HEAD"]),
-        "status": "dirty" if _run(["git", "status", "--porcelain"]) else "clean",
+        "commit": commit,
+        "ref": ref if ref else f"refs/heads/{_run(['git', 'rev-parse', '--abbrev-ref', 'HEAD'])}",
+        "status": status,
     }
 
 
 def _dist_info() -> dict:
     dist_dir = settings.base_dir / "dist"
     if not dist_dir.exists():
-        return {"exists": False}
+        return {"exists": False, "last_modified": None, "manifest": None}
+
     latest = None
+    manifest_file = None
+
     for path in dist_dir.rglob("*"):
         if path.is_file():
             mtime = path.stat().st_mtime
             if latest is None or mtime > latest:
                 latest = mtime
+            # Look for manifest file
+            if path.name.endswith(".manifest") or "manifest" in path.name.lower():
+                manifest_file = path.name
+
     return {
         "exists": True,
-        "lastModifiedAt": iso_z(datetime.fromtimestamp(latest, tz=timezone.utc)) if latest else None,
+        "last_modified": iso_z(datetime.fromtimestamp(latest, tz=timezone.utc)) if latest else None,
+        "manifest": manifest_file,
+    }
+
+
+def _snapshot_info() -> dict:
+    releases_dir = settings.base_dir / "var" / "releases"
+    if not releases_dir.exists():
+        return {"count": 0, "latest": None}
+
+    snapshots = []
+    for path in releases_dir.glob("dist-*.tar.gz"):
+        if path.is_file():
+            snapshots.append({
+                "name": path.name,
+                "mtime": path.stat().st_mtime,
+            })
+
+    if not snapshots:
+        return {"count": 0, "latest": None}
+
+    snapshots.sort(key=lambda x: x["mtime"], reverse=True)
+    latest = snapshots[0]
+
+    return {
+        "count": len(snapshots),
+        "latest": latest["name"],
     }
 
 
@@ -145,15 +183,22 @@ def diagnostics_health(request: Request, db: Session = Depends(get_db)):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     db_ok = True
+    db_message = "Database connection successful"
     try:
         db.execute(text("SELECT 1"))
-    except Exception:
+    except Exception as e:
         db_ok = False
+        db_message = f"Database connection failed: {str(e)}"
 
     return {
-        "status": "ok" if db_ok else "degraded",
-        "time": iso_z(datetime.now(timezone.utc)),
-        "db": {"ok": db_ok},
+        "status": "healthy" if db_ok else "degraded",
+        "timestamp": iso_z(datetime.now(timezone.utc)),
+        "checks": {
+            "database": {
+                "status": "ok" if db_ok else "error",
+                "message": db_message,
+            }
+        },
     }
 
 
@@ -163,28 +208,77 @@ def diagnostics_db_stats(request: Request, db: Session = Depends(get_db)):
     if not require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    counts = {
-        "users": db.scalar(select(func.count()).select_from(User)) or 0,
-        "comments": db.scalar(select(func.count()).select_from(Comment)) or 0,
-        "posts": db.scalar(select(func.count()).select_from(Post)) or 0,
-        "series": db.scalar(select(func.count()).select_from(Series)) or 0,
-        "entries": db.scalar(select(func.count()).select_from(Entry)) or 0,
-        "entryPages": db.scalar(select(func.count()).select_from(EntryPage)) or 0,
-        "mediaItems": db.scalar(select(func.count()).select_from(MediaItem)) or 0,
-        "emailSubscribers": db.scalar(select(func.count()).select_from(EmailSubscriber)) or 0,
-    }
-
-    version = ""
     try:
-        version = db.execute(text("SELECT version()")).scalar() or ""
-    except Exception:
-        version = ""
+        # User counts by role
+        total_users = db.scalar(select(func.count()).select_from(User)) or 0
+        users_by_role_user = db.scalar(select(func.count()).select_from(User).where(User.role == "user")) or 0
+        users_by_role_premium = db.scalar(select(func.count()).select_from(User).where(User.role == "premium")) or 0
+        users_by_role_admin = db.scalar(select(func.count()).select_from(User).where(User.role == "admin")) or 0
 
-    return {
-        "generatedAt": iso_z(datetime.now(timezone.utc)),
-        "counts": {k: int(v) for k, v in counts.items()},
-        "dbVersion": version,
-    }
+        # Series counts
+        total_series = db.scalar(select(func.count()).select_from(Series)) or 0
+        series_published = db.scalar(select(func.count()).select_from(Series).where(Series.active == True)) or 0
+        series_premium = db.scalar(select(func.count()).select_from(Series).where(Series.premium_only == True)) or 0
+
+        # Comment counts
+        total_comments = db.scalar(select(func.count()).select_from(Comment)) or 0
+        comments_approved = db.scalar(select(func.count()).select_from(Comment).where(Comment.hidden == False)) or 0
+
+        # Premium code counts
+        total_codes = db.scalar(select(func.count()).select_from(PremiumCode)) or 0
+        active_codes = db.scalar(select(func.count()).select_from(PremiumCode).where(PremiumCode.active == True)) or 0
+
+        # Other counts
+        total_posts = db.scalar(select(func.count()).select_from(Post)) or 0
+        total_entries = db.scalar(select(func.count()).select_from(Entry)) or 0
+        total_entry_pages = db.scalar(select(func.count()).select_from(EntryPage)) or 0
+        total_media_items = db.scalar(select(func.count()).select_from(MediaItem)) or 0
+        total_email_subscribers = db.scalar(select(func.count()).select_from(EmailSubscriber)) or 0
+
+        return {
+            "generatedAt": iso_z(datetime.now(timezone.utc)),
+            "users": {
+                "total": int(total_users),
+                "by_role": {
+                    "user": int(users_by_role_user),
+                    "premium": int(users_by_role_premium),
+                    "admin": int(users_by_role_admin),
+                },
+            },
+            "series": {
+                "total": int(total_series),
+                "published": int(series_published),
+                "premium_only": int(series_premium),
+            },
+            "comments": {
+                "total": int(total_comments),
+                "approved": int(comments_approved),
+            },
+            "premium_codes": {
+                "total": int(total_codes),
+                "active": int(active_codes),
+            },
+            "posts": int(total_posts),
+            "entries": int(total_entries),
+            "entry_pages": int(total_entry_pages),
+            "media_items": int(total_media_items),
+            "email_subscribers": int(total_email_subscribers),
+        }
+    except Exception as e:
+        # Return safe defaults on error
+        return {
+            "generatedAt": iso_z(datetime.now(timezone.utc)),
+            "users": {"total": 0, "by_role": {"user": 0, "premium": 0, "admin": 0}},
+            "series": {"total": 0, "published": 0, "premium_only": 0},
+            "comments": {"total": 0, "approved": 0},
+            "premium_codes": {"total": 0, "active": 0},
+            "posts": 0,
+            "entries": 0,
+            "entry_pages": 0,
+            "media_items": 0,
+            "email_subscribers": 0,
+            "error": str(e),
+        }
 
 
 @router.get("/api/admin/diagnostics/db-overview")
@@ -193,12 +287,63 @@ def diagnostics_db_overview(request: Request, db: Session = Depends(get_db)):
     if not require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
+    # Database info
+    database_info = {"name": "", "version": "", "size_pretty": ""}
+    try:
+        db_info_row = db.execute(
+            text("SELECT current_database(), version(), pg_database_size(current_database())")
+        ).first()
+        if db_info_row:
+            database_info = {
+                "name": db_info_row[0] or "",
+                "version": (db_info_row[1] or "").split(" ")[0] if db_info_row[1] else "",
+                "size_pretty": f"{(db_info_row[2] or 0) / (1024 ** 3):.2f} GB" if db_info_row[2] else "0 GB",
+            }
+    except Exception:
+        pass
+
+    # Connection stats
+    connections = {"active": 0, "idle": 0, "total": 0, "max": 100}
+    try:
+        active_count = db.execute(
+            text("SELECT count(*) FROM pg_stat_activity WHERE state = 'active'")
+        ).scalar() or 0
+        idle_count = db.execute(
+            text("SELECT count(*) FROM pg_stat_activity WHERE state = 'idle'")
+        ).scalar() or 0
+        total_count = db.execute(text("SELECT count(*) FROM pg_stat_activity")).scalar() or 0
+        max_conn = db.execute(text("SHOW max_connections")).scalar()
+        connections = {
+            "active": int(active_count),
+            "idle": int(idle_count),
+            "total": int(total_count),
+            "max": int(max_conn) if max_conn else 100,
+        }
+    except Exception:
+        pass
+
+    # Alembic version
+    alembic_info = {"version": "unknown"}
+    try:
+        alembic_version = db.execute(text("SELECT version_num FROM alembic_version")).scalar()
+        if alembic_version:
+            alembic_info = {"version": str(alembic_version)}
+    except Exception:
+        pass
+
+    # Table stats with size
     tables = []
     try:
         rows = db.execute(
             text(
                 """
-                SELECT relname, n_live_tup, n_dead_tup, last_vacuum, last_autovacuum
+                SELECT
+                    relname,
+                    n_live_tup,
+                    n_dead_tup,
+                    last_vacuum,
+                    last_autovacuum,
+                    pg_total_relation_size(schemaname||'.'||relname)
                 FROM pg_stat_user_tables
                 ORDER BY n_live_tup DESC
                 LIMIT 50
@@ -206,6 +351,9 @@ def diagnostics_db_overview(request: Request, db: Session = Depends(get_db)):
             )
         ).all()
         for row in rows:
+            size_bytes = row[5] or 0
+            size_mb = size_bytes / (1024 ** 2)
+            size_pretty = f"{size_mb:.2f} MB" if size_mb < 1024 else f"{size_mb / 1024:.2f} GB"
             tables.append(
                 {
                     "name": row[0],
@@ -213,12 +361,20 @@ def diagnostics_db_overview(request: Request, db: Session = Depends(get_db)):
                     "deadRows": int(row[2] or 0),
                     "lastVacuum": iso_z(row[3]) if row[3] else None,
                     "lastAutovacuum": iso_z(row[4]) if row[4] else None,
+                    "rows_estimate": int(row[1] or 0),
+                    "size_pretty": size_pretty,
                 }
             )
     except Exception:
         tables = []
 
-    return {"generatedAt": iso_z(datetime.now(timezone.utc)), "tables": tables}
+    return {
+        "generatedAt": iso_z(datetime.now(timezone.utc)),
+        "database": database_info,
+        "connections": connections,
+        "alembic": alembic_info,
+        "tables": tables,
+    }
 
 
 @router.get("/api/admin/diagnostics/deploy-status")
@@ -226,10 +382,17 @@ def diagnostics_deploy_status(request: Request, db: Session = Depends(get_db)):
     if not require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
+    uptime_seconds = int((datetime.now(timezone.utc) - APP_STARTED_AT).total_seconds())
+
     return {
         "generatedAt": iso_z(datetime.now(timezone.utc)),
+        "server": {
+            "started_at": iso_z(APP_STARTED_AT),
+            "uptime_seconds": uptime_seconds,
+        },
         "git": _git_info(),
         "dist": _dist_info(),
+        "snapshots": _snapshot_info(),
     }
 
 
