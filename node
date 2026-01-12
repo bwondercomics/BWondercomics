@@ -1,0 +1,44 @@
+
+ RUN  v1.6.1 /srv/bw-quality
+
+ ✓ tests/utils.test.js  (45 tests | 1 skipped) 41ms
+ ❯ tests/series.test.js  (7 tests | 1 failed) 20ms
+   ❯ tests/series.test.js > sanitizeSeriesId > should trim leading/trailing dashes
+     → expected 'weird---name' to be 'weird-name' // Object.is equality
+ ❯ tests/chapters.test.js  (17 tests | 1 failed) 45ms
+   ❯ tests/chapters.test.js > sortChapterNamesWithMeta > should fall back to name sorting when displayNumber missing
+     → expected [ 'Issue 10', 'Issue 2', 'Bonus' ] to deeply equal [ 'Issue 10', 'Bonus', 'Issue 2' ]
+ ✓ tests/state.test.js  (11 tests) 39ms
+stdout | tests/data.test.js > loadPageConfig > should call setSubtitlesFn when subtitles exist
+✓ Page config loaded from page-config.json
+
+ ✓ tests/data.test.js  (4 tests) 44ms
+ ✓ tests/render.test.js  (10 tests) 122ms
+stdout | tests/admin-smoke.test.js > admin app smoke > initializes without throwing and shows login screen when unauthenticated
+Battle Bros Admin initialized
+
+stdout | tests/admin-smoke.test.js > admin app smoke > allows creating a blog post and renders it
+Battle Bros Admin initialized
+
+stdout | tests/admin-smoke.test.js > admin app smoke > allows creating a chapter and renders it
+Battle Bros Admin initialized
+
+ ✓ tests/comment-targets.test.js  (5 tests) 10ms
+stdout | tests/admin-smoke.test.js > admin app smoke > renders media section with empty placeholder
+Battle Bros Admin initialized
+
+ ❯ tests/admin-smoke.test.js  (4 tests | 1 failed) 994ms
+   ❯ tests/admin-smoke.test.js > admin app smoke > allows creating a blog post and renders it
+     → expected +0 to be 1 // Object.is equality
+
+⎯⎯⎯⎯⎯⎯ Unhandled Errors ⎯⎯⎯⎯⎯⎯
+
+Vitest caught 1 unhandled error during the test run.
+This might cause false positive tests. Resolve unhandled errors to make sure your tests are not affected.
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯
+ Test Files  3 failed | 5 passed (8)
+      Tests  3 failed | 99 passed | 1 skipped (103)
+     Errors  1 error
+   Start at  01:14:43
+   Duration  2.38s (transform 1.12s, setup 275ms, collect 1.06s, tests 1.31s, environment 4.06s, prepare 2.06s)
+

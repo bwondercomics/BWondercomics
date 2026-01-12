@@ -3,7 +3,12 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { extractChapterNumber, sortChapterNames, sanitizeChapters } from '../reader/chapters.js';
+import {
+    extractChapterNumber,
+    sortChapterNames,
+    sortChapterNamesWithMeta,
+    sanitizeChapters
+} from '../reader/chapters.js';
 
 describe('extractChapterNumber', () => {
     it('should extract chapter number from standard format', () => {
@@ -120,5 +125,33 @@ describe('sanitizeChapters', () => {
         const result = sanitizeChapters(input);
 
         expect(result.order).toEqual(['Chapter 1', 'Chapter 2', 'Chapter 10']);
+    });
+});
+
+describe('sortChapterNamesWithMeta', () => {
+    it('should sort by displayNumber when available', () => {
+        const names = ['Start Here', 'Issue 10', 'Issue 2'];
+        const meta = {
+            'Start Here': { displayNumber: 1 },
+            'Issue 2': { displayNumber: 2 },
+            'Issue 10': { displayNumber: 10 }
+        };
+
+        expect(sortChapterNamesWithMeta(names, meta)).toEqual([
+            'Start Here',
+            'Issue 2',
+            'Issue 10'
+        ]);
+    });
+
+    it('should fall back to name sorting when displayNumber missing', () => {
+        const names = ['Bonus', 'Issue 2', 'Issue 10'];
+        const meta = { 'Issue 10': { displayNumber: 10 } };
+
+        expect(sortChapterNamesWithMeta(names, meta)).toEqual([
+            'Issue 10',
+            'Issue 2',
+            'Bonus'
+        ]);
     });
 });

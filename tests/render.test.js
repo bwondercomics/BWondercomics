@@ -23,6 +23,11 @@ vi.mock('../reader/dom.js', () => ({
     el: {}
 }));
 
+vi.mock('../reader/analytics.js', () => ({
+    markEntryComplete: vi.fn(),
+    trackVisiblePages: vi.fn()
+}));
+
 let isTwoPageMode;
 let canShowTwoPages;
 

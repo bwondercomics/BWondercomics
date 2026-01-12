@@ -422,6 +422,10 @@
   margin-top: 10px;
 }
 
+#test-hourly {
+  margin-top: 12px;
+}
+
 /* Operations */
 .ops-note {
   color: #999;
@@ -468,6 +472,11 @@
   gap: 10px;
 }
 
+.ops-card--compact {
+  padding: 12px 14px;
+  gap: 8px;
+}
+
 .ops-title {
   font-weight: bold;
   color: #fff;
@@ -507,43 +516,12 @@
   white-space: pre-wrap;
 }
 
-.ops-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.ops-run {
-  font-size: 0.8rem;
-  padding: 6px 12px;
-}
-
-.ops-copy {
-  font-size: 0.8rem;
-  padding: 6px 12px;
-}
-
-.ops-copy-status {
-  color: #00d9ff;
-  font-size: 0.8em;
-}
-
-.ops-output {
-  display: none;
-  background: #000;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  padding: 10px;
-  font-size: 0.8em;
-  color: #fff;
-  white-space: pre-wrap;
-  max-height: 260px;
+.ops-history-scroll {
+  max-height: 380px;
   overflow-y: auto;
+  padding-right: 6px;
 }
 
-.ops-output--visible {
-  display: block;
-}
 
 /* Refresh Indicator */
 .refresh-indicator {
@@ -658,12 +636,6 @@
   font-size: 0.8em;
 }
 
-.ops-history-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 10px;
-  align-items: center;
-}
 
 .ops-history-note {
   color: #999;
@@ -677,23 +649,6 @@
   margin-top: 8px;
 }
 
-.ops-history-output {
-  display: none;
-  margin-top: 10px;
-  background: #000;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 6px;
-  padding: 10px;
-  font-size: 0.8em;
-  color: #fff;
-  white-space: pre-wrap;
-  max-height: 260px;
-  overflow-y: auto;
-}
-
-.ops-history-output--visible {
-  display: block;
-}
 
 /* Test Results */
 .test-result {

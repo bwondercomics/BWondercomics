@@ -3,6 +3,7 @@
 
 import { getActiveSeriesId } from './series.js';
 import { h } from './dom.js';
+import { buildEntryTargetId } from './comment-targets.js';
 
 (() => {
     'use strict';
@@ -74,15 +75,6 @@ import { h } from './dom.js';
         }
     };
 
-    const slugifyTarget = (raw = '') => {
-        const base = (raw || 'chapter').toString().trim();
-        const cleaned = base
-            .toLowerCase()
-            .replace(/[^a-z0-9._:-]+/g, '-')
-            .replace(/^-+|-+$/g, '');
-        return (cleaned || 'chapter').slice(0, 120);
-    };
-
     const parseEntryNumber = (raw) => {
         const parsed = Number.isFinite(raw) ? raw : parseInt(raw, 10);
         return Number.isFinite(parsed) ? parsed : null;
@@ -107,13 +99,11 @@ import { h } from './dom.js';
             ? (select.value || select.options[select.selectedIndex]?.value || 'chapter-1')
             : 'chapter-1';
         const entryNumber = getEntryNumberFromSelect(select, rawValue);
-        const chapterSlug = entryNumber != null ? `entry-${entryNumber}` : slugifyTarget(rawValue || 'chapter');
-
-        const maxLen = 120;
-        const prefix = `${seriesId}:`;
-        const remaining = Math.max(1, maxLen - prefix.length);
-        const trimmedChapter = chapterSlug.slice(0, remaining).replace(/-+$/g, '') || 'chapter';
-        return `${seriesId}:${trimmedChapter}`.slice(0, maxLen);
+        return buildEntryTargetId({
+            seriesId,
+            entryName: rawValue || 'chapter',
+            displayNumber: entryNumber
+        });
     }
 
     function init() {

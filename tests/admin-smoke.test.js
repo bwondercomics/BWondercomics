@@ -21,7 +21,7 @@ const domTemplate = `
   <input id="postImageTags" />
   <input id="postPublishAt" />
   <button id="btnMediaPicker"></button>
-  <textarea id="postContent"></textarea>
+  <div id="postContent" contenteditable="true"></div>
   <input id="postShare" type="checkbox" />
   <button id="btnSavePost"></button>
   <button id="btnSaveDraft"></button>
@@ -63,6 +63,22 @@ const domTemplate = `
   <ul id="changesList"></ul>
   <button id="btnConfirmRenumber"></button>
   <button id="btnCancelRenumber"></button>
+  <div id="seriesModal"></div>
+  <form id="seriesForm"></form>
+  <div id="seriesModalStatus"></div>
+  <button id="seriesModalDelete"></button>
+  <button id="seriesModalClose"></button>
+  <button id="seriesModalCancel"></button>
+  <button id="seriesModalSave"></button>
+  <input id="seriesIdInput" />
+  <input id="seriesTitleInput" />
+  <textarea id="seriesDescriptionInput"></textarea>
+  <input id="seriesCoverInput" />
+  <input id="seriesUnitSingular" />
+  <input id="seriesUnitPlural" />
+  <input id="seriesPremiumOnly" type="checkbox" />
+  <select id="seriesSelect"></select>
+  <a id="btnOpenSeries"></a>
 `;
 
 describe("admin app smoke", () => {
@@ -157,7 +173,7 @@ describe("admin app smoke", () => {
     document.getElementById("adminDashboard").style.display = "block";
 
     document.getElementById("postTitle").value = "Smoke Post";
-    document.getElementById("postContent").value = "Some content";
+    document.getElementById("postContent").innerHTML = "Some content";
     document.getElementById("postImageTags").value = "a,b";
 
     document.getElementById("btnSavePost").click();

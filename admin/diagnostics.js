@@ -1,7 +1,7 @@
 /**
  * Diagnostics and Troubleshooting Panel
  * 
- * Displays system health, configuration, and allows running tests.
+ * Displays system health, configuration, and read-only diagnostics.
  */
 
 import { fetchAdminAPI } from './api.js';
@@ -17,13 +17,8 @@ const healthIndicators = {
 let diagnosticsInitialized = false;
 let testSuites = [];
 let opsCommands = [];
-let opsRunnerEnabled = false;
-let opsRunnerMessage = '';
 let logStreamSource = null;
-let activeOpsStream = null;
 let refreshIndicatorTimer = null;
-const opsRecoveryPending = new Set();
-const OPS_RECOVERY_WINDOW_MS = 10 * 60 * 1000;
 
 function escapeHtml(value) {
     return String(value ?? '')
@@ -32,10 +27,6 @@ function escapeHtml(value) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#39;');
-}
-
-function delay(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function showRefreshIndicator() {
@@ -59,15 +50,6 @@ function lockDiagnosticsBox(container) {
     container.dataset.locked = 'true';
 }
 
-function confirmDangerousAction(spec) {
-    if (!spec?.dangerous) return true;
-    const label = spec?.label ? `"${spec.label}"` : 'this action';
-    const response = window.prompt(
-        `This will overwrite data.\n\nType RESTORE to confirm ${label}.`,
-        ''
-    );
-    return String(response || '').trim().toUpperCase() === 'RESTORE';
-}
 
 function captureScrollAnchor() {
     const scrollY = window.scrollY || 0;
@@ -126,22 +108,6 @@ function appendLogLine(line) {
     if (autoScroll && autoScroll.checked) {
         output.scrollTop = output.scrollHeight;
     }
-}
-
-function appendOpsOutput(output, line) {
-    if (!output) return;
-    const next = `${output.textContent}${line}\n`;
-    const maxChars = 200000;
-    output.textContent = next.length > maxChars ? next.slice(-maxChars) : next;
-    output.scrollTop = output.scrollHeight;
-}
-
-function closeActiveOpsStream() {
-    if (!activeOpsStream) return;
-    activeOpsStream.source.close();
-    activeOpsStream.button.disabled = false;
-    activeOpsStream.button.textContent = activeOpsStream.originalLabel;
-    activeOpsStream = null;
 }
 
 function updateLogServiceOptions(services = []) {
@@ -322,12 +288,6 @@ export async function initDiagnostics() {
         const refreshBtn = document.getElementById('diagnostics-refresh');
         if (refreshBtn) {
             refreshBtn.addEventListener('click', refreshAllDiagnostics);
-        }
-
-        // Set up run tests button
-        const runTestsBtn = document.getElementById('run-tests-btn');
-        if (runTestsBtn) {
-            runTestsBtn.addEventListener('click', () => runTests());
         }
 
         const logsStart = document.getElementById('logs-start');
@@ -793,9 +753,13 @@ function stopLogStream() {
 
 async function loadTestStatus() {
     const container = document.getElementById('test-status');
+    const hourlyContainer = document.getElementById('test-hourly');
     if (!container) return;
 
     container.innerHTML = '<div class="loading">Loading test status...</div>';
+    if (hourlyContainer) {
+        hourlyContainer.innerHTML = '<div class="test-info">Hourly test report: <em>Not configured yet.</em></div>';
+    }
 
     try {
         const status = await fetchAdminAPI('/api/admin/diagnostics/test-status');
@@ -806,16 +770,12 @@ async function loadTestStatus() {
             return;
         }
 
-        const runnableSuites = testSuites.filter((suite) => suite.runner_available && suite.available);
         let html = `
       <div class="test-info">
         <p>${healthIndicators.ok} Tests discovered: <strong>${status.count || 0} files</strong></p>
-      </div>
-      <div class="test-suite-actions">
-        <button id="run-all-tests-btn" class="btn-primary" ${runnableSuites.length ? '' : 'disabled'}>
-          ▶️ Run All Available Suites
-        </button>
-        <span class="test-suite-note">Runs each available suite one at a time.</span>
+        <p>Status: <strong>${escapeHtml(status.status || 'unknown')}</strong></p>
+        <p>Last run: ${status.finishedAt ? new Date(status.finishedAt).toLocaleString() : 'No runs yet'}</p>
+        <p>Exit code: ${status.exitCode !== null && status.exitCode !== undefined ? status.exitCode : 'n/a'}</p>
       </div>
       <div class="test-suite-grid">
     `;
@@ -823,20 +783,6 @@ async function loadTestStatus() {
         html += testSuites.map((suite) => renderTestSuiteCard(suite)).join('');
         html += '</div>';
         container.innerHTML = html;
-
-        const runAllBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById('run-all-tests-btn'));
-        if (runAllBtn) {
-            runAllBtn.addEventListener('click', () => runAllTests(runnableSuites));
-        }
-
-        container.querySelectorAll('[data-suite][data-action="run"]').forEach((btn) => {
-            btn.addEventListener('click', (event) => {
-                const target = event.currentTarget;
-                if (!(target instanceof HTMLElement)) return;
-                const suiteId = target.getAttribute('data-suite');
-                if (suiteId) runTests(suiteId);
-            });
-        });
     } catch (error) {
         container.innerHTML = `<div class="error">Failed to load test status: ${error.message}</div>`;
     } finally {
@@ -848,7 +794,6 @@ function renderTestSuiteCard(suite) {
     const availableIcon = suite.available ? healthIndicators.ok : healthIndicators.warning;
     const runnerIcon = suite.runner_available ? healthIndicators.ok : healthIndicators.error;
     const runnerMessage = suite.runner_message || (suite.runner_available ? 'Runner available' : 'Runner not available');
-    const runDisabled = !suite.runner_available || !suite.available;
 
     return `
       <div class="test-suite-card">
@@ -862,11 +807,6 @@ function renderTestSuiteCard(suite) {
         <div class="test-suite-meta">
           <div>Tests: <strong>${suite.count || 0}</strong></div>
           <div>Runner: ${runnerIcon} ${runnerMessage}</div>
-        </div>
-        <div class="test-suite-actions">
-          <button class="btn-primary" data-suite="${suite.id}" data-action="run" ${runDisabled ? 'disabled' : ''}>
-            ▶️ Run ${suite.label || suite.id}
-          </button>
         </div>
         <div class="test-files">
           <strong>Files:</strong>
@@ -907,99 +847,21 @@ async function loadConfiguration() {
     }
 }
 
-async function runTests(suiteId = 'backend') {
-    const resultsContainer = document.getElementById(`test-results-${suiteId}`);
-    const runBtn = /** @type {HTMLButtonElement | null} */ (
-        document.querySelector(`[data-suite="${suiteId}"][data-action="run"]`)
-    );
-
-    if (!resultsContainer) return;
-
-    if (runBtn) {
-        runBtn.disabled = true;
-        runBtn.textContent = '⏳ Running tests...';
-    }
-    resultsContainer.innerHTML = '<div class="loading">Executing test suite... This may take a minute.</div>';
-
-    try {
-        const result = await fetchAdminAPI('/api/admin/diagnostics/run-tests', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ suite: suiteId })
-        });
-
-        const statusClass = result.success ? 'test-success' : 'test-failure';
-        const statusIcon = result.success ? '✅' : '❌';
-
-        let html = `
-      <div class="test-result ${statusClass}">
-        <h4>${statusIcon} Test Results - ${suiteId} (Exit Code: ${result.exit_code})</h4>
-        <div class="test-output">
-          <h5>Output:</h5>
-          <pre>${result.stdout || 'No output'}</pre>
-          ${result.stderr ? `
-            <h5>Errors:</h5>
-            <pre class="test-errors">${result.stderr}</pre>
-          ` : ''}
-        </div>
-      </div>
-    `;
-
-        resultsContainer.innerHTML = html;
-        return result.success;
-    } catch (error) {
-        resultsContainer.innerHTML = `
-      <div class="test-result test-failure">
-        <h4>❌ Test Execution Failed</h4>
-        <p>${error.message}</p>
-      </div>
-    `;
-        return false;
-    } finally {
-        if (runBtn) {
-            const suite = testSuites.find((item) => item.id === suiteId);
-            runBtn.textContent = suite ? `▶️ Run ${suite.label || suite.id}` : '▶️ Run Tests';
-            runBtn.disabled = false;
-        }
-    }
-}
-
-async function runAllTests(suites) {
-    const runAllBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById('run-all-tests-btn'));
-    if (runAllBtn) {
-        runAllBtn.disabled = true;
-        runAllBtn.textContent = '⏳ Running suites...';
-    }
-
-    for (const suite of suites) {
-        await runTests(suite.id);
-    }
-
-    if (runAllBtn) {
-        runAllBtn.disabled = false;
-        runAllBtn.textContent = '▶️ Run All Available Suites';
-    }
-}
 
 function loadOperations() {
     const container = document.getElementById('ops-commands');
     if (!container) return;
 
-    closeActiveOpsStream();
     container.innerHTML = '<div class="loading">Loading operations...</div>';
 
     fetchAdminAPI('/api/admin/diagnostics/ops')
         .then((payload) => {
             opsCommands = Array.isArray(payload.commands) ? payload.commands : [];
-            opsRunnerEnabled = payload.enabled === true;
-            opsRunnerMessage = payload.message || '';
-            renderOperations(container, opsCommands, opsRunnerEnabled, opsRunnerMessage);
+            renderOperations(container, opsCommands, payload.message || '');
         })
         .catch((error) => {
             opsCommands = fallbackOps;
-            opsRunnerEnabled = false;
-            opsRunnerMessage = error.message || 'Operations runner unavailable.';
-            renderOperations(container, opsCommands, opsRunnerEnabled, opsRunnerMessage);
+            renderOperations(container, opsCommands, error.message || 'Operations runner unavailable.');
         });
 }
 
@@ -1021,15 +883,7 @@ function loadOpsHistory() {
             const message = error?.message || 'Unable to load history.';
             container.innerHTML = `<div class="warning">${healthIndicators.warning} ${escapeHtml(message)}</div>`;
             requestAnimationFrame(() => restoreScrollAnchor(anchor));
-            lockDiagnosticsBox(container);
         });
-}
-
-function isRecentOpsRun(run) {
-    if (!run?.started_at) return false;
-    const startedAt = Date.parse(run.started_at);
-    if (Number.isNaN(startedAt)) return false;
-    return Date.now() - startedAt < OPS_RECOVERY_WINDOW_MS;
 }
 
 function renderOpsHistory(container, runs) {
@@ -1042,35 +896,29 @@ function renderOpsHistory(container, runs) {
     let html = '<div class="ops-history-grid">';
     runs.forEach((run) => {
         const status = String(run.status || 'unknown').toLowerCase();
-        const recovering = status === 'interrupted' && run.disrupts_api && isRecentOpsRun(run);
         const statusLabel = status === 'success'
             ? 'Success'
             : status === 'running'
                 ? 'Running'
                 : status === 'failed'
                     ? 'Failed'
-                    : recovering
-                        ? 'Restarting'
-                        : status === 'interrupted'
-                            ? 'Interrupted'
-                            : 'Error';
+                    : status === 'interrupted'
+                        ? 'Interrupted'
+                        : 'Error';
         const statusClass = status === 'success'
             ? 'ops-history-status--ok'
-            : status === 'running' || recovering
+            : status === 'running'
                 ? 'ops-history-status--running'
                 : status === 'interrupted'
                     ? 'ops-history-status--interrupted'
                     : 'ops-history-status--fail';
-        const statusSpinner = status === 'running' || recovering
+        const statusSpinner = status === 'running'
             ? '<span class="ops-history-spinner" aria-hidden="true"></span>'
             : '';
         const title = escapeHtml(run.label || run.command_id || 'Operation');
         const startedAt = run.started_at ? new Date(run.started_at).toLocaleString() : 'Unknown';
         const duration = run.duration_seconds != null ? `${run.duration_seconds}s` : '—';
         const userLabel = run.user_email ? `By ${escapeHtml(run.user_email)}` : 'By admin';
-        const output = escapeHtml(run.output || '');
-        const outputNote = run.output_truncated ? '<div class="ops-history-note">Output truncated.</div>' : '';
-        const hasOutput = output.length > 0;
         const noteMessage = status === 'success' && run.error_message
             ? `<div class="ops-history-note">${escapeHtml(run.error_message)}</div>`
             : '';
@@ -1091,64 +939,15 @@ function renderOpsHistory(container, runs) {
         </div>
         ${errorMessage}
         ${noteMessage}
-        <div class="ops-history-actions">
-          <button class="btn-secondary ops-history-toggle" data-run-id="${run.id}" ${hasOutput ? '' : 'disabled'}>
-            ${hasOutput ? 'Show output' : 'No output'}
-          </button>
-          <button class="btn-secondary ops-history-copy" data-run-id="${run.id}" ${hasOutput ? '' : 'disabled'}>Copy output</button>
-        </div>
-        ${outputNote}
-        <pre class="ops-history-output" id="ops-history-output-${run.id}">${output}</pre>
       </div>
     `;
     });
     html += '</div>';
 
     container.innerHTML = html;
-    lockDiagnosticsBox(container);
-
-    runs.forEach((run) => {
-        if (run.status === 'interrupted' && run.disrupts_api && isRecentOpsRun(run)) {
-            confirmOpsRecovery(run.id);
-        }
-    });
-
-    container.querySelectorAll('.ops-history-toggle').forEach((button) => {
-        button.addEventListener('click', (event) => {
-            const target = event.currentTarget;
-            if (!(target instanceof HTMLElement)) return;
-            const runId = target.getAttribute('data-run-id');
-            if (!runId) return;
-            const output = document.getElementById(`ops-history-output-${runId}`);
-            if (!output) return;
-            output.classList.toggle('ops-history-output--visible');
-            target.textContent = output.classList.contains('ops-history-output--visible') ? 'Hide output' : 'Show output';
-        });
-    });
-
-    container.querySelectorAll('.ops-history-copy').forEach((button) => {
-        button.addEventListener('click', async (event) => {
-            const target = event.currentTarget;
-            if (!(target instanceof HTMLElement)) return;
-            const runId = target.getAttribute('data-run-id');
-            if (!runId) return;
-            const output = document.getElementById(`ops-history-output-${runId}`);
-            if (!output) return;
-            try {
-                await navigator.clipboard.writeText(output.textContent || '');
-                target.textContent = 'Copied';
-            } catch (err) {
-                target.textContent = 'Copy failed';
-            } finally {
-                setTimeout(() => {
-                    target.textContent = 'Copy output';
-                }, 1500);
-            }
-        });
-    });
 }
 
-function renderOperations(container, commands, runnerEnabled, runnerMessage) {
+function renderOperations(container, commands, statusMessage) {
     const groupMap = new Map();
     commands.forEach((cmd) => {
         const group = cmd.group || 'Other';
@@ -1156,9 +955,9 @@ function renderOperations(container, commands, runnerEnabled, runnerMessage) {
         groupMap.get(group).push(cmd);
     });
 
-    let html = '<p class="ops-note">Run these from the repo root (where the Makefile lives).</p>';
-    if (!runnerEnabled) {
-        const safeMessage = escapeHtml(runnerMessage || 'Command runner disabled.');
+    let html = '<p class="ops-note">Reference only. Run these from the repo root (where the Makefile lives).</p>';
+    if (statusMessage) {
+        const safeMessage = escapeHtml(statusMessage);
         html += `<div class="warning">${healthIndicators.warning} ${safeMessage}</div>`;
     }
 
@@ -1187,36 +986,19 @@ function renderOperations(container, commands, runnerEnabled, runnerMessage) {
         html += '<div class="ops-grid">';
         items.forEach((item) => {
             const available = item.available !== false;
-            const canRun = runnerEnabled && available;
-            let availability = item.available_message || (available ? 'Ready to run' : 'Unavailable');
-            if (item.disrupts_api && canRun) {
-                availability = `${availability} - Restarts API`;
-            }
-            if (item.streamable && canRun) {
-                availability = `${availability} - Live output`;
-            }
-            if (item.dangerous && canRun) {
-                availability = `${availability} - Destructive`;
-            }
+            let availability = item.available_message || (available ? 'Available' : 'Unavailable');
             availability = escapeHtml(availability);
             const safeLabel = escapeHtml(item.label);
             const safeDesc = escapeHtml(item.description);
             const safeCommand = escapeHtml(item.command);
             const alias = item.alias ? `<div class="ops-alias">Terminal: <code>${escapeHtml(item.alias)}</code></div>` : '';
-            const runLabel = item.streamable ? 'Run (Live)' : 'Run';
             html += `
-        <div class="ops-card">
+        <div class="ops-card ops-card--compact">
           <div class="ops-title">${safeLabel}</div>
           <div class="ops-desc">${safeDesc}</div>
           ${alias}
           <div class="ops-meta">${availability}</div>
           <pre class="ops-command">${safeCommand}</pre>
-          <div class="ops-actions">
-            <button class="btn-primary ops-run" data-op-id="${item.id}" ${canRun ? '' : 'disabled'}>${runLabel}</button>
-            <button class="btn-secondary ops-copy" data-op-id="${item.id}">Copy</button>
-            <span class="ops-copy-status" data-status-for="${item.id}"></span>
-          </div>
-          <pre class="ops-output" id="ops-output-${item.id}"></pre>
         </div>
       `;
         });
@@ -1224,277 +1006,6 @@ function renderOperations(container, commands, runnerEnabled, runnerMessage) {
     }
 
     container.innerHTML = html;
-
-    container.querySelectorAll('.ops-copy').forEach((button) => {
-        button.addEventListener('click', async (event) => {
-            const target = event.currentTarget;
-            if (!(target instanceof HTMLButtonElement)) return;
-            const opId = target.getAttribute('data-op-id');
-            if (!opId) return;
-            await copyCommand(opId, target);
-        });
-    });
-
-    container.querySelectorAll('.ops-run').forEach((button) => {
-        button.addEventListener('click', async (event) => {
-            const target = event.currentTarget;
-            if (!(target instanceof HTMLButtonElement)) return;
-            const opId = target.getAttribute('data-op-id');
-            if (!opId) return;
-            await runOperation(opId, target);
-        });
-    });
-}
-
-function getOperationCommand(opId) {
-    const match = opsCommands.find((item) => item.id === opId);
-    return match?.command || '';
-}
-
-function getOperationSpec(opId) {
-    return opsCommands.find((item) => item.id === opId) || null;
-}
-
-async function copyCommand(opId, button) {
-    const command = getOperationCommand(opId);
-    if (!command) {
-        showCopyStatus(button, 'Command unavailable');
-        return;
-    }
-    try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-            await navigator.clipboard.writeText(command);
-        } else {
-            const helper = document.createElement('textarea');
-            helper.value = command;
-            helper.style.position = 'fixed';
-            helper.style.opacity = '0';
-            document.body.appendChild(helper);
-            helper.select();
-            document.execCommand('copy');
-            document.body.removeChild(helper);
-        }
-        showCopyStatus(button, 'Copied');
-    } catch (err) {
-        showCopyStatus(button, 'Copy failed');
-    }
-}
-
-function showCopyStatus(button, message) {
-    const opId = button.getAttribute('data-op-id');
-    if (!opId) return;
-    const status = button.parentElement?.querySelector(`[data-status-for="${opId}"]`);
-    if (status) {
-        status.textContent = message;
-        setTimeout(() => {
-            status.textContent = '';
-        }, 2000);
-    }
-}
-
-async function runOperation(opId, button) {
-    const output = document.getElementById(`ops-output-${opId}`);
-    if (!output) return;
-
-    const spec = getOperationSpec(opId);
-    if (!confirmDangerousAction(spec)) {
-        output.classList.add('ops-output--visible');
-        output.textContent = 'Canceled.';
-        return;
-    }
-    if (spec?.streamable) {
-        runOperationStream(opId, button, output, spec);
-        return;
-    }
-
-    button.disabled = true;
-    const originalLabel = button.textContent;
-    button.textContent = 'Running...';
-    output.classList.add('ops-output--visible');
-    output.textContent = 'Executing...';
-
-    try {
-        const result = await fetchAdminAPI('/api/admin/diagnostics/run-command', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: opId })
-        });
-
-        const lines = [
-            `Command: ${result.command}`,
-            `Exit code: ${result.exit_code}`,
-            `Duration: ${result.duration_seconds}s`,
-            '',
-            result.stdout || '(no stdout)',
-        ];
-        if (result.stderr) {
-            lines.push('', '--- stderr ---', result.stderr);
-        }
-        if (result.stdout_truncated || result.stderr_truncated) {
-            lines.push('', 'Output truncated.');
-        }
-        output.textContent = lines.join('\n');
-    } catch (error) {
-        const message = error?.message || 'Request failed';
-        if (spec?.disrupts_api && /NetworkError|Failed to fetch/i.test(message)) {
-            output.textContent = 'Command dispatched. The API is restarting; confirming recovery...';
-            const recovered = await waitForApiRecovery(output);
-            if (recovered) {
-                loadSystemHealth();
-            }
-            return;
-        }
-        output.textContent = `Failed: ${message}`;
-    } finally {
-        button.disabled = false;
-        button.textContent = originalLabel;
-        loadOpsHistory();
-    }
-}
-
-function runOperationStream(opId, button, output, spec) {
-    closeActiveOpsStream();
-
-    button.disabled = true;
-    const originalLabel = button.textContent;
-    button.textContent = 'Running (Live)...';
-    output.classList.add('ops-output--visible');
-    output.textContent = 'Connecting...';
-
-    const params = new URLSearchParams({ id: opId });
-    const source = new EventSource(`/api/admin/diagnostics/run-command-stream?${params.toString()}`);
-    activeOpsStream = { source, button, originalLabel, output };
-
-    source.addEventListener('meta', (event) => {
-        output.textContent = '';
-        try {
-            const meta = JSON.parse(event.data || '{}');
-            if (meta.command) {
-                appendOpsOutput(output, `Command: ${meta.command}`);
-            }
-            if (meta.started_at) {
-                appendOpsOutput(output, `Started: ${new Date(meta.started_at).toLocaleString()}`);
-            }
-        } catch {
-            appendOpsOutput(output, 'Command started.');
-        }
-        appendOpsOutput(output, '---');
-    });
-
-    source.addEventListener('ops-error', (event) => {
-        let message = event.data || 'Command error';
-        try {
-            const payload = JSON.parse(event.data || '{}');
-            message = payload.error || message;
-        } catch {}
-        appendOpsOutput(output, `Error: ${message}`);
-        source.close();
-        button.disabled = false;
-        button.textContent = originalLabel;
-        activeOpsStream = null;
-        loadOpsHistory();
-    });
-
-    source.onmessage = (event) => {
-        if (event?.data) {
-            appendOpsOutput(output, event.data);
-        }
-    };
-
-    source.addEventListener('done', (event) => {
-        let payload = {};
-        try {
-            payload = JSON.parse(event.data || '{}');
-        } catch {}
-        appendOpsOutput(output, '');
-        appendOpsOutput(
-            output,
-            `Exit code: ${payload.exit_code ?? 'unknown'} | Duration: ${payload.duration_seconds ?? 'n/a'}s`
-        );
-        if (payload.success) {
-            appendOpsOutput(output, '✅ Command finished successfully.');
-        } else {
-            appendOpsOutput(output, '❌ Command finished with errors.');
-        }
-        loadOpsHistory();
-        source.close();
-        button.disabled = false;
-        button.textContent = originalLabel;
-        activeOpsStream = null;
-        if (opId === 'frontend-build' || opId === 'frontend-rollback') {
-            loadDeployStatus();
-        }
-    });
-
-    source.onerror = () => {
-        if (!activeOpsStream) return;
-        source.close();
-        if (spec?.disrupts_api) {
-            output.textContent = 'Command dispatched. The API is restarting; confirming recovery...';
-            waitForApiRecovery(output).then((recovered) => {
-                if (recovered) loadSystemHealth();
-            });
-        } else {
-            appendOpsOutput(output, 'Connection lost. Try again if needed.');
-        }
-        button.disabled = false;
-        button.textContent = originalLabel;
-        activeOpsStream = null;
-        loadOpsHistory();
-    };
-}
-
-async function waitForApiRecoverySilent() {
-    const maxAttempts = 6;
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-        await delay(1500 + attempt * 500);
-        try {
-            await fetchAdminAPI('/api/admin/diagnostics/health');
-            return true;
-        } catch (err) {
-            // keep trying
-        }
-    }
-    return false;
-}
-
-async function confirmOpsRecovery(runId) {
-    if (!runId || opsRecoveryPending.has(runId)) return;
-    opsRecoveryPending.add(runId);
-    try {
-        const recovered = await waitForApiRecoverySilent();
-        if (recovered) {
-            await fetchAdminAPI('/api/admin/diagnostics/ops-history/confirm', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: runId })
-            });
-            loadOpsHistory();
-        }
-    } catch (err) {
-        console.warn('Failed to confirm ops recovery.', err);
-    } finally {
-        opsRecoveryPending.delete(runId);
-    }
-}
-
-async function waitForApiRecovery(output) {
-    const maxAttempts = 6;
-    let lastError = '';
-    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-        await delay(2000 + attempt * 500);
-        try {
-            const health = await fetchAdminAPI('/api/admin/diagnostics/health');
-            const timestamp = health?.timestamp ? new Date(health.timestamp).toLocaleString() : 'now';
-            output.textContent = `API is back up. Health check OK (${timestamp}).`;
-            return true;
-        } catch (err) {
-            lastError = err?.message || 'Request failed';
-            output.textContent = `Waiting for API... (${attempt}/${maxAttempts})`;
-        }
-    }
-    output.textContent = `Still waiting for API. Try refreshing. Last error: ${lastError}`;
-    return false;
 }
 
 // Auto-refresh health status every 30 seconds
