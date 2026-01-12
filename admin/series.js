@@ -37,6 +37,7 @@ function createSeriesManager() {
       premiumOnly: el.seriesPremiumOnly,
       closeBtn: el.seriesModalClose,
       cancelBtn: el.seriesModalCancel,
+      deleteBtn: el.seriesModalDelete,
       saveBtn: el.seriesModalSave,
     };
   }
@@ -68,6 +69,7 @@ function createSeriesManager() {
       form,
       closeBtn,
       cancelBtn,
+      deleteBtn,
       idInput,
       unitSingular,
       unitPlural,
@@ -76,6 +78,7 @@ function createSeriesManager() {
 
     if (closeBtn) closeBtn.addEventListener("click", closeSeriesModal);
     if (cancelBtn) cancelBtn.addEventListener("click", closeSeriesModal);
+    if (deleteBtn) deleteBtn.addEventListener("click", handleSeriesModalDelete);
     modal.addEventListener("click", (event) => {
       if (event.target === modal) closeSeriesModal();
     });
@@ -106,6 +109,17 @@ function createSeriesManager() {
     }
 
     seriesModalBound = true;
+  }
+
+  function updateSeriesModalDeleteButton() {
+    const { deleteBtn } = getSeriesModalElements();
+    if (!deleteBtn) return;
+    const canDelete =
+      seriesModalMode === "edit" &&
+      seriesModalEditingId &&
+      seriesModalEditingId !== DEFAULT_SERIES_ID;
+    deleteBtn.style.display = canDelete ? "inline-flex" : "none";
+    deleteBtn.disabled = !canDelete;
   }
 
   function openSeriesModal(mode, series) {
@@ -162,6 +176,7 @@ function createSeriesManager() {
       premiumOnly.checked = !!series?.premiumOnly;
     }
 
+    updateSeriesModalDeleteButton();
     modal.classList.add("active");
     if (idInput && mode === "create") {
       idInput.focus();
@@ -691,6 +706,71 @@ function createSeriesManager() {
       setSeriesModalStatus(message, true);
     } finally {
       if (saveBtn) saveBtn.disabled = false;
+    }
+  }
+
+  async function handleSeriesModalDelete() {
+    if (!chaptersApi) return;
+    const { deleteBtn } = getSeriesModalElements();
+    const id = sanitizeSeriesId(seriesModalEditingId || "");
+    if (!id) {
+      setSeriesModalStatus("Series not found.", true);
+      return;
+    }
+    if (id === DEFAULT_SERIES_ID) {
+      setSeriesModalStatus("Default series cannot be deleted.", true);
+      return;
+    }
+    if (state.hasUnsavedChanges) {
+      const { plural } = getUnitLabels();
+      const proceed = window.confirm(
+        `You have unsaved changes in ${plural}. Deleting the series will discard them. Continue?`,
+      );
+      if (!proceed) return;
+    }
+
+    const seriesList = state.seriesIndex.series || [];
+    const current = seriesList.find((s) => s && s.id === id);
+    if (!current) {
+      setSeriesModalStatus("Series not found.", true);
+      return;
+    }
+
+    const seriesTitle = current.title || id;
+    const confirmed = window.confirm(
+      `Delete series \"${seriesTitle}\" (${id}) from the series list?\n\nThis hides it from the site but keeps its data in the database.`,
+    );
+    if (!confirmed) return;
+
+    const confirmedAgain = window.confirm(
+      "You can restore it later by creating a series with the same ID.\n\nContinue?",
+    );
+    if (!confirmedAgain) return;
+
+    if (deleteBtn) deleteBtn.disabled = true;
+    try {
+      setSeriesModalStatus("Deleting...", false);
+      const nextIndex = {
+        ...state.seriesIndex,
+        series: seriesList.filter((s) => s && s.id !== id),
+      };
+      await saveToServer("admin/series.json", nextIndex);
+      state.seriesIndex = nextIndex;
+
+      if (getActiveSeriesId() === id) {
+        await switchSeries(DEFAULT_SERIES_ID);
+      } else {
+        renderSeriesSelect();
+        updateSeriesLinks();
+        applyUnitLabels();
+      }
+
+      closeSeriesModal();
+    } catch (err) {
+      const message = err?.message || "Failed to delete series.";
+      setSeriesModalStatus(message, true);
+    } finally {
+      if (deleteBtn) deleteBtn.disabled = false;
     }
   }
 

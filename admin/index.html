@@ -1842,6 +1842,20 @@
       color: var(--bg-dark);
     }
 
+    .modal-actions .btn-delete {
+      padding: 10px 24px;
+      font-size: 1rem;
+      border-radius: 5px;
+      font-family: 'Bebas Neue', cursive;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      border-width: 2px;
+    }
+
+    .modal-actions .btn-delete:hover {
+      color: var(--bg-dark);
+    }
+
     /* ==================== PREVIEW SECTION ==================== */
     .preview-container {
       background: var(--bg-dark);
@@ -3964,6 +3978,7 @@
         </div>
 
         <div class="modal-actions">
+          <button type="button" class="btn-delete" id="seriesModalDelete">Delete Series</button>
           <button type="button" class="btn-cancel" id="seriesModalCancel">Cancel</button>
           <button type="submit" class="btn-save" id="seriesModalSave">Save Series</button>
         </div>

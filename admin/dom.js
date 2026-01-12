@@ -264,6 +264,7 @@ export const el = {
   seriesPremiumOnly: /** @type {HTMLInputElement | null} */ (document.getElementById('seriesPremiumOnly')),
   seriesModalClose: document.getElementById('seriesModalClose'),
   seriesModalCancel: document.getElementById('seriesModalCancel'),
+  seriesModalDelete: document.getElementById('seriesModalDelete'),
   seriesModalSave: document.getElementById('seriesModalSave'),
   unsavedIndicator: document.getElementById('unsavedIndicator'),
   confirmModal: document.getElementById('confirmModal'),

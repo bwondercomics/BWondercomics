@@ -335,58 +335,28 @@ def admin_analytics_summary(request: Request, db: Session = Depends(get_db)):
         "last7d": (now_ms - 7 * 24 * 60 * 60 * 1000, now_ms),
     }
 
-    warning = ""
-    source = "umami"
     referrers = []
     events = []
+    stats = {}
 
     try:
         stats = fetch_umami_stats(ranges)
 
         # Fetch referrers and events for the 7-day window
-        try:
-            start_7d, end_7d = ranges["last7d"]
-            referrers_data = fetch_umami_metrics(start_7d, end_7d, metric_type="referrer", limit=10)
-            events_data = fetch_umami_metrics(start_7d, end_7d, metric_type="event", limit=10)
+        start_7d, end_7d = ranges["last7d"]
+        referrers_data = fetch_umami_metrics(start_7d, end_7d, metric_type="referrer", limit=10)
+        events_data = fetch_umami_metrics(start_7d, end_7d, metric_type="event", limit=10)
 
-            # Transform to frontend format: [{x: "label", y: count}, ...]
-            referrers = [{"x": item.get("x", ""), "y": item.get("y", 0)} for item in referrers_data if item.get("x")]
-            events = [{"x": item.get("x", ""), "y": item.get("y", 0)} for item in events_data if item.get("x")]
-        except UmamiAPIError:
-            # If metrics fail, continue with empty arrays
-            pass
+        # Transform to frontend format: [{x: "label", y: count}, ...]
+        referrers = [{"x": item.get("x", ""), "y": item.get("y", 0)} for item in referrers_data if item.get("x")]
+        events = [{"x": item.get("x", ""), "y": item.get("y", 0)} for item in events_data if item.get("x")]
 
     except UmamiAPIError as exc:
-        source = "local"
-        warning = str(exc)
-        stats = {}
-        for name, (start, end) in ranges.items():
-            start_dt = datetime.fromtimestamp(start / 1000, tz=timezone.utc)
-            end_dt = datetime.fromtimestamp(end / 1000, tz=timezone.utc)
-            pageviews = db.scalar(
-                select(func.count()).select_from(VisitorEvent).where(
-                    VisitorEvent.created_at >= start_dt,
-                    VisitorEvent.created_at <= end_dt,
-                )
-            ) or 0
-            visitors = db.scalar(
-                select(func.count(distinct(VisitorEvent.visitor_id))).where(
-                    VisitorEvent.created_at >= start_dt,
-                    VisitorEvent.created_at <= end_dt,
-                )
-            ) or 0
-            stats[name] = {
-                "pageviews": int(pageviews),
-                "visitors": int(visitors),
-                "sessions": None,
-                "bounces": None,
-                "totaltime": None,
-            }
+        return JSONResponse(status_code=502, content={"error": f"Umami API error: {exc}"})
 
     return {
-        "source": source,
+        "source": "umami",
         "websiteId": settings.umami_website_id,
-        **({"warning": warning} if warning else {}),
         "ranges": {
             name: {**(stats.get(name, {}) or {}), "start": start, "end": end}
             for name, (start, end) in ranges.items()
