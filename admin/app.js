@@ -3,7 +3,7 @@ import { el } from "./dom.js";
 import { checkSession, login, logout } from "./auth.js";
 import { createChaptersApi } from "./chapters.js";
 import { getChapterFolder } from "./utils.js";
-import { COUNT_VIEWS_KEY, NAV_LAYOUT_KEY, state } from "./state.js";
+import { COUNT_VIEWS_KEY, HEADER_STICKY_KEY, NAV_LAYOUT_KEY, state } from "./state.js";
 import { saveToServer, showError, showSuccess } from "./core.js";
 import {
   applyNavLayout,
@@ -37,6 +37,8 @@ const SUPPORT_TEXT_HTML = `<span class="bubble-em">WANT TO SUPPORT THE COMIC?</s
   <span class="bubble-bold">Buy the physical book</span> at the
   <a class="bubble-highlight" href="https://bwondercomics.bigcartel.com/product/battle-bros-volume-1" target="_blank" rel="noopener noreferrer" aria-label="bwondercomics store link">bwondercomics store!</a>`;
 let analyticsManager;
+let headerStickyEnabled = false;
+let lastHeaderScrollY = 0;
 
 const DEFAULT_PAGE_CONFIG = {
   theme: {
@@ -123,6 +125,53 @@ function hideAllSections() {
 
 function getCountViewsEnabled() {
   return readStorage(COUNT_VIEWS_KEY) !== "false";
+}
+
+function updateHeaderMetrics() {
+  if (!el.adminDashboard || !el.adminHeader) return;
+  if (el.adminDashboard.classList.contains("header-hidden")) return;
+  const height = el.adminHeader.offsetHeight;
+  if (!height) return;
+  el.adminDashboard.style.setProperty("--admin-header-height", `${height}px`);
+}
+
+function setHeaderHidden(hidden) {
+  if (!el.adminDashboard) return;
+  const shouldHide = Boolean(hidden);
+  el.adminDashboard.classList.toggle("header-hidden", shouldHide);
+  if (!shouldHide) updateHeaderMetrics();
+}
+
+function applyHeaderSticky(enabled) {
+  headerStickyEnabled = Boolean(enabled);
+  if (el.stickyHeaderToggle) el.stickyHeaderToggle.checked = headerStickyEnabled;
+  if (el.adminDashboard) {
+    el.adminDashboard.classList.toggle("header-sticky", headerStickyEnabled);
+    if (headerStickyEnabled) {
+      el.adminDashboard.classList.remove("header-hidden");
+    }
+  }
+  if (!headerStickyEnabled) {
+    const current = window.scrollY || 0;
+    setHeaderHidden(current > 24);
+  } else {
+    setHeaderHidden(false);
+  }
+  updateHeaderMetrics();
+  requestAnimationFrame(updateHeaderMetrics);
+  lastHeaderScrollY = window.scrollY || 0;
+}
+
+function setHeaderStickyEnabled(enabled) {
+  applyHeaderSticky(enabled);
+  writeStorage(HEADER_STICKY_KEY, headerStickyEnabled ? "true" : "false");
+}
+
+function handleHeaderScroll() {
+  if (headerStickyEnabled || !el.adminDashboard) return;
+  const current = window.scrollY || 0;
+  setHeaderHidden(current > 24);
+  lastHeaderScrollY = current;
 }
 
 function applyCountViewsEnabled(enabled) {
@@ -436,6 +485,12 @@ function attachEventHandlers() {
       setScanlinesEnabled(target.checked);
     });
   }
+  if (el.stickyHeaderToggle) {
+    el.stickyHeaderToggle.addEventListener("change", (event) => {
+      const target = /** @type {HTMLInputElement} */ (event.currentTarget);
+      setHeaderStickyEnabled(target.checked);
+    });
+  }
   document.addEventListener("click", (event) => {
     const settingsOpen =
       el.adminSettingsPanel && !el.adminSettingsPanel.hasAttribute("hidden");
@@ -675,7 +730,12 @@ function attachEventHandlers() {
 async function init() {
   attachEventHandlers();
   initNavPreferences();
+  applyHeaderSticky(readStorage(HEADER_STICKY_KEY) === "true");
   applyCountViewsEnabled(getCountViewsEnabled());
+  updateHeaderMetrics();
+  lastHeaderScrollY = window.scrollY || 0;
+  window.addEventListener("scroll", handleHeaderScroll, { passive: true });
+  window.addEventListener("resize", updateHeaderMetrics);
   designerManager.initDesignerFrame();
   uploadManager.initUploadHandlers();
   const isAuthenticated = await checkSession(showDashboard);

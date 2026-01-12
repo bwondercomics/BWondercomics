@@ -28,6 +28,11 @@ bwondercomics.com {
 		reverse_proxy umami:3000
 	}
 
+	handle /admin/* {
+		root * /srv/bwondercomics/root
+		file_server
+	}
+
 	root * /srv/bwondercomics/dist
 	file_server
 }

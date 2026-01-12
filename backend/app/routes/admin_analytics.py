@@ -289,6 +289,7 @@ def admin_reader_analytics(
             "label": label,  # Frontend normalizer expects 'label'
             "value": label,  # Also used as value for detail requests
             "entryLabel": label,  # Keep for compatibility
+            "displayNumber": entry_stat["displayNumber"],  # For filtering
             "count": reads,
             "seriesId": sid,
             "seriesTitle": entry_stat["seriesTitle"] or "",
@@ -401,55 +402,119 @@ def admin_reader_series_analytics(
     total_seconds = int((now - start).total_seconds())
     bucket_seconds = max(3600, total_seconds // points)  # Minimum 1 hour buckets
 
-    # Build query with optional property filtering
+    # Check if we're counting finishes (completions) vs views
+    is_finish_metric = event == "reader_entry_complete"
+
+    # For finish metrics, we need page counts to determine completion
+    page_counts: dict[tuple[str, int], int] = {}
+    if is_finish_metric:
+        # Build lookup: (series_id, display_number) -> page_count
+        entries = db.scalars(select(Entry)).all()
+        entry_page_counts = {
+            entry_id: count
+            for entry_id, count in db.execute(
+                select(EntryPage.entry_id, func.count())
+                .group_by(EntryPage.entry_id)
+            ).all()
+        }
+        for entry in entries:
+            if entry.display_number is not None:
+                sid = entry.series_id or ""
+                pc = entry_page_counts.get(entry.id, 0)
+                if pc > 0:
+                    page_counts[(sid, int(entry.display_number))] = pc
+
+    # Build query - include visitor_id and page_number for finish calculations
     query = select(
         VisitorEvent.created_at,
+        VisitorEvent.visitor_id,
         VisitorEvent.entry_title,
         VisitorEvent.entry_label,
         VisitorEvent.series_id,
+        VisitorEvent.page_number,
     ).where(VisitorEvent.created_at >= start)
 
     # Apply property-based filtering if specified
+    filter_series_id = None
+    filter_display_num = None
     if prop and value:
         normalized_value = value.strip()
         if prop == "entryLabel":
-            # Match by entry title (displayed as entryLabel in frontend)
-            # Extract display number from the filter value
-            display_num = _extract_display_number(normalized_value)
-            if display_num is not None:
-                # Filter events that match this display number
-                # We'll filter in Python after fetching to match the main endpoint logic
-                pass
-            else:
-                # Fallback: match entry_title or entry_label directly
+            filter_display_num = _extract_display_number(normalized_value)
+            if filter_display_num is None:
                 query = query.where(
                     (VisitorEvent.entry_title == normalized_value) |
                     (VisitorEvent.entry_label == normalized_value)
                 )
         elif prop == "seriesId":
+            filter_series_id = normalized_value
+            query = query.where(VisitorEvent.series_id == normalized_value)
+        elif prop == "series":
+            # Series filter by series_id value
+            filter_series_id = normalized_value
             query = query.where(VisitorEvent.series_id == normalized_value)
 
     events = db.execute(query).all()
 
-    # Apply display_number filtering if needed (Python-side)
-    filtered_events = []
-    if prop == "entryLabel" and value:
-        target_display_num = _extract_display_number(value.strip())
-        if target_display_num is not None:
-            for created_at, entry_title, entry_label, series_id in events:
-                event_display_num = _extract_display_number(entry_label) or _extract_display_number(entry_title)
-                if event_display_num == target_display_num:
-                    filtered_events.append((created_at, entry_title, entry_label, series_id))
-            events = filtered_events
-        # If no display_num extracted, events already filtered by DB query
-
     # Create time buckets
     buckets: dict[int, int] = defaultdict(int)
-    for created_at, *_ in events:
-        # Calculate bucket index
-        seconds_since_start = int((created_at - start).total_seconds())
-        bucket_index = seconds_since_start // bucket_seconds
-        buckets[bucket_index] += 1
+
+    if is_finish_metric:
+        # For finishes: count unique visitor+entry combinations that reached last page
+        # Track first finish time per (visitor, series_id, display_num)
+        finish_times: dict[tuple[str, str, int], datetime] = {}
+
+        for created_at, visitor_id, entry_title, entry_label, series_id, page_number in events:
+            if not visitor_id or page_number is None:
+                continue
+
+            sid = series_id or ""
+            display_num = _extract_display_number(entry_label) or _extract_display_number(entry_title)
+            if display_num is None:
+                continue
+
+            # Apply display_number filter if specified
+            if filter_display_num is not None and display_num != filter_display_num:
+                continue
+
+            # Check if this page view is a completion
+            pc = page_counts.get((sid, display_num))
+            if pc is None or page_number < pc:
+                continue  # Not a finish
+
+            # Track first finish time per visitor+entry
+            key = (visitor_id, sid, display_num)
+            if key not in finish_times or created_at < finish_times[key]:
+                finish_times[key] = created_at
+
+        # Now bucket the finish times
+        for finish_time in finish_times.values():
+            seconds_since_start = int((finish_time - start).total_seconds())
+            bucket_index = seconds_since_start // bucket_seconds
+            buckets[bucket_index] += 1
+    else:
+        # For views: count unique visitors per time bucket
+        # Track unique visitors per bucket
+        bucket_visitors: dict[int, set] = defaultdict(set)
+
+        for created_at, visitor_id, entry_title, entry_label, series_id, page_number in events:
+            # Apply display_number filter if specified
+            if filter_display_num is not None:
+                display_num = _extract_display_number(entry_label) or _extract_display_number(entry_title)
+                if display_num != filter_display_num:
+                    continue
+
+            seconds_since_start = int((created_at - start).total_seconds())
+            bucket_index = seconds_since_start // bucket_seconds
+            if visitor_id:
+                bucket_visitors[bucket_index].add(visitor_id)
+            else:
+                # Anonymous event, count as 1
+                buckets[bucket_index] += 1
+
+        # Convert visitor sets to counts
+        for bucket_index, visitors in bucket_visitors.items():
+            buckets[bucket_index] += len(visitors)
 
     # Build response with time-series data
     series = []
@@ -473,4 +538,234 @@ def admin_reader_series_analytics(
         "generatedAt": iso_z(now),
         "windowDays": days,
         "series": series,
+    }
+
+
+@router.get("/api/admin/analytics/reads-over-time")
+def admin_reads_over_time(
+    request: Request,
+    db: Session = Depends(get_db),
+    time_range: str = Query("7d", alias="range"),
+    entry_id: str = Query(None),
+    series_id: str = Query(None),
+):
+    """Daily read counts for time-series chart. Supports aggregate or per-entry view."""
+    if not require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    # Parse range to days
+    days_map = {"7d": 7, "30d": 30, "90d": 90}
+    days = days_map.get(time_range, 7)
+
+    now = datetime.now(timezone.utc)
+    start = now - timedelta(days=days)
+
+    # Determine mode and entry filter
+    mode = "aggregate"
+    entry_label_filter = None
+    target_display_num = None
+
+    if entry_id and entry_id != "aggregate":
+        mode = "entry"
+        entry_label_filter = entry_id
+        # entry_id can be a direct display number (e.g., "5") or a label string
+        if entry_id.isdigit():
+            target_display_num = int(entry_id)
+        else:
+            target_display_num = _extract_display_number(entry_id)
+
+    # Fetch all events in range
+    query = (
+        select(
+            VisitorEvent.created_at,
+            VisitorEvent.visitor_id,
+            VisitorEvent.entry_label,
+            VisitorEvent.entry_title,
+            VisitorEvent.series_id,
+        )
+        .where(VisitorEvent.created_at >= start)
+    )
+
+    if series_id:
+        query = query.where(VisitorEvent.series_id == series_id)
+
+    events = db.execute(query).all()
+
+    # Group by date
+    daily_counts: dict[str, dict] = {}
+    for created_at, visitor_id, entry_label, entry_title, evt_series_id in events:
+        # Apply entry filter if in entry mode
+        if mode == "entry" and target_display_num is not None:
+            event_display_num = _extract_display_number(entry_label) or _extract_display_number(entry_title)
+            if event_display_num != target_display_num:
+                continue
+
+        date_str = created_at.date().isoformat()
+        if date_str not in daily_counts:
+            daily_counts[date_str] = {"count": 0, "visitors": set()}
+        daily_counts[date_str]["count"] += 1
+        if visitor_id:
+            daily_counts[date_str]["visitors"].add(visitor_id)
+
+    # Build response with all dates in range (including zeros)
+    series = []
+    total_reads = 0
+    all_visitors: set[str] = set()
+
+    current = start.date()
+    end_date = now.date()
+    while current <= end_date:
+        date_str = current.isoformat()
+        data = daily_counts.get(date_str, {"count": 0, "visitors": set()})
+        count = data["count"]
+        visitors = data["visitors"]
+
+        total_reads += count
+        all_visitors.update(visitors)
+
+        series.append({
+            "date": date_str,
+            "count": count,
+            "uniqueVisitors": len(visitors),
+        })
+        current += timedelta(days=1)
+
+    return {
+        "generatedAt": iso_z(now),
+        "range": time_range,
+        "mode": mode,
+        "entryLabel": entry_label_filter,
+        "series": series,
+        "totals": {
+            "reads": total_reads,
+            "uniqueVisitors": len(all_visitors),
+        },
+    }
+
+
+@router.get("/api/admin/analytics/weekly-digest")
+def admin_weekly_digest(
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """This week vs last week comparison for dashboard card."""
+    if not require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    now = datetime.now(timezone.utc)
+    today = now.date()
+
+    # Week boundaries (Monday to Sunday)
+    days_since_monday = today.weekday()
+    this_week_start = datetime.combine(
+        today - timedelta(days=days_since_monday),
+        datetime.min.time(),
+        tzinfo=timezone.utc
+    )
+    this_week_end = now
+
+    last_week_start = this_week_start - timedelta(days=7)
+    last_week_end = this_week_start
+
+    # Get entry page counts for finish calculation
+    page_counts = {
+        entry_id: count
+        for entry_id, count in db.execute(
+            select(EntryPage.entry_id, func.count())
+            .group_by(EntryPage.entry_id)
+        ).all()
+    }
+
+    entries = db.scalars(select(Entry)).all()
+    entry_lookup: dict[tuple[str, int], dict] = {}
+    for entry in entries:
+        if entry.display_number is not None:
+            key = (entry.series_id or "", int(entry.display_number))
+            entry_lookup[key] = {
+                "id": entry.id,
+                "pageCount": page_counts.get(entry.id, 0),
+            }
+
+    def calculate_period_stats(start_dt: datetime, end_dt: datetime) -> dict:
+        events = db.execute(
+            select(
+                VisitorEvent.visitor_id,
+                VisitorEvent.series_id,
+                VisitorEvent.entry_label,
+                VisitorEvent.entry_title,
+                VisitorEvent.page_number,
+            )
+            .where(VisitorEvent.created_at >= start_dt)
+            .where(VisitorEvent.created_at < end_dt)
+        ).all()
+
+        unique_visitors: set[str] = set()
+        reads_by_entry: dict[tuple[str, int], set] = {}
+        max_page_by_visitor_entry: dict[tuple[str, str, int], int] = {}
+
+        for visitor_id, series_id, entry_label, entry_title, page_number in events:
+            sid = series_id or ""
+            display_num = _extract_display_number(entry_label) or _extract_display_number(entry_title)
+
+            if visitor_id:
+                unique_visitors.add(visitor_id)
+
+            if display_num is None:
+                continue
+
+            key = (sid, display_num)
+            if key not in reads_by_entry:
+                reads_by_entry[key] = set()
+            if visitor_id:
+                reads_by_entry[key].add(visitor_id)
+
+            if visitor_id and page_number is not None:
+                vkey = (visitor_id, sid, display_num)
+                current = max_page_by_visitor_entry.get(vkey, 0)
+                max_page_by_visitor_entry[vkey] = max(current, int(page_number))
+
+        total_reads = sum(len(v) for v in reads_by_entry.values())
+
+        # Calculate finishes
+        total_finishes = 0
+        for (visitor_id, sid, display_num), max_page in max_page_by_visitor_entry.items():
+            entry_info = entry_lookup.get((sid, display_num))
+            if entry_info and entry_info["pageCount"] > 0:
+                if max_page >= entry_info["pageCount"]:
+                    total_finishes += 1
+
+        completion_rate = total_finishes / total_reads if total_reads > 0 else 0
+
+        return {
+            "reads": total_reads,
+            "finishes": total_finishes,
+            "completionRate": round(completion_rate, 4),
+            "uniqueVisitors": len(unique_visitors),
+        }
+
+    this_week = calculate_period_stats(this_week_start, this_week_end)
+    this_week["startDate"] = this_week_start.date().isoformat()
+    this_week["endDate"] = this_week_end.date().isoformat()
+
+    last_week = calculate_period_stats(last_week_start, last_week_end)
+    last_week["startDate"] = last_week_start.date().isoformat()
+    last_week["endDate"] = last_week_end.date().isoformat()
+
+    def calc_change(current: float, previous: float) -> dict:
+        diff = current - previous
+        pct = diff / previous if previous != 0 else (1.0 if diff > 0 else 0.0)
+        return {"value": round(diff, 4), "percent": round(pct, 4)}
+
+    changes = {
+        "reads": calc_change(this_week["reads"], last_week["reads"]),
+        "finishes": calc_change(this_week["finishes"], last_week["finishes"]),
+        "completionRate": calc_change(this_week["completionRate"], last_week["completionRate"]),
+        "uniqueVisitors": calc_change(this_week["uniqueVisitors"], last_week["uniqueVisitors"]),
+    }
+
+    return {
+        "generatedAt": iso_z(now),
+        "thisWeek": this_week,
+        "lastWeek": last_week,
+        "changes": changes,
     }

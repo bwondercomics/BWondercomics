@@ -86,6 +86,47 @@ def _git_info() -> dict:
     }
 
 
+def _fail2ban_status() -> dict:
+    snapshot_path = settings.base_dir / "var" / "diagnostics" / "fail2ban.json"
+    if not snapshot_path.exists():
+        return {
+            "status": "warning",
+            "message": "Fail2ban snapshot missing (enable host status timer).",
+        }
+    try:
+        payload = json.loads(snapshot_path.read_text())
+    except Exception as exc:
+        return {
+            "status": "warning",
+            "message": f"Fail2ban snapshot unreadable: {exc}",
+        }
+    if not isinstance(payload, dict):
+        return {
+            "status": "warning",
+            "message": "Fail2ban snapshot invalid.",
+        }
+
+    status = str(payload.get("status") or "warning").lower()
+    updated_at = payload.get("updatedAt")
+    if isinstance(updated_at, str):
+        try:
+            parsed = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
+            age_seconds = (datetime.now(timezone.utc) - parsed).total_seconds()
+            if age_seconds > 900:
+                age_minutes = int(age_seconds // 60)
+                status = "warning"
+                payload["message"] = (
+                    f"Fail2ban snapshot stale ({age_minutes} min old)."
+                )
+        except Exception:
+            status = "warning"
+            payload["message"] = "Fail2ban snapshot has invalid timestamp."
+
+    payload["status"] = status
+    payload.setdefault("message", "Fail2ban snapshot loaded.")
+    return payload
+
+
 def _dist_info() -> dict:
     dist_dir = settings.base_dir / "dist"
     if not dist_dir.exists():
@@ -190,15 +231,18 @@ def diagnostics_health(request: Request, db: Session = Depends(get_db)):
         db_ok = False
         db_message = f"Database connection failed: {str(e)}"
 
+    checks = {
+        "database": {
+            "status": "ok" if db_ok else "error",
+            "message": db_message,
+        },
+        "fail2ban": _fail2ban_status(),
+    }
+
     return {
         "status": "healthy" if db_ok else "degraded",
         "timestamp": iso_z(datetime.now(timezone.utc)),
-        "checks": {
-            "database": {
-                "status": "ok" if db_ok else "error",
-                "message": db_message,
-            }
-        },
+        "checks": checks,
     }
 
 

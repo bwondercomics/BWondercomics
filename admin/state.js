@@ -9,6 +9,7 @@ const ANALYTICS_LIVE_ENDPOINT = "/api/admin/analytics/live";
 const NAV_LAYOUT_KEY = "battlebros_admin_nav_layout";
 const NAV_COLLAPSED_KEY = "battlebros_admin_nav_collapsed";
 const SCANLINES_KEY = "battlebros_admin_scanlines";
+const HEADER_STICKY_KEY = "battlebros_admin_sticky_header";
 const COUNT_VIEWS_KEY = "battlebros_count_views";
 
 // Central admin UI state; primary data comes from DB-backed endpoints.
@@ -45,6 +46,7 @@ export {
   ANALYTICS_LIVE_ENDPOINT,
   COUNT_VIEWS_KEY,
   DEFAULT_SERIES_ID,
+  HEADER_STICKY_KEY,
   NAV_COLLAPSED_KEY,
   NAV_LAYOUT_KEY,
   SCANLINES_KEY,

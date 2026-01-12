@@ -5,6 +5,7 @@ const COMMENTS_ENDPOINT = "/api/admin/comments/recent";
 const USERS_ENDPOINT = "/api/admin/users";
 const ANALYTICS_ENDPOINT = "/api/admin/analytics/summary";
 const READER_ANALYTICS_ENDPOINT = "/api/admin/analytics/reader";
+const WEEKLY_DIGEST_ENDPOINT = "/api/admin/analytics/weekly-digest";
 const BLUESKY_NOTIFICATIONS_ENDPOINT = "/api/admin/bluesky/notifications";
 const BLUESKY_STATUS_ENDPOINT = "/api/admin/bluesky/status";
 const TODOS_ENDPOINT = "/api/admin/todos";
@@ -420,6 +421,52 @@ function renderConnections(status = {}) {
   renderList(el.dashConnectionsList, null, connections, buildListItem);
 }
 
+function formatChangeIndicator(change) {
+  const value = change?.value ?? 0;
+  const percent = change?.percent ?? 0;
+  const isPositive = value > 0;
+  const isNeutral = value === 0;
+
+  const arrow = isPositive ? "\u2191" : isNeutral ? "\u2013" : "\u2193";
+  const colorClass = isPositive ? "change-positive" : isNeutral ? "change-neutral" : "change-negative";
+  const percentText = Math.abs(Math.round(percent * 100));
+
+  return `<span class="change-indicator ${colorClass}">${arrow} ${percentText}%</span>`;
+}
+
+function renderWeeklyDigest(payload) {
+  if (!payload || !el.weeklyDigestCard) return;
+
+  const tw = payload.thisWeek || {};
+  const changes = payload.changes || {};
+
+  if (el.weeklyDigestReads) {
+    el.weeklyDigestReads.textContent = formatStat(tw.reads);
+  }
+  if (el.weeklyDigestFinishes) {
+    el.weeklyDigestFinishes.textContent = formatStat(tw.finishes);
+  }
+  if (el.weeklyDigestCompletionRate) {
+    el.weeklyDigestCompletionRate.textContent = formatPercent(tw.completionRate);
+  }
+  if (el.weeklyDigestVisitors) {
+    el.weeklyDigestVisitors.textContent = formatStat(tw.uniqueVisitors);
+  }
+
+  if (el.weeklyDigestReadsChange) {
+    el.weeklyDigestReadsChange.innerHTML = formatChangeIndicator(changes.reads);
+  }
+  if (el.weeklyDigestFinishesChange) {
+    el.weeklyDigestFinishesChange.innerHTML = formatChangeIndicator(changes.finishes);
+  }
+  if (el.weeklyDigestCompletionRateChange) {
+    el.weeklyDigestCompletionRateChange.innerHTML = formatChangeIndicator(changes.completionRate);
+  }
+  if (el.weeklyDigestVisitorsChange) {
+    el.weeklyDigestVisitorsChange.innerHTML = formatChangeIndicator(changes.uniqueVisitors);
+  }
+}
+
 async function deleteTodo(todoId) {
   if (!todoId) return;
   const ok = confirm("Remove this todo?");
@@ -556,6 +603,7 @@ function createDashboard({ hideAllSections, setActiveNav, loadPosts } = {}) {
         usersResult,
         analyticsResult,
         readerResult,
+        weeklyDigestResult,
         blueskyResult,
         blueskyStatusResult,
         todosResult,
@@ -565,6 +613,7 @@ function createDashboard({ hideAllSections, setActiveNav, loadPosts } = {}) {
           fetchJson(USERS_ENDPOINT),
           fetchJson(ANALYTICS_ENDPOINT),
           fetchJson(`${READER_ANALYTICS_ENDPOINT}?range=7d`),
+          fetchJson(WEEKLY_DIGEST_ENDPOINT),
           fetchJson(`${BLUESKY_NOTIFICATIONS_ENDPOINT}?limit=${BLUESKY_LIMIT}`),
           fetchJson(BLUESKY_STATUS_ENDPOINT),
           fetchJson(`${TODOS_ENDPOINT}?limit=${TODO_LIMIT}`),
@@ -625,6 +674,13 @@ function createDashboard({ hideAllSections, setActiveNav, loadPosts } = {}) {
         renderReaderSummary(readerResult.value);
       } else {
         renderReaderSummary({});
+      }
+
+      // Weekly Digest
+      if (weeklyDigestResult.status === "fulfilled") {
+        renderWeeklyDigest(weeklyDigestResult.value);
+      } else {
+        renderWeeklyDigest({});
       }
 
       if (summaryOk && readerOk) {

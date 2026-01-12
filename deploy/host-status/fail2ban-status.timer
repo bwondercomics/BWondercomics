@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh fail2ban status snapshot for BWonderComics admin
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+AccuracySec=10s
+Persistent=true
+
+[Install]
+WantedBy=timers.target

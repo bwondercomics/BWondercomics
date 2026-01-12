@@ -7,7 +7,11 @@ import {
   ANALYTICS_LIVE_ENDPOINT,
 } from "./state.js";
 
+const READS_OVER_TIME_ENDPOINT = "/api/admin/analytics/reads-over-time";
+
 const activeReaderDetails = new Map();
+let readsOverTimeData = [];
+let readsOverTimeCtx = null;
 let lastReaderPayload = null;
 let lastReaderSeriesFilter = "all";
 const LIVE_REFRESH_MS = 5 * 60 * 1000;
@@ -292,20 +296,21 @@ function collectSeriesOptions(payload) {
   const seriesViews = Array.isArray(payload?.seriesViews)
     ? payload.seriesViews
     : [];
+  // Use seriesTitle (label) for display and filtering consistency
   const fromSeriesViews = seriesViews
-    .map((item) => String(item?.value || item?.label || "").trim())
+    .map((item) => String(item?.seriesTitle || item?.label || item?.value || "").trim())
     .filter(Boolean);
   if (fromSeriesViews.length) {
     return Array.from(new Set(fromSeriesViews));
   }
 
+  // Fallback: collect from entryViews using seriesTitle field
   const entryViews = Array.isArray(payload?.entryViews)
     ? payload.entryViews
     : [];
   const seriesSet = new Set();
   entryViews.forEach((item) => {
-    const label = item?.entryLabel || item?.value || item?.label || "";
-    const series = extractSeriesName(label);
+    const series = item?.seriesTitle || "";
     if (series) seriesSet.add(series);
   });
   return Array.from(seriesSet);
@@ -343,10 +348,17 @@ function filterEntryItems(items, seriesFilter) {
   const list = Array.isArray(items) ? items : [];
   if (!seriesFilter || seriesFilter === "all") return list;
   return list.filter((item) => {
+    // Use seriesTitle or seriesId field directly (preferred)
+    const seriesTitle = item?.seriesTitle || "";
+    const seriesId = item?.seriesId || "";
+    if (seriesTitle === seriesFilter || seriesId === seriesFilter) {
+      return true;
+    }
+    // Fallback: extract from label format "Series | Entry N"
     const label =
       item?.entryLabel || item?.stopLabel || item?.value || item?.label || "";
-    const series = extractSeriesName(label);
-    return series === seriesFilter;
+    const extractedSeries = extractSeriesName(label);
+    return extractedSeries === seriesFilter;
   });
 }
 
@@ -1367,6 +1379,230 @@ async function loadReaderAnalytics({ showLoading = true } = {}) {
   }
 }
 
+// Reads Over Time Chart
+function getReadsOverTimeRange() {
+  return (el.readsOverTimeRange?.value || "7d").trim();
+}
+
+function getReadsOverTimeMode() {
+  return (el.readsOverTimeMode?.value || "aggregate").trim();
+}
+
+function getReadsOverTimeEntry() {
+  return (el.readsOverTimeEntry?.value || "").trim();
+}
+
+function setReadsOverTimeStatus(message, isError = false) {
+  if (!el.readsOverTimeStatus) return;
+  el.readsOverTimeStatus.textContent = message || "";
+  el.readsOverTimeStatus.style.display = message ? "block" : "none";
+  el.readsOverTimeStatus.className = isError ? "error-message" : "success-message";
+}
+
+function updateReadsOverTimeEntryOptions(payload) {
+  if (!el.readsOverTimeEntry) return;
+  const entryViews = Array.isArray(payload?.entryViews) ? payload.entryViews : [];
+  // Filter to entries with valid displayNumber
+  const validEntries = entryViews
+    .filter((item) => item?.displayNumber != null)
+    .slice(0, 50);
+
+  const current = getReadsOverTimeEntry();
+  el.readsOverTimeEntry.innerHTML = "";
+
+  validEntries.forEach((item) => {
+    const option = document.createElement("option");
+    // Use displayNumber as value for backend filtering
+    option.value = String(item.displayNumber);
+    const label = item.label || `Entry ${item.displayNumber}`;
+    option.textContent = label.length > 25 ? label.slice(0, 25) + "…" : label;
+    el.readsOverTimeEntry.appendChild(option);
+  });
+
+  const validValues = validEntries.map((e) => String(e.displayNumber));
+  if (current && validValues.includes(current)) {
+    el.readsOverTimeEntry.value = current;
+  } else if (validEntries.length) {
+    el.readsOverTimeEntry.value = String(validEntries[0].displayNumber);
+  }
+}
+
+function drawReadsOverTimeChart() {
+  const canvas = el.readsOverTimeCanvas;
+  if (!canvas || !(canvas instanceof HTMLCanvasElement)) return;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const rect = canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const width = rect.width;
+  const height = rect.height;
+  const padding = { top: 20, right: 20, bottom: 30, left: 45 };
+
+  ctx.clearRect(0, 0, width, height);
+
+  const data = readsOverTimeData;
+  if (!data || !data.length) {
+    ctx.fillStyle = "rgba(255,255,255,0.7)";
+    ctx.font = "12px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("No data available", width / 2, height / 2);
+    return;
+  }
+
+  // Calculate scales
+  const maxCount = Math.max(...data.map((d) => d.count || 0), 1);
+  const chartWidth = width - padding.left - padding.right;
+  const chartHeight = height - padding.top - padding.bottom;
+  const xScale = chartWidth / Math.max(data.length - 1, 1);
+  const yScale = chartHeight / maxCount;
+
+  // Draw grid lines
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const y = padding.top + (chartHeight * i) / 4;
+    ctx.beginPath();
+    ctx.moveTo(padding.left, y);
+    ctx.lineTo(width - padding.right, y);
+    ctx.stroke();
+  }
+
+  // Draw line
+  const lineColor = getCssVar("--accent", "#ffed00");
+  const glowColor = getCssVar("--secondary", "#ff00ea");
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = "round";
+  ctx.shadowColor = glowColor;
+  ctx.shadowBlur = 6;
+  ctx.beginPath();
+
+  data.forEach((point, i) => {
+    const x = padding.left + i * xScale;
+    const y = padding.top + chartHeight - (point.count || 0) * yScale;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // Draw points
+  ctx.fillStyle = lineColor;
+  data.forEach((point, i) => {
+    const x = padding.left + i * xScale;
+    const y = padding.top + chartHeight - (point.count || 0) * yScale;
+    ctx.beginPath();
+    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // Draw x-axis labels
+  ctx.fillStyle = "rgba(255,255,255,0.7)";
+  ctx.font = "10px sans-serif";
+  ctx.textAlign = "center";
+  const step = Math.max(1, Math.floor(data.length / 7));
+  data.forEach((point, i) => {
+    if (i % step === 0 || i === data.length - 1) {
+      const x = padding.left + i * xScale;
+      const date = new Date(point.date);
+      const label = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      ctx.fillText(label, x, height - 10);
+    }
+  });
+
+  // Draw y-axis labels
+  ctx.textAlign = "right";
+  for (let i = 0; i <= 4; i++) {
+    const value = Math.round((maxCount * (4 - i)) / 4);
+    const y = padding.top + (chartHeight * i) / 4;
+    ctx.fillText(String(value), padding.left - 8, y + 4);
+  }
+}
+
+async function loadReadsOverTime({ showLoading = true } = {}) {
+  if (!el.readsOverTimeCanvas) return;
+
+  const range = getReadsOverTimeRange();
+  const mode = getReadsOverTimeMode();
+  const entryId = mode === "entry" ? getReadsOverTimeEntry() : null;
+
+  // Show/hide entry selector based on mode
+  if (el.readsOverTimeEntry) {
+    el.readsOverTimeEntry.style.display = mode === "entry" ? "inline-block" : "none";
+  }
+
+  const params = new URLSearchParams({ range });
+  if (entryId) params.append("entry_id", entryId);
+
+  if (showLoading) setReadsOverTimeStatus("Loading chart data…");
+
+  try {
+    const res = await fetch(`${READS_OVER_TIME_ENDPOINT}?${params.toString()}`, {
+      cache: "no-store",
+    });
+    let payload = null;
+    try {
+      payload = await res.json();
+    } catch (err) {
+      payload = null;
+    }
+
+    if (!res.ok) {
+      const errorText =
+        (payload && typeof payload === "object" && payload.error) || `HTTP ${res.status}`;
+      throw new Error(errorText);
+    }
+
+    readsOverTimeData = Array.isArray(payload?.series) ? payload.series : [];
+    drawReadsOverTimeChart();
+
+    // Update totals display
+    if (el.readsOverTimeTotals && payload?.totals) {
+      const { reads, uniqueVisitors } = payload.totals;
+      el.readsOverTimeTotals.textContent = `Total: ${formatStat(reads)} reads · ${formatStat(uniqueVisitors)} visitors`;
+    }
+
+    setReadsOverTimeStatus("");
+  } catch (err) {
+    readsOverTimeData = [];
+    drawReadsOverTimeChart();
+    setReadsOverTimeStatus(err?.message || "Unable to load chart data.", true);
+  }
+}
+
+function initReadsOverTimeControls() {
+  if (el.readsOverTimeRange) {
+    el.readsOverTimeRange.addEventListener("change", () => {
+      loadReadsOverTime({ showLoading: true });
+    });
+  }
+
+  if (el.readsOverTimeMode) {
+    el.readsOverTimeMode.addEventListener("change", () => {
+      loadReadsOverTime({ showLoading: true });
+    });
+  }
+
+  if (el.readsOverTimeEntry) {
+    el.readsOverTimeEntry.addEventListener("change", () => {
+      loadReadsOverTime({ showLoading: true });
+    });
+  }
+
+  // Update entry options when reader analytics loads
+  window.addEventListener("resize", () => {
+    if (readsOverTimeData.length) {
+      drawReadsOverTimeChart();
+    }
+  });
+}
+
 function createAnalytics({ hideAllSections, setActiveNav }) {
   function renderReaderAnalyticsView() {
     renderReaderAnalytics(lastReaderPayload || {});
@@ -1375,7 +1611,11 @@ function createAnalytics({ hideAllSections, setActiveNav }) {
   function refreshAnalytics({ showLoading = true } = {}) {
     loadAnalyticsSummary({ showLoading });
     loadAnalyticsPages({ showLoading });
-    loadReaderAnalytics({ showLoading });
+    loadReaderAnalytics({ showLoading }).then(() => {
+      // Update entry options after reader analytics loads
+      updateReadsOverTimeEntryOptions(lastReaderPayload);
+    });
+    loadReadsOverTime({ showLoading });
   }
 
   function showAnalyticsSection() {
@@ -1388,10 +1628,14 @@ function createAnalytics({ hideAllSections, setActiveNav }) {
     refreshAnalytics({ showLoading: true });
   }
 
+  // Initialize Reads Over Time controls
+  initReadsOverTimeControls();
+
   return {
     loadAnalyticsSummary,
     loadAnalyticsPages,
     loadReaderAnalytics,
+    loadReadsOverTime,
     loadLiveVisitors,
     renderReaderAnalyticsView,
     refreshAnalytics,

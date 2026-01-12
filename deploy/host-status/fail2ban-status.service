@@ -1,0 +1,7 @@
+[Unit]
+Description=Capture fail2ban status snapshot for BWonderComics admin
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/env python3 /srv/bw-quality/deploy/host-status/fail2ban_status.py
