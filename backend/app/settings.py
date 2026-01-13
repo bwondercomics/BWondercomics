@@ -40,6 +40,7 @@ class Settings:
     umami_api_token: str
     umami_api_username: str
     umami_api_password: str
+    umami_database_url: str
 
 
 def load_settings() -> Settings:
@@ -88,6 +89,18 @@ def load_settings() -> Settings:
     umami_api_username = (os.environ.get("UMAMI_API_USERNAME") or "").strip()
     umami_api_password = (os.environ.get("UMAMI_API_PASSWORD") or "").strip()
 
+    # Umami database connection for direct queries
+    umami_database_url = (os.environ.get("UMAMI_DATABASE_URL") or "").strip()
+    if not umami_database_url:
+        umami_db_user = (os.environ.get("UMAMI_DB_USER") or "umami").strip()
+        umami_db_password = (os.environ.get("UMAMI_DB_PASSWORD") or "").strip()
+        umami_db_name = (os.environ.get("UMAMI_DB_NAME") or "umami").strip()
+        umami_db_host = "umami-db" if _in_docker() else "127.0.0.1"
+        umami_db_host = (os.environ.get("UMAMI_DB_HOST") or umami_db_host).strip()
+        umami_db_port = (os.environ.get("UMAMI_DB_PORT") or "5432").strip()
+        if umami_db_password:
+            umami_database_url = f"postgresql+psycopg://{umami_db_user}:{umami_db_password}@{umami_db_host}:{umami_db_port}/{umami_db_name}"
+
     return Settings(
         base_dir=base_dir,
         host=host,
@@ -108,6 +121,7 @@ def load_settings() -> Settings:
         umami_api_token=umami_api_token,
         umami_api_username=umami_api_username,
         umami_api_password=umami_api_password,
+        umami_database_url=umami_database_url,
     )
 
 

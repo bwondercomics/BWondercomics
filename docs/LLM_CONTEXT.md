@@ -8,7 +8,7 @@ This document is a concise handoff for new threads/agents. It captures how the s
   - Reader UI: `reader/` + `index.html` + `assets/css/main.css` + `assets/*`
   - Admin UI: `admin/`
 - Backend: `backend/` (FastAPI + SQLAlchemy)
-- Built frontend: `dist/` (served in production)
+- Built frontend: `dist/` (public pages served from here in production)
 - Frontend build snapshots: `var/releases/dist-YYYYMMDD-HHMMSS.tar.gz`
 - Media/content: `media/`, `chapters/`, `comics/<seriesId>/chapters/`
 - Deploy config: `deploy/bwondercomics-compose.yml`, `deploy/Caddyfile`, `deploy/bwondercomics.env`
@@ -58,17 +58,19 @@ Machine reboot depends on host OS (not in repo). After reboot, verify services w
 - Serves static:
   - `/assets/*` from `dist/assets` (fallback to repo `/assets`)
   - `/media/*` and `/chapters/*` from filesystem
+  - `/admin/*` from repo root (`/srv/bwondercomics/root`) so admin uses source files
   - `/` root from `dist/`
 
 If the site turns into plain text or missing CSS/JS, confirm the `/assets/*` handler is correct and Caddy is running. The Caddyfile is sensitive to formatting; validate after edits.
 
 ## Frontend Workflow
 - Edit source files in `reader/`, `admin/`, `assets/`, and top-level HTML files.
-- Build `dist/` after changes:
+- Rebuild `dist/` after changes to public pages or shared assets:
 ```
 ./scripts/frontend-build.sh
 ```
 This also snapshots the current `dist/` into `var/releases/`.
+Admin is currently served from `admin/` (repo source) via Caddy; rebuilding `dist/` is optional for admin-only changes unless you change Caddy to serve admin from `dist/`.
 
 Avoid editing `dist/` directly. Treat it as build output only.
 

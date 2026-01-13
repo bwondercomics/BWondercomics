@@ -24,8 +24,9 @@ If you don’t have `make`, run the equivalent commands shown in `Makefile`.
 2. Start services: `make up`
 3. Run migrations: `make migrate`
 4. Open:
-   - Site: `http://localhost:8000/`
-   - Admin: `http://localhost:8000/admin/`
+   - Site (via Caddy): `http://localhost/`
+   - Admin: `http://localhost/admin/`
+   - API (direct, debug only): `http://localhost:8000/healthz`
 
 ### Deploy/update on a server
 1. Pull latest code: `git pull`
@@ -40,8 +41,8 @@ If you don’t have `make`, run the equivalent commands shown in `Makefile`.
    - `UMAMI_API_USERNAME` and `UMAMI_API_PASSWORD` (Umami user for the admin analytics API; create a read-only account)
 2. Start Umami: `make analytics-up` (or `make up-analytics` on a fresh server)
 3. Open:
-   - Umami via the site proxy: `http://localhost:8000/umami/`
-   - Admin analytics summary: `http://localhost:8000/admin/` → **Analytics** (shows counts fetched from Umami; no embedded dashboard)
+   - Umami via the site proxy: `http://localhost/umami/`
+   - Admin analytics summary: `http://localhost/admin/` → **Analytics** (shows counts fetched from Umami; no embedded dashboard)
 4. After creating a site in Umami, set `UMAMI_WEBSITE_ID=...` in `deploy/bwondercomics.env`, then run `make restart`.
 
 ### Back up everything that matters
@@ -64,6 +65,10 @@ DB restore and file restore are destructive by nature.
   - Default series pages: `chapters/`
   - Other series pages: `comics/<seriesId>/chapters/`
 - Media library files live under `media/` (index + tags are stored in Postgres).
+
+## Frontend builds
+- Edit source files in `reader/`, `admin/`, `assets/`, and top-level HTML files.
+- Rebuild static output with `./scripts/frontend-build.sh` (also snapshots `dist/` into `var/releases/`).
 
 ## Common issues
 - **Admin says “not an admin”**: the first registered account becomes `admin`; after that, an existing admin must promote roles in the **Users** section.

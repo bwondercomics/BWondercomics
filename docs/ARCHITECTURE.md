@@ -5,8 +5,9 @@ This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic p
 ## Components
 - Frontend (static): `index.html`, `feed.html`, `media.html`, `comics.html`, plus `reader/` + `admin/` JS modules.
 - Static assets (site chrome): `assets/` (icons, banners, UI images used by the site/theme).
-- Backend (dynamic): FastAPI app in `backend/` (Docker-friendly).
-- Database: Postgres (recommended) for users, comments, and posts.
+- Reverse proxy + file server: Caddy (see `deploy/Caddyfile`) serves `/` from `dist/` and `/admin/*` from repo source, and proxies API routes.
+- Backend (dynamic): FastAPI app in `backend/` (Docker-friendly). API only (no static hosting).
+- Database: Postgres (recommended) for users, comments, posts, series, entries, and media.
 
 ## Data sources
 - Series + entries (including per-series entry labels) + status message: Postgres (served to the frontend as DB-backed JSON at `admin/data.json` and `admin/series/<id>/data.json`).
@@ -17,9 +18,8 @@ This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic p
 - Page configs: Postgres table, served at `/admin/page-config.json` and `/admin/series/<id>/page-config.json`.
 
 ## Runtime routing
-The FastAPI app serves both:
-- API routes under `/api/*` (and `/rss.xml`), and
-- the static site mounted at `/` (repo root).
+- Caddy serves static pages and assets, and proxies `/api/*` + JSON endpoints to the FastAPI app.
+- FastAPI serves API routes under `/api/*` (and `/rss.xml`); it does not serve static files.
 
 ## API (current contract)
 - Series + entries (DB-backed JSON views, used by reader/admin):
@@ -54,4 +54,4 @@ Admin analytics pulls Umami stats via API (no embedded dashboard).
 In Docker, Umami runs as an optional compose profile (`analytics`) alongside the main stack.
 
 ## Data seeding
-- The JSON chapter files are treated as a seed; the backend imports them into Postgres and then serves DB-backed JSON at the same paths.
+- The backend seeds a default series only if the DB is empty. JSON endpoints are always DB-backed; do not treat static JSON or HTML files as a data source.

@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import VisitorEvent, VisitorSession
+from ..models import VisitorSession
 from ..security import get_current_user
 
 
@@ -109,23 +109,8 @@ def track_visitor(payload: TrackVisitorRequest, request: Request, db: Session = 
         )
         db.add(session)
 
-    db.add(
-        VisitorEvent(
-            id=uuid4(),
-            visitor_id=visitor_id[:120],
-            user_id=user.id if user else None,
-            ip_address=client_ip or None,
-            origin=_normalize(payload.origin, 300),
-            referrer=_normalize(payload.referrer, 500),
-            path=_normalize(payload.path, 300),
-            title=_normalize(payload.title, 300),
-            series_id=series_id,
-            entry_title=entry_title,
-            entry_label=entry_label,
-            page_number=payload.page_number,
-            created_at=now,
-        )
-    )
+    # Note: VisitorEvent creation removed - analytics now comes from Umami
+    # The VisitorSession is still updated for live presence tracking
     db.commit()
 
     return {"status": "ok"}

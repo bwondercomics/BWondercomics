@@ -15,7 +15,7 @@ This guide maps the reader-side modules, their responsibilities, and how they co
 - `reader/gallery.js` — Cover gallery overlay (chapter grid), selection, and smooth scroll to current chapter.
 - `reader/overlays.js` — Shortcuts modal, help overlays, and shared show/hide helpers.
 - `reader/latest.js` — Renders the “Latest update” widget from the post returned by `/api/posts/latest`.
-- `reader/email.js` — Formspree-powered signup form submission with inline success/error feedback.
+- `reader/email.js` — Signup form submission to the internal API (`POST /api/email/subscribe`) with inline success/error feedback.
 - `reader/customization.js` — Public `window.BattleBros` API (set subtitle, set subtitle list, random subtitle) and dynamic theme/app bar updates.
 - `reader/chapters.js` — Chapter metadata helpers: sort chapters, derive page arrays, next/prev chapter lookup.
 - `reader/transform.js` — Math utilities for scale/translate clamping, aspect-ratio fitting, and pointer focal calculations.
@@ -60,7 +60,7 @@ flowchart TD
   - Selects the newest post (by date) where `share !== false`.
   - Formats date (`toLocaleString`) and safely injects HTML-escaped content preview.
 - **email.js**
-  - Submits to Formspree endpoint, toggles success/error states inline.
+  - Submits to `/api/email/subscribe`, toggles success/error states inline.
 - **customization.js**
   - Exposes `window.BattleBros` helpers; updates DOM for subtitle/banner/button tweaks at runtime.
 
@@ -85,7 +85,6 @@ flowchart TD
 ## Common Extension Points
 - Add a new header button: extend `admin/page-config.json` buttons; `customization.js` renders them at startup.
 - Change theme/branding: adjust `admin/page-config.json` theme vars; `customization.js` applies to CSS variables.
-- Integrate comments: `feed.html` placeholder can host a third-party embed; reader code is unaffected.
 
 ## Gotchas / Notes
 - Admin auth is minimal; reader fetches data anonymously. Ensure `admin/data.json` and assets are publicly readable on your host.

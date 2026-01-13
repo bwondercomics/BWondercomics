@@ -699,4 +699,4 @@ Before marking a task as complete, ensure:
 **Last Updated**: December 17, 2025  
 **Maintainer**: Battle Bros Dev Team
 
-For detailed optimization strategies, see: `docs/CODE_REVIEW_AND_OPTIMIZATION.md`
+For historical optimization notes, see: `docs/archive/CODE_REVIEW_AND_OPTIMIZATION.md` (legacy).

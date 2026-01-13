@@ -1,5 +1,7 @@
 # BWonderComics - Code Fixes Guide
 
+Legacy note: This document predates the current DB-first architecture and may reference outdated code paths. Use `docs/SYSTEM_OVERVIEW.md` and `docs/ROADMAP.md` for current guidance.
+
 **Date**: December 17, 2025  
 **Status**: Ready for Implementation
 

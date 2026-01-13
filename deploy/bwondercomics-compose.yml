@@ -29,6 +29,7 @@ services:
     environment:
       BWC_DB_HOST: bwondercomics-db
       BWC_DB_PORT: 5432
+      UMAMI_DB_PASSWORD: ${UMAMI_DB_PASSWORD:-}
     ports:
       - "${BWC_API_PORT:-8000}:8000"
     user: "${BWC_UID:-1000}:${BWC_GID:-1000}"

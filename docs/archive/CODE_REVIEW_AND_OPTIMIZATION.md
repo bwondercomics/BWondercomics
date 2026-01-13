@@ -1,5 +1,7 @@
 # BWonderComics - Code Review & Optimization Strategies
 
+Legacy note: This review reflects a static-first snapshot and is not aligned with the current DB-first architecture. Treat it as historical context only.
+
 **Date**: December 17, 2025  
 **Reviewer**: Sonnet (AI Code Analysis)  
 **Project**: BWonderComics - Self-hosted Comic Platform Toolkit

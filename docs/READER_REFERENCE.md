@@ -22,7 +22,7 @@ This summarizes the reader runtime after modularization: what each file does, ke
 - `reader/overlays.js`: shortcuts overlay handlers, chapter change (next/restart) helpers.
 - `reader/gallery.js`: gallery render/toggle and button wiring.
 - `reader/latest.js`: render the latest update widget.
-- `reader/email.js`: Formspree email signup submission + messaging.
+- `reader/email.js`: Email signup submission to the internal API (`/api/email/subscribe`) + messaging.
 - `reader/app.js`: entry wiring—imports modules, loads data, initializes UI, binds events, exposes `window.BattleBros`.
 - `reader/customization.js`: applies `page-config` theme/content/layout overrides at load (runs as module).
 
