@@ -422,6 +422,7 @@ async function showDashboard() {
     console.error("Media failed to load:", e);
   }
   chaptersApi.renderStatusMessageInput();
+  chaptersApi.renderEntryLabelTabs();
   chaptersApi.renderChapterList();
   seriesManager.updateSeriesLinks();
   await dashboardManager.refreshDashboard({ skipPosts: true });
@@ -537,6 +538,9 @@ function attachEventHandlers() {
     });
   }
   el.btnAddChapter.addEventListener("click", chaptersApi.addNewChapter);
+  if (el.btnAddEntryLabel) {
+    el.btnAddEntryLabel.addEventListener("click", chaptersApi.addEntryLabel);
+  }
   if (el.btnSaveStatus) {
     el.btnSaveStatus.addEventListener("click", chaptersApi.saveStatusMessage);
   }

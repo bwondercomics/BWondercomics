@@ -1,3 +1,14 @@
+"""
+Admin Ops API routes.
+
+Execute predefined shell commands from the admin UI:
+- frontend-build, db-backup, restart, etc.
+- Commands run in background with output streaming
+- Execution history stored in admin_ops_runs table
+
+Security: Only runs commands from ADMIN_COMMANDS allowlist.
+Enable with ADMIN_COMMANDS_ENABLED=true in env.
+"""
 from __future__ import annotations
 
 import json

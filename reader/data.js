@@ -27,8 +27,8 @@ export async function loadChapterData(seriesId) {
       throw new Error(`Invalid chapter data structure in ${dataPath}`);
     }
 
-    const normalized = sanitizeChapters(data.chapters);
     const chapterMeta = data.chapterMeta && typeof data.chapterMeta === 'object' ? data.chapterMeta : {};
+    const normalized = sanitizeChapters(data.chapters, chapterMeta);
     const orderedNames = sortChapterNamesWithMeta(Object.keys(normalized.chapters), chapterMeta);
     return {
       chapters: normalized.chapters,
@@ -37,7 +37,8 @@ export async function loadChapterData(seriesId) {
       chapterMeta,
       premiumOnly: !!data.premiumOnly,
       unitLabelSingular: String(data.unitLabelSingular || '').trim() || 'Entry',
-      unitLabelPlural: String(data.unitLabelPlural || '').trim() || 'Entries'
+      unitLabelPlural: String(data.unitLabelPlural || '').trim() || 'Entries',
+      entryLabels: Array.isArray(data.entryLabels) ? data.entryLabels : []
     };
   } catch (error) {
     console.error('Failed to load chapter data:', error);

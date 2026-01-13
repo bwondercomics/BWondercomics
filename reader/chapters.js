@@ -72,7 +72,7 @@ export function sortChapterNamesWithMeta(names = [], meta = {}) {
  * sanitizeChapters({ "Entry 1": ["page1.png"], "Empty": [] })
  * // returns { chapters: { "Entry 1": ["page1.png"] }, order: ["Entry 1"] }
  */
-export function sanitizeChapters(rawChapters = {}) {
+export function sanitizeChapters(rawChapters = {}, chapterMeta = {}) {
   const clean = {};
   const seen = new Set();
 
@@ -87,6 +87,14 @@ export function sanitizeChapters(rawChapters = {}) {
     }
 
     const normalizedPages = Array.isArray(pages) ? pages.filter(Boolean) : [];
+    const meta = chapterMeta?.[trimmed];
+    const keepEmpty = !!(
+      normalizedPages.length === 0 &&
+      meta &&
+      typeof meta === 'object' &&
+      (meta.showInGallery || meta.showInDropdown || meta.releaseType === 'store')
+    );
+    if (!normalizedPages.length && !keepEmpty) return;
     clean[trimmed] = normalizedPages;
     seen.add(key);
   });

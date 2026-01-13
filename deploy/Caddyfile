@@ -11,7 +11,12 @@ bwondercomics.com {
 		root * /srv/bwondercomics
 		file_server
 	}
-	
+
+	handle /comics/* {
+		root * /srv/bwondercomics
+		file_server
+	}
+
 	handle /media/* {
 		root * /srv/bwondercomics
 		file_server

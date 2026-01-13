@@ -136,6 +136,8 @@ import { getActiveSeriesId } from "./series.js";
   let chapterOrder = [];
   let statusMessage = "";
   let chapterMeta = {};
+  let entryLabels = [];
+  let entryLabelsById = {};
   let premiumOnly = false;
   let unitLabelSingular = "Entry";
   let unitLabelPlural = "Entries";
@@ -145,6 +147,21 @@ import { getActiveSeriesId } from "./series.js";
     const singular = String(unitLabelSingular || "").trim() || "Entry";
     const plural = String(unitLabelPlural || "").trim() || `${singular}s`;
     return { singular, plural };
+  }
+
+  function getEntryLabelFor(name) {
+    const meta = chapterMeta?.[name] || {};
+    const labelId = meta.entryLabelId;
+    if (labelId && entryLabelsById[labelId]) {
+      return entryLabelsById[labelId];
+    }
+    if (meta.entryLabelSingular || meta.entryLabelPlural) {
+      return {
+        singular: String(meta.entryLabelSingular || "").trim() || getUnitLabels().singular,
+        plural: String(meta.entryLabelPlural || "").trim() || getUnitLabels().plural
+      };
+    }
+    return getUnitLabels();
   }
 
   function getEntryDisplayNumber(name) {
@@ -157,9 +174,10 @@ import { getActiveSeriesId } from "./series.js";
     if (!name) return "";
     const displayNumber = getEntryDisplayNumber(name);
     const meta = chapterMeta?.[name] || {};
+    const entryLabel = getEntryLabelFor(name);
     const baseLabel = displayNumber == null
       ? name
-      : `${getUnitLabels().singular} ${displayNumber} - ${name}`;
+      : `${entryLabel.singular} ${displayNumber} - ${name}`;
     const isComingSoon = !!meta.comingSoon || String(meta.status || "").toLowerCase() === "scheduled";
     return isComingSoon ? `${baseLabel} (Coming Soon)` : baseLabel;
   }
@@ -167,7 +185,24 @@ import { getActiveSeriesId } from "./series.js";
   function formatEntryTrackingLabel(name) {
     const displayNumber = getEntryDisplayNumber(name);
     if (displayNumber == null) return "";
-    return `${getUnitLabels().singular} ${displayNumber}`;
+    const entryLabel = getEntryLabelFor(name);
+    return `${entryLabel.singular} ${displayNumber}`;
+  }
+
+  function shouldShowInDropdown(name) {
+    const meta = chapterMeta?.[name] || {};
+    if (meta.showInDropdown === false) return false;
+    if (String(meta.releaseType || "").toLowerCase() === "store" && !meta.storeUrl) return false;
+    return true;
+  }
+
+  function isStoreEntry(name) {
+    return String(chapterMeta?.[name]?.releaseType || "").toLowerCase() === "store";
+  }
+
+  function getNavigableChapters() {
+    const names = chapterOrder.length ? chapterOrder : Object.keys(chapters);
+    return names.filter((name) => !isStoreEntry(name));
   }
 
   function applyUnitLabels() {
@@ -219,9 +254,10 @@ import { getActiveSeriesId } from "./series.js";
     if (!el.chapter) return;
 
     const names = chapterOrder.length ? chapterOrder : Object.keys(chapters);
+    const dropdownNames = names.filter(shouldShowInDropdown);
     el.chapter.innerHTML = "";
 
-    names.forEach((name) => {
+    dropdownNames.forEach((name) => {
       const option = document.createElement("option");
       option.value = name;
       option.textContent = name;
@@ -234,7 +270,7 @@ import { getActiveSeriesId } from "./series.js";
       el.chapter.appendChild(option);
     });
 
-    buildChapterSelectMenu(names);
+    buildChapterSelectMenu(dropdownNames);
     bindChapterSelectEvents();
     syncChapterSelectDisplay();
   }
@@ -594,7 +630,15 @@ import { getActiveSeriesId } from "./series.js";
 
     if (el.chapter) {
       el.chapter.addEventListener("change", (e) => {
-        changeChapter(e.target.value, chapters, chapterMeta);
+        const nextName = e.target.value;
+        const meta = chapterMeta?.[nextName] || {};
+        if (String(meta.releaseType || "").toLowerCase() === "store" && meta.storeUrl) {
+          window.open(meta.storeUrl, "_blank", "noopener,noreferrer");
+          el.chapter.value = state.currentChapter;
+          syncChapterSelectDisplay();
+          return;
+        }
+        changeChapter(nextName, chapters, chapterMeta);
       });
     }
 
@@ -621,7 +665,7 @@ import { getActiveSeriesId } from "./series.js";
 
     if (nextChapterBtn) {
       nextChapterBtn.addEventListener("click", () =>
-        goToNextChapter(chapterOrder, chapters, chapterMeta),
+        goToNextChapter(getNavigableChapters(), chapters, chapterMeta),
       );
     }
     if (restartChapterBtn) {
@@ -698,9 +742,10 @@ import { getActiveSeriesId } from "./series.js";
     renderStatusPanel(statusMessage || "ready", statusTimerRef);
     initEmailSignupForm();
 
-    const availableChapters = chapterOrder.length
-      ? chapterOrder
-      : Object.keys(chapters);
+    const navigableChapters = getNavigableChapters();
+    const availableChapters = navigableChapters.length
+      ? navigableChapters
+      : (chapterOrder.length ? chapterOrder : Object.keys(chapters));
 
     if (!availableChapters.length) {
       if (el.chapter) el.chapter.innerHTML = "";
@@ -756,6 +801,11 @@ import { getActiveSeriesId } from "./series.js";
         chapterOrder = data.chapterOrder;
         statusMessage = data.statusMessage;
         chapterMeta = data.chapterMeta || {};
+        entryLabels = Array.isArray(data.entryLabels) ? data.entryLabels : [];
+        entryLabelsById = entryLabels.reduce((acc, label) => {
+          if (label && label.id) acc[label.id] = label;
+          return acc;
+        }, {});
         premiumOnly = !!data.premiumOnly;
         unitLabelSingular = data.unitLabelSingular || "Entry";
         unitLabelPlural = data.unitLabelPlural || "Entries";

@@ -19,7 +19,7 @@ This document covers the admin panel (content editor) architecture, data flow, a
 - Series settings: Each series can set its own singular/plural label (e.g., `Issue/Issues`, `Chapter/Chapters`) stored in the DB and served at `admin/series.json`.
 
 ## Data Paths and Persistence
-- Reads: `/admin/data.json`/`/admin/series/<id>/data.json` (DB-backed JSON views for chapters + folders + status), `/media.json` (DB-backed); image paths under `chapters/` and `comics/<seriesId>/chapters/`.
+- Reads: `/admin/data.json`/`/admin/series/<id>/data.json` (DB-backed JSON views for chapters + folders + status), `/media.json` (DB-backed); image paths under `comics/<seriesId>/entries/`.
 - Writes (server):
   - Chapters (DB): `/api/save` for `admin/data.json` and `admin/series/<id>/data.json` writes to Postgres (no disk write).
   - Series index (DB): `/api/save` for `admin/series.json` writes to Postgres (no disk write).

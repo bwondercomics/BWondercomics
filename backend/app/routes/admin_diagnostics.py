@@ -1,3 +1,15 @@
+"""
+Admin Diagnostics API routes.
+
+Read-only health and status endpoints for admin dashboard:
+- System health (API, DB, disk space)
+- Database stats and table counts
+- Backup file listings
+- Service status (Docker containers, systemd)
+- fail2ban snapshot data
+
+All endpoints require admin auth. No mutations.
+"""
 from __future__ import annotations
 
 import json

@@ -12,7 +12,7 @@ This repo serves a plain HTML/CSS/JS frontend, with a FastAPI backend adding dyn
 ## Core data model
 - **Series**: a comic series (title/description, premium flag, and the per-series entry label like `Issue/Issues`).
 - **Entries**: the updates within a series (internally “entries”; a series can call them “issues”, “chapters”, “episodes”, etc).
-- **Entry pages**: ordered image paths for each entry (images live on disk; paths are stored in DB).
+- **Entry pages**: ordered image paths for each entry (images live on disk under `comics/<seriesId>/entries/`; paths are stored in DB).
 - **Posts**: feed/blog updates (draft/scheduled/published + optional share flag for RSS/social).
 - **Users + comments**: accounts + comment threads (with roles for admin/premium).
 - **Media library**: Postgres table for the media index + files under `media/` (tagged library used by admin/tools).

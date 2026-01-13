@@ -1,3 +1,15 @@
+"""
+Visitor Tracking API routes.
+
+Records reader analytics events from the frontend:
+- Page views, entry completions, exit events
+- Stores in visitor_sessions table
+
+Key fields:
+- entry_label: "series-id | Entry N" (used for analytics rollups)
+- entry_title: Display title from DB
+- page_number: Current page being viewed
+"""
 from __future__ import annotations
 
 from datetime import datetime, timezone

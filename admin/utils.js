@@ -68,12 +68,15 @@ export function sanitizeFolderFromName(name = '', chaptersRoot = 'chapters') {
  */
 export function inferFolderFromPages(name, chapters = {}, currentPages = [], chaptersRoot = 'chapters') {
   const pages = chapters[name] || currentPages || [];
-  const prefix = `${String(chaptersRoot || 'chapters').replace(/\/+$/g, '')}/`;
+  const root = chaptersRoot === null ? '' : String(chaptersRoot || 'chapters').replace(/\/+$/g, '');
+  const prefix = root ? `${root}/` : '';
   const counts = {};
   pages.forEach(p => {
     if (typeof p !== 'string') return;
-    if (!p.startsWith(prefix)) return;
-    const dir = p.slice(0, p.lastIndexOf('/'));
+    const normalized = p.trim().replace(/^\/+/, '');
+    if (!normalized || normalized.startsWith('http')) return;
+    if (prefix && !normalized.startsWith(prefix)) return;
+    const dir = normalized.slice(0, normalized.lastIndexOf('/'));
     if (!dir) return;
     counts[dir] = (counts[dir] || 0) + 1;
   });
@@ -98,6 +101,12 @@ export function ensureChapterFolder(name = '', chapterFolders = {}, chapters = {
   if (inferred) {
     chapterFolders[name] = inferred;
     return inferred;
+  }
+
+  const inferredAny = inferFolderFromPages(name, chapters, currentPages, null);
+  if (inferredAny) {
+    chapterFolders[name] = inferredAny;
+    return inferredAny;
   }
 
   const existing = new Set(Object.values(chapterFolders || {}));

@@ -48,7 +48,7 @@ If you don’t have `make`, run the equivalent commands shown in `Makefile`.
 ### Back up everything that matters
 The project has two kinds of “state”:
 - **Database state (Postgres)**: users, comments, posts, series, entries, media index, page configs
-- **File state (on disk)**: comic page images (`chapters/`, `comics/*/chapters/`), media library files (`media/`)
+- **File state (on disk)**: comic page images (`comics/*/entries/`), media library files (`media/`)
 
 Run:
 - `make backup` (writes to `var/backups/` by default)
@@ -61,9 +61,10 @@ DB restore and file restore are destructive by nature.
 
 ## Where data lives
 - Postgres data is stored in a Docker volume (`bwondercomics-db`).
+  - The database name inside Postgres can differ (e.g., `bwondercomics_quality` via `BWC_DB_NAME`).
+  - Volume name and database name are separate; they do not need to match.
 - Uploaded images live in the repo tree:
-  - Default series pages: `chapters/`
-  - Other series pages: `comics/<seriesId>/chapters/`
+  - Series pages: `comics/<seriesId>/entries/`
 - Media library files live under `media/` (index + tags are stored in Postgres).
 
 ## Frontend builds

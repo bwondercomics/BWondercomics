@@ -10,7 +10,7 @@ This document is a concise handoff for new threads/agents. It captures how the s
 - Backend: `backend/` (FastAPI + SQLAlchemy)
 - Built frontend: `dist/` (public pages served from here in production)
 - Frontend build snapshots: `var/releases/dist-YYYYMMDD-HHMMSS.tar.gz`
-- Media/content: `media/`, `chapters/`, `comics/<seriesId>/chapters/`
+- Media/content: `media/`, `comics/<seriesId>/entries/<label-slug>/` (primary path for entry pages)
 - Deploy config: `deploy/bwondercomics-compose.yml`, `deploy/Caddyfile`, `deploy/bwondercomics.env`
 
 ## Services (Docker Compose)
@@ -55,9 +55,9 @@ Machine reboot depends on host OS (not in repo). After reboot, verify services w
 ## Caddy Routing (deploy/Caddyfile)
 - Proxies `/api/*` to `bwondercomics-api:8000`
 - Proxies `/data.json`, `/series.json`, `/page-config.json`, `/media.json`, `/series/*` to the API
-- Serves static:
+#### Serves static:
   - `/assets/*` from `dist/assets` (fallback to repo `/assets`)
-  - `/media/*` and `/chapters/*` from filesystem
+  - `/media/*`, `/chapters/*`, and `/comics/*` from filesystem
   - `/admin/*` from repo root (`/srv/bwondercomics/root`) so admin uses source files
   - `/` root from `dist/`
 
@@ -96,7 +96,8 @@ Key tables:
 - Entry page order is stored in DB; saving an entry preserves the order as arranged in the UI.
 - Uploads auto-sort only when the entry has no existing pages; otherwise new pages append at the bottom.
 - Avoid renumber/sync unless you intentionally want to rename or rescan files.
-- `entry_pages.path` should be web-relative like `chapters/09/01.png` (not an absolute `/srv/...` path).
+- `entry_pages.path` should be web-relative like `comics/battle-bros/entries/issues/09/01.png` (not an absolute `/srv/...` path).
+  - Entry labels (Issue/Volume/etc) live in `entry_labels` and drive the `<label-slug>` segment.
 
 ## Email List (Two Paths)
 1) Account opt-in:

@@ -1,3 +1,18 @@
+/**
+ * Admin Analytics UI
+ *
+ * Renders analytics data in the admin dashboard:
+ * - Summary cards (reads, finishes, finish rate, avg stop page)
+ * - Reader analytics cards with drill-down charts
+ * - Reads over time chart (aggregate and per-entry)
+ * - Live visitors ticker
+ *
+ * Key functions:
+ * - renderReaderAnalytics(): Main entry point for reader stats
+ * - renderReaderSummary(): Updates summary card values
+ * - renderAnalyticsList(): Generic list renderer with click-to-detail
+ * - formatDeltaText(): Formats week-over-week change
+ */
 import { el } from "./dom.js";
 import {
   ANALYTICS_ENDPOINT,

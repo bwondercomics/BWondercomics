@@ -78,6 +78,7 @@ services:
     volumes:
       - ../dist:/srv/bwondercomics/dist:ro
       - ../chapters:/srv/bwondercomics/chapters:ro
+      - ../comics:/srv/bwondercomics/comics:ro
       - ../media:/srv/bwondercomics/media:ro
       - ../assets:/srv/bwondercomics/assets:ro
       - ..:/srv/bwondercomics/root:ro

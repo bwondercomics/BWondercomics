@@ -25,12 +25,27 @@ export function createChaptersApi({
   getStorageKey,
   STORAGE_KEY
 }) {
-  const getRoot = () => (typeof getChaptersRoot === 'function' ? getChaptersRoot() : 'chapters');
+  const getBaseRoot = () => (typeof getChaptersRoot === 'function' ? getChaptersRoot() : 'chapters');
+  const getRootForLabel = (labelId = null) => {
+    const base = getBaseRoot();
+    const label = getEntryLabels().find((item) => item && item.id === labelId) || getActiveEntryLabel();
+    const slug = label?.slug ? String(label.slug).trim().replace(/^\/+/, '') : '';
+    if (!slug) return base;
+    return `${String(base || 'chapters').replace(/\/+$/g, '')}/${slug}`;
+  };
+  const getRoot = () => getRootForLabel(getActiveEntryLabel()?.id || null);
   const getDataUrl = () => (typeof getDataFileUrl === 'function' ? getDataFileUrl() : 'data.json');
   const getSaveFile = () => (typeof getSaveFilename === 'function' ? getSaveFilename() : 'admin/data.json');
   const getStorage = () => (typeof getStorageKey === 'function' ? getStorageKey() : STORAGE_KEY);
   const labels = () => {
     const fallback = { singular: 'Entry', plural: 'Entries' };
+    const activeLabel = getActiveEntryLabel();
+    if (activeLabel) {
+      return {
+        singular: String(activeLabel.singular || '').trim() || fallback.singular,
+        plural: String(activeLabel.plural || '').trim() || fallback.plural
+      };
+    }
     if (typeof getUnitLabels !== 'function') return fallback;
     try {
       const got = getUnitLabels() || {};
@@ -40,6 +55,53 @@ export function createChaptersApi({
     } catch {
       return fallback;
     }
+  };
+
+  const getEntryLabels = () => (Array.isArray(state.entryLabels) ? state.entryLabels : []);
+
+  const getDefaultEntryLabel = () => {
+    const labels = getEntryLabels();
+    if (!labels.length) return null;
+    return labels.find((label) => label && label.isDefault) || labels[0];
+  };
+
+  const getActiveEntryLabel = () => {
+    const labels = getEntryLabels();
+    if (!labels.length) return null;
+    const activeId = state.activeEntryLabelId;
+    const active = labels.find((label) => label && label.id === activeId);
+    return active || getDefaultEntryLabel();
+  };
+
+  const setActiveEntryLabel = (id) => {
+    const labels = getEntryLabels();
+    if (!labels.length) {
+      state.activeEntryLabelId = null;
+      return;
+    }
+    const match = labels.find((label) => label && label.id === id);
+    state.activeEntryLabelId = match ? match.id : getDefaultEntryLabel()?.id || labels[0].id;
+  };
+
+  const slugifyLabel = (value) => {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 64) || 'entry';
+  };
+
+  const ensureUniqueSlug = (base) => {
+    const labels = getEntryLabels();
+    if (!labels.some((label) => label.slug === base)) return base;
+    let counter = 2;
+    let candidate = `${base}-${counter}`;
+    while (labels.some((label) => label.slug === candidate)) {
+      counter += 1;
+      candidate = `${base}-${counter}`;
+    }
+    return candidate;
   };
 
   const STATUS_VALUES = new Set(['published', 'scheduled', 'draft']);
@@ -526,6 +588,11 @@ export function createChaptersApi({
       syncEntryScheduleFields();
     });
   }
+  if (el.entryReleaseType) {
+    el.entryReleaseType.addEventListener('change', () => {
+      syncReleaseTypeFields();
+    });
+  }
 
   async function loadChapters() {
     // Load DB-backed chapter data; fall back to local drafts if API fails.
@@ -537,6 +604,23 @@ export function createChaptersApi({
           state.chapters = data.chapters;
           state.chapterFolders = data.chapterFolders || {};
           state.chapterMeta = data.chapterMeta || {};
+          state.entryLabels = Array.isArray(data.entryLabels) ? data.entryLabels : [];
+          if (!state.entryLabels.length) {
+            const singular = String(data.unitLabelSingular || '').trim() || 'Entry';
+            const plural = String(data.unitLabelPlural || '').trim() || 'Entries';
+            const slug = slugifyLabel(plural || singular);
+            state.entryLabels = [
+              {
+                id: crypto?.randomUUID ? crypto.randomUUID() : `label-${Date.now()}`,
+                singular,
+                plural,
+                slug,
+                sortIndex: 0,
+                isDefault: true
+              }
+            ];
+          }
+          setActiveEntryLabel(state.activeEntryLabelId);
           state.statusMessage = data.statusMessage || '';
           state.premiumOnly = !!data.premiumOnly;
           const removed = pruneInvalidChapters();
@@ -551,6 +635,8 @@ export function createChaptersApi({
               }
             }
           });
+          renderEntryLabelTabs();
+          applyEntryLabelUi();
           return;
         }
       }
@@ -566,6 +652,8 @@ export function createChaptersApi({
           state.chapters = parsed.chapters;
           state.chapterFolders = parsed.chapterFolders || {};
           state.chapterMeta = parsed.chapterMeta || {};
+          state.entryLabels = Array.isArray(parsed.entryLabels) ? parsed.entryLabels : [];
+          setActiveEntryLabel(state.activeEntryLabelId);
           state.statusMessage = parsed.statusMessage || '';
           state.premiumOnly = !!parsed.premiumOnly;
         } else {
@@ -578,6 +666,8 @@ export function createChaptersApi({
         if (removed > 0) {
           await saveChapters();
         }
+        renderEntryLabelTabs();
+        applyEntryLabelUi();
         return;
       } catch (e) {
         console.error('Error loading saved data:', e);
@@ -587,6 +677,23 @@ export function createChaptersApi({
     state.chapters = {};
     state.chapterMeta = {};
     state.premiumOnly = false;
+    if (!getEntryLabels().length) {
+      const defaults = getUnitLabels ? getUnitLabels() : { singular: 'Entry', plural: 'Entries' };
+      const slug = ensureUniqueSlug(slugifyLabel(defaults.plural || defaults.singular));
+      state.entryLabels = [
+        {
+          id: crypto?.randomUUID ? crypto.randomUUID() : `label-${Date.now()}`,
+          singular: defaults.singular || 'Entry',
+          plural: defaults.plural || 'Entries',
+          slug,
+          sortIndex: 0,
+          isDefault: true
+        }
+      ];
+    }
+    setActiveEntryLabel(state.activeEntryLabelId);
+    renderEntryLabelTabs();
+    applyEntryLabelUi();
   }
 
   async function saveChapters(showMessage = false) {
@@ -598,6 +705,7 @@ export function createChaptersApi({
           chapters: state.chapters,
           chapterFolders: state.chapterFolders,
           chapterMeta: state.chapterMeta,
+          entryLabels: state.entryLabels,
           premiumOnly: !!state.premiumOnly,
           statusMessage: state.statusMessage
         })
@@ -610,6 +718,7 @@ export function createChaptersApi({
       chapters: state.chapters,
       chapterFolders: state.chapterFolders,
       chapterMeta: state.chapterMeta,
+      entryLabels: state.entryLabels,
       statusMessage: state.statusMessage,
       premiumOnly: !!state.premiumOnly,
       lastUpdated: new Date().toISOString(),
@@ -632,6 +741,100 @@ export function createChaptersApi({
   function renderStatusMessageInput() {
     if (el.statusMessageInput) {
       el.statusMessageInput.value = state.statusMessage || '';
+    }
+  }
+
+  function renderEntryLabelTabs() {
+    if (!el.entryLabelTabs) return;
+    const labels = [...getEntryLabels()].sort((a, b) => {
+      const aIndex = Number.isFinite(a?.sortIndex) ? a.sortIndex : 0;
+      const bIndex = Number.isFinite(b?.sortIndex) ? b.sortIndex : 0;
+      if (aIndex !== bIndex) return aIndex - bIndex;
+      return String(a?.plural || a?.singular || '').localeCompare(String(b?.plural || b?.singular || ''));
+    });
+    el.entryLabelTabs.innerHTML = '';
+    labels.forEach((label) => {
+      if (!label) return;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'btn-small btn-secondary entry-label-tab';
+      button.textContent = String(label.plural || label.singular || 'Entries');
+      button.dataset.labelId = label.id;
+      if (label.id === getActiveEntryLabel()?.id) {
+        button.classList.add('is-active');
+      }
+      button.addEventListener('click', () => {
+        setActiveEntryLabel(label.id);
+        renderEntryLabelTabs();
+        applyEntryLabelUi();
+        renderChapterList();
+      });
+      el.entryLabelTabs.appendChild(button);
+    });
+  }
+
+  function updateEntryLabelSelect(selectedId = null) {
+    if (!el.entryLabelSelect) return;
+    const labels = [...getEntryLabels()].sort((a, b) => {
+      const aIndex = Number.isFinite(a?.sortIndex) ? a.sortIndex : 0;
+      const bIndex = Number.isFinite(b?.sortIndex) ? b.sortIndex : 0;
+      if (aIndex !== bIndex) return aIndex - bIndex;
+      return String(a?.plural || a?.singular || '').localeCompare(String(b?.plural || b?.singular || ''));
+    });
+    el.entryLabelSelect.innerHTML = '';
+    labels.forEach((label) => {
+      if (!label) return;
+      const option = document.createElement('option');
+      option.value = label.id;
+      option.textContent = String(label.singular || 'Entry');
+      el.entryLabelSelect.appendChild(option);
+    });
+    const targetId = selectedId || getActiveEntryLabel()?.id || labels[0]?.id;
+    if (targetId) el.entryLabelSelect.value = targetId;
+  }
+
+  async function addEntryLabel() {
+    const singular = (prompt('Entry label (singular):') || '').trim();
+    if (!singular) return;
+    const plural = (prompt('Entry label (plural):', `${singular}s`) || '').trim();
+    const baseSlug = slugifyLabel(plural || singular);
+    const slug = ensureUniqueSlug(baseSlug);
+    const labels = getEntryLabels();
+    const id = crypto?.randomUUID ? crypto.randomUUID() : `label-${Date.now()}`;
+    const isFirst = labels.length === 0;
+    labels.push({
+      id,
+      singular,
+      plural: plural || `${singular}s`,
+      slug,
+      sortIndex: labels.length,
+      isDefault: isFirst
+    });
+    state.entryLabels = labels;
+    setActiveEntryLabel(id);
+    renderEntryLabelTabs();
+    applyEntryLabelUi();
+    renderChapterList();
+    await saveChapters(true);
+  }
+
+  function applyEntryLabelUi() {
+    const { singular, plural } = labels();
+    const title = document.getElementById('chaptersSectionTitle');
+    if (title) title.textContent = `${plural} Management`;
+    if (el.btnAddChapter) el.btnAddChapter.textContent = `+ Add New ${singular}`;
+    const nameLabel = document.getElementById('entryNameLabel');
+    if (nameLabel) nameLabel.textContent = `${singular} Name`;
+    if (el.chapterName) el.chapterName.placeholder = `e.g., ${singular} 1`;
+    const accessLabel = document.getElementById('entryAccessLabel');
+    if (accessLabel) accessLabel.textContent = `${singular} Access`;
+  }
+
+  function syncReleaseTypeFields() {
+    const releaseType = String(el.entryReleaseType?.value || 'digital').toLowerCase();
+    const isStore = releaseType === 'store';
+    if (el.entryStoreUrl) {
+      el.entryStoreUrl.disabled = !isStore;
     }
   }
 
@@ -865,6 +1068,22 @@ export function createChaptersApi({
     el.modalTitle.textContent = `Edit ${labels().singular}`;
     el.chapterName.value = chapterName;
     const meta = state.chapterMeta?.[chapterName] || {};
+    updateEntryLabelSelect(meta.entryLabelId || meta.entry_label_id || getDefaultEntryLabel()?.id || null);
+    if (el.entryShowInDropdown) {
+      el.entryShowInDropdown.checked = meta.showInDropdown !== false;
+    }
+    if (el.entryShowInGallery) {
+      el.entryShowInGallery.checked = meta.showInGallery !== false;
+    }
+    if (el.entryReleaseType) {
+      el.entryReleaseType.value = String(meta.releaseType || 'digital').toLowerCase();
+    }
+    if (el.entryStoreUrl) {
+      el.entryStoreUrl.value = String(meta.storeUrl || '');
+    }
+    if (el.entryCoverImage) {
+      el.entryCoverImage.value = String(meta.coverImage || '');
+    }
     if (el.chapterPremium) {
       el.chapterPremium.checked = !!meta.premium;
     }
@@ -894,6 +1113,7 @@ export function createChaptersApi({
     if (el.entryPostContent) {
       el.entryPostContent.value = String(meta.releasePostContent || '');
     }
+    syncReleaseTypeFields();
     syncEntryScheduleFields();
     const combined = normalizePages(state.chapters[chapterName] || []);
     renderPageList(combined);
@@ -906,6 +1126,12 @@ export function createChaptersApi({
     state.currentEditingChapter = '';
     el.modalTitle.textContent = `Add New ${labels().singular}`;
     el.chapterName.value = '';
+    updateEntryLabelSelect(getActiveEntryLabel()?.id || getDefaultEntryLabel()?.id || null);
+    if (el.entryShowInDropdown) el.entryShowInDropdown.checked = true;
+    if (el.entryShowInGallery) el.entryShowInGallery.checked = true;
+    if (el.entryReleaseType) el.entryReleaseType.value = 'digital';
+    if (el.entryStoreUrl) el.entryStoreUrl.value = '';
+    if (el.entryCoverImage) el.entryCoverImage.value = '';
     if (el.chapterPremium) el.chapterPremium.checked = false;
     if (el.entryDisplayNumber) el.entryDisplayNumber.value = '';
     if (el.entryStatus) el.entryStatus.value = 'published';
@@ -915,6 +1141,7 @@ export function createChaptersApi({
     if (el.entryShareBluesky) el.entryShareBluesky.checked = false;
     if (el.entryPostTitle) el.entryPostTitle.value = '';
     if (el.entryPostContent) el.entryPostContent.value = '';
+    syncReleaseTypeFields();
     syncEntryScheduleFields();
     renderPageList([]);
     showModal();
@@ -938,21 +1165,27 @@ export function createChaptersApi({
     }
 
     const pages = [...state.currentPages];
-    const chapterFolder = ensureChapterFolder(newName, state.chapterFolders, state.chapters, state.currentPages, getRoot());
-    try {
-      const resp = await fetch('/api/create-chapter', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chapterFolder })
-      });
-      if (!resp.ok) {
-        const result = await resp.json().catch(() => ({}));
-        throw new Error(result.error || 'Unable to create chapter folder');
+    const selectedLabelId = el.entryLabelSelect?.value || getActiveEntryLabel()?.id || getDefaultEntryLabel()?.id || null;
+    const releaseType = String(el.entryReleaseType?.value || 'digital').toLowerCase();
+    const chapterRoot = getRootForLabel(selectedLabelId);
+    const chapterFolder = ensureChapterFolder(newName, state.chapterFolders, state.chapters, state.currentPages, chapterRoot);
+    const needsFolder = releaseType !== 'store' || pages.length > 0;
+    if (needsFolder) {
+      try {
+        const resp = await fetch('/api/create-chapter', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chapterFolder })
+        });
+        if (!resp.ok) {
+          const result = await resp.json().catch(() => ({}));
+          throw new Error(result.error || 'Unable to create chapter folder');
+        }
+      } catch (e) {
+        console.warn('Create chapter folder failed:', e);
+        if (showError) showError(`Could not create folder for ${newName}: ${e.message}`);
+        return;
       }
-    } catch (e) {
-      console.warn('Create chapter folder failed:', e);
-      if (showError) showError(`Could not create folder for ${newName}: ${e.message}`);
-      return;
     }
 
     if (state.currentEditingChapter && state.currentEditingChapter !== newName) {
@@ -988,11 +1221,24 @@ export function createChaptersApi({
     const shareBluesky = autoPost && !!el.entryShareBluesky?.checked;
     const releasePostTitle = String(el.entryPostTitle?.value || '').trim();
     const releasePostContent = String(el.entryPostContent?.value || '').trim();
+    const showInDropdown = el.entryShowInDropdown ? !!el.entryShowInDropdown.checked : true;
+    const showInGallery = el.entryShowInGallery ? !!el.entryShowInGallery.checked : true;
+    const storeUrl = String(el.entryStoreUrl?.value || '').trim();
+    const coverImage = String(el.entryCoverImage?.value || '').trim();
+    const entryLabel = getEntryLabels().find((label) => label && label.id === selectedLabelId) || getActiveEntryLabel();
     state.chapterMeta = state.chapterMeta || {};
     state.chapterMeta[newName] = {
       ...(state.chapterMeta[newName] || {}),
       premium: premiumFlag,
       displayNumber,
+      entryLabelId: selectedLabelId,
+      entryLabelSingular: entryLabel?.singular || labels().singular,
+      entryLabelPlural: entryLabel?.plural || labels().plural,
+      showInDropdown,
+      showInGallery,
+      releaseType,
+      storeUrl,
+      coverImage,
       status,
       publishAt: publishAtIso,
       comingSoon,
@@ -1071,6 +1317,7 @@ export function createChaptersApi({
   function renderChapterList() {
     el.chapterList.innerHTML = '';
     const chapterNames = Object.keys(state.chapters).filter(name => name && name !== 'undefined');
+    const activeLabelId = getActiveEntryLabel()?.id || null;
     const sortedNames = chapterNames
       .map(name => {
         const displayNumber = state.chapterMeta?.[name]?.displayNumber;
@@ -1084,7 +1331,13 @@ export function createChaptersApi({
         if (aNum == null && bNum != null) return 1;
         return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
       })
-      .map(item => item.name);
+      .map(item => item.name)
+      .filter((name) => {
+        const meta = state.chapterMeta?.[name] || {};
+        const labelId = meta.entryLabelId || meta.entry_label_id || null;
+        const effectiveId = labelId || getDefaultEntryLabel()?.id || null;
+        return !activeLabelId || effectiveId === activeLabelId;
+      });
     sortedNames.forEach(name => {
       const pages = state.chapters[name];
       const meta = state.chapterMeta?.[name] || {};
@@ -1100,11 +1353,15 @@ export function createChaptersApi({
       const displayNumber = Number.isFinite(meta.displayNumber)
         ? meta.displayNumber
         : null;
+      const entryLabelSingular = String(meta.entryLabelSingular || '').trim() || labels().singular;
       const displayLabel = displayNumber != null
-        ? `${labels().singular} ${displayNumber} - ${name}`
+        ? `${entryLabelSingular} ${displayNumber} - ${name}`
         : name;
       const metaParts = [`${pages.length} pages`, statusLabel];
       if (isPremium) metaParts.push('Premium');
+      if (meta.releaseType === 'store') metaParts.push('Store');
+      if (meta.showInDropdown === false) metaParts.push('No dropdown');
+      if (meta.showInGallery === false) metaParts.push('No gallery');
       if (comingSoonLabel) metaParts.push(comingSoonLabel);
       const item = document.createElement('div');
       item.className = 'chapter-item';
@@ -1174,6 +1431,7 @@ export function createChaptersApi({
   }
 
   return {
+    addEntryLabel,
     loadChapters,
     saveChapters,
     renderStatusMessageInput,
@@ -1191,6 +1449,7 @@ export function createChaptersApi({
     addPage,
     removePage,
     renderChapterList,
+    renderEntryLabelTabs,
     getActiveChapterName,
     fetchChapterImages,
     showModal,

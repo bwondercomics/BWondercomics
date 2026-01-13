@@ -21,7 +21,6 @@ from ..models import (
     PremiumCode,
     PremiumCodeRedemption,
     User,
-    VisitorEvent,
     VisitorSession,
 )
 from ..security import get_current_user, public_user
@@ -157,11 +156,6 @@ def admin_delete_user(user_id: str, request: Request, db: Session = Depends(get_
     db.execute(
         update(VisitorSession)
         .where(VisitorSession.user_id == target.id)
-        .values(user_id=None)
-    )
-    db.execute(
-        update(VisitorEvent)
-        .where(VisitorEvent.user_id == target.id)
         .values(user_id=None)
     )
     db.execute(

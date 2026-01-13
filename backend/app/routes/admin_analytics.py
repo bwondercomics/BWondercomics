@@ -1,3 +1,17 @@
+"""
+Admin Analytics API routes.
+
+Provides reader analytics data for the admin dashboard:
+- Entry/series reads, finishes, stop pages
+- Time-series data for charts
+- Live visitor counts
+
+Key implementation notes:
+- Entries are matched using (series_id, display_number) as canonical ID
+- entry_label format from tracking: "series-id | Entry N"
+- _extract_display_number() parses the numeric display_number from labels
+- Health score calculated from finish_rate + week-over-week change
+"""
 from __future__ import annotations
 
 from collections import defaultdict
@@ -10,7 +24,7 @@ from sqlalchemy import distinct, func, select, text
 from sqlalchemy.orm import Session
 
 from ..db import get_db, get_umami_db
-from ..models import Entry, EntryPage, Series, User, VisitorEvent, VisitorSession
+from ..models import Entry, EntryPage, Series, User, VisitorSession
 from ..settings import settings
 from .admin_utils import iso_z, require_admin
 
@@ -138,30 +152,59 @@ def admin_page_reads(
 
     now = datetime.now(timezone.utc)
     start = now - timedelta(days=days)
+    website_id = _get_umami_website_id()
+    website_filter, website_params = _umami_website_filter(website_id)
 
-    total = db.scalar(select(func.count()).select_from(VisitorEvent).where(VisitorEvent.created_at >= start)) or 0
+    try:
+        with get_umami_db() as umami_db:
+            # Query total page views from Umami (standard page views have NULL event_name)
+            total_query = text(f"""
+                SELECT COUNT(*)
+                FROM website_event we
+                WHERE we.event_name IS NULL
+                    AND we.created_at >= :start_time
+                    {website_filter}
+            """)
+            total = umami_db.execute(total_query, {"start_time": start, **website_params}).scalar() or 0
 
-    rows = db.execute(
-        select(
-            VisitorEvent.path,
-            VisitorEvent.title,
-            func.count().label("views"),
-            func.count(distinct(VisitorEvent.visitor_id)).label("visitors"),
-        )
-        .where(VisitorEvent.created_at >= start)
-        .group_by(VisitorEvent.path, VisitorEvent.title)
-        .order_by(func.count().desc())
-        .limit(limit)
-    ).all()
+            # Query page views grouped by path
+            pages_query = text(f"""
+                SELECT
+                    we.url_path as path,
+                    COUNT(*) as views,
+                    COUNT(DISTINCT s.visitor_id) as visitors
+                FROM website_event we
+                JOIN session s ON we.session_id = s.session_id
+                WHERE we.event_name IS NULL
+                    AND we.created_at >= :start_time
+                    {website_filter}
+                GROUP BY we.url_path
+                ORDER BY views DESC
+                LIMIT :limit
+            """)
+            rows = umami_db.execute(pages_query, {
+                "start_time": start,
+                "limit": limit,
+                **website_params,
+            }).fetchall()
+
+    except Exception as e:
+        return {
+            "generatedAt": iso_z(now),
+            "windowDays": days,
+            "error": f"Umami query failed: {str(e)}",
+            "total": 0,
+            "pages": [],
+        }
 
     pages = []
-    for path, title, views, visitors in rows:
-        if not path and not title:
+    for path, views, visitors in rows:
+        if not path:
             continue
         pages.append(
             {
                 "path": path or "",
-                "title": title or "",
+                "title": "",  # Umami doesn't store page title in website_event
                 "views": int(views or 0),
                 "visitors": int(visitors or 0),
             }
@@ -765,72 +808,73 @@ def admin_weekly_digest(
     last_week_start = this_week_start - timedelta(days=7)
     last_week_end = this_week_start
 
-    # Get entry page counts for finish calculation
-    page_counts = {
-        entry_id: count
-        for entry_id, count in db.execute(
-            select(EntryPage.entry_id, func.count())
-            .group_by(EntryPage.entry_id)
-        ).all()
-    }
+    website_id = _get_umami_website_id()
+    website_filter, website_params = _umami_website_filter(website_id)
 
-    entries = db.scalars(select(Entry)).all()
-    entry_lookup: dict[tuple[str, int], dict] = {}
-    for entry in entries:
-        if entry.display_number is not None:
-            key = (entry.series_id or "", int(entry.display_number))
-            entry_lookup[key] = {
-                "id": entry.id,
-                "pageCount": page_counts.get(entry.id, 0),
+    def calculate_period_stats_umami(start_dt: datetime, end_dt: datetime) -> dict:
+        try:
+            with get_umami_db() as umami_db:
+                # Query unique visitors from all reader events
+                visitors_query = text(f"""
+                    SELECT COUNT(DISTINCT s.visitor_id)
+                    FROM website_event we
+                    JOIN session s ON we.session_id = s.session_id
+                    WHERE we.event_name IN ('reader_page_view', 'reader_entry_complete', 'reader_entry_exit')
+                        AND we.created_at >= :start_time
+                        AND we.created_at < :end_time
+                        {website_filter}
+                """)
+                unique_visitors = umami_db.execute(visitors_query, {
+                    "start_time": start_dt,
+                    "end_time": end_dt,
+                    **website_params,
+                }).scalar() or 0
+
+                # Query reads: unique sessions per entry from reader_page_view
+                reads_query = text(f"""
+                    SELECT
+                        ed_entry.string_value as entry_label,
+                        COUNT(DISTINCT we.session_id) as session_count
+                    FROM website_event we
+                    LEFT JOIN event_data ed_entry ON we.event_id = ed_entry.website_event_id
+                        AND ed_entry.data_key = 'entryLabel'
+                    WHERE we.event_name = 'reader_page_view'
+                        AND we.created_at >= :start_time
+                        AND we.created_at < :end_time
+                        AND ed_entry.string_value IS NOT NULL
+                        {website_filter}
+                    GROUP BY ed_entry.string_value
+                """)
+                reads_rows = umami_db.execute(reads_query, {
+                    "start_time": start_dt,
+                    "end_time": end_dt,
+                    **website_params,
+                }).fetchall()
+
+                total_reads = sum(row[1] for row in reads_rows)
+
+                # Query finishes: unique sessions from reader_entry_complete
+                finishes_query = text(f"""
+                    SELECT COUNT(DISTINCT we.session_id)
+                    FROM website_event we
+                    WHERE we.event_name = 'reader_entry_complete'
+                        AND we.created_at >= :start_time
+                        AND we.created_at < :end_time
+                        {website_filter}
+                """)
+                total_finishes = umami_db.execute(finishes_query, {
+                    "start_time": start_dt,
+                    "end_time": end_dt,
+                    **website_params,
+                }).scalar() or 0
+
+        except Exception:
+            return {
+                "reads": 0,
+                "finishes": 0,
+                "completionRate": 0,
+                "uniqueVisitors": 0,
             }
-
-    def calculate_period_stats(start_dt: datetime, end_dt: datetime) -> dict:
-        events = db.execute(
-            select(
-                VisitorEvent.visitor_id,
-                VisitorEvent.series_id,
-                VisitorEvent.entry_label,
-                VisitorEvent.entry_title,
-                VisitorEvent.page_number,
-            )
-            .where(VisitorEvent.created_at >= start_dt)
-            .where(VisitorEvent.created_at < end_dt)
-        ).all()
-
-        unique_visitors: set[str] = set()
-        reads_by_entry: dict[tuple[str, int], set] = {}
-        max_page_by_visitor_entry: dict[tuple[str, str, int], int] = {}
-
-        for visitor_id, series_id, entry_label, entry_title, page_number in events:
-            sid = series_id or ""
-            display_num = _extract_display_number(entry_label) or _extract_display_number(entry_title)
-
-            if visitor_id:
-                unique_visitors.add(visitor_id)
-
-            if display_num is None:
-                continue
-
-            key = (sid, display_num)
-            if key not in reads_by_entry:
-                reads_by_entry[key] = set()
-            if visitor_id:
-                reads_by_entry[key].add(visitor_id)
-
-            if visitor_id and page_number is not None:
-                vkey = (visitor_id, sid, display_num)
-                current = max_page_by_visitor_entry.get(vkey, 0)
-                max_page_by_visitor_entry[vkey] = max(current, int(page_number))
-
-        total_reads = sum(len(v) for v in reads_by_entry.values())
-
-        # Calculate finishes
-        total_finishes = 0
-        for (visitor_id, sid, display_num), max_page in max_page_by_visitor_entry.items():
-            entry_info = entry_lookup.get((sid, display_num))
-            if entry_info and entry_info["pageCount"] > 0:
-                if max_page >= entry_info["pageCount"]:
-                    total_finishes += 1
 
         completion_rate = total_finishes / total_reads if total_reads > 0 else 0
 
@@ -838,14 +882,14 @@ def admin_weekly_digest(
             "reads": total_reads,
             "finishes": total_finishes,
             "completionRate": round(completion_rate, 4),
-            "uniqueVisitors": len(unique_visitors),
+            "uniqueVisitors": unique_visitors,
         }
 
-    this_week = calculate_period_stats(this_week_start, this_week_end)
+    this_week = calculate_period_stats_umami(this_week_start, this_week_end)
     this_week["startDate"] = this_week_start.date().isoformat()
     this_week["endDate"] = this_week_end.date().isoformat()
 
-    last_week = calculate_period_stats(last_week_start, last_week_end)
+    last_week = calculate_period_stats_umami(last_week_start, last_week_end)
     last_week["startDate"] = last_week_start.date().isoformat()
     last_week["endDate"] = last_week_end.date().isoformat()
 

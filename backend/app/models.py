@@ -143,6 +143,29 @@ class Series(Base):
     )
 
     entries: Mapped[list["Entry"]] = relationship(back_populates="series", cascade="all, delete-orphan")
+    entry_labels: Mapped[list["EntryLabel"]] = relationship(
+        back_populates="series",
+        cascade="all, delete-orphan",
+    )
+
+
+class EntryLabel(Base):
+    __tablename__ = "entry_labels"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    series_id: Mapped[str] = mapped_column(String(64), ForeignKey("series.id"), nullable=False, index=True)
+    slug: Mapped[str] = mapped_column(String(64), nullable=False)
+    singular: Mapped[str] = mapped_column(String(30), nullable=False)
+    plural: Mapped[str] = mapped_column(String(30), nullable=False)
+    sort_index: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    is_default: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    series: Mapped[Series] = relationship(back_populates="entry_labels")
+    entries: Mapped[list["Entry"]] = relationship(back_populates="entry_label")
 
 
 class Entry(Base):
@@ -152,9 +175,19 @@ class Entry(Base):
     series_id: Mapped[str] = mapped_column(String(64), ForeignKey("series.id"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     display_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    entry_label_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("entry_labels.id", ondelete="SET NULL"),
+        nullable=True,
+    )
 
     folder_path: Mapped[str] = mapped_column(String(300), nullable=False, default="")
     premium_only: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    show_in_dropdown: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    show_in_gallery: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    release_type: Mapped[str] = mapped_column(String(20), nullable=False, default="digital")
+    store_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    cover_image: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="published")
     publish_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
@@ -166,6 +199,7 @@ class Entry(Base):
     )
 
     series: Mapped[Series] = relationship(back_populates="entries")
+    entry_label: Mapped[EntryLabel | None] = relationship(back_populates="entries")
     pages: Mapped[list["EntryPage"]] = relationship(back_populates="entry", cascade="all, delete-orphan")
 
 
@@ -284,21 +318,3 @@ class VisitorSession(Base):
     first_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     last_seen: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     hit_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-
-
-class VisitorEvent(Base):
-    __tablename__ = "visitor_events"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    visitor_id: Mapped[str] = mapped_column(String(120), index=True, nullable=False)
-    user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    ip_address: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    origin: Mapped[str | None] = mapped_column(String(300), nullable=True)
-    referrer: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    path: Mapped[str | None] = mapped_column(String(300), nullable=True)
-    title: Mapped[str | None] = mapped_column(String(300), nullable=True)
-    series_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    entry_title: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    entry_label: Mapped[str | None] = mapped_column(String(200), nullable=True)
-    page_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

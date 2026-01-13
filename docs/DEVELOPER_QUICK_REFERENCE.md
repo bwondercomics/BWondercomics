@@ -16,8 +16,13 @@ grep -r "TODO" reader/ admin/ backend/
 # 3. Run tests
 npm test
 
-# 4. Check code formatting
-npm run format:check  # (add this script if not exists)
+# 4. Lint + format (JS)
+npm run lint
+npm run format:check
+
+# 5. Lint + format (backend)
+python -m ruff check backend/app
+python -m ruff format backend/app
 ```
 
 ### **Security**

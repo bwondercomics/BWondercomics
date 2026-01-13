@@ -19,6 +19,8 @@ const state = {
   chapters: {},
   chapterFolders: {},
   chapterMeta: {},
+  entryLabels: [],
+  activeEntryLabelId: null,
   statusMessage: "",
   premiumOnly: false,
   currentEditingChapter: null,

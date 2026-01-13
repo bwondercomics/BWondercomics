@@ -11,7 +11,7 @@ This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic p
 
 ## Data sources
 - Series + entries (including per-series entry labels) + status message: Postgres (served to the frontend as DB-backed JSON at `admin/data.json` and `admin/series/<id>/data.json`).
-- Entry page images: on disk under `chapters/` (default series) and `comics/<seriesId>/chapters/` (other series).
+- Entry page images: on disk under `comics/<seriesId>/entries/`.
 - Blog/feed posts: Postgres `posts` table (supports draft/scheduled/published).
 - Comments + accounts: Postgres (`users`, `comments` tables).
 - Media library: Postgres table (index + tags) with files under `media/` on disk.

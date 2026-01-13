@@ -1,5 +1,5 @@
 [Unit]
-Description=Nightly BWonderComics data backup
+Description=Nightly BWonderComics database backup
 
 [Timer]
 OnCalendar=*-*-* 03:00:00

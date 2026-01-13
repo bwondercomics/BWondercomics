@@ -241,7 +241,27 @@ function createSeriesManager() {
 
   function getChaptersRoot() {
     const id = getActiveSeriesId();
-    return id === DEFAULT_SERIES_ID ? "chapters" : `comics/${id}/chapters`;
+    const preferredRoot = `comics/${id}/entries`;
+    const legacyRoots = [`comics/${id}/chapters`, "chapters"];
+    const rootsToCheck = [preferredRoot, ...legacyRoots];
+
+    const normalizePath = (value) => String(value || "").trim().replace(/^\/+/, "");
+    const hasRootMatch = (path, root) => {
+      const normalized = normalizePath(path);
+      const normalizedRoot = normalizePath(root).replace(/\/+$/, "");
+      return normalized && normalizedRoot && normalized.startsWith(`${normalizedRoot}/`);
+    };
+
+    const folderPaths = Object.values(state.chapterFolders || {});
+    const chapterPages = Object.values(state.chapters || {})
+      .flatMap((pages) => (Array.isArray(pages) ? pages : []));
+
+    for (const root of rootsToCheck) {
+      if (folderPaths.some((path) => hasRootMatch(path, root))) return root;
+      if (chapterPages.some((path) => hasRootMatch(path, root))) return root;
+    }
+
+    return preferredRoot;
   }
 
   function getChaptersDataFileUrl() {
@@ -448,7 +468,7 @@ function createSeriesManager() {
     await fetch("/api/create-chapter", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chapterFolder: `comics/${id}/chapters` }),
+      body: JSON.stringify({ chapterFolder: `comics/${id}/entries` }),
     }).catch(() => {});
 
     state.seriesIndex = nextIndex;
@@ -655,7 +675,7 @@ function createSeriesManager() {
         await fetch("/api/create-chapter", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chapterFolder: `comics/${id}/chapters` }),
+          body: JSON.stringify({ chapterFolder: `comics/${id}/entries` }),
         }).catch(() => {});
 
         state.seriesIndex = nextIndex;

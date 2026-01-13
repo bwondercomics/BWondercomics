@@ -41,7 +41,7 @@ flowchart TD
   - Persists progress to `localStorage` (key from `config.STORAGE_KEY`) and restores on boot.
   - Emits derived values used by render (e.g., `getVisiblePages`).
 - **render.js**
-  - Computes the visible page(s), resolves URLs relative to `chapters/`.
+  - Computes the visible page(s), resolves URLs relative to `comics/<seriesId>/entries/`.
   - Applies transform (scale + translate) based on `state` and `transform` helpers.
   - Preloads neighbor pages for snappier navigation.
   - Updates UI affordances: prev/next disabled states, page label, status text.
@@ -88,5 +88,5 @@ flowchart TD
 
 ## Gotchas / Notes
 - Admin auth is minimal; reader fetches data anonymously. Ensure `admin/data.json` and assets are publicly readable on your host.
-- Image paths must live under `chapters/` (or be absolute URLs) for the preview/reader to resolve them.
+- Image paths must live under `comics/<seriesId>/entries/` (or be absolute URLs) for the preview/reader to resolve them.
 - Double-check `statusMessage`: shown both on the reader ticker and in admin; comes from `admin/data.json`.

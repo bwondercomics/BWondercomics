@@ -4,17 +4,7 @@ import { changeChapter as changeChapterFromOverlays } from "./overlays.js";
 
 // Entry gallery overlay with lazy-loaded thumbnails and promo cards.
 
-const VOLUME_LINK =
-  "https://bwondercomics.bigcartel.com/product/battle-bros-volume-1";
-const VOLUME_EXCLUSIVES = [
-  {
-    image: "chapters/volumes/frontBBCOVER.png",
-    title: "Physical Volume",
-    href: VOLUME_LINK,
-    badgeText: "Physical Volume",
-    variantClass: "volume-card",
-  },
-];
+const STORE_BADGE_TEXT = "Physical Volume";
 
 // Lazy-load gallery thumbnails as they enter the viewport.
 const imageObserver = new IntersectionObserver((entries) => {
@@ -50,7 +40,8 @@ function getDisplayNumber(meta) {
 function formatEntryLabel(name, meta, unitLabel) {
   const displayNumber = getDisplayNumber(meta);
   if (displayNumber == null) return name;
-  return `${unitLabel} ${displayNumber} - ${name}`;
+  const label = String(meta?.entryLabelSingular || unitLabel || "Entry");
+  return `${label} ${displayNumber} - ${name}`;
 }
 
 function openCommentsPanel() {
@@ -84,10 +75,26 @@ export function renderGallery(chapterOrder, chapters, options = {}) {
 
   names.forEach((name) => {
     const pages = chapters[name];
+    const meta = chapterMeta?.[name] || {};
+    const releaseType = String(meta.releaseType || "digital").toLowerCase();
+    const showInGallery = meta.showInGallery !== false;
+    if (!showInGallery) return;
+
+    if (releaseType === "store") {
+      const coverUrl = meta.coverImage || (Array.isArray(pages) ? pages[0] : "");
+      const storeUrl = meta.storeUrl;
+      if (!storeUrl || !coverUrl) return;
+      addPromoCard(
+        { image: coverUrl, title: formatEntryLabel(name, meta, unitLabel), href: storeUrl },
+        "volume-card",
+        STORE_BADGE_TEXT,
+      );
+      return;
+    }
+
     if (!pages || pages.length === 0) return;
 
     const coverUrl = pages[0];
-    const meta = chapterMeta?.[name];
     const isPatron = !!meta?.premium;
     const displayTitle = formatEntryLabel(name, meta, unitLabel);
 
@@ -231,10 +238,6 @@ export function renderGallery(chapterOrder, chapters, options = {}) {
     card.appendChild(info);
     grid.appendChild(card);
   });
-
-  VOLUME_EXCLUSIVES.forEach((cover) =>
-    addPromoCard(cover, cover.variantClass, cover.badgeText),
-  );
 
   const closeBtn = document.getElementById("galleryClose");
   if (closeBtn) {
