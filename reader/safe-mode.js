@@ -29,7 +29,7 @@ async function checkSafeMode() {
     if (safeOrigin === window.location.origin) return;
     const target = `${safeOrigin}${window.location.pathname}${window.location.search}${window.location.hash}`;
     window.location.replace(target);
-  } catch (err) {
+  } catch {
     // Ignore failures and let the site load normally.
   }
 }

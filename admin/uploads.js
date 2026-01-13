@@ -250,16 +250,18 @@ function createUploadManager({
 
       const errors = result.errors?.length || 0;
       if (errors > 0) {
-        if (showError)
+        if (showError) {
           showError(`Uploaded ${newPaths.length} file(s), ${errors} failed.`);
+        }
       } else if (showSuccess) {
         showSuccess(`Successfully uploaded ${newPaths.length} image(s)!`);
       }
     } catch (error) {
       console.error("Upload error:", error);
       if (showError) showError(`Upload failed: ${error.message}`);
-      if (uploadProgress)
+      if (uploadProgress) {
         uploadProgress.textContent = `Upload failed: ${error.message}`;
+      }
     } finally {
       state.isUploading = false;
       btnUploadImages.disabled = false;

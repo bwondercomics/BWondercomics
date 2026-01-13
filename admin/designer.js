@@ -48,7 +48,7 @@ function createDesigner({ sanitizeSeriesId, getActiveSeriesId, hideAllSections, 
         if (height) {
           el.designerFrame.style.height = `${Math.max(600, Math.ceil(height))}px`;
         }
-      } catch (err) {
+      } catch {
         // Ignore cross-origin access failures.
       }
     });

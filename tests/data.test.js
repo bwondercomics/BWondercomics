@@ -54,6 +54,7 @@ describe('loadChapterData', () => {
 
 describe('loadPageConfig', () => {
   it('should call setSubtitlesFn when subtitles exist', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const setSubtitles = vi.fn();
     const payload = {
       content: {
@@ -71,6 +72,7 @@ describe('loadPageConfig', () => {
     const result = await loadPageConfig(setSubtitles, 'battle-bros');
     expect(result).toBe(true);
     expect(setSubtitles).toHaveBeenCalledWith(['one', 'two']);
+    warnSpy.mockRestore();
   });
 
   it('should return false when config fails to load', async () => {

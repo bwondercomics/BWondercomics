@@ -48,7 +48,16 @@ export default [
                 AbortController: 'readonly',
                 requestAnimationFrame: 'readonly',
                 cancelAnimationFrame: 'readonly',
-                performance: 'readonly'
+                performance: 'readonly',
+                alert: 'readonly',
+                confirm: 'readonly',
+                prompt: 'readonly',
+                crypto: 'readonly',
+                EventSource: 'readonly',
+                HTMLCanvasElement: 'readonly',
+                HTMLButtonElement: 'readonly',
+                CSS: 'readonly',
+                getComputedStyle: 'readonly'
             }
         },
         rules: {

@@ -114,9 +114,10 @@ function createPreviewManager({
     el.previewFrame.style.display = "block";
     el.previewEmpty.style.display = "none";
     if (el.previewPrev) el.previewPrev.disabled = state.previewState.index <= 0;
-    if (el.previewNext)
+    if (el.previewNext) {
       el.previewNext.disabled =
         state.previewState.index >= pages.length - 1;
+    }
   }
 
   function copyToClipboard() {

@@ -25,7 +25,7 @@ function getTracker() {
 function canTrackViews() {
   try {
     return localStorage.getItem(COUNT_VIEWS_KEY) !== "false";
-  } catch (err) {
+  } catch {
     return true;
   }
 }
@@ -43,7 +43,7 @@ function trackEvent(name, data) {
   flushPending(tracker);
   try {
     tracker(name, data);
-  } catch (err) {
+  } catch {
     // Ignore analytics failures to avoid breaking the reader.
   }
 }
@@ -56,7 +56,7 @@ function flushPending(tracker) {
   queued.forEach((event) => {
     try {
       active(event.name, event.data);
-    } catch (err) {
+    } catch {
       // Ignore analytics failures to avoid breaking the reader.
     }
   });

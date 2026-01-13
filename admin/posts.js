@@ -319,15 +319,18 @@ function createPostsManager({
     state.editingPostId = post.id;
     el.postTitle.value = post.title || "";
     el.postImage.value = post.image || "";
-    if (el.postImageTags)
+    if (el.postImageTags) {
       el.postImageTags.value = (post.imageTags || []).join(", ");
+    }
     if (el.postImageFocus) el.postImageFocus.value = post.imageFocus || "center";
-    if (el.postPublishAt)
+    if (el.postPublishAt) {
       el.postPublishAt.value = isoToDateTimeLocal(post.date || "");
+    }
     if (el.postContent) el.postContent.innerHTML = post.content || "";
     el.postShare.checked = post.share !== false;
-    if (el.postShareBluesky)
+    if (el.postShareBluesky) {
       el.postShareBluesky.checked = post.shareBluesky === true;
+    }
     el.btnSavePost.textContent = "Update Post";
     updateBlueskyCounter();
     showBlogSection();
@@ -585,8 +588,9 @@ function createPostsManager({
 
   function applyMediaToPost(item) {
     if (el.postImage) el.postImage.value = item.path || "";
-    if (el.postImageTags)
+    if (el.postImageTags) {
       el.postImageTags.value = (item.tags || []).join(", ");
+    }
     updateBlueskyCounter();
     state.pendingMediaSelection = null;
     showBlogSection();

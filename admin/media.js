@@ -128,8 +128,9 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
         headers: { "Content-Type": "application/json" },
       });
       const result = await response.json();
-      if (!response.ok)
+      if (!response.ok) {
         throw new Error(result.error || "Failed to list media folder");
+      }
 
       const diskPaths = result.paths || [];
       const existingMap = new Map(state.mediaItems.map((m) => [m.path, m]));

@@ -3,7 +3,6 @@
  * Handles reading progress persistence and runtime state
  */
 
-import { CONFIG } from './config.js';
 import { STORAGE } from './constants.js';
 
 /**
@@ -78,7 +77,7 @@ export function loadProgress() {
   try {
     const json = localStorage.getItem(STORAGE.PROGRESS_KEY);
     return json ? JSON.parse(json) : null;
-  } catch (e) {
+  } catch {
     return null;
   }
 }

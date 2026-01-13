@@ -6,7 +6,6 @@ const MIN_UPDATE_MS = 15_000;
 
 let started = false;
 let visitorId = null;
-let heartbeatTimer = null;
 let lastSentAt = 0;
 let memoryVisitorId = null;
 let context = {
@@ -23,7 +22,7 @@ let context = {
 function canTrack() {
   try {
     return localStorage.getItem(COUNT_VIEWS_KEY) !== "false";
-  } catch (err) {
+  } catch {
     return true;
   }
 }
@@ -49,7 +48,7 @@ function getVisitorId() {
     localStorage.setItem(VISITOR_ID_KEY, next);
     memoryVisitorId = next;
     return next;
-  } catch (err) {
+  } catch {
     memoryVisitorId = buildVisitorId();
     return memoryVisitorId;
   }
@@ -132,7 +131,7 @@ export function initLiveTracking() {
   });
   sendUpdate({ force: true });
 
-  heartbeatTimer = window.setInterval(() => {
+  window.setInterval(() => {
     sendUpdate();
   }, HEARTBEAT_MS);
 

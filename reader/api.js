@@ -3,7 +3,7 @@
  * Centralized API request handling with error management
  */
 
-import { API, HTTP_STATUS } from './constants.js';
+import { API } from './constants.js';
 import { logger } from './logger.js';
 
 /**

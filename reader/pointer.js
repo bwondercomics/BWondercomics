@@ -24,7 +24,7 @@ export function initPointerHandlers() {
       updateEdgeZones(e.clientX, e.clientY);
     });
 
-    el.viewport.addEventListener('pointerup', (e) => {
+    el.viewport.addEventListener('pointerup', () => {
       if (!state.isDragging && state.pointers.size === 0) {
         const now = Date.now();
         if (state.lastTap && now - state.lastTap < 300) {
@@ -42,7 +42,9 @@ function onPointerDown(e) {
   // Track pointers for drag/pinch interactions and taps.
   try {
     e.target.setPointerCapture(e.pointerId);
-  } catch (err) { }
+  } catch {
+    // Ignore pointer capture failures on unsupported targets.
+  }
 
   state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
   const pointerCount = state.pointers.size;
@@ -118,7 +120,9 @@ function onPointerUp(e) {
   // Finish gestures, handle swipes, reset pointer state.
   try {
     e.target.releasePointerCapture(e.pointerId);
-  } catch (err) { }
+  } catch {
+    // Ignore pointer release failures on unsupported targets.
+  }
 
   state.pointers.delete(e.pointerId);
 
@@ -162,7 +166,7 @@ function onWheel(e) {
   }
 }
 
-export function updateEdgeZones(x, y) {
+export function updateEdgeZones(x, _y) {
   if (!el.viewport) return;
 
   if (state.isDragging || state.pointers.size > 0) {

@@ -26,7 +26,6 @@ const READS_OVER_TIME_ENDPOINT = "/api/admin/analytics/reads-over-time";
 
 const activeReaderDetails = new Map();
 let readsOverTimeData = [];
-let readsOverTimeCtx = null;
 let lastReaderPayload = null;
 let lastReaderSeriesFilter = "all";
 const LIVE_REFRESH_MS = 5 * 60 * 1000;
@@ -39,7 +38,6 @@ let liveTimer = null;
 let liveTickerRaf = null;
 let liveTickerLastTime = 0;
 let liveGraphRaf = null;
-let liveCanvasCtx = null;
 let liveCanvasSize = { width: 0, height: 0 };
 let liveCanvasColors = null;
 
@@ -58,7 +56,7 @@ function loadLiveHistoryFromStorage() {
       .filter((item) => Number.isFinite(item.ts) && Number.isFinite(item.count))
       .filter((item) => item.ts >= cutoff);
     liveHistory = restored.slice(-LIVE_HISTORY_MAX_ITEMS);
-  } catch (err) {
+  } catch {
     // Ignore storage parsing errors.
   }
 }
@@ -68,7 +66,7 @@ function saveLiveHistoryToStorage() {
     if (!Array.isArray(liveHistory)) return;
     const trimmed = liveHistory.slice(-LIVE_HISTORY_MAX_ITEMS);
     localStorage.setItem(LIVE_HISTORY_STORAGE_KEY, JSON.stringify(trimmed));
-  } catch (err) {
+  } catch {
     // Ignore storage write errors.
   }
 }
@@ -452,14 +450,18 @@ function clearAnalyticsSummary() {
 
 function renderReaderSummary(payload) {
   if (!payload) return;
-  if (el.statEntryReads)
+  if (el.statEntryReads) {
     el.statEntryReads.textContent = formatStat(payload.entryReadsTotal);
-  if (el.statEntryFinishes)
+  }
+  if (el.statEntryFinishes) {
     el.statEntryFinishes.textContent = formatStat(payload.entryFinishesTotal);
-  if (el.statFinishRate)
+  }
+  if (el.statFinishRate) {
     el.statFinishRate.textContent = formatPercent(payload.finishRate);
-  if (el.statAvgStopPage)
+  }
+  if (el.statAvgStopPage) {
     el.statAvgStopPage.textContent = formatDecimal(payload.avgStopPage);
+  }
 }
 
 function renderAnalyticsPages(payload) {
@@ -656,7 +658,7 @@ async function loadReaderSeries(target, detail, { showLoading = true } = {}) {
     let payload = null;
     try {
       payload = await res.json();
-    } catch (err) {
+    } catch {
       payload = null;
     }
 
@@ -674,11 +676,11 @@ async function loadReaderSeries(target, detail, { showLoading = true } = {}) {
     if (detail.requestId !== requestId) return;
     detail.series = [];
     detail.error = err?.message || "Unable to load item history.";
-  } finally {
-    if (detail.requestId !== requestId) return;
-    detail.loading = false;
-    renderReaderDetail(target, detail);
   }
+
+  if (detail.requestId !== requestId) return;
+  detail.loading = false;
+  renderReaderDetail(target, detail);
 }
 
 function bindReaderInteractions(target) {
@@ -917,7 +919,6 @@ function ensureLiveCanvas() {
   const ctx = canvas.getContext("2d");
   if (!ctx) return null;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  liveCanvasCtx = ctx;
   liveCanvasSize = { width, height };
   if (!liveCanvasColors) liveCanvasColors = getLiveColors();
   return ctx;
@@ -1228,7 +1229,7 @@ async function loadLiveVisitors({ showLoading = true, at = null } = {}) {
     let payload = null;
     try {
       payload = await res.json();
-    } catch (err) {
+    } catch {
       payload = null;
     }
 
@@ -1290,7 +1291,7 @@ async function loadAnalyticsSummary({ showLoading = true } = {}) {
     let payload = null;
     try {
       payload = await res.json();
-    } catch (err) {
+    } catch {
       payload = null;
     }
 
@@ -1327,7 +1328,7 @@ async function loadAnalyticsPages({ showLoading = true } = {}) {
     let payload = null;
     try {
       payload = await res.json();
-    } catch (err) {
+    } catch {
       payload = null;
     }
 
@@ -1369,7 +1370,7 @@ async function loadReaderAnalytics({ showLoading = true } = {}) {
     let payload = null;
     try {
       payload = await res.json();
-    } catch (err) {
+    } catch {
       payload = null;
     }
 
@@ -1564,7 +1565,7 @@ async function loadReadsOverTime({ showLoading = true } = {}) {
     let payload = null;
     try {
       payload = await res.json();
-    } catch (err) {
+    } catch {
       payload = null;
     }
 

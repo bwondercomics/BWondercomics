@@ -112,7 +112,7 @@ export function ensureChapterFolder(name = '', chapterFolders = {}, chapters = {
   const existing = new Set(Object.values(chapterFolders || {}));
   const numberMatch = name.match(/\d+/)?.[0];
   const root = String(chaptersRoot || 'chapters').replace(/\/+$/g, '');
-  let base = numberMatch ? `${root}/${numberMatch.padStart(2, '0')}` : sanitizeFolderFromName(name, root);
+  const base = numberMatch ? `${root}/${numberMatch.padStart(2, '0')}` : sanitizeFolderFromName(name, root);
   let candidate = base;
   let counter = 1;
   while (existing.has(candidate)) {

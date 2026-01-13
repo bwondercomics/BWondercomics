@@ -295,7 +295,7 @@ function createSeriesManager() {
         defaultSeriesId,
         series,
       };
-    } catch (err) {
+    } catch {
       state.seriesIndex = {
         version: 1,
         defaultSeriesId: DEFAULT_SERIES_ID,
@@ -576,8 +576,9 @@ function createSeriesManager() {
       premiumOnly,
       saveBtn,
     } = getSeriesModalElements();
-    if (!idInput || !titleInput || !unitSingular || !unitPlural || !premiumOnly)
+    if (!idInput || !titleInput || !unitSingular || !unitPlural || !premiumOnly) {
       return;
+    }
 
     const rawId = idInput.value.trim();
     const id = sanitizeSeriesId(rawId);
@@ -758,7 +759,7 @@ function createSeriesManager() {
 
     const seriesTitle = current.title || id;
     const confirmed = window.confirm(
-      `Delete series \"${seriesTitle}\" (${id}) from the series list?\n\nThis hides it from the site but keeps its data in the database.`,
+      `Delete series "${seriesTitle}" (${id}) from the series list?\n\nThis hides it from the site but keeps its data in the database.`,
     );
     if (!confirmed) return;
 

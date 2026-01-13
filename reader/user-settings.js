@@ -49,7 +49,7 @@ import { API } from "./constants.js";
   function dispatchSession(user) {
     try {
       window.dispatchEvent(new CustomEvent("bbSessionChanged", { detail: { user } }));
-    } catch (err) {
+    } catch {
       // Ignore dispatch errors.
     }
   }
@@ -202,7 +202,7 @@ import { API } from "./constants.js";
       showContent();
       dispatchSession(user);
       await loadComments(true);
-    } catch (err) {
+    } catch {
       showAuth();
       currentUser = null;
       currentCommentCount = 0;
@@ -295,7 +295,7 @@ import { API } from "./constants.js";
   async function handleDeleteComments() {
     if (!confirm("Delete all of your comments? This cannot be undone.")) return;
     try {
-      const data = await fetchJson(API.ENDPOINTS.USER_DELETE_COMMENTS, { method: "POST" });
+      await fetchJson(API.ENDPOINTS.USER_DELETE_COMMENTS, { method: "POST" });
       if (commentCountEl) {
         currentCommentCount = 0;
         commentCountEl.textContent = "You have 0 comments.";
@@ -312,7 +312,7 @@ import { API } from "./constants.js";
   async function handleLogout() {
     try {
       await fetchJson(API.ENDPOINTS.LOGOUT, { method: "POST" });
-    } catch (err) {
+    } catch {
       // Ignore logout errors.
     }
     dispatchSession(null);

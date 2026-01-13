@@ -237,7 +237,9 @@ import { buildEntryTargetId } from './comment-targets.js';
         if (willShow) {
             try {
                 panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            } catch (err) { }
+            } catch {
+                // Ignore scroll failures (e.g., detached node).
+            }
             if (commentCtx) {
                 loadComments(commentCtx);
             }
@@ -314,7 +316,9 @@ import { buildEntryTargetId } from './comment-targets.js';
             await loadComments(ctx);
             try {
                 window.dispatchEvent(new CustomEvent('bbSessionChanged', { detail: { user: ctx.user || null } }));
-            } catch (err) { }
+            } catch {
+                // Ignore dispatch errors in older browsers.
+            }
         } catch (err) {
             ctx.authError.textContent = err.message || 'Authentication failed.';
         } finally {
@@ -331,7 +335,9 @@ import { buildEntryTargetId } from './comment-targets.js';
             await loadComments(ctx);
             try {
                 window.dispatchEvent(new CustomEvent('bbSessionChanged', { detail: { user: null } }));
-            } catch (err) { }
+            } catch {
+                // Ignore dispatch errors in older browsers.
+            }
         }
     }
 

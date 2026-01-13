@@ -1,11 +1,5 @@
 // Reader bootstrap: loads data, binds UI, and wires view state.
-import { CONFIG } from "./config.js";
-import {
-  extractChapterNumber,
-  sortChapterNames,
-  sanitizeChapters,
-} from "./chapters.js";
-import { state, saveProgress, loadProgress } from "./state.js";
+import { state, loadProgress } from "./state.js";
 import { logger } from "./logger.js";
 import { loadChapterData, loadPageConfig, loadLatestPost } from "./data.js";
 import { el, initElements } from "./dom.js";
@@ -17,13 +11,7 @@ import {
   restartChapter,
   hideEndOfChapter,
 } from "./controls.js";
-import {
-  fitHeightFullscreen,
-  fitToScreen,
-  zoomIn,
-  zoomOut,
-  resetView,
-} from "./transform.js";
+import { fitToScreen, zoomIn, zoomOut, resetView } from "./transform.js";
 import { initPointerHandlers } from "./pointer.js";
 import {
   toggleShortcutsOverlay,
@@ -448,7 +436,7 @@ import { getActiveSeriesId } from "./series.js";
       }
 
       return totalDelay ? totalDelay * 10 : null;
-    } catch (err) {
+    } catch {
       return null;
     }
   }
@@ -474,7 +462,7 @@ import { getActiveSeriesId } from "./series.js";
           }
           ctx.drawImage(loader, 0, 0, width, height);
           resolve(canvas.toDataURL("image/png"));
-        } catch (err) {
+        } catch {
           resolve(null);
         }
       };
@@ -539,8 +527,9 @@ import { getActiveSeriesId } from "./series.js";
     if (el.zoomIn) el.zoomIn.addEventListener("click", zoomIn);
     if (el.zoomOut) el.zoomOut.addEventListener("click", zoomOut);
     if (el.fitBtn) el.fitBtn.addEventListener("click", fitToScreen);
-    if (el.fullscreenBtn)
+    if (el.fullscreenBtn) {
       el.fullscreenBtn.addEventListener("click", toggleFullscreen);
+    }
 
     // Help button
     const helpBtn = document.getElementById("helpBtn");
@@ -828,7 +817,7 @@ import { getActiveSeriesId } from "./series.js";
         const data = await res.json();
         sessionUser = data.user || null;
       }
-    } catch (err) {
+    } catch {
       sessionUser = null;
     }
 

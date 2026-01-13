@@ -15,13 +15,16 @@ Goal: the platform runs clean, stable, and predictable.
 
 ### Codebase scan
 - [x] Resolve or log all TODO/FIXME/HACK/TEMP in `backend/`, `admin/`, `reader/`, `assets/`, `docs/`. *(Verified 2026-01-13 via rg; no code TODOs)*
-- [ ] Remove dead code and unused imports in `backend/app/` and `admin/*.js`. *(Not re-verified; needs lint/static analysis)*
-- [ ] Add/confirm lint + format scripts in `package.json` and backend tooling. *(ESLint installed; ruff config added; backend install still needed)*
+- [ ] Remove dead code and unused imports in `backend/app/`, `admin/*.js`, `reader/*.js`. *(Admin/reader lint cleanup done 2026-01-13; backend audit still needed)*
+- [ ] Add/confirm lint + format scripts in `package.json` and backend tooling. *(ESLint clean for admin/reader; backend install still needed)*
+- [x] JS lint passes for `admin/` + `reader/`. *(`npm run lint` clean 2026-01-13)*
+- [x] JS test suite passes. *(`npm test` clean 2026-01-13)*
 
 ### Data safety + integrity
 - [ ] Verify migrations align with live schema (`backend/alembic/`, `backend/app/models.py`). *(Needs DB check vs alembic head)*
 - [ ] Validate DB write paths for comments, entries, posts, analytics events. *(Needs endpoint review + smoke tests)*
 - [ ] Enforce canonical IDs: `series_id + display_number` for entries. *(Implemented in code/docs; needs DB audit)*
+- [x] Entries payload is canonical (`entries/entryMeta/entryFolders`); legacy `chapters/*` removed. *(API + reader/admin updated; tests passing)*
 
 ### Observability + backups
 - [ ] Document backup + restore steps in `docs/` and test once. *(Docs updated; restore not re-tested)*
@@ -65,6 +68,7 @@ Goal: the control room feels real and reliable.
 
 ### Analytics revamp
 - [x] Fix analytics data pipeline (tracking → rollups → display). *(Working as of Jan 2026)*
+- [x] Ignore zero-page entries in Reader Analytics (click-only entries no longer show reads).
 - [ ] Revamp analytics UX to surface actionable insights (retention, drop-off points, popular entries).
 - [ ] Add retention + session summary metrics with clear definitions.
 - [ ] Consider time-based comparisons (this week vs last week).

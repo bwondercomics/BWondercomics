@@ -917,7 +917,7 @@ export function createChaptersApi({
         item.draggable = allowDrag;
 
         if (moveModeEnabled) {
-          item.addEventListener('click', (e) => {
+          item.addEventListener('click', () => {
             // If we are currently dragging, OR we just finished dragging, do not select
             if (isDragClickLocked()) return;
             selectPage(index);
@@ -934,6 +934,7 @@ export function createChaptersApi({
               e.dataTransfer.setData('text/plain', String(index));
               e.dataTransfer.setData('text/html', item.innerHTML);
             } catch {
+              // Ignore drag data transfer errors in older browsers.
             }
           });
 

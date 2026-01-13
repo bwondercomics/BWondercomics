@@ -295,10 +295,12 @@ export async function initDiagnostics() {
         const logsClear = document.getElementById('logs-clear');
         if (logsStart) logsStart.addEventListener('click', startLogStream);
         if (logsStop) logsStop.addEventListener('click', stopLogStream);
-        if (logsClear) logsClear.addEventListener('click', () => {
-            const output = document.getElementById('logs-output');
-            if (output) output.textContent = '';
-        });
+        if (logsClear) {
+            logsClear.addEventListener('click', () => {
+                const output = document.getElementById('logs-output');
+                if (output) output.textContent = '';
+            });
+        }
     }
 
     // Initial load

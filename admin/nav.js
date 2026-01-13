@@ -7,7 +7,7 @@ const SCANLINES_CLASS = "admin-scanlines-off";
 function readStorage(key) {
   try {
     return localStorage.getItem(key);
-  } catch (err) {
+  } catch {
     return null;
   }
 }
@@ -15,7 +15,7 @@ function readStorage(key) {
 function writeStorage(key, value) {
   try {
     localStorage.setItem(key, value);
-  } catch (err) {
+  } catch {
     // Ignore storage failures (private mode / blocked storage).
   }
 }

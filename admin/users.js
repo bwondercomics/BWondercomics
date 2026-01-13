@@ -318,7 +318,7 @@ function createUsersManager({ hideAllSections, setActiveNav } = {}) {
           } else {
             window.prompt("Copy premium code:", code);
           }
-        } catch (err) {
+        } catch {
           window.prompt("Copy premium code:", code);
         }
       });

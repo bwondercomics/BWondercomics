@@ -30,7 +30,7 @@ export function goToNextChapter(entryOrder, entries, entryMeta = {}) {
   }
 }
 
-export function restartChapter(entries) {
+export function restartChapter(_entries) {
   state.pageIndex = 0;
   render();
   saveProgress(state);

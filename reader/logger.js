@@ -14,7 +14,7 @@ export const logger = {
      * @param {...any} args - Arguments to log
      */
     log: (...args) => {
-        if (isDevelopment) console.log(...args);
+        if (isDevelopment) console.warn('[log]', ...args);
     },
 
     /**
@@ -22,7 +22,7 @@ export const logger = {
      * @param {...any} args - Arguments to log
      */
     info: (...args) => {
-        if (isDevelopment) console.info(...args);
+        if (isDevelopment) console.warn('[info]', ...args);
     },
 
     /**

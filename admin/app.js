@@ -20,7 +20,6 @@ import { createDesigner } from "./designer.js";
 import {
   bindEvents as bindBlueskyEvents,
   loadStatus as loadBlueskyStatus,
-  loadNotifications as loadBlueskyNotifications,
 } from "./bluesky.js";
 import { createModerationManager } from "./moderation.js";
 import { createSocialManager } from "./social.js";
@@ -36,9 +35,7 @@ const SAFE_MODE_URL = "https://safe.bwondercomics.com";
 const SUPPORT_TEXT_HTML = `<span class="bubble-em">WANT TO SUPPORT THE COMIC?</span>
   <span class="bubble-bold">Buy the physical book</span> at the
   <a class="bubble-highlight" href="https://bwondercomics.bigcartel.com/product/battle-bros-volume-1" target="_blank" rel="noopener noreferrer" aria-label="bwondercomics store link">bwondercomics store!</a>`;
-let analyticsManager;
 let headerStickyEnabled = false;
-let lastHeaderScrollY = 0;
 
 const DEFAULT_PAGE_CONFIG = {
   theme: {
@@ -107,8 +104,9 @@ function setActiveNav(active) {
 }
 
 function hideAllSections() {
-  if (el.adminDashboard)
+  if (el.adminDashboard) {
     el.adminDashboard.classList.remove("admin-designer-open");
+  }
   if (el.dashboardSection) el.dashboardSection.style.display = "none";
   if (el.chaptersSection) el.chaptersSection.style.display = "none";
   if (el.blogSection) el.blogSection.style.display = "none";
@@ -159,7 +157,6 @@ function applyHeaderSticky(enabled) {
   }
   updateHeaderMetrics();
   requestAnimationFrame(updateHeaderMetrics);
-  lastHeaderScrollY = window.scrollY || 0;
 }
 
 function setHeaderStickyEnabled(enabled) {
@@ -171,14 +168,14 @@ function handleHeaderScroll() {
   if (headerStickyEnabled || !el.adminDashboard) return;
   const current = window.scrollY || 0;
   setHeaderHidden(current > 24);
-  lastHeaderScrollY = current;
 }
 
 function applyCountViewsEnabled(enabled) {
   const isEnabled = Boolean(enabled);
   if (el.countViewsToggle) el.countViewsToggle.checked = isEnabled;
-  if (el.analyticsCountViewsToggle)
+  if (el.analyticsCountViewsToggle) {
     el.analyticsCountViewsToggle.checked = isEnabled;
+  }
   return isEnabled;
 }
 
@@ -251,7 +248,7 @@ async function loadInnerNetTarget() {
     let payload = null;
     try {
       payload = await response.json();
-    } catch (err) {
+    } catch {
       payload = null;
     }
     if (!response.ok) {
@@ -294,16 +291,16 @@ const previewManager = createPreviewManager({
   showError,
 });
 
-let postsManager;
+const postsManager = createPostsManager({
+  hideAllSections,
+  setActiveNav,
+  upsertMediaEntry: (...args) => mediaManager.upsertMediaEntry(...args),
+});
+
 const mediaManager = createMediaManager({
   hideAllSections,
   setActiveNav,
-  onUseMedia: (item) => postsManager?.applyMediaToPost(item),
-});
-postsManager = createPostsManager({
-  hideAllSections,
-  setActiveNav,
-  upsertMediaEntry: mediaManager.upsertMediaEntry,
+  onUseMedia: (item) => postsManager.applyMediaToPost(item),
 });
 
 const dashboardManager = createDashboard({
@@ -314,7 +311,7 @@ const dashboardManager = createDashboard({
 
 const usersManager = createUsersManager({ hideAllSections, setActiveNav });
 const socialManager = createSocialManager({ hideAllSections, setActiveNav });
-analyticsManager = createAnalytics({ hideAllSections, setActiveNav });
+const analyticsManager = createAnalytics({ hideAllSections, setActiveNav });
 const moderationManager = createModerationManager({
   hideAllSections,
   setActiveNav,
@@ -504,10 +501,12 @@ function attachEventHandlers() {
     if (el.btnSettings && el.btnSettings.contains(target)) return;
     if (el.innerNetPanel && el.innerNetPanel.contains(target)) return;
     if (el.btnInnerNet && el.btnInnerNet.contains(target)) return;
-    if (settingsOpen && el.adminSettingsPanel)
+    if (settingsOpen && el.adminSettingsPanel) {
       el.adminSettingsPanel.setAttribute("hidden", "");
-    if (innerNetOpen && el.innerNetPanel)
+    }
+    if (innerNetOpen && el.innerNetPanel) {
       el.innerNetPanel.setAttribute("hidden", "");
+    }
   });
 
   // Entries
@@ -737,7 +736,6 @@ async function init() {
   applyHeaderSticky(readStorage(HEADER_STICKY_KEY) === "true");
   applyCountViewsEnabled(getCountViewsEnabled());
   updateHeaderMetrics();
-  lastHeaderScrollY = window.scrollY || 0;
   window.addEventListener("scroll", handleHeaderScroll, { passive: true });
   window.addEventListener("resize", updateHeaderMetrics);
   designerManager.initDesignerFrame();
@@ -747,7 +745,6 @@ async function init() {
     el.loginScreen.style.display = "flex";
     el.adminDashboard.style.display = "none";
   }
-  console.log("Battle Bros Admin initialized");
 }
 
 if (
