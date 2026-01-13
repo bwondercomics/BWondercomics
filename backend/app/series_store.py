@@ -136,15 +136,16 @@ def series_data_payload(db: Session, series_id: str) -> dict[str, Any]:
     if not series or not series.active:
         # Keep reader resilient: return a valid empty structure.
         return {
-            "chapters": {},
-            "chapterFolders": {},
-            "chapterMeta": {},
+            "entries": {},
+            "entryFolders": {},
+            "entryMeta": {},
             "statusMessage": "",
             "premiumOnly": False,
             "unitLabelSingular": "Chapter",
             "unitLabelPlural": "Chapters",
             "lastUpdated": _now().isoformat().replace("+00:00", "Z"),
             "publishedBy": "Database",
+            "payloadVersion": 2,
         }
 
     entry_labels = _ensure_entry_labels(db, series)
@@ -185,9 +186,9 @@ def series_data_payload(db: Session, series_id: str) -> dict[str, Any]:
         chapter_meta[entry.title] = meta
 
     return {
-        "chapters": chapters,
-        "chapterFolders": chapter_folders,
-        "chapterMeta": chapter_meta,
+        "entries": chapters,
+        "entryFolders": chapter_folders,
+        "entryMeta": chapter_meta,
         "statusMessage": series.status_message or "",
         "premiumOnly": bool(series.premium_only),
         "unitLabelSingular": default_label.singular if default_label else series.unit_label_singular,
@@ -205,6 +206,7 @@ def series_data_payload(db: Session, series_id: str) -> dict[str, Any]:
         ],
         "lastUpdated": (series.updated_at or _now()).astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
         "publishedBy": "Database",
+        "payloadVersion": 2,
     }
 
 
@@ -325,9 +327,9 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
     series.updated_at = _now()
     db.add(series)
 
-    chapters = payload.get("chapters") if isinstance(payload.get("chapters"), dict) else {}
-    chapter_folders = payload.get("chapterFolders") if isinstance(payload.get("chapterFolders"), dict) else {}
-    chapter_meta = payload.get("chapterMeta") if isinstance(payload.get("chapterMeta"), dict) else {}
+    chapters = payload.get("entries") if isinstance(payload.get("entries"), dict) else {}
+    chapter_folders = payload.get("entryFolders") if isinstance(payload.get("entryFolders"), dict) else {}
+    chapter_meta = payload.get("entryMeta") if isinstance(payload.get("entryMeta"), dict) else {}
     entry_labels_payload = payload.get("entryLabels") if isinstance(payload.get("entryLabels"), list) else None
 
     existing_labels = db.scalars(

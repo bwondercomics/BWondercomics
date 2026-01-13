@@ -77,7 +77,7 @@ describe('sanitizeChapters', () => {
         expect(result.order).toEqual(['Chapter 1', 'Chapter 2']);
     });
 
-    it('should filter out empty page arrays', () => {
+    it('should drop empty entries without meta flags', () => {
         const input = {
             'Chapter 1': ['page1.png'],
             'Empty Chapter': [],
@@ -86,8 +86,20 @@ describe('sanitizeChapters', () => {
         const result = sanitizeChapters(input);
 
         expect(result.chapters['Chapter 1']).toEqual(['page1.png']);
-        expect(result.chapters['Empty Chapter']).toEqual([]);
+        expect(result.chapters['Empty Chapter']).toBeUndefined();
         expect(result.chapters['Chapter 2']).toEqual(['page1.png']);
+    });
+
+    it('should keep empty entries with gallery or dropdown flags', () => {
+        const input = {
+            'Empty Chapter': []
+        };
+        const meta = {
+            'Empty Chapter': { showInGallery: true }
+        };
+        const result = sanitizeChapters(input, meta);
+
+        expect(result.chapters['Empty Chapter']).toEqual([]);
     });
 
     it('should trim whitespace from chapter names', () => {

@@ -104,11 +104,12 @@ describe("admin app smoke", () => {
 
       const method = String(init?.method || "GET").toUpperCase();
 
-      if (typeof url === "string") {
+        if (typeof url === "string") {
         if (url.endsWith("data.json"))
           return okResp({
-            chapters: {},
-            chapterFolders: {},
+            entries: {},
+            entryFolders: {},
+            entryMeta: {},
             statusMessage: "",
           });
         if (url.includes("/api/admin/posts")) {

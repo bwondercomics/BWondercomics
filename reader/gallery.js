@@ -59,95 +59,16 @@ function openCommentsPanel() {
   }
 }
 
-// Build the gallery grid for available and locked chapters.
-export function renderGallery(chapterOrder, chapters, options = {}) {
+// Build the gallery grid for available and locked entries.
+export function renderGallery(entryOrder, entries, options = {}) {
   const grid = document.getElementById("galleryGrid");
   if (!grid) return;
 
   grid.innerHTML = "";
 
-  const lockedChapters = Array.isArray(options.lockedChapters) ? options.lockedChapters : [];
-  const chapterMeta = options.chapterMeta && typeof options.chapterMeta === "object" ? options.chapterMeta : {};
+  const lockedEntries = Array.isArray(options.lockedEntries) ? options.lockedEntries : [];
+  const entryMetaPayload = options.entryMeta && typeof options.entryMeta === "object" ? options.entryMeta : {};
   const unitLabel = options.unitLabelSingular || "Entry";
-
-  const names = chapterOrder.length ? chapterOrder : Object.keys(chapters);
-  let cardIndex = 0;
-
-  names.forEach((name) => {
-    const pages = chapters[name];
-    const meta = chapterMeta?.[name] || {};
-    const releaseType = String(meta.releaseType || "digital").toLowerCase();
-    const showInGallery = meta.showInGallery !== false;
-    if (!showInGallery) return;
-
-    if (releaseType === "store") {
-      const coverUrl = meta.coverImage || (Array.isArray(pages) ? pages[0] : "");
-      const storeUrl = meta.storeUrl;
-      if (!storeUrl || !coverUrl) return;
-      addPromoCard(
-        { image: coverUrl, title: formatEntryLabel(name, meta, unitLabel), href: storeUrl },
-        "volume-card",
-        STORE_BADGE_TEXT,
-      );
-      return;
-    }
-
-    if (!pages || pages.length === 0) return;
-
-    const coverUrl = pages[0];
-    const isPatron = !!meta?.premium;
-    const displayTitle = formatEntryLabel(name, meta, unitLabel);
-
-    const card = document.createElement("div");
-    card.className = "chapter-card";
-    card.style.setProperty("--card-index", cardIndex++);
-    if (name === state.currentChapter) {
-      card.classList.add("active");
-    }
-
-    card.onclick = () => {
-      if (el.chapter) el.chapter.value = name;
-      changeChapterFromOverlays(name, chapters, chapterMeta);
-      toggleGallery();
-    };
-
-    const thumbWrap = document.createElement("div");
-    thumbWrap.className = "chapter-thumb-wrap";
-
-    const thumb = document.createElement("img");
-    thumb.className = "chapter-thumb";
-    // Use data-src for lazy loading via Intersection Observer
-    thumb.dataset.src = coverUrl;
-    thumb.alt = name;
-    // Lightweight placeholder (1x1 transparent pixel)
-    thumb.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='150'%3E%3Crect width='100' height='150' fill='%23111'/%3E%3C/svg%3E";
-
-    // Observe for lazy loading
-    if (imageObserver) {
-      imageObserver.observe(thumb);
-    }
-
-    thumbWrap.appendChild(thumb);
-
-    if (isPatron) {
-      const badge = document.createElement("div");
-      badge.className = "patron-badge";
-      badge.textContent = "Patron";
-      thumbWrap.appendChild(badge);
-    }
-
-    const info = document.createElement("div");
-    info.className = "chapter-info";
-
-    const title = document.createElement("div");
-    title.className = "chapter-title";
-    title.textContent = displayTitle;
-
-    info.appendChild(title);
-    card.appendChild(thumbWrap);
-    card.appendChild(info);
-    grid.appendChild(card);
-  });
 
   // Append a promo card for merch or special volume releases.
   const addPromoCard = (cover, variantClass, badgeText) => {
@@ -191,8 +112,87 @@ export function renderGallery(chapterOrder, chapters, options = {}) {
     grid.appendChild(card);
   };
 
-  lockedChapters.forEach((name) => {
-    const meta = chapterMeta?.[name];
+  const names = entryOrder.length ? entryOrder : Object.keys(entries);
+  let cardIndex = 0;
+
+  names.forEach((name) => {
+    const pages = entries[name];
+    const meta = entryMetaPayload?.[name] || {};
+    const releaseType = String(meta.releaseType || "digital").toLowerCase();
+    const showInGallery = meta.showInGallery !== false;
+    if (!showInGallery) return;
+
+    if (releaseType === "store") {
+      const coverUrl = meta.coverImage || (Array.isArray(pages) ? pages[0] : "");
+      const storeUrl = meta.storeUrl;
+      if (!storeUrl || !coverUrl) return;
+      addPromoCard(
+        { image: coverUrl, title: formatEntryLabel(name, meta, unitLabel), href: storeUrl },
+        "volume-card",
+        STORE_BADGE_TEXT,
+      );
+      return;
+    }
+
+    if (!pages || pages.length === 0) return;
+
+    const coverUrl = pages[0];
+    const isPatron = !!meta?.premium;
+    const displayTitle = formatEntryLabel(name, meta, unitLabel);
+
+    const card = document.createElement("div");
+    card.className = "chapter-card";
+    card.style.setProperty("--card-index", cardIndex++);
+    if (name === state.currentChapter) {
+      card.classList.add("active");
+    }
+
+    card.onclick = () => {
+      if (el.chapter) el.chapter.value = name;
+      changeChapterFromOverlays(name, entries, entryMetaPayload);
+      toggleGallery();
+    };
+
+    const thumbWrap = document.createElement("div");
+    thumbWrap.className = "chapter-thumb-wrap";
+
+    const thumb = document.createElement("img");
+    thumb.className = "chapter-thumb";
+    // Use data-src for lazy loading via Intersection Observer
+    thumb.dataset.src = coverUrl;
+    thumb.alt = name;
+    // Lightweight placeholder (1x1 transparent pixel)
+    thumb.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='150'%3E%3Crect width='100' height='150' fill='%23111'/%3E%3C/svg%3E";
+
+    // Observe for lazy loading
+    if (imageObserver) {
+      imageObserver.observe(thumb);
+    }
+
+    thumbWrap.appendChild(thumb);
+
+    if (isPatron) {
+      const badge = document.createElement("div");
+      badge.className = "patron-badge";
+      badge.textContent = "Patron";
+      thumbWrap.appendChild(badge);
+    }
+
+    const info = document.createElement("div");
+    info.className = "chapter-info";
+
+    const title = document.createElement("div");
+    title.className = "chapter-title";
+    title.textContent = displayTitle;
+
+    info.appendChild(title);
+    card.appendChild(thumbWrap);
+    card.appendChild(info);
+    grid.appendChild(card);
+  });
+
+  lockedEntries.forEach((name) => {
+    const meta = entryMetaPayload?.[name];
     const coverUrl = getLockedCoverUrl(name, meta);
     const displayTitle = formatEntryLabel(name, meta, unitLabel);
 

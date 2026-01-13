@@ -256,15 +256,19 @@ def admin_reader_analytics(
 
     # Build lookup by (series_id, display_number)
     entry_lookup: dict[tuple[str, int], dict] = {}
+    empty_entry_keys: set[tuple[str, int]] = set()
     for entry in entries:
         series_id = entry.series_id or ""
         display_num = entry.display_number
         if display_num is not None:
             key = (series_id, int(display_num))
+            page_count = int(page_counts.get(entry.id) or 0)
+            if page_count <= 0:
+                empty_entry_keys.add(key)
             entry_lookup[key] = {
                 "seriesId": series_id,
                 "entryTitle": entry.title or "",
-                "pageCount": int(page_counts.get(entry.id) or 0) or None,
+                "pageCount": page_count or None,
                 "seriesTitle": (series_map.get(series_id).title if series_id in series_map else None),
             }
 
@@ -342,6 +346,8 @@ def admin_reader_analytics(
             continue
 
         key = (sid, display_num)
+        if key in empty_entry_keys:
+            continue
         base = entry_lookup.get(key)
 
         if key not in stats:
@@ -371,6 +377,8 @@ def admin_reader_analytics(
             continue
 
         key = (sid, display_num)
+        if key in empty_entry_keys:
+            continue
         if key in stats and session_id:
             stats[key]["completedSessions"].add(str(session_id))
 

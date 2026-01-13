@@ -19,9 +19,14 @@ This repo serves a plain HTML/CSS/JS frontend, with a FastAPI backend adding dyn
 
 ## Routing + contracts (why the frontend still works)
 The backend serves **DB-backed JSON at the existing file paths** (Caddy proxies these to the API) so the reader/admin can keep using the same URLs:
-- `GET /admin/series.json` → series list (DB-backed)
-- `GET /admin/data.json` → default series entries (DB-backed)
-- `GET /admin/series/<id>/data.json` → per-series entries (DB-backed)
+- Public:
+  - `GET /series.json` → series list (DB-backed)
+  - `GET /data.json` → default series entries (DB-backed)
+  - `GET /series/<id>/data.json` → per-series entries (DB-backed)
+- Admin:
+  - `GET /admin/series.json` → series list (DB-backed)
+  - `GET /admin/data.json` → default series entries (DB-backed)
+  - `GET /admin/series/<id>/data.json` → per-series entries (DB-backed)
 
 DB is the source of truth. Do not reintroduce static HTML/JSON files as a data store.
 
@@ -34,9 +39,9 @@ The admin “save JSON” flow is also kept, but is intercepted and written to P
 1. Browser loads `index.html`.
 2. `reader/app.js` determines `seriesId` from `?series=<id>` (default is `battle-bros`).
 3. Reader fetches:
-   - `admin/series.json` (series list + labels)
-   - `admin/data.json` or `admin/series/<id>/data.json` (entries + page paths + status + labels)
-   - `admin/page-config.json` or `admin/series/<id>/page-config.json` (theme/panel content; DB-backed)
+   - `series.json` (series list + labels)
+   - `data.json` or `series/<id>/data.json` (entries + page paths + status + labels)
+   - `page-config.json` or `series/<id>/page-config.json` (theme/panel content; DB-backed)
    - `GET /api/posts/latest` (latest update widget)
 4. Reader renders pages from the paths in the data JSON.
 

@@ -57,7 +57,7 @@ Machine reboot depends on host OS (not in repo). After reboot, verify services w
 - Proxies `/data.json`, `/series.json`, `/page-config.json`, `/media.json`, `/series/*` to the API
 #### Serves static:
   - `/assets/*` from `dist/assets` (fallback to repo `/assets`)
-  - `/media/*`, `/chapters/*`, and `/comics/*` from filesystem
+  - `/media/*` and `/comics/*` from filesystem (`/chapters/*` is legacy)
   - `/admin/*` from repo root (`/srv/bwondercomics/root`) so admin uses source files
   - `/` root from `dist/`
 
@@ -98,6 +98,10 @@ Key tables:
 - Avoid renumber/sync unless you intentionally want to rename or rescan files.
 - `entry_pages.path` should be web-relative like `comics/battle-bros/entries/issues/09/01.png` (not an absolute `/srv/...` path).
   - Entry labels (Issue/Volume/etc) live in `entry_labels` and drive the `<label-slug>` segment.
+
+## Entry Payload (Reader/Admin)
+- API payload uses `entries`, `entryMeta`, `entryFolders`.
+- `payloadVersion: 2` indicates the entries schema.
 
 ## Email List (Two Paths)
 1) Account opt-in:

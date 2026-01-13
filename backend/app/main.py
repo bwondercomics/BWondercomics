@@ -199,9 +199,11 @@ if settings.umami_proxy_path:
         return response
 
 
-# Serve uploaded media and chapter assets even when the main site is built into dist/
+# Serve uploaded media and entry assets even when the main site is built into dist/
 app.mount("/media", StaticFiles(directory=str(settings.base_dir / "media")), name="media")
-app.mount("/chapters", StaticFiles(directory=str(settings.base_dir / "chapters")), name="chapters")
+chapters_dir = settings.base_dir / "chapters"
+if chapters_dir.exists():
+    app.mount("/chapters", StaticFiles(directory=str(chapters_dir)), name="chapters")
 app.mount("/comics", StaticFiles(directory=str(settings.base_dir / "comics")), name="comics")
 
 # Serve production-built files from dist/ directory

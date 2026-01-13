@@ -10,13 +10,13 @@ afterEach(() => {
 });
 
 describe('loadChapterData', () => {
-  it('should normalize chapters and order by displayNumber', async () => {
+  it('should normalize entries and order by displayNumber', async () => {
     const payload = {
-      chapters: {
+      entries: {
         'Issue 2': ['b.png'],
         'Issue 1': ['a.png']
       },
-      chapterMeta: {
+      entryMeta: {
         'Issue 1': { displayNumber: 1 },
         'Issue 2': { displayNumber: 2 }
       },
@@ -32,21 +32,23 @@ describe('loadChapterData', () => {
     })));
 
     const data = await loadChapterData('battle-bros');
-    expect(data.chapterOrder).toEqual(['Issue 1', 'Issue 2']);
-    expect(data.chapters['Issue 1']).toEqual(['a.png']);
+    expect(data.entryOrder).toEqual(['Issue 1', 'Issue 2']);
+    expect(data.entries['Issue 1']).toEqual(['a.png']);
     expect(data.unitLabelSingular).toBe('Issue');
     expect(data.unitLabelPlural).toBe('Issues');
   });
 
-  it('should throw on invalid chapter payload', async () => {
+  it('should throw on invalid entry payload', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,
       json: async () => ({})
     })));
 
     await expect(loadChapterData('battle-bros')).rejects.toThrow(
-      'Invalid chapter data structure'
+      'Invalid entry data structure'
     );
+    errorSpy.mockRestore();
   });
 });
 
@@ -72,8 +74,10 @@ describe('loadPageConfig', () => {
   });
 
   it('should return false when config fails to load', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false })));
     const result = await loadPageConfig(() => {}, 'battle-bros');
     expect(result).toBe(false);
+    warnSpy.mockRestore();
   });
 });

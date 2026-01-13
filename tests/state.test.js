@@ -2,7 +2,7 @@
  * Tests for state management and progress persistence
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { state, saveProgress, loadProgress } from '../reader/state.js';
 
 describe('state object', () => {
@@ -78,6 +78,7 @@ describe('saveProgress', () => {
         localStorage.setItem = () => {
             throw new Error('Storage full');
         };
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
         // Should not throw
         expect(() => {
@@ -86,6 +87,7 @@ describe('saveProgress', () => {
 
         // Restore
         localStorage.setItem = originalSetItem;
+        warnSpy.mockRestore();
     });
 });
 

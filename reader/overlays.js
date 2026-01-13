@@ -19,18 +19,18 @@ export function closeShortcutsOverlay() {
   }
 }
 
-export function goToNextChapter(chapterOrder, chapters, chapterMeta = {}) {
-  const chapterNames = chapterOrder.length ? chapterOrder : Object.keys(chapters);
-  const currentIndex = chapterNames.indexOf(state.currentChapter);
-  if (currentIndex >= 0 && currentIndex < chapterNames.length - 1) {
-    const nextChapter = chapterNames[currentIndex + 1];
+export function goToNextChapter(entryOrder, entries, entryMeta = {}) {
+  const entryNames = entryOrder.length ? entryOrder : Object.keys(entries);
+  const currentIndex = entryNames.indexOf(state.currentChapter);
+  if (currentIndex >= 0 && currentIndex < entryNames.length - 1) {
+    const nextChapter = entryNames[currentIndex + 1];
     if (el.chapter) el.chapter.value = nextChapter;
-    changeChapter(nextChapter, chapters, chapterMeta);
+    changeChapter(nextChapter, entries, entryMeta);
     hideEndOfChapter();
   }
 }
 
-export function restartChapter(chapters) {
+export function restartChapter(entries) {
   state.pageIndex = 0;
   render();
   saveProgress(state);
@@ -38,16 +38,16 @@ export function restartChapter(chapters) {
   hideEndOfChapter();
 }
 
-export function changeChapter(name, chapters, chapterMeta = {}) {
+export function changeChapter(name, entries, entryMeta = {}) {
   // Reset view state when switching chapters.
-  if (!chapters[name]) return;
+  if (!entries[name]) return;
   trackEntryExit("change_chapter");
   state.currentChapter = name;
-  state.pages = chapters[name];
+  state.pages = entries[name];
   state.pageIndex = 0;
   state.scale = 1;
   state.pan = { x: 0, y: 0 };
-  state.entryMeta = chapterMeta?.[name] || null;
+  state.entryMeta = entryMeta?.[name] || null;
   setActiveEntry();
   render();
   saveProgress(state);

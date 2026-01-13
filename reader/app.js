@@ -132,10 +132,10 @@ import { getActiveSeriesId } from "./series.js";
 
   // ==================== ENTRY DATA ====================
   // Entry data is loaded dynamically from the series data endpoint
-  let chapters = {};
-  let chapterOrder = [];
+  let entries = {};
+  let entryOrder = [];
   let statusMessage = "";
-  let chapterMeta = {};
+  let entryMeta = {};
   let entryLabels = [];
   let entryLabelsById = {};
   let premiumOnly = false;
@@ -150,7 +150,7 @@ import { getActiveSeriesId } from "./series.js";
   }
 
   function getEntryLabelFor(name) {
-    const meta = chapterMeta?.[name] || {};
+    const meta = entryMeta?.[name] || {};
     const labelId = meta.entryLabelId;
     if (labelId && entryLabelsById[labelId]) {
       return entryLabelsById[labelId];
@@ -165,7 +165,7 @@ import { getActiveSeriesId } from "./series.js";
   }
 
   function getEntryDisplayNumber(name) {
-    const rawNumber = chapterMeta?.[name]?.displayNumber;
+    const rawNumber = entryMeta?.[name]?.displayNumber;
     const parsed = Number.isFinite(rawNumber) ? rawNumber : parseInt(rawNumber, 10);
     return Number.isFinite(parsed) ? parsed : null;
   }
@@ -173,7 +173,7 @@ import { getActiveSeriesId } from "./series.js";
   function formatEntryLabel(name) {
     if (!name) return "";
     const displayNumber = getEntryDisplayNumber(name);
-    const meta = chapterMeta?.[name] || {};
+    const meta = entryMeta?.[name] || {};
     const entryLabel = getEntryLabelFor(name);
     const baseLabel = displayNumber == null
       ? name
@@ -190,18 +190,18 @@ import { getActiveSeriesId } from "./series.js";
   }
 
   function shouldShowInDropdown(name) {
-    const meta = chapterMeta?.[name] || {};
+    const meta = entryMeta?.[name] || {};
     if (meta.showInDropdown === false) return false;
     if (String(meta.releaseType || "").toLowerCase() === "store" && !meta.storeUrl) return false;
     return true;
   }
 
   function isStoreEntry(name) {
-    return String(chapterMeta?.[name]?.releaseType || "").toLowerCase() === "store";
+    return String(entryMeta?.[name]?.releaseType || "").toLowerCase() === "store";
   }
 
-  function getNavigableChapters() {
-    const names = chapterOrder.length ? chapterOrder : Object.keys(chapters);
+  function getNavigableEntries() {
+    const names = entryOrder.length ? entryOrder : Object.keys(entries);
     return names.filter((name) => !isStoreEntry(name));
   }
 
@@ -253,7 +253,7 @@ import { getActiveSeriesId } from "./series.js";
   function initChapterSelect() {
     if (!el.chapter) return;
 
-    const names = chapterOrder.length ? chapterOrder : Object.keys(chapters);
+    const names = entryOrder.length ? entryOrder : Object.keys(entries);
     const dropdownNames = names.filter(shouldShowInDropdown);
     el.chapter.innerHTML = "";
 
@@ -310,7 +310,7 @@ import { getActiveSeriesId } from "./series.js";
       label.textContent = formatEntryLabel(name);
       button.appendChild(label);
 
-      if (chapterMeta?.[name]?.premium) {
+      if (entryMeta?.[name]?.premium) {
         const patron = document.createElement("span");
         patron.className = "chapter-option-patron";
         patron.textContent = "Patron";
@@ -334,7 +334,7 @@ import { getActiveSeriesId } from "./series.js";
     if (!name || !el.chapter) return;
     const value = el.chapter.value || "";
     name.textContent = value ? formatEntryLabel(value) : getUnitLabels().singular;
-    const isPatron = !!chapterMeta?.[value]?.premium;
+    const isPatron = !!entryMeta?.[value]?.premium;
     if (patron) {
       patron.style.display = isPatron ? "inline-flex" : "none";
     }
@@ -631,14 +631,14 @@ import { getActiveSeriesId } from "./series.js";
     if (el.chapter) {
       el.chapter.addEventListener("change", (e) => {
         const nextName = e.target.value;
-        const meta = chapterMeta?.[nextName] || {};
+        const meta = entryMeta?.[nextName] || {};
         if (String(meta.releaseType || "").toLowerCase() === "store" && meta.storeUrl) {
           window.open(meta.storeUrl, "_blank", "noopener,noreferrer");
           el.chapter.value = state.currentChapter;
           syncChapterSelectDisplay();
           return;
         }
-        changeChapter(nextName, chapters, chapterMeta);
+        changeChapter(nextName, entries, entryMeta);
       });
     }
 
@@ -665,12 +665,12 @@ import { getActiveSeriesId } from "./series.js";
 
     if (nextChapterBtn) {
       nextChapterBtn.addEventListener("click", () =>
-        goToNextChapter(getNavigableChapters(), chapters, chapterMeta),
+        goToNextChapter(getNavigableEntries(), entries, entryMeta),
       );
     }
     if (restartChapterBtn) {
       restartChapterBtn.addEventListener("click", () =>
-        restartChapter(chapters),
+        restartChapter(entries),
       );
     }
     if (closeEndOverlay) {
@@ -718,7 +718,7 @@ import { getActiveSeriesId } from "./series.js";
               ERROR LOADING COMIC DATA
             </div>
             <div style="font-size: 16px; color: var(--text); max-width: 500px; line-height: 1.6;">
-              Unable to load chapter data from the server. Please refresh the page or contact support if the issue persists.
+              Unable to load entry data from the server. Please refresh the page or contact support if the issue persists.
             </div>
             <div style="font-size: 14px; color: rgba(255,255,255,0.6); font-family: monospace;">
               ${error.message}
@@ -742,12 +742,12 @@ import { getActiveSeriesId } from "./series.js";
     renderStatusPanel(statusMessage || "ready", statusTimerRef);
     initEmailSignupForm();
 
-    const navigableChapters = getNavigableChapters();
-    const availableChapters = navigableChapters.length
-      ? navigableChapters
-      : (chapterOrder.length ? chapterOrder : Object.keys(chapters));
+    const navigableEntries = getNavigableEntries();
+    const availableEntries = navigableEntries.length
+      ? navigableEntries
+      : (entryOrder.length ? entryOrder : Object.keys(entries));
 
-    if (!availableChapters.length) {
+    if (!availableEntries.length) {
       if (el.chapter) el.chapter.innerHTML = "";
       const viewport = document.getElementById("viewport");
       if (viewport) {
@@ -764,17 +764,17 @@ import { getActiveSeriesId } from "./series.js";
       return;
     }
     const saved = loadProgress();
-    if (saved && chapters[saved.chapter]) {
+    if (saved && entries[saved.chapter]) {
       state.currentChapter = saved.chapter;
-      state.pages = chapters[saved.chapter];
+      state.pages = entries[saved.chapter];
       state.pageIndex = saved.page || 0;
     } else {
-      const firstChapter = availableChapters[0];
+      const firstChapter = availableEntries[0];
       state.currentChapter = firstChapter;
-      state.pages = chapters[firstChapter] || [];
+      state.pages = entries[firstChapter] || [];
       state.pageIndex = 0;
     }
-    state.entryMeta = chapterMeta?.[state.currentChapter] || null;
+    state.entryMeta = entryMeta?.[state.currentChapter] || null;
     setActiveEntry();
 
     if (el.chapter) el.chapter.value = state.currentChapter;
@@ -797,10 +797,10 @@ import { getActiveSeriesId } from "./series.js";
     try {
       const data = await loadChapterData(seriesId);
       if (data) {
-        chapters = data.chapters;
-        chapterOrder = data.chapterOrder;
+        entries = data.entries;
+        entryOrder = data.entryOrder;
         statusMessage = data.statusMessage;
-        chapterMeta = data.chapterMeta || {};
+        entryMeta = data.entryMeta || {};
         entryLabels = Array.isArray(data.entryLabels) ? data.entryLabels : [];
         entryLabelsById = entryLabels.reduce((acc, label) => {
           if (label && label.id) acc[label.id] = label;
@@ -817,8 +817,8 @@ import { getActiveSeriesId } from "./series.js";
       return;
     }
 
-    const fullChapterOrder = Array.isArray(chapterOrder) ? [...chapterOrder] : [];
-    const fullChapterMeta = chapterMeta && typeof chapterMeta === "object" ? chapterMeta : {};
+    const fullEntryOrder = Array.isArray(entryOrder) ? [...entryOrder] : [];
+    const fullEntryMeta = entryMeta && typeof entryMeta === "object" ? entryMeta : {};
 
     // Apply premium gating (client-side UX; server enforces for protected folders too)
     let sessionUser = null;
@@ -841,32 +841,32 @@ import { getActiveSeriesId } from "./series.js";
     if (adminNavLink) {
       adminNavLink.style.display = role === "admin" ? "inline-flex" : "none";
     }
-    let lockedChapters = [];
+    let lockedEntries = [];
     if (!isPremiumUser) {
       if (premiumOnly) {
-        lockedChapters = fullChapterOrder.length ? fullChapterOrder : Object.keys(chapters);
+        lockedEntries = fullEntryOrder.length ? fullEntryOrder : Object.keys(entries);
       } else {
-        lockedChapters = fullChapterOrder.filter((name) => fullChapterMeta?.[name]?.premium);
+        lockedEntries = fullEntryOrder.filter((name) => fullEntryMeta?.[name]?.premium);
       }
     }
 
     if (premiumOnly && !isPremiumUser) {
-      chapters = {};
-      chapterOrder = [];
+      entries = {};
+      entryOrder = [];
       statusMessage = "PREMIUM_ONLY";
-    } else if (!isPremiumUser && chapterMeta && typeof chapterMeta === "object") {
-      const filteredOrder = chapterOrder.filter((name) => !(chapterMeta[name]?.premium));
-      const filteredChapters = {};
+    } else if (!isPremiumUser && entryMeta && typeof entryMeta === "object") {
+      const filteredOrder = entryOrder.filter((name) => !(entryMeta[name]?.premium));
+      const filteredEntries = {};
       filteredOrder.forEach((name) => {
-        filteredChapters[name] = chapters[name];
+        filteredEntries[name] = entries[name];
       });
-      chapters = filteredChapters;
-      chapterOrder = filteredOrder;
+      entries = filteredEntries;
+      entryOrder = filteredOrder;
     }
 
-    renderGallery(chapterOrder, chapters, {
-      lockedChapters,
-      chapterMeta: fullChapterMeta,
+    renderGallery(entryOrder, entries, {
+      lockedEntries,
+      entryMeta: fullEntryMeta,
       unitLabelSingular,
     });
     await loadPageConfig(setSubtitles, seriesId);

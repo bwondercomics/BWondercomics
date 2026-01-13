@@ -10,12 +10,12 @@ This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic p
 - Database: Postgres (recommended) for users, comments, posts, series, entries, and media.
 
 ## Data sources
-- Series + entries (including per-series entry labels) + status message: Postgres (served to the frontend as DB-backed JSON at `admin/data.json` and `admin/series/<id>/data.json`).
+- Series + entries (including per-series entry labels) + status message: Postgres (served to the frontend as DB-backed JSON at `data.json` and `series/<id>/data.json`; admin aliases still exist).
 - Entry page images: on disk under `comics/<seriesId>/entries/`.
 - Blog/feed posts: Postgres `posts` table (supports draft/scheduled/published).
 - Comments + accounts: Postgres (`users`, `comments` tables).
 - Media library: Postgres table (index + tags) with files under `media/` on disk.
-- Page configs: Postgres table, served at `/admin/page-config.json` and `/admin/series/<id>/page-config.json`.
+- Page configs: Postgres table, served at `/page-config.json` and `/series/<id>/page-config.json` (admin aliases also exist).
 
 ## Runtime routing
 - Caddy serves static pages and assets, and proxies `/api/*` + JSON endpoints to the FastAPI app.
@@ -23,9 +23,8 @@ This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic p
 
 ## API (current contract)
 - Series + entries (DB-backed JSON views, used by reader/admin):
-  - `GET /admin/series.json`
-  - `GET /admin/data.json`
-  - `GET /admin/series/{id}/data.json`
+  - Public: `GET /series.json`, `GET /data.json`, `GET /series/{id}/data.json`
+  - Admin: `GET /admin/series.json`, `GET /admin/data.json`, `GET /admin/series/{id}/data.json`
 - Public posts:
   - `GET /api/posts` → `{ posts: Post[] }` (published only; scheduled posts appear once due)
   - `GET /api/posts/latest` → `{ post: Post | null }`

@@ -600,10 +600,14 @@ export function createChaptersApi({
       const response = await fetch(getDataUrl());
       if (response.ok) {
         const data = await response.json();
-        if (data.chapters && typeof data.chapters === 'object') {
-          state.chapters = data.chapters;
-          state.chapterFolders = data.chapterFolders || {};
-          state.chapterMeta = data.chapterMeta || {};
+        const entries = data.entries && typeof data.entries === 'object' ? data.entries : null;
+        if (entries) {
+          const entryFolders = data.entryFolders && typeof data.entryFolders === 'object' ? data.entryFolders : {};
+          const entryMeta = data.entryMeta && typeof data.entryMeta === 'object' ? data.entryMeta : {};
+
+          state.chapters = entries;
+          state.chapterFolders = entryFolders;
+          state.chapterMeta = entryMeta;
           state.entryLabels = Array.isArray(data.entryLabels) ? data.entryLabels : [];
           if (!state.entryLabels.length) {
             const singular = String(data.unitLabelSingular || '').trim() || 'Entry';
@@ -648,10 +652,11 @@ export function createChaptersApi({
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.chapters) {
-          state.chapters = parsed.chapters;
-          state.chapterFolders = parsed.chapterFolders || {};
-          state.chapterMeta = parsed.chapterMeta || {};
+        const storedEntries = parsed && typeof parsed === 'object' ? parsed.entries : null;
+        if (storedEntries && typeof storedEntries === 'object') {
+          state.chapters = storedEntries;
+          state.chapterFolders = parsed.entryFolders || {};
+          state.chapterMeta = parsed.entryMeta || {};
           state.entryLabels = Array.isArray(parsed.entryLabels) ? parsed.entryLabels : [];
           setActiveEntryLabel(state.activeEntryLabelId);
           state.statusMessage = parsed.statusMessage || '';
@@ -702,9 +707,9 @@ export function createChaptersApi({
       localStorage.setItem(
         getStorage(),
         JSON.stringify({
-          chapters: state.chapters,
-          chapterFolders: state.chapterFolders,
-          chapterMeta: state.chapterMeta,
+          entries: state.chapters,
+          entryFolders: state.chapterFolders,
+          entryMeta: state.chapterMeta,
           entryLabels: state.entryLabels,
           premiumOnly: !!state.premiumOnly,
           statusMessage: state.statusMessage
@@ -715,9 +720,9 @@ export function createChaptersApi({
     }
 
     const payload = {
-      chapters: state.chapters,
-      chapterFolders: state.chapterFolders,
-      chapterMeta: state.chapterMeta,
+      entries: state.chapters,
+      entryFolders: state.chapterFolders,
+      entryMeta: state.chapterMeta,
       entryLabels: state.entryLabels,
       statusMessage: state.statusMessage,
       premiumOnly: !!state.premiumOnly,

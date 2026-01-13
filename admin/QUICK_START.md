@@ -44,7 +44,7 @@
 - **Page Designer**: edit page-config theme/content.
 
 ## Tips and tricks
-- Image paths use forward slashes: `chapters/08/01.png`.
+- Image paths use forward slashes: `comics/<seriesId>/entries/issues/08/01.png`.
 - Uploaded pages are stored on disk; entry metadata lives in Postgres.
 - Drafts are saved in your browser; use **Save Changes** to persist to the server.
 - If you enable premium access on a series or entry, only premium/admin users (or codes) can view it.

@@ -1,34 +1,34 @@
 # Reader Code Reference
 
-This guide maps the reader-side modules, their responsibilities, and how they collaborate to render and navigate chapters.
+This guide maps the reader-side modules, their responsibilities, and how they collaborate to render and navigate entries.
 
 ## Module Inventory
 - `reader/app.js` — Composition root; wires modules together, bootstraps data load, kicks off render, and binds global events.
 - `reader/config.js` — Constants for storage keys, debounce timings, UI thresholds (e.g., two-page breakpoints), and default options.
 - `reader/dom.js` — Centralized DOM lookups; a single source of element references used across modules.
-- `reader/data.js` — Fetches `/admin/data.json`, `/admin/page-config.json` (DB-backed), and `/api/posts/latest`; normalizes chapter metadata and page-config overrides.
-- `reader/state.js` — Single state container: current chapter/page, zoom, fit mode, progress persistence (localStorage), and derived helpers (e.g., `isTwoPageMode`).
+- `reader/data.js` — Fetches `/data.json` (or `/series/<id>/data.json`), `/page-config.json` (DB-backed), and `/api/posts/latest`; normalizes entry metadata and page-config overrides.
+- `reader/state.js` — Single state container: current entry/page, zoom, fit mode, progress persistence (localStorage), and derived helpers (e.g., `isTwoPageMode`).
 - `reader/render.js` — Renders pages into the stage, applies fit/zoom transforms, preloads images, and updates UI labels/buttons.
 - `reader/controls.js` — Keyboard and click navigation (prev/next, first/last, toggle two-page, reset zoom, fullscreen), debounce helpers, and guard rails when zoomed.
 - `reader/pointer.js` — Wheel/pinch/drag handling for zoom + pan, including zoom focal point math and drag inertia limits.
 - `reader/fullscreen.js` — Cross-browser fullscreen enter/exit and button state sync.
-- `reader/gallery.js` — Cover gallery overlay (chapter grid), selection, and smooth scroll to current chapter.
+- `reader/gallery.js` — Cover gallery overlay (entry grid), selection, and smooth scroll to current entry.
 - `reader/overlays.js` — Shortcuts modal, help overlays, and shared show/hide helpers.
 - `reader/latest.js` — Renders the “Latest update” widget from the post returned by `/api/posts/latest`.
 - `reader/email.js` — Signup form submission to the internal API (`POST /api/email/subscribe`) with inline success/error feedback.
 - `reader/customization.js` — Public `window.BattleBros` API (set subtitle, set subtitle list, random subtitle) and dynamic theme/app bar updates.
-- `reader/chapters.js` — Chapter metadata helpers: sort chapters, derive page arrays, next/prev chapter lookup.
+- `reader/chapters.js` — Entry metadata helpers: sort entries, derive page arrays, next/prev entry lookup.
 - `reader/transform.js` — Math utilities for scale/translate clamping, aspect-ratio fitting, and pointer focal calculations.
 
 ## Execution Flow (high level)
 ```mermaid
 flowchart TD
-  A[startup] --> B[load admin/data.json + admin/page-config.json + /api/posts/latest]
-  B --> C[populate state (chapters, folders, status)]
-  C --> D[render initial chapter/page]
+  A[startup] --> B[load data.json + page-config.json + /api/posts/latest]
+  B --> C[populate state (entries, folders, status)]
+  C --> D[render initial entry/page]
   D --> E[attach controls + pointer + fullscreen listeners]
   E --> F{user input}
-  F -->|prev/next/chapter| G[controls -> state -> render]
+  F -->|prev/next/entry| G[controls -> state -> render]
   F -->|zoom/pan| H[pointer -> state -> render]
   F -->|fullscreen| I[fullscreen -> state -> render]
   F -->|gallery/help| J[overlays/gallery toggles]
@@ -54,7 +54,7 @@ flowchart TD
   - Clamps scale and translate using `transform` utilities to keep content on screen.
 - **data.js**
   - Fetches JSON with `cache: 'no-store'` to avoid stale content.
-- Normalizes status message, chapter folder mapping, and optional theme/layout overrides from `admin/page-config.json`.
+- Normalizes status message, entry folder mapping, and optional theme/layout overrides from `page-config.json`.
   - Exposes a unified `loadAll()` that `app.js` uses at startup.
 - **latest.js**
   - Selects the newest post (by date) where `share !== false`.
@@ -65,28 +65,28 @@ flowchart TD
   - Exposes `window.BattleBros` helpers; updates DOM for subtitle/banner/button tweaks at runtime.
 
 ## Data Sources
-- `admin/data.json` — Chapters, chapterFolders, statusMessage.
+- `data.json` — Entries, entryFolders, statusMessage.
 - `/api/posts/latest` — DB-backed latest blog post for the “Latest update” widget.
 - `admin/page-config.json` — Optional theming, header/panel content, button list, and layout ordering (DB-backed).
 - `localStorage` — Reading progress (`battleBros_progress` via `config`).
 
 ## Persistence & Progress
-- Progress: saved per chapter/page in `state.saveProgress()`; restored on load.
+- Progress: saved per entry/page in `state.saveProgress()`; restored on load.
 - Two-page mode: derived from viewport width/aspect (thresholds in `config.js`).
-- Zoom/fit: transient in memory; reset on chapter change unless the user zooms manually.
+- Zoom/fit: transient in memory; reset on entry change unless the user zooms manually.
 
 ## Testing
 - Vitest suite (`tests/render.test.js`, `tests/state.test.js`, `tests/chapters.test.js`) covers:
   - Page resolution and ordering
   - Progress save/load with localStorage error handling
   - Two-page mode logic
-  - Chapter sorting and normalization
+  - Entry sorting and normalization
 
 ## Common Extension Points
 - Add a new header button: extend `admin/page-config.json` buttons; `customization.js` renders them at startup.
 - Change theme/branding: adjust `admin/page-config.json` theme vars; `customization.js` applies to CSS variables.
 
 ## Gotchas / Notes
-- Admin auth is minimal; reader fetches data anonymously. Ensure `admin/data.json` and assets are publicly readable on your host.
+- Admin auth is minimal; reader fetches data anonymously. Ensure `data.json` and assets are publicly readable on your host.
 - Image paths must live under `comics/<seriesId>/entries/` (or be absolute URLs) for the preview/reader to resolve them.
-- Double-check `statusMessage`: shown both on the reader ticker and in admin; comes from `admin/data.json`.
+- Double-check `statusMessage`: shown both on the reader ticker and in admin; comes from `data.json`.

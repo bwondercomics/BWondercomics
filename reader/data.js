@@ -8,10 +8,10 @@ import { getSeriesDataPath, getSeriesPageConfigPath } from './series.js';
 import { logger } from './logger.js';
 
 /**
- * Loads chapter data from the public series endpoint
- * Fetches chapter list, page URLs, and status message from the database-backed API
+ * Loads entry data from the public series endpoint
+ * Fetches entry list, page URLs, and status message from the database-backed API
  * @async
- * @returns {Promise<{chapters: Object, chapterOrder: string[], statusMessage: string}>} Normalized chapter data
+ * @returns {Promise<{entries: Object, entryOrder: string[], statusMessage: string}>} Normalized entry data
  * @throws {Error} If fetch fails or data structure is invalid
  */
 export async function loadChapterData(seriesId) {
@@ -23,25 +23,28 @@ export async function loadChapterData(seriesId) {
     }
     const data = await response.json();
 
-    if (!data.chapters || typeof data.chapters !== 'object') {
-      throw new Error(`Invalid chapter data structure in ${dataPath}`);
+    const entryPayload = data.entries && typeof data.entries === 'object' ? data.entries : null;
+    if (!entryPayload) {
+      throw new Error(`Invalid entry data structure in ${dataPath}`);
     }
 
-    const chapterMeta = data.chapterMeta && typeof data.chapterMeta === 'object' ? data.chapterMeta : {};
-    const normalized = sanitizeChapters(data.chapters, chapterMeta);
-    const orderedNames = sortChapterNamesWithMeta(Object.keys(normalized.chapters), chapterMeta);
+    const entryMetaPayload = data.entryMeta && typeof data.entryMeta === 'object' ? data.entryMeta : null;
+    const entryMeta = entryMetaPayload || {};
+
+    const normalized = sanitizeChapters(entryPayload, entryMeta);
+    const orderedNames = sortChapterNamesWithMeta(Object.keys(normalized.chapters), entryMeta);
     return {
-      chapters: normalized.chapters,
-      chapterOrder: orderedNames,
+      entries: normalized.chapters,
+      entryOrder: orderedNames,
       statusMessage: data.statusMessage || '',
-      chapterMeta,
+      entryMeta,
       premiumOnly: !!data.premiumOnly,
       unitLabelSingular: String(data.unitLabelSingular || '').trim() || 'Entry',
       unitLabelPlural: String(data.unitLabelPlural || '').trim() || 'Entries',
       entryLabels: Array.isArray(data.entryLabels) ? data.entryLabels : []
     };
   } catch (error) {
-    console.error('Failed to load chapter data:', error);
+    console.error('Failed to load entry data:', error);
     throw error;
   }
 }

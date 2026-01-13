@@ -6,6 +6,7 @@ bwondercomics.com {
 	reverse_proxy /page-config.json bwondercomics-api:8000
 	reverse_proxy /series/* bwondercomics-api:8000
 	reverse_proxy /media.json bwondercomics-api:8000
+	reverse_proxy /analytics.js bwondercomics-api:8000
 	
 	handle /chapters/* {
 		root * /srv/bwondercomics
