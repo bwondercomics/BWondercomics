@@ -200,7 +200,11 @@ function createUploadManager({
     }
 
     const chaptersRoot =
-      typeof getChaptersRoot === "function" ? getChaptersRoot() : "chapters";
+      typeof chaptersApi?.getActiveEntryRoot === "function"
+        ? chaptersApi.getActiveEntryRoot()
+        : typeof getChaptersRoot === "function"
+          ? getChaptersRoot()
+          : "chapters";
     const chapterFolder = getChapterFolder(
       chapterName,
       state.chapterFolders,

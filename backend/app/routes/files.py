@@ -4,23 +4,25 @@ import base64
 import json
 import os
 import re
+import shutil
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..content_store import apply_media_items_save, get_page_config, list_media_items, save_page_config
 from ..db import get_db
 from ..file_ops import ALLOWED_IMAGE_EXTENSIONS, extract_numbers, renumber_files, safe_path
-from ..models import User
+from ..models import Entry, EntryPage, MediaItem, PremiumCode, PremiumCodeRedemption, Series, User
 from ..series_store import sanitize_series_id
 from ..settings import settings
 from ..security import get_current_user
 from ..series_store import apply_series_data_save, apply_series_index_save
-from ..validation import is_admin_role
+from ..validation import is_admin_role, is_premium_role
 
 
 router = APIRouter()
@@ -128,6 +130,87 @@ def _require_admin(request: Request, db: Session) -> User | None:
     if not user or not is_admin_role(user.role):
         return None
     return user
+
+
+def _has_premium_access(db: Session, user: User | None) -> bool:
+    if not user:
+        return False
+    if is_premium_role(user.role):
+        return True
+    redeemed = db.scalar(
+        select(func.count())
+        .select_from(PremiumCodeRedemption)
+        .where(PremiumCodeRedemption.user_id == user.id)
+    )
+    if redeemed:
+        return True
+    fallback = db.scalar(
+        select(func.count()).select_from(PremiumCode).where(PremiumCode.redeemed_by == user.id)
+    )
+    return bool(fallback)
+
+
+def _protected_rel_path(asset_path: str) -> tuple[Path, str] | None:
+    rel_path = _safe_rel_path(asset_path)
+    if rel_path is None:
+        return None
+    protected_rel = Path("protected") / rel_path
+    return protected_rel, str(rel_path)
+
+
+def _resolve_media_access(item: MediaItem | None) -> str:
+    if not item:
+        return "private"
+    if item.access in {"public", "premium", "private"}:
+        return item.access
+    return "public" if item.public else "private"
+
+
+@router.get("/api/protected/{asset_path:path}")
+def protected_assets(asset_path: str, request: Request, db: Session = Depends(get_db)):
+    resolved = _protected_rel_path(asset_path)
+    if resolved is None:
+        return JSONResponse(status_code=404, content={"error": "Asset not found"})
+
+    protected_rel, raw_rel = resolved
+    try:
+        abs_path = safe_path(str(protected_rel))
+    except ValueError:
+        return JSONResponse(status_code=404, content={"error": "Asset not found"})
+
+    if not abs_path.is_file():
+        return JSONResponse(status_code=404, content={"error": "Asset not found"})
+
+    user = get_current_user(db, request)
+    rel_parts = Path(raw_rel).parts
+    if rel_parts and rel_parts[0] == "media":
+        item = db.scalar(select(MediaItem).where(MediaItem.path == str(protected_rel)))
+        if not item:
+            item = db.scalar(select(MediaItem).where(MediaItem.path == raw_rel))
+        access = _resolve_media_access(item)
+        if access == "private" and not is_admin_role(user.role if user else None):
+            return JSONResponse(status_code=403, content={"error": "Private media"})
+        if access == "premium" and not _has_premium_access(db, user):
+            return JSONResponse(status_code=403, content={"error": "Premium media"})
+        if access == "private" and not item:
+            return JSONResponse(status_code=404, content={"error": "Asset not found"})
+        return FileResponse(abs_path)
+
+    entry_page = db.scalar(select(EntryPage).where(EntryPage.path == str(protected_rel)))
+    if not entry_page:
+        if is_admin_role(user.role if user else None):
+            return FileResponse(abs_path)
+        return JSONResponse(status_code=404, content={"error": "Asset not found"})
+
+    entry = db.get(Entry, entry_page.entry_id)
+    if not entry:
+        return JSONResponse(status_code=404, content={"error": "Asset not found"})
+    series = db.get(Series, entry.series_id)
+    requires_premium = bool(entry.premium_only or (series and series.premium_only))
+    if requires_premium and not _has_premium_access(db, user):
+        return JSONResponse(status_code=403, content={"error": "Premium content"})
+
+    return FileResponse(abs_path)
 
 
 class SaveRequest(BaseModel):
@@ -415,6 +498,43 @@ def rename_image(payload: RenameImageRequest, request: Request, db: Session = De
         return JSONResponse(status_code=500, content={"error": str(exc)})
 
     return {"status": "renamed", "from": src, "to": dest}
+
+
+class MovePathRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    src: str = Field(alias="from")
+    dest: str = Field(alias="to")
+
+
+@router.post("/api/move-path")
+def move_path(payload: MovePathRequest, request: Request, db: Session = Depends(get_db)):
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    src = (payload.src or "").strip().strip("/")
+    dest = (payload.dest or "").strip().strip("/")
+    if not src or not dest:
+        return JSONResponse(status_code=400, content={"error": "from and to are required"})
+
+    try:
+        abs_src = safe_path(src)
+        abs_dest = safe_path(dest)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"error": "Invalid path"})
+
+    if not abs_src.exists():
+        return JSONResponse(status_code=404, content={"error": "Source path not found"})
+    if abs_dest.exists():
+        return JSONResponse(status_code=409, content={"error": "Destination already exists"})
+
+    abs_dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.move(str(abs_src), str(abs_dest))
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"error": str(exc)})
+
+    return {"status": "moved", "from": src, "to": dest}
 
 
 class RenumberChapterRequest(BaseModel):

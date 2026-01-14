@@ -105,6 +105,9 @@ class MediaItem(Base):
     id: Mapped[str] = mapped_column(String(120), primary_key=True)
     path: Mapped[str] = mapped_column(String(500), unique=True, nullable=False)
     tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    access: Mapped[str] = mapped_column(String(20), nullable=False, default="public")
+    premium_visibility: Mapped[str] = mapped_column(String(20), nullable=False, default="blur")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False

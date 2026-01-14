@@ -191,6 +191,7 @@
       width: 100%;
       aspect-ratio: 5 / 7;
       background: #05050a;
+      position: relative;
     }
 
     .card img {
@@ -199,6 +200,25 @@
       object-fit: cover;
       display: block;
       background: #05050a;
+    }
+
+    .card.is-premium img {
+      filter: blur(10px);
+      transform: scale(1.03);
+    }
+
+    .premium-badge {
+      position: absolute;
+      inset: auto 12px 12px 12px;
+      padding: 8px 10px;
+      border-radius: 8px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 1px solid rgba(255, 237, 0, 0.7);
+      color: var(--accent);
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      text-align: center;
     }
 
     .card-body {
@@ -294,6 +314,11 @@
       border-radius: 10px;
       background: #05050a;
       box-shadow: 0 0 24px rgba(0, 217, 255, 0.35);
+    }
+
+    .lightbox.premium-blur img {
+      filter: blur(18px);
+      transform: scale(1.02);
     }
 
     .lightbox-close {
@@ -410,6 +435,8 @@
     let mediaItems = [];
     let activeTag = '';
     let currentIndex = -1;
+    let viewerIsAdmin = false;
+    let viewerIsPremium = false;
 
     // Show or hide the error banner.
     function setError(message) {
@@ -429,10 +456,105 @@
         : [];
     }
 
+    function normalizeAccess(raw, fallbackPublic = true) {
+      const value = String(raw || '').trim().toLowerCase();
+      if (value === 'public' || value === 'premium' || value === 'private') {
+        return value;
+      }
+      return fallbackPublic ? 'public' : 'private';
+    }
+
+    function normalizePremiumVisibility(raw) {
+      const value = String(raw || '').trim().toLowerCase();
+      return value === 'hidden' ? 'hidden' : 'blur';
+    }
+
+    const PREMIUM_PLACEHOLDER = (() => {
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
+  <defs>
+    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0%" stop-color="#1a1a1a"/>
+      <stop offset="100%" stop-color="#3b3b3b"/>
+    </linearGradient>
+  </defs>
+  <rect width="600" height="400" fill="url(#g)"/>
+  <rect x="40" y="40" width="520" height="320" fill="rgba(0,0,0,0.35)" stroke="#f6c454" stroke-width="3"/>
+  <text x="300" y="205" fill="#f6c454" font-size="40" font-family="sans-serif" text-anchor="middle">Premium Preview</text>
+</svg>`;
+      return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+    })();
+
+    function resolveMediaPath(item) {
+      const raw = item?.path || '';
+      if (!raw) return '';
+      if (/^https?:\/\//i.test(raw)) return raw;
+      if (raw.startsWith('protected/')) {
+        const rel = raw.replace(/^protected\//, '');
+        return `/api/protected/${rel}`;
+      }
+      if (raw.startsWith('/')) return raw;
+      return `/${raw}`;
+    }
+
+    function resolveMediaSrc(item) {
+      const access = normalizeAccess(item.access ?? item.visibility, item.public !== false);
+      const premiumVisibility = normalizePremiumVisibility(
+        item.premiumVisibility ?? item.premium_visibility
+      );
+      if (access === 'premium' && !viewerIsPremium) {
+        return premiumVisibility === 'blur' ? PREMIUM_PLACEHOLDER : '';
+      }
+      if (access === 'private' && !viewerIsAdmin) {
+        return '';
+      }
+      return resolveMediaPath(item);
+    }
+
+    async function loadSession() {
+      try {
+        const response = await fetch('/api/session', {
+          cache: 'no-store',
+          credentials: 'same-origin'
+        });
+        if (!response.ok) return;
+        const data = await response.json();
+        const user = data?.user || null;
+        const role = String(user?.role || '').toLowerCase();
+        viewerIsAdmin = role === 'admin';
+        viewerIsPremium = viewerIsAdmin || role === 'premium' || !!user?.premiumActive;
+      } catch (error) {
+        viewerIsAdmin = false;
+        viewerIsPremium = false;
+      }
+    }
+
+    function isItemVisible(item) {
+      const access = normalizeAccess(item.access ?? item.visibility, item.public !== false);
+      const premiumVisibility = normalizePremiumVisibility(
+        item.premiumVisibility ?? item.premium_visibility
+      );
+      if (access === 'private') return viewerIsAdmin;
+      if (access === 'premium') {
+        return viewerIsPremium || premiumVisibility === 'blur';
+      }
+      return true;
+    }
+
+    function isItemBlurred(item) {
+      const access = normalizeAccess(item.access ?? item.visibility, item.public !== false);
+      const premiumVisibility = normalizePremiumVisibility(
+        item.premiumVisibility ?? item.premium_visibility
+      );
+      return access === 'premium' && !viewerIsPremium && premiumVisibility === 'blur';
+    }
+
     // Render the tag filter pills.
     function renderTags() {
       tagsBar.innerHTML = '';
-      const allTags = Array.from(new Set(mediaItems.flatMap(m => normalizeTags(m.tags || [])))).sort();
+      const visibleItems = mediaItems.filter(isItemVisible);
+      const allTags = Array.from(
+        new Set(visibleItems.flatMap(m => normalizeTags(m.tags || [])))
+      ).sort();
       if (!allTags.length) return;
 
       const all = document.createElement('button');
@@ -470,7 +592,7 @@
         const matchesTerm = term
           ? path.includes(term) || tags.some(t => t.includes(term))
           : true;
-        return matchesTag && matchesTerm;
+        return matchesTag && matchesTerm && isItemVisible(item);
       });
 
       if (!filtered.length) {
@@ -482,17 +604,28 @@
       }
 
       filtered.forEach((item, index) => {
+        const access = normalizeAccess(item.access ?? item.visibility, item.public !== false);
+        const isPremium = access === 'premium';
+        const isBlurred = isItemBlurred(item);
         const card = document.createElement('div');
-        card.className = 'card';
+        card.className = `card${isPremium ? ' is-premium' : ''}`;
         const media = document.createElement('div');
         media.className = 'card-media';
         const img = document.createElement('img');
         img.loading = 'lazy';
         img.alt = item.path || 'Media item';
-        img.src = item.path || '';
+        img.src = resolveMediaSrc(item) || '';
         img.onerror = () => { img.style.opacity = '0.3'; };
-        img.addEventListener('click', () => openLightbox(filtered, index));
+        if (!isBlurred) {
+          img.addEventListener('click', () => openLightbox(filtered, index));
+        }
         media.appendChild(img);
+        if (isPremium) {
+          const badge = document.createElement('div');
+          badge.className = 'premium-badge';
+          badge.textContent = 'Premium';
+          media.appendChild(badge);
+        }
         card.appendChild(media);
 
         const body = document.createElement('div');
@@ -544,10 +677,18 @@
     function updateLightbox() {
       if (currentIndex < 0 || currentIndex >= mediaItems.length) return closeLightbox();
       const item = mediaItems[currentIndex];
-      lightboxImg.src = item.path || '';
+      lightboxImg.src = resolveMediaSrc(item) || '';
       lightboxImg.alt = item.path || 'Media item';
       const tags = normalizeTags(item.tags || []);
-      lightboxMeta.textContent = `${item.path || ''}${tags.length ? ' • ' + tags.join(', ') : ''}`;
+      const access = normalizeAccess(item.access ?? item.visibility, item.public !== false);
+      const premiumVisibility = normalizePremiumVisibility(
+        item.premiumVisibility ?? item.premium_visibility
+      );
+      const isBlurred = access === 'premium' && !viewerIsPremium && premiumVisibility === 'blur';
+      lightbox.classList.toggle('premium-blur', isBlurred);
+      const suffix = tags.length ? ' • ' + tags.join(', ') : '';
+      const premiumNote = isBlurred ? ' • Premium preview' : '';
+      lightboxMeta.textContent = `${item.path || ''}${suffix}${premiumNote}`;
     }
 
     // Move forward or backward through the filtered list.
@@ -560,10 +701,22 @@
     // Load media metadata from media.json and render the UI.
     async function loadMedia() {
       try {
+        await loadSession();
         const response = await fetch('media.json', { cache: 'no-cache' });
         if (!response.ok) throw new Error('Failed to load media library');
         const data = await response.json();
-        mediaItems = Array.isArray(data) ? data : [];
+        mediaItems = Array.isArray(data)
+          ? data
+              .filter((item) => item && item.path)
+              .map((item) => {
+                const fallbackPublic = item.public !== false;
+                const access = normalizeAccess(item.access ?? item.visibility, fallbackPublic);
+                const premiumVisibility = normalizePremiumVisibility(
+                  item.premiumVisibility ?? item.premium_visibility
+                );
+                return { ...item, access, premiumVisibility };
+              })
+          : [];
         setError('');
       } catch (error) {
         console.error(error);

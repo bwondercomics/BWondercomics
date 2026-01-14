@@ -30,6 +30,18 @@ def _normalize_tags(raw: Any) -> list[str]:
     return []
 
 
+def _normalize_access(raw: Any, fallback_public: bool) -> str:
+    value = str(raw or "").strip().lower()
+    if value in {"public", "premium", "private"}:
+        return value
+    return "public" if fallback_public else "private"
+
+
+def _normalize_premium_visibility(raw: Any) -> str:
+    value = str(raw or "").strip().lower()
+    return value if value in {"blur", "hidden"} else "blur"
+
+
 def _media_id_from_path(path: str) -> str:
     filename = path.split("/")[-1]
     base = re.sub(r"\.[^.]+$", "", filename)
@@ -54,14 +66,39 @@ def _normalize_media_items(payload: Any) -> list[dict[str, Any]]:
             continue
         mid = str(raw.get("id") or "").strip() or _media_id_from_path(path)
         tags = _normalize_tags(raw.get("tags"))
-        items.append({"id": mid, "path": path, "tags": tags})
+        fallback_public = raw.get("public") is not False
+        access = _normalize_access(raw.get("access") or raw.get("visibility"), fallback_public)
+        premium_visibility = _normalize_premium_visibility(
+            raw.get("premiumVisibility") or raw.get("premium_visibility")
+        )
+        public = access == "public"
+        items.append(
+            {
+                "id": mid,
+                "path": path,
+                "tags": tags,
+                "public": public,
+                "access": access,
+                "premium_visibility": premium_visibility,
+            }
+        )
         seen_paths.add(path)
     return items
 
 
 def list_media_items(db: Session) -> list[dict[str, Any]]:
     items = db.scalars(select(MediaItem).order_by(MediaItem.path.asc())).all()
-    return [{"id": item.id, "path": item.path, "tags": list(item.tags or [])} for item in items]
+    return [
+        {
+            "id": item.id,
+            "path": item.path,
+            "tags": list(item.tags or []),
+            "public": item.public,
+            "access": item.access,
+            "premiumVisibility": item.premium_visibility,
+        }
+        for item in items
+    ]
 
 
 def apply_media_items_save(db: Session, payload: Any) -> None:
@@ -76,11 +113,17 @@ def apply_media_items_save(db: Session, payload: Any) -> None:
         mid = item["id"]
         path = item["path"]
         tags = item["tags"]
+        public = item["public"]
+        access = item["access"]
+        premium_visibility = item["premium_visibility"]
 
         if mid in existing_by_id:
             record = existing_by_id[mid]
             record.path = path
             record.tags = tags
+            record.public = public
+            record.access = access
+            record.premium_visibility = premium_visibility
             record.updated_at = now
             keep_ids.add(record.id)
             continue
@@ -88,11 +131,23 @@ def apply_media_items_save(db: Session, payload: Any) -> None:
         by_path = existing_by_path.get(path)
         if by_path:
             by_path.tags = tags
+            by_path.public = public
+            by_path.access = access
+            by_path.premium_visibility = premium_visibility
             by_path.updated_at = now
             keep_ids.add(by_path.id)
             continue
 
-        record = MediaItem(id=mid, path=path, tags=tags, created_at=now, updated_at=now)
+        record = MediaItem(
+            id=mid,
+            path=path,
+            tags=tags,
+            public=public,
+            access=access,
+            premium_visibility=premium_visibility,
+            created_at=now,
+            updated_at=now,
+        )
         db.add(record)
         keep_ids.add(record.id)
 

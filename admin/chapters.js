@@ -33,7 +33,40 @@ export function createChaptersApi({
     if (!slug) return base;
     return `${String(base || 'chapters').replace(/\/+$/g, '')}/${slug}`;
   };
-  const getRoot = () => getRootForLabel(getActiveEntryLabel()?.id || null);
+  const normalizeRoot = (value = '') => String(value || '').replace(/^\/+/, '').replace(/\/+$/, '');
+  const stripProtectedPrefix = (value = '') => normalizeRoot(value).replace(/^protected\//, '');
+  const isEntryPremium = (chapterName, override) => {
+    if (typeof override === 'boolean') return override || !!state.premiumOnly;
+    const meta = chapterName ? state.chapterMeta?.[chapterName] : null;
+    return !!state.premiumOnly || !!meta?.premium;
+  };
+  const getEntryRootForLabel = (labelId, premiumFlag = false) => {
+    const base = getRootForLabel(labelId);
+    const clean = stripProtectedPrefix(base);
+    return premiumFlag ? `protected/${clean}` : clean;
+  };
+  const getEntryRootForChapter = (chapterName, labelId = null, premiumOverride) => {
+    const meta = chapterName ? state.chapterMeta?.[chapterName] : null;
+    const effectiveLabel =
+      labelId ||
+      meta?.entryLabelId ||
+      meta?.entry_label_id ||
+      getActiveEntryLabel()?.id ||
+      getDefaultEntryLabel()?.id ||
+      null;
+    return getEntryRootForLabel(effectiveLabel, isEntryPremium(chapterName, premiumOverride));
+  };
+  const replaceRootPrefix = (path, fromRoot, toRoot) => {
+    const cleanFrom = normalizeRoot(fromRoot);
+    const cleanTo = normalizeRoot(toRoot);
+    if (!cleanFrom || !path.startsWith(`${cleanFrom}/`)) return path;
+    return `${cleanTo}${path.slice(cleanFrom.length)}`;
+  };
+  const mapPagePaths = (paths, fromRoot, toRoot) => {
+    const cleanFrom = normalizeRoot(fromRoot);
+    if (!cleanFrom) return paths;
+    return paths.map((path) => replaceRootPrefix(path, cleanFrom, toRoot));
+  };
   const getDataUrl = () => (typeof getDataFileUrl === 'function' ? getDataFileUrl() : 'data.json');
   const getSaveFile = () => (typeof getSaveFilename === 'function' ? getSaveFilename() : 'admin/data.json');
   const getStorage = () => (typeof getStorageKey === 'function' ? getStorageKey() : STORAGE_KEY);
@@ -186,6 +219,10 @@ export function createChaptersApi({
     if (!raw) return '';
     if (raw.startsWith('http')) return raw;
     if (raw.startsWith('/')) return raw;
+    if (raw.startsWith('protected/')) {
+      const rel = raw.replace(/^protected\//, '');
+      return `/api/protected/${rel}`;
+    }
     return `../${raw}`;
   };
 
@@ -633,7 +670,18 @@ export function createChaptersApi({
           }
           Object.keys(state.chapters).forEach(name => {
             if (!state.chapterFolders[name]) {
-              const inferred = inferFolderFromPages(name, state.chapters, state.currentPages, getRoot());
+              const meta = state.chapterMeta?.[name] || {};
+              const labelId = meta.entryLabelId || meta.entry_label_id || null;
+              const root = getEntryRootForChapter(name, labelId);
+              let inferred = inferFolderFromPages(name, state.chapters, state.currentPages, root);
+              if (!inferred && root.startsWith('protected/')) {
+                inferred = inferFolderFromPages(
+                  name,
+                  state.chapters,
+                  state.currentPages,
+                  stripProtectedPrefix(root),
+                );
+              }
               if (inferred) {
                 state.chapterFolders[name] = inferred;
               }
@@ -1170,13 +1218,51 @@ export function createChaptersApi({
       return;
     }
 
-    const pages = [...state.currentPages];
+    let pages = [...state.currentPages];
     const selectedLabelId = el.entryLabelSelect?.value || getActiveEntryLabel()?.id || getDefaultEntryLabel()?.id || null;
+    const premiumFlag = !!el.chapterPremium?.checked;
     const releaseType = String(el.entryReleaseType?.value || 'digital').toLowerCase();
-    const chapterRoot = getRootForLabel(selectedLabelId);
-    const chapterFolder = ensureChapterFolder(newName, state.chapterFolders, state.chapters, state.currentPages, chapterRoot);
+    const originalName = state.currentEditingChapter || newName;
+    const chapterRoot = getEntryRootForLabel(selectedLabelId, isEntryPremium(originalName, premiumFlag));
+    const publicRoot = getEntryRootForLabel(selectedLabelId, false);
+    const protectedRoot = getEntryRootForLabel(selectedLabelId, true);
+    let chapterFolder = state.chapterFolders[originalName] || state.chapterFolders[newName] || '';
+    if (chapterFolder) {
+      const desiredRoot = chapterRoot;
+      const altRoot = desiredRoot.startsWith('protected/') ? publicRoot : protectedRoot;
+      if (chapterFolder.startsWith(`${altRoot}/`) && !chapterFolder.startsWith(`${desiredRoot}/`)) {
+        const updatedFolder = replaceRootPrefix(chapterFolder, altRoot, desiredRoot);
+        pages = mapPagePaths(pages, altRoot, desiredRoot);
+        chapterFolder = updatedFolder;
+      }
+    }
+    if (!chapterFolder) {
+      chapterFolder = ensureChapterFolder(newName, state.chapterFolders, state.chapters, state.currentPages, chapterRoot);
+    }
     const needsFolder = releaseType !== 'store' || pages.length > 0;
-    if (needsFolder) {
+    let movedFolder = false;
+    if (chapterFolder && state.chapterFolders[originalName] && chapterFolder !== state.chapterFolders[originalName]) {
+      try {
+        const resp = await fetch('/api/move-path', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from: state.chapterFolders[originalName], to: chapterFolder })
+        });
+        if (!resp.ok) {
+          const result = await resp.json().catch(() => ({}));
+          if (!(resp.status === 404 && pages.length === 0)) {
+            throw new Error(result.error || 'Unable to move chapter folder');
+          }
+        } else {
+          movedFolder = true;
+        }
+      } catch (e) {
+        console.warn('Move chapter folder failed:', e);
+        if (showError) showError(`Could not move folder for ${newName}: ${e.message}`);
+        return;
+      }
+    }
+    if (needsFolder && !movedFolder) {
       try {
         const resp = await fetch('/api/create-chapter', {
           method: 'POST',
@@ -1197,7 +1283,6 @@ export function createChaptersApi({
     if (state.currentEditingChapter && state.currentEditingChapter !== newName) {
       delete state.chapters[state.currentEditingChapter];
       if (state.chapterFolders[state.currentEditingChapter]) {
-        state.chapterFolders[newName] = state.chapterFolders[state.currentEditingChapter];
         delete state.chapterFolders[state.currentEditingChapter];
       }
       if (state.chapterMeta && state.chapterMeta[state.currentEditingChapter]) {
@@ -1206,8 +1291,8 @@ export function createChaptersApi({
       }
     }
 
+    state.chapterFolders[newName] = chapterFolder;
     state.chapters[newName] = pages;
-    const premiumFlag = !!el.chapterPremium?.checked;
     const rawDisplayNumber = el.entryDisplayNumber?.value ?? "";
     const trimmedDisplayNumber = String(rawDisplayNumber).trim();
     let displayNumber = null;
@@ -1272,7 +1357,11 @@ export function createChaptersApi({
   }
 
   function addPage() {
-    const path = prompt(`Enter image path (e.g., ${getRoot()}/01/01.png):`);
+    const chapterName = getActiveChapterName();
+    const labelId = el.entryLabelSelect?.value || getActiveEntryLabel()?.id || null;
+    const premiumFlag = !!el.chapterPremium?.checked;
+    const hintRoot = getEntryRootForChapter(chapterName, labelId, premiumFlag);
+    const path = prompt(`Enter image path (e.g., ${hintRoot}/01/01.png):`);
     if (path) {
       state.currentPages.push(path.trim());
       renderPageList(state.currentPages);
@@ -1286,8 +1375,16 @@ export function createChaptersApi({
     const wasReorderActive = isReorderActive();
     const previousSelected = selectedPageIndex;
     const targetPath = imagePath || state.currentPages[index];
-    const rootPrefix = `${String(getRoot() || 'chapters').replace(/\/+$/, '')}/`;
-    if (targetPath && targetPath.startsWith(rootPrefix)) {
+    const chapterName = state.currentEditingChapter || getActiveChapterName();
+    const chapterFolder = getChapterFolder(
+      chapterName,
+      state.chapterFolders,
+      state.chapters,
+      state.currentPages,
+      getEntryRootForChapter(chapterName),
+    );
+    const rootPrefix = `${normalizeRoot(chapterFolder || '')}/`;
+    if (targetPath && rootPrefix !== "/" && targetPath.startsWith(rootPrefix)) {
       try {
         const response = await fetch('/api/delete-image', {
           method: 'POST',
@@ -1406,8 +1503,21 @@ export function createChaptersApi({
     return fromInput || state.currentEditingChapter || '';
   }
 
+  function getActiveEntryRoot() {
+    const chapterName = getActiveChapterName();
+    const labelId = el.entryLabelSelect?.value || getActiveEntryLabel()?.id || null;
+    const premiumFlag = !!el.chapterPremium?.checked;
+    return getEntryRootForChapter(chapterName, labelId, premiumFlag);
+  }
+
   async function fetchChapterImages(chapterName) {
-    const chapterFolder = getChapterFolder(chapterName, state.chapterFolders, state.chapters, state.currentPages, getRoot());
+    const chapterFolder = getChapterFolder(
+      chapterName,
+      state.chapterFolders,
+      state.chapters,
+      state.currentPages,
+      getEntryRootForChapter(chapterName),
+    );
     try {
       const response = await fetch('/api/list-images', {
         method: 'POST',
@@ -1457,6 +1567,7 @@ export function createChaptersApi({
     renderChapterList,
     renderEntryLabelTabs,
     getActiveChapterName,
+    getActiveEntryRoot,
     fetchChapterImages,
     showModal,
     hideModal

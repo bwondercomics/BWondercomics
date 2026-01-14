@@ -107,6 +107,9 @@ function hideAllSections() {
   if (el.adminDashboard) {
     el.adminDashboard.classList.remove("admin-designer-open");
   }
+  if (el.adminContent) {
+    el.adminContent.classList.remove("media-content-wide");
+  }
   if (el.dashboardSection) el.dashboardSection.style.display = "none";
   if (el.chaptersSection) el.chaptersSection.style.display = "none";
   if (el.blogSection) el.blogSection.style.display = "none";
@@ -696,6 +699,9 @@ function attachEventHandlers() {
   }
   if (el.mediaSearch) {
     el.mediaSearch.addEventListener("input", mediaManager.renderMedia);
+  }
+  if (el.mediaSort) {
+    el.mediaSort.addEventListener("change", mediaManager.renderMedia);
   }
   if (el.previewChapterSelect) {
     el.previewChapterSelect.addEventListener("change", (e) => {

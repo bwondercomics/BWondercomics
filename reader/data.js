@@ -31,7 +31,31 @@ export async function loadChapterData(seriesId) {
     const entryMetaPayload = data.entryMeta && typeof data.entryMeta === 'object' ? data.entryMeta : null;
     const entryMeta = entryMetaPayload || {};
 
-    const normalized = sanitizeChapters(entryPayload, entryMeta);
+    const resolveProtectedPath = (raw = '') => {
+      const value = String(raw || '').trim();
+      if (!value) return '';
+      if (value.startsWith('http') || value.startsWith('/')) return value;
+      if (value.startsWith('protected/')) {
+        return `/api/protected/${value.replace(/^protected\//, '')}`;
+      }
+      return value;
+    };
+
+    const mappedEntries = Object.fromEntries(
+      Object.entries(entryPayload).map(([name, pages]) => [
+        name,
+        Array.isArray(pages) ? pages.map(resolveProtectedPath) : []
+      ])
+    );
+
+    Object.values(entryMeta).forEach((meta) => {
+      if (!meta || typeof meta !== 'object') return;
+      if (meta.coverImage) {
+        meta.coverImage = resolveProtectedPath(meta.coverImage);
+      }
+    });
+
+    const normalized = sanitizeChapters(mappedEntries, entryMeta);
     const orderedNames = sortChapterNamesWithMeta(Object.keys(normalized.chapters), entryMeta);
     return {
       entries: normalized.chapters,
