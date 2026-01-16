@@ -82,7 +82,7 @@ import { getActiveSeriesId } from "./series.js";
   "use strict";
   // ==================== CHAPTER HELPERS ====================
 
-  // Helpers now live in reader/chapters.js
+  // Helpers now live in reader/entries.js
 
   // ==================== SUBTITLES ====================
   let SUBTITLES = [];

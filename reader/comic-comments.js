@@ -260,7 +260,7 @@ import { buildEntryTargetId } from './comment-targets.js';
             ctx.submitBtn.disabled = false;
             ctx.commentHint.textContent = 'Be kind. No spoilers or spam.';
         } else {
-            ctx.authStatus.textContent = 'Sign in to discuss this chapter';
+            ctx.authStatus.textContent = 'Sign in to discuss this entry';
             ctx.authForm.style.display = 'flex';
             ctx.signoutBtn.style.display = 'none';
             ctx.commentForm.classList.add('disabled');

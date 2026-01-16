@@ -2,7 +2,7 @@ import { state } from "./state.js";
 import { sortPagesByFilename, getChapterFolder, readFileAsBase64 } from "./utils.js";
 
 function createUploadManager({
-  chaptersApi,
+  entriesApi,
   getChaptersRoot,
   showError,
   showSuccess,
@@ -164,7 +164,7 @@ function createUploadManager({
 
   function maybeAutoUpload() {
     if (!state.selectedFiles.length || state.isUploading) return;
-    const chapterName = chaptersApi?.getActiveChapterName();
+    const chapterName = entriesApi?.getActiveChapterName();
     const uploadProgress = document.getElementById("uploadProgress");
     if (!chapterName) {
       if (uploadProgress) uploadProgress.style.display = "none";
@@ -180,12 +180,12 @@ function createUploadManager({
     const uploadProgress = document.getElementById("uploadProgress");
 
     if (state.isUploading) return;
-    const chapterName = chaptersApi?.getActiveChapterName();
+    const chapterName = entriesApi?.getActiveChapterName();
     if (!chapterName) {
-      if (showError) showError("Enter a chapter name first.");
+      if (showError) showError("Enter an entry name first.");
       if (uploadProgress) {
         uploadProgress.style.display = "block";
-        uploadProgress.textContent = "Enter a chapter name first.";
+        uploadProgress.textContent = "Enter an entry name first.";
       }
       return;
     }
@@ -200,8 +200,8 @@ function createUploadManager({
     }
 
     const chaptersRoot =
-      typeof chaptersApi?.getActiveEntryRoot === "function"
-        ? chaptersApi.getActiveEntryRoot()
+      typeof entriesApi?.getActiveEntryRoot === "function"
+        ? entriesApi.getActiveEntryRoot()
         : typeof getChaptersRoot === "function"
           ? getChaptersRoot()
           : "chapters";
@@ -222,10 +222,10 @@ function createUploadManager({
     btnUploadImages.textContent = "Uploading...";
 
     try {
-      await fetch("/api/create-chapter", {
+      await fetch("/api/create-entry", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chapterFolder }),
+        body: JSON.stringify({ entryFolder: chapterFolder }),
       });
 
       const filesPayload = await Promise.all(
@@ -235,10 +235,10 @@ function createUploadManager({
         })),
       );
 
-      const response = await fetch("/api/upload-images", {
+      const response = await fetch("/api/upload-entry-images", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ chapterFolder, files: filesPayload }),
+        body: JSON.stringify({ entryFolder: chapterFolder, files: filesPayload }),
       });
 
       const result = await response.json();
@@ -248,8 +248,8 @@ function createUploadManager({
       state.currentPages = state.currentPages.length
         ? [...state.currentPages, ...newPaths]
         : sortPagesByFilename([...state.currentPages, ...newPaths]);
-      chaptersApi?.renderPageList(state.currentPages);
-      chaptersApi?.markUnsaved();
+      entriesApi?.renderPageList(state.currentPages);
+      entriesApi?.markUnsaved();
       clearSelectedFiles();
 
       const errors = result.errors?.length || 0;

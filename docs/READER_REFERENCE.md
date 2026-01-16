@@ -11,7 +11,7 @@ This summarizes the reader runtime after modularization: what each file does, ke
 
 ## Module map
 - `reader/config.js`: constants (storage key, cache sizes, zoom steps, breakpoints, animation timings).
-- `reader/chapters.js`: entry helpers (`extractChapterNumber`, `sortChapterNames`, `sanitizeChapters`).
+- `reader/entries.js`: entry helpers (`extractChapterNumber`, `sortChapterNames`, `sanitizeChapters`).
 - `reader/state.js`: shared `state` object; `saveProgress`, `loadProgress`.
 - `reader/data.js`: loaders for entry data, page config (subtitles), latest post.
 - `reader/dom.js`: element lookups (`el` map) and `initElements`.

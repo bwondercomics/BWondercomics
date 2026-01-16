@@ -74,4 +74,4 @@ The admin “save JSON” flow is also kept, but is intercepted and written to P
 - Backend runtime + routing: `backend/app/main.py`
 - Series/entry JSON views and DB save logic: `backend/app/series_store.py`, `backend/app/routes/series_json.py`, `backend/app/routes/files.py`
 - Reader boot + behavior: `reader/app.js`, `reader/data.js`, `reader/series.js`
-- Admin boot + behavior: `admin/app.js`, `admin/chapters.js`
+- Admin boot + behavior: `admin/app.js`, `admin/entries.js`

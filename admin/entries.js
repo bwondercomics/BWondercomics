@@ -12,7 +12,7 @@ import {
  * Entry management logic extracted from app.js for reuse and readability.
  * All state is passed in by reference so the main app remains the source of truth.
  */
-export function createChaptersApi({
+export function createEntriesApi({
   state,
   el,
   saveToServer,
@@ -1251,30 +1251,30 @@ export function createChaptersApi({
         if (!resp.ok) {
           const result = await resp.json().catch(() => ({}));
           if (!(resp.status === 404 && pages.length === 0)) {
-            throw new Error(result.error || 'Unable to move chapter folder');
+            throw new Error(result.error || 'Unable to move entry folder');
           }
         } else {
           movedFolder = true;
         }
       } catch (e) {
-        console.warn('Move chapter folder failed:', e);
+        console.warn('Move entry folder failed:', e);
         if (showError) showError(`Could not move folder for ${newName}: ${e.message}`);
         return;
       }
     }
     if (needsFolder && !movedFolder) {
       try {
-        const resp = await fetch('/api/create-chapter', {
+        const resp = await fetch('/api/create-entry', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chapterFolder })
+          body: JSON.stringify({ entryFolder: chapterFolder })
         });
         if (!resp.ok) {
           const result = await resp.json().catch(() => ({}));
-          throw new Error(result.error || 'Unable to create chapter folder');
+          throw new Error(result.error || 'Unable to create entry folder');
         }
       } catch (e) {
-        console.warn('Create chapter folder failed:', e);
+        console.warn('Create entry folder failed:', e);
         if (showError) showError(`Could not create folder for ${newName}: ${e.message}`);
         return;
       }
@@ -1519,14 +1519,14 @@ export function createChaptersApi({
       getEntryRootForChapter(chapterName),
     );
     try {
-      const response = await fetch('/api/list-images', {
+      const response = await fetch('/api/list-entry-images', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chapterFolder })
+        body: JSON.stringify({ entryFolder: chapterFolder })
       });
       if (!response.ok) {
         const result = await response.json().catch(() => ({}));
-        throw new Error(result.error || 'Failed to load chapter files');
+        throw new Error(result.error || 'Failed to load entry files');
       }
       const data = await response.json();
       return sortPagesByFilename(data.paths || []);

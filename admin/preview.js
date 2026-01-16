@@ -152,7 +152,7 @@ function createPreviewManager({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "battle-bros-chapters.json";
+    a.download = "battle-bros-entries.json";
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

@@ -139,10 +139,10 @@ describe("admin app smoke", () => {
           return okResp({ posts: [] });
         }
         if (url.endsWith("media.json")) return okResp([]);
-        if (url.includes("/api/list-images")) return okResp({ paths: [] });
+        if (url.includes("/api/list-entry-images")) return okResp({ paths: [] });
         if (url.includes("/api/list-media")) return okResp({ paths: [] });
-        if (url.includes("/api/create-chapter")) return okResp({});
-        if (url.includes("/api/renumber-chapter")) return okResp({ paths: [] });
+        if (url.includes("/api/create-entry")) return okResp({});
+        if (url.includes("/api/renumber-entry")) return okResp({ paths: [] });
         if (url.includes("/api/save")) return okResp({});
       }
       return okResp({});
@@ -185,7 +185,7 @@ describe("admin app smoke", () => {
     expect(postList.textContent).toContain("Smoke Post");
   });
 
-  it("allows creating a chapter and renders it", async () => {
+  it("allows creating an entry and renders it", async () => {
     vi.resetModules();
     await import("../admin/app.js");
     await waitTick();

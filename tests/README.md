@@ -57,7 +57,7 @@ npm run test:coverage
 
 Current test coverage includes:
 
-### ✅ chapters.js (100%)
+### ✅ entries.js (100%)
 - `extractChapterNumber()` - Number extraction from chapter names
 - `sortChapterNames()` - Numerical and alphabetical sorting
 - `sanitizeChapters()` - Data normalization and validation

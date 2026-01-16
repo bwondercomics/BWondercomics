@@ -17,7 +17,7 @@ This guide maps the reader-side modules, their responsibilities, and how they co
 - `reader/latest.js` — Renders the “Latest update” widget from the post returned by `/api/posts/latest`.
 - `reader/email.js` — Signup form submission to the internal API (`POST /api/email/subscribe`) with inline success/error feedback.
 - `reader/customization.js` — Public `window.BattleBros` API (set subtitle, set subtitle list, random subtitle) and dynamic theme/app bar updates.
-- `reader/chapters.js` — Entry metadata helpers: sort entries, derive page arrays, next/prev entry lookup.
+- `reader/entries.js` — Entry metadata helpers: sort entries, derive page arrays, next/prev entry lookup.
 - `reader/transform.js` — Math utilities for scale/translate clamping, aspect-ratio fitting, and pointer focal calculations.
 
 ## Execution Flow (high level)

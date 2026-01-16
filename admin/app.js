@@ -1,7 +1,7 @@
 import { STORAGE_KEY } from "./config.js";
 import { el } from "./dom.js";
 import { checkSession, login, logout } from "./auth.js";
-import { createChaptersApi } from "./chapters.js";
+import { createEntriesApi } from "./entries.js";
 import { getChapterFolder } from "./utils.js";
 import { COUNT_VIEWS_KEY, HEADER_STICKY_KEY, NAV_LAYOUT_KEY, state } from "./state.js";
 import { saveToServer, showError, showSuccess } from "./core.js";
@@ -327,7 +327,7 @@ const designerManager = createDesigner({
   setActiveNav,
 });
 
-const chaptersApi = createChaptersApi({
+const entriesApi = createEntriesApi({
   state,
   el,
   saveToServer,
@@ -342,13 +342,13 @@ const chaptersApi = createChaptersApi({
 });
 
 seriesManager.bindDependencies({
-  chaptersApi,
+  entriesApi,
   setDesignerFrameSrc: designerManager.setDesignerFrameSrc,
   showChaptersSection,
 });
 
 const uploadManager = createUploadManager({
-  chaptersApi,
+  entriesApi,
   getChaptersRoot: seriesManager.getChaptersRoot,
   showError,
   showSuccess,
@@ -356,7 +356,7 @@ const uploadManager = createUploadManager({
 
 // ---------------- RENUMBER ----------------
 async function renumberPages() {
-  const chapterName = chaptersApi.getActiveChapterName();
+  const chapterName = entriesApi.getActiveChapterName();
   const chapterFolder = getChapterFolder(
     chapterName,
     state.chapterFolders,
@@ -372,16 +372,16 @@ async function renumberPages() {
       btnRenumber.disabled = true;
       btnRenumber.textContent = "Renumbering...";
     }
-    const response = await fetch("/api/renumber-chapter", {
+    const response = await fetch("/api/renumber-entry", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chapterFolder, order: state.currentPages }),
+      body: JSON.stringify({ entryFolder: chapterFolder, order: state.currentPages }),
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error || "Renumber failed");
     state.currentPages = result.paths || [];
-    chaptersApi.renderPageList(state.currentPages);
-    chaptersApi.markUnsaved();
+    entriesApi.renderPageList(state.currentPages);
+    entriesApi.markUnsaved();
     showSuccess(`Renumbered ${state.currentPages.length} file(s).`);
   } catch (error) {
     console.error("Renumber error:", error);
@@ -406,7 +406,7 @@ async function showDashboard() {
   await seriesManager.loadSeriesIndex();
   seriesManager.renderSeriesSelect();
   try {
-    await chaptersApi.loadChapters();
+    await entriesApi.loadChapters();
   } catch (e) {
     console.error("Entries failed to load:", e);
   }
@@ -421,9 +421,9 @@ async function showDashboard() {
   } catch (e) {
     console.error("Media failed to load:", e);
   }
-  chaptersApi.renderStatusMessageInput();
-  chaptersApi.renderEntryLabelTabs();
-  chaptersApi.renderChapterList();
+  entriesApi.renderStatusMessageInput();
+  entriesApi.renderEntryLabelTabs();
+  entriesApi.renderChapterList();
   seriesManager.updateSeriesLinks();
   await dashboardManager.refreshDashboard({ skipPosts: true });
 }
@@ -539,20 +539,20 @@ function attachEventHandlers() {
       designerManager.showDesignerSection();
     });
   }
-  el.btnAddChapter.addEventListener("click", chaptersApi.addNewChapter);
+  el.btnAddChapter.addEventListener("click", entriesApi.addNewChapter);
   if (el.btnAddEntryLabel) {
-    el.btnAddEntryLabel.addEventListener("click", chaptersApi.addEntryLabel);
+    el.btnAddEntryLabel.addEventListener("click", entriesApi.addEntryLabel);
   }
   if (el.btnSaveStatus) {
-    el.btnSaveStatus.addEventListener("click", chaptersApi.saveStatusMessage);
+    el.btnSaveStatus.addEventListener("click", entriesApi.saveStatusMessage);
   }
-  el.btnCloseModal.addEventListener("click", chaptersApi.hideModal);
-  el.btnCancelEdit.addEventListener("click", chaptersApi.hideModal);
+  el.btnCloseModal.addEventListener("click", entriesApi.hideModal);
+  el.btnCancelEdit.addEventListener("click", entriesApi.hideModal);
   el.editForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    await chaptersApi.saveChapterEdit();
+    await entriesApi.saveChapterEdit();
   });
-  el.btnAddPage.addEventListener("click", chaptersApi.addPage);
+  el.btnAddPage.addEventListener("click", entriesApi.addPage);
 
   // Preview & export
   el.btnPreview.addEventListener("click", () => {
@@ -732,7 +732,7 @@ function attachEventHandlers() {
 
   // Close modals on backdrop
   el.editModal.addEventListener("click", (e) => {
-    if (e.target === el.editModal) chaptersApi.hideModal();
+    if (e.target === el.editModal) entriesApi.hideModal();
   });
 }
 

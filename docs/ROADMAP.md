@@ -8,7 +8,7 @@ Use it as a living checklist. Mark items as you complete them.
 - Keep notes next to any item that needs follow-up.
 - Each phase has clear exit criteria. Do not move on until those are met.
 
-Last updated: 2026-01-13
+Last updated: 2026-01-16
 
 ## Phase 1 - Lock the Machine (stability + data safety)
 Goal: the platform runs clean, stable, and predictable.
@@ -19,6 +19,7 @@ Goal: the platform runs clean, stable, and predictable.
 - [ ] Add/confirm lint + format scripts in `package.json` and backend tooling. *(ESLint clean for admin/reader; backend install still needed)*
 - [x] JS lint passes for `admin/` + `reader/`. *(`npm run lint` clean 2026-01-13)*
 - [x] JS test suite passes. *(`npm test` clean 2026-01-13)*
+- [x] Legacy "chapter" cleanup plan documented. *(`docs/LEGACY_CHAPTER_CLEANUP.md`)*
 
 ### Data safety + integrity
 - [ ] Verify migrations align with live schema (`backend/alembic/`, `backend/app/models.py`). *(Needs DB check vs alembic head)*

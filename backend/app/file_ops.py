@@ -29,7 +29,7 @@ def extract_numbers(filename: str) -> int:
 def renumber_files(chapter_folder: str, order: list[str]) -> list[str]:
     chapter_folder = (chapter_folder or "").strip().strip("/")
     if not chapter_folder or not order:
-        raise ValueError("chapterFolder and non-empty order are required")
+        raise ValueError("entryFolder and non-empty order are required")
 
     target_dir = safe_path(chapter_folder)
     target_dir.mkdir(parents=True, exist_ok=True)

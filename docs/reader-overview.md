@@ -9,7 +9,7 @@ This document summarizes how the reader portion of the site is organized, what e
 ## Modules
 - `reader/config.js` — Tunables for layout/zoom, keyboard settings, debounce intervals; includes `TWO_PAGE_ASPECT_RATIO` (0.714).
 - `reader/data.js` — Fetches entries/media/posts, normalizes JSON, and provides simple caching helpers.
-- `reader/chapters.js` — Entry navigation helpers (next/prev resolution, slug/name mapping, index clamping).
+- `reader/entries.js` — Entry navigation helpers (next/prev resolution, slug/name mapping, index clamping).
 - `reader/state.js` — Central mutable state (entry, page, zoom, layout, overlays). Persists progress via `localStorage` and is resilient to storage errors.
 - `reader/dom.js` — Cached DOM lookups and small helper methods to avoid repeated queries.
 - `reader/render.js` — Draws the current page(s) (single/two-page), handles preloading, sizing logic, skeleton/empty states.

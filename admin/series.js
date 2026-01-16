@@ -4,7 +4,7 @@ import { DEFAULT_SERIES_ID, ACTIVE_SERIES_KEY, state } from "./state.js";
 import { saveToServer } from "./core.js";
 
 function createSeriesManager() {
-  let chaptersApi = null;
+  let entriesApi = null;
   let setDesignerFrameSrc = null;
   let showChaptersSection = null;
   let seriesModalMode = "edit";
@@ -13,11 +13,11 @@ function createSeriesManager() {
   let seriesModalLabelsTouched = false;
 
   function bindDependencies({
-    chaptersApi: nextChaptersApi,
+    entriesApi: nextEntriesApi,
     setDesignerFrameSrc: nextSetDesignerFrameSrc,
     showChaptersSection: nextShowChaptersSection,
   } = {}) {
-    if (nextChaptersApi) chaptersApi = nextChaptersApi;
+    if (nextEntriesApi) entriesApi = nextEntriesApi;
     if (nextSetDesignerFrameSrc) setDesignerFrameSrc = nextSetDesignerFrameSrc;
     if (nextShowChaptersSection) showChaptersSection = nextShowChaptersSection;
   }
@@ -355,7 +355,7 @@ function createSeriesManager() {
 
   async function switchSeries(nextIdRaw) {
     // Swap active series and reload DB data + UI labels.
-    if (!chaptersApi) return;
+    if (!entriesApi) return;
     const nextId = sanitizeSeriesId(nextIdRaw) || DEFAULT_SERIES_ID;
     if (nextId === getActiveSeriesId()) return;
 
@@ -373,9 +373,9 @@ function createSeriesManager() {
     state.activeSeriesId = nextId;
     localStorage.setItem(ACTIVE_SERIES_KEY, nextId);
 
-    await chaptersApi.loadChapters();
-    chaptersApi.renderStatusMessageInput();
-    chaptersApi.renderChapterList();
+    await entriesApi.loadChapters();
+    entriesApi.renderStatusMessageInput();
+    entriesApi.renderChapterList();
     applyUnitLabels();
     updateSeriesLinks();
     if (
@@ -390,7 +390,7 @@ function createSeriesManager() {
 
   async function createNewSeriesPrompt() {
     // Create a new series index entry plus empty DB-backed data + page config.
-    if (!chaptersApi) return;
+    if (!entriesApi) return;
     const rawId = prompt("New series ID (letters/numbers/-/_):");
     const id = sanitizeSeriesId(rawId);
     if (!id) return;
@@ -465,10 +465,10 @@ function createSeriesManager() {
     await saveToServer(pageConfigFile, pageConfig);
 
     // Create the series chapters root folder so uploads work immediately.
-    await fetch("/api/create-chapter", {
+    await fetch("/api/create-entry", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chapterFolder: `comics/${id}/entries` }),
+      body: JSON.stringify({ entryFolder: `comics/${id}/entries` }),
     }).catch(() => {});
 
     state.seriesIndex = nextIndex;
@@ -479,7 +479,7 @@ function createSeriesManager() {
   }
 
   async function editActiveSeriesPrompt() {
-    if (!chaptersApi) return;
+    if (!entriesApi) return;
     const id = getActiveSeriesId();
     const seriesList = state.seriesIndex.series || [];
     const current = seriesList.find((s) => s && s.id === id);
@@ -552,7 +552,7 @@ function createSeriesManager() {
     // Keep the series' data.json flag in sync so the reader can enforce it.
     state.premiumOnly = premiumOnly;
     try {
-      await chaptersApi.saveChapters(false);
+      await entriesApi.saveChapters(false);
     } catch (e) {
       console.warn("Failed to persist premiumOnly to data file:", e);
     }
@@ -565,7 +565,7 @@ function createSeriesManager() {
 
   async function handleSeriesModalSubmit(event) {
     event.preventDefault();
-    if (!chaptersApi) return;
+    if (!entriesApi) return;
     const {
       idInput,
       titleInput,
@@ -673,10 +673,10 @@ function createSeriesManager() {
         });
         await saveToServer(pageConfigFile, pageConfig);
 
-        await fetch("/api/create-chapter", {
+        await fetch("/api/create-entry", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ chapterFolder: `comics/${id}/entries` }),
+          body: JSON.stringify({ entryFolder: `comics/${id}/entries` }),
         }).catch(() => {});
 
         state.seriesIndex = nextIndex;
@@ -711,7 +711,7 @@ function createSeriesManager() {
 
         state.premiumOnly = premiumOnlyValue;
         try {
-          await chaptersApi.saveChapters(false);
+          await entriesApi.saveChapters(false);
         } catch (e) {
           console.warn("Failed to persist premiumOnly to data file:", e);
         }
@@ -731,7 +731,7 @@ function createSeriesManager() {
   }
 
   async function handleSeriesModalDelete() {
-    if (!chaptersApi) return;
+    if (!entriesApi) return;
     const { deleteBtn } = getSeriesModalElements();
     const id = sanitizeSeriesId(seriesModalEditingId || "");
     if (!id) {

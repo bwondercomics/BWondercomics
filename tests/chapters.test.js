@@ -8,7 +8,7 @@ import {
     sortChapterNames,
     sortChapterNamesWithMeta,
     sanitizeChapters
-} from '../reader/chapters.js';
+} from '../reader/entries.js';
 
 describe('extractChapterNumber', () => {
     it('should extract chapter number from standard format', () => {

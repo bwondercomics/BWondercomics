@@ -3,7 +3,7 @@
  * Handles fetching and parsing chapter data, page config, and latest posts
  */
 
-import { sanitizeChapters, sortChapterNamesWithMeta } from './chapters.js';
+import { sanitizeChapters, sortChapterNamesWithMeta } from './entries.js';
 import { getSeriesDataPath, getSeriesPageConfigPath } from './series.js';
 import { logger } from './logger.js';
 
@@ -19,7 +19,7 @@ export async function loadChapterData(seriesId) {
     const dataPath = getSeriesDataPath(seriesId);
     const response = await fetch(dataPath, { cache: 'no-store' });
     if (!response.ok) {
-      throw new Error(`Failed to load chapter data: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to load entry data: ${response.status} ${response.statusText}`);
     }
     const data = await response.json();
 

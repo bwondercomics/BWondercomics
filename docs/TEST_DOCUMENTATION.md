@@ -60,7 +60,7 @@ tests/
 ## chapters.test.js
 
 **File:** `tests/chapters.test.js`  
-**Covers:** `reader/chapters.js`
+**Covers:** `reader/entries.js`
 
 ### Test Suites
 

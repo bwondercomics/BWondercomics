@@ -304,51 +304,51 @@ def save_file(payload: SaveRequest, request: Request, db: Session = Depends(get_
     return {"status": "success", "message": f"Saved {filename}"}
 
 
-class CreateChapterRequest(BaseModel):
+class CreateEntryRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    chapter_folder: str = Field(alias="chapterFolder")
+    entry_folder: str = Field(alias="entryFolder")
 
 
-@router.post("/api/create-chapter")
-def create_chapter(payload: CreateChapterRequest, request: Request, db: Session = Depends(get_db)):
+@router.post("/api/create-entry")
+def create_entry(payload: CreateEntryRequest, request: Request, db: Session = Depends(get_db)):
     if not _require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    chapter_folder = (payload.chapter_folder or "").strip().strip("/")
-    if not chapter_folder:
-        return JSONResponse(status_code=400, content={"error": "chapterFolder is required"})
+    entry_folder = (payload.entry_folder or "").strip().strip("/")
+    if not entry_folder:
+        return JSONResponse(status_code=400, content={"error": "entryFolder is required"})
 
     try:
-        dest_dir = safe_path(chapter_folder)
+        dest_dir = safe_path(entry_folder)
         dest_dir.mkdir(parents=True, exist_ok=True)
     except ValueError:
-        return JSONResponse(status_code=400, content={"error": "Invalid chapter path"})
+        return JSONResponse(status_code=400, content={"error": "Invalid entry path"})
     except Exception as exc:
         return JSONResponse(status_code=500, content={"error": str(exc)})
 
-    return {"status": "ok", "folder": chapter_folder}
+    return {"status": "ok", "folder": entry_folder}
 
 
-class ListImagesRequest(BaseModel):
+class ListEntryImagesRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    chapter_folder: str = Field(alias="chapterFolder")
+    entry_folder: str = Field(alias="entryFolder")
 
 
-@router.post("/api/list-images")
-def list_images(payload: ListImagesRequest, request: Request, db: Session = Depends(get_db)):
+@router.post("/api/list-entry-images")
+def list_entry_images(payload: ListEntryImagesRequest, request: Request, db: Session = Depends(get_db)):
     if not _require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    chapter_folder = (payload.chapter_folder or "").strip().strip("/")
-    if not chapter_folder:
-        return JSONResponse(status_code=400, content={"error": "chapterFolder is required"})
+    entry_folder = (payload.entry_folder or "").strip().strip("/")
+    if not entry_folder:
+        return JSONResponse(status_code=400, content={"error": "entryFolder is required"})
 
     try:
-        target_dir = safe_path(chapter_folder)
+        target_dir = safe_path(entry_folder)
     except ValueError:
-        return JSONResponse(status_code=400, content={"error": "Invalid chapter path"})
+        return JSONResponse(status_code=400, content={"error": "Invalid entry path"})
 
     if not target_dir.exists():
         return {"paths": []}
@@ -367,28 +367,28 @@ class UploadImageFile(BaseModel):
     data: str
 
 
-class UploadImagesRequest(BaseModel):
+class UploadEntryImagesRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    chapter_folder: str = Field(alias="chapterFolder")
+    entry_folder: str = Field(alias="entryFolder")
     files: list[UploadImageFile]
 
 
-@router.post("/api/upload-images")
-def upload_images(payload: UploadImagesRequest, request: Request, db: Session = Depends(get_db)):
+@router.post("/api/upload-entry-images")
+def upload_entry_images(payload: UploadEntryImagesRequest, request: Request, db: Session = Depends(get_db)):
     if not _require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    chapter_folder = (payload.chapter_folder or "").strip().strip("/")
+    entry_folder = (payload.entry_folder or "").strip().strip("/")
     files = payload.files or []
 
-    if not chapter_folder or not isinstance(files, list):
-        return JSONResponse(status_code=400, content={"error": "chapterFolder and files are required"})
+    if not entry_folder or not isinstance(files, list):
+        return JSONResponse(status_code=400, content={"error": "entryFolder and files are required"})
 
     try:
-        dest_dir = safe_path(chapter_folder)
+        dest_dir = safe_path(entry_folder)
     except ValueError:
-        return JSONResponse(status_code=400, content={"error": "Invalid chapter path"})
+        return JSONResponse(status_code=400, content={"error": "Invalid entry path"})
 
     dest_dir.mkdir(parents=True, exist_ok=True)
 
@@ -426,7 +426,7 @@ def upload_images(payload: UploadImagesRequest, request: Request, db: Session = 
 
         try:
             (dest_dir / new_name).write_bytes(raw)
-            stored_paths.append(f"{chapter_folder}/{new_name}")
+            stored_paths.append(f"{entry_folder}/{new_name}")
         except Exception as exc:
             errors.append({"file": name, "error": str(exc)})
 
@@ -584,35 +584,33 @@ def copy_path(payload: CopyPathRequest, request: Request, db: Session = Depends(
     return {"status": "copied", "from": src, "to": dest}
 
 
-class RenumberChapterRequest(BaseModel):
+class RenumberEntryRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    chapter_folder: str = Field(alias="chapterFolder")
+    entry_folder: str = Field(alias="entryFolder")
     order: list[str]
 
 
-@router.post("/api/renumber-chapter")
-def renumber_chapter(payload: RenumberChapterRequest, request: Request, db: Session = Depends(get_db)):
+@router.post("/api/renumber-entry")
+def renumber_entry(payload: RenumberEntryRequest, request: Request, db: Session = Depends(get_db)):
     if not _require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    chapter_folder = (payload.chapter_folder or "").strip().strip("/")
+    entry_folder = (payload.entry_folder or "").strip().strip("/")
     order = payload.order or []
-    if not chapter_folder or not isinstance(order, list) or not order:
+    if not entry_folder or not isinstance(order, list) or not order:
         return JSONResponse(
             status_code=400,
-            content={"error": "chapterFolder and non-empty order are required"},
+            content={"error": "entryFolder and non-empty order are required"},
         )
 
     try:
-        new_paths = renumber_files(chapter_folder, order)
+        new_paths = renumber_files(entry_folder, order)
     except FileNotFoundError as exc:
         return JSONResponse(status_code=404, content={"error": str(exc)})
     except ValueError as exc:
         message = str(exc)
         if message.startswith("Unsupported file type"):
-            return JSONResponse(status_code=400, content={"error": message})
-        if message.startswith("chapterFolder"):
             return JSONResponse(status_code=400, content={"error": message})
         return JSONResponse(status_code=400, content={"error": message})
     except Exception as exc:

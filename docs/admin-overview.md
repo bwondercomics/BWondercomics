@@ -9,8 +9,8 @@ This document covers the admin panel (content editor) architecture, data flow, a
 
 ## Feature Areas
 - Auth/session: Uses the site's account system (`/api/login`, `/api/session`) and requires an `admin` role.
-- Entry management (chapters/issues/etc): Load/save entries; add/edit/delete; reconcile pages with disk via `/api/list-images`; reorder pages (drag/drop and up/down); renumber flow with confirmation; premium/private handling moves pages into `protected/`.
-- Page ops: Add/remove pages; ensure entry folder creation via `/api/create-chapter`; delete images via `/api/delete-image`; move/copy files with `/api/move-path` + `/api/copy-path`.
+- Entry management (issues/etc): Load/save entries; add/edit/delete; reconcile pages with disk via `/api/list-entry-images`; reorder pages (drag/drop and up/down); renumber flow with confirmation; premium/private handling moves pages into `protected/`.
+- Page ops: Add/remove pages; ensure entry folder creation via `/api/create-entry`; delete images via `/api/delete-image`; move/copy files with `/api/move-path` + `/api/copy-path`.
 - Status message: Editable site-wide status stored with entry payload.
 - Blog/updates: CRUD for posts via the DB-backed API (`/api/admin/posts`), with draft/scheduled/published and a “publish date/time” field.
 - Media library: Load/save `/media.json` (DB-backed); search/filter by tags/path; sync with disk via `/api/list-media`; apply media to posts; tag propagation from posts; per-item access (`public`/`premium`/`private`) and premium visibility (`blur`/`hidden`). Premium/private items are stored under `protected/media/`. Post images may be copied to `media/post-assets/` automatically; that folder is derived and excluded from media sync. Blurred previews live at `media/previews/` and are excluded from the admin list; the preview panel shows both the original and public preview.
@@ -25,7 +25,7 @@ This document covers the admin panel (content editor) architecture, data flow, a
   - Series index (DB): `/api/save` for `admin/series.json` writes to Postgres (no disk write).
   - Media (DB): `/api/save` for `media.json`
   - Posts (DB): `/api/admin/posts` (create/update/delete)
-  - Files/folders: `/api/create-chapter`, `/api/delete-image`, `/api/list-images`, `/api/list-media`, `/api/move-path`, `/api/copy-path`
+  - Files/folders: `/api/create-entry`, `/api/delete-image`, `/api/list-entry-images`, `/api/list-media`, `/api/move-path`, `/api/copy-path`
 - Local cache: `localStorage` (`STORAGE_KEY`) for draft entries/status.
 
 ## Runtime Flow (High Level)
@@ -51,13 +51,13 @@ flowchart TD
 ### Entry Edit/Save Flow
 ```mermaid
 flowchart LR
-  X[Open edit modal] --> Y[reconcile pages with /api/list-images]
+  X[Open edit modal] --> Y[reconcile pages with /api/list-entry-images]
   Y --> Z[render page list (drag/drop + up/down)]
   Z --> W{rename entry?}
   W -- yes --> M[remap folder mapping; delete old name]
   W -- no --> N[keep folder mapping]
   M --> O
-  N --> O[ensure entry folder via /api/create-chapter]
+  N --> O[ensure entry folder via /api/create-entry]
   O --> P[save entries draft to localStorage]
   P --> Q[POST admin/data.json via /api/save]
   Q --> R[refresh entry list + clear unsaved]

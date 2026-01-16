@@ -315,14 +315,14 @@
       const data = await res.json().catch(() => null);
       if (!data || typeof data !== 'object') return null;
 
-      const chapters = (data.chapters && typeof data.chapters === 'object') ? data.chapters : {};
-      const chapterMeta = (data.chapterMeta && typeof data.chapterMeta === 'object') ? data.chapterMeta : {};
+      const entries = (data.entries && typeof data.entries === 'object') ? data.entries : {};
+      const entryMeta = (data.entryMeta && typeof data.entryMeta === 'object') ? data.entryMeta : {};
 
-      for (const [chapterName, pages] of Object.entries(chapters)) {
+      for (const [entryName, pages] of Object.entries(entries)) {
         if (!Array.isArray(pages) || pages.length === 0) continue;
-        const meta = chapterMeta[chapterName];
-        const isPremiumChapter = !!(meta && typeof meta === 'object' && meta.premium);
-        if (isPremiumChapter && !premium) continue;
+        const meta = entryMeta[entryName];
+        const isPremiumEntry = !!(meta && typeof meta === 'object' && meta.premium);
+        if (isPremiumEntry && !premium) continue;
 
         const first = pages.find((p) => typeof p === 'string' && p.trim());
         const cover = normalizeCoverUrl(first);
@@ -332,7 +332,7 @@
       return null;
     }
 
-    // Prefer configured covers, otherwise infer from chapter data.
+    // Prefer configured covers, otherwise infer from entry data.
     async function resolveCover(series, opts) {
       const configured = normalizeCoverUrl(series.coverImage || series.cover || '');
       if (configured) return configured;
