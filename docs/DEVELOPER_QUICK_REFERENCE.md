@@ -115,13 +115,13 @@ function handlePageChange(direction) {
 #### ❌ **Duplicate Code**
 ```javascript
 // BAD - repeated logic
-function loadChapter1() {
+function loadSeries1() {
     showLoading();
-    fetch('/api/chapter1')
+    fetch('/series/battle-bros/data.json')
         .then(r => r.json())
         .then(data => {
             hideLoading();
-            renderChapter(data);
+            renderSeries(data);
         })
         .catch(err => {
             hideLoading();
@@ -129,13 +129,13 @@ function loadChapter1() {
         });
 }
 
-function loadChapter2() {
+function loadSeries2() {
     showLoading();
-    fetch('/api/chapter2')
+    fetch('/series/another-series/data.json')
         .then(r => r.json())
         .then(data => {
             hideLoading();
-            renderChapter(data);
+            renderSeries(data);
         })
         .catch(err => {
             hideLoading();
@@ -144,12 +144,12 @@ function loadChapter2() {
 }
 
 // GOOD - extracted common pattern
-async function loadChapter(chapterId) {
+async function loadSeries(seriesId) {
     showLoading();
     try {
-        const response = await fetch(`/api/chapter${chapterId}`);
+        const response = await fetch(`/series/${seriesId}/data.json`);
         const data = await response.json();
-        renderChapter(data);
+        renderSeries(data);
     } catch (err) {
         showError(err);
     } finally {

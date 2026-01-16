@@ -14,6 +14,7 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
 
   const ACCESS_OPTIONS = ["public", "premium", "private"];
   const PREMIUM_VISIBILITY_OPTIONS = ["blur", "hidden"];
+  const POST_ASSET_ROOT = "media/post-assets";
 
   function normalizeAccess(raw, fallbackPublic = true) {
     const value = String(raw || "").trim().toLowerCase();
@@ -45,6 +46,21 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
     return `protected/${clean}`;
   }
 
+  function getPathExtension(path = "") {
+    const match = String(path || "").match(/(\.[a-zA-Z0-9]+)$/);
+    return match ? match[1].toLowerCase() : "";
+  }
+
+  function getPostAssetPath(item, sourcePath = "") {
+    const ext = getPathExtension(sourcePath || item?.path);
+    const suffix = ext || ".png";
+    return `${POST_ASSET_ROOT}/${item.id}${suffix}`;
+  }
+
+  function getPostAssetPrefix(item) {
+    return `${POST_ASSET_ROOT}/${item.id}.`;
+  }
+
   function resolveMediaSrc(path = "") {
     if (!path) return "";
     if (/^https?:\/\//i.test(path)) return path;
@@ -56,11 +72,91 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
     return `/${path}`;
   }
 
+  function resolvePreviewSrc(item) {
+    const id = String(item?.id || "").trim();
+    if (!id) return "";
+    return `/media/previews/${encodeURIComponent(id)}.jpg`;
+  }
+
+  function getPostsUsingMedia(item) {
+    const prefix = getPostAssetPrefix(item);
+    return (state.posts || []).filter((post) => {
+      const image = post?.image || "";
+      return image === item.path || (prefix && image.startsWith(prefix));
+    });
+  }
+
+  async function updatePostImage(post, imagePath) {
+    if (!post || !post.id) return;
+    const payload = {
+      title: post.title || "Update",
+      content: post.content || "",
+      image: imagePath,
+      imageTags: Array.isArray(post.imageTags) ? post.imageTags : parseTags(post.imageTags || ""),
+      imageFocus: post.imageFocus || "center",
+      share: post.share !== false,
+      shareBluesky: post.shareBluesky === true,
+      status: post.status || "published",
+      date: post.date || null,
+    };
+    const response = await fetch(`/api/admin/posts/${encodeURIComponent(post.id)}`, {
+      method: "PUT",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(result.error || "Failed to update post image");
+    }
+    const saved = result.post || null;
+    if (saved) {
+      const idx = state.posts.findIndex((p) => p.id === saved.id);
+      if (idx !== -1) {
+        state.posts[idx] = {
+          ...saved,
+          status: saved.status || "published",
+          imageFocus: saved.imageFocus || "center",
+          share: saved.share !== false,
+          shareBluesky: saved.shareBluesky === true,
+          imageTags: Array.isArray(saved.imageTags)
+            ? saved.imageTags
+            : parseTags(saved.imageTags || ""),
+        };
+      }
+    }
+  }
+
+  async function ensurePostAsset(item, sourcePath, postsUsing) {
+    if (!item || !sourcePath || !postsUsing?.length) return;
+    const destPath = getPostAssetPath(item, sourcePath);
+    const resp = await fetch("/api/copy-path", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ from: sourcePath, to: destPath }),
+    });
+    if (!resp.ok) {
+      const result = await resp.json().catch(() => ({}));
+      throw new Error(result.error || "Unable to copy post asset");
+    }
+    for (const post of postsUsing) {
+      if (post.image === destPath) continue;
+      await updatePostImage(post, destPath);
+    }
+  }
+
   function getUsageMap() {
     const usage = new Map();
     (state.posts || []).forEach((post) => {
       if (!post?.image) return;
       usage.set(post.image, (usage.get(post.image) || 0) + 1);
+      const match = post.image.match(/^media\/post-assets\/([^./]+)\./);
+      if (match) {
+        const item = state.mediaItems.find((m) => m.id === match[1]);
+        if (item?.path) {
+          usage.set(item.path, (usage.get(item.path) || 0) + 1);
+        }
+      }
     });
     return usage;
   }
@@ -94,7 +190,9 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
       if (!response.ok) throw new Error("Failed to load media library");
       const data = await response.json();
       state.mediaItems = Array.isArray(data)
-        ? data.map((m) => {
+        ? data
+            .filter((m) => m && m.path && !String(m.path).startsWith("media/previews/"))
+            .map((m) => {
           const fallbackPublic = m.public !== false;
           const access = normalizeAccess(m.access ?? m.visibility, fallbackPublic);
           const premiumVisibility = normalizePremiumVisibility(
@@ -184,6 +282,7 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
 
     const usageMap = getUsageMap();
     const filtered = state.mediaItems.filter((item) => {
+      if (String(item.path || "").startsWith("media/previews/")) return false;
       if (!term) return true;
       return (
         item.path.toLowerCase().includes(term) ||
@@ -381,6 +480,29 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
     el.mediaPreview.setAttribute("aria-hidden", "false");
     el.mediaPreviewImg.src = resolveMediaSrc(item.path);
     el.mediaPreviewImg.alt = item.path;
+    if (el.mediaPreviewBlurImg && el.mediaPreviewBlurMissing) {
+      const previewSrc = resolvePreviewSrc(item);
+      el.mediaPreviewBlurMissing.style.display = "none";
+      el.mediaPreviewBlurImg.style.display = "block";
+      if (!previewSrc) {
+        el.mediaPreviewBlurImg.removeAttribute("src");
+        el.mediaPreviewBlurImg.style.display = "none";
+        el.mediaPreviewBlurMissing.style.display = "flex";
+        el.mediaPreviewBlurMissing.textContent = "Preview missing";
+      } else {
+        el.mediaPreviewBlurImg.onerror = () => {
+          el.mediaPreviewBlurImg.style.display = "none";
+          el.mediaPreviewBlurMissing.style.display = "flex";
+          el.mediaPreviewBlurMissing.textContent = "Preview missing";
+        };
+        el.mediaPreviewBlurImg.onload = () => {
+          el.mediaPreviewBlurMissing.style.display = "none";
+          el.mediaPreviewBlurImg.style.display = "block";
+        };
+        el.mediaPreviewBlurImg.src = previewSrc;
+        el.mediaPreviewBlurImg.alt = `${item.path} preview`;
+      }
+    }
     if (el.mediaPreviewPath) el.mediaPreviewPath.textContent = item.path;
     if (el.mediaPreviewTags) el.mediaPreviewTags.textContent = `Tags: ${tagsText}`;
     if (el.mediaPreviewUsage) {
@@ -510,22 +632,16 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
         const item = state.mediaItems.find((m) => m.id === id);
         if (!item) return;
         const nextAccess = normalizeAccess(el.mediaPreviewAccess.value, true);
-        const usageCount = getUsageMap().get(item.path) || 0;
-        if (usageCount && nextAccess !== "public") {
-          const proceed = window.confirm(
-            `This image is used in ${usageCount} post(s). Locking it may hide those images for public visitors.\n\nContinue?`,
-          );
-          if (!proceed) {
-            el.mediaPreviewAccess.value = item.access || "public";
-            return;
-          }
-        }
+        const postsUsing = getPostsUsingMedia(item);
         try {
           const nextPath = await moveMediaPath(item, nextAccess);
           item.path = nextPath;
+          if (postsUsing.length) {
+            await ensurePostAsset(item, nextPath, postsUsing);
+          }
         } catch (error) {
-          console.warn("Failed to move media file:", error);
-          setMediaStatus(`Media move failed: ${error.message}`, true);
+          console.warn("Failed to update media access:", error);
+          setMediaStatus(`Media update failed: ${error.message}`, true);
           el.mediaPreviewAccess.value = item.access || "public";
           return;
         }
@@ -618,6 +734,7 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
       );
 
       diskPaths.forEach((p) => {
+        if (String(p).startsWith("media/previews/")) return;
         const inferredTags = inferTagsForPath(p);
         const postTags = normalizeTags(postTagMap.get(p));
         const existing = existingMap.get(p);
@@ -663,6 +780,8 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
 
   async function upsertMediaEntry(path, tags = []) {
     if (!path) return;
+    if (String(path).startsWith(`${POST_ASSET_ROOT}/`)) return;
+    if (String(path).startsWith("media/previews/")) return;
     const normalizedTags = normalizeTags(tags);
     const existing = state.mediaItems.find((m) => m.path === path);
     if (existing) {
@@ -696,10 +815,14 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
 
     const existing = state.mediaItems.find((m) => m.path === path);
     if (existing) {
+      const postsUsing = getPostsUsingMedia(existing);
       try {
         const nextPath = await moveMediaPath(existing, access);
         existing.path = nextPath;
         path = nextPath;
+        if (postsUsing.length) {
+          await ensurePostAsset(existing, nextPath, postsUsing);
+        }
       } catch (error) {
         console.warn("Failed to move media file:", error);
         setMediaStatus(`Media move failed: ${error.message}`, true);

@@ -19,6 +19,10 @@ namecheap-ddns.env.example
 # Battle Bros persistent server data (users/comments)
 var/
 
+# Protected premium assets (server-only)
+protected/*
+!protected/.gitkeep
+
 # Vite build output and cache
 dist/
 dist-ssr/

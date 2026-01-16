@@ -7,6 +7,7 @@ This summarizes the reader runtime after modularization: what each file does, ke
 - `page-config.json`: optional theme/content overrides + subtitles (DB-backed).
 - `/api/posts/latest`: latest update widget (DB-backed; published-only + scheduling support).
 - `localStorage` key `battleBros_progress`: saved chapter/page.
+- Entry page paths may start with `protected/`; those are requested via `/api/protected/<path>`.
 
 ## Module map
 - `reader/config.js`: constants (storage key, cache sizes, zoom steps, breakpoints, animation timings).

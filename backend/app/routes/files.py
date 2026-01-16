@@ -537,6 +537,53 @@ def move_path(payload: MovePathRequest, request: Request, db: Session = Depends(
     return {"status": "moved", "from": src, "to": dest}
 
 
+class CopyPathRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    src: str = Field(alias="from")
+    dest: str = Field(alias="to")
+    cleanup_stem: bool = Field(default=False, alias="cleanupStem")
+
+
+@router.post("/api/copy-path")
+def copy_path(payload: CopyPathRequest, request: Request, db: Session = Depends(get_db)):
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    src = (payload.src or "").strip().strip("/")
+    dest = (payload.dest or "").strip().strip("/")
+    if not src or not dest:
+        return JSONResponse(status_code=400, content={"error": "from and to are required"})
+
+    try:
+        abs_src = safe_path(src)
+        abs_dest = safe_path(dest)
+    except ValueError:
+        return JSONResponse(status_code=400, content={"error": "Invalid path"})
+
+    if not abs_src.exists():
+        return JSONResponse(status_code=404, content={"error": "Source path not found"})
+
+    abs_dest.parent.mkdir(parents=True, exist_ok=True)
+
+    if payload.cleanup_stem:
+        for candidate in abs_dest.parent.glob(f"{abs_dest.stem}.*"):
+            if candidate == abs_dest:
+                continue
+            if candidate.is_file():
+                try:
+                    candidate.unlink()
+                except Exception:
+                    continue
+
+    try:
+        shutil.copy2(str(abs_src), str(abs_dest))
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"error": str(exc)})
+
+    return {"status": "copied", "from": src, "to": dest}
+
+
 class RenumberChapterRequest(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
@@ -634,6 +681,8 @@ def list_media(request: Request, db: Session = Depends(get_db)):
             if ext in ALLOWED_IMAGE_EXTENSIONS:
                 rel = os.path.join(root, name)
                 rel_path = os.path.relpath(rel, base_dir).replace(os.sep, "/")
+                if rel_path.startswith("media/post-assets/") or rel_path.startswith("media/previews/"):
+                    continue
                 paths.append(rel_path)
 
     paths.sort()

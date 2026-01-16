@@ -4,7 +4,7 @@ This document summarizes how the reader portion of the site is organized, what e
 
 ## Entry Point and Data
 - `reader/app.js` bootstraps config/state, fetches content, wires UI handlers, and kicks off rendering.
-- Data sources: entry page images under `comics/<seriesId>/entries/`, `/data.json` / `/series/<id>/data.json` (entries + status + metadata + per-series labels), `/page-config.json` / `/series/<id>/page-config.json` (DB-backed theme/content overrides), and `/api/posts/latest` for the “latest update” widget.
+- Data sources: entry page images under `comics/<seriesId>/entries/` (public) or `protected/comics/<seriesId>/entries/` (premium/private), `/data.json` / `/series/<id>/data.json` (entries + status + metadata + per-series labels), `/page-config.json` / `/series/<id>/page-config.json` (DB-backed theme/content overrides), and `/api/posts/latest` for the “latest update” widget. Reader requests `protected/*` paths via `/api/protected/*`.
 
 ## Modules
 - `reader/config.js` — Tunables for layout/zoom, keyboard settings, debounce intervals; includes `TWO_PAGE_ASPECT_RATIO` (0.714).

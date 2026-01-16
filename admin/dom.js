@@ -155,6 +155,8 @@ export const el = {
   mediaGallery: document.getElementById('mediaGallery'),
   mediaPreview: document.getElementById('mediaPreview'),
   mediaPreviewImg: /** @type {HTMLImageElement | null} */ (document.getElementById('mediaPreviewImg')),
+  mediaPreviewBlurImg: /** @type {HTMLImageElement | null} */ (document.getElementById('mediaPreviewBlurImg')),
+  mediaPreviewBlurMissing: document.getElementById('mediaPreviewBlurMissing'),
   mediaPreviewInfo: document.getElementById('mediaPreviewInfo'),
   mediaPreviewPath: document.getElementById('mediaPreviewPath'),
   mediaPreviewTags: document.getElementById('mediaPreviewTags'),

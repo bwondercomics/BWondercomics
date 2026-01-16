@@ -4,6 +4,8 @@
 
 This document provides comprehensive documentation for the test suite of the Battle Bros comic reader. The tests ensure code quality, catch regressions, and serve as living documentation for how the code should behave.
 
+Note: "chapter" in code/tests is legacy naming for entries (issues/volumes/etc). The helpers still accept strings like "Chapter 1" because the label text is user-defined.
+
 ---
 
 ## Table of Contents
@@ -13,9 +15,10 @@ This document provides comprehensive documentation for the test suite of the Bat
 3. [chapters.test.js](#chapterstestjs)
 4. [state.test.js](#statetestjs)
 5. [render.test.js](#rendertestjs)
-6. [Running Tests](#running-tests)
-7. [Writing New Tests](#writing-new-tests)
-8. [Continuous Integration](#continuous-integration)
+6. [Additional Test Files](#additional-test-files)
+7. [Running Tests](#running-tests)
+8. [Writing New Tests](#writing-new-tests)
+9. [Continuous Integration](#continuous-integration)
 
 ---
 
@@ -39,21 +42,25 @@ This document provides comprehensive documentation for the test suite of the Bat
 ```
 tests/
 ├── setup.js              # Test environment configuration
-├── chapters.test.js      # Chapter utility function tests (15 tests)
-├── state.test.js         # State management tests (11 tests)
-├── render.test.js        # Rendering logic tests (10 tests)
-└── README.md            # Testing guide
+├── chapters.test.js      # Entry/chapter helper tests
+├── state.test.js         # Reader state persistence tests
+├── render.test.js        # Rendering logic tests
+├── data.test.js          # reader/data.js loader tests
+├── series.test.js        # reader/series.js helper tests
+├── comment-targets.test.js # Comment target ID helpers
+├── utils.test.js         # admin/utils.js helper tests
+├── admin-smoke.test.js   # Admin UI smoke tests (happy-dom)
+└── README.md             # Testing guide
 ```
 
-**Total Test Coverage:** 36 automated tests
+**Test counts change over time.** Run `npm test` for current totals.
 
 ---
 
 ## chapters.test.js
 
-**File:** [tests/chapters.test.js](file:///c:/Users/dbmel/battle-bros-reader-dev/tests/chapters.test.js)  
-**Tests:** 15  
-**Coverage:** 100% of `reader/chapters.js`
+**File:** `tests/chapters.test.js`  
+**Covers:** `reader/chapters.js`
 
 ### Test Suites
 
@@ -138,7 +145,7 @@ expect(input).toEqual(original);
 
 ---
 
-#### `sanitizeChapters` (6 tests)
+#### `sanitizeChapters` (7 tests)
 
 Tests the data normalization and validation logic for chapter data.
 
@@ -155,7 +162,7 @@ expect(result.order).toEqual(['Chapter 1', 'Chapter 2']);
 ```
 **Purpose:** Verifies basic normalization and order creation
 
-##### Test: "should filter out empty page arrays"
+##### Test: "should drop empty entries without meta flags"
 ```javascript
 const input = {
   'Chapter 1': ['page1.png'],
@@ -165,9 +172,24 @@ const input = {
 const result = sanitizeChapters(input);
 
 expect(result.chapters['Chapter 1']).toEqual(['page1.png']);
+expect(result.chapters['Empty Chapter']).toBeUndefined();
+expect(result.chapters['Chapter 2']).toEqual(['page1.png']);
+```
+**Purpose:** Empty entries are removed unless metadata says they should be kept
+
+##### Test: "should keep empty entries with gallery or dropdown flags"
+```javascript
+const input = {
+  'Empty Chapter': []
+};
+const meta = {
+  'Empty Chapter': { showInGallery: true }
+};
+const result = sanitizeChapters(input, meta);
+
 expect(result.chapters['Empty Chapter']).toEqual([]);
 ```
-**Purpose:** Ensures empty chapters are preserved (not removed) but normalized
+**Purpose:** Empty entries can be preserved when flagged for gallery or dropdown display
 
 ##### Test: "should trim whitespace from chapter names"
 ```javascript
@@ -216,11 +238,46 @@ expect(result.order).toEqual(['Chapter 1', 'Chapter 2', 'Chapter 10']);
 
 ---
 
+#### `sortChapterNamesWithMeta` (2 tests)
+
+Tests sorting with displayNumber metadata when available.
+
+##### Test: "should sort by displayNumber when available"
+```javascript
+const names = ['Start Here', 'Issue 10', 'Issue 2'];
+const meta = {
+  'Start Here': { displayNumber: 1 },
+  'Issue 2': { displayNumber: 2 },
+  'Issue 10': { displayNumber: 10 }
+};
+
+expect(sortChapterNamesWithMeta(names, meta)).toEqual([
+  'Start Here',
+  'Issue 2',
+  'Issue 10'
+]);
+```
+**Purpose:** Uses displayNumber as the primary sort when present
+
+##### Test: "should fall back to name sorting when displayNumber missing"
+```javascript
+const names = ['Bonus', 'Issue 2', 'Issue 10'];
+const meta = { 'Issue 10': { displayNumber: 10 } };
+
+expect(sortChapterNamesWithMeta(names, meta)).toEqual([
+  'Issue 10',
+  'Issue 2',
+  'Bonus'
+]);
+```
+**Purpose:** Falls back to name sorting when metadata is incomplete
+
+---
+
 ## state.test.js
 
-**File:** [tests/state.test.js](file:///c:/Users/dbmel/battle-bros-reader-dev/tests/state.test.js)  
-**Tests:** 11  
-**Coverage:** 100% of `reader/state.js`
+**File:** `tests/state.test.js`
+**Covers:** `reader/state.js`
 
 ### Test Suites
 
@@ -378,9 +435,8 @@ localStorage.getItem = originalGetItem;
 
 ## render.test.js
 
-**File:** [tests/render.test.js](file:///c:/Users/dbmel/battle-bros-reader-dev/tests/render.test.js)  
-**Tests:** 10  
-**Coverage:** Core rendering logic
+**File:** `tests/render.test.js`
+**Covers:** core rendering logic
 
 ### Test Suites
 
@@ -483,6 +539,16 @@ expect(canShowTwoPages()).toBe(false);
 
 ---
 
+## Additional Test Files
+
+- `tests/data.test.js` — `reader/data.js` loaders (entry normalization, error handling, subtitles).
+- `tests/utils.test.js` — `admin/utils.js` helpers (tag parsing, page sorting, media IDs, folder sanitizing).
+- `tests/series.test.js` — `reader/series.js` helpers (series ID normalization and data/config paths).
+- `tests/comment-targets.test.js` — comment target ID helpers (`entry-*` and `post:*`).
+- `tests/admin-smoke.test.js` — admin UI smoke coverage in happy-dom (boot + basic post/entry flows).
+
+---
+
 ## Running Tests
 
 ### Prerequisites
@@ -492,7 +558,7 @@ expect(canShowTwoPages()).toBe(false);
 ### Installation
 
 ```bash
-cd c:\Users\dbmel\battle-bros-reader-dev
+cd /srv/bw-quality
 npm install
 ```
 
@@ -508,25 +574,22 @@ This installs:
 npm test
 ```
 
-**Output:**
+**Output (example; counts vary):**
 ```
-✓ tests/chapters.test.js (15)
-  ✓ extractChapterNumber (4)
-  ✓ sortChapterNames (5)
-  ✓ sanitizeChapters (6)
-✓ tests/state.test.js (11)
-  ✓ state object (3)
-  ✓ saveProgress (4)
-  ✓ loadProgress (4)
-✓ tests/render.test.js (10)
-  ✓ isTwoPageMode (6)
-  ✓ canShowTwoPages (4)
+ RUN  v1.0.4 /srv/bw-quality
 
-Test Files  3 passed (3)
-     Tests  36 passed (36)
-  Start at  05:26:11
-  Duration  234ms
+ ✓ tests/chapters.test.js
+ ✓ tests/state.test.js
+ ✓ tests/render.test.js
+ ✓ tests/data.test.js
+ ✓ tests/utils.test.js
+ ✓ tests/series.test.js
+ ✓ tests/comment-targets.test.js
+ ✓ tests/admin-smoke.test.js
+
+Test Files  8 passed (8)
 ```
+
 
 #### Watch mode (re-runs on file changes)
 ```bash
@@ -680,10 +743,9 @@ jobs:
 
 | Metric | Value |
 |--------|-------|
-| **Total Tests** | 36 |
-| **Test Files** | 3 |
-| **Coverage** | High (100% of tested modules) |
-| **Execution Time** | ~200-300ms |
+| **Total Tests** | Run `npm test` for current totals |
+| **Test Files** | 8 |
+| **Coverage** | Focused unit + smoke coverage |
 | **Framework** | Vitest 1.0.4 |
 
 ---
@@ -694,8 +756,8 @@ Consider adding tests for:
 
 ### High Priority
 - **pointer.js** - Touch/pan/zoom gesture handling (complex logic)
-- **data.js** - Async data loading with mocked fetch
 - **transform.js** - Zoom calculation edge cases
+- **data.js** - Expand edge case coverage (bad payloads, timeouts)
 
 ### Medium Priority
 - **fullscreen.js** - Fullscreen mode transitions
@@ -711,7 +773,7 @@ Consider adding tests for:
 ## Troubleshooting
 
 ### Tests fail with "Cannot find module"
-**Solution:** Ensure you're using Node.js 16+ with ES modules support
+**Solution:** Ensure you're using Node.js 18+ with ES modules support
 
 ### localStorage is undefined
 **Solution:** Tests use the mock in `tests/setup.js` - ensure it's loaded
@@ -736,10 +798,10 @@ Consider adding tests for:
 
 The Battle Bros reader test suite provides:
 
-✅ **Comprehensive coverage** of critical utility functions  
-✅ **Fast execution** with Vitest (~200ms for 36 tests)  
+✅ **Focused coverage** of reader + admin helpers  
+✅ **Fast execution** with Vitest (timing varies by machine)  
 ✅ **Living documentation** showing how code should behave  
-✅ **Regression prevention** catching bugs before production  
+✅ **Regression prevention** catching common UI/data bugs  
 ✅ **Developer confidence** enabling safe refactoring  
 
-**Total:** 36 tests across 3 files ensuring code quality and reliability.
+**Totals:** Run `npm test` for current counts.

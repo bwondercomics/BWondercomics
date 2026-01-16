@@ -6,7 +6,7 @@ This guide maps the reader-side modules, their responsibilities, and how they co
 - `reader/app.js` — Composition root; wires modules together, bootstraps data load, kicks off render, and binds global events.
 - `reader/config.js` — Constants for storage keys, debounce timings, UI thresholds (e.g., two-page breakpoints), and default options.
 - `reader/dom.js` — Centralized DOM lookups; a single source of element references used across modules.
-- `reader/data.js` — Fetches `/data.json` (or `/series/<id>/data.json`), `/page-config.json` (DB-backed), and `/api/posts/latest`; normalizes entry metadata and page-config overrides.
+- `reader/data.js` — Fetches `/data.json` (or `/series/<id>/data.json`), `/page-config.json` (DB-backed), and `/api/posts/latest`; normalizes entry metadata, page-config overrides, and maps `protected/*` asset paths to `/api/protected/*`.
 - `reader/state.js` — Single state container: current entry/page, zoom, fit mode, progress persistence (localStorage), and derived helpers (e.g., `isTwoPageMode`).
 - `reader/render.js` — Renders pages into the stage, applies fit/zoom transforms, preloads images, and updates UI labels/buttons.
 - `reader/controls.js` — Keyboard and click navigation (prev/next, first/last, toggle two-page, reset zoom, fullscreen), debounce helpers, and guard rails when zoomed.
@@ -42,6 +42,7 @@ flowchart TD
   - Emits derived values used by render (e.g., `getVisiblePages`).
 - **render.js**
   - Computes the visible page(s), resolves URLs relative to `comics/<seriesId>/entries/`.
+  - If a page path starts with `protected/`, it is requested via `/api/protected/<path>`.
   - Applies transform (scale + translate) based on `state` and `transform` helpers.
   - Preloads neighbor pages for snappier navigation.
   - Updates UI affordances: prev/next disabled states, page label, status text.
@@ -67,7 +68,7 @@ flowchart TD
 ## Data Sources
 - `data.json` — Entries, entryFolders, statusMessage.
 - `/api/posts/latest` — DB-backed latest blog post for the “Latest update” widget.
-- `admin/page-config.json` — Optional theming, header/panel content, button list, and layout ordering (DB-backed).
+- `/page-config.json` (and `/series/<id>/page-config.json`) — Optional theming, header/panel content, button list, and layout ordering (DB-backed).
 - `localStorage` — Reading progress (`battleBros_progress` via `config`).
 
 ## Persistence & Progress
@@ -83,10 +84,10 @@ flowchart TD
   - Entry sorting and normalization
 
 ## Common Extension Points
-- Add a new header button: extend `admin/page-config.json` buttons; `customization.js` renders them at startup.
-- Change theme/branding: adjust `admin/page-config.json` theme vars; `customization.js` applies to CSS variables.
+- Add a new header button: edit page config in admin (stored in DB and served at `/page-config.json`); `customization.js` renders them at startup.
+- Change theme/branding: edit page config in admin (theme vars stored in DB); `customization.js` applies to CSS variables.
 
 ## Gotchas / Notes
 - Admin auth is minimal; reader fetches data anonymously. Ensure `data.json` and assets are publicly readable on your host.
-- Image paths must live under `comics/<seriesId>/entries/` (or be absolute URLs) for the preview/reader to resolve them.
+- Image paths must live under `comics/<seriesId>/entries/`, `protected/comics/<seriesId>/entries/`, or be absolute URLs for the preview/reader to resolve them.
 - Double-check `statusMessage`: shown both on the reader ticker and in admin; comes from `data.json`.

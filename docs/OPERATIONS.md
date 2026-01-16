@@ -48,7 +48,13 @@ If you don’t have `make`, run the equivalent commands shown in `Makefile`.
 ### Back up everything that matters
 The project has two kinds of “state”:
 - **Database state (Postgres)**: users, comments, posts, series, entries, media index, page configs
-- **File state (on disk)**: comic page images (`comics/*/entries/`), media library files (`media/`)
+- **File state (on disk)**:
+  - Public entry pages: `comics/*/entries/`
+  - Premium/private entry pages: `protected/comics/*/entries/`
+  - Public media: `media/`
+  - Premium/private media: `protected/media/`
+  - Post copies (derived): `media/post-assets/`
+  - Premium blur previews (derived): `media/previews/`
 
 Run:
 - `make backup` (writes to `var/backups/` by default)
@@ -64,8 +70,11 @@ DB restore and file restore are destructive by nature.
   - The database name inside Postgres can differ (e.g., `bwondercomics_quality` via `BWC_DB_NAME`).
   - Volume name and database name are separate; they do not need to match.
 - Uploaded images live in the repo tree:
-  - Series pages: `comics/<seriesId>/entries/`
-- Media library files live under `media/` (index + tags are stored in Postgres).
+  - Series pages: `comics/<seriesId>/entries/` (public) or `protected/comics/<seriesId>/entries/` (premium/private)
+- Media library files live under `media/` (public) or `protected/media/` (premium/private).
+- `media/post-assets/` is derived (auto-copied post images) and should not be edited manually.
+- `media/previews/` is derived (blurred previews for premium media) and should not be edited manually.
+- `protected/` is server-only and ignored by git (tracked only via `protected/.gitkeep`).
 
 ## Frontend builds
 - Edit source files in `reader/`, `admin/`, `assets/`, and top-level HTML files.

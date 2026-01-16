@@ -11,15 +11,17 @@ This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic p
 
 ## Data sources
 - Series + entries (including per-series entry labels) + status message: Postgres (served to the frontend as DB-backed JSON at `data.json` and `series/<id>/data.json`; admin aliases still exist).
-- Entry page images: on disk under `comics/<seriesId>/entries/`.
+- Entry page images: on disk under `comics/<seriesId>/entries/` (public) or `protected/comics/<seriesId>/entries/` (premium/private).
 - Blog/feed posts: Postgres `posts` table (supports draft/scheduled/published).
 - Comments + accounts: Postgres (`users`, `comments` tables).
-- Media library: Postgres table (index + tags) with files under `media/` on disk.
+- Media library: Postgres table (index + tags) with files under `media/` (public) or `protected/media/` (premium/private). Access is tracked via `media_items.access` and `media_items.premium_visibility`.
+- Post assets: when posts use premium/private media, the API copies the image into `media/post-assets/` for public feeds.
 - Page configs: Postgres table, served at `/page-config.json` and `/series/<id>/page-config.json` (admin aliases also exist).
 
 ## Runtime routing
 - Caddy serves static pages and assets, and proxies `/api/*` + JSON endpoints to the FastAPI app.
 - FastAPI serves API routes under `/api/*` (and `/rss.xml`); it does not serve static files.
+- Protected files are served by FastAPI at `/api/protected/*` (Caddy does not serve `/protected/*` directly).
 
 ## API (current contract)
 - Series + entries (DB-backed JSON views, used by reader/admin):

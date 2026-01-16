@@ -9,23 +9,23 @@ This document covers the admin panel (content editor) architecture, data flow, a
 
 ## Feature Areas
 - Auth/session: Uses the site's account system (`/api/login`, `/api/session`) and requires an `admin` role.
-- Entry management (chapters/issues/etc): Load/save entries; add/edit/delete; reconcile pages with disk via `/api/list-images`; reorder pages (drag/drop and up/down); renumber flow with confirmation.
-- Page ops: Add/remove pages; ensure entry folder creation via `/api/create-chapter`; delete images via `/api/delete-image`.
+- Entry management (chapters/issues/etc): Load/save entries; add/edit/delete; reconcile pages with disk via `/api/list-images`; reorder pages (drag/drop and up/down); renumber flow with confirmation; premium/private handling moves pages into `protected/`.
+- Page ops: Add/remove pages; ensure entry folder creation via `/api/create-chapter`; delete images via `/api/delete-image`; move/copy files with `/api/move-path` + `/api/copy-path`.
 - Status message: Editable site-wide status stored with entry payload.
 - Blog/updates: CRUD for posts via the DB-backed API (`/api/admin/posts`), with draft/scheduled/published and a “publish date/time” field.
-- Media library: Load/save `/media.json` (DB-backed); search/filter by tags/path; sync with disk via `/api/list-media`; apply media to posts; tag propagation from posts.
+- Media library: Load/save `/media.json` (DB-backed); search/filter by tags/path; sync with disk via `/api/list-media`; apply media to posts; tag propagation from posts; per-item access (`public`/`premium`/`private`) and premium visibility (`blur`/`hidden`). Premium/private items are stored under `protected/media/`. Post images may be copied to `media/post-assets/` automatically; that folder is derived and excluded from media sync. Blurred previews live at `media/previews/` and are excluded from the admin list; the preview panel shows both the original and public preview.
 - Preview/export: Entry preview image navigation; JSON export/copy; share data assembly.
 - UI: Modals for entry edit and renumber confirmation; indicators for unsaved changes; smooth scroll to sections.
 - Series settings: Each series can set its own singular/plural label (e.g., `Issue/Issues`, `Chapter/Chapters`) stored in the DB and served at `admin/series.json`.
 
 ## Data Paths and Persistence
-- Reads: `/admin/data.json`/`/admin/series/<id>/data.json` (DB-backed JSON views for entries + folders + status), `/media.json` (DB-backed); image paths under `comics/<seriesId>/entries/`.
+- Reads: `/admin/data.json`/`/admin/series/<id>/data.json` (DB-backed JSON views for entries + folders + status), `/media.json` (DB-backed); image paths under `comics/<seriesId>/entries/` or `protected/comics/<seriesId>/entries/`.
 - Writes (server):
   - Entries (DB): `/api/save` for `admin/data.json` and `admin/series/<id>/data.json` writes to Postgres (no disk write).
   - Series index (DB): `/api/save` for `admin/series.json` writes to Postgres (no disk write).
   - Media (DB): `/api/save` for `media.json`
   - Posts (DB): `/api/admin/posts` (create/update/delete)
-  - Files/folders: `/api/create-chapter`, `/api/delete-image`, `/api/list-images`, `/api/list-media`
+  - Files/folders: `/api/create-chapter`, `/api/delete-image`, `/api/list-images`, `/api/list-media`, `/api/move-path`, `/api/copy-path`
 - Local cache: `localStorage` (`STORAGE_KEY`) for draft entries/status.
 
 ## Runtime Flow (High Level)

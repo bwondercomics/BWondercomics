@@ -1,24 +1,30 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import os
+import re
+import shutil
 from typing import Any
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import and_, select, update
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.orm import Session
 
 from ..bluesky import BlueskyError, BlueskyPost
 from ..db import get_db
-from ..models import Post, User
+from ..models import MediaItem, Post, User
+from ..file_ops import safe_path
 from ..rss import build_rss_xml
 from ..security import get_current_user
 from ..validation import is_admin_role
 
 
 router = APIRouter()
+POST_ASSET_ROOT = "media/post-assets"
+POST_ASSET_PREFIX = f"{POST_ASSET_ROOT}/"
 
 
 def _iso_z(dt: datetime | None) -> str | None:
@@ -55,6 +61,141 @@ def _normalize_tags(raw: Any) -> list[str]:
     if isinstance(raw, str):
         return [t for t in (x.strip() for x in raw.split(",")) if t][:50]
     return []
+
+
+def _normalize_image_path(raw: str | None) -> str | None:
+    value = (raw or "").strip()
+    if not value:
+        return None
+    if value.startswith("http://") or value.startswith("https://"):
+        return value
+    if value.startswith("/api/protected/"):
+        value = f"protected/{value[len('/api/protected/'):]}"
+    return value.lstrip("/")
+
+
+def _is_post_asset_path(path: str) -> bool:
+    return path.startswith(POST_ASSET_PREFIX)
+
+
+def _resolve_media_access(item: MediaItem | None) -> str:
+    if not item:
+        return "private"
+    if item.access in {"public", "premium", "private"}:
+        return item.access
+    return "public" if item.public else "private"
+
+
+def _media_id_from_path(path: str) -> str:
+    filename = path.split("/")[-1]
+    base = re.sub(r"\.[^.]+$", "", filename)
+    base = re.sub(r"[^a-zA-Z0-9]+", "-", base).strip("-").lower() or "media"
+    h = 2166136261
+    for ch in path:
+        h ^= ord(ch)
+        h = (h * 16777619) & 0xFFFFFFFF
+    return f"{base}-{h:08x}"
+
+
+def _post_asset_path(source_path: str, item: MediaItem | None) -> str:
+    ext = os.path.splitext(source_path)[1].lower() or ".png"
+    stem = item.id if item else _media_id_from_path(source_path)
+    return f"{POST_ASSET_ROOT}/{stem}{ext}"
+
+
+def _find_media_item(db: Session, path: str) -> MediaItem | None:
+    if not path or _is_post_asset_path(path):
+        return None
+    candidates = {path}
+    if path.startswith("protected/"):
+        candidates.add(path.replace("protected/", "", 1))
+    else:
+        candidates.add(f"protected/{path}")
+    return db.scalar(select(MediaItem).where(MediaItem.path.in_(candidates)))
+
+
+def _resolve_source_path(path: str, item: MediaItem | None) -> str | None:
+    candidates: list[str] = []
+    if path:
+        candidates.append(path)
+    if item and item.path and item.path not in candidates:
+        candidates.append(item.path)
+    if path and not path.startswith("protected/"):
+        candidates.append(f"protected/{path}")
+
+    for candidate in candidates:
+        if candidate.startswith("http://") or candidate.startswith("https://"):
+            continue
+        try:
+            abs_path = safe_path(candidate)
+        except ValueError:
+            continue
+        if abs_path.exists() and abs_path.is_file():
+            return candidate
+    return None
+
+
+def _prepare_post_image(db: Session, image: str | None) -> str | None:
+    if not image:
+        return None
+    normalized = _normalize_image_path(image)
+    if not normalized or normalized.startswith("http://") or normalized.startswith("https://"):
+        return normalized
+    if _is_post_asset_path(normalized):
+        return normalized
+
+    item = _find_media_item(db, normalized)
+    requires_copy = normalized.startswith("protected/")
+    if not requires_copy and item and _resolve_media_access(item) != "public":
+        requires_copy = True
+    if not requires_copy:
+        return normalized
+
+    source_path = _resolve_source_path(normalized, item)
+    if not source_path:
+        raise ValueError("Unable to locate image file to copy for post")
+
+    dest_path = _post_asset_path(source_path, item)
+    try:
+        abs_src = safe_path(source_path)
+        abs_dest = safe_path(dest_path)
+    except ValueError as exc:
+        raise ValueError("Invalid image path") from exc
+
+    abs_dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.copy2(str(abs_src), str(abs_dest))
+    except Exception as exc:
+        raise ValueError("Unable to copy image for post") from exc
+
+    return dest_path
+
+
+def _cleanup_post_asset_if_unused(db: Session, path: str | None) -> None:
+    if not path:
+        return
+    normalized = _normalize_image_path(path)
+    if not normalized or not _is_post_asset_path(normalized):
+        return
+    stem = os.path.splitext(normalized)[0]
+    count = db.scalar(
+        select(func.count()).select_from(Post).where(Post.image.like(f"{stem}.%"))
+    ) or 0
+    if count > 0:
+        return
+    try:
+        abs_base = safe_path(stem)
+    except ValueError:
+        return
+    parent = abs_base.parent
+    if not parent.exists():
+        return
+    for candidate in parent.glob(f"{abs_base.name}.*"):
+        if candidate.is_file():
+            try:
+                candidate.unlink()
+            except Exception:
+                continue
 
 
 def _require_admin(request: Request, db: Session) -> User | None:
@@ -261,7 +402,10 @@ def admin_create_post(payload: PostUpsertRequest, request: Request, db: Session 
     except ValueError as exc:
         return JSONResponse(status_code=400, content={"error": str(exc)})
 
-    image = (payload.image or "").strip() or None
+    try:
+        image = _prepare_post_image(db, payload.image)
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
     image_focus = (payload.image_focus or "center").strip() or "center"
     image_tags = _normalize_tags(payload.image_tags)
     share = bool(payload.share)
@@ -321,7 +465,11 @@ def admin_update_post(post_id: str, payload: PostUpsertRequest, request: Request
     except ValueError as exc:
         return JSONResponse(status_code=400, content={"error": str(exc)})
 
-    image = (payload.image or "").strip() or None
+    old_image = post.image
+    try:
+        image = _prepare_post_image(db, payload.image)
+    except ValueError as exc:
+        return JSONResponse(status_code=400, content={"error": str(exc)})
     image_focus = (payload.image_focus or post.image_focus or "center").strip() or "center"
     image_tags = _normalize_tags(payload.image_tags) if payload.image_tags is not None else list(post.image_tags or [])
     share = bool(payload.share)
@@ -345,6 +493,8 @@ def admin_update_post(post_id: str, payload: PostUpsertRequest, request: Request
 
     db.add(post)
     db.commit()
+    if old_image and old_image != image:
+        _cleanup_post_asset_if_unused(db, old_image)
     db.refresh(post)
     _share_post_to_bluesky(db, post)
     db.commit()
@@ -365,6 +515,8 @@ def admin_delete_post(post_id: str, request: Request, db: Session = Depends(get_
     if not post:
         return JSONResponse(status_code=404, content={"error": "Post not found"})
 
+    old_image = post.image
     db.delete(post)
     db.commit()
+    _cleanup_post_asset_if_unused(db, old_image)
     return {"status": "ok"}

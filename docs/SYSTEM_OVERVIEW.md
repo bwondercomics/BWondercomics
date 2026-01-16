@@ -6,16 +6,18 @@ This repo serves a plain HTML/CSS/JS frontend, with a FastAPI backend adding dyn
 - **Static frontend** (served by Caddy in production): `index.html` (reader shell), `feed.html`, `media.html`, `comics.html`, plus JS modules under `reader/` and `admin/`. Public pages come from `dist/`; the admin UI is served from `/admin/*` (repo source) per the current Caddyfile.
 - **Static assets** (site chrome): `assets/` (icons, banners, UI images referenced by HTML and page configs).
 - **Reverse proxy + file server**: Caddy (see `deploy/Caddyfile`) serves `/` from `dist/` and proxies `/api/*` + JSON endpoints to the API.
-- **Backend API**: `backend/app/main.py` only serves API routes and JSON views (no static hosting).
+- **Backend API**: `backend/app/main.py` only serves API routes and JSON views (no static hosting). It also serves protected files via `/api/protected/*`.
 - **Database**: Postgres (Docker Compose recommended) stores users/comments, posts, series, and entries.
 
 ## Core data model
 - **Series**: a comic series (title/description, premium flag, and the per-series entry label like `Issue/Issues`).
 - **Entries**: the updates within a series (internally “entries”; a series can call them “issues”, “chapters”, “episodes”, etc).
-- **Entry pages**: ordered image paths for each entry (images live on disk under `comics/<seriesId>/entries/`; paths are stored in DB).
+- **Entry pages**: ordered image paths for each entry (images live on disk under `comics/<seriesId>/entries/` for public pages or `protected/comics/<seriesId>/entries/` for premium/private; paths are stored in DB).
 - **Posts**: feed/blog updates (draft/scheduled/published + optional share flag for RSS/social).
 - **Users + comments**: accounts + comment threads (with roles for admin/premium).
-- **Media library**: Postgres table for the media index + files under `media/` (tagged library used by admin/tools).
+- **Media library**: Postgres table for the media index + files under `media/` (public) or `protected/media/` (premium/private). Access is tracked via `media_items.access` (`public`/`premium`/`private`) and `media_items.premium_visibility` (`blur`/`hidden`).
+- **Post assets**: when a post uses premium/private media, the API copies it into `media/post-assets/` so public feeds still show the image.
+- **Premium blur previews**: when a media item is `premium + blur`, the API generates a real blurred JPEG in `media/previews/` for the public gallery (derived output).
 
 ## Routing + contracts (why the frontend still works)
 The backend serves **DB-backed JSON at the existing file paths** (Caddy proxies these to the API) so the reader/admin can keep using the same URLs:
@@ -44,12 +46,14 @@ The admin “save JSON” flow is also kept, but is intercepted and written to P
    - `page-config.json` or `series/<id>/page-config.json` (theme/panel content; DB-backed)
    - `GET /api/posts/latest` (latest update widget)
 4. Reader renders pages from the paths in the data JSON.
+   - If a page path starts with `protected/`, the reader requests it via `/api/protected/<path>`.
 
 ### 2) Managing series + entries (admin)
 1. Admin opens `/admin/` and signs in (must be an `admin` role).
 2. Admin edits series settings (including the per-series entry label).
 3. Admin creates/edits entries, uploads pages, reorders pages, and saves.
 4. Admin writes go through `/api/save` (DB-backed for series, entries, media index, and page configs).
+5. File moves/copies (public ↔ protected) go through `/api/move-path` and `/api/copy-path`.
 
 ### 3) Posts + RSS
 - Admin CRUD happens at `/api/admin/posts`.

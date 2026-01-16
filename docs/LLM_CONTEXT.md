@@ -10,7 +10,13 @@ This document is a concise handoff for new threads/agents. It captures how the s
 - Backend: `backend/` (FastAPI + SQLAlchemy)
 - Built frontend: `dist/` (public pages served from here in production)
 - Frontend build snapshots: `var/releases/dist-YYYYMMDD-HHMMSS.tar.gz`
-- Media/content: `media/`, `comics/<seriesId>/entries/<label-slug>/` (primary path for entry pages)
+- Media/content:
+  - Public entry pages: `comics/<seriesId>/entries/<label-slug>/`
+  - Premium/private entry pages: `protected/comics/<seriesId>/entries/<label-slug>/`
+  - Public media: `media/`
+  - Premium/private media: `protected/media/`
+  - Public post copies (auto-managed): `media/post-assets/`
+  - `protected/` is server-only and ignored by git (tracked only via `protected/.gitkeep`).
 - Deploy config: `deploy/bwondercomics-compose.yml`, `deploy/Caddyfile`, `deploy/bwondercomics.env`
 
 ## Services (Docker Compose)
@@ -60,6 +66,9 @@ Machine reboot depends on host OS (not in repo). After reboot, verify services w
   - `/media/*` and `/comics/*` from filesystem (`/chapters/*` is legacy)
   - `/admin/*` from repo root (`/srv/bwondercomics/root`) so admin uses source files
   - `/` root from `dist/`
+#### Protected assets:
+  - `/protected/*` is **not** served by Caddy.
+  - Access goes through the API at `/api/protected/*` (auth + premium checks).
 
 If the site turns into plain text or missing CSS/JS, confirm the `/assets/*` handler is correct and Caddy is running. The Caddyfile is sensitive to formatting; validate after edits.
 
@@ -96,7 +105,8 @@ Key tables:
 - Entry page order is stored in DB; saving an entry preserves the order as arranged in the UI.
 - Uploads auto-sort only when the entry has no existing pages; otherwise new pages append at the bottom.
 - Avoid renumber/sync unless you intentionally want to rename or rescan files.
-- `entry_pages.path` should be web-relative like `comics/battle-bros/entries/issues/09/01.png` (not an absolute `/srv/...` path).
+- `entry_pages.path` should be web-relative like `comics/battle-bros/entries/issues/09/01.png`
+  or `protected/comics/battle-bros/entries/issues/09/01.png` (not an absolute `/srv/...` path).
   - Entry labels (Issue/Volume/etc) live in `entry_labels` and drive the `<label-slug>` segment.
 
 ## Entry Payload (Reader/Admin)
@@ -135,6 +145,8 @@ Admin:
 - `GET /api/admin/premium-codes`, `POST /api/admin/premium-codes`
 - Diagnostics: `/api/admin/diagnostics/*`
 - Ops: `/api/admin/ops`, `/api/admin/ops-history`
+- File ops: `POST /api/move-path`, `POST /api/copy-path`
+- Protected files: `GET /api/protected/{path}`
 
 Content:
 - `GET /api/posts`, `/api/posts/latest`
@@ -236,3 +248,17 @@ title: "ISSUE 5"  -- display-only string, can be changed
 - Keep one source of truth (DB) and avoid legacy/static data sources.
 - Prefer durable fixes over temporary shims.
 - Keep frontend changes in source and rebuild `dist/` after each feature.
+## Protected assets + post images
+- **Protected files** live under `protected/` and are only served by `GET /api/protected/{path}`.
+- **Entry pages** can live under `comics/...` (public) or `protected/comics/...` (premium/private).
+  - `entry_pages.path` stores the web-relative path (may start with `protected/`).
+- **Media items** can live under `media/...` (public) or `protected/media/...` (premium/private).
+  - `media_items.access`: `public` | `premium` | `private`
+  - `media_items.premium_visibility`: `blur` | `hidden` (public gallery behavior)
+- **Post images**: when a post uses premium/private media, the API copies it to
+  `media/post-assets/<id>.<ext>` and the post points at the copy so public feeds don’t break.
+  `media/post-assets/` is derived and excluded from media sync.
+- **Premium blur previews**: when a media item is `access=premium` + `premium_visibility=blur`,
+  the API generates a real blurred JPEG at `media/previews/<media_id>.jpg` for public gallery use.
+  - Blur strength is set in `backend/app/content_store.py` (`PREVIEW_BLUR_RADIUS`).
+  - Admin media preview shows the public preview image alongside the original.

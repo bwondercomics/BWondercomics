@@ -202,9 +202,17 @@
       background: #05050a;
     }
 
-    .card.is-premium img {
-      filter: blur(10px);
-      transform: scale(1.03);
+    .media-missing {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(5, 5, 10, 0.7);
+      color: #ffb54a;
+      font-size: 0.85rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
     }
 
     .premium-badge {
@@ -316,11 +324,21 @@
       box-shadow: 0 0 24px rgba(0, 217, 255, 0.35);
     }
 
-    .lightbox.premium-blur img {
-      filter: blur(18px);
-      transform: scale(1.02);
+    .lightbox-missing {
+      position: absolute;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      color: #ffb54a;
+      font-size: 1rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      background: rgba(5, 5, 10, 0.7);
+      border: 2px dashed rgba(255, 181, 74, 0.6);
+      border-radius: 10px;
+      pointer-events: none;
     }
-
     .lightbox-close {
       position: absolute;
       top: -12px;
@@ -413,6 +431,7 @@
     <div class="lightbox-content">
       <button class="lightbox-btn" id="prevBtn" aria-label="Previous">&#8592;</button>
       <img id="lightboxImg" src="" alt="">
+      <div class="lightbox-missing" id="lightboxMissing">Image missing</div>
       <button class="lightbox-btn" id="nextBtn" aria-label="Next">&#8594;</button>
       <button class="lightbox-close" id="closeBtn" aria-label="Close">&times;</button>
       <div class="lightbox-meta" id="lightboxMeta"></div>
@@ -427,6 +446,7 @@
     const errorEl = document.getElementById('error');
     const lightbox = document.getElementById('lightbox');
     const lightboxImg = document.getElementById('lightboxImg');
+    const lightboxMissing = document.getElementById('lightboxMissing');
     const lightboxMeta = document.getElementById('lightboxMeta');
     const prevBtn = document.getElementById('prevBtn');
     const nextBtn = document.getElementById('nextBtn');
@@ -469,21 +489,6 @@
       return value === 'hidden' ? 'hidden' : 'blur';
     }
 
-    const PREMIUM_PLACEHOLDER = (() => {
-      const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 400">
-  <defs>
-    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
-      <stop offset="0%" stop-color="#1a1a1a"/>
-      <stop offset="100%" stop-color="#3b3b3b"/>
-    </linearGradient>
-  </defs>
-  <rect width="600" height="400" fill="url(#g)"/>
-  <rect x="40" y="40" width="520" height="320" fill="rgba(0,0,0,0.35)" stroke="#f6c454" stroke-width="3"/>
-  <text x="300" y="205" fill="#f6c454" font-size="40" font-family="sans-serif" text-anchor="middle">Premium Preview</text>
-</svg>`;
-      return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
-    })();
-
     function resolveMediaPath(item) {
       const raw = item?.path || '';
       if (!raw) return '';
@@ -496,13 +501,19 @@
       return `/${raw}`;
     }
 
+    function resolvePreviewPath(item) {
+      const id = String(item?.id || '').trim();
+      if (!id) return '';
+      return `/media/previews/${encodeURIComponent(id)}.jpg`;
+    }
+
     function resolveMediaSrc(item) {
       const access = normalizeAccess(item.access ?? item.visibility, item.public !== false);
       const premiumVisibility = normalizePremiumVisibility(
         item.premiumVisibility ?? item.premium_visibility
       );
       if (access === 'premium' && !viewerIsPremium) {
-        return premiumVisibility === 'blur' ? PREMIUM_PLACEHOLDER : '';
+        return premiumVisibility === 'blur' ? resolvePreviewPath(item) : '';
       }
       if (access === 'private' && !viewerIsAdmin) {
         return '';
@@ -538,14 +549,6 @@
         return viewerIsPremium || premiumVisibility === 'blur';
       }
       return true;
-    }
-
-    function isItemBlurred(item) {
-      const access = normalizeAccess(item.access ?? item.visibility, item.public !== false);
-      const premiumVisibility = normalizePremiumVisibility(
-        item.premiumVisibility ?? item.premium_visibility
-      );
-      return access === 'premium' && !viewerIsPremium && premiumVisibility === 'blur';
     }
 
     // Render the tag filter pills.
@@ -606,20 +609,24 @@
       filtered.forEach((item, index) => {
         const access = normalizeAccess(item.access ?? item.visibility, item.public !== false);
         const isPremium = access === 'premium';
-        const isBlurred = isItemBlurred(item);
         const card = document.createElement('div');
         card.className = `card${isPremium ? ' is-premium' : ''}`;
         const media = document.createElement('div');
         media.className = 'card-media';
         const img = document.createElement('img');
+        const missing = document.createElement('div');
+        missing.className = 'media-missing';
+        missing.textContent = 'Image missing';
         img.loading = 'lazy';
         img.alt = item.path || 'Media item';
         img.src = resolveMediaSrc(item) || '';
-        img.onerror = () => { img.style.opacity = '0.3'; };
-        if (!isBlurred) {
-          img.addEventListener('click', () => openLightbox(filtered, index));
-        }
+        img.onerror = () => {
+          img.style.display = 'none';
+          missing.style.display = 'flex';
+        };
+        img.addEventListener('click', () => openLightbox(filtered, index));
         media.appendChild(img);
+        media.appendChild(missing);
         if (isPremium) {
           const badge = document.createElement('div');
           badge.className = 'premium-badge';
@@ -677,17 +684,25 @@
     function updateLightbox() {
       if (currentIndex < 0 || currentIndex >= mediaItems.length) return closeLightbox();
       const item = mediaItems[currentIndex];
+      if (lightboxMissing) lightboxMissing.style.display = 'none';
+      lightboxImg.style.display = 'block';
       lightboxImg.src = resolveMediaSrc(item) || '';
       lightboxImg.alt = item.path || 'Media item';
+      lightboxImg.onerror = () => {
+        lightboxImg.style.display = 'none';
+        if (lightboxMissing) lightboxMissing.style.display = 'flex';
+        lightboxMeta.textContent = 'Image missing';
+      };
       const tags = normalizeTags(item.tags || []);
       const access = normalizeAccess(item.access ?? item.visibility, item.public !== false);
       const premiumVisibility = normalizePremiumVisibility(
         item.premiumVisibility ?? item.premium_visibility
       );
-      const isBlurred = access === 'premium' && !viewerIsPremium && premiumVisibility === 'blur';
-      lightbox.classList.toggle('premium-blur', isBlurred);
       const suffix = tags.length ? ' • ' + tags.join(', ') : '';
-      const premiumNote = isBlurred ? ' • Premium preview' : '';
+      const premiumNote =
+        access === 'premium' && !viewerIsPremium && premiumVisibility === 'blur'
+          ? ' • Premium preview'
+          : '';
       lightboxMeta.textContent = `${item.path || ''}${suffix}${premiumNote}`;
     }
 
@@ -708,6 +723,7 @@
         mediaItems = Array.isArray(data)
           ? data
               .filter((item) => item && item.path)
+              .filter((item) => !String(item.path).startsWith('media/previews/'))
               .map((item) => {
                 const fallbackPublic = item.public !== false;
                 const access = normalizeAccess(item.access ?? item.visibility, fallbackPublic);

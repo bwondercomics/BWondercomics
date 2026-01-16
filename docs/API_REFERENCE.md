@@ -198,7 +198,7 @@ Make a DELETE request.
 Fetch comments for a target.
 - **Parameters**: `targetId` (string) - Target identifier
 - **Returns**: `Promise<Array>` - Array of comments
-- **Example**: `const comments = await fetchComments('chapter-1');`
+- **Example**: `const comments = await fetchComments('battle-bros:entry-1');`
 
 #### `postComment(targetId, message)`
 Post a new comment.
@@ -206,6 +206,10 @@ Post a new comment.
   - `targetId` (string) - Target identifier
   - `message` (string) - Comment message
 - **Returns**: `Promise<Object>` - Created comment
+
+**Target IDs**
+- Entries: `series-id:entry-<display_number>` (example: `battle-bros:entry-1`)
+- Posts: `post:<uuid>`
 
 #### `fetchLatestPost()`
 Fetch the latest post.
@@ -258,6 +262,34 @@ Load saved reading progress.
 
 ---
 
+## System Endpoints (Admin + Server)
+
+These are backend endpoints used by admin tooling and server-side flows. They are not part of the reader API, but are included here for reference.
+
+### Protected Assets
+
+#### `GET /api/protected/{path}`
+Serve a premium/private file (entry pages or media) with auth checks.
+- **Auth**: required for premium; admin-only for private.
+- **Example**: `/api/protected/media/banner.png`
+
+### File Ops (Admin only)
+
+#### `POST /api/move-path`
+Move a file or folder on disk (public ↔ protected).
+- **Body**:
+  - `from` (string) - source path (web-relative)
+  - `to` (string) - destination path (web-relative)
+
+#### `POST /api/copy-path`
+Copy a file on disk (used for post asset copies).
+- **Body**:
+  - `from` (string) - source path (web-relative)
+  - `to` (string) - destination path (web-relative)
+  - `cleanupStem` (boolean, optional) - delete sibling files with same stem before copy
+
+---
+
 ## Usage Examples
 
 ### Complete Authentication Flow
@@ -297,12 +329,12 @@ import { fetchComments, postComment } from './reader/api.js';
 import { logger } from './reader/logger.js';
 
 // Fetch comments
-const comments = await fetchComments('chapter-1');
+const comments = await fetchComments('battle-bros:entry-1');
 logger.log('Loaded comments:', comments.length);
 
 // Post comment
 try {
-  const newComment = await postComment('chapter-1', 'Great chapter!');
+  const newComment = await postComment('battle-bros:entry-1', 'Great entry!');
   logger.log('Comment posted:', newComment);
 } catch (err) {
   logger.error('Failed to post comment:', err);
