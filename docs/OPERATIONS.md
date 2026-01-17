@@ -6,6 +6,19 @@ This is the “don’t make me think” guide for running and maintaining the se
 - Docker + Docker Compose (v2) installed
 - A filled env file at `deploy/bwondercomics.env`
 
+## Active services (current)
+As of **2026-01-17**, the live stack is running:
+- `bwondercomics-api` (FastAPI) — host `:8001` → container `:8000`
+- `bwondercomics-db` (Postgres) — `127.0.0.1:5434` → `:5432`
+- `caddy` (reverse proxy/static) — `:80`, `:443`
+- `umami` (analytics UI) — `127.0.0.1:3001` → `:3000`
+- `umami-db` (Postgres for Umami)
+
+To verify current state on the server:
+`sudo docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-compose.yml ps`
+
+Note: update this section whenever services or ports change.
+
 ## The easy way (Makefile)
 From the repo root:
 

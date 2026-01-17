@@ -30,6 +30,15 @@ Ports are configurable via env in `deploy/bwondercomics.env`. Example running ma
 - API: host `8001` -> container `8000`
 - DB: host `5434` -> container `5432`
 - Caddy: `80/443`
+- Umami: host `3001` -> container `3000` (bound to localhost)
+
+### Current active services (as of 2026-01-17)
+All services are running in the live stack:
+- `bwondercomics-api`
+- `bwondercomics-db`
+- `caddy`
+- `umami`
+- `umami-db`
 
 `deploy/bwondercomics.env` also sets `COMPOSE_PROJECT_NAME=bwondercomics`. If you run compose without that env file, container names/ports may differ.
 

@@ -2,7 +2,7 @@ import { el } from "./dom.js";
 import { MEDIA_FILE } from "./config.js";
 import { state } from "./state.js";
 import { saveToServer } from "./core.js";
-import { escapeHtml, parseTags, generateMediaId } from "./utils.js";
+import { escapeHtml, parseTags, generateMediaId, readFileAsBase64 } from "./utils.js";
 
 function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) {
   const onUse =
@@ -11,6 +11,8 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
   let currentMediaOrder = [];
   let currentMediaIndex = -1;
   let previewKeyHandlerBound = false;
+  let uploadStatusActive = false;
+  let previewWasHidden = false;
 
   const ACCESS_OPTIONS = ["public", "premium", "private"];
   const PREMIUM_VISIBILITY_OPTIONS = ["blur", "hidden"];
@@ -184,9 +186,10 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
     return sorted;
   }
 
-  async function loadMedia() {
+  async function loadMedia(options = {}) {
+    const { syncDisk = true, selectPath = null, selectId = null } = options;
     try {
-      const response = await fetch("/media.json", { cache: "no-cache" });
+      const response = await fetch("/media.json", { cache: "no-store" });
       if (!response.ok) throw new Error("Failed to load media library");
       const data = await response.json();
       state.mediaItems = Array.isArray(data)
@@ -214,7 +217,16 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
       console.warn("Error loading media library, starting empty:", error);
       state.mediaItems = [];
     }
-    await syncMediaFromDisk(false);
+    if (syncDisk) {
+      await syncMediaFromDisk(false);
+    }
+    if (selectId) {
+      const match = state.mediaItems.find((m) => m.id === selectId);
+      if (match) selectedMediaId = match.id;
+    } else if (selectPath) {
+      const match = state.mediaItems.find((m) => m.path === selectPath);
+      if (match) selectedMediaId = match.id;
+    }
     renderMedia();
   }
 
@@ -239,6 +251,61 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
     setTimeout(() => {
       el.mediaStatus.style.display = "none";
     }, 2500);
+  }
+
+  function setUploadStatus(message, options = {}) {
+    if (!el.mediaUploadStatus || !el.mediaUploadStatusText) return;
+    const {
+      progress = null,
+      indeterminate = false,
+      isError = false,
+      show = true,
+    } = options;
+
+    if (!show || !message) {
+      el.mediaUploadStatus.style.display = "none";
+      el.mediaUploadStatus.classList.remove("is-error");
+      if (el.mediaUploadStatusFill) {
+        el.mediaUploadStatusFill.classList.remove("is-indeterminate");
+        el.mediaUploadStatusFill.style.width = "0%";
+      }
+      uploadStatusActive = false;
+      if (previewWasHidden && !selectedMediaId && el.mediaPreview) {
+        el.mediaPreview.style.display = "none";
+        el.mediaPreview.setAttribute("aria-hidden", "true");
+        previewWasHidden = false;
+      }
+      return;
+    }
+
+    uploadStatusActive = true;
+    if (el.mediaPreview && el.mediaPreview.style.display === "none") {
+      previewWasHidden = true;
+      el.mediaPreview.style.display = "grid";
+      el.mediaPreview.setAttribute("aria-hidden", "false");
+    }
+
+    el.mediaUploadStatusText.textContent = message;
+    el.mediaUploadStatus.style.display = "grid";
+    el.mediaUploadStatus.classList.toggle("is-error", isError);
+    if (el.mediaUploadStatusFill) {
+      if (indeterminate || typeof progress !== "number") {
+        el.mediaUploadStatusFill.classList.add("is-indeterminate");
+        el.mediaUploadStatusFill.style.width = "100%";
+      } else {
+        const pct = Math.max(0, Math.min(100, progress));
+        el.mediaUploadStatusFill.classList.remove("is-indeterminate");
+        el.mediaUploadStatusFill.style.width = `${pct}%`;
+      }
+    }
+  }
+
+  function clearUploadStatus(delayMs = 0) {
+    if (delayMs) {
+      setTimeout(() => setUploadStatus("", { show: false }), delayMs);
+    } else {
+      setUploadStatus("", { show: false });
+    }
   }
 
   async function moveMediaPath(item, nextAccess) {
@@ -472,14 +539,21 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
   function renderMediaPreview(item, usageCount) {
     if (!el.mediaPreview || !el.mediaPreviewImg || !el.mediaPreviewInfo) return;
     if (!item) {
-      el.mediaPreview.style.display = "none";
-      el.mediaPreview.setAttribute("aria-hidden", "true");
+      if (uploadStatusActive) {
+        el.mediaPreview.style.display = "grid";
+        el.mediaPreview.setAttribute("aria-hidden", "false");
+        el.mediaPreviewImg.style.display = "none";
+      } else {
+        el.mediaPreview.style.display = "none";
+        el.mediaPreview.setAttribute("aria-hidden", "true");
+      }
       return;
     }
 
     const tagsText = (item.tags || []).join(", ") || "No tags";
     el.mediaPreview.style.display = "grid";
     el.mediaPreview.setAttribute("aria-hidden", "false");
+    el.mediaPreviewImg.style.display = "block";
     el.mediaPreviewImg.src = resolveMediaSrc(item.path);
     el.mediaPreviewImg.alt = item.path;
     if (el.mediaPreviewBlurImg && el.mediaPreviewBlurMissing) {
@@ -810,9 +884,18 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
     const tags = parseTags(el.mediaTags?.value || "");
     const access = normalizeAccess(el.mediaAccess?.value, true);
     const premiumVisibility = normalizePremiumVisibility(el.mediaPremiumVisibility?.value);
+    const saved = await upsertMediaItem(path, tags, access, premiumVisibility);
+    if (!saved) return;
+    el.mediaPath.value = "";
+    if (el.mediaTags) el.mediaTags.value = "";
+  }
+
+  async function upsertMediaItem(path, tags, access, premiumVisibility, options = {}) {
+    const { silent = false, onError } = options;
     if (!path) {
-      setMediaStatus("Path is required.", true);
-      return;
+      if (!silent) setMediaStatus("Path is required.", true);
+      if (onError) onError("Path is required.");
+      return null;
     }
 
     const existing = state.mediaItems.find((m) => m.path === path);
@@ -827,14 +910,15 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
         }
       } catch (error) {
         console.warn("Failed to move media file:", error);
-        setMediaStatus(`Media move failed: ${error.message}`, true);
-        return;
+        if (!silent) setMediaStatus(`Media move failed: ${error.message}`, true);
+        if (onError) onError(error.message || "Media move failed.");
+        return null;
       }
       existing.tags = tags;
       existing.access = access;
       existing.premiumVisibility = premiumVisibility;
       existing.public = access === "public";
-      setMediaStatus("Updated existing media tags.");
+      if (!silent) setMediaStatus("Updated existing media tags.");
     } else {
       try {
         const tempItem = { path };
@@ -842,8 +926,9 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
         path = nextPath;
       } catch (error) {
         console.warn("Failed to move media file:", error);
-        setMediaStatus(`Media move failed: ${error.message}`, true);
-        return;
+        if (!silent) setMediaStatus(`Media move failed: ${error.message}`, true);
+        if (onError) onError(error.message || "Media move failed.");
+        return null;
       }
       const newItem = {
         id: generateMediaId(path),
@@ -855,13 +940,138 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
       };
       state.mediaItems.push(newItem);
       selectedMediaId = newItem.id;
-      setMediaStatus("Added media item.");
+      if (!silent) setMediaStatus("Added media item.");
     }
 
-    el.mediaPath.value = "";
-    if (el.mediaTags) el.mediaTags.value = "";
     renderMedia();
     await saveMedia();
+    const updated = state.mediaItems.find((m) => m.path === path);
+    return updated || { id: generateMediaId(path), path };
+  }
+
+  function uploadMediaPayload(file, base64, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open("POST", "/api/upload-media");
+      xhr.setRequestHeader("Content-Type", "application/json");
+      xhr.upload.onprogress = (event) => {
+        if (typeof onProgress !== "function") return;
+        if (event.lengthComputable && event.total > 0) {
+          onProgress((event.loaded / event.total) * 100);
+        } else {
+          onProgress(null);
+        }
+      };
+      xhr.onerror = () => reject(new Error("Upload failed"));
+      xhr.onload = () => {
+        let payload = {};
+        try {
+          payload = xhr.responseText ? JSON.parse(xhr.responseText) : {};
+        } catch (error) {
+          payload = {};
+        }
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(payload);
+        } else {
+          reject(new Error(payload.error || "Upload failed"));
+        }
+      };
+      xhr.send(JSON.stringify({ file: { name: file.name, data: base64 } }));
+    });
+  }
+
+  async function uploadMediaFiles() {
+    const files = Array.from(el.mediaUploadInput?.files || []);
+    if (!files.length) {
+      setUploadStatus("No files selected.", { isError: true });
+      return;
+    }
+
+    const tags = parseTags(el.mediaTags?.value || "");
+    const access = normalizeAccess(el.mediaAccess?.value, true);
+    const premiumVisibility = normalizePremiumVisibility(el.mediaPremiumVisibility?.value);
+    let uploaded = 0;
+    let failed = 0;
+    const total = files.length;
+    const uploadedItems = [];
+    let lastUploadedId = null;
+
+    for (let idx = 0; idx < files.length; idx += 1) {
+      const file = files[idx];
+      try {
+        setUploadStatus(
+          `Preparing ${idx + 1}/${total}: ${file.name}`,
+          { indeterminate: true },
+        );
+        const base64 = await readFileAsBase64(file);
+        setUploadStatus(
+          `Uploading ${idx + 1}/${total}: ${file.name}`,
+          { indeterminate: true },
+        );
+        const result = await uploadMediaPayload(file, base64, (progress) => {
+          if (typeof progress === "number") {
+            setUploadStatus(
+              `Uploading ${idx + 1}/${total} (${Math.round(progress)}%)`,
+              { progress, indeterminate: false },
+            );
+          } else {
+            setUploadStatus(
+              `Uploading ${idx + 1}/${total}`,
+              { indeterminate: true },
+            );
+          }
+        });
+        const path = String(result.path || "").trim();
+        if (!path) throw new Error("Upload returned no path");
+        setUploadStatus(
+          `Saving to library + previews (${idx + 1}/${total})`,
+          { indeterminate: true },
+        );
+        const saved = await upsertMediaItem(path, tags, access, premiumVisibility, {
+          silent: true,
+          onError: (message) => {
+            setUploadStatus(
+              `Save failed (${file.name}): ${message}`,
+              { isError: true },
+            );
+          },
+        });
+        if (saved) {
+          uploaded += 1;
+          lastUploadedId = saved.id || generateMediaId(saved.path || path);
+          uploadedItems.push(saved);
+          await loadMedia({ syncDisk: false, selectId: lastUploadedId });
+        }
+      } catch (error) {
+        failed += 1;
+        console.warn("Media upload failed:", error);
+        setUploadStatus(
+          `Upload failed (${file.name}): ${error.message || "error"}`,
+          { isError: true },
+        );
+      }
+    }
+
+    if (el.mediaUploadInput) el.mediaUploadInput.value = "";
+    if (uploaded > 0) {
+      const statusText =
+        failed === 0
+          ? `Upload complete: ${uploaded}/${total}`
+          : `Upload complete: ${uploaded} ok, ${failed} failed`;
+      setUploadStatus(statusText, { progress: 100, isError: failed > 0 });
+      if (uploadedItems.length) {
+        try {
+          const finalItem = uploadedItems[uploadedItems.length - 1];
+          const finalId = finalItem.id || generateMediaId(finalItem.path || "");
+          await loadMedia({ syncDisk: false, selectId: finalId });
+        } catch (error) {
+          console.warn("Failed to refresh media after uploads:", error);
+        }
+      }
+      if (failed === 0) clearUploadStatus(3000);
+    } else {
+      setUploadStatus("Upload failed.", { isError: true });
+    }
   }
 
   function inferTagsForPath(path = "") {
@@ -951,6 +1161,7 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
     showMediaSection,
     syncMediaFromDisk,
     upsertMediaEntry,
+    uploadMediaFiles,
   };
 }
 

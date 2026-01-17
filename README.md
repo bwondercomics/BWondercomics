@@ -1,6 +1,6 @@
 # BWonderComics (self-hosted comics platform kit)
 
-Static-first comic site (no build step) + a proper backend for the “dynamic stuff” (auth, comments, post scheduling, RSS, uploads, analytics proxy).
+Static frontend (built with Vite) + FastAPI backend for the dynamic stuff (auth, comments, post scheduling, RSS, uploads, analytics proxy).
 
 ## Quick start (Docker)
 1) Create env:
@@ -9,8 +9,13 @@ Static-first comic site (no build step) + a proper backend for the “dynamic st
    - `make up`
    - `make migrate`
 3) Open:
-   - `http://localhost:8000/` (site)
-   - `http://localhost:8000/admin/` (admin)
+   - Site is served by Caddy (domain in `deploy/Caddyfile`)
+   - Admin is served from `/admin/` off the repo root
+
+## Frontend build
+Public pages are served from `dist/`.
+- Build + snapshot: `./scripts/frontend-build.sh` (writes `dist/` and saves a tarball in `var/releases/`).
+- Caddy serves `dist/` for the public site, and `/admin/` directly from the repo (admin changes go live without rebuild).
 
 ## Docs
 - Overview: `docs/README.md`

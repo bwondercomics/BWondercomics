@@ -8,7 +8,7 @@ Use it as a living checklist. Mark items as you complete them.
 - Keep notes next to any item that needs follow-up.
 - Each phase has clear exit criteria. Do not move on until those are met.
 
-Last updated: 2026-01-16
+Last updated: 2026-01-17
 
 ## Phase 1 - Lock the Machine (stability + data safety)
 Goal: the platform runs clean, stable, and predictable.
@@ -26,6 +26,7 @@ Goal: the platform runs clean, stable, and predictable.
 - [ ] Validate DB write paths for comments, entries, posts, analytics events. *(Needs endpoint review + smoke tests)*
 - [ ] Enforce canonical IDs: `series_id + display_number` for entries. *(Implemented in code/docs; needs DB audit)*
 - [x] Entries payload is canonical (`entries/entryMeta/entryFolders`); legacy `chapters/*` removed. *(API + reader/admin updated; tests passing)*
+- [x] Media thumbnails + previews are DB-backed; posts reuse media thumbs. *(Thumb pipeline + `posts.media_id` in place)*
 
 ### Observability + backups
 - [ ] Document backup + restore steps in `docs/` and test once. *(Docs updated; restore not re-tested)*

@@ -161,6 +161,7 @@ def _sync_media_previews(db: Session, items: list[dict[str, Any]], removed_ids: 
 def ensure_media_previews(db: Session, item: MediaItem | None) -> None:
     if not item or not item.id or not item.path:
         return
+    db.flush()
     access = _normalize_access(item.access, item.public)
     premium_visibility = _normalize_premium_visibility(item.premium_visibility)
     _sync_media_previews(
@@ -295,6 +296,7 @@ def apply_media_items_save(db: Session, payload: Any) -> None:
         if record.id not in keep_ids:
             db.delete(record)
 
+    db.flush()
     removed_ids = {record.id for record in existing if record.id not in keep_ids}
     _sync_media_previews(db, items, removed_ids)
 

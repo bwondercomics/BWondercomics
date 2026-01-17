@@ -122,7 +122,7 @@ def public_series_page_config(series_id: str, db: Session = Depends(get_db)):
 
 @router.get("/media.json")
 def legacy_media_index(db: Session = Depends(get_db)):
-    return JSONResponse(content=list_media_items(db))
+    return JSONResponse(content=list_media_items(db), headers={"Cache-Control": "no-store"})
 
 
 def _require_admin(request: Request, db: Session) -> User | None:

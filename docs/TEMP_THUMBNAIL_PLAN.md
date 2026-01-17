@@ -40,10 +40,11 @@ Backfill approach (plan only, no tool yet):
 - [x] Ensure post-created media generates previews. *(Posts now call preview generation.)*
 
 ## 4) Admin updates
-- [ ] Add device upload to media library.
+- [x] Add device upload to media library.
 - [x] Show preview image + missing indicator in media preview panel; grid uses thumbnails.
 - [x] Ensure premium toggle swaps normal thumbnail ↔ blurred preview for public.
 - [x] Post images always become media items; posts reuse media thumbnails.
+- [x] Upload preview updates now refresh correctly (DB flush before preview sync).
 
 ## 5) Frontend updates
 - [ ] Entry gallery keeps DB source but uses cover thumbnail field instead of full-size path.
@@ -62,6 +63,7 @@ Backfill approach (plan only, no tool yet):
 - [ ] Premium/admin see originals.
 - [ ] Entry covers visible to non-premium; pages still locked.
 - [ ] No duplicate preview items in admin gallery.
+- [x] Post images generate thumbnails immediately and show in feed + galleries.
 
 ## 8) Entry gallery refactor (post-DB fields)
 - [ ] Rename legacy `galleryoverlay` UI to `entrygallery` in `index.html`.

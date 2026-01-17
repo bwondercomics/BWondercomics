@@ -1719,6 +1719,57 @@
       overflow: auto;
     }
 
+    .media-upload-status {
+      display: none;
+      gap: 6px;
+      padding: 12px;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 217, 255, 0.2);
+      background: rgba(5, 5, 10, 0.55);
+    }
+
+    .media-upload-status.is-error {
+      border-color: rgba(255, 69, 69, 0.55);
+    }
+
+    .media-upload-status-title {
+      font-size: 0.72rem;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      opacity: 0.7;
+    }
+
+    .media-upload-status-text {
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .media-upload-status-bar {
+      height: 6px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255, 255, 255, 0.1);
+    }
+
+    .media-upload-status-fill {
+      height: 100%;
+      width: 0%;
+      background: var(--accent);
+      transition: width 0.15s ease;
+    }
+
+    .media-upload-status-fill.is-indeterminate {
+      width: 100%;
+      background: linear-gradient(90deg, rgba(0, 217, 255, 0.1), rgba(0, 217, 255, 0.8), rgba(0, 217, 255, 0.1));
+      background-size: 200% 100%;
+      animation: media-upload-bar 1.1s linear infinite;
+    }
+
+    @keyframes media-upload-bar {
+      0% { background-position: 0% 0%; }
+      100% { background-position: 200% 0%; }
+    }
+
     .media-preview-setting label {
       display: block;
       font-size: 0.8rem;
@@ -4129,6 +4180,11 @@
         <h2 class="section-title">Media Library</h2>
         <div class="form-group">
           <label class="form-label">Add Media</label>
+          <input type="file" id="mediaUploadInput" class="form-input" accept="image/*" multiple
+            style="margin-bottom: 8px;">
+          <button class="btn-secondary" id="btnUploadMedia" type="button" style="margin-bottom: 12px;">
+            Upload image(s)
+          </button>
           <input type="text" id="mediaPath" class="form-input"
             placeholder="Image path or URL (e.g., comics/<seriesId>/entries/issues/01/01.png)" style="margin-bottom: 8px;">
           <input type="text" id="mediaTags" class="form-input" placeholder="Tags (comma separated, e.g., cover,issue1)"
@@ -4193,6 +4249,13 @@
                 <div id="mediaPreviewPath"></div>
                 <div id="mediaPreviewTags"></div>
                 <div id="mediaPreviewUsage"></div>
+                <div id="mediaUploadStatus" class="media-upload-status">
+                  <div class="media-upload-status-title">Upload status</div>
+                  <div id="mediaUploadStatusText" class="media-upload-status-text"></div>
+                  <div class="media-upload-status-bar">
+                    <div id="mediaUploadStatusFill" class="media-upload-status-fill"></div>
+                  </div>
+                </div>
                 <div class="media-preview-preview">
                   <div class="media-preview-preview-label">Public preview</div>
                   <div class="media-preview-preview-frame">

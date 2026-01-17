@@ -692,6 +692,9 @@ function attachEventHandlers() {
   if (el.btnAddMedia) {
     el.btnAddMedia.addEventListener("click", mediaManager.addMediaItem);
   }
+  if (el.btnUploadMedia) {
+    el.btnUploadMedia.addEventListener("click", mediaManager.uploadMediaFiles);
+  }
   if (el.btnSyncMedia) {
     el.btnSyncMedia.addEventListener("click", () =>
       mediaManager.syncMediaFromDisk(true),
