@@ -2,6 +2,7 @@
 
 Goal: DB-backed thumbnails/previews with premium cover visibility and no fake blur.
 
+
 ## 1) Inventory (read-only)
 - [x] Map entry gallery cover source (DB-backed `entryMeta.coverImage` or first page path in `entries`).
 - [x] Map feed image source (post image) and where it renders.
@@ -10,31 +11,47 @@ Goal: DB-backed thumbnails/previews with premium cover visibility and no fake bl
 - [x] Produce a source → path → desired thumbnail mapping.
 
 ## 2) DB schema (source of truth)
-- [ ] Add entry cover thumbnail field (e.g., `entries.cover_thumb_path`).
-- [ ] Add media thumbnail field (`media_items.thumb_path`).
-- [ ] Add media blurred preview field (`media_items.preview_path`) and store the generated preview path in the DB (no derived-only paths in UI).
-- [ ] Decide folder layout under `media/previews/`.
-- [ ] Write migration + backfill approach.
+- [x] Add entry cover thumbnail field (`entries.cover_thumb_path`). *(Migration applied: `0012_media_thumbnails`.)*
+- [x] Add media thumbnail field (`media_items.thumb_path`). *(Migration applied: `0012_media_thumbnails`.)*
+- [x] Add media blurred preview field (`media_items.preview_path`) and store the generated preview path in the DB (no derived-only paths in UI). *(Column applied; pipeline live.)*
+- [x] Add post → media link (`posts.media_id`) to reuse media thumbnails in feeds. *(Migration applied: `0013_posts_media_id`.)*
+- [x] Decide folder layout under `media/previews/`.
+- [x] Write migration + backfill approach.
+
+Folder layout (all JPEG):
+- `media/previews/thumbs/` (media thumbnails)
+- `media/previews/blurred/` (premium blur previews)
+- `media/previews/covers/` (entry cover thumbnails)
+
+Backfill approach (plan only, no tool yet):
+- Generate thumbnails/previews from existing sources and store the paths in DB.
+- Use a one-off admin/ops command that:
+  - Scans `media_items` and regenerates `thumb_path` + `preview_path` where missing.
+  - Scans entries for `cover_image` and generates `cover_thumb_path` where missing.
+  - Skips items with missing source files and logs them.
+  - Writes DB updates in batches; no filesystem deletions during backfill.
 
 ## 3) Backend pipeline (Pillow)
-- [ ] Generate compressed thumbnails (JPEG) for entries/media/posts.
-- [ ] Generate compressed blurred previews (JPEG) for premium blur.
-- [ ] Update on change; delete on removal.
-- [ ] Ensure previews are excluded from list-media/sync.
-- [ ] Persist paths in DB.
+- [x] Generate compressed thumbnails (JPEG) for entries/media. *(Entries + media done.)*
+- [x] Generate compressed blurred previews (JPEG) for premium blur. *(Thumbnail-sized blur in `media/previews/blurred/`.)*
+- [x] Update on change; delete on removal. *(Media thumbnails + previews; entry cover thumbnails on save/removal.)*
+- [x] Ensure previews are excluded from list-media/sync. *(Still filtered by `media/previews/`.)*
+- [x] Persist paths in DB. *(`thumb_path` + `preview_path` + `cover_thumb_path` now written.)*
+- [x] Ensure post-created media generates previews. *(Posts now call preview generation.)*
 
 ## 4) Admin updates
 - [ ] Add device upload to media library.
-- [ ] Show preview/thumbnail status in media preview panel.
-- [ ] Ensure premium toggle swaps normal thumbnail ↔ blurred preview for public.
+- [x] Show preview image + missing indicator in media preview panel; grid uses thumbnails.
+- [x] Ensure premium toggle swaps normal thumbnail ↔ blurred preview for public.
+- [x] Post images always become media items; posts reuse media thumbnails.
 
 ## 5) Frontend updates
 - [ ] Entry gallery keeps DB source but uses cover thumbnail field instead of full-size path.
-- [ ] Media gallery uses thumbnail; full image loads on open.
-- [ ] Feed uses thumbnail; full image loads on open.
-- [ ] Update `rightPanelFeed` in `index.html` to use DB thumbnail fields instead of direct paths.
-- [ ] Update `feed.html` to use DB thumbnail fields instead of direct paths.
-- [ ] Premium/hidden rules apply to thumbnails correctly.
+- [x] Media gallery uses thumbnail; full image loads on open.
+- [x] Feed uses media thumbnails from posts API (`thumbPath` via `posts.media_id`); full image loads on open (no separate post thumbnails).
+- [x] Update `rightPanelFeed` in `index.html` to use DB thumbnail fields instead of direct paths.
+- [x] Update `feed.html` to use DB thumbnail fields instead of direct paths.
+- [ ] Premium/hidden rules apply to thumbnails correctly (media done; entry gallery pending).
 
 ## 6) Backfill + regen
 - [ ] Script to generate thumbnails/previews for existing items.

@@ -489,8 +489,8 @@
       return value === 'hidden' ? 'hidden' : 'blur';
     }
 
-    function resolveMediaPath(item) {
-      const raw = item?.path || '';
+    function resolveAssetPath(rawPath = '') {
+      const raw = String(rawPath || '').trim();
       if (!raw) return '';
       if (/^https?:\/\//i.test(raw)) return raw;
       if (raw.startsWith('protected/')) {
@@ -501,10 +501,18 @@
       return `/${raw}`;
     }
 
+    function resolveMediaPath(item) {
+      return resolveAssetPath(item?.path || '');
+    }
+
     function resolvePreviewPath(item) {
-      const id = String(item?.id || '').trim();
-      if (!id) return '';
-      return `/media/previews/${encodeURIComponent(id)}.jpg`;
+      const raw = String(item?.previewPath || item?.preview_path || '').trim();
+      return raw ? resolveAssetPath(raw) : '';
+    }
+
+    function resolveThumbPath(item) {
+      const raw = String(item?.thumbPath || item?.thumb_path || '').trim();
+      return raw ? resolveAssetPath(raw) : '';
     }
 
     function resolveMediaSrc(item) {
@@ -519,6 +527,21 @@
         return '';
       }
       return resolveMediaPath(item);
+    }
+
+    function resolveThumbSrc(item) {
+      const access = normalizeAccess(item.access ?? item.visibility, item.public !== false);
+      const premiumVisibility = normalizePremiumVisibility(
+        item.premiumVisibility ?? item.premium_visibility
+      );
+      if (access === 'premium' && !viewerIsPremium) {
+        return premiumVisibility === 'blur' ? resolvePreviewPath(item) : '';
+      }
+      if (access === 'private' && !viewerIsAdmin) {
+        return '';
+      }
+      const thumb = resolveThumbPath(item);
+      return thumb || resolveMediaPath(item);
     }
 
     async function loadSession() {
@@ -619,7 +642,7 @@
         missing.textContent = 'Image missing';
         img.loading = 'lazy';
         img.alt = item.path || 'Media item';
-        img.src = resolveMediaSrc(item) || '';
+        img.src = resolveThumbSrc(item) || '';
         img.onerror = () => {
           img.style.display = 'none';
           missing.style.display = 'flex';

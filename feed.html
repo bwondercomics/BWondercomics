@@ -566,6 +566,7 @@
     }
     const feedContainer = document.getElementById('feedContainer');
     const commentContexts = [];
+    const FALLBACK_IMAGE = '/assets/image-missing.png';
     const authState = { user: null };
 
     // API helpers for auth + comments.
@@ -984,15 +985,21 @@
       header.appendChild(titleWrap);
       article.appendChild(header);
 
-      if (post.image) {
+      const imageSrc = (post.image || post.thumbPath || '').trim();
+      if (imageSrc) {
         const img = document.createElement('img');
         img.className = 'post-image';
         if (post.imageFocus) {
           img.style.objectPosition = post.imageFocus;
         }
-        img.src = post.image;
+        img.src = imageSrc;
         img.alt = titleText || 'Update image';
         img.loading = 'lazy';
+        img.onerror = () => {
+          if (img.src.endsWith(FALLBACK_IMAGE)) return;
+          img.src = FALLBACK_IMAGE;
+          img.classList.add('is-missing');
+        };
         article.appendChild(img);
       }
 

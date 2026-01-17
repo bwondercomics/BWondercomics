@@ -73,9 +73,9 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
   }
 
   function resolvePreviewSrc(item) {
-    const id = String(item?.id || "").trim();
-    if (!id) return "";
-    return `/media/previews/${encodeURIComponent(id)}.jpg`;
+    const previewPath = String(item?.previewPath || item?.preview_path || "").trim();
+    if (previewPath) return resolveMediaSrc(previewPath);
+    return "";
   }
 
   function getPostsUsingMedia(item) {
@@ -205,6 +205,8 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
             access,
             premiumVisibility,
             public: access === "public",
+            thumbPath: m.thumbPath || m.thumb_path || "",
+            previewPath: m.previewPath || m.preview_path || "",
           };
         })
         : [];
@@ -371,7 +373,7 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
       if (item.id === selectedMediaId) {
         card.classList.add("media-item--selected");
       }
-      const resolvedSrc = resolveMediaSrc(item.path);
+      const resolvedSrc = resolveMediaSrc(item.thumbPath || item.thumb_path || item.path);
       card.innerHTML = `
         <img src="${escapeHtml(resolvedSrc)}" alt="${escapeHtml(item.path)}" loading="lazy" />
         <div class="media-card-body">
@@ -903,8 +905,12 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
     if (!confirmed) return;
 
     // Warn about posts using this image
+    const postAssetPrefix = getPostAssetPrefix(item);
     const usedBy = (state.posts || [])
-      .filter((p) => p.image === item.path)
+      .filter((p) => {
+        const image = p.image || "";
+        return image === item.path || (postAssetPrefix && image.startsWith(postAssetPrefix));
+      })
       .map((p) => p.title || p.id)
       .slice(0, 5);
     if (usedBy.length) {
@@ -912,6 +918,21 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
         `This image is used by posts: ${usedBy.join(", ")}. Continue?`,
       );
       if (!proceed) return;
+    }
+
+    try {
+      const response = await fetch("/api/delete-image", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: item.path }),
+      });
+      if (!response.ok && response.status !== 404) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || "Failed to delete image file");
+      }
+    } catch (error) {
+      setMediaStatus(`Delete failed: ${error.message}`, true);
+      return;
     }
 
     state.mediaItems = state.mediaItems.filter((m) => m.id !== id);

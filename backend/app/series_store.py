@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -10,11 +11,19 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import Entry, EntryLabel, EntryPage, Series
+from .preview_pipeline import (
+    delete_preview_file,
+    entry_cover_thumb_rel_path,
+    generate_thumbnail,
+    resolve_source_path,
+)
+from .file_ops import safe_path
 from .settings import settings
 
 
 DEFAULT_SERIES_ID = "battle-bros"
 SERIES_ID_RE = re.compile(r"^[a-z0-9_-]{1,64}$")
+logger = logging.getLogger(__name__)
 
 
 def sanitize_series_id(raw: str | None) -> str:
@@ -176,6 +185,7 @@ def series_data_payload(db: Session, series_id: str) -> dict[str, Any]:
             "releaseType": entry.release_type or "digital",
             "storeUrl": entry.store_url or "",
             "coverImage": entry.cover_image or "",
+            "coverThumbPath": entry.cover_thumb_path or "",
         }
         if label:
             meta["entryLabelId"] = str(label.id)
@@ -454,6 +464,8 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
             cover_image = str(meta.get("coverImage") or meta.get("cover") or "").strip()
 
         entry = db.scalar(select(Entry).where(Entry.series_id == sid, Entry.title == title))
+        existing_cover = entry.cover_image if entry else ""
+        existing_thumb = entry.cover_thumb_path if entry else ""
         if not entry:
             entry = Entry(
                 id=uuid4(),
@@ -468,6 +480,7 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
                 release_type=release_type,
                 store_url=store_url or None,
                 cover_image=cover_image or None,
+                cover_thumb_path=None,
                 status="published",
                 publish_at=_now(),
                 sort_index=display_number if display_number is not None else _extract_sort_index(
@@ -498,6 +511,42 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
             entry.updated_at = _now()
 
         fallback_index += 1
+        db.add(entry)
+        db.flush()
+
+        expected_thumb = entry_cover_thumb_rel_path(str(entry.id)) if cover_image else ""
+        thumb_ok = False
+        if cover_image:
+            should_regen = (
+                str(existing_cover or "") != cover_image
+                or str(existing_thumb or "") != expected_thumb
+                or not str(existing_thumb or "")
+            )
+            try:
+                abs_thumb = safe_path(expected_thumb)
+            except ValueError:
+                abs_thumb = None
+            if should_regen and abs_thumb:
+                source = resolve_source_path(cover_image)
+                if source:
+                    try:
+                        generate_thumbnail(source, abs_thumb)
+                    except Exception as exc:
+                        logger.warning("Failed to generate entry cover thumbnail for %s: %s", cover_image, exc)
+                else:
+                    logger.warning("Cover source missing for %s", cover_image)
+            if abs_thumb:
+                thumb_ok = abs_thumb.exists()
+            if thumb_ok:
+                entry.cover_thumb_path = expected_thumb
+            else:
+                delete_preview_file(expected_thumb)
+                entry.cover_thumb_path = None
+        else:
+            if existing_thumb:
+                delete_preview_file(existing_thumb)
+            entry.cover_thumb_path = None
+
         db.add(entry)
         db.flush()
 

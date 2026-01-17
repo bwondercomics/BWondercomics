@@ -3,24 +3,26 @@ from __future__ import annotations
 import logging
 import re
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
-
-from PIL import Image, ImageFilter
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .file_ops import safe_path
 from .models import MediaItem, PageConfig
+from .preview_pipeline import (
+    PREVIEW_ROOT,
+    delete_preview_file,
+    generate_blurred_preview,
+    generate_thumbnail,
+    media_blur_rel_path,
+    media_thumb_rel_path,
+    resolve_source_path,
+)
 from .series_store import DEFAULT_SERIES_ID, sanitize_series_id
 
 logger = logging.getLogger(__name__)
 
-PREVIEW_DIR = "media/previews"
-PREVIEW_EXT = ".jpg"
-PREVIEW_QUALITY = 70
-PREVIEW_BLUR_RADIUS = 64
 POST_ASSET_PREFIX = "media/post-assets/"
 
 
@@ -55,6 +57,24 @@ def _normalize_premium_visibility(raw: Any) -> str:
     return value if value in {"blur", "hidden"} else "blur"
 
 
+def _delete_post_assets_for_media_id(media_id: str) -> None:
+    if not media_id:
+        return
+    root = POST_ASSET_PREFIX.rstrip("/")
+    try:
+        assets_dir = safe_path(root)
+    except ValueError:
+        return
+    if not assets_dir.exists():
+        return
+    for candidate in assets_dir.glob(f"{media_id}.*"):
+        if candidate.is_file():
+            try:
+                candidate.unlink()
+            except Exception:
+                continue
+
+
 def _media_id_from_path(path: str) -> str:
     filename = path.split("/")[-1]
     base = re.sub(r"\.[^.]+$", "", filename)
@@ -66,46 +86,15 @@ def _media_id_from_path(path: str) -> str:
     return f"media-{base}-{h:08x}"
 
 
-def _preview_rel_path(media_id: str) -> str:
-    return f"{PREVIEW_DIR}/{media_id}{PREVIEW_EXT}"
+def media_id_from_path(path: str) -> str:
+    return _media_id_from_path(path)
 
 
-def _resolve_media_source_path(path: str) -> Path | None:
-    if not path:
-        return None
-    clean = str(path).strip().lstrip("/")
-    if not clean or clean.startswith("http://") or clean.startswith("https://"):
-        return None
-    candidates = [clean]
-    if clean.startswith("protected/"):
-        candidates.append(clean.replace("protected/", "", 1))
-    else:
-        candidates.append(f"protected/{clean}")
-    for candidate in candidates:
-        try:
-            abs_path = safe_path(candidate)
-        except ValueError:
-            continue
-        if abs_path.is_file():
-            return abs_path
-    return None
-
-
-def _generate_blur_preview(source: Path, dest: Path) -> None:
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    with Image.open(source) as img:
-        blurred = img.convert("RGB").filter(ImageFilter.GaussianBlur(radius=PREVIEW_BLUR_RADIUS))
-        blurred.save(dest, format="JPEG", quality=PREVIEW_QUALITY, optimize=True, progressive=True)
-
-
-def _sync_media_previews(items: list[dict[str, Any]], removed_ids: set[str]) -> None:
+def _sync_media_previews(db: Session, items: list[dict[str, Any]], removed_ids: set[str]) -> None:
     for media_id in removed_ids:
-        try:
-            abs_preview = safe_path(_preview_rel_path(media_id))
-            if abs_preview.exists():
-                abs_preview.unlink()
-        except Exception:
-            continue
+        delete_preview_file(media_thumb_rel_path(media_id))
+        delete_preview_file(media_blur_rel_path(media_id))
+        _delete_post_assets_for_media_id(media_id)
 
     for item in items:
         media_id = item.get("id") or ""
@@ -113,29 +102,79 @@ def _sync_media_previews(items: list[dict[str, Any]], removed_ids: set[str]) -> 
             continue
         access = item.get("access") or "public"
         premium_visibility = item.get("premium_visibility") or "blur"
-        preview_rel = _preview_rel_path(media_id)
-        try:
-            abs_preview = safe_path(preview_rel)
-        except ValueError:
-            continue
-
         should_blur = access == "premium" and premium_visibility == "blur"
-        if not should_blur:
-            if abs_preview.exists():
-                try:
-                    abs_preview.unlink()
-                except Exception:
-                    continue
-            continue
+        thumb_rel = media_thumb_rel_path(media_id)
+        blur_rel = media_blur_rel_path(media_id) if should_blur else ""
 
-        source = _resolve_media_source_path(item.get("path") or "")
-        if not source:
-            logger.warning("Media preview source missing for %s", item.get("path"))
-            continue
+        record = db.get(MediaItem, media_id)
+        if not record:
+            path = item.get("path") or ""
+            if path:
+                record = db.scalar(select(MediaItem).where(MediaItem.path == path))
         try:
-            _generate_blur_preview(source, abs_preview)
-        except Exception as exc:
-            logger.warning("Failed to generate media preview for %s: %s", item.get("path"), exc)
+            abs_thumb = safe_path(thumb_rel)
+        except ValueError:
+            abs_thumb = None
+        try:
+            abs_blur = safe_path(blur_rel) if blur_rel else None
+        except ValueError:
+            abs_blur = None
+
+        source = resolve_source_path(item.get("path") or "")
+        thumb_ok = False
+        blur_ok = False
+
+        if source and abs_thumb:
+            try:
+                generate_thumbnail(source, abs_thumb)
+            except Exception as exc:
+                logger.warning("Failed to generate media thumbnail for %s: %s", item.get("path"), exc)
+            thumb_ok = abs_thumb.exists()
+        elif abs_thumb:
+            thumb_ok = abs_thumb.exists()
+            if not thumb_ok:
+                logger.warning("Media source missing for %s", item.get("path"))
+
+        if should_blur and abs_blur:
+            if source:
+                try:
+                    generate_blurred_preview(source, abs_blur)
+                except Exception as exc:
+                    logger.warning("Failed to generate media preview for %s: %s", item.get("path"), exc)
+            blur_ok = abs_blur.exists()
+        else:
+            if abs_blur and abs_blur.exists():
+                delete_preview_file(blur_rel)
+
+        if record:
+            record.thumb_path = thumb_rel if thumb_ok else None
+            record.preview_path = blur_rel if blur_ok else None
+            record.updated_at = _now()
+            db.add(record)
+
+        if not thumb_ok and thumb_rel:
+            delete_preview_file(thumb_rel)
+        if not blur_ok and blur_rel:
+            delete_preview_file(blur_rel)
+
+
+def ensure_media_previews(db: Session, item: MediaItem | None) -> None:
+    if not item or not item.id or not item.path:
+        return
+    access = _normalize_access(item.access, item.public)
+    premium_visibility = _normalize_premium_visibility(item.premium_visibility)
+    _sync_media_previews(
+        db,
+        [
+            {
+                "id": item.id,
+                "path": item.path,
+                "access": access,
+                "premium_visibility": premium_visibility,
+            }
+        ],
+        set(),
+    )
 
 
 def _normalize_media_items(payload: Any) -> list[dict[str, Any]]:
@@ -149,10 +188,12 @@ def _normalize_media_items(payload: Any) -> list[dict[str, Any]]:
         path = str(raw.get("path") or "").strip()
         if not path or path in seen_paths:
             continue
-        if path.startswith(PREVIEW_DIR + "/") or path.startswith(POST_ASSET_PREFIX):
+        if path.startswith(PREVIEW_ROOT + "/") or path.startswith(POST_ASSET_PREFIX):
             continue
         mid = str(raw.get("id") or "").strip() or _media_id_from_path(path)
         tags = _normalize_tags(raw.get("tags"))
+        thumb_path = str(raw.get("thumbPath") or raw.get("thumb_path") or "").strip() or None
+        preview_path = str(raw.get("previewPath") or raw.get("preview_path") or "").strip() or None
         fallback_public = raw.get("public") is not False
         access = _normalize_access(raw.get("access") or raw.get("visibility"), fallback_public)
         premium_visibility = _normalize_premium_visibility(
@@ -167,6 +208,8 @@ def _normalize_media_items(payload: Any) -> list[dict[str, Any]]:
                 "public": public,
                 "access": access,
                 "premium_visibility": premium_visibility,
+                "thumb_path": thumb_path,
+                "preview_path": preview_path,
             }
         )
         seen_paths.add(path)
@@ -183,6 +226,8 @@ def list_media_items(db: Session) -> list[dict[str, Any]]:
             "public": item.public,
             "access": item.access,
             "premiumVisibility": item.premium_visibility,
+            "thumbPath": item.thumb_path or "",
+            "previewPath": item.preview_path or "",
         }
         for item in items
     ]
@@ -203,6 +248,8 @@ def apply_media_items_save(db: Session, payload: Any) -> None:
         public = item["public"]
         access = item["access"]
         premium_visibility = item["premium_visibility"]
+        thumb_path = item["thumb_path"]
+        preview_path = item["preview_path"]
 
         if mid in existing_by_id:
             record = existing_by_id[mid]
@@ -211,6 +258,8 @@ def apply_media_items_save(db: Session, payload: Any) -> None:
             record.public = public
             record.access = access
             record.premium_visibility = premium_visibility
+            record.thumb_path = thumb_path
+            record.preview_path = preview_path
             record.updated_at = now
             keep_ids.add(record.id)
             continue
@@ -221,6 +270,8 @@ def apply_media_items_save(db: Session, payload: Any) -> None:
             by_path.public = public
             by_path.access = access
             by_path.premium_visibility = premium_visibility
+            by_path.thumb_path = thumb_path
+            by_path.preview_path = preview_path
             by_path.updated_at = now
             keep_ids.add(by_path.id)
             continue
@@ -232,6 +283,8 @@ def apply_media_items_save(db: Session, payload: Any) -> None:
             public=public,
             access=access,
             premium_visibility=premium_visibility,
+            thumb_path=thumb_path,
+            preview_path=preview_path,
             created_at=now,
             updated_at=now,
         )
@@ -242,10 +295,10 @@ def apply_media_items_save(db: Session, payload: Any) -> None:
         if record.id not in keep_ids:
             db.delete(record)
 
-    db.commit()
-
     removed_ids = {record.id for record in existing if record.id not in keep_ids}
-    _sync_media_previews(items, removed_ids)
+    _sync_media_previews(db, items, removed_ids)
+
+    db.commit()
 
 
 def get_page_config(db: Session, series_id: str | None) -> dict[str, Any] | None:

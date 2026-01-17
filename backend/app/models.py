@@ -85,6 +85,9 @@ class Post(Base):
     title: Mapped[str] = mapped_column(String(200), nullable=False)
     content: Mapped[str] = mapped_column(Text, nullable=False)
     image: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    media_id: Mapped[str | None] = mapped_column(
+        String(120), ForeignKey("media_items.id", ondelete="SET NULL"), nullable=True
+    )
     image_tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
     image_focus: Mapped[str] = mapped_column(String(20), nullable=False, default="center")
     share: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
@@ -108,6 +111,8 @@ class MediaItem(Base):
     public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     access: Mapped[str] = mapped_column(String(20), nullable=False, default="public")
     premium_visibility: Mapped[str] = mapped_column(String(20), nullable=False, default="blur")
+    thumb_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    preview_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
@@ -191,6 +196,7 @@ class Entry(Base):
     release_type: Mapped[str] = mapped_column(String(20), nullable=False, default="digital")
     store_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     cover_image: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    cover_thumb_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="published")
     publish_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)

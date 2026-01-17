@@ -14,6 +14,7 @@ from sqlalchemy import and_, func, select, update
 from sqlalchemy.orm import Session
 
 from ..bluesky import BlueskyError, BlueskyPost
+from ..content_store import ensure_media_previews, media_id_from_path
 from ..db import get_db
 from ..models import MediaItem, Post, User
 from ..file_ops import safe_path
@@ -205,11 +206,17 @@ def _require_admin(request: Request, db: Session) -> User | None:
     return user
 
 
-def _post_to_dict(post: Post) -> dict[str, Any]:
+def _post_to_dict(post: Post, media_lookup: dict[str, MediaItem] | None = None) -> dict[str, Any]:
+    thumb_path = ""
+    if media_lookup and post.media_id:
+        item = media_lookup.get(post.media_id)
+        thumb_path = item.thumb_path or "" if item else ""
     return {
         "id": str(post.id),
         "title": post.title,
         "image": post.image or "",
+        "mediaId": post.media_id or "",
+        "thumbPath": thumb_path,
         "imageTags": list(post.image_tags or []),
         "imageFocus": post.image_focus or "center",
         "content": post.content,
@@ -220,6 +227,53 @@ def _post_to_dict(post: Post) -> dict[str, Any]:
         "status": post.status,
         "updatedAt": _iso_z(post.updated_at),
     }
+
+
+def _extract_post_asset_stem(path: str) -> str:
+    if not path or not _is_post_asset_path(path):
+        return ""
+    base = os.path.splitext(path)[0]
+    return base.split("/")[-1]
+
+
+def _build_post_media_lookup(db: Session, posts: list[Post]) -> dict[str, MediaItem]:
+    id_candidates: set[str] = set()
+    for post in posts:
+        if post.media_id:
+            id_candidates.add(post.media_id)
+    if not id_candidates:
+        return {}
+    items = db.scalars(select(MediaItem).where(MediaItem.id.in_(id_candidates))).all()
+    return {item.id: item for item in items if item.id}
+
+
+def _ensure_media_item(db: Session, image: str | None, tags: list[str], now: datetime) -> MediaItem | None:
+    normalized = _normalize_image_path(image)
+    if not normalized:
+        return None
+    if normalized.startswith("http://") or normalized.startswith("https://"):
+        return None
+    if _is_post_asset_path(normalized):
+        stem = _extract_post_asset_stem(normalized)
+        return db.get(MediaItem, stem) if stem else None
+
+    existing = _find_media_item(db, normalized)
+    if existing:
+        return existing
+
+    access = "premium" if normalized.startswith("protected/") else "public"
+    record = MediaItem(
+        id=media_id_from_path(normalized),
+        path=normalized,
+        tags=tags,
+        public=access == "public",
+        access=access,
+        premium_visibility="blur",
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(record)
+    return record
 
 
 def _promote_due_scheduled(db: Session, now: datetime) -> None:
@@ -288,7 +342,8 @@ def list_public_posts(
         .limit(limit)
     )
     posts = db.scalars(stmt).all()
-    return {"posts": [_post_to_dict(p) for p in posts]}
+    thumb_lookup = _build_post_media_lookup(db, posts)
+    return {"posts": [_post_to_dict(p, thumb_lookup) for p in posts]}
 
 
 @router.get("/api/posts/latest")
@@ -297,7 +352,10 @@ def latest_public_post(db: Session = Depends(get_db)):
     _promote_due_scheduled(db, now)
 
     post = db.scalar(select(Post).where(Post.status == "published").order_by(Post.publish_at.desc()).limit(1))
-    return {"post": _post_to_dict(post) if post else None}
+    if not post:
+        return {"post": None}
+    thumb_lookup = _build_post_media_lookup(db, [post])
+    return {"post": _post_to_dict(post, thumb_lookup)}
 
 
 @router.get("/rss.xml")
@@ -346,7 +404,8 @@ def admin_list_posts(request: Request, db: Session = Depends(get_db)):
     _promote_due_scheduled(db, now)
 
     posts = db.scalars(select(Post).order_by(Post.publish_at.desc())).all()
-    return {"posts": [_post_to_dict(p) for p in posts]}
+    thumb_lookup = _build_post_media_lookup(db, posts)
+    return {"posts": [_post_to_dict(p, thumb_lookup) for p in posts]}
 
 
 class PostUpsertRequest(BaseModel):
@@ -408,6 +467,9 @@ def admin_create_post(payload: PostUpsertRequest, request: Request, db: Session 
         return JSONResponse(status_code=400, content={"error": str(exc)})
     image_focus = (payload.image_focus or "center").strip() or "center"
     image_tags = _normalize_tags(payload.image_tags)
+    media_item = _ensure_media_item(db, payload.image, image_tags, now)
+    if media_item:
+        ensure_media_previews(db, media_item)
     share = bool(payload.share)
     share_bluesky = bool(payload.share_bluesky)
     if status == "draft":
@@ -422,6 +484,7 @@ def admin_create_post(payload: PostUpsertRequest, request: Request, db: Session 
         content=content,
         image=image,
         image_tags=image_tags,
+        media_id=media_item.id if media_item else None,
         image_focus=image_focus[:20],
         share=share,
         share_bluesky=share_bluesky,
@@ -435,7 +498,8 @@ def admin_create_post(payload: PostUpsertRequest, request: Request, db: Session 
     db.refresh(post)
     _share_post_to_bluesky(db, post)
     db.commit()
-    return {"post": _post_to_dict(post)}
+    thumb_lookup = _build_post_media_lookup(db, [post])
+    return {"post": _post_to_dict(post, thumb_lookup)}
 
 
 @router.put("/api/admin/posts/{post_id}")
@@ -472,6 +536,12 @@ def admin_update_post(post_id: str, payload: PostUpsertRequest, request: Request
         return JSONResponse(status_code=400, content={"error": str(exc)})
     image_focus = (payload.image_focus or post.image_focus or "center").strip() or "center"
     image_tags = _normalize_tags(payload.image_tags) if payload.image_tags is not None else list(post.image_tags or [])
+    if image == old_image and post.media_id:
+        media_item = db.get(MediaItem, post.media_id)
+    else:
+        media_item = _ensure_media_item(db, payload.image, image_tags, now)
+    if media_item:
+        ensure_media_previews(db, media_item)
     share = bool(payload.share)
     share_bluesky = bool(payload.share_bluesky) if payload.share_bluesky is not None else post.share_bluesky
     if status == "draft":
@@ -485,6 +555,7 @@ def admin_update_post(post_id: str, payload: PostUpsertRequest, request: Request
     post.image = image
     post.image_tags = image_tags
     post.image_focus = image_focus[:20]
+    post.media_id = media_item.id if media_item else None
     post.share = share
     post.share_bluesky = share_bluesky
     post.status = status
@@ -498,7 +569,8 @@ def admin_update_post(post_id: str, payload: PostUpsertRequest, request: Request
     db.refresh(post)
     _share_post_to_bluesky(db, post)
     db.commit()
-    return {"post": _post_to_dict(post)}
+    thumb_lookup = _build_post_media_lookup(db, [post])
+    return {"post": _post_to_dict(post, thumb_lookup)}
 
 
 @router.delete("/api/admin/posts/{post_id}")

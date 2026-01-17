@@ -6,6 +6,8 @@ export function latestPreviewText(text = '') {
   return condensed.length > 120 ? `${condensed.slice(0, 120)}...` : condensed;
 }
 
+const FALLBACK_IMAGE = '/assets/image-missing.png';
+
 export function renderLatestUpdate(post) {
   const body = document.getElementById('latestBody');
   if (!body) return;
@@ -13,16 +15,22 @@ export function renderLatestUpdate(post) {
   body.innerHTML = '';
 
   const titleText = (post.title || '').trim();
-  const thumb = document.createElement(post.image ? 'img' : 'div');
-  thumb.className = post.image ? 'latest-thumb' : 'latest-thumb placeholder';
-  if (post.image) {
-    thumb.src = post.image;
+  const imageSrc = (post.thumbPath || post.image || '').trim();
+  const thumb = document.createElement(imageSrc ? 'img' : 'div');
+  thumb.className = imageSrc ? 'latest-thumb' : 'latest-thumb placeholder';
+  if (imageSrc) {
+    thumb.src = imageSrc;
     thumb.alt = titleText || 'Latest update image';
     thumb.loading = 'lazy';
     if (post.imageFocus) {
       thumb.style.objectPosition = post.imageFocus;
       thumb.style.objectFit = 'cover';
     }
+    thumb.onerror = () => {
+      if (thumb.src.endsWith(FALLBACK_IMAGE)) return;
+      thumb.src = FALLBACK_IMAGE;
+      thumb.classList.add('is-missing');
+    };
   } else {
     thumb.textContent = titleText || 'Update';
   }

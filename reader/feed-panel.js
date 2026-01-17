@@ -1,5 +1,7 @@
 import { latestPreviewText } from './latest.js';
 
+const FALLBACK_IMAGE = '/assets/image-missing.png';
+
 async function fetchFeedPosts() {
   const response = await fetch('/api/posts', { cache: 'no-store' });
   if (!response.ok) throw new Error('Failed to load posts');
@@ -93,16 +95,22 @@ function renderFeedItem(post, index) {
   const media = document.createElement('div');
   media.className = 'feed-item-media';
 
-  const thumb = document.createElement(post.image ? 'img' : 'div');
-  thumb.className = post.image ? 'feed-item-thumb' : 'feed-item-thumb placeholder';
-  if (post.image) {
-    thumb.src = post.image;
+  const imageSrc = (post.thumbPath || post.image || '').trim();
+  const thumb = document.createElement(imageSrc ? 'img' : 'div');
+  thumb.className = imageSrc ? 'feed-item-thumb' : 'feed-item-thumb placeholder';
+  if (imageSrc) {
+    thumb.src = imageSrc;
     thumb.alt = titleText || 'Feed update image';
     thumb.loading = 'lazy';
     if (post.imageFocus) {
       thumb.style.objectPosition = post.imageFocus;
       thumb.style.objectFit = 'cover';
     }
+    thumb.onerror = () => {
+      if (thumb.src.endsWith(FALLBACK_IMAGE)) return;
+      thumb.src = FALLBACK_IMAGE;
+      thumb.classList.add('is-missing');
+    };
   } else {
     thumb.textContent = titleText || 'Update';
   }
