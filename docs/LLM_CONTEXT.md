@@ -7,6 +7,8 @@ This document is a concise handoff for new threads/agents. It captures how the s
 - Frontend sources:
   - Reader UI: `reader/` + `index.html` + `assets/css/main.css` + `assets/*`
   - Admin UI: `admin/`
+  - CSS is split into core sections under `assets/css/main.core.*.css` and responsive overrides in `assets/css/main.responsive.css`.
+    `assets/css/main.css` now only imports `main.core.css` + `main.responsive.css`.
 - Backend: `backend/` (FastAPI + SQLAlchemy)
 - Built frontend: `dist/` (public pages served from here in production)
 - Frontend build snapshots: `var/releases/dist-YYYYMMDD-HHMMSS.tar.gz`
@@ -118,6 +120,13 @@ This also snapshots the current `dist/` into `var/releases/`.
 Admin is currently served from `admin/` (repo source) via Caddy; rebuilding `dist/` is optional for admin-only changes unless you change Caddy to serve admin from `dist/`.
 
 Avoid editing `dist/` directly. Treat it as build output only.
+
+## Entry Cover Gallery (Reader)
+- Overlay root: `#entryCoverGallery`
+- Grid container: `#entryCoverGalleryGrid`
+- Button: `#entryCoverGalleryBtn`
+- Close button: `#entryCoverGalleryClose`
+- Entry card classes used by the reader gallery: `.entry-card`, `.entry-thumb-wrap`, `.entry-thumb`, `.entry-info`, `.entry-title`
 
 Backend changes do not hot-reload (uvicorn runs without `--reload`), so restart the API container after code changes.
 

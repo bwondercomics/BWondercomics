@@ -13,6 +13,8 @@ This guide maps the reader-side modules, their responsibilities, and how they co
 - `reader/pointer.js` — Wheel/pinch/drag handling for zoom + pan, including zoom focal point math and drag inertia limits.
 - `reader/fullscreen.js` — Cross-browser fullscreen enter/exit and button state sync.
 - `reader/gallery.js` — Cover gallery overlay (entry grid), selection, and smooth scroll to current entry.
+  - Overlay IDs: `entryCoverGallery`, `entryCoverGalleryGrid`, `entryCoverGalleryBtn`, `entryCoverGalleryClose`
+  - Entry card classes: `.entry-card`, `.entry-thumb-wrap`, `.entry-thumb`, `.entry-info`, `.entry-title`
 - `reader/overlays.js` — Shortcuts modal, help overlays, and shared show/hide helpers.
 - `reader/latest.js` — Renders the “Latest update” widget from the post returned by `/api/posts/latest`.
 - `reader/email.js` — Signup form submission to the internal API (`POST /api/email/subscribe`) with inline success/error feedback.
