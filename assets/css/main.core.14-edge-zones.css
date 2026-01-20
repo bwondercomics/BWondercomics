@@ -1,0 +1,58 @@
+    /* ==================== EDGE ZONES ==================== */
+    .edgeZone {
+      position: absolute;
+      top: 0;
+      height: 100%;
+      width: 12%;
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 120ms;
+    }
+
+    .edgeZone.active {
+      pointer-events: auto;
+      opacity: 1;
+    }
+
+    .edgeZone.left {
+      left: 0;
+    }
+
+    .edgeZone.right {
+      right: 0;
+    }
+
+    .edgeArrow {
+      width: 64px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 50%;
+      color: rgba(255, 255, 255, 0.4);
+      cursor: pointer;
+      user-select: none;
+      backdrop-filter: blur(2px);
+      transition: all 0.2s ease;
+      font-size: 28px;
+    }
+
+    .edgeArrow:hover {
+      background: rgba(0, 0, 0, 0.4);
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: scale(1.1);
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+    }
+
+    .edgeArrow:active {
+      transform: scale(0.95);
+      background: rgba(0, 0, 0, 0.6);
+    }
+

@@ -1,0 +1,51 @@
+    /* ==================== BASE LAYOUT ==================== */
+    html,
+    body {
+      height: 100%;
+      font-family: "Righteous", sans-serif;
+      background: var(--bg-dark);
+      color: var(--text);
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+
+    main {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - 72px);
+      height: calc(100dvh - 72px); /* dvh accounts for mobile browser chrome */
+      overflow: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        repeating-linear-gradient(0deg,
+          transparent 0px,
+          transparent 2px,
+          rgba(0, 217, 255, 0.02) 2px,
+          rgba(0, 217, 255, 0.02) 4px),
+        radial-gradient(circle at 20% 80%,
+          rgba(255, 237, 0, 0.05),
+          transparent 40%),
+        radial-gradient(circle at 80% 20%,
+          rgba(255, 0, 234, 0.05),
+          transparent 40%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(transparent 50%, rgba(0, 0, 0, 0.05) 50%);
+      background-size: 100% 3px;
+      pointer-events: none;
+      z-index: 1;
+      animation: scanline 6s linear infinite;
+      opacity: 0.4;
+    }
+

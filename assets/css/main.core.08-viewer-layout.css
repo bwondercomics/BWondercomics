@@ -1,0 +1,22 @@
+    /* ==================== VIEWER LAYOUT ==================== */
+    .viewerWrap {
+      display: flex;
+      gap: 12px;
+      align-items: stretch;
+      justify-content: center;
+      width: 100%;
+      max-width: 2000px;
+      margin: 0 auto;
+      padding: 16px 12px 0 12px;
+      flex: 1 1 auto;
+      min-height: 0;
+    }
+
+    .viewer-content-wrapper {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow: hidden;
+    }
+

@@ -1,0 +1,81 @@
+    /* ==================== ANIMATIONS ==================== */
+    @keyframes glitchText {
+
+      0%,
+      100% {
+        text-shadow:
+          2px 2px 0 var(--primary),
+          -2px -2px 0 var(--secondary);
+      }
+
+      25% {
+        text-shadow:
+          -2px 2px 0 var(--secondary),
+          2px -2px 0 var(--primary);
+      }
+
+      50% {
+        text-shadow:
+          2px -2px 0 var(--primary),
+          -2px 2px 0 var(--secondary);
+      }
+
+      75% {
+        text-shadow:
+          -2px -2px 0 var(--secondary),
+          2px 2px 0 var(--primary);
+      }
+    }
+
+    @keyframes scanline {
+      0% {
+        transform: translateY(-100%);
+      }
+
+      100% {
+        transform: translateY(100%);
+      }
+    }
+
+    @keyframes neonPulse {
+
+      0%,
+      100% {
+        box-shadow:
+          0 0 5px var(--primary),
+          0 0 10px var(--primary);
+      }
+
+      50% {
+        box-shadow:
+          0 0 10px var(--primary),
+          0 0 20px var(--primary);
+      }
+    }
+
+    @keyframes pixelShift {
+
+      0%,
+      100% {
+        transform: translate(0, 0);
+      }
+
+      25% {
+        transform: translate(2px, 0);
+      }
+
+      50% {
+        transform: translate(0, 2px);
+      }
+
+      75% {
+        transform: translate(-2px, 0);
+      }
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
