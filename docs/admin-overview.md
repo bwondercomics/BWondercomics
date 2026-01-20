@@ -6,6 +6,7 @@ This document covers the admin panel (content editor) architecture, data flow, a
 - `admin/app.js` — Main script; initializes the UI and wires up entries/posts/media/designer tools.
 - `admin/config.js` — Constants: storage keys and API endpoints.
 - `admin/dom.js` — Centralized DOM lookups for forms, buttons, lists, modals, and status elements.
+- `admin/admin.css` — Extracted styles from `admin/index.html` (admin UI styling lives here now).
 
 ## Feature Areas
 - Auth/session: Uses the site's account system (`/api/login`, `/api/session`) and requires an `admin` role.

@@ -594,12 +594,15 @@ function renderMetricList(containerId, items, valueLabel = "Views") {
     return;
   }
 
-  const maxVal = Math.max(...items.map((i) => Number(i.views || i.count || 0)), 1);
+  const maxVal = Math.max(
+    ...items.map((i) => Number(i.views || i.count || i.y || 0)),
+    1,
+  );
 
   container.innerHTML = items
     .map((item) => {
-      const label = item.path || item.value || "Unknown";
-      const count = Number(item.views || item.count || 0);
+      const label = item.path || item.value || item.label || item.x || "Unknown";
+      const count = Number(item.views || item.count || item.y || 0);
       const pct = (count / maxVal) * 100;
 
       return `

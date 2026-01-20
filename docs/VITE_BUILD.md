@@ -14,7 +14,8 @@ Vite is now configured as the build tool for the BWonderComics reader, providing
 ```bash
 npm run dev
 ```
-- Runs on `http://localhost:3000` (accessible on LAN at `http://10.0.0.166:3000`)
+- Default Vite port is `5173` (use `--host 0.0.0.0 --port 5173` for LAN access)
+- LAN example: `http://10.0.0.166:5173`
 - Hot reload - changes appear instantly without refresh
 - API proxy configured to `http://localhost:8001` (bw-quality test server)
 
@@ -56,7 +57,7 @@ For production deployment:
 
 ## Notes
 
-- Development server uses port 3000 (configurable in vite.config.js)
+- Development server defaults to port 5173
 - Production builds are in `dist/` (git-ignored)
 - Source maps help debug minified production code
 - Console.logs are automatically removed in production builds

@@ -6,7 +6,7 @@ This document is a concise handoff for new threads/agents. It captures how the s
 - Repo root: `/srv/bw-quality`
 - Frontend sources:
   - Reader UI: `reader/` + `index.html` + `assets/css/main.css` + `assets/*`
-  - Admin UI: `admin/`
+  - Admin UI: `admin/` (`admin/index.html` + `admin/admin.css`)
   - CSS is split into core sections under `assets/css/main.core.*.css` and responsive overrides in `assets/css/main.responsive.css`.
     `assets/css/main.css` now only imports `main.core.css` + `main.responsive.css`.
 - Backend: `backend/` (FastAPI + SQLAlchemy)
