@@ -45,7 +45,7 @@ function formatEntryLabel(name, meta, unitLabel) {
 }
 
 function openCommentsPanel() {
-  const overlay = document.getElementById("galleryOverlay");
+  const overlay = document.getElementById("entryCoverGallery");
   if (overlay && overlay.classList.contains("active")) toggleGallery();
 
   const commentsSection = document.getElementById("comicCommentsSection");
@@ -61,7 +61,7 @@ function openCommentsPanel() {
 
 // Build the gallery grid for available and locked entries.
 export function renderGallery(entryOrder, entries, options = {}) {
-  const grid = document.getElementById("galleryGrid");
+  const grid = document.getElementById("entryCoverGalleryGrid");
   if (!grid) return;
 
   grid.innerHTML = "";
@@ -73,7 +73,7 @@ export function renderGallery(entryOrder, entries, options = {}) {
   // Append a promo card for merch or special volume releases.
   const addPromoCard = (cover, variantClass, badgeText) => {
     const card = document.createElement("div");
-    card.className = `chapter-card ${variantClass}`;
+    card.className = `entry-card ${variantClass}`;
     card.style.setProperty("--card-index", cardIndex++);
 
     card.onclick = () => {
@@ -81,10 +81,10 @@ export function renderGallery(entryOrder, entries, options = {}) {
     };
 
     const thumbWrap = document.createElement("div");
-    thumbWrap.className = "chapter-thumb-wrap";
+    thumbWrap.className = "entry-thumb-wrap";
 
     const thumb = document.createElement("img");
-    thumb.className = "chapter-thumb";
+    thumb.className = "entry-thumb";
     thumb.dataset.src = cover.image;
     thumb.alt = cover.title;
     thumb.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='150'%3E%3Crect width='100' height='150' fill='%23111'/%3E%3C/svg%3E";
@@ -94,10 +94,10 @@ export function renderGallery(entryOrder, entries, options = {}) {
     }
 
     const info = document.createElement("div");
-    info.className = "chapter-info";
+    info.className = "entry-info";
 
     const title = document.createElement("div");
-    title.className = "chapter-title";
+    title.className = "entry-title";
     title.textContent = cover.title;
 
     const badge = document.createElement("div");
@@ -141,7 +141,7 @@ export function renderGallery(entryOrder, entries, options = {}) {
     const displayTitle = formatEntryLabel(name, meta, unitLabel);
 
     const card = document.createElement("div");
-    card.className = "chapter-card";
+    card.className = "entry-card";
     card.style.setProperty("--card-index", cardIndex++);
     if (name === state.currentChapter) {
       card.classList.add("active");
@@ -154,10 +154,10 @@ export function renderGallery(entryOrder, entries, options = {}) {
     };
 
     const thumbWrap = document.createElement("div");
-    thumbWrap.className = "chapter-thumb-wrap";
+    thumbWrap.className = "entry-thumb-wrap";
 
     const thumb = document.createElement("img");
-    thumb.className = "chapter-thumb";
+    thumb.className = "entry-thumb";
     // Use data-src for lazy loading via Intersection Observer
     thumb.dataset.src = coverUrl;
     thumb.alt = name;
@@ -179,10 +179,10 @@ export function renderGallery(entryOrder, entries, options = {}) {
     }
 
     const info = document.createElement("div");
-    info.className = "chapter-info";
+    info.className = "entry-info";
 
     const title = document.createElement("div");
-    title.className = "chapter-title";
+    title.className = "entry-title";
     title.textContent = displayTitle;
 
     info.appendChild(title);
@@ -197,16 +197,16 @@ export function renderGallery(entryOrder, entries, options = {}) {
     const displayTitle = formatEntryLabel(name, meta, unitLabel);
 
     const card = document.createElement("div");
-    card.className = "chapter-card premium-card locked";
+    card.className = "entry-card premium-card locked";
     card.style.setProperty("--card-index", cardIndex++);
 
     card.onclick = () => openCommentsPanel();
 
     const thumbWrap = document.createElement("div");
-    thumbWrap.className = "chapter-thumb-wrap";
+    thumbWrap.className = "entry-thumb-wrap";
 
     const thumb = document.createElement("img");
-    thumb.className = "chapter-thumb";
+    thumb.className = "entry-thumb";
     if (coverUrl) thumb.dataset.src = coverUrl;
     thumb.alt = name;
     thumb.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='150'%3E%3Crect width='100' height='150' fill='%23111'/%3E%3C/svg%3E";
@@ -221,10 +221,10 @@ export function renderGallery(entryOrder, entries, options = {}) {
     };
 
     const info = document.createElement("div");
-    info.className = "chapter-info";
+    info.className = "entry-info";
 
     const title = document.createElement("div");
-    title.className = "chapter-title";
+    title.className = "entry-title";
     title.textContent = displayTitle;
 
     const badge = document.createElement("div");
@@ -239,7 +239,7 @@ export function renderGallery(entryOrder, entries, options = {}) {
     grid.appendChild(card);
   });
 
-  const closeBtn = document.getElementById("galleryClose");
+  const closeBtn = document.getElementById("entryCoverGalleryClose");
   if (closeBtn) {
     closeBtn.onclick = toggleGallery;
   }
@@ -247,7 +247,7 @@ export function renderGallery(entryOrder, entries, options = {}) {
 
 // Toggle the gallery overlay visibility.
 export function toggleGallery() {
-  const overlay = document.getElementById("galleryOverlay");
+  const overlay = document.getElementById("entryCoverGallery");
   if (overlay) {
     overlay.classList.toggle("active");
   }
@@ -255,10 +255,10 @@ export function toggleGallery() {
 
 // Wire the gallery button click handler once the DOM is ready.
 export function attachGalleryButton() {
-  const galleryBtn = document.getElementById("galleryBtn");
+  const galleryBtn = document.getElementById("entryCoverGalleryBtn");
   if (galleryBtn) galleryBtn.addEventListener("click", toggleGallery);
 
-  const overlay = document.getElementById("galleryOverlay");
+  const overlay = document.getElementById("entryCoverGallery");
   if (overlay) {
     overlay.addEventListener("click", (event) => {
       if (event.target === overlay) toggleGallery();

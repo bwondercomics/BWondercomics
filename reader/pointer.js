@@ -3,7 +3,12 @@ import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { el } from './dom.js';
 import { applyTransform, fitToScreen } from './transform.js';
+import { toggleControlsBar } from './fullscreen.js';
 import { prevPage, nextPage } from './controls.js';
+import { throttle, cachedMeasure } from './utils.js';
+
+// Cached viewport measurement to avoid layout thrashing
+let getViewportRect = null;
 
 function getDistance(a, b) {
   const dx = a.x - b.x;
@@ -20,12 +25,20 @@ export function initPointerHandlers() {
   if (el.stage) el.stage.addEventListener('wheel', onWheel, { passive: false });
 
   if (el.viewport) {
+    // Initialize cached measurement for viewport rect (100ms TTL)
+    getViewportRect = cachedMeasure(() => el.viewport.getBoundingClientRect(), 100);
+
+    // Throttle edge zone updates to ~30fps max to reduce layout thrashing
+    const throttledEdgeUpdate = throttle((x, y) => updateEdgeZones(x, y), 32);
     el.viewport.addEventListener('mousemove', (e) => {
-      updateEdgeZones(e.clientX, e.clientY);
+      throttledEdgeUpdate(e.clientX, e.clientY);
     });
 
-    el.viewport.addEventListener('pointerup', () => {
+    el.viewport.addEventListener('pointerup', (e) => {
       if (!state.isDragging && state.pointers.size === 0) {
+        if (document.fullscreenElement && e.pointerType === 'touch') {
+          return;
+        }
         const now = Date.now();
         if (state.lastTap && now - state.lastTap < 300) {
           state.lastTap = 0;
@@ -57,7 +70,13 @@ function onPointerDown(e) {
     };
     state.dragStart = { x: e.clientX, y: e.clientY };
     state.panStart = { ...state.pan };
-    state.isDragging = state.scale > 1.01;
+    // In fullscreen, allow mouse drag pan when zoomed; reserve touch for navigation.
+    if (document.fullscreenElement) {
+      const baseScale = state.fullscreenBaseScale || 1;
+      state.isDragging = e.pointerType === 'mouse' && state.scale > baseScale + 0.01;
+    } else {
+      state.isDragging = state.scale > 1.01;
+    }
   } else if (pointerCount === 2) {
     const points = Array.from(state.pointers.values());
     state.pinchDistance = getDistance(points[0], points[1]);
@@ -101,7 +120,10 @@ function onPointerMove(e) {
 
     if (state.pinchDistance && state.pinchScale != null) {
       const scale = state.pinchScale * (newDist / state.pinchDistance);
-      const newScale = Math.max(CONFIG.ZOOM_MIN, Math.min(CONFIG.ZOOM_MAX, scale));
+      const minScale = document.fullscreenElement
+        ? (state.fullscreenBaseScale || 1)
+        : CONFIG.ZOOM_MIN;
+      const newScale = Math.max(minScale, Math.min(CONFIG.ZOOM_MAX, scale));
 
       const newCenter = {
         x: (points[0].x + points[1].x) / 2,
@@ -128,18 +150,27 @@ function onPointerUp(e) {
 
   if (state.pointers.size === 0) {
     const wasPinching = state.pinchDistance !== null;
+    let skipSwipe = false;
 
     if (!wasPinching && state.touchStart) {
       const dx = e.clientX - state.touchStart.x;
       const dy = e.clientY - state.touchStart.y;
       const dt = Date.now() - state.touchStart.time;
+      const isTap = Math.abs(dx) < 12 && Math.abs(dy) < 12 && dt < 300;
+
+      if (document.fullscreenElement && e.pointerType === 'touch' && isTap) {
+        toggleControlsBar();
+        state.lastTap = 0;
+        skipSwipe = true;
+      }
 
       const isHorizontalSwipe = Math.abs(dx) > CONFIG.SWIPE_THRESHOLD;
       const isDominantlyHorizontal = Math.abs(dx) > Math.abs(dy);
       const isFastEnough = dt < CONFIG.SWIPE_TIMEOUT;
-      const isNotZoomed = state.scale <= 1.01;
+      const allowSwipeWhenZoomed = document.fullscreenElement && e.pointerType === 'touch';
+      const isNotZoomed = state.scale <= 1.01 || allowSwipeWhenZoomed;
 
-      if (isHorizontalSwipe && isDominantlyHorizontal && isFastEnough && isNotZoomed) {
+      if (!skipSwipe && isHorizontalSwipe && isDominantlyHorizontal && isFastEnough && isNotZoomed) {
         dx > 0 ? prevPage() : nextPage();
       }
     }
@@ -153,7 +184,11 @@ function onPointerUp(e) {
     const remaining = Array.from(state.pointers.values())[0];
     state.dragStart = { x: remaining.x, y: remaining.y };
     state.panStart = { ...state.pan };
-    state.isDragging = state.scale > 1.01;
+    if (document.fullscreenElement) {
+      state.isDragging = false;
+    } else {
+      state.isDragging = state.scale > 1.01;
+    }
   }
 }
 
@@ -161,7 +196,10 @@ function onWheel(e) {
   if (e.ctrlKey) {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    state.scale = Math.max(CONFIG.ZOOM_MIN, Math.min(CONFIG.ZOOM_MAX, state.scale + delta));
+    const minScale = document.fullscreenElement
+      ? (state.fullscreenBaseScale || 1)
+      : CONFIG.ZOOM_MIN;
+    state.scale = Math.max(minScale, Math.min(CONFIG.ZOOM_MAX, state.scale + delta));
     applyTransform();
   }
 }
@@ -176,7 +214,8 @@ export function updateEdgeZones(x, _y) {
     return;
   }
 
-  const rect = el.viewport.getBoundingClientRect();
+  // Use cached rect to avoid layout thrashing (falls back to direct call if not initialized)
+  const rect = getViewportRect ? getViewportRect() : el.viewport.getBoundingClientRect();
   const relX = x - rect.left;
   const pct = relX / rect.width;
 

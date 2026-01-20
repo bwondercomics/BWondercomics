@@ -92,9 +92,13 @@ export function renderStatusPanel(message, statusTimerRef) {
   const text = statusMessage || 'ready';
   let i = 0;
   const step = () => {
-    if (i < text.length) {
-      el.statusText.textContent += text[i++];
-      statusTimerRef.current = setTimeout(step, 35);
+    if (i <= text.length) {
+      // Use substring instead of += to avoid O(n²) string concatenation
+      el.statusText.textContent = text.substring(0, i);
+      i++;
+      if (i <= text.length) {
+        statusTimerRef.current = setTimeout(step, 35);
+      }
     }
   };
   step();

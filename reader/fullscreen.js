@@ -7,6 +7,19 @@ import { fitHeightFullscreen } from './transform.js';
 let hideTimer = null;
 let mouseOverControls = false;
 
+function isCoarsePointer() {
+  return typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia('(pointer: coarse)').matches;
+}
+
+function getFullscreenHideDelay() {
+  if (document.fullscreenElement && isCoarsePointer()) {
+    return CONFIG.CONTROLS_HIDE_DELAY + 6000;
+  }
+  return CONFIG.CONTROLS_HIDE_DELAY;
+}
+
 export function showControlsBar() {
   // Keep topbar/controls visible, then auto-hide after a delay.
   if (el.topbar) el.topbar.classList.remove('hidden');
@@ -23,7 +36,27 @@ export function showControlsBar() {
         if (el.topbar) el.topbar.classList.add('hidden');
         if (el.controls) el.controls.classList.add('hidden');
       }
-    }, CONFIG.CONTROLS_HIDE_DELAY);
+    }, getFullscreenHideDelay());
+  }
+}
+
+export function hideControlsBar() {
+  if (el.topbar) el.topbar.classList.add('hidden');
+  if (el.controls) el.controls.classList.add('hidden');
+  if (hideTimer) {
+    clearTimeout(hideTimer);
+    hideTimer = null;
+  }
+}
+
+export function toggleControlsBar() {
+  const topHidden = !el.topbar || el.topbar.classList.contains('hidden');
+  const controlsHidden = !el.controls || el.controls.classList.contains('hidden');
+  const isHidden = topHidden && controlsHidden;
+  if (isHidden) {
+    showControlsBar();
+  } else {
+    hideControlsBar();
   }
 }
 
@@ -49,6 +82,7 @@ export function onFullscreenChange() {
     if (el.topbar) el.topbar.classList.remove('hidden');
     if (el.controls) el.controls.classList.remove('hidden');
 
+    state.fullscreenBaseScale = 1;
     if (el.stage && state.prevTransformOrigin !== null) {
       el.stage.style.transformOrigin = state.prevTransformOrigin;
       state.prevTransformOrigin = null;

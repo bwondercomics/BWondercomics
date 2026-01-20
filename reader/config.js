@@ -2,15 +2,42 @@
  * Application configuration constants
  * Centralized configuration for the Battle Bros comic reader
  */
+
+/**
+ * Detect if device is low-end based on available signals.
+ * Used to adjust cache/preload for better performance on older devices.
+ */
+function isLowEndDevice() {
+  // Check device memory (in GB) - available in Chrome/Edge
+  const memory = navigator.deviceMemory;
+  if (memory && memory <= 4) return true;
+
+  // Check hardware concurrency (CPU cores)
+  const cores = navigator.hardwareConcurrency;
+  if (cores && cores <= 4) return true;
+
+  // Check for mobile user agent as fallback
+  const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+  // If mobile and we couldn't detect memory, assume low-end to be safe
+  if (isMobile && !memory) return true;
+
+  return false;
+}
+
+const lowEnd = isLowEndDevice();
+
 export const CONFIG = {
   /** LocalStorage key for saving reading progress */
   STORAGE_KEY: 'battleBros_progress',
 
-  /** Maximum number of images to cache in memory (FIFO) */
-  IMAGE_CACHE_SIZE: 60,
+  /** Maximum number of images to cache in memory (FIFO)
+   * Reduced on low-end devices to avoid memory pressure */
+  IMAGE_CACHE_SIZE: lowEnd ? 15 : 30,
 
-  /** Number of pages to preload ahead of current position */
-  PRELOAD_AHEAD: 8,
+  /** Number of pages to preload ahead of current position
+   * Reduced on low-end devices for faster initial load */
+  PRELOAD_AHEAD: lowEnd ? 3 : 5,
 
   /** Minimum viewport width (px) required for two-page mode */
   TWO_PAGE_BREAKPOINT: 900,

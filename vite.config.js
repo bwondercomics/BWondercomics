@@ -33,6 +33,26 @@ export default defineConfig({
                 target: 'http://localhost:8001', // Proxy to bw-quality test server
                 changeOrigin: true
             },
+            '/data.json': {
+                target: 'http://localhost:8001',
+                changeOrigin: true
+            },
+            '/series.json': {
+                target: 'http://localhost:8001',
+                changeOrigin: true
+            },
+            '/page-config.json': {
+                target: 'http://localhost:8001',
+                changeOrigin: true
+            },
+            '/media.json': {
+                target: 'http://localhost:8001',
+                changeOrigin: true
+            },
+            '/series': {
+                target: 'http://localhost:8001',
+                changeOrigin: true
+            },
             '/analytics.js': {
                 target: 'http://localhost:8001',
                 changeOrigin: true

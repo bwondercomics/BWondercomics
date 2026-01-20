@@ -67,6 +67,33 @@ docker restart bwondercomics-bwondercomics-api-1
 ```
 Machine reboot depends on host OS (not in repo). After reboot, verify services with `docker compose ps` and run `up -d` if needed.
 
+## Vite Dev Server (local testing)
+We now use a Vite dev server to preview **source files** (not `dist/`) for reader changes.
+
+Start (server):
+```
+npm run dev -- --host 0.0.0.0 --port 5173
+```
+
+Stop:
+```
+kill <pid>
+```
+(PID is printed when the server starts; current example: `kill 795527`.)
+
+Access:
+- Server-local: `http://127.0.0.1:5173/`
+- LAN: `http://10.0.0.166:5173/` (same router)
+
+Firewall (LAN access only):
+```
+sudo ufw allow from 10.0.0.0/24 to any port 5173 proto tcp
+sudo ufw delete allow from 10.0.0.0/24 to any port 5173 proto tcp
+```
+
+Vite proxies these to the API (so data.json/series.json work):
+`/api`, `/data.json`, `/series.json`, `/page-config.json`, `/media.json`, `/series/*`, `/analytics.js`.
+
 ## Caddy Routing (deploy/Caddyfile)
 - Proxies `/api/*` to `bwondercomics-api:8000`
 - Proxies `/data.json`, `/series.json`, `/page-config.json`, `/media.json`, `/series/*` to the API

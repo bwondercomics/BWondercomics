@@ -1,6 +1,7 @@
 // Reader bootstrap: loads data, binds UI, and wires view state.
 import { state, loadProgress } from "./state.js";
 import { logger } from "./logger.js";
+import { throttle } from "./utils.js";
 import { loadChapterData, loadPageConfig, loadLatestPost } from "./data.js";
 import { el, initElements } from "./dom.js";
 import { renderStatusPanel, render } from "./render.js";
@@ -217,8 +218,8 @@ import { getActiveSeriesId } from "./series.js";
     const restartBtn = document.getElementById("restartChapterBtn");
     if (restartBtn) restartBtn.textContent = `Restart ${singular}`;
 
-    const galleryTitle = document.querySelector("#galleryOverlay h2");
-    if (galleryTitle) galleryTitle.textContent = `${singularUpper} GALLERY`;
+    const galleryTitle = document.querySelector("#entryCoverGallery h2");
+    if (galleryTitle) galleryTitle.textContent = "COVER GALLERY";
 
     window.dispatchEvent(
       new CustomEvent("unitLabelChanged", {
@@ -599,13 +600,17 @@ import { getActiveSeriesId } from "./series.js";
 
     document.addEventListener("fullscreenchange", onFullscreenChange);
 
-    document.addEventListener("mousemove", (e) => {
+    // Throttle fullscreen edge detection to reduce overhead (100ms = 10fps max)
+    document.addEventListener("mousemove", throttle((e) => {
       if (document.fullscreenElement) {
-        const nearEdge =
-          e.clientY < 150 || e.clientY > window.innerHeight - 200;
+        const vh = window.innerHeight;
+        // Use percentage-based thresholds for better scaling on small screens
+        const topThreshold = Math.min(150, vh * 0.15);
+        const bottomThreshold = Math.min(200, vh * 0.2);
+        const nearEdge = e.clientY < topThreshold || e.clientY > vh - bottomThreshold;
         if (nearEdge) showControlsBar();
       }
-    });
+    }, 100));
 
     if (el.topbar) {
       el.topbar.addEventListener("mouseenter", handleMouseEnterControls);

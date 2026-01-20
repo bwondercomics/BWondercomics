@@ -28,6 +28,7 @@ import { STORAGE } from './constants.js';
  * @property {boolean} isTransitioning - Whether page transition animation is active
  * @property {number|null} rafId - RequestAnimationFrame ID for animations
  * @property {Object|null} prevTransformOrigin - Previous transform origin for animations
+ * @property {number} fullscreenBaseScale - Baseline scale when entering fullscreen (used to clamp zoom-out)
  */
 export const state = {
   currentChapter: '',
@@ -48,7 +49,8 @@ export const state = {
   lastTap: 0,
   isTransitioning: false,
   rafId: null,
-  prevTransformOrigin: null
+  prevTransformOrigin: null,
+  fullscreenBaseScale: 1
 };
 
 /**

@@ -45,7 +45,10 @@ export function zoomIn() {
  * Clamped to CONFIG.ZOOM_MIN minimum
  */
 export function zoomOut() {
-  state.scale = Math.max(CONFIG.ZOOM_MIN, state.scale / CONFIG.ZOOM_STEP);
+  const minScale = document.fullscreenElement
+    ? (state.fullscreenBaseScale || 1)
+    : CONFIG.ZOOM_MIN;
+  state.scale = Math.max(minScale, state.scale / CONFIG.ZOOM_STEP);
   applyTransform();
 }
 
@@ -106,5 +109,6 @@ export function fitHeightFullscreen() {
 
   state.scale = targetScale;
   state.pan = { x: 0, y: 0 };
+  state.fullscreenBaseScale = state.scale || 1;
   applyTransform();
 }
