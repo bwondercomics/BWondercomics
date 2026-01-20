@@ -23,7 +23,15 @@ import {
 } from "./state.js";
 
 const READS_OVER_TIME_ENDPOINT = "/api/admin/analytics/reads-over-time";
+const WEEKLY_DIGEST_ENDPOINT = "/api/admin/analytics/weekly-digest";
 
+// Health indicator thresholds
+const HEALTH_THRESHOLDS = {
+  finishRate: { good: 0.6, concern: 0.4 },
+  weekChange: { good: 0.1, concern: -0.1 },
+};
+
+let lastWeeklyDigest = null;
 const activeReaderDetails = new Map();
 let readsOverTimeData = [];
 let lastReaderPayload = null;
@@ -126,6 +134,196 @@ function formatTimeAgo(value) {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
+}
+
+/**
+ * Calculate health status based on finish rate and week-over-week change.
+ * Returns: { status: 'good'|'neutral'|'concern', title: string, summary: string }
+ */
+function calculateHealthStatus(readerPayload, weeklyDigest) {
+  const finishRate = Number(readerPayload?.finishRate) || 0;
+  const changes = weeklyDigest?.changes || {};
+  const thisWeek = weeklyDigest?.thisWeek || {};
+
+  // Determine status based on finish rate and week-over-week change
+  let status = 'neutral';
+  let title = 'Content is performing steadily';
+  let summary = 'Your reader engagement is holding stable.';
+
+  const readsChange = changes.reads?.percent || 0;
+
+  // Good: high finish rate OR positive growth
+  if (finishRate >= HEALTH_THRESHOLDS.finishRate.good || readsChange >= HEALTH_THRESHOLDS.weekChange.good) {
+    status = 'good';
+    title = 'Your content is performing well';
+    if (finishRate >= HEALTH_THRESHOLDS.finishRate.good && readsChange > 0) {
+      summary = `Readers are engaged with a ${Math.round(finishRate * 100)}% finish rate and growing.`;
+    } else if (finishRate >= HEALTH_THRESHOLDS.finishRate.good) {
+      summary = `Strong ${Math.round(finishRate * 100)}% finish rate shows readers are completing your content.`;
+    } else {
+      summary = `Readership is up ${Math.round(readsChange * 100)}% from last week.`;
+    }
+  }
+  // Concern: low finish rate AND negative growth
+  else if (finishRate < HEALTH_THRESHOLDS.finishRate.concern && readsChange < HEALTH_THRESHOLDS.weekChange.concern) {
+    status = 'concern';
+    title = 'Content needs attention';
+    summary = `Finish rate (${Math.round(finishRate * 100)}%) and reads are both down. Consider reviewing recent entries.`;
+  }
+  // Concern: very low finish rate
+  else if (finishRate < HEALTH_THRESHOLDS.finishRate.concern) {
+    status = 'concern';
+    title = 'Readers are dropping off early';
+    summary = `Only ${Math.round(finishRate * 100)}% of readers finish. Check where they're leaving.`;
+  }
+  // Neutral with context
+  else {
+    if (readsChange > 0) {
+      summary = `Reads are up ${Math.round(readsChange * 100)}% this week with ${Math.round(finishRate * 100)}% finish rate.`;
+    } else if (readsChange < 0) {
+      summary = `Reads are down ${Math.round(Math.abs(readsChange) * 100)}% but finish rate is ${Math.round(finishRate * 100)}%.`;
+    }
+  }
+
+  return { status, title, summary, finishRate, changes, thisWeek };
+}
+
+/**
+ * Format a trend indicator with arrow and percentage.
+ */
+function formatTrendHtml(changeObj) {
+  if (!changeObj || typeof changeObj.percent !== 'number') {
+    return { html: '', className: 'trend-flat' };
+  }
+  const pct = changeObj.percent;
+  const pctStr = Math.round(Math.abs(pct) * 100);
+  if (pct > 0.01) {
+    return { html: `↑${pctStr}%`, className: 'trend-up' };
+  } else if (pct < -0.01) {
+    return { html: `↓${pctStr}%`, className: 'trend-down' };
+  }
+  return { html: '→', className: 'trend-flat' };
+}
+
+/**
+ * Update the health indicator UI.
+ */
+function renderHealthIndicator(readerPayload, weeklyDigest) {
+  if (!el.healthDot || !el.healthTitle) return;
+
+  const health = calculateHealthStatus(readerPayload, weeklyDigest);
+  const tw = health.thisWeek || {};
+  const changes = health.changes || {};
+
+  // Update dot color
+  el.healthDot.className = `analytics-health-dot ${health.status}`;
+
+  // Update title and summary
+  el.healthTitle.textContent = health.title;
+  el.healthTitle.className = `analytics-health-title stat-${health.status}`;
+  if (el.healthSummary) {
+    el.healthSummary.textContent = health.summary;
+  }
+
+  // Update stat values with trends
+  if (el.healthReads) {
+    el.healthReads.textContent = formatStat(tw.reads);
+  }
+  if (el.healthReadsTrend) {
+    const trend = formatTrendHtml(changes.reads);
+    el.healthReadsTrend.textContent = trend.html;
+    el.healthReadsTrend.className = `analytics-health-stat-trend ${trend.className}`;
+  }
+
+  if (el.healthFinishes) {
+    el.healthFinishes.textContent = formatStat(tw.finishes);
+  }
+  if (el.healthFinishesTrend) {
+    const trend = formatTrendHtml(changes.finishes);
+    el.healthFinishesTrend.textContent = trend.html;
+    el.healthFinishesTrend.className = `analytics-health-stat-trend ${trend.className}`;
+  }
+
+  if (el.healthRate) {
+    el.healthRate.textContent = formatPercent(tw.completionRate);
+  }
+  if (el.healthRateTrend) {
+    const trend = formatTrendHtml(changes.completionRate);
+    el.healthRateTrend.textContent = trend.html;
+    el.healthRateTrend.className = `analytics-health-stat-trend ${trend.className}`;
+  }
+
+  if (el.healthVisitors) {
+    el.healthVisitors.textContent = formatStat(tw.uniqueVisitors);
+  }
+  if (el.healthVisitorsTrend) {
+    const trend = formatTrendHtml(changes.uniqueVisitors);
+    el.healthVisitorsTrend.textContent = trend.html;
+    el.healthVisitorsTrend.className = `analytics-health-stat-trend ${trend.className}`;
+  }
+}
+
+/**
+ * Fetch weekly digest for health indicator.
+ */
+async function fetchWeeklyDigest() {
+  try {
+    const res = await fetch(WEEKLY_DIGEST_ENDPOINT, { credentials: "include" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    lastWeeklyDigest = data;
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Generate an insight sentence about the top performer.
+ */
+function generateInsightSentence(payload) {
+  const entryViews = payload?.entryViews || [];
+  if (!entryViews.length) return "";
+
+  // Find top performer
+  const top = entryViews[0];
+  const topLabel = top?.label || top?.entryTitle || "Unknown";
+  const topReads = top?.count || 0;
+
+  // Find finish rate for top entry
+  const topCompletion = (payload?.entryCompletions || [])
+    .find(c => c.label === topLabel || c.entryTitle === topLabel);
+  const finishRate = topCompletion?.rate
+    ? Math.round(topCompletion.rate * 100)
+    : null;
+
+  if (finishRate !== null) {
+    return `${topLabel} is your top performer this week with ${topReads} reads and ${finishRate}% finish rate.`;
+  }
+  return `${topLabel} leads with ${topReads} reads this week.`;
+}
+
+/**
+ * Initialize tab switching for Reader Analytics.
+ */
+function initReaderTabs() {
+  const tabs = document.querySelectorAll('.analytics-tab');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      // Update active tab button
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      // Show corresponding content
+      const tabName = /** @type {HTMLElement} */ (tab).dataset.tab;
+      if (el.tabEntry) {
+        el.tabEntry.classList.toggle('active', tabName === 'entry');
+      }
+      if (el.tabSeries) {
+        el.tabSeries.classList.toggle('active', tabName === 'series');
+      }
+    });
+  });
 }
 
 function getCssVar(name, fallback) {
@@ -462,6 +660,32 @@ function renderReaderSummary(payload) {
   if (el.statAvgStopPage) {
     el.statAvgStopPage.textContent = formatDecimal(payload.avgStopPage);
   }
+  // Update trends from weekly digest if available
+  updateSummaryTrends();
+}
+
+/**
+ * Update summary card trends from weekly digest.
+ * Called after renderReaderSummary and when weekly digest loads.
+ */
+function updateSummaryTrends() {
+  const changes = lastWeeklyDigest?.changes || {};
+
+  if (el.statEntryReadsTrend) {
+    const trend = formatTrendHtml(changes.reads);
+    el.statEntryReadsTrend.textContent = trend.html;
+    el.statEntryReadsTrend.className = `analytics-trend ${trend.className}`;
+  }
+  if (el.statEntryFinishesTrend) {
+    const trend = formatTrendHtml(changes.finishes);
+    el.statEntryFinishesTrend.textContent = trend.html;
+    el.statEntryFinishesTrend.className = `analytics-trend ${trend.className}`;
+  }
+  if (el.statFinishRateTrend) {
+    const trend = formatTrendHtml(changes.completionRate);
+    el.statFinishRateTrend.textContent = trend.html;
+    el.statFinishRateTrend.className = `analytics-trend ${trend.className}`;
+  }
 }
 
 function renderAnalyticsPages(payload) {
@@ -496,8 +720,14 @@ function renderAnalyticsList(target, items, emptyText, labelFn, options = {}) {
     )}</div>`;
     return;
   }
+
+  // Calculate average for color-coding (relative performance)
+  const counts = list.map(item => Number(item.count) || 0);
+  const avg = counts.length ? counts.reduce((a, b) => a + b, 0) / counts.length : 0;
+  const max = Math.max(...counts);
+
   target.innerHTML = list
-    .map((item) => {
+    .map((item, index) => {
       const label = escapeHtml(item.label);
       const subLabel =
         typeof options.subLabelFn === "function"
@@ -510,8 +740,20 @@ function renderAnalyticsList(target, items, emptyText, labelFn, options = {}) {
       const value = escapeHtml(item.value);
       const formatted = formatStat(item.count);
       const countAttr = escapeHtml(String(item.count ?? ""));
+      const count = Number(item.count) || 0;
+
+      // Color-code: top item green, below average red, others neutral
+      let colorClass = '';
+      if (counts.length > 1) {
+        if (index === 0 && count === max) {
+          colorClass = 'stat-good';
+        } else if (count < avg * 0.5) {
+          colorClass = 'stat-concern';
+        }
+      }
+
       return `
-        <div class="analytics-reader-item" data-label="${label}" data-value="${value}" data-count="${countAttr}" data-sub="${safeSubLabel}" data-event="${options.eventName || ""}" data-property="${options.propertyName || ""}">
+        <div class="analytics-reader-item ${colorClass}" data-label="${label}" data-value="${value}" data-count="${countAttr}" data-sub="${safeSubLabel}" data-event="${options.eventName || ""}" data-property="${options.propertyName || ""}">
           <div class="analytics-reader-label">
             <div>${label}</div>
             ${subHtml}
@@ -772,6 +1014,12 @@ function renderReaderCard(card) {
 function renderReaderAnalytics(payload) {
   lastReaderPayload = payload || {};
   renderReaderSummary(lastReaderPayload);
+
+  // Render insight sentence
+  if (el.analyticsInsight) {
+    el.analyticsInsight.textContent = generateInsightSentence(lastReaderPayload);
+  }
+
   const seriesFilter = updateReaderSeriesOptions(lastReaderPayload);
   if (seriesFilter !== lastReaderSeriesFilter) {
     lastReaderSeriesFilter = seriesFilter;
@@ -788,11 +1036,11 @@ function renderReaderAnalytics(payload) {
   const cards = [
     {
       target: el.analyticsEntryReads,
-      title: "Entry Reads",
+      title: "Reads",
       eventName: "reader_page_view",
       propertyName: "entryLabel",
       items: entryViews,
-      emptyText: "No entry reads yet.",
+      emptyText: "No reads yet. Readers will appear here as they engage with your content.",
       subLabelFn: (item) => formatDeltaText(item),
     },
     {
@@ -801,16 +1049,16 @@ function renderReaderAnalytics(payload) {
       eventName: "reader_page_view",
       propertyName: "series",
       items: payload?.seriesViews,
-      emptyText: "No series reads yet.",
+      emptyText: "No series data yet. This will populate as readers explore your comics.",
       subLabelFn: (item) => formatDeltaText(item),
     },
     {
       target: el.analyticsEntryCompletes,
-      title: "Entry Finishes",
+      title: "Finishes",
       eventName: "reader_entry_complete",
       propertyName: "entryLabel",
       items: entryCompletions,
-      emptyText: "No entry finishes yet.",
+      emptyText: "No finishes yet. When readers complete entries, you'll see completion rates here.",
       subLabelFn: (item) => {
         const rateText = formatCompletionRateText(item);
         const deltaText = formatDeltaText(item);
@@ -823,7 +1071,7 @@ function renderReaderAnalytics(payload) {
       eventName: "reader_entry_complete",
       propertyName: "series",
       items: payload?.seriesCompletions,
-      emptyText: "No series finishes yet.",
+      emptyText: "No series finishes yet. Completion data will show up as readers finish your series.",
       subLabelFn: (item) => {
         const rateText = formatCompletionRateText(item);
         const deltaText = formatDeltaText(item);
@@ -832,11 +1080,11 @@ function renderReaderAnalytics(payload) {
     },
     {
       target: el.analyticsEntryStops,
-      title: "Stop Page (per entry)",
+      title: "Where They Stop",
       eventName: "reader_entry_exit",
       propertyName: "stopLabel",
       items: entryStops,
-      emptyText: "No stop-page data yet.",
+      emptyText: "No stop data yet. This shows where readers leave, helping you identify pacing issues.",
       labelFn: (item) =>
         `${item?.entryLabel || item?.label || "Unknown entry"} - page ${item?.page ?? "?"
         }`,
@@ -1489,9 +1737,30 @@ function drawReadsOverTimeChart() {
     ctx.stroke();
   }
 
-  // Draw line
+  // Draw area fill under the line
   const lineColor = getCssVar("--accent", "#ffed00");
   const glowColor = getCssVar("--secondary", "#ff00ea");
+  const gradient = ctx.createLinearGradient(0, padding.top, 0, padding.top + chartHeight);
+  gradient.addColorStop(0, "rgba(255, 237, 0, 0.3)");
+  gradient.addColorStop(0.5, "rgba(255, 237, 0, 0.1)");
+  gradient.addColorStop(1, "rgba(255, 237, 0, 0)");
+
+  ctx.beginPath();
+  data.forEach((point, i) => {
+    const x = padding.left + i * xScale;
+    const y = padding.top + chartHeight - (point.count || 0) * yScale;
+    if (i === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  // Close the path to create the fill area
+  const lastX = padding.left + (data.length - 1) * xScale;
+  ctx.lineTo(lastX, padding.top + chartHeight);
+  ctx.lineTo(padding.left, padding.top + chartHeight);
+  ctx.closePath();
+  ctx.fillStyle = gradient;
+  ctx.fill();
+
+  // Draw line
   ctx.strokeStyle = lineColor;
   ctx.lineWidth = 2;
   ctx.lineJoin = "round";
@@ -1627,10 +1896,19 @@ function createAnalytics({ hideAllSections, setActiveNav }) {
   function refreshAnalytics({ showLoading = true } = {}) {
     loadAnalyticsSummary({ showLoading });
     loadAnalyticsPages({ showLoading });
-    loadReaderAnalytics({ showLoading }).then(() => {
+
+    // Fetch reader analytics and weekly digest in parallel, then render health indicator
+    const readerPromise = loadReaderAnalytics({ showLoading }).then(() => {
       // Update entry options after reader analytics loads
       updateReadsOverTimeEntryOptions(lastReaderPayload);
     });
+    const digestPromise = fetchWeeklyDigest();
+
+    Promise.all([readerPromise, digestPromise]).then(() => {
+      renderHealthIndicator(lastReaderPayload, lastWeeklyDigest);
+      updateSummaryTrends(); // Re-apply trends now that digest is loaded
+    });
+
     loadReadsOverTime({ showLoading });
   }
 
@@ -1646,6 +1924,9 @@ function createAnalytics({ hideAllSections, setActiveNav }) {
 
   // Initialize Reads Over Time controls
   initReadsOverTimeControls();
+
+  // Initialize Reader Analytics tabs
+  initReaderTabs();
 
   return {
     loadAnalyticsSummary,

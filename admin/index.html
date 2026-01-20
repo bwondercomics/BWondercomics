@@ -2869,6 +2869,89 @@
       margin-top: 6px;
     }
 
+    /* Health Status Colors */
+    .stat-good { color: #22c55e; }
+    .stat-neutral { color: #f59e0b; }
+    .stat-concern { color: #ef4444; }
+    .stat-good-bg { background: rgba(34, 197, 94, 0.15); border-color: #22c55e; }
+    .stat-neutral-bg { background: rgba(245, 158, 11, 0.15); border-color: #f59e0b; }
+    .stat-concern-bg { background: rgba(239, 68, 68, 0.15); border-color: #ef4444; }
+
+    /* Health Indicator */
+    .analytics-health {
+      background: rgba(10, 10, 18, 0.9);
+      border: 1px solid var(--primary);
+      border-radius: 12px;
+      padding: 16px 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 0 20px rgba(0, 217, 255, 0.1);
+    }
+    .analytics-health-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+    .analytics-health-dot {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .analytics-health-dot.good { background: #22c55e; box-shadow: 0 0 8px #22c55e; }
+    .analytics-health-dot.neutral { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; }
+    .analytics-health-dot.concern { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+    .analytics-health-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+    }
+    .analytics-health-summary {
+      font-size: 0.9rem;
+      opacity: 0.85;
+      font-style: italic;
+    }
+    .analytics-health-stats {
+      display: flex;
+      gap: 24px;
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      flex-wrap: wrap;
+    }
+    .analytics-health-stat {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .analytics-health-stat-value {
+      font-size: 1.4rem;
+      font-weight: 700;
+    }
+    .analytics-health-stat-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      opacity: 0.7;
+      letter-spacing: 0.5px;
+    }
+    .analytics-health-stat-trend {
+      font-size: 0.8rem;
+      margin-left: 4px;
+    }
+
+    /* Trend Arrows */
+    .trend-up { color: #22c55e; }
+    .trend-down { color: #ef4444; }
+    .trend-flat { color: #f59e0b; }
+    .trend-arrow {
+      font-size: 0.85em;
+      margin-left: 4px;
+    }
+    .analytics-trend {
+      font-size: 0.75em;
+      vertical-align: middle;
+      margin-left: 4px;
+    }
+
     .analytics-pages {
       margin-top: 18px;
       border-top: 1px solid rgba(0, 217, 255, 0.2);
@@ -2952,6 +3035,56 @@
       gap: 14px;
       margin-top: 12px;
     }
+    .analytics-reader-grid--3col {
+      grid-template-columns: repeat(3, 1fr);
+    }
+    .analytics-reader-grid--2col {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    @media (max-width: 900px) {
+      .analytics-reader-grid--3col,
+      .analytics-reader-grid--2col {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Insight sentence */
+    .analytics-insight {
+      background: rgba(255, 237, 0, 0.08);
+      border: 1px solid rgba(255, 237, 0, 0.3);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      font-size: 0.95rem;
+      color: var(--text);
+    }
+    .analytics-insight:empty { display: none; }
+
+    /* Tab buttons */
+    .analytics-tabs {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 12px;
+    }
+    .analytics-tab {
+      padding: 8px 16px;
+      background: transparent;
+      border: 1px solid rgba(0, 217, 255, 0.3);
+      border-radius: 6px;
+      color: var(--text);
+      cursor: pointer;
+      font-size: 0.9rem;
+      transition: all 0.2s;
+    }
+    .analytics-tab:hover { border-color: rgba(0, 217, 255, 0.6); }
+    .analytics-tab.active {
+      background: rgba(0, 217, 255, 0.15);
+      border-color: var(--accent);
+    }
+
+    /* Tab content */
+    .analytics-tab-content { display: none; }
+    .analytics-tab-content.active { display: block; }
 
     .analytics-reader-card {
       background: rgba(10, 10, 18, 0.85);
@@ -2996,6 +3129,19 @@
     .analytics-reader-item:hover {
       border-color: rgba(255, 237, 0, 0.7);
       box-shadow: 0 0 10px rgba(255, 237, 0, 0.2);
+    }
+    .analytics-reader-item.stat-good {
+      border-left: 3px solid #22c55e;
+    }
+    .analytics-reader-item.stat-good .analytics-reader-value {
+      color: #22c55e;
+    }
+    .analytics-reader-item.stat-concern {
+      border-left: 3px solid #ef4444;
+      opacity: 0.8;
+    }
+    .analytics-reader-item.stat-concern .analytics-reader-value {
+      color: #ef4444;
     }
 
     .analytics-reader-label {
@@ -4032,6 +4178,46 @@
           </label>
           <div id="analyticsStatus" class="success-message" style="display: none; margin: 0;"></div>
         </div>
+
+        <!-- Health Indicator -->
+        <div class="analytics-health" id="analyticsHealth">
+          <div class="analytics-health-header">
+            <div class="analytics-health-dot neutral" id="healthDot"></div>
+            <div class="analytics-health-title" id="healthTitle">Checking content health...</div>
+          </div>
+          <div class="analytics-health-summary" id="healthSummary">Analyzing your reader engagement data.</div>
+          <div class="analytics-health-stats">
+            <div class="analytics-health-stat">
+              <div class="analytics-health-stat-value">
+                <span id="healthReads">—</span>
+                <span class="analytics-health-stat-trend trend-flat" id="healthReadsTrend"></span>
+              </div>
+              <div class="analytics-health-stat-label">Reads</div>
+            </div>
+            <div class="analytics-health-stat">
+              <div class="analytics-health-stat-value">
+                <span id="healthFinishes">—</span>
+                <span class="analytics-health-stat-trend trend-flat" id="healthFinishesTrend"></span>
+              </div>
+              <div class="analytics-health-stat-label">Finishes</div>
+            </div>
+            <div class="analytics-health-stat">
+              <div class="analytics-health-stat-value">
+                <span id="healthRate">—</span>
+                <span class="analytics-health-stat-trend trend-flat" id="healthRateTrend"></span>
+              </div>
+              <div class="analytics-health-stat-label">Finish Rate</div>
+            </div>
+            <div class="analytics-health-stat">
+              <div class="analytics-health-stat-value">
+                <span id="healthVisitors">—</span>
+                <span class="analytics-health-stat-trend trend-flat" id="healthVisitorsTrend"></span>
+              </div>
+              <div class="analytics-health-stat-label">Visitors</div>
+            </div>
+          </div>
+        </div>
+
         <div class="analytics-grid">
           <div class="analytics-card">
             <div class="analytics-label">Pageviews (24h)</div>
@@ -4047,15 +4233,15 @@
         <div class="analytics-grid analytics-grid--compact" style="margin-top: 14px;">
           <div class="analytics-card">
             <div class="analytics-label">Entry Reads</div>
-            <div class="analytics-value" id="statEntryReads">—</div>
+            <div class="analytics-value"><span id="statEntryReads">—</span> <span id="statEntryReadsTrend" class="analytics-trend"></span></div>
           </div>
           <div class="analytics-card">
             <div class="analytics-label">Entry Finishes</div>
-            <div class="analytics-value" id="statEntryFinishes">—</div>
+            <div class="analytics-value"><span id="statEntryFinishes">—</span> <span id="statEntryFinishesTrend" class="analytics-trend"></span></div>
           </div>
           <div class="analytics-card">
             <div class="analytics-label">Finish Rate</div>
-            <div class="analytics-value" id="statFinishRate">—</div>
+            <div class="analytics-value"><span id="statFinishRate">—</span> <span id="statFinishRateTrend" class="analytics-trend"></span></div>
           </div>
           <div class="analytics-card">
             <div class="analytics-label">Avg Stop Page</div>
@@ -4140,36 +4326,55 @@
             </div>
           </div>
           <div id="analyticsReaderStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
-          <div class="analytics-reader-grid">
-            <div class="analytics-reader-card">
-              <div class="analytics-reader-heading">
-                <div class="analytics-reader-title">Entry Reads</div>
+
+          <!-- Insight sentence -->
+          <div id="analyticsInsight" class="analytics-insight"></div>
+
+          <!-- Tab buttons -->
+          <div class="analytics-tabs">
+            <button class="analytics-tab active" data-tab="entry">Entry Performance</button>
+            <button class="analytics-tab" data-tab="series">Series Performance</button>
+          </div>
+
+          <!-- Entry Performance tab content -->
+          <div id="tabEntry" class="analytics-tab-content active">
+            <div class="analytics-reader-grid analytics-reader-grid--3col">
+              <div class="analytics-reader-card">
+                <div class="analytics-reader-heading">
+                  <div class="analytics-reader-title">Reads</div>
+                </div>
+                <div id="analyticsEntryReads"></div>
               </div>
-              <div id="analyticsEntryReads"></div>
+              <div class="analytics-reader-card">
+                <div class="analytics-reader-heading">
+                  <div class="analytics-reader-title">Finishes</div>
+                </div>
+                <div id="analyticsEntryCompletes"></div>
+              </div>
+              <div class="analytics-reader-card">
+                <div class="analytics-reader-heading">
+                  <div class="analytics-reader-title">Where They Stop</div>
+                </div>
+                <div id="analyticsEntryStops"></div>
+              </div>
             </div>
-            <div class="analytics-reader-card">
-              <div class="analytics-reader-heading">
-                <div class="analytics-reader-title">Series Reads</div>
+          </div>
+
+          <!-- Series Performance tab content -->
+          <div id="tabSeries" class="analytics-tab-content">
+            <div class="analytics-reader-grid analytics-reader-grid--2col">
+              <div class="analytics-reader-card">
+                <div class="analytics-reader-heading">
+                  <div class="analytics-reader-title">Series Reads</div>
+                </div>
+                <div id="analyticsSeriesReads"></div>
               </div>
-              <div id="analyticsSeriesReads"></div>
-            </div>
-            <div class="analytics-reader-card">
-              <div class="analytics-reader-heading">
-                <div class="analytics-reader-title">Entry Finishes</div>
+              <div class="analytics-reader-card">
+                <div class="analytics-reader-heading">
+                  <div class="analytics-reader-title">Series Finishes</div>
+                </div>
+                <div id="analyticsSeriesCompletes"></div>
               </div>
-              <div id="analyticsEntryCompletes"></div>
-            </div>
-            <div class="analytics-reader-card">
-              <div class="analytics-reader-heading">
-                <div class="analytics-reader-title">Series Finishes</div>
-              </div>
-              <div id="analyticsSeriesCompletes"></div>
-            </div>
-            <div class="analytics-reader-card">
-              <div class="analytics-reader-heading">
-                <div class="analytics-reader-title">Stop Page (per entry)</div>
-              </div>
-              <div id="analyticsEntryStops"></div>
             </div>
           </div>
         </div>
