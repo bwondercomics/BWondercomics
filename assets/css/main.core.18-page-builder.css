@@ -378,6 +378,239 @@
   color: var(--danger, #ff3838);
 }
 
+/* ==================== EMAIL SIGNUP MODULE OVERRIDES ==================== */
+
+.pb-email-signup-styled {
+  width: 100%;
+}
+
+.pb-email-signup-styled .email-submit-btn {
+  background: linear-gradient(135deg, var(--btn-color, var(--primary)), var(--accent));
+  border-color: var(--btn-color, var(--primary));
+}
+
+.pb-email-signup-styled .email-submit-btn:hover {
+  background: linear-gradient(135deg, var(--accent), var(--btn-color, var(--primary)));
+}
+
+.pb-email-btn--glow {
+  box-shadow:
+    0 4px 0 rgba(0, 0, 0, 0.5),
+    0 0 20px color-mix(in srgb, var(--btn-color, var(--primary)) 50%, transparent);
+}
+
+.pb-email-btn--glow:hover {
+  box-shadow:
+    0 6px 0 rgba(0, 0, 0, 0.5),
+    0 0 30px color-mix(in srgb, var(--btn-color, var(--primary)) 70%, transparent);
+}
+
+.pb-email-input--flat {
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: none;
+}
+
+.pb-email-input--flat:focus {
+  border-color: var(--primary);
+  box-shadow: none;
+}
+
+/* ==================== PROMO CAROUSEL ==================== */
+
+.pb-promo {
+  position: relative;
+  width: 100%;
+  height: var(--promo-height, 400px);
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--bg-panel, #1a1a2e);
+}
+
+.pb-promo--empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.pb-promo-slides {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.pb-promo-slide {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.5s ease, visibility 0.5s ease;
+}
+
+.pb-promo--fade .pb-promo-slide.active {
+  opacity: 1;
+  visibility: visible;
+}
+
+.pb-promo--slide .pb-promo-slide {
+  transition: transform 0.5s ease, opacity 0.3s ease;
+  transform: translateX(100%);
+}
+
+.pb-promo--slide .pb-promo-slide.active {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(0);
+}
+
+.pb-promo--slide .pb-promo-slide.prev {
+  transform: translateX(-100%);
+}
+
+.pb-promo-image-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.pb-promo-slide--outside .pb-promo-image-container {
+  height: auto;
+  flex: 1;
+}
+
+.pb-promo-slide--outside {
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.pb-promo-image-container img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.pb-promo-no-image {
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+/* Overlay positioning */
+.pb-promo-overlay {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 20px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pb-promo-top-text {
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--accent, #ffed00);
+}
+
+.pb-promo-bottom-text {
+  font-size: 1rem;
+  color: var(--text, #fff);
+}
+
+.pb-promo-bottom-text a {
+  color: var(--primary, #00d9ff);
+  text-decoration: none;
+}
+
+.pb-promo-bottom-text a:hover {
+  text-decoration: underline;
+}
+
+/* Outside position text styling */
+.pb-promo-slide--outside .pb-promo-top-text {
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.pb-promo-slide--outside .pb-promo-bottom-text {
+  text-align: center;
+  margin-top: 12px;
+}
+
+/* Navigation arrows */
+.pb-promo-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  background: rgba(0, 0, 0, 0.5);
+  border: none;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 1.5rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease, background 0.2s ease;
+  z-index: 10;
+}
+
+.pb-promo:hover .pb-promo-nav {
+  opacity: 1;
+}
+
+.pb-promo-nav:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+
+.pb-promo-nav--prev {
+  left: 10px;
+}
+
+.pb-promo-nav--next {
+  right: 10px;
+}
+
+/* Dot indicators */
+.pb-promo-indicators {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 10;
+}
+
+.pb-promo-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.4);
+  border: none;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.pb-promo-indicator:hover {
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.pb-promo-indicator.active {
+  background: var(--primary, #00d9ff);
+  transform: scale(1.2);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .pb-layout--1-1,
@@ -402,5 +635,15 @@
 
   .pb-email-form input[type="email"] {
     width: 100%;
+  }
+
+  .pb-promo {
+    height: calc(var(--promo-height, 400px) * 0.75);
+  }
+
+  .pb-promo-nav {
+    width: 32px;
+    height: 32px;
+    font-size: 1.2rem;
   }
 }

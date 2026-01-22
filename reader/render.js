@@ -162,7 +162,7 @@ export function loadImage(imgEl, spinnerEl, url) {
   imgEl.addEventListener('error', hideSpinner);
 
   const pageNum = state.pages.indexOf(url) + 1;
-  imgEl.alt = `${state.currentChapter} - page ${pageNum}`;
+  imgEl.alt = `${state.currentEntry} - page ${pageNum}`;
 
   // Performance: Add lazy loading and async decoding
   imgEl.loading = 'eager'; // Eager loading for comic pages (user is actively reading)

@@ -183,7 +183,7 @@
     }
 
     /* End of chapter overlay */
-    .chapter-end-overlay {
+    .entry-end-overlay {
       position: absolute;
       inset: 0;
       background: linear-gradient(180deg,
@@ -198,7 +198,7 @@
       animation: fadeIn 300ms ease-in;
     }
 
-    .chapter-end-overlay.active {
+    .entry-end-overlay.active {
       display: flex;
     }
 
@@ -212,7 +212,7 @@
       }
     }
 
-    .chapter-end-content {
+    .entry-end-content {
       text-align: center;
       max-width: 500px;
       padding: 32px;
@@ -227,7 +227,7 @@
       position: relative;
     }
 
-    .chapter-end-content::before {
+    .entry-end-content::before {
       content: "";
       position: absolute;
       top: 0;
@@ -241,7 +241,7 @@
       z-index: 1;
     }
 
-    .chapter-end-content h2 {
+    .entry-end-content h2 {
       font-family: "Bebas Neue";
       font-size: 52px;
       color: var(--accent);
@@ -254,7 +254,7 @@
       animation: pixelBounce 2s ease-in-out infinite;
     }
 
-    .chapter-end-content p {
+    .entry-end-content p {
       font-size: 18px;
       color: var(--text);
       margin: 0 0 32px 0;
@@ -262,14 +262,14 @@
       font-weight: 600;
     }
 
-    .chapter-end-buttons {
+    .entry-end-buttons {
       display: flex;
       gap: 12px;
       justify-content: center;
       flex-wrap: wrap;
     }
 
-    .chapter-end-btn {
+    .entry-end-btn {
       padding: 14px 24px;
       border: 3px solid var(--primary);
       background: linear-gradient(135deg,
@@ -287,7 +287,7 @@
       text-transform: uppercase;
     }
 
-    .chapter-end-btn:hover {
+    .entry-end-btn:hover {
       background: linear-gradient(135deg,
           rgba(0, 217, 255, 0.2),
           rgba(255, 0, 234, 0.15));
@@ -297,12 +297,12 @@
         0 0 20px rgba(0, 217, 255, 0.5);
     }
 
-    .chapter-end-btn:active {
+    .entry-end-btn:active {
       transform: translateY(0);
       box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
     }
 
-    .chapter-end-btn.primary {
+    .entry-end-btn.primary {
       background: linear-gradient(135deg, var(--accent), var(--primary));
       color: var(--bg-dark);
       border: 3px solid var(--accent);

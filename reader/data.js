@@ -3,7 +3,7 @@
  * Handles fetching and parsing chapter data, page config, and latest posts
  */
 
-import { sanitizeChapters, sortChapterNamesWithMeta } from './entries.js';
+import { sanitizeEntries, sortEntryNamesWithMeta } from './entries.js';
 import { getSeriesDataPath, getSeriesPageConfigPath, getActiveSeriesId } from './series.js';
 import { logger } from './logger.js';
 
@@ -14,7 +14,7 @@ import { logger } from './logger.js';
  * @returns {Promise<{entries: Object, entryOrder: string[], statusMessage: string}>} Normalized entry data
  * @throws {Error} If fetch fails or data structure is invalid
  */
-export async function loadChapterData(seriesId) {
+export async function loadEntryData(seriesId) {
   try {
     const dataPath = getSeriesDataPath(seriesId);
     const response = await fetch(dataPath, { cache: 'no-store' });
@@ -55,8 +55,8 @@ export async function loadChapterData(seriesId) {
       }
     });
 
-    const normalized = sanitizeChapters(mappedEntries, entryMeta);
-    const orderedNames = sortChapterNamesWithMeta(Object.keys(normalized.chapters), entryMeta);
+    const normalized = sanitizeEntries(mappedEntries, entryMeta);
+    const orderedNames = sortEntryNamesWithMeta(Object.keys(normalized.chapters), entryMeta);
     return {
       entries: normalized.chapters,
       entryOrder: orderedNames,
@@ -183,6 +183,180 @@ export function extractSubtitlesFromBuilderPage(page) {
     }
   }
   return [];
+}
+
+/**
+ * Apply page-level theme colors from page builder.
+ * Sets CSS custom properties on the document root.
+ * @param {Object} page - The page data from the builder API
+ */
+function applyPageTheme(page) {
+  if (!page?.meta?.theme) return;
+
+  const theme = page.meta.theme;
+  const root = document.documentElement;
+
+  Object.entries(theme).forEach(([key, value]) => {
+    if (!value) return;
+    // Convert camelCase to kebab-case: bgDark -> bg-dark
+    const cssVar = '--' + key.replace(/([A-Z])/g, '-$1').toLowerCase();
+    root.style.setProperty(cssVar, value);
+  });
+
+  logger.log('✓ Applied page theme');
+}
+
+/**
+ * Apply page builder modules to the existing DOM elements.
+ * Updates header, panels, and other elements based on module config.
+ * @param {Object} page - The page data from the builder API
+ */
+export function applyBuilderPageToDOM(page) {
+  if (!page || !page.sections) return;
+
+  // Apply theme first
+  applyPageTheme(page);
+
+  // Find modules by type across all sections
+  const findModulesByType = (type) => {
+    const results = [];
+    for (const section of page.sections) {
+      for (const mod of section.modules || []) {
+        if (mod.moduleType === type) {
+          results.push({ module: mod, section });
+        }
+      }
+    }
+    return results;
+  };
+
+  // Find modules by column index in multi-column sections
+  const findModulesInColumn = (columnIndex) => {
+    const results = [];
+    for (const section of page.sections) {
+      const layout = section.layout || '1';
+      const colCount = layout.split('-').length;
+      if (colCount >= 3) {
+        for (const mod of section.modules || []) {
+          if (mod.columnIndex === columnIndex) {
+            results.push({ module: mod, section });
+          }
+        }
+      }
+    }
+    return results;
+  };
+
+  // Apply header module (title)
+  const headers = findModulesByType('header');
+  if (headers.length > 0) {
+    const config = headers[0].module.config || {};
+    const titleEl = document.querySelector('.topbar .title h1');
+    if (titleEl && config.title) {
+      titleEl.textContent = config.title;
+    }
+  }
+
+  // Apply left panel content (column 0)
+  const leftModules = findModulesInColumn(0);
+  applyPanelModules('left', leftModules);
+
+  // Apply right panel content (column 2)
+  const rightModules = findModulesInColumn(2);
+  applyPanelModules('right', rightModules);
+
+  // Check panel visibility from section settings
+  for (const section of page.sections) {
+    const settings = section.settings || {};
+    if (settings.panelEnabled) {
+      const leftPanel = document.getElementById('leftPanel');
+      const rightPanel = document.getElementById('rightPanel');
+      if (leftPanel && settings.panelEnabled.left === false) {
+        leftPanel.style.display = 'none';
+      } else if (leftPanel) {
+        leftPanel.style.display = '';
+      }
+      if (rightPanel && settings.panelEnabled.right === false) {
+        rightPanel.style.display = 'none';
+      } else if (rightPanel) {
+        rightPanel.style.display = '';
+      }
+    }
+  }
+
+  logger.log('✓ Applied page builder config to DOM');
+}
+
+/**
+ * Apply modules to a side panel.
+ */
+function applyPanelModules(side, modules) {
+  if (modules.length === 0) return;
+
+  const panelId = side === 'left' ? 'leftPanel' : 'rightPanel';
+  const panel = document.getElementById(panelId);
+  if (!panel) return;
+
+  // Sort by sortIndex
+  modules.sort((a, b) => (a.module.sortIndex || 0) - (b.module.sortIndex || 0));
+
+  for (const { module } of modules) {
+    const config = module.config || {};
+    const type = module.moduleType;
+
+    if (type === 'text') {
+      if (side === 'left') {
+        const topText = panel.querySelector('.left-panel-text-top');
+        if (topText && config.content) {
+          topText.innerHTML = config.content;
+        }
+      }
+    } else if (type === 'image') {
+      const previewId = side === 'left' ? 'leftPreview' : 'rightPreview';
+      const preview = document.getElementById(previewId);
+      if (preview && config.src) {
+        const img = preview.querySelector('img');
+        if (img) {
+          img.src = config.src;
+          if (config.alt) img.alt = config.alt;
+        }
+      }
+    } else if (type === 'html') {
+      if (side === 'left') {
+        const bottomText = panel.querySelector('.left-panel-text-bottom');
+        if (bottomText && config.code) {
+          bottomText.innerHTML = config.code;
+        }
+      }
+    } else if (type === 'social') {
+      if (side === 'right' && Array.isArray(config.buttons) && config.buttons.length > 0) {
+        const container = document.getElementById('dynamicButtons');
+        if (container) {
+          container.innerHTML = config.buttons.map(btn => {
+            const icon = escapeHtml(btn.icon || '');
+            const text = escapeHtml(btn.text || '');
+            const url = escapeHtml(btn.url || '#');
+            const isImg = /\.(png|jpe?g|webp|gif|svg)$/i.test(icon);
+            const iconHtml = isImg
+              ? `<img src="${icon}" alt="${text}" />`
+              : `<span style="font-size:24px;">${icon}</span>`;
+            // Wrap each character of text in span for wiggle animation
+            const textChars = text.split('').map(c => `<span>${c === ' ' ? '&nbsp;' : c}</span>`).join('');
+            return `<a href="${url}" class="panel-btn" target="_blank" rel="noopener noreferrer"><div class="panel-btn-icon">${iconHtml}</div><div class="panel-btn-text">${textChars}</div></a>`;
+          }).join('');
+        }
+      }
+    }
+  }
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
 }
 
 /**

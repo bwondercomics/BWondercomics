@@ -1,8 +1,8 @@
-// Overlay helpers for shortcuts, end-of-chapter, and chapter switching.
+// Overlay helpers for shortcuts, end-of-entry, and chapter switching.
 import { el } from './dom.js';
 import { state, saveProgress } from './state.js';
 import { render } from './render.js';
-import { hideEndOfChapter } from './controls.js';
+import { hideEndOfEntry } from './controls.js';
 import { resetEntryCompletion, setActiveEntry, trackEntryExit } from './analytics.js';
 
 export function toggleShortcutsOverlay() {
@@ -19,30 +19,30 @@ export function closeShortcutsOverlay() {
   }
 }
 
-export function goToNextChapter(entryOrder, entries, entryMeta = {}) {
+export function goToNextEntry(entryOrder, entries, entryMeta = {}) {
   const entryNames = entryOrder.length ? entryOrder : Object.keys(entries);
-  const currentIndex = entryNames.indexOf(state.currentChapter);
+  const currentIndex = entryNames.indexOf(state.currentEntry);
   if (currentIndex >= 0 && currentIndex < entryNames.length - 1) {
-    const nextChapter = entryNames[currentIndex + 1];
-    if (el.chapter) el.chapter.value = nextChapter;
-    changeChapter(nextChapter, entries, entryMeta);
-    hideEndOfChapter();
+    const nextEntry = entryNames[currentIndex + 1];
+    if (el.entry) el.entry.value = nextEntry;
+    changeEntry(nextEntry, entries, entryMeta);
+    hideEndOfEntry();
   }
 }
 
-export function restartChapter(_entries) {
+export function restartEntry(_entries) {
   state.pageIndex = 0;
   render();
   saveProgress(state);
   resetEntryCompletion();
-  hideEndOfChapter();
+  hideEndOfEntry();
 }
 
-export function changeChapter(name, entries, entryMeta = {}) {
-  // Reset view state when switching chapters.
+export function changeEntry(name, entries, entryMeta = {}) {
+  // Reset view state when switching entries.
   if (!entries[name]) return;
-  trackEntryExit("change_chapter");
-  state.currentChapter = name;
+  trackEntryExit("change_entry");
+  state.currentEntry = name;
   state.pages = entries[name];
   state.pageIndex = 0;
   state.scale = 1;
@@ -51,5 +51,5 @@ export function changeChapter(name, entries, entryMeta = {}) {
   setActiveEntry();
   render();
   saveProgress(state);
-  window.dispatchEvent(new CustomEvent("chapterChanged", { detail: { chapter: name } }));
+  window.dispatchEvent(new CustomEvent("entryChanged", { detail: { chapter: name } }));
 }

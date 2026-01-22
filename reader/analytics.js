@@ -80,7 +80,7 @@ function formatPageLabel(seriesId, entryDescriptor, pageNumber) {
 
 function getEntryTrackingInfo() {
   const seriesId = getActiveSeriesId();
-  const entryName = state.currentChapter || "";
+  const entryName = state.currentEntry || "";
   let entryNumber = null;
   let entryDescriptor = "";
 

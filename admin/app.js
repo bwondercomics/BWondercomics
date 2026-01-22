@@ -107,6 +107,7 @@ function setActiveNav(active) {
 function hideAllSections() {
   if (el.adminDashboard) {
     el.adminDashboard.classList.remove("admin-designer-open");
+    el.adminDashboard.classList.remove("admin-page-builder-open");
   }
   if (el.adminContent) {
     el.adminContent.classList.remove("media-content-wide");
@@ -366,11 +367,11 @@ const uploadManager = createUploadManager({
 
 // ---------------- RENUMBER ----------------
 async function renumberPages() {
-  const chapterName = entriesApi.getActiveChapterName();
+  const entryName = entriesApi.getActiveChapterName();
   const chapterFolder = getChapterFolder(
-    chapterName,
-    state.chapterFolders,
-    state.chapters,
+    entryName,
+    state.entryFolders,
+    state.entries,
     state.currentPages,
     seriesManager.getChaptersRoot(),
   );
@@ -416,7 +417,7 @@ async function showDashboard() {
   await seriesManager.loadSeriesIndex();
   seriesManager.renderSeriesSelect();
   try {
-    await entriesApi.loadChapters();
+    await entriesApi.loadEntries();
   } catch (e) {
     console.error("Entries failed to load:", e);
   }
@@ -433,7 +434,7 @@ async function showDashboard() {
   }
   entriesApi.renderStatusMessageInput();
   entriesApi.renderEntryLabelTabs();
-  entriesApi.renderChapterList();
+  entriesApi.renderEntryList();
   seriesManager.updateSeriesLinks();
   await dashboardManager.refreshDashboard({ skipPosts: true });
 }
@@ -549,7 +550,7 @@ function attachEventHandlers() {
       pageBuilderManager.showPageBuilderSection();
     });
   }
-  el.btnAddChapter.addEventListener("click", entriesApi.addNewChapter);
+  el.btnAddEntry.addEventListener("click", entriesApi.addNewEntry);
   if (el.btnAddEntryLabel) {
     el.btnAddEntryLabel.addEventListener("click", entriesApi.addEntryLabel);
   }
@@ -569,7 +570,7 @@ function attachEventHandlers() {
     previewManager.showPreviewSection();
     previewManager.loadPreviewPayload();
     previewManager.updatePreviewChapters(
-      state.currentEditingChapter || Object.keys(state.chapters)[0] || "",
+      state.currentEditingEntry || Object.keys(state.entries)[0] || "",
     );
   });
   el.btnCopy.addEventListener("click", previewManager.copyToClipboard);

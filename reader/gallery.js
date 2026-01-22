@@ -143,12 +143,12 @@ export function renderGallery(entryOrder, entries, options = {}) {
     const card = document.createElement("div");
     card.className = "entry-card";
     card.style.setProperty("--card-index", cardIndex++);
-    if (name === state.currentChapter) {
+    if (name === state.currentEntry) {
       card.classList.add("active");
     }
 
     card.onclick = () => {
-      if (el.chapter) el.chapter.value = name;
+      if (el.entry) el.entry.value = name;
       changeChapterFromOverlays(name, entries, entryMetaPayload);
       toggleGallery();
     };

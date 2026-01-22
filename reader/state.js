@@ -9,7 +9,7 @@ import { STORAGE } from './constants.js';
  * Global application state object
  * Contains all runtime state for the comic reader
  * @type {Object}
- * @property {string} currentChapter - Name of the currently displayed chapter
+ * @property {string} currentEntry - Name of the currently displayed chapter
  * @property {string[]} pages - Array of image URLs for the current chapter
  * @property {number} pageIndex - Current page index (0-based)
  * @property {Object|null} entryMeta - Metadata for the current entry (status, comingSoon, etc)
@@ -31,7 +31,7 @@ import { STORAGE } from './constants.js';
  * @property {number} fullscreenBaseScale - Baseline scale when entering fullscreen (used to clamp zoom-out)
  */
 export const state = {
-  currentChapter: '',
+  currentEntry: '',
   pages: [],
   pageIndex: 0,
   entryMeta: null,
@@ -61,7 +61,7 @@ export const state = {
 export function saveProgress(stateObj = state) {
   try {
     const data = {
-      chapter: stateObj.currentChapter,
+      chapter: stateObj.currentEntry,
       page: stateObj.pageIndex,
       timestamp: Date.now()
     };

@@ -1,6 +1,6 @@
     /* ==================== CHAPTER SELECT ==================== */
     select#chapter,
-    .chapter-select-trigger {
+    .entry-select-trigger {
       background: linear-gradient(135deg,
           rgba(0, 217, 255, 0.15),
           rgba(255, 0, 234, 0.15));
@@ -28,7 +28,7 @@
     }
 
     select#chapter:hover,
-    .chapter-select-trigger:hover {
+    .entry-select-trigger:hover {
       background: linear-gradient(135deg,
           rgba(0, 217, 255, 0.25),
           rgba(255, 0, 234, 0.25));
@@ -40,7 +40,7 @@
     }
 
     select#chapter:active,
-    .chapter-select-trigger:active {
+    .entry-select-trigger:active {
       transform: translateY(0);
       box-shadow:
         0 2px 0 rgba(0, 0, 0, 0.3),
@@ -54,18 +54,18 @@
       padding: 8px;
     }
 
-    .chapter-select {
+    .entry-select {
       position: relative;
       display: inline-flex;
       align-items: center;
       flex: 0 0 auto;
     }
 
-    .chapter-select-trigger {
+    .entry-select-trigger {
       cursor: pointer;
     }
 
-    .chapter-select-trigger::after {
+    .entry-select-trigger::after {
       content: "";
       width: 0;
       height: 0;
@@ -76,14 +76,14 @@
       opacity: 0.8;
     }
 
-    .chapter-select-name {
+    .entry-select-name {
       color: var(--text);
       text-transform: uppercase;
       letter-spacing: 1px;
       font-family: "Bebas Neue", sans-serif;
     }
 
-    .chapter-select-patron {
+    .entry-select-patron {
       display: inline-flex;
       align-items: center;
       color: #39ff7e;
@@ -95,7 +95,7 @@
       text-rendering: optimizeLegibility;
     }
 
-    .chapter-select-menu {
+    .entry-select-menu {
       position: absolute;
       top: calc(100% + 6px);
       left: 0;
@@ -113,11 +113,11 @@
       box-shadow: 0 8px 20px rgba(0, 0, 0, 0.45);
     }
 
-    .chapter-select-menu.open {
+    .entry-select-menu.open {
       display: flex;
     }
 
-    .chapter-option {
+    .entry-option {
       display: flex;
       align-items: center;
       justify-content: flex-start;
@@ -136,13 +136,13 @@
       transition: background 0.15s ease, color 0.15s ease;
     }
 
-    .chapter-option:hover,
-    .chapter-option.is-selected {
+    .entry-option:hover,
+    .entry-option.is-selected {
       background: rgba(0, 217, 255, 0.18);
       color: var(--text);
     }
 
-    .chapter-option-patron {
+    .entry-option-patron {
       display: inline-flex;
       align-items: center;
       color: #39ff7e;
@@ -154,7 +154,7 @@
       text-rendering: optimizeLegibility;
     }
 
-    .chapter-select-native {
+    .entry-select-native {
       position: absolute;
       opacity: 0;
       pointer-events: none;
@@ -163,7 +163,7 @@
       left: -9999px;
     }
 
-    .chapter-controls {
+    .entry-controls {
       display: inline-flex;
       align-items: stretch;
       gap: 0;
@@ -178,12 +178,12 @@
         0 0 14px rgba(255, 0, 234, 0.25);
     }
 
-    .chapter-controls .chapter-select {
+    .entry-controls .entry-select {
       flex: 1 1 auto;
       min-width: 200px;
     }
 
-    .chapter-controls .chapter-select-trigger {
+    .entry-controls .entry-select-trigger {
       width: 100%;
       min-height: 44px;
       padding: 10px 16px;
@@ -196,22 +196,22 @@
       z-index: 1;
     }
 
-    .chapter-controls .chapter-select-trigger:hover,
-    .chapter-controls .chapter-select-trigger:active {
+    .entry-controls .entry-select-trigger:hover,
+    .entry-controls .entry-select-trigger:active {
       background: rgba(0, 217, 255, 0.18);
       box-shadow: 0 6px 14px rgba(0, 217, 255, 0.25);
     }
 
-    .chapter-controls .chapter-select-trigger:hover {
+    .entry-controls .entry-select-trigger:hover {
       transform: translateY(-2px);
     }
 
-    .chapter-controls .chapter-select-trigger:active {
+    .entry-controls .entry-select-trigger:active {
       transform: translateY(0);
       box-shadow: 0 2px 8px rgba(0, 217, 255, 0.2);
     }
 
-    .chapter-covers-btn {
+    .entry-covers-btn {
       min-width: 72px;
       padding: 10px 12px;
       border: none;
@@ -233,13 +233,13 @@
       z-index: 1;
     }
 
-    .chapter-covers-btn:hover {
+    .entry-covers-btn:hover {
       background: #2be3ff;
       transform: translateY(-2px);
       box-shadow: 0 6px 14px rgba(0, 217, 255, 0.35);
     }
 
-    .chapter-covers-btn:active {
+    .entry-covers-btn:active {
       background: #00c1e6;
       transform: translateY(0);
       box-shadow: 0 2px 8px rgba(0, 217, 255, 0.25);

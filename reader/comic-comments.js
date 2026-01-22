@@ -179,10 +179,10 @@ import { buildEntryTargetId } from './comment-targets.js';
         ctx.authToggle.addEventListener('click', () => toggleAuthMode(ctx));
         ctx.signoutBtn.addEventListener('click', () => handleLogout(ctx));
         ctx.commentForm.addEventListener('submit', (e) => handleCommentSubmit(e, ctx));
-        window.addEventListener('chapterChanged', () => handleChapterChange(ctx));
-        const chapterSelect = document.getElementById('chapter');
-        if (chapterSelect) {
-            chapterSelect.addEventListener('change', () => handleChapterChange(ctx));
+        window.addEventListener('entryChanged', () => handleChapterChange(ctx));
+        const entrySelect = document.getElementById('chapter');
+        if (entrySelect) {
+            entrySelect.addEventListener('change', () => handleChapterChange(ctx));
         }
         window.addEventListener('unitLabelChanged', (event) => {
             const singular = String(event?.detail?.singular || '').trim();

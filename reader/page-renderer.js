@@ -211,16 +211,42 @@ const MODULE_RENDERERS = {
   },
 
   "email-signup": (config) => {
-    const heading = escapeHtml(config.heading || "Subscribe");
-    const buttonText = escapeHtml(config.buttonText || "Sign Up");
+    const heading = escapeHtml(config.heading || "Join the List");
+    const subtext = escapeHtml(config.subtext || "");
+    const placeholder = escapeHtml(config.placeholder || "your@email.com");
+    const buttonText = escapeHtml(config.buttonText || "Subscribe");
+    const style = config.style || {};
+
+    // Build heading styles
+    const headingStyles = [];
+    headingStyles.push(`color: ${style.headingColor || "#ffffff"}`);
+    if (style.headingFont === "display") {
+      headingStyles.push('font-family: "Bebas Neue", sans-serif');
+    } else if (style.headingFont === "mono") {
+      headingStyles.push('font-family: "JetBrains Mono", monospace');
+    }
+    if (style.headingGlow) {
+      const glowColor = style.headingColor || "#ffffff";
+      headingStyles.push(`text-shadow: 0 0 10px ${glowColor}, 0 0 20px ${glowColor}`);
+    }
+
+    // Determine input class based on style
+    const inputClass = style.inputStyle === "flat" ? "pb-email-input--flat" : "pb-email-input--bubble";
+
+    // Build button styles
+    const buttonColor = style.buttonColor || "#00d9ff";
+    const buttonStyles = [`--btn-color: ${buttonColor}`];
+    const buttonClass = style.buttonGlow ? "pb-email-btn--glow" : "";
+
     return `
-      <div class="pb-email-signup">
-        <h3>${heading}</h3>
-        <form class="pb-email-form" data-email-signup>
-          <input type="email" placeholder="Enter your email" required />
-          <button type="submit">${buttonText}</button>
+      <div class="email-signup-section pb-email-signup-styled">
+        <div class="email-signup-label" style="${headingStyles.join(";")}">${heading}</div>
+        ${subtext ? `<div class="email-signup-cta">${subtext}</div>` : ""}
+        <form class="email-signup-form" data-email-signup>
+          <input type="email" class="email-input ${inputClass}" placeholder="${placeholder}" required />
+          <button type="submit" class="email-submit-btn ${buttonClass}" style="${buttonStyles.join(";")}">${buttonText}</button>
         </form>
-        <div class="pb-email-status"></div>
+        <div class="email-form-message pb-email-status"></div>
       </div>
     `;
   },
@@ -293,6 +319,125 @@ const MODULE_RENDERERS = {
     // Custom HTML is rendered as-is (be careful with untrusted content)
     return `<div class="pb-html">${code}</div>`;
   },
+
+  promo: (config) => {
+    const items = config.items || [];
+    if (items.length === 0) {
+      return '<div class="pb-promo pb-promo--empty">No promos configured</div>';
+    }
+
+    const height = config.height || 400;
+    const showNav = config.showNavigation !== false;
+    const showIndicators = config.showIndicators !== false;
+    const autoRotate = config.autoRotate !== false;
+    const interval = config.interval || 5000;
+    const transition = config.transition || "fade";
+
+    const slidesHtml = items.map((item, index) => {
+      const style = item.style || {};
+      const isOverlay = item.textPosition === "overlay";
+
+      // Build inline styles for the slide
+      const slideStyles = [];
+      if (style.backgroundColor && style.backgroundColor !== "transparent") {
+        slideStyles.push(`background-color: ${style.backgroundColor}`);
+      }
+
+      // Image styles
+      const imageStyles = [];
+      if (style.imageBorder) {
+        imageStyles.push(`border: 2px solid ${style.imageBorderColor || "#00d9ff"}`);
+      }
+      if (style.imageGlow) {
+        const glowColor = style.imageGlowColor || "#00d9ff";
+        const intensity = style.imageGlowIntensity || 0.5;
+        imageStyles.push(`box-shadow: 0 0 ${20 * intensity}px ${glowColor}, 0 0 ${40 * intensity}px ${glowColor}`);
+      }
+
+      // Top text styles
+      const topTextStyles = [];
+      topTextStyles.push(`color: ${style.topTextColor || "#ffed00"}`);
+      if (style.topTextFont === "display") {
+        topTextStyles.push('font-family: "Bebas Neue", sans-serif');
+      } else if (style.topTextFont === "mono") {
+        topTextStyles.push('font-family: "JetBrains Mono", monospace');
+      }
+      if (style.topTextGlow) {
+        const glowColor = style.topTextGlowColor || "#ffed00";
+        topTextStyles.push(`text-shadow: 0 0 10px ${glowColor}, 0 0 20px ${glowColor}`);
+      }
+
+      // Bottom text styles
+      const bottomTextStyles = [];
+      bottomTextStyles.push(`color: ${style.bottomTextColor || "#ffffff"}`);
+      if (style.bottomTextFont === "display") {
+        bottomTextStyles.push('font-family: "Bebas Neue", sans-serif');
+      } else if (style.bottomTextFont === "mono") {
+        bottomTextStyles.push('font-family: "JetBrains Mono", monospace');
+      }
+      if (style.bottomTextGlow) {
+        const glowColor = style.bottomTextGlowColor || "#00d9ff";
+        bottomTextStyles.push(`text-shadow: 0 0 10px ${glowColor}, 0 0 20px ${glowColor}`);
+      }
+
+      const imageSrc = escapeHtml(item.image || "");
+      const topText = item.topText ? `<div class="pb-promo-top-text" style="${topTextStyles.join(";")}">${escapeHtml(item.topText)}</div>` : "";
+      const bottomText = item.bottomText ? `<div class="pb-promo-bottom-text" style="${bottomTextStyles.join(";")}">${item.bottomText}</div>` : "";
+
+      const imageHtml = imageSrc
+        ? `<img src="${imageSrc}" alt="" loading="lazy" style="${imageStyles.join(";")}" />`
+        : '<div class="pb-promo-no-image"></div>';
+
+      if (isOverlay) {
+        return `
+          <div class="pb-promo-slide ${index === 0 ? "active" : ""}" data-index="${index}" style="${slideStyles.join(";")}">
+            <div class="pb-promo-image-container">
+              ${imageHtml}
+              <div class="pb-promo-overlay">
+                ${topText}
+                ${bottomText}
+              </div>
+            </div>
+          </div>
+        `;
+      } else {
+        return `
+          <div class="pb-promo-slide pb-promo-slide--outside ${index === 0 ? "active" : ""}" data-index="${index}" style="${slideStyles.join(";")}">
+            ${topText}
+            <div class="pb-promo-image-container">
+              ${imageHtml}
+            </div>
+            ${bottomText}
+          </div>
+        `;
+      }
+    }).join("");
+
+    const indicatorsHtml = showIndicators && items.length > 1 ? `
+      <div class="pb-promo-indicators">
+        ${items.map((_, i) => `<button class="pb-promo-indicator ${i === 0 ? "active" : ""}" data-index="${i}" aria-label="Go to slide ${i + 1}"></button>`).join("")}
+      </div>
+    ` : "";
+
+    const navHtml = showNav && items.length > 1 ? `
+      <button class="pb-promo-nav pb-promo-nav--prev" data-dir="prev" aria-label="Previous slide">\u2039</button>
+      <button class="pb-promo-nav pb-promo-nav--next" data-dir="next" aria-label="Next slide">\u203A</button>
+    ` : "";
+
+    return `
+      <div class="pb-promo pb-promo--${transition}"
+           style="--promo-height: ${height}px;"
+           data-auto-rotate="${autoRotate}"
+           data-interval="${interval}"
+           data-item-count="${items.length}">
+        <div class="pb-promo-slides">
+          ${slidesHtml}
+        </div>
+        ${navHtml}
+        ${indicatorsHtml}
+      </div>
+    `;
+  },
 };
 
 /**
@@ -332,6 +477,7 @@ export async function mountPage(container, slug, seriesId = null) {
 
   // Initialize interactive modules
   initEmailForms(container);
+  initPromoCarousels(container);
 }
 
 /**
@@ -363,6 +509,136 @@ function initEmailForms(container) {
         }
       } catch {
         if (status) status.textContent = "Failed to subscribe.";
+      }
+    });
+  });
+}
+
+/**
+ * Initialize promo carousel modules within a container.
+ */
+function initPromoCarousels(container) {
+  container.querySelectorAll(".pb-promo[data-item-count]").forEach((promo) => {
+    const itemCount = parseInt(promo.dataset.itemCount, 10);
+    if (itemCount <= 1) return; // No carousel needed for single item
+
+    const autoRotate = promo.dataset.autoRotate === "true";
+    const interval = parseInt(promo.dataset.interval, 10) || 5000;
+    const slides = promo.querySelectorAll(".pb-promo-slide");
+    const indicators = promo.querySelectorAll(".pb-promo-indicator");
+    const prevBtn = promo.querySelector(".pb-promo-nav--prev");
+    const nextBtn = promo.querySelector(".pb-promo-nav--next");
+    const isSlideTransition = promo.classList.contains("pb-promo--slide");
+
+    let currentIndex = 0;
+    let autoRotateTimer = null;
+    let isPaused = false;
+
+    function goToSlide(index, direction = "next") {
+      // Normalize index
+      if (index < 0) index = slides.length - 1;
+      if (index >= slides.length) index = 0;
+
+      // Update slides
+      slides.forEach((slide, i) => {
+        slide.classList.remove("active", "prev");
+        if (i === index) {
+          slide.classList.add("active");
+        } else if (isSlideTransition && i === currentIndex) {
+          slide.classList.add(direction === "next" ? "prev" : "");
+        }
+      });
+
+      // Update indicators
+      indicators.forEach((ind, i) => {
+        ind.classList.toggle("active", i === index);
+      });
+
+      currentIndex = index;
+    }
+
+    function nextSlide() {
+      goToSlide(currentIndex + 1, "next");
+    }
+
+    function prevSlide() {
+      goToSlide(currentIndex - 1, "prev");
+    }
+
+    function startAutoRotate() {
+      if (!autoRotate || isPaused) return;
+      stopAutoRotate();
+      autoRotateTimer = setInterval(nextSlide, interval);
+    }
+
+    function stopAutoRotate() {
+      if (autoRotateTimer) {
+        clearInterval(autoRotateTimer);
+        autoRotateTimer = null;
+      }
+    }
+
+    // Navigation button events
+    prevBtn?.addEventListener("click", () => {
+      prevSlide();
+      startAutoRotate();
+    });
+
+    nextBtn?.addEventListener("click", () => {
+      nextSlide();
+      startAutoRotate();
+    });
+
+    // Indicator click events
+    indicators.forEach((indicator) => {
+      indicator.addEventListener("click", () => {
+        const targetIndex = parseInt(indicator.dataset.index, 10);
+        const direction = targetIndex > currentIndex ? "next" : "prev";
+        goToSlide(targetIndex, direction);
+        startAutoRotate();
+      });
+    });
+
+    // Pause on hover
+    promo.addEventListener("mouseenter", () => {
+      isPaused = true;
+      stopAutoRotate();
+    });
+
+    promo.addEventListener("mouseleave", () => {
+      isPaused = false;
+      startAutoRotate();
+    });
+
+    // Touch/swipe support
+    let touchStartX = 0;
+
+    promo.addEventListener("touchstart", (e) => {
+      touchStartX = e.changedTouches[0].screenX;
+    }, { passive: true });
+
+    promo.addEventListener("touchend", (e) => {
+      const touchEndX = e.changedTouches[0].screenX;
+      const diff = touchStartX - touchEndX;
+      if (Math.abs(diff) > 50) {
+        if (diff > 0) {
+          nextSlide();
+        } else {
+          prevSlide();
+        }
+        startAutoRotate();
+      }
+    }, { passive: true });
+
+    // Start auto-rotation
+    startAutoRotate();
+
+    // Pause when tab is hidden
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        stopAutoRotate();
+      } else if (!isPaused) {
+        startAutoRotate();
       }
     });
   });

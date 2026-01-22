@@ -229,14 +229,14 @@ function createSeriesManager() {
     if (el.btnChapters) el.btnChapters.textContent = plural;
     const title = document.getElementById("chaptersSectionTitle");
     if (title) title.textContent = `${plural} Management`;
-    if (el.btnAddChapter) el.btnAddChapter.textContent = `+ Add New ${singular}`;
+    if (el.btnAddEntry) el.btnAddEntry.textContent = `+ Add New ${singular}`;
 
     const previewLabel = document.getElementById("previewEntryLabel");
     if (previewLabel) previewLabel.textContent = singular;
 
     const nameLabel = document.getElementById("entryNameLabel");
     if (nameLabel) nameLabel.textContent = `${singular} Name`;
-    if (el.chapterName) el.chapterName.placeholder = `e.g., ${singular} 1`;
+    if (el.entryName) el.entryName.placeholder = `e.g., ${singular} 1`;
 
     const accessLabel = document.getElementById("entryAccessLabel");
     if (accessLabel) accessLabel.textContent = `${singular} Access`;
@@ -255,8 +255,8 @@ function createSeriesManager() {
       return normalized && normalizedRoot && normalized.startsWith(`${normalizedRoot}/`);
     };
 
-    const folderPaths = Object.values(state.chapterFolders || {});
-    const chapterPages = Object.values(state.chapters || {})
+    const folderPaths = Object.values(state.entryFolders || {});
+    const chapterPages = Object.values(state.entries || {})
       .flatMap((pages) => (Array.isArray(pages) ? pages : []));
 
     for (const root of rootsToCheck) {
@@ -376,9 +376,9 @@ function createSeriesManager() {
     state.activeSeriesId = nextId;
     localStorage.setItem(ACTIVE_SERIES_KEY, nextId);
 
-    await entriesApi.loadChapters();
+    await entriesApi.loadEntries();
     entriesApi.renderStatusMessageInput();
-    entriesApi.renderChapterList();
+    entriesApi.renderEntryList();
     applyUnitLabels();
     updateSeriesLinks();
     if (
@@ -558,7 +558,7 @@ function createSeriesManager() {
     // Keep the series' data.json flag in sync so the reader can enforce it.
     state.premiumOnly = premiumOnly;
     try {
-      await entriesApi.saveChapters(false);
+      await entriesApi.saveEntries(false);
     } catch (e) {
       console.warn("Failed to persist premiumOnly to data file:", e);
     }
@@ -717,7 +717,7 @@ function createSeriesManager() {
 
         state.premiumOnly = premiumOnlyValue;
         try {
-          await entriesApi.saveChapters(false);
+          await entriesApi.saveEntries(false);
         } catch (e) {
           console.warn("Failed to persist premiumOnly to data file:", e);
         }

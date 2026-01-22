@@ -3,18 +3,18 @@
  * Handles entry name parsing, sorting, and data normalization
  */
 
-import { CHAPTER_NUMBER_PATTERN } from './config.js';
+import { ENTRY_NUMBER_PATTERN } from './config.js';
 
 /**
  * Extracts the numeric entry number from an entry name string
  * @param {string} [name=''] - Entry name (e.g., "Entry 5" or "entry 10")
  * @returns {number|null} The extracted entry number, or null if no number found
  * @example
- * extractChapterNumber("Entry 5") // returns 5
- * extractChapterNumber("Bonus") // returns null
+ * extractEntryNumber("Entry 5") // returns 5
+ * extractEntryNumber("Bonus") // returns null
  */
-export function extractChapterNumber(name = '') {
-  const match = name.match(CHAPTER_NUMBER_PATTERN);
+export function extractEntryNumber(name = '') {
+  const match = name.match(ENTRY_NUMBER_PATTERN);
   return match ? parseInt(match[1], 10) : null;
 }
 
@@ -24,13 +24,13 @@ export function extractChapterNumber(name = '') {
  * @param {string[]} [names=[]] - Array of entry names to sort
  * @returns {string[]} Sorted array of entry names
  * @example
- * sortChapterNames(["Entry 10", "Entry 2", "Bonus"])
+ * sortEntryNames(["Entry 10", "Entry 2", "Bonus"])
  * // returns ["Entry 2", "Entry 10", "Bonus"]
  */
-export function sortChapterNames(names = []) {
+export function sortEntryNames(names = []) {
   return [...names].sort((a, b) => {
-    const aNum = extractChapterNumber(a);
-    const bNum = extractChapterNumber(b);
+    const aNum = extractEntryNumber(a);
+    const bNum = extractEntryNumber(b);
     if (aNum != null && bNum != null && aNum !== bNum) {
       return aNum - bNum;
     }
@@ -40,7 +40,7 @@ export function sortChapterNames(names = []) {
   });
 }
 
-export function sortChapterNamesWithMeta(names = [], meta = {}) {
+export function sortEntryNamesWithMeta(names = [], meta = {}) {
   const withNumbers = [];
   const withoutNumbers = [];
 
@@ -60,23 +60,23 @@ export function sortChapterNamesWithMeta(names = [], meta = {}) {
     return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
   });
 
-  return [...withNumbers.map((item) => item.name), ...sortChapterNames(withoutNumbers)];
+  return [...withNumbers.map((item) => item.name), ...sortEntryNames(withoutNumbers)];
 }
 
 /**
  * Normalizes and validates entry data from the series data endpoint
  * Filters out empty entries, removes duplicates, and creates a sorted entry order
- * @param {Object.<string, string[]>} [rawChapters={}] - Raw entries object with entry names as keys and page arrays as values
+ * @param {Object.<string, string[]>} [rawEntries={}] - Raw entries object with entry names as keys and page arrays as values
  * @returns {{chapters: Object.<string, string[]>, order: string[]}} Normalized entries object and sorted order array
  * @example
- * sanitizeChapters({ "Entry 1": ["page1.png"], "Empty": [] })
+ * sanitizeEntries({ "Entry 1": ["page1.png"], "Empty": [] })
  * // returns { chapters: { "Entry 1": ["page1.png"] }, order: ["Entry 1"] }
  */
-export function sanitizeChapters(rawChapters = {}, chapterMeta = {}) {
+export function sanitizeEntries(rawEntries = {}, entryMeta = {}) {
   const clean = {};
   const seen = new Set();
 
-  Object.entries(rawChapters).forEach(([name, pages]) => {
+  Object.entries(rawEntries).forEach(([name, pages]) => {
     const trimmed = (name || '').trim();
     if (!trimmed) return;
 
@@ -87,7 +87,7 @@ export function sanitizeChapters(rawChapters = {}, chapterMeta = {}) {
     }
 
     const normalizedPages = Array.isArray(pages) ? pages.filter(Boolean) : [];
-    const meta = chapterMeta?.[trimmed];
+    const meta = entryMeta?.[trimmed];
     const keepEmpty = !!(
       normalizedPages.length === 0 &&
       meta &&
@@ -101,6 +101,6 @@ export function sanitizeChapters(rawChapters = {}, chapterMeta = {}) {
 
   return {
     chapters: clean,
-    order: sortChapterNames(Object.keys(clean))
+    order: sortEntryNames(Object.keys(clean))
   };
 }

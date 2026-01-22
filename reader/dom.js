@@ -3,7 +3,7 @@ export const el = {};
 
 export function initElements() {
   // Cache DOM nodes once to avoid repeated lookups.
-  el.chapter = document.getElementById('chapter');
+  el.entry = document.getElementById('chapter');
   el.stageWrap = document.getElementById('stageWrap');
   el.stage = document.getElementById('stage');
   el.viewport = document.getElementById('viewport');

@@ -45,15 +45,15 @@ function createPreviewManager({
   // Populate preview selector from the currently loaded chapter state.
   function updatePreviewChapters(selectedName = "") {
     if (!el.previewChapterSelect) return;
-    const names = Object.keys(state.chapters).filter(
+    const names = Object.keys(state.entries).filter(
       (name) => name && name !== "undefined",
     );
     if (
-      state.currentEditingChapter &&
-      state.currentEditingChapter !== "undefined" &&
-      !names.includes(state.currentEditingChapter)
+      state.currentEditingEntry &&
+      state.currentEditingEntry !== "undefined" &&
+      !names.includes(state.currentEditingEntry)
     ) {
-      names.push(state.currentEditingChapter);
+      names.push(state.currentEditingEntry);
     }
     el.previewChapterSelect.innerHTML = "";
     names.forEach((name) => {
@@ -73,7 +73,7 @@ function createPreviewManager({
   }
 
   function setPreviewChapter(name) {
-    state.previewState.chapter = name;
+    state.previewState.entry = name;
     state.previewState.pages = sortPagesByFilename(getPreviewPages(name));
     state.previewState.index = 0;
     renderPreviewImage();
@@ -81,7 +81,7 @@ function createPreviewManager({
 
   // Use the loaded chapters map to build the preview page list.
   function getPreviewPages(name) {
-    return sortPagesByFilename(state.chapters[name] || state.currentPages || []);
+    return sortPagesByFilename(state.entries[name] || state.currentPages || []);
   }
 
   function renderPreviewImage() {

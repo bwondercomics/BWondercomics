@@ -330,7 +330,7 @@
         width: 100%;
       }
 
-      .chapter-controls {
+      .entry-controls {
         display: flex;
         flex-direction: row;
         gap: 4px;
@@ -338,19 +338,19 @@
         flex: 0 1 auto;
       }
 
-      .chapter-controls .chapter-select {
+      .entry-controls .entry-select {
         flex: 1 1 auto;
         min-width: 80px;
       }
 
-      .chapter-controls .chapter-select-trigger {
+      .entry-controls .entry-select-trigger {
         padding: 1px 5px;
         font-size: 12px;
         min-width: auto;
         gap: 4px;
       }
 
-      .chapter-controls .chapter-covers-btn {
+      .entry-controls .entry-covers-btn {
         padding: 1px 11px 1px 6px;
         font-size: 12px;
         white-space: nowrap;
@@ -418,18 +418,18 @@
         max-width: none;
       }
 
-      .chapter-controls .chapter-select {
+      .entry-controls .entry-select {
         min-width: 70px;
       }
 
-      .chapter-controls .chapter-select-trigger {
+      .entry-controls .entry-select-trigger {
         font-size: 11px;
         padding: 1px 4px;
         min-width: auto;
         gap: 3px;
       }
 
-      .chapter-controls .chapter-covers-btn {
+      .entry-controls .entry-covers-btn {
         font-size: 11px;
         padding: 1px 10px 1px 5px;
         min-width: auto;

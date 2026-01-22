@@ -164,9 +164,9 @@ function createUploadManager({
 
   function maybeAutoUpload() {
     if (!state.selectedFiles.length || state.isUploading) return;
-    const chapterName = entriesApi?.getActiveChapterName();
+    const entryName = entriesApi?.getActiveChapterName();
     const uploadProgress = document.getElementById("uploadProgress");
-    if (!chapterName) {
+    if (!entryName) {
       if (uploadProgress) uploadProgress.style.display = "none";
       return; // wait until user sets a chapter name
     }
@@ -180,8 +180,8 @@ function createUploadManager({
     const uploadProgress = document.getElementById("uploadProgress");
 
     if (state.isUploading) return;
-    const chapterName = entriesApi?.getActiveChapterName();
-    if (!chapterName) {
+    const entryName = entriesApi?.getActiveChapterName();
+    if (!entryName) {
       if (showError) showError("Enter an entry name first.");
       if (uploadProgress) {
         uploadProgress.style.display = "block";
@@ -206,9 +206,9 @@ function createUploadManager({
           ? getChaptersRoot()
           : "chapters";
     const chapterFolder = getChapterFolder(
-      chapterName,
-      state.chapterFolders,
-      state.chapters,
+      entryName,
+      state.entryFolders,
+      state.entries,
       state.currentPages,
       chaptersRoot,
     );

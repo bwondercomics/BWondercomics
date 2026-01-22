@@ -394,8 +394,8 @@
           <div id="entryLabelTabs" class="entry-label-tabs" role="tablist"></div>
           <button class="btn-small btn-secondary" id="btnAddEntryLabel" type="button">+ Add Label</button>
         </div>
-        <div id="chapterList" class="chapter-list"></div>
-        <button class="btn-small btn-add" id="btnAddChapter">+ Add New Entry</button>
+        <div id="entryList" class="entry-list"></div>
+        <button class="btn-small btn-add" id="btnAddEntry">+ Add New Entry</button>
       </section>
 
       <!-- Blog Management Section -->
@@ -494,7 +494,7 @@
         </div>
 
         <h3 class="section-title" style="font-size: 1.2rem; margin-top: 30px;">Recent Posts</h3>
-        <div id="postList" class="chapter-list"></div>
+        <div id="postList" class="entry-list"></div>
       </section>
 
       <!-- Social Section -->
@@ -1019,7 +1019,7 @@
               <span>Users</span>
               <span id="usersCount" class="dashboard-pill">0</span>
             </div>
-            <div id="usersList" class="chapter-list"></div>
+            <div id="usersList" class="entry-list"></div>
           </div>
           <div class="dashboard-card dashboard-card--wide">
             <div class="dashboard-card-title">
@@ -1037,7 +1037,7 @@
               </div>
               <div id="emailListStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
             </div>
-            <div id="emailList" class="chapter-list"></div>
+            <div id="emailList" class="entry-list"></div>
             <div id="emailListEmpty" class="dashboard-empty">No email subscribers yet.</div>
           </div>
           <div class="dashboard-card dashboard-card--wide">
@@ -1056,7 +1056,7 @@
               </div>
               <div id="premiumCodesStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
             </div>
-            <div id="premiumCodesList" class="chapter-list" style="margin-top: 12px;"></div>
+            <div id="premiumCodesList" class="entry-list" style="margin-top: 12px;"></div>
             <div id="premiumCodesEmpty" class="dashboard-empty">No premium codes yet.</div>
           </div>
         </div>
@@ -1165,13 +1165,13 @@
           <div class="dashboard-card dashboard-card--wide">
             <div class="dashboard-card-title">Comments</div>
             <div id="moderationResults" class="moderation-results"></div>
-            <div id="moderationCommentsList" class="chapter-list" style="margin-top: 12px;"></div>
+            <div id="moderationCommentsList" class="entry-list" style="margin-top: 12px;"></div>
             <div id="moderationCommentsEmpty" class="dashboard-empty">No comments found.</div>
           </div>
 
           <div class="dashboard-card">
             <div class="dashboard-card-title">Banned Users</div>
-            <div id="moderationBannedUsersList" class="chapter-list" style="margin-top: 12px;"></div>
+            <div id="moderationBannedUsersList" class="entry-list" style="margin-top: 12px;"></div>
             <div id="moderationBannedUsersEmpty" class="dashboard-empty">No banned users.</div>
           </div>
 
@@ -1183,7 +1183,7 @@
               <button class="btn-secondary" id="btnModerationBanIp" type="button" style="margin-top: 8px;">Ban
                 IP</button>
             </div>
-            <div id="moderationBannedIpsList" class="chapter-list" style="margin-top: 12px;"></div>
+            <div id="moderationBannedIpsList" class="entry-list" style="margin-top: 12px;"></div>
             <div id="moderationBannedIpsEmpty" class="dashboard-empty">No banned IPs.</div>
           </div>
 
@@ -1201,7 +1201,7 @@
                 <button class="btn-secondary" id="btnModerationAddWord" type="button" style="margin-top: 8px;">Add
                   Phrase</button>
               </div>
-              <div id="moderationWordsList" class="chapter-list" style="margin-top: 12px;"></div>
+              <div id="moderationWordsList" class="entry-list" style="margin-top: 12px;"></div>
               <div id="moderationWordsEmpty" class="dashboard-empty">No censored words yet.</div>
             </div>
           </div>
@@ -1406,7 +1406,7 @@
       <form id="editForm" class="form-editor">
         <div class="form-group">
           <label class="form-label" for="chapterName" id="entryNameLabel">Entry Name</label>
-          <input type="text" id="chapterName" class="form-input" placeholder="e.g., Entry 1" required />
+          <input type="text" id="entryName" class="form-input" placeholder="e.g., Entry 1" required />
         </div>
 
         <div class="form-group">
@@ -1450,7 +1450,7 @@
         <div class="form-group">
           <label class="form-label" id="entryAccessLabel">Entry Access</label>
           <label style="display:flex; align-items:center; gap:10px; font-size: 0.95rem;">
-            <input type="checkbox" id="chapterPremium" />
+            <input type="checkbox" id="entryPremium" />
             Premium only (requires a premium account to view)
           </label>
         </div>

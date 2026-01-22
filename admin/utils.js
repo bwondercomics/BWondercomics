@@ -124,16 +124,16 @@ export function ensureChapterFolder(name = '', chapterFolders = {}, chapters = {
 
 /**
  * Gets the folder path for a chapter, ensuring one exists
- * @param {string} chapterName - Name of the chapter
+ * @param {string} entryName - Name of the chapter
  * @param {Object} chapterFolders - Mapping of chapter names to folder paths
  * @param {Object} chapters - Entries data object
  * @param {string[]} currentPages - Current page paths
  * @param {string} chaptersRoot - Root directory for chapters
  * @returns {string} Folder path for the chapter
  */
-export function getChapterFolder(chapterName = '', chapterFolders = {}, chapters = {}, currentPages = [], chaptersRoot = 'chapters') {
-  if (chapterFolders[chapterName]) return chapterFolders[chapterName];
-  return ensureChapterFolder(chapterName || 'Entry', chapterFolders, chapters, currentPages, chaptersRoot);
+export function getChapterFolder(entryName = '', chapterFolders = {}, chapters = {}, currentPages = [], chaptersRoot = 'chapters') {
+  if (chapterFolders[entryName]) return chapterFolders[entryName];
+  return ensureChapterFolder(entryName || 'Entry', chapterFolders, chapters, currentPages, chaptersRoot);
 }
 
 /**

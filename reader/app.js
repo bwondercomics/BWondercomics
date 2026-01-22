@@ -2,23 +2,23 @@
 import { state, loadProgress } from "./state.js";
 import { logger } from "./logger.js";
 import { throttle } from "./utils.js";
-import { loadChapterData, loadPageConfigWithFallback, loadLatestPost } from "./data.js";
+import { loadEntryData, loadPageConfigWithFallback, loadLatestPost, applyBuilderPageToDOM } from "./data.js";
 import { el, initElements } from "./dom.js";
 import { renderStatusPanel, render } from "./render.js";
 import { initReaderAnalytics, setActiveEntry } from "./analytics.js";
 import {
   prevPage,
   nextPage,
-  restartChapter,
-  hideEndOfChapter,
+  restartEntry,
+  hideEndOfEntry,
 } from "./controls.js";
 import { fitToScreen, zoomIn, zoomOut, resetView } from "./transform.js";
 import { initPointerHandlers } from "./pointer.js";
 import {
   toggleShortcutsOverlay,
   closeShortcutsOverlay,
-  goToNextChapter,
-  changeChapter,
+  goToNextEntry,
+  changeEntry,
 } from "./overlays.js";
 
 // Code splitting: lazy load heavier modules on demand.
@@ -81,7 +81,7 @@ import { getActiveSeriesId } from "./series.js";
 
 (function () {
   "use strict";
-  // ==================== CHAPTER HELPERS ====================
+  // ==================== ENTRY HELPERS ====================
 
   // Helpers now live in reader/entries.js
 
@@ -130,7 +130,7 @@ import { getActiveSeriesId } from "./series.js";
   let premiumOnly = false;
   let unitLabelSingular = "Entry";
   let unitLabelPlural = "Entries";
-  let chapterSelectBound = false;
+  let entrySelectBound = false;
 
   function getUnitLabels() {
     const singular = String(unitLabelSingular || "").trim() || "Entry";
@@ -204,18 +204,18 @@ import { getActiveSeriesId } from "./series.js";
     );
     if (commentsTitle) commentsTitle.textContent = `Discuss This ${singular}`;
 
-    const endTitle = document.querySelector("#chapterEndOverlay h2");
+    const endTitle = document.querySelector("#entryEndOverlay h2");
     if (endTitle) endTitle.textContent = `${singularUpper} COMPLETE`;
 
-    const endBody = document.querySelector("#chapterEndOverlay p");
+    const endBody = document.querySelector("#entryEndOverlay p");
     if (endBody) {
       endBody.textContent = `You've reached the end of this ${singular.toLowerCase()}! Ready for more?`;
     }
 
-    const nextBtn = document.getElementById("nextChapterBtn");
+    const nextBtn = document.getElementById("nextEntryBtn");
     if (nextBtn) nextBtn.textContent = `Next ${singular}`;
 
-    const restartBtn = document.getElementById("restartChapterBtn");
+    const restartBtn = document.getElementById("restartEntryBtn");
     if (restartBtn) restartBtn.textContent = `Restart ${singular}`;
 
     const galleryTitle = document.querySelector("#entryCoverGallery h2");
@@ -237,14 +237,14 @@ import { getActiveSeriesId } from "./series.js";
   // ==================== POINTER INTERACTIONS ====================
   // Moved to reader/pointer.js
 
-  // ==================== CHAPTER MANAGEMENT ====================
+  // ==================== ENTRY MANAGEMENT ====================
 
-  function initChapterSelect() {
-    if (!el.chapter) return;
+  function initEntrySelect() {
+    if (!el.entry) return;
 
     const names = entryOrder.length ? entryOrder : Object.keys(entries);
     const dropdownNames = names.filter(shouldShowInDropdown);
-    el.chapter.innerHTML = "";
+    el.entry.innerHTML = "";
 
     dropdownNames.forEach((name) => {
       const option = document.createElement("option");
@@ -256,79 +256,79 @@ import { getActiveSeriesId } from "./series.js";
         const trackingLabel = formatEntryTrackingLabel(name);
         if (trackingLabel) option.dataset.entryLabel = trackingLabel;
       }
-      el.chapter.appendChild(option);
+      el.entry.appendChild(option);
     });
 
-    buildChapterSelectMenu(dropdownNames);
-    bindChapterSelectEvents();
-    syncChapterSelectDisplay();
+    buildEntrySelectMenu(dropdownNames);
+    bindEntrySelectEvents();
+    syncEntrySelectDisplay();
   }
 
-  function getChapterSelectElements() {
+  function getEntrySelectElements() {
     return {
-      wrap: document.getElementById("chapterSelect"),
-      trigger: document.getElementById("chapterSelectTrigger"),
-      name: document.getElementById("chapterSelectName"),
-      patron: document.getElementById("chapterSelectPatron"),
-      menu: document.getElementById("chapterSelectMenu"),
+      wrap: document.getElementById("entrySelect"),
+      trigger: document.getElementById("entrySelectTrigger"),
+      name: document.getElementById("entrySelectName"),
+      patron: document.getElementById("entrySelectPatron"),
+      menu: document.getElementById("entrySelectMenu"),
     };
   }
 
-  function setChapterMenuOpen(isOpen) {
-    const { trigger, menu } = getChapterSelectElements();
+  function setEntryMenuOpen(isOpen) {
+    const { trigger, menu } = getEntrySelectElements();
     if (!trigger || !menu) return;
     menu.classList.toggle("open", isOpen);
     trigger.setAttribute("aria-expanded", isOpen ? "true" : "false");
   }
 
-  function buildChapterSelectMenu(names) {
-    const { menu } = getChapterSelectElements();
+  function buildEntrySelectMenu(names) {
+    const { menu } = getEntrySelectElements();
     if (!menu) return;
     menu.innerHTML = "";
 
     names.forEach((name) => {
       const button = document.createElement("button");
       button.type = "button";
-      button.className = "chapter-option";
+      button.className = "entry-option";
       button.dataset.value = name;
       button.setAttribute("role", "option");
       button.setAttribute("aria-selected", "false");
 
       const label = document.createElement("span");
-      label.className = "chapter-option-name";
+      label.className = "entry-option-name";
       label.textContent = formatEntryLabel(name);
       button.appendChild(label);
 
       if (entryMeta?.[name]?.premium) {
         const patron = document.createElement("span");
-        patron.className = "chapter-option-patron";
+        patron.className = "entry-option-patron";
         patron.textContent = "Patron";
         button.appendChild(patron);
       }
 
       button.addEventListener("click", () => {
-        if (el.chapter) {
-          el.chapter.value = name;
-          el.chapter.dispatchEvent(new Event("change", { bubbles: true }));
+        if (el.entry) {
+          el.entry.value = name;
+          el.entry.dispatchEvent(new Event("change", { bubbles: true }));
         }
-        setChapterMenuOpen(false);
+        setEntryMenuOpen(false);
       });
 
       menu.appendChild(button);
     });
   }
 
-  function syncChapterSelectDisplay() {
-    const { name, patron, menu } = getChapterSelectElements();
-    if (!name || !el.chapter) return;
-    const value = el.chapter.value || "";
+  function syncEntrySelectDisplay() {
+    const { name, patron, menu } = getEntrySelectElements();
+    if (!name || !el.entry) return;
+    const value = el.entry.value || "";
     name.textContent = value ? formatEntryLabel(value) : getUnitLabels().singular;
     const isPatron = !!entryMeta?.[value]?.premium;
     if (patron) {
       patron.style.display = isPatron ? "inline-flex" : "none";
     }
     if (menu) {
-      menu.querySelectorAll(".chapter-option").forEach((option) => {
+      menu.querySelectorAll(".entry-option").forEach((option) => {
         const selected = option.dataset.value === value;
         option.setAttribute("aria-selected", selected ? "true" : "false");
         option.classList.toggle("is-selected", selected);
@@ -336,14 +336,14 @@ import { getActiveSeriesId } from "./series.js";
     }
   }
 
-  function bindChapterSelectEvents() {
-    if (chapterSelectBound) return;
-    const { wrap, trigger, menu } = getChapterSelectElements();
+  function bindEntrySelectEvents() {
+    if (entrySelectBound) return;
+    const { wrap, trigger, menu } = getEntrySelectElements();
     if (!wrap || !trigger || !menu) return;
 
     trigger.addEventListener("click", (event) => {
       event.stopPropagation();
-      setChapterMenuOpen(!menu.classList.contains("open"));
+      setEntryMenuOpen(!menu.classList.contains("open"));
     });
 
     menu.addEventListener("click", (event) => {
@@ -352,17 +352,17 @@ import { getActiveSeriesId } from "./series.js";
 
     document.addEventListener("click", (event) => {
       if (!wrap.contains(event.target)) {
-        setChapterMenuOpen(false);
+        setEntryMenuOpen(false);
       }
     });
 
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape") {
-        setChapterMenuOpen(false);
+        setEntryMenuOpen(false);
       }
     });
 
-    chapterSelectBound = true;
+    entrySelectBound = true;
   }
 
   // ==================== COVER GALLERY ====================
@@ -590,7 +590,7 @@ import { getActiveSeriesId } from "./series.js";
         case "Escape":
           e.preventDefault();
           closeShortcutsOverlay();
-          hideEndOfChapter();
+          hideEndOfEntry();
           if (document.fullscreenElement) {
             document.exitFullscreen();
           }
@@ -622,17 +622,17 @@ import { getActiveSeriesId } from "./series.js";
       el.controls.addEventListener("mouseleave", handleMouseLeaveControls);
     }
 
-    if (el.chapter) {
-      el.chapter.addEventListener("change", (e) => {
+    if (el.entry) {
+      el.entry.addEventListener("change", (e) => {
         const nextName = e.target.value;
         const meta = entryMeta?.[nextName] || {};
         if (String(meta.releaseType || "").toLowerCase() === "store" && meta.storeUrl) {
           window.open(meta.storeUrl, "_blank", "noopener,noreferrer");
-          el.chapter.value = state.currentChapter;
-          syncChapterSelectDisplay();
+          el.entry.value = state.currentEntry;
+          syncEntrySelectDisplay();
           return;
         }
-        changeChapter(nextName, entries, entryMeta);
+        changeEntry(nextName, entries, entryMeta);
       });
     }
 
@@ -653,22 +653,22 @@ import { getActiveSeriesId } from "./series.js";
     }
 
     // End of chapter overlay buttons
-    const nextChapterBtn = document.getElementById("nextChapterBtn");
-    const restartChapterBtn = document.getElementById("restartChapterBtn");
+    const nextEntryBtn = document.getElementById("nextEntryBtn");
+    const restartEntryBtn = document.getElementById("restartEntryBtn");
     const closeEndOverlay = document.getElementById("closeEndOverlay");
 
-    if (nextChapterBtn) {
-      nextChapterBtn.addEventListener("click", () =>
-        goToNextChapter(getNavigableEntries(), entries, entryMeta),
+    if (nextEntryBtn) {
+      nextEntryBtn.addEventListener("click", () =>
+        goToNextEntry(getNavigableEntries(), entries, entryMeta),
       );
     }
-    if (restartChapterBtn) {
-      restartChapterBtn.addEventListener("click", () =>
-        restartChapter(entries),
+    if (restartEntryBtn) {
+      restartEntryBtn.addEventListener("click", () =>
+        restartEntry(entries),
       );
     }
     if (closeEndOverlay) {
-      closeEndOverlay.addEventListener("click", hideEndOfChapter);
+      closeEndOverlay.addEventListener("click", hideEndOfEntry);
     }
   }
 
@@ -697,7 +697,7 @@ import { getActiveSeriesId } from "./series.js";
     renderLatestUpdate(latest);
   }
 
-  // ==================== LOAD CHAPTER DATA ====================
+  // ==================== LOAD ENTRY DATA ====================
 
   // ==================== DATA LOADERS ====================
 
@@ -729,7 +729,7 @@ import { getActiveSeriesId } from "./series.js";
 
   function init() {
     initElements();
-    initChapterSelect();
+    initEntrySelect();
     initReaderAnalytics();
     // renderGallery(); // Loaded on open
     setInitialSubtitle();
@@ -742,7 +742,7 @@ import { getActiveSeriesId } from "./series.js";
       : (entryOrder.length ? entryOrder : Object.keys(entries));
 
     if (!availableEntries.length) {
-      if (el.chapter) el.chapter.innerHTML = "";
+      if (el.entry) el.entry.innerHTML = "";
       const viewport = document.getElementById("viewport");
       if (viewport) {
         const message = premiumOnly
@@ -759,22 +759,22 @@ import { getActiveSeriesId } from "./series.js";
     }
     const saved = loadProgress();
     if (saved && entries[saved.chapter]) {
-      state.currentChapter = saved.chapter;
+      state.currentEntry = saved.chapter;
       state.pages = entries[saved.chapter];
       state.pageIndex = saved.page || 0;
     } else {
-      const firstChapter = availableEntries[0];
-      state.currentChapter = firstChapter;
-      state.pages = entries[firstChapter] || [];
+      const firstEntry = availableEntries[0];
+      state.currentEntry = firstEntry;
+      state.pages = entries[firstEntry] || [];
       state.pageIndex = 0;
     }
-    state.entryMeta = entryMeta?.[state.currentChapter] || null;
+    state.entryMeta = entryMeta?.[state.currentEntry] || null;
     setActiveEntry();
 
-    if (el.chapter) el.chapter.value = state.currentChapter;
-    syncChapterSelectDisplay();
+    if (el.entry) el.entry.value = state.currentEntry;
+    syncEntrySelectDisplay();
     window.dispatchEvent(
-      new CustomEvent("chapterChanged", { detail: { chapter: state.currentChapter } }),
+      new CustomEvent("entryChanged", { detail: { chapter: state.currentEntry } }),
     );
 
     attachEventHandlers();
@@ -789,7 +789,7 @@ import { getActiveSeriesId } from "./series.js";
     const seriesId = getActiveSeriesId();
 
     try {
-      const data = await loadChapterData(seriesId);
+      const data = await loadEntryData(seriesId);
       if (data) {
         entries = data.entries;
         entryOrder = data.entryOrder;
@@ -863,7 +863,10 @@ import { getActiveSeriesId } from "./series.js";
       entryMeta: fullEntryMeta,
       unitLabelSingular,
     });
-    await loadPageConfigWithFallback(setSubtitles, seriesId);
+    const pageConfig = await loadPageConfigWithFallback(setSubtitles, seriesId);
+    if (pageConfig.source === 'builder' && pageConfig.page) {
+      applyBuilderPageToDOM(pageConfig.page);
+    }
     loadLatestUpdate();
     init();
   }
@@ -878,8 +881,8 @@ import { getActiveSeriesId } from "./series.js";
     updatePatronWelcome(user);
   });
 
-  window.addEventListener("chapterChanged", () => {
-    syncChapterSelectDisplay();
+  window.addEventListener("entryChanged", () => {
+    syncEntrySelectDisplay();
   });
 
   if (

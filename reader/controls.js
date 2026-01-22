@@ -27,7 +27,7 @@ export function prevPage() {
 /**
  * Navigate to the next page(s)
  * In two-page mode, moves forward by 2 pages; otherwise by 1 page
- * Shows end-of-chapter overlay when reaching the last page
+ * Shows end-of-entry overlay when reaching the last page
  */
 export function nextPage() {
   if (state.isTransitioning) return;
@@ -40,7 +40,7 @@ export function nextPage() {
   const isAtEnd = state.pageIndex >= total - 1;
 
   if (rightIsLast || isAtEnd) {
-    showEndOfChapter();
+    showEndOfEntry();
     return;
   }
 
@@ -60,24 +60,24 @@ export function nextPage() {
   });
 }
 
-export function restartChapter() {
+export function restartEntry() {
   state.pageIndex = 0;
   render();
   saveProgress(state);
   resetEntryCompletion();
-  hideEndOfChapter();
+  hideEndOfEntry();
 }
 
-export function showEndOfChapter() {
-  const overlay = document.getElementById('chapterEndOverlay');
+export function showEndOfEntry() {
+  const overlay = document.getElementById('entryEndOverlay');
   if (overlay) {
     markEntryComplete();
     overlay.classList.add('active');
   }
 }
 
-export function hideEndOfChapter() {
-  const overlay = document.getElementById('chapterEndOverlay');
+export function hideEndOfEntry() {
+  const overlay = document.getElementById('entryEndOverlay');
   if (overlay) {
     overlay.classList.remove('active');
   }

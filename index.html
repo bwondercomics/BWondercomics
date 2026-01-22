@@ -74,20 +74,20 @@
         <span class="status-text" id="statusText"></span><span class="status-cursor" id="statusCursor"
           aria-hidden="true"></span>
       </div>
-      <div class="chapter-controls">
-        <div class="chapter-select" id="chapterSelect">
-          <button class="chapter-select-trigger" id="chapterSelectTrigger" type="button" aria-haspopup="listbox"
+      <div class="entry-controls">
+        <div class="entry-select" id="entrySelect">
+          <button class="entry-select-trigger" id="entrySelectTrigger" type="button" aria-haspopup="listbox"
             aria-expanded="false">
-            <span class="chapter-select-name" id="chapterSelectName">Entry</span>
-            <span class="chapter-select-patron" id="chapterSelectPatron" style="display: none;">Patron</span>
+            <span class="entry-select-name" id="entrySelectName">Entry</span>
+            <span class="entry-select-patron" id="entrySelectPatron" style="display: none;">Patron</span>
           </button>
-          <div class="chapter-select-menu" id="chapterSelectMenu" role="listbox" aria-label="Select entry"></div>
+          <div class="entry-select-menu" id="entrySelectMenu" role="listbox" aria-label="Select entry"></div>
         </div>
-        <button id="entryCoverGalleryBtn" class="chapter-covers-btn" aria-label="Open Cover Gallery" title="Cover Gallery">
+        <button id="entryCoverGalleryBtn" class="entry-covers-btn" aria-label="Open Cover Gallery" title="Cover Gallery">
           COVERS
         </button>
       </div>
-      <select id="chapter" class="chapter-select-native" aria-label="Select entry"></select>
+      <select id="entry" class="entry-select-native" aria-label="Select entry"></select>
       <div class="nav-links">
         <a class="nav-link" href="comics.html">Comics</a>
         <a class="nav-link admin-link" id="adminNavLink" href="admin/" target="_blank" rel="noopener noreferrer"
@@ -421,21 +421,21 @@
   </div>
 
   <!-- End of Entry Overlay -->
-  <div class="chapter-end-overlay" id="chapterEndOverlay">
-    <div class="chapter-end-content">
+  <div class="entry-end-overlay" id="entryEndOverlay">
+    <div class="entry-end-content">
       <h2>ENTRY COMPLETE</h2>
       <p>
         You've reached the end of this entry! Ready for more Battle Bros
         action?
       </p>
-      <div class="chapter-end-buttons">
-        <button class="chapter-end-btn primary" id="nextChapterBtn">
+      <div class="entry-end-buttons">
+        <button class="entry-end-btn primary" id="nextEntryBtn">
           Next Entry
         </button>
-        <button class="chapter-end-btn" id="restartChapterBtn">
+        <button class="entry-end-btn" id="restartEntryBtn">
           Restart Entry
         </button>
-        <button class="chapter-end-btn" id="closeEndOverlay">
+        <button class="entry-end-btn" id="closeEndOverlay">
           Keep Reading
         </button>
       </div>
