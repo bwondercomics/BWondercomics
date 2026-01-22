@@ -10,6 +10,7 @@ Read-only health and status endpoints for admin dashboard:
 
 All endpoints require admin auth. No mutations.
 """
+
 from __future__ import annotations
 
 import json
@@ -17,7 +18,6 @@ import os
 import platform
 import subprocess
 from datetime import datetime, timezone
-from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -40,7 +40,6 @@ from ..models import (
 from ..settings import settings
 from .admin_ops import OPS_COMMANDS, run_ops_command
 from .admin_utils import iso_z, require_admin
-
 
 router = APIRouter()
 APP_STARTED_AT = datetime.now(timezone.utc)
@@ -127,9 +126,7 @@ def _fail2ban_status() -> dict:
             if age_seconds > 900:
                 age_minutes = int(age_seconds // 60)
                 status = "warning"
-                payload["message"] = (
-                    f"Fail2ban snapshot stale ({age_minutes} min old)."
-                )
+                payload["message"] = f"Fail2ban snapshot stale ({age_minutes} min old)."
         except Exception:
             status = "warning"
             payload["message"] = "Fail2ban snapshot has invalid timestamp."
@@ -171,10 +168,12 @@ def _snapshot_info() -> dict:
     snapshots = []
     for path in releases_dir.glob("dist-*.tar.gz"):
         if path.is_file():
-            snapshots.append({
-                "name": path.name,
-                "mtime": path.stat().st_mtime,
-            })
+            snapshots.append(
+                {
+                    "name": path.name,
+                    "mtime": path.stat().st_mtime,
+                }
+            )
 
     if not snapshots:
         return {"count": 0, "latest": None}
@@ -267,22 +266,41 @@ def diagnostics_db_stats(request: Request, db: Session = Depends(get_db)):
     try:
         # User counts by role
         total_users = db.scalar(select(func.count()).select_from(User)) or 0
-        users_by_role_user = db.scalar(select(func.count()).select_from(User).where(User.role == "user")) or 0
-        users_by_role_premium = db.scalar(select(func.count()).select_from(User).where(User.role == "premium")) or 0
-        users_by_role_admin = db.scalar(select(func.count()).select_from(User).where(User.role == "admin")) or 0
+        users_by_role_user = (
+            db.scalar(select(func.count()).select_from(User).where(User.role == "user")) or 0
+        )
+        users_by_role_premium = (
+            db.scalar(select(func.count()).select_from(User).where(User.role == "premium")) or 0
+        )
+        users_by_role_admin = (
+            db.scalar(select(func.count()).select_from(User).where(User.role == "admin")) or 0
+        )
 
         # Series counts
         total_series = db.scalar(select(func.count()).select_from(Series)) or 0
-        series_published = db.scalar(select(func.count()).select_from(Series).where(Series.active == True)) or 0
-        series_premium = db.scalar(select(func.count()).select_from(Series).where(Series.premium_only == True)) or 0
+        series_published = (
+            db.scalar(select(func.count()).select_from(Series).where(Series.active.is_(True))) or 0
+        )
+        series_premium = (
+            db.scalar(select(func.count()).select_from(Series).where(Series.premium_only.is_(True)))
+            or 0
+        )
 
         # Comment counts
         total_comments = db.scalar(select(func.count()).select_from(Comment)) or 0
-        comments_approved = db.scalar(select(func.count()).select_from(Comment).where(Comment.hidden == False)) or 0
+        comments_approved = (
+            db.scalar(select(func.count()).select_from(Comment).where(Comment.hidden.is_(False)))
+            or 0
+        )
 
         # Premium code counts
         total_codes = db.scalar(select(func.count()).select_from(PremiumCode)) or 0
-        active_codes = db.scalar(select(func.count()).select_from(PremiumCode).where(PremiumCode.active == True)) or 0
+        active_codes = (
+            db.scalar(
+                select(func.count()).select_from(PremiumCode).where(PremiumCode.active.is_(True))
+            )
+            or 0
+        )
 
         # Other counts
         total_posts = db.scalar(select(func.count()).select_from(Post)) or 0
@@ -353,7 +371,9 @@ def diagnostics_db_overview(request: Request, db: Session = Depends(get_db)):
             database_info = {
                 "name": db_info_row[0] or "",
                 "version": (db_info_row[1] or "").split(" ")[0] if db_info_row[1] else "",
-                "size_pretty": f"{(db_info_row[2] or 0) / (1024 ** 3):.2f} GB" if db_info_row[2] else "0 GB",
+                "size_pretty": f"{(db_info_row[2] or 0) / (1024 ** 3):.2f} GB"
+                if db_info_row[2]
+                else "0 GB",
             }
     except Exception:
         pass
@@ -361,12 +381,16 @@ def diagnostics_db_overview(request: Request, db: Session = Depends(get_db)):
     # Connection stats
     connections = {"active": 0, "idle": 0, "total": 0, "max": 100}
     try:
-        active_count = db.execute(
-            text("SELECT count(*) FROM pg_stat_activity WHERE state = 'active'")
-        ).scalar() or 0
-        idle_count = db.execute(
-            text("SELECT count(*) FROM pg_stat_activity WHERE state = 'idle'")
-        ).scalar() or 0
+        active_count = (
+            db.execute(
+                text("SELECT count(*) FROM pg_stat_activity WHERE state = 'active'")
+            ).scalar()
+            or 0
+        )
+        idle_count = (
+            db.execute(text("SELECT count(*) FROM pg_stat_activity WHERE state = 'idle'")).scalar()
+            or 0
+        )
         total_count = db.execute(text("SELECT count(*) FROM pg_stat_activity")).scalar() or 0
         max_conn = db.execute(text("SHOW max_connections")).scalar()
         connections = {
@@ -408,7 +432,7 @@ def diagnostics_db_overview(request: Request, db: Session = Depends(get_db)):
         ).all()
         for row in rows:
             size_bytes = row[5] or 0
-            size_mb = size_bytes / (1024 ** 2)
+            size_mb = size_bytes / (1024**2)
             size_pretty = f"{size_mb:.2f} MB" if size_mb < 1024 else f"{size_mb / 1024:.2f} GB"
             tables.append(
                 {
@@ -590,7 +614,11 @@ def diagnostics_inner_net_target(request: Request, db: Session = Depends(get_db)
 
     forwarded_proto = (request.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
     proto = forwarded_proto if forwarded_proto in {"http", "https"} else "http"
-    host = (request.headers.get("X-Forwarded-Host") or request.headers.get("Host") or "").split(",")[0].strip()
+    host = (
+        (request.headers.get("X-Forwarded-Host") or request.headers.get("Host") or "")
+        .split(",")[0]
+        .strip()
+    )
     base = f"{proto}://{host}" if host else ""
 
     return {"target": base, "generatedAt": iso_z(datetime.now(timezone.utc))}

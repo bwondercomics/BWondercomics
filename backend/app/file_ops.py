@@ -8,7 +8,6 @@ from pathlib import Path
 
 from .settings import settings
 
-
 ALLOWED_IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".webp"}
 
 

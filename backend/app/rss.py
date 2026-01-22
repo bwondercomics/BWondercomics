@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 from xml.dom import minidom
-import xml.etree.ElementTree as ET
 
 from .settings import settings
 

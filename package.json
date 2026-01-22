@@ -13,8 +13,11 @@
         "test:coverage": "node ./node_modules/vitest/vitest.mjs run --coverage",
         "lint": "eslint reader/ admin/",
         "lint:fix": "eslint --fix reader/ admin/",
+        "lint:py": "python3 -m ruff check backend/app backend/alembic",
         "format": "prettier --write '**/*.{js,html,css,md}'",
-        "format:check": "prettier --check '**/*.{js,html,css,md}'"
+        "format:check": "prettier --check '**/*.{js,html,css,md}'",
+        "format:py": "python3 -m ruff format backend/app backend/alembic",
+        "format:py:check": "python3 -m ruff format --check backend/app backend/alembic"
     },
     "devDependencies": {
         "@eslint/js": "^9.39.2",

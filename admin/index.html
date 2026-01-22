@@ -577,7 +577,54 @@
         </div>
       </section>
 
-      <!-- Page Designer Section -->
+      <!-- Page Builder Section -->
+      <section class="section" id="pageBuilderSection" style="display: none;">
+        <div class="page-builder">
+          <!-- Page Builder Header -->
+          <div class="page-builder-header">
+            <h2 class="section-title">Page Builder</h2>
+            <div class="page-builder-actions">
+              <button type="button" class="btn-secondary" id="pbAddPage">+ New Page</button>
+              <button type="button" class="btn-primary" id="pbSave">Save Changes</button>
+            </div>
+          </div>
+
+          <!-- Page Builder Layout -->
+          <div class="page-builder-layout">
+            <!-- Left Sidebar: Page List -->
+            <aside class="page-builder-sidebar">
+              <div class="pb-sidebar-section">
+                <h3 class="pb-sidebar-title">Pages</h3>
+                <div id="pbPageList" class="pb-page-list"></div>
+              </div>
+              <div class="pb-sidebar-section">
+                <h3 class="pb-sidebar-title">Modules</h3>
+                <div id="pbModulePalette" class="pb-module-palette"></div>
+              </div>
+            </aside>
+
+            <!-- Main Canvas Area -->
+            <main class="page-builder-canvas">
+              <div id="pbCanvas" class="pb-canvas">
+                <div class="pb-canvas-empty">
+                  <p>Select a page from the sidebar or create a new one to get started.</p>
+                </div>
+              </div>
+            </main>
+
+            <!-- Right Sidebar: Module Editor -->
+            <aside class="page-builder-editor">
+              <div id="pbModuleEditor" class="pb-module-editor">
+                <div class="pb-editor-empty">
+                  <p>Click on a module to edit its settings.</p>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </div>
+      </section>
+
+      <!-- Legacy Designer Section (hidden, kept for migration) -->
       <section class="section" id="designerSection" style="display: none;">
         <iframe id="designerFrame" class="designer-frame" title="Page Designer" loading="lazy"></iframe>
       </section>

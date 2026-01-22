@@ -2,7 +2,7 @@
 import { state, loadProgress } from "./state.js";
 import { logger } from "./logger.js";
 import { throttle } from "./utils.js";
-import { loadChapterData, loadPageConfig, loadLatestPost } from "./data.js";
+import { loadChapterData, loadPageConfigWithFallback, loadLatestPost } from "./data.js";
 import { el, initElements } from "./dom.js";
 import { renderStatusPanel, render } from "./render.js";
 import { initReaderAnalytics, setActiveEntry } from "./analytics.js";
@@ -863,7 +863,7 @@ import { getActiveSeriesId } from "./series.js";
       entryMeta: fullEntryMeta,
       unitLabelSingular,
     });
-    await loadPageConfig(setSubtitles, seriesId);
+    await loadPageConfigWithFallback(setSubtitles, seriesId);
     loadLatestUpdate();
     init();
   }

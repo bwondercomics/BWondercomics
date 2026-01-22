@@ -14,16 +14,19 @@ from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from ..content_store import apply_media_items_save, get_page_config, list_media_items, save_page_config
+from ..content_store import (
+    apply_media_items_save,
+    get_page_config,
+    list_media_items,
+    save_page_config,
+)
 from ..db import get_db
 from ..file_ops import ALLOWED_IMAGE_EXTENSIONS, extract_numbers, renumber_files, safe_path
 from ..models import Entry, EntryPage, MediaItem, PremiumCode, PremiumCodeRedemption, Series, User
-from ..series_store import sanitize_series_id
-from ..settings import settings
 from ..security import get_current_user
-from ..series_store import apply_series_data_save, apply_series_index_save
+from ..series_store import apply_series_data_save, apply_series_index_save, sanitize_series_id
+from ..settings import settings
 from ..validation import is_admin_role, is_premium_role
-
 
 router = APIRouter()
 
@@ -337,7 +340,9 @@ class ListEntryImagesRequest(BaseModel):
 
 
 @router.post("/api/list-entry-images")
-def list_entry_images(payload: ListEntryImagesRequest, request: Request, db: Session = Depends(get_db)):
+def list_entry_images(
+    payload: ListEntryImagesRequest, request: Request, db: Session = Depends(get_db)
+):
     if not _require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
@@ -359,7 +364,7 @@ def list_entry_images(payload: ListEntryImagesRequest, request: Request, db: Ses
         if ext in ALLOWED_IMAGE_EXTENSIONS:
             files.append(name)
     files.sort(key=lambda n: (extract_numbers(n), n))
-    return {"paths": [f"{chapter_folder}/{name}" for name in files]}
+    return {"paths": [f"{entry_folder}/{name}" for name in files]}
 
 
 class UploadImageFile(BaseModel):
@@ -375,7 +380,9 @@ class UploadEntryImagesRequest(BaseModel):
 
 
 @router.post("/api/upload-entry-images")
-def upload_entry_images(payload: UploadEntryImagesRequest, request: Request, db: Session = Depends(get_db)):
+def upload_entry_images(
+    payload: UploadEntryImagesRequest, request: Request, db: Session = Depends(get_db)
+):
     if not _require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
@@ -383,7 +390,9 @@ def upload_entry_images(payload: UploadEntryImagesRequest, request: Request, db:
     files = payload.files or []
 
     if not entry_folder or not isinstance(files, list):
-        return JSONResponse(status_code=400, content={"error": "entryFolder and files are required"})
+        return JSONResponse(
+            status_code=400, content={"error": "entryFolder and files are required"}
+        )
 
     try:
         dest_dir = safe_path(entry_folder)
@@ -679,7 +688,9 @@ def list_media(request: Request, db: Session = Depends(get_db)):
             if ext in ALLOWED_IMAGE_EXTENSIONS:
                 rel = os.path.join(root, name)
                 rel_path = os.path.relpath(rel, base_dir).replace(os.sep, "/")
-                if rel_path.startswith("media/post-assets/") or rel_path.startswith("media/previews/"):
+                if rel_path.startswith("media/post-assets/") or rel_path.startswith(
+                    "media/previews/"
+                ):
                     continue
                 paths.append(rel_path)
 

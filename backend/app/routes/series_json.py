@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..series_store import series_data_payload, series_index_payload
 
-
 router = APIRouter()
 
 

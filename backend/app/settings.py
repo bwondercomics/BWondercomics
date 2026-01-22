@@ -71,7 +71,9 @@ def load_settings() -> Settings:
         except ValueError:
             db_port = 5433
         if db_password:
-            database_url = f"postgresql+psycopg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+            database_url = (
+                f"postgresql+psycopg://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+            )
 
     umami_website_id = (os.environ.get("UMAMI_WEBSITE_ID") or "").strip()
     umami_base_url = (os.environ.get("UMAMI_BASE_URL") or "").strip()
@@ -80,7 +82,9 @@ def load_settings() -> Settings:
         umami_proxy_path = "/" + umami_proxy_path
     umami_proxy_path = (umami_proxy_path or "").rstrip("/")
     default_umami_upstream = "http://umami:3000" if _in_docker() else "http://127.0.0.1:3000"
-    umami_upstream = (os.environ.get("UMAMI_UPSTREAM") or default_umami_upstream).strip().rstrip("/")
+    umami_upstream = (
+        (os.environ.get("UMAMI_UPSTREAM") or default_umami_upstream).strip().rstrip("/")
+    )
     try:
         umami_port = int(os.environ.get("UMAMI_PORT") or "3000")
     except ValueError:

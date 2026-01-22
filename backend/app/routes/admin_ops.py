@@ -9,6 +9,7 @@ Execute predefined shell commands from the admin UI:
 Security: Only runs commands from ADMIN_COMMANDS allowlist.
 Enable with ADMIN_COMMANDS_ENABLED=true in env.
 """
+
 from __future__ import annotations
 
 import json
@@ -28,7 +29,6 @@ from ..db import SessionLocal, get_db
 from ..models import AdminOpsRun
 from ..settings import settings
 from .admin_utils import iso_z, require_admin
-
 
 router = APIRouter()
 
@@ -127,7 +127,9 @@ def _record_run(db: Session, command_id: str, user_email: str | None) -> AdminOp
     return run
 
 
-def _finalize_run(run_id: str, result: subprocess.CompletedProcess | None, error_message: str | None) -> None:
+def _finalize_run(
+    run_id: str, result: subprocess.CompletedProcess | None, error_message: str | None
+) -> None:
     db = SessionLocal()
     try:
         run = db.get(AdminOpsRun, run_id)
@@ -148,9 +150,7 @@ def _finalize_run(run_id: str, result: subprocess.CompletedProcess | None, error
         now = datetime.now(timezone.utc)
         run.status = "completed" if exit_code == 0 else "failed"
         run.finished_at = now
-        run.duration_seconds = int(
-            (now - (run.started_at or now)).total_seconds()
-        )
+        run.duration_seconds = int((now - (run.started_at or now)).total_seconds())
         run.exit_code = exit_code
         run.output = output or None
         run.output_truncated = output_truncated
@@ -183,7 +183,9 @@ def _run_command_background(command_id: str, run_id: str) -> None:
     _finalize_run(run_id, result, error_message)
 
 
-def run_ops_command(command_id: str, request: Request, db: Session, confirm: bool) -> tuple[dict, int]:
+def run_ops_command(
+    command_id: str, request: Request, db: Session, confirm: bool
+) -> tuple[dict, int]:
     admin = require_admin(request, db)
     if not admin:
         return {"error": "Admin access required"}, 403

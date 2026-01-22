@@ -14,7 +14,6 @@ from ..models import BannedIP, CensoredWord, Comment, CommentLimit
 from ..security import get_current_user
 from ..validation import is_admin_role, sanitize_target
 
-
 router = APIRouter()
 
 

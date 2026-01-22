@@ -93,7 +93,12 @@ def proxy_to_umami(
     prefix_path = _normalize_proxy_path(settings.umami_proxy_path)
     upstream_raw = (settings.umami_upstream or "").strip().rstrip("/")
     if not upstream_raw:
-        return 502, "Bad Gateway", [("Content-Type", "text/plain; charset=utf-8")], b"Umami upstream not configured.\n"
+        return (
+            502,
+            "Bad Gateway",
+            [("Content-Type", "text/plain; charset=utf-8")],
+            b"Umami upstream not configured.\n",
+        )
 
     upstream = urlparse(upstream_raw)
     scheme = (upstream.scheme or "http").lower()
@@ -101,7 +106,9 @@ def proxy_to_umami(
     port = upstream.port or (443 if scheme == "https" else 80)
     upstream_prefix = (upstream.path or "").rstrip("/")
 
-    request_path = _strip_prefix(incoming_path or "/", prefix_path) if prefix_path else (incoming_path or "/")
+    request_path = (
+        _strip_prefix(incoming_path or "/", prefix_path) if prefix_path else (incoming_path or "/")
+    )
     request_target = request_path + (incoming_query or "")
     target = (upstream_prefix + request_target) if upstream_prefix else request_target
 
@@ -137,8 +144,12 @@ def proxy_to_umami(
 
     forward_headers["X-Forwarded-Host"] = host_header
     existing_xff = forward_headers.get("X-Forwarded-For", "")
-    forward_headers["X-Forwarded-For"] = (existing_xff + ", " + client_ip).strip(", ") if existing_xff else client_ip
-    forward_headers["X-Forwarded-Proto"] = forwarded_proto if forwarded_proto in ("http", "https") else "http"
+    forward_headers["X-Forwarded-For"] = (
+        (existing_xff + ", " + client_ip).strip(", ") if existing_xff else client_ip
+    )
+    forward_headers["X-Forwarded-Proto"] = (
+        forwarded_proto if forwarded_proto in ("http", "https") else "http"
+    )
 
     if prefix_path:
         forward_headers["X-Forwarded-Prefix"] = prefix_path
@@ -198,11 +209,23 @@ def proxy_to_umami(
                 loc_query = ("?" + loc.query) if loc.query else ""
                 loc_frag = ("#" + loc.fragment) if loc.fragment else ""
 
-                if loc.scheme and loc.netloc and loc.hostname == host and (loc.port or (443 if loc.scheme == "https" else 80)) == port:
+                if (
+                    loc.scheme
+                    and loc.netloc
+                    and loc.hostname == host
+                    and (loc.port or (443 if loc.scheme == "https" else 80)) == port
+                ):
                     value = loc_path + loc_query + loc_frag
 
                 if prefix_path and value.startswith("/"):
-                    if upstream_prefix and loc_path and (loc_path == upstream_prefix or loc_path.startswith(upstream_prefix + "/")):
+                    if (
+                        upstream_prefix
+                        and loc_path
+                        and (
+                            loc_path == upstream_prefix
+                            or loc_path.startswith(upstream_prefix + "/")
+                        )
+                    ):
                         loc_path = loc_path[len(upstream_prefix) :] or "/"
                         value = loc_path + loc_query + loc_frag
                     if not (loc_path == prefix_path or loc_path.startswith(prefix_path + "/")):

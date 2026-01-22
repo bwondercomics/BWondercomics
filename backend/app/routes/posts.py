@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import os
 import re
 import shutil
+from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -16,12 +16,11 @@ from sqlalchemy.orm import Session
 from ..bluesky import BlueskyError, BlueskyPost
 from ..content_store import ensure_media_previews, media_id_from_path
 from ..db import get_db
-from ..models import MediaItem, Post, User
 from ..file_ops import safe_path
+from ..models import MediaItem, Post, User
 from ..rss import build_rss_xml
 from ..security import get_current_user
 from ..validation import is_admin_role
-
 
 router = APIRouter()
 POST_ASSET_ROOT = "media/post-assets"
@@ -179,9 +178,9 @@ def _cleanup_post_asset_if_unused(db: Session, path: str | None) -> None:
     if not normalized or not _is_post_asset_path(normalized):
         return
     stem = os.path.splitext(normalized)[0]
-    count = db.scalar(
-        select(func.count()).select_from(Post).where(Post.image.like(f"{stem}.%"))
-    ) or 0
+    count = (
+        db.scalar(select(func.count()).select_from(Post).where(Post.image.like(f"{stem}.%"))) or 0
+    )
     if count > 0:
         return
     try:
@@ -247,7 +246,9 @@ def _build_post_media_lookup(db: Session, posts: list[Post]) -> dict[str, MediaI
     return {item.id: item for item in items if item.id}
 
 
-def _ensure_media_item(db: Session, image: str | None, tags: list[str], now: datetime) -> MediaItem | None:
+def _ensure_media_item(
+    db: Session, image: str | None, tags: list[str], now: datetime
+) -> MediaItem | None:
     normalized = _normalize_image_path(image)
     if not normalized:
         return None
@@ -351,7 +352,9 @@ def latest_public_post(db: Session = Depends(get_db)):
     now = datetime.now(timezone.utc)
     _promote_due_scheduled(db, now)
 
-    post = db.scalar(select(Post).where(Post.status == "published").order_by(Post.publish_at.desc()).limit(1))
+    post = db.scalar(
+        select(Post).where(Post.status == "published").order_by(Post.publish_at.desc()).limit(1)
+    )
     if not post:
         return {"post": None}
     thumb_lookup = _build_post_media_lookup(db, [post])
@@ -372,7 +375,11 @@ def rss_xml(request: Request, db: Session = Depends(get_db)):
 
     forwarded_proto = (request.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
     proto = forwarded_proto if forwarded_proto in ("http", "https") else "http"
-    host = (request.headers.get("X-Forwarded-Host") or request.headers.get("Host") or "").split(",")[0].strip()
+    host = (
+        (request.headers.get("X-Forwarded-Host") or request.headers.get("Host") or "")
+        .split(",")[0]
+        .strip()
+    )
     base_url = f"{proto}://{host}".rstrip("/") if host else ""
 
     shaped = [
@@ -429,7 +436,9 @@ def _normalize_status(raw: str | None) -> str:
     return value
 
 
-def _coerce_status(status: str, publish_at: datetime | None, now: datetime, *, require_date_for_scheduled: bool) -> tuple[str, datetime]:
+def _coerce_status(
+    status: str, publish_at: datetime | None, now: datetime, *, require_date_for_scheduled: bool
+) -> tuple[str, datetime]:
     if status == "scheduled" and publish_at is None:
         if require_date_for_scheduled:
             raise ValueError("date is required for scheduled posts")
@@ -457,7 +466,9 @@ def admin_create_post(payload: PostUpsertRequest, request: Request, db: Session 
     status = _normalize_status(payload.status)
     publish_at = _parse_dt(payload.date)
     try:
-        status, publish_at = _coerce_status(status, publish_at, now, require_date_for_scheduled=True)
+        status, publish_at = _coerce_status(
+            status, publish_at, now, require_date_for_scheduled=True
+        )
     except ValueError as exc:
         return JSONResponse(status_code=400, content={"error": str(exc)})
 
@@ -503,7 +514,9 @@ def admin_create_post(payload: PostUpsertRequest, request: Request, db: Session 
 
 
 @router.put("/api/admin/posts/{post_id}")
-def admin_update_post(post_id: str, payload: PostUpsertRequest, request: Request, db: Session = Depends(get_db)):
+def admin_update_post(
+    post_id: str, payload: PostUpsertRequest, request: Request, db: Session = Depends(get_db)
+):
     if not _require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
@@ -525,7 +538,9 @@ def admin_update_post(post_id: str, payload: PostUpsertRequest, request: Request
     status = _normalize_status(payload.status or post.status)
     publish_at = _parse_dt(payload.date) if payload.date is not None else post.publish_at
     try:
-        status, publish_at = _coerce_status(status, publish_at, now, require_date_for_scheduled=False)
+        status, publish_at = _coerce_status(
+            status, publish_at, now, require_date_for_scheduled=False
+        )
     except ValueError as exc:
         return JSONResponse(status_code=400, content={"error": str(exc)})
 
@@ -535,7 +550,11 @@ def admin_update_post(post_id: str, payload: PostUpsertRequest, request: Request
     except ValueError as exc:
         return JSONResponse(status_code=400, content={"error": str(exc)})
     image_focus = (payload.image_focus or post.image_focus or "center").strip() or "center"
-    image_tags = _normalize_tags(payload.image_tags) if payload.image_tags is not None else list(post.image_tags or [])
+    image_tags = (
+        _normalize_tags(payload.image_tags)
+        if payload.image_tags is not None
+        else list(post.image_tags or [])
+    )
     if image == old_image and post.media_id:
         media_item = db.get(MediaItem, post.media_id)
     else:
@@ -543,7 +562,9 @@ def admin_update_post(post_id: str, payload: PostUpsertRequest, request: Request
     if media_item:
         ensure_media_previews(db, media_item)
     share = bool(payload.share)
-    share_bluesky = bool(payload.share_bluesky) if payload.share_bluesky is not None else post.share_bluesky
+    share_bluesky = (
+        bool(payload.share_bluesky) if payload.share_bluesky is not None else post.share_bluesky
+    )
     if status == "draft":
         share = False
         share_bluesky = False

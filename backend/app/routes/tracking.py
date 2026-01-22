@@ -10,6 +10,7 @@ Key fields:
 - entry_title: Display title from DB
 - page_number: Current page being viewed
 """
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
@@ -25,7 +26,6 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..models import VisitorSession
 from ..security import get_current_user
-
 
 router = APIRouter()
 

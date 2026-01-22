@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import re
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
@@ -10,6 +9,7 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .file_ops import safe_path
 from .models import Entry, EntryLabel, EntryPage, Series
 from .preview_pipeline import (
     delete_preview_file,
@@ -17,9 +17,6 @@ from .preview_pipeline import (
     generate_thumbnail,
     resolve_source_path,
 )
-from .file_ops import safe_path
-from .settings import settings
-
 
 DEFAULT_SERIES_ID = "battle-bros"
 SERIES_ID_RE = re.compile(r"^[a-z0-9_-]{1,64}$")
@@ -119,7 +116,9 @@ def ensure_seeded(db: Session) -> None:
 
 def series_index_payload(db: Session) -> dict[str, Any]:
     ensure_seeded(db)
-    items = db.scalars(select(Series).where(Series.active.is_(True)).order_by(Series.created_at.asc())).all()
+    items = db.scalars(
+        select(Series).where(Series.active.is_(True)).order_by(Series.created_at.asc())
+    ).all()
     return {
         "version": 1,
         "defaultSeriesId": DEFAULT_SERIES_ID,
@@ -159,7 +158,10 @@ def series_data_payload(db: Session, series_id: str) -> dict[str, Any]:
 
     entry_labels = _ensure_entry_labels(db, series)
     entry_labels = sorted(entry_labels, key=lambda label: (label.sort_index, label.created_at))
-    default_label = next((label for label in entry_labels if label.is_default), entry_labels[0] if entry_labels else None)
+    default_label = next(
+        (label for label in entry_labels if label.is_default),
+        entry_labels[0] if entry_labels else None,
+    )
     label_by_id = {label.id: label for label in entry_labels}
 
     entries = db.scalars(
@@ -173,7 +175,11 @@ def series_data_payload(db: Session, series_id: str) -> dict[str, Any]:
     chapter_meta: dict[str, dict[str, Any]] = {}
 
     for entry in entries:
-        pages = db.scalars(select(EntryPage).where(EntryPage.entry_id == entry.id).order_by(EntryPage.sort_index.asc())).all()
+        pages = db.scalars(
+            select(EntryPage)
+            .where(EntryPage.entry_id == entry.id)
+            .order_by(EntryPage.sort_index.asc())
+        ).all()
         chapters[entry.title] = [p.path for p in pages]
         if entry.folder_path:
             chapter_folders[entry.title] = entry.folder_path
@@ -201,7 +207,9 @@ def series_data_payload(db: Session, series_id: str) -> dict[str, Any]:
         "entryMeta": chapter_meta,
         "statusMessage": series.status_message or "",
         "premiumOnly": bool(series.premium_only),
-        "unitLabelSingular": default_label.singular if default_label else series.unit_label_singular,
+        "unitLabelSingular": default_label.singular
+        if default_label
+        else series.unit_label_singular,
         "unitLabelPlural": default_label.plural if default_label else series.unit_label_plural,
         "entryLabels": [
             {
@@ -214,7 +222,10 @@ def series_data_payload(db: Session, series_id: str) -> dict[str, Any]:
             }
             for label in entry_labels
         ],
-        "lastUpdated": (series.updated_at or _now()).astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "lastUpdated": (series.updated_at or _now())
+        .astimezone(timezone.utc)
+        .isoformat()
+        .replace("+00:00", "Z"),
         "publishedBy": "Database",
         "payloadVersion": 2,
     }
@@ -245,12 +256,14 @@ def apply_series_index_save(db: Session, payload: Any) -> None:
                 cover_image=str(item.get("coverImage") or "").strip() or None,
                 premium_only=bool(item.get("premiumOnly")),
                 status_message="",
-                unit_label_singular=str(item.get("unitLabelSingular") or ("Issue" if sid == DEFAULT_SERIES_ID else "Chapter"))[
-                    :30
-                ],
-                unit_label_plural=str(item.get("unitLabelPlural") or ("Issues" if sid == DEFAULT_SERIES_ID else "Chapters"))[
-                    :30
-                ],
+                unit_label_singular=str(
+                    item.get("unitLabelSingular")
+                    or ("Issue" if sid == DEFAULT_SERIES_ID else "Chapter")
+                )[:30],
+                unit_label_plural=str(
+                    item.get("unitLabelPlural")
+                    or ("Issues" if sid == DEFAULT_SERIES_ID else "Chapters")
+                )[:30],
                 active=True,
                 created_at=_now(),
                 updated_at=_now(),
@@ -261,9 +274,14 @@ def apply_series_index_save(db: Session, payload: Any) -> None:
             series.cover_image = str(item.get("coverImage") or "").strip() or None
             series.premium_only = bool(item.get("premiumOnly"))
             if "unitLabelSingular" in item:
-                series.unit_label_singular = str(item.get("unitLabelSingular") or "").strip()[:30] or series.unit_label_singular
+                series.unit_label_singular = (
+                    str(item.get("unitLabelSingular") or "").strip()[:30]
+                    or series.unit_label_singular
+                )
             if "unitLabelPlural" in item:
-                series.unit_label_plural = str(item.get("unitLabelPlural") or "").strip()[:30] or series.unit_label_plural
+                series.unit_label_plural = (
+                    str(item.get("unitLabelPlural") or "").strip()[:30] or series.unit_label_plural
+                )
             series.active = True
             series.updated_at = _now()
 
@@ -279,7 +297,9 @@ def apply_series_index_save(db: Session, payload: Any) -> None:
                 EntryLabel(
                     id=uuid4(),
                     series_id=sid,
-                    slug=_slugify_label(series.unit_label_plural or series.unit_label_singular, "entries"),
+                    slug=_slugify_label(
+                        series.unit_label_plural or series.unit_label_singular, "entries"
+                    ),
                     singular=_normalize_label_text(series.unit_label_singular, "Entry"),
                     plural=_normalize_label_text(series.unit_label_plural, "Entries"),
                     sort_index=0,
@@ -292,7 +312,9 @@ def apply_series_index_save(db: Session, payload: Any) -> None:
         default_label = next((label for label in labels if label.is_default), labels[0])
         default_label.singular = _normalize_label_text(series.unit_label_singular, "Entry")
         default_label.plural = _normalize_label_text(series.unit_label_plural, "Entries")
-        default_label.slug = _slugify_label(default_label.plural or default_label.singular, "entries")
+        default_label.slug = _slugify_label(
+            default_label.plural or default_label.singular, "entries"
+        )
         default_label.updated_at = _now()
         db.add(default_label)
 
@@ -338,9 +360,13 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
     db.add(series)
 
     chapters = payload.get("entries") if isinstance(payload.get("entries"), dict) else {}
-    chapter_folders = payload.get("entryFolders") if isinstance(payload.get("entryFolders"), dict) else {}
+    chapter_folders = (
+        payload.get("entryFolders") if isinstance(payload.get("entryFolders"), dict) else {}
+    )
     chapter_meta = payload.get("entryMeta") if isinstance(payload.get("entryMeta"), dict) else {}
-    entry_labels_payload = payload.get("entryLabels") if isinstance(payload.get("entryLabels"), list) else None
+    entry_labels_payload = (
+        payload.get("entryLabels") if isinstance(payload.get("entryLabels"), list) else None
+    )
 
     existing_labels = db.scalars(
         select(EntryLabel)
@@ -370,8 +396,12 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
                 )
             label.singular = _normalize_label_text(raw.get("singular"), "Entry")
             label.plural = _normalize_label_text(raw.get("plural"), "Entries")
-            label.slug = _slugify_label(raw.get("slug") or label.plural or label.singular, "entries")
-            label.sort_index = int(raw.get("sortIndex") if raw.get("sortIndex") is not None else idx)
+            label.slug = _slugify_label(
+                raw.get("slug") or label.plural or label.singular, "entries"
+            )
+            label.sort_index = int(
+                raw.get("sortIndex") if raw.get("sortIndex") is not None else idx
+            )
             label.is_default = bool(raw.get("isDefault"))
             label.updated_at = _now()
             labels.append(label)
@@ -421,7 +451,11 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
 
         requested_titles.add(title)
         pages = [p.strip() for p in (raw_pages or []) if isinstance(p, str) and p.strip()]
-        folder_path = str(chapter_folders.get(raw_title) or chapter_folders.get(title) or "").strip().strip("/")
+        folder_path = (
+            str(chapter_folders.get(raw_title) or chapter_folders.get(title) or "")
+            .strip()
+            .strip("/")
+        )
 
         meta = chapter_meta.get(raw_title) or chapter_meta.get(title) or {}
         premium_only = bool(meta.get("premium")) if isinstance(meta, dict) else False
@@ -483,7 +517,9 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
                 cover_thumb_path=None,
                 status="published",
                 publish_at=_now(),
-                sort_index=display_number if display_number is not None else _extract_sort_index(
+                sort_index=display_number
+                if display_number is not None
+                else _extract_sort_index(
                     title,
                     folder_path,
                     fallback_index,
@@ -502,7 +538,9 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
             entry.cover_image = cover_image or None
             if display_number is not None:
                 entry.display_number = display_number
-            effective_display = display_number if display_number is not None else entry.display_number
+            effective_display = (
+                display_number if display_number is not None else entry.display_number
+            )
             entry.sort_index = (
                 effective_display
                 if effective_display is not None
@@ -532,7 +570,9 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
                     try:
                         generate_thumbnail(source, abs_thumb)
                     except Exception as exc:
-                        logger.warning("Failed to generate entry cover thumbnail for %s: %s", cover_image, exc)
+                        logger.warning(
+                            "Failed to generate entry cover thumbnail for %s: %s", cover_image, exc
+                        )
                 else:
                     logger.warning("Cover source missing for %s", cover_image)
             if abs_thumb:

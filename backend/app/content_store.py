@@ -128,7 +128,9 @@ def _sync_media_previews(db: Session, items: list[dict[str, Any]], removed_ids: 
             try:
                 generate_thumbnail(source, abs_thumb)
             except Exception as exc:
-                logger.warning("Failed to generate media thumbnail for %s: %s", item.get("path"), exc)
+                logger.warning(
+                    "Failed to generate media thumbnail for %s: %s", item.get("path"), exc
+                )
             thumb_ok = abs_thumb.exists()
         elif abs_thumb:
             thumb_ok = abs_thumb.exists()
@@ -140,7 +142,9 @@ def _sync_media_previews(db: Session, items: list[dict[str, Any]], removed_ids: 
                 try:
                     generate_blurred_preview(source, abs_blur)
                 except Exception as exc:
-                    logger.warning("Failed to generate media preview for %s: %s", item.get("path"), exc)
+                    logger.warning(
+                        "Failed to generate media preview for %s: %s", item.get("path"), exc
+                    )
             blur_ok = abs_blur.exists()
         else:
             if abs_blur and abs_blur.exists():

@@ -15,8 +15,8 @@ Goal: the platform runs clean, stable, and predictable.
 
 ### Codebase scan
 - [x] Resolve or log all TODO/FIXME/HACK/TEMP in `backend/`, `admin/`, `reader/`, `assets/`, `docs/`. *(Verified 2026-01-13 via rg; no code TODOs)*
-- [ ] Remove dead code and unused imports in `backend/app/`, `admin/*.js`, `reader/*.js`. *(Admin/reader lint cleanup done 2026-01-13; backend audit still needed)*
-- [ ] Add/confirm lint + format scripts in `package.json` and backend tooling. *(ESLint clean for admin/reader; backend install still needed)*
+- [x] Remove dead code and unused imports in `backend/app/`, `admin/*.js`, `reader/*.js`. *(Unused imports removed; dead-code pass completed 2026-01-21)*
+- [x] Add/confirm lint + format scripts in `package.json` and backend tooling. *(Ruff config + scripts wired; lint/format verified 2026-01-21)*
 - [x] JS lint passes for `admin/` + `reader/`. *(`npm run lint` clean 2026-01-13)*
 - [x] JS test suite passes. *(`npm test` clean 2026-01-13)*
 - [x] Legacy "chapter" cleanup plan documented. *(`docs/LEGACY_CHAPTER_CLEANUP.md`)*

@@ -14,7 +14,6 @@ from ..db import get_db
 from ..models import SocialAccount
 from .admin_utils import iso_z, require_admin
 
-
 router = APIRouter()
 
 
@@ -73,7 +72,9 @@ def bluesky_notifications(request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/api/admin/bluesky/connect")
-def bluesky_connect(payload: BlueskyConnectRequest, request: Request, db: Session = Depends(get_db)):
+def bluesky_connect(
+    payload: BlueskyConnectRequest, request: Request, db: Session = Depends(get_db)
+):
     admin = require_admin(request, db)
     if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
@@ -81,7 +82,9 @@ def bluesky_connect(payload: BlueskyConnectRequest, request: Request, db: Sessio
     handle = (payload.handle or "").strip()
     app_password = (payload.app_password or "").strip()
     if not handle or not app_password:
-        return JSONResponse(status_code=400, content={"error": "handle and appPassword are required"})
+        return JSONResponse(
+            status_code=400, content={"error": "handle and appPassword are required"}
+        )
 
     try:
         session = BlueskyClient.create_session(handle, app_password)

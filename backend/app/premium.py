@@ -5,11 +5,10 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from urllib.parse import unquote, urlparse
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import Entry, Series
-
 
 DEFAULT_SERIES_ID = "battle-bros"
 

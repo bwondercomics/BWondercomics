@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 import time
+from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import delete, distinct, func, select, text, update
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.orm import Session
 
 from ..db import get_db
@@ -25,10 +25,9 @@ from ..models import (
 )
 from ..security import get_current_user, public_user
 from ..settings import settings
-from ..umami_api import UmamiAPIError, fetch_umami_stats, fetch_umami_metrics
+from ..umami_api import UmamiAPIError, fetch_umami_metrics, fetch_umami_stats
 from ..validation import is_admin_role, sanitize_target
 from .admin_utils import iso_z
-
 
 router = APIRouter()
 
@@ -62,7 +61,9 @@ class SetUserRoleRequest(BaseModel):
 
 
 @router.post("/api/admin/users/role")
-def admin_set_user_role(payload: SetUserRoleRequest, request: Request, db: Session = Depends(get_db)):
+def admin_set_user_role(
+    payload: SetUserRoleRequest, request: Request, db: Session = Depends(get_db)
+):
     if not _require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
@@ -110,22 +111,24 @@ def admin_delete_user(user_id: str, request: Request, db: Session = Depends(get_
         return JSONResponse(status_code=400, content={"error": "Invalid userId"})
 
     if admin.id == target_id:
-        return JSONResponse(status_code=400, content={"error": "You cannot delete your own account"})
+        return JSONResponse(
+            status_code=400, content={"error": "You cannot delete your own account"}
+        )
 
     target = db.get(User, target_id)
     if not target:
         return JSONResponse(status_code=404, content={"error": "User not found"})
 
     if target.role == "admin":
-        admin_count = db.scalar(select(func.count()).select_from(User).where(User.role == "admin")) or 0
+        admin_count = (
+            db.scalar(select(func.count()).select_from(User).where(User.role == "admin")) or 0
+        )
         if admin_count <= 1:
             return JSONResponse(status_code=400, content={"error": "Cannot delete the last admin"})
 
     db.execute(delete(Comment).where(Comment.user_id == target.id))
     db.execute(
-        update(Comment)
-        .where(Comment.hidden_by == target.id)
-        .values(hidden_by=None, hidden_at=None)
+        update(Comment).where(Comment.hidden_by == target.id).values(hidden_by=None, hidden_at=None)
     )
     db.execute(delete(PremiumCodeRedemption).where(PremiumCodeRedemption.user_id == target.id))
     db.execute(
@@ -134,35 +137,19 @@ def admin_delete_user(user_id: str, request: Request, db: Session = Depends(get_
         .values(redeemed_by=None, redeemed_at=None, redeemed_ip=None, active=True)
     )
     db.execute(
-        update(PremiumCode)
-        .where(PremiumCode.created_by == target.id)
-        .values(created_by=None)
+        update(PremiumCode).where(PremiumCode.created_by == target.id).values(created_by=None)
+    )
+    db.execute(update(BannedIP).where(BannedIP.banned_by == target.id).values(banned_by=None))
+    db.execute(
+        update(CensoredWord).where(CensoredWord.created_by == target.id).values(created_by=None)
     )
     db.execute(
-        update(BannedIP)
-        .where(BannedIP.banned_by == target.id)
-        .values(banned_by=None)
+        update(CommentLimit).where(CommentLimit.updated_by == target.id).values(updated_by=None)
     )
     db.execute(
-        update(CensoredWord)
-        .where(CensoredWord.created_by == target.id)
-        .values(created_by=None)
+        update(VisitorSession).where(VisitorSession.user_id == target.id).values(user_id=None)
     )
-    db.execute(
-        update(CommentLimit)
-        .where(CommentLimit.updated_by == target.id)
-        .values(updated_by=None)
-    )
-    db.execute(
-        update(VisitorSession)
-        .where(VisitorSession.user_id == target.id)
-        .values(user_id=None)
-    )
-    db.execute(
-        update(AdminTodo)
-        .where(AdminTodo.created_by == target.id)
-        .values(created_by=None)
-    )
+    db.execute(update(AdminTodo).where(AdminTodo.created_by == target.id).values(created_by=None))
     db.execute(text("DELETE FROM personal_feed_items WHERE user_id = :uid"), {"uid": target.id})
     db.execute(delete(EmailSubscriber).where(EmailSubscriber.email == target.email))
 
@@ -271,7 +258,9 @@ class ModerateCommentRequest(BaseModel):
 
 
 @router.post("/api/admin/comments")
-def admin_moderate_comment(payload: ModerateCommentRequest, request: Request, db: Session = Depends(get_db)):
+def admin_moderate_comment(
+    payload: ModerateCommentRequest, request: Request, db: Session = Depends(get_db)
+):
     admin = _require_admin(request, db)
     if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
@@ -342,8 +331,14 @@ def admin_analytics_summary(request: Request, db: Session = Depends(get_db)):
         events_data = fetch_umami_metrics(start_7d, end_7d, metric_type="event", limit=10)
 
         # Transform to frontend format: [{x: "label", y: count}, ...]
-        referrers = [{"x": item.get("x", ""), "y": item.get("y", 0)} for item in referrers_data if item.get("x")]
-        events = [{"x": item.get("x", ""), "y": item.get("y", 0)} for item in events_data if item.get("x")]
+        referrers = [
+            {"x": item.get("x", ""), "y": item.get("y", 0)}
+            for item in referrers_data
+            if item.get("x")
+        ]
+        events = [
+            {"x": item.get("x", ""), "y": item.get("y", 0)} for item in events_data if item.get("x")
+        ]
 
     except UmamiAPIError as exc:
         return JSONResponse(status_code=502, content={"error": f"Umami API error: {exc}"})

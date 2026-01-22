@@ -12,22 +12,22 @@ Key implementation notes:
 - _extract_display_number() parses the numeric display_number from labels
 - Health score calculated from finish_rate + week-over-week change
 """
+
 from __future__ import annotations
 
+import re
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
-import re
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import distinct, func, select, text
+from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from ..db import get_db, get_umami_db
 from ..models import Entry, EntryPage, Series, User, VisitorSession
 from ..settings import settings
 from .admin_utils import iso_z, require_admin
-
 
 router = APIRouter()
 
@@ -59,9 +59,9 @@ def _extract_display_number(label: str | None) -> int | None:
     # Strip series prefix if present (format: "series-id | Entry 5")
     if " | " in label:
         label = label.split(" | ", 1)[1].strip()
-    
+
     # Match patterns like "Entry 5", "Issue 10", etc.
-    match = re.search(r'\b(\d+)\b', label)
+    match = re.search(r"\b(\d+)\b", label)
     if match:
         try:
             return int(match.group(1))
@@ -152,8 +152,6 @@ def admin_page_reads(
 
     now = datetime.now(timezone.utc)
     start = now - timedelta(days=days)
-    prev_start = start - timedelta(days=days)
-    prev_end = start
     website_id = _get_umami_website_id()
     website_filter, website_params = _umami_website_filter(website_id)
 
@@ -167,7 +165,9 @@ def admin_page_reads(
                     AND we.created_at >= :start_time
                     {website_filter}
             """)
-            total = umami_db.execute(total_query, {"start_time": start, **website_params}).scalar() or 0
+            total = (
+                umami_db.execute(total_query, {"start_time": start, **website_params}).scalar() or 0
+            )
 
             # Query page views grouped by path
             pages_query = text(f"""
@@ -184,11 +184,14 @@ def admin_page_reads(
                 ORDER BY views DESC
                 LIMIT :limit
             """)
-            rows = umami_db.execute(pages_query, {
-                "start_time": start,
-                "limit": limit,
-                **website_params,
-            }).fetchall()
+            rows = umami_db.execute(
+                pages_query,
+                {
+                    "start_time": start,
+                    "limit": limit,
+                    **website_params,
+                },
+            ).fetchall()
 
     except Exception as e:
         return {
@@ -252,8 +255,7 @@ def admin_reader_analytics(
     page_counts = {
         entry_id: count
         for entry_id, count in db.execute(
-            select(EntryPage.entry_id, func.count())
-            .group_by(EntryPage.entry_id)
+            select(EntryPage.entry_id, func.count()).group_by(EntryPage.entry_id)
         ).all()
     }
     series_map = {s.id: s for s in db.scalars(select(Series)).all()}
@@ -273,7 +275,9 @@ def admin_reader_analytics(
                 "seriesId": series_id,
                 "entryTitle": entry.title or "",
                 "pageCount": page_count or None,
-                "seriesTitle": (series_map.get(series_id).title if series_id in series_map else None),
+                "seriesTitle": (
+                    series_map.get(series_id).title if series_id in series_map else None
+                ),
             }
 
     # Query Umami for reader analytics
@@ -282,6 +286,7 @@ def admin_reader_analytics(
 
     try:
         with get_umami_db() as umami_db:
+
             def _collect_window_counts(start_time: datetime, end_time: datetime):
                 entry_views_window: dict[tuple[str, int], int] = defaultdict(int)
                 series_views_window: dict[str, int] = defaultdict(int)
@@ -302,11 +307,14 @@ def admin_reader_analytics(
                         {website_filter}
                 """)
 
-                events_window = umami_db.execute(page_view_query_window, {
-                    "start_time": start_time,
-                    "end_time": end_time,
-                    **website_params,
-                }).fetchall()
+                events_window = umami_db.execute(
+                    page_view_query_window,
+                    {
+                        "start_time": start_time,
+                        "end_time": end_time,
+                        **website_params,
+                    },
+                ).fetchall()
 
                 for session_id, series_id, entry_label in events_window:
                     sid = series_id or ""
@@ -333,11 +341,14 @@ def admin_reader_analytics(
                         {website_filter}
                 """)
 
-                completions_window = umami_db.execute(complete_query_window, {
-                    "start_time": start_time,
-                    "end_time": end_time,
-                    **website_params,
-                }).fetchall()
+                completions_window = umami_db.execute(
+                    complete_query_window,
+                    {
+                        "start_time": start_time,
+                        "end_time": end_time,
+                        **website_params,
+                    },
+                ).fetchall()
 
                 for session_id, series_id, entry_label in completions_window:
                     sid = series_id or ""
@@ -358,7 +369,12 @@ def admin_reader_analytics(
                     sid: len(sessions) for sid, sessions in series_finish_sessions.items()
                 }
 
-                return entry_views_window, entry_finishes_window, series_views_window, series_finishes_window
+                return (
+                    entry_views_window,
+                    entry_finishes_window,
+                    series_views_window,
+                    series_finishes_window,
+                )
 
             # Query page views with their properties from Umami
             # Join event_data to get series, entryLabel, page, totalPages
@@ -380,11 +396,14 @@ def admin_reader_analytics(
                     {website_filter}
             """)
 
-            events = umami_db.execute(page_view_query, {
-                "start_time": start,
-                "end_time": now,
-                **website_params,
-            }).fetchall()
+            events = umami_db.execute(
+                page_view_query,
+                {
+                    "start_time": start,
+                    "end_time": now,
+                    **website_params,
+                },
+            ).fetchall()
 
             # Also get completion events
             complete_query = text(f"""
@@ -401,11 +420,14 @@ def admin_reader_analytics(
                     {website_filter}
             """)
 
-            completions = umami_db.execute(complete_query, {
-                "start_time": start,
-                "end_time": now,
-                **website_params,
-            }).fetchall()
+            completions = umami_db.execute(
+                complete_query,
+                {
+                    "start_time": start,
+                    "end_time": now,
+                    **website_params,
+                },
+            ).fetchall()
 
             (
                 prev_entry_views,
@@ -449,7 +471,9 @@ def admin_reader_analytics(
                 "seriesTitle": base.get("seriesTitle") if base else None,
                 "entryTitle": base.get("entryTitle") if base else f"Entry {display_num}",
                 "displayNumber": display_num,
-                "pageCount": base.get("pageCount") if base else (int(total_pages) if total_pages else None),
+                "pageCount": base.get("pageCount")
+                if base
+                else (int(total_pages) if total_pages else None),
                 "readsBySession": set(),
                 "pageViews": 0,
                 "maxPageBySession": {},
@@ -506,41 +530,47 @@ def admin_reader_analytics(
 
         prev_views = int(prev_entry_views.get((sid, entry_stat["displayNumber"]), 0))
         view_delta = page_views - prev_views
-        entry_views.append({
-            "label": label,
-            "value": str(entry_stat["displayNumber"]),  # Use displayNumber for detail queries
-            "entryLabel": label,
-            "displayNumber": entry_stat["displayNumber"],
-            "count": page_views,
-            "seriesId": sid,
-            "seriesTitle": entry_stat["seriesTitle"] or "",
-            "delta": view_delta,
-            "deltaPct": (view_delta / prev_views) if prev_views else None,
-        })
+        entry_views.append(
+            {
+                "label": label,
+                "value": str(entry_stat["displayNumber"]),  # Use displayNumber for detail queries
+                "entryLabel": label,
+                "displayNumber": entry_stat["displayNumber"],
+                "count": page_views,
+                "seriesId": sid,
+                "seriesTitle": entry_stat["seriesTitle"] or "",
+                "delta": view_delta,
+                "deltaPct": (view_delta / prev_views) if prev_views else None,
+            }
+        )
 
         prev_finishes = int(prev_entry_finishes.get((sid, entry_stat["displayNumber"]), 0))
         finish_delta = finishes - prev_finishes
-        entry_completions.append({
-            "label": label,
-            "value": str(entry_stat["displayNumber"]),
-            "entryLabel": label,
-            "count": finishes,
-            "completionRate": round(finish_rate, 4),
-            "finishRate": round(finish_rate, 4),
-            "seriesId": sid,
-            "delta": finish_delta,
-            "deltaPct": (finish_delta / prev_finishes) if prev_finishes else None,
-        })
+        entry_completions.append(
+            {
+                "label": label,
+                "value": str(entry_stat["displayNumber"]),
+                "entryLabel": label,
+                "count": finishes,
+                "completionRate": round(finish_rate, 4),
+                "finishRate": round(finish_rate, 4),
+                "seriesId": sid,
+                "delta": finish_delta,
+                "deltaPct": (finish_delta / prev_finishes) if prev_finishes else None,
+            }
+        )
 
-        entry_stops.append({
-            "label": label,
-            "value": str(entry_stat["displayNumber"]),
-            "entryLabel": label,
-            "page": round(avg_stop, 2),
-            "avgStopPage": round(avg_stop, 2),
-            "pageCount": entry_stat["pageCount"],
-            "seriesId": sid,
-        })
+        entry_stops.append(
+            {
+                "label": label,
+                "value": str(entry_stat["displayNumber"]),
+                "entryLabel": label,
+                "page": round(avg_stop, 2),
+                "avgStopPage": round(avg_stop, 2),
+                "pageCount": entry_stat["pageCount"],
+                "seriesId": sid,
+            }
+        )
 
         # Aggregate by series
         if sid not in series_aggregates:
@@ -578,16 +608,18 @@ def admin_reader_analytics(
         rate = (finishes / reads) if reads else 0
         prev_finishes = int(prev_series_finishes.get(agg.get("seriesId", ""), 0))
         finish_delta = finishes - prev_finishes
-        series_completions.append({
-            "label": agg.get("label", ""),
-            "value": agg.get("value", ""),
-            "seriesId": agg.get("seriesId", ""),
-            "seriesTitle": agg.get("seriesTitle", ""),
-            "count": finishes,
-            "completionRate": round(rate, 4),
-            "delta": finish_delta,
-            "deltaPct": (finish_delta / prev_finishes) if prev_finishes else None,
-        })
+        series_completions.append(
+            {
+                "label": agg.get("label", ""),
+                "value": agg.get("value", ""),
+                "seriesId": agg.get("seriesId", ""),
+                "seriesTitle": agg.get("seriesTitle", ""),
+                "count": finishes,
+                "completionRate": round(rate, 4),
+                "delta": finish_delta,
+                "deltaPct": (finish_delta / prev_finishes) if prev_finishes else None,
+            }
+        )
     series_completions.sort(key=lambda x: x.get("count", 0), reverse=True)
 
     # Calculate overall stats
@@ -681,10 +713,13 @@ def admin_reader_series_analytics(
                         {website_filter}
                 """)
 
-                events = umami_db.execute(query, {
-                    "start_time": start,
-                    **website_params,
-                }).fetchall()
+                events = umami_db.execute(
+                    query,
+                    {
+                        "start_time": start,
+                        **website_params,
+                    },
+                ).fetchall()
 
                 # Track unique completions per session+entry
                 completion_times: dict[tuple[str, str, int], datetime] = {}
@@ -727,10 +762,13 @@ def admin_reader_series_analytics(
                         {website_filter}
                 """)
 
-                events = umami_db.execute(query, {
-                    "start_time": start,
-                    **website_params,
-                }).fetchall()
+                events = umami_db.execute(
+                    query,
+                    {
+                        "start_time": start,
+                        **website_params,
+                    },
+                ).fetchall()
 
                 for created_at, session_id, series_id, entry_label in events:
                     sid = series_id or ""
@@ -765,11 +803,13 @@ def admin_reader_series_analytics(
             bucket_end = now
 
         count = buckets.get(i, 0)
-        series.append({
-            "start": iso_z(bucket_start),
-            "end": iso_z(bucket_end),
-            "count": count,
-        })
+        series.append(
+            {
+                "start": iso_z(bucket_start),
+                "end": iso_z(bucket_end),
+                "count": count,
+            }
+        )
 
         if bucket_end >= now:
             break
@@ -836,10 +876,13 @@ def admin_reads_over_time(
                     {website_filter}
             """)
 
-            events = umami_db.execute(query, {
-                "start_time": start,
-                **website_params,
-            }).fetchall()
+            events = umami_db.execute(
+                query,
+                {
+                    "start_time": start,
+                    **website_params,
+                },
+            ).fetchall()
 
             for created_at, session_id, evt_series_id, entry_label in events:
                 # Apply series filter
@@ -886,11 +929,13 @@ def admin_reads_over_time(
         all_sessions.update(sessions)
         total_views += views
 
-        series.append({
-            "date": date_str,
-            "count": views,  # Total page views per day
-            "uniqueVisitors": len(sessions),
-        })
+        series.append(
+            {
+                "date": date_str,
+                "count": views,  # Total page views per day
+                "uniqueVisitors": len(sessions),
+            }
+        )
         current += timedelta(days=1)
 
     return {
@@ -921,9 +966,7 @@ def admin_weekly_digest(
     # Week boundaries (Monday to Sunday)
     days_since_monday = today.weekday()
     this_week_start = datetime.combine(
-        today - timedelta(days=days_since_monday),
-        datetime.min.time(),
-        tzinfo=timezone.utc
+        today - timedelta(days=days_since_monday), datetime.min.time(), tzinfo=timezone.utc
     )
     this_week_end = now
 
@@ -946,11 +989,17 @@ def admin_weekly_digest(
                         AND we.created_at < :end_time
                         {website_filter}
                 """)
-                unique_visitors = umami_db.execute(visitors_query, {
-                    "start_time": start_dt,
-                    "end_time": end_dt,
-                    **website_params,
-                }).scalar() or 0
+                unique_visitors = (
+                    umami_db.execute(
+                        visitors_query,
+                        {
+                            "start_time": start_dt,
+                            "end_time": end_dt,
+                            **website_params,
+                        },
+                    ).scalar()
+                    or 0
+                )
 
                 # Query reads: unique sessions per entry from reader_page_view
                 reads_query = text(f"""
@@ -967,11 +1016,14 @@ def admin_weekly_digest(
                         {website_filter}
                     GROUP BY ed_entry.string_value
                 """)
-                reads_rows = umami_db.execute(reads_query, {
-                    "start_time": start_dt,
-                    "end_time": end_dt,
-                    **website_params,
-                }).fetchall()
+                reads_rows = umami_db.execute(
+                    reads_query,
+                    {
+                        "start_time": start_dt,
+                        "end_time": end_dt,
+                        **website_params,
+                    },
+                ).fetchall()
 
                 total_reads = sum(row[1] for row in reads_rows)
 
@@ -984,11 +1036,17 @@ def admin_weekly_digest(
                         AND we.created_at < :end_time
                         {website_filter}
                 """)
-                total_finishes = umami_db.execute(finishes_query, {
-                    "start_time": start_dt,
-                    "end_time": end_dt,
-                    **website_params,
-                }).scalar() or 0
+                total_finishes = (
+                    umami_db.execute(
+                        finishes_query,
+                        {
+                            "start_time": start_dt,
+                            "end_time": end_dt,
+                            **website_params,
+                        },
+                    ).scalar()
+                    or 0
+                )
 
         except Exception:
             return {

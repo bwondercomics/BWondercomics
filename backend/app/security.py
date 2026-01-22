@@ -108,7 +108,9 @@ def get_current_user(db: Session, request: Request) -> User | None:
 
 def public_user(user: User) -> dict[str, Any]:
     created = user.created_at
-    created_at = created.astimezone(timezone.utc).isoformat().replace("+00:00", "Z") if created else None
+    created_at = (
+        created.astimezone(timezone.utc).isoformat().replace("+00:00", "Z") if created else None
+    )
     return {
         "id": str(user.id),
         "email": user.email,
@@ -116,4 +118,3 @@ def public_user(user: User) -> dict[str, Any]:
         "role": user.role,
         "createdAt": created_at,
     }
-

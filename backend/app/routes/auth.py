@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
-from sqlalchemy.sql import func
 from sqlalchemy.orm import Session
+from sqlalchemy.sql import func
 
 from ..db import get_db
 from ..models import EmailSubscriber, User
@@ -20,7 +20,6 @@ from ..security import (
 )
 from ..settings import settings
 from ..validation import is_admin_role
-
 
 router = APIRouter()
 
@@ -54,6 +53,7 @@ def _set_session_cookie(response: JSONResponse, token: str, secure: bool) -> Non
 
 def _clear_session_cookie(response: JSONResponse) -> None:
     response.delete_cookie(key=settings.session_cookie_name, path="/")
+
 
 def _client_ip(request: Request) -> str:
     if request.client and request.client.host:
@@ -91,14 +91,18 @@ def login(payload: LoginRequest, request: Request, db: Session = Depends(get_db)
 def register(payload: RegisterRequest, request: Request, db: Session = Depends(get_db)):
     email = (payload.email or "").strip().lower()
     password = payload.password or ""
-    display_name = (payload.display_name or "").strip() or (email.split("@")[0] if "@" in email else "User")
+    display_name = (payload.display_name or "").strip() or (
+        email.split("@")[0] if "@" in email else "User"
+    )
     invite_code = (payload.invite_code or "").strip()
     email_opt_in = bool(payload.email_opt_in)
 
     if not email or "@" not in email or len(email) > 120:
         return JSONResponse(status_code=400, content={"error": "Valid email is required"})
     if len(password) < 8 or len(password) > 128:
-        return JSONResponse(status_code=400, content={"error": "Password must be between 8 and 128 characters"})
+        return JSONResponse(
+            status_code=400, content={"error": "Password must be between 8 and 128 characters"}
+        )
 
     if settings.registration_mode not in {"open", "invite", "closed"}:
         return JSONResponse(

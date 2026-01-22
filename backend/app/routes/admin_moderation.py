@@ -10,9 +10,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import BannedIP, CommentLimit, CensoredWord, User
+from ..models import BannedIP, CensoredWord, CommentLimit, User
 from .admin_utils import iso_z, require_admin
-
 
 router = APIRouter()
 
@@ -211,7 +210,9 @@ def remove_censored_word(word_id: str, request: Request, db: Session = Depends(g
 
 
 @router.post("/api/admin/moderation/words/remove")
-def remove_censored_word_body(payload: CensorWordRequest, request: Request, db: Session = Depends(get_db)):
+def remove_censored_word_body(
+    payload: CensorWordRequest, request: Request, db: Session = Depends(get_db)
+):
     if not require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
@@ -246,7 +247,9 @@ def get_comment_limits(request: Request, db: Session = Depends(get_db)):
 
 
 @router.put("/api/admin/moderation/comment-limits")
-def update_comment_limits(payload: CommentLimitRequest, request: Request, db: Session = Depends(get_db)):
+def update_comment_limits(
+    payload: CommentLimitRequest, request: Request, db: Session = Depends(get_db)
+):
     admin = require_admin(request, db)
     if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
@@ -280,5 +283,7 @@ def update_comment_limits(payload: CommentLimitRequest, request: Request, db: Se
 
 
 @router.post("/api/admin/moderation/comment-limits")
-def update_comment_limits_post(payload: CommentLimitRequest, request: Request, db: Session = Depends(get_db)):
+def update_comment_limits_post(
+    payload: CommentLimitRequest, request: Request, db: Session = Depends(get_db)
+):
     return update_comment_limits(payload, request, db)

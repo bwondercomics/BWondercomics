@@ -14,7 +14,6 @@ from ..models import Comment, EmailSubscriber, PremiumCode, PremiumCodeRedemptio
 from ..security import get_current_user, public_user
 from ..settings import settings
 
-
 router = APIRouter()
 
 
@@ -72,7 +71,9 @@ def _require_user(request: Request, db: Session) -> User | None:
 
 
 @router.post("/api/email/subscribe")
-def subscribe_email(payload: EmailSubscribeRequest, request: Request, db: Session = Depends(get_db)):
+def subscribe_email(
+    payload: EmailSubscribeRequest, request: Request, db: Session = Depends(get_db)
+):
     email = (payload.email or "").strip().lower()
     if not email or "@" not in email or len(email) > 120:
         return JSONResponse(status_code=400, content={"error": "Valid email is required"})
@@ -112,9 +113,9 @@ def get_user_settings(request: Request, db: Session = Depends(get_db)):
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
-    comment_count = db.scalar(
-        select(func.count()).select_from(Comment).where(Comment.user_id == user.id)
-    ) or 0
+    comment_count = (
+        db.scalar(select(func.count()).select_from(Comment).where(Comment.user_id == user.id)) or 0
+    )
     premium_active = _has_premium_active(db, user.id)
     return {"user": _user_payload(user, premium_active), "commentCount": comment_count}
 
@@ -169,9 +170,9 @@ def get_user_comments(
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
 
-    total = db.scalar(
-        select(func.count()).select_from(Comment).where(Comment.user_id == user.id)
-    ) or 0
+    total = (
+        db.scalar(select(func.count()).select_from(Comment).where(Comment.user_id == user.id)) or 0
+    )
     comments = db.scalars(
         select(Comment)
         .where(Comment.user_id == user.id)
@@ -275,7 +276,9 @@ def delete_account(request: Request, db: Session = Depends(get_db)):
     if not user:
         return JSONResponse(status_code=401, content={"error": "Not authenticated"})
     if user.role == "admin":
-        return JSONResponse(status_code=403, content={"error": "Admin accounts cannot be deleted here"})
+        return JSONResponse(
+            status_code=403, content={"error": "Admin accounts cannot be deleted here"}
+        )
 
     db.execute(delete(Comment).where(Comment.user_id == user.id))
     db.execute(text("DELETE FROM personal_feed_items WHERE user_id = :uid"), {"uid": user.id})

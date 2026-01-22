@@ -15,7 +15,6 @@ from ..db import get_db
 from ..models import EmailSubscriber, PremiumCode, PremiumCodeRedemption, User
 from .admin_utils import client_ip, iso_z, require_admin
 
-
 router = APIRouter()
 
 
@@ -222,7 +221,9 @@ def list_premium_codes(request: Request, db: Session = Depends(get_db)):
 
 
 @router.post("/api/admin/premium-codes")
-def create_premium_codes(payload: PremiumCodeCreateRequest, request: Request, db: Session = Depends(get_db)):
+def create_premium_codes(
+    payload: PremiumCodeCreateRequest, request: Request, db: Session = Depends(get_db)
+):
     admin = require_admin(request, db)
     if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
@@ -272,7 +273,9 @@ def create_premium_codes(payload: PremiumCodeCreateRequest, request: Request, db
                     break
                 attempt += 1
             if attempt >= 5:
-                return JSONResponse(status_code=500, content={"error": "Failed to generate unique code"})
+                return JSONResponse(
+                    status_code=500, content={"error": "Failed to generate unique code"}
+                )
 
     for code in codes:
         db.add(code)
@@ -282,7 +285,9 @@ def create_premium_codes(payload: PremiumCodeCreateRequest, request: Request, db
 
 
 @router.patch("/api/admin/premium-codes/{code_id}")
-def update_premium_code(code_id: str, payload: PremiumCodeUpdateRequest, request: Request, db: Session = Depends(get_db)):
+def update_premium_code(
+    code_id: str, payload: PremiumCodeUpdateRequest, request: Request, db: Session = Depends(get_db)
+):
     admin = require_admin(request, db)
     if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
@@ -307,7 +312,9 @@ def update_premium_code(code_id: str, payload: PremiumCodeUpdateRequest, request
 
 
 @router.post("/api/admin/premium-codes/deactivate")
-def deactivate_premium_code(payload: PremiumCodeDeactivateRequest, request: Request, db: Session = Depends(get_db)):
+def deactivate_premium_code(
+    payload: PremiumCodeDeactivateRequest, request: Request, db: Session = Depends(get_db)
+):
     admin = require_admin(request, db)
     if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})

@@ -17,6 +17,7 @@ import {
 import { createAnalytics } from "./analytics.js";
 import { createDashboard } from "./dashboard.js";
 import { createDesigner } from "./designer.js";
+import { createPageBuilder } from "./page-builder.js";
 import {
   bindEvents as bindBlueskyEvents,
   loadStatus as loadBlueskyStatus,
@@ -116,6 +117,7 @@ function hideAllSections() {
   if (el.socialSection) el.socialSection.style.display = "none";
   if (el.previewSection) el.previewSection.style.display = "none";
   if (el.designerSection) el.designerSection.style.display = "none";
+  if (el.pageBuilderSection) el.pageBuilderSection.style.display = "none";
   if (el.analyticsSection) el.analyticsSection.style.display = "none";
   if (el.mediaSection) el.mediaSection.style.display = "none";
   if (el.usersSection) el.usersSection.style.display = "none";
@@ -327,6 +329,13 @@ const designerManager = createDesigner({
   setActiveNav,
 });
 
+const pageBuilderManager = createPageBuilder({
+  sanitizeSeriesId: seriesManager.sanitizeSeriesId,
+  getActiveSeriesId: seriesManager.getActiveSeriesId,
+  hideAllSections,
+  setActiveNav,
+});
+
 const entriesApi = createEntriesApi({
   state,
   el,
@@ -344,6 +353,7 @@ const entriesApi = createEntriesApi({
 seriesManager.bindDependencies({
   entriesApi,
   setDesignerFrameSrc: designerManager.setDesignerFrameSrc,
+  onPageBuilderSeriesChange: pageBuilderManager.onSeriesChange,
   showChaptersSection,
 });
 
@@ -531,12 +541,12 @@ function attachEventHandlers() {
   }
   if (el.btnSeriesDesigner) {
     el.btnSeriesDesigner.addEventListener("click", () => {
-      designerManager.showDesignerSection();
+      pageBuilderManager.showPageBuilderSection();
     });
   }
   if (el.btnDesigner) {
     el.btnDesigner.addEventListener("click", () => {
-      designerManager.showDesignerSection();
+      pageBuilderManager.showPageBuilderSection();
     });
   }
   el.btnAddChapter.addEventListener("click", entriesApi.addNewChapter);
@@ -748,6 +758,7 @@ async function init() {
   window.addEventListener("scroll", handleHeaderScroll, { passive: true });
   window.addEventListener("resize", updateHeaderMetrics);
   designerManager.initDesignerFrame();
+  pageBuilderManager.initPageBuilder();
   uploadManager.initUploadHandlers();
   const isAuthenticated = await checkSession(showDashboard);
   if (!isAuthenticated) {

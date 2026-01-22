@@ -4,7 +4,7 @@
  */
 
 import { sanitizeChapters, sortChapterNamesWithMeta } from './entries.js';
-import { getSeriesDataPath, getSeriesPageConfigPath } from './series.js';
+import { getSeriesDataPath, getSeriesPageConfigPath, getActiveSeriesId } from './series.js';
 import { logger } from './logger.js';
 
 /**
@@ -133,4 +133,84 @@ export async function loadLatestPost() {
     body.innerHTML = '<div class="latest-empty" style="color: var(--danger);">Could not load updates.</div>';
     return null;
   }
+}
+
+/**
+ * Loads a page from the page builder API.
+ * @param {string} slug - The page slug (e.g., "reader")
+ * @param {string} [seriesId] - Optional series ID override
+ * @returns {Promise<Object|null>} The page data or null if not found
+ */
+export async function loadBuilderPage(slug, seriesId = null) {
+  const sid = seriesId || getActiveSeriesId();
+  try {
+    const res = await fetch(`/api/pages/${encodeURIComponent(sid)}/${encodeURIComponent(slug)}`);
+    if (!res.ok) {
+      if (res.status === 404) {
+        logger.log(`Builder page "${slug}" not found`);
+        return null;
+      }
+      throw new Error(`Failed to load builder page: ${res.status}`);
+    }
+    const data = await res.json();
+    return data.page || null;
+  } catch (error) {
+    logger.error('Failed to load builder page:', error);
+    return null;
+  }
+}
+
+/**
+ * Extract subtitles from a page builder page.
+ * Looks for header modules and extracts their subtitles array.
+ * @param {Object} page - The page data from the builder API
+ * @returns {string[]} Array of subtitles
+ */
+export function extractSubtitlesFromBuilderPage(page) {
+  if (!page || !page.sections) return [];
+
+  for (const section of page.sections) {
+    for (const mod of section.modules || []) {
+      if (mod.moduleType === 'header' && mod.config) {
+        // Try subtitles array first, then fall back to single subtitle
+        if (Array.isArray(mod.config.subtitles) && mod.config.subtitles.length > 0) {
+          return mod.config.subtitles;
+        }
+        if (mod.config.subtitle) {
+          return [mod.config.subtitle];
+        }
+      }
+    }
+  }
+  return [];
+}
+
+/**
+ * Loads page configuration with fallback.
+ * Tries page builder first, then falls back to legacy page-config.
+ * @param {Function} setSubtitlesFn - Callback to set subtitles
+ * @param {string} [seriesId] - Optional series ID override
+ * @returns {Promise<{source: string, page?: Object}>} Result with source indicator
+ */
+export async function loadPageConfigWithFallback(setSubtitlesFn, seriesId = null) {
+  const sid = seriesId || getActiveSeriesId();
+
+  // Try page builder first
+  const builderPage = await loadBuilderPage('reader', sid);
+  if (builderPage) {
+    const subtitles = extractSubtitlesFromBuilderPage(builderPage);
+    if (subtitles.length > 0) {
+      setSubtitlesFn(subtitles);
+    }
+    logger.log(`✓ Loaded reader page from page builder for series: ${sid}`);
+    return { source: 'builder', page: builderPage };
+  }
+
+  // Fall back to legacy page-config
+  const legacyLoaded = await loadPageConfig(setSubtitlesFn, sid);
+  if (legacyLoaded) {
+    return { source: 'legacy' };
+  }
+
+  return { source: 'none' };
 }

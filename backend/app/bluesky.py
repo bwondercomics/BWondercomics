@@ -16,7 +16,6 @@ from sqlalchemy.orm import Session
 from .models import Post, SocialAccount
 from .settings import settings
 
-
 DEFAULT_PDS_URL = "https://bsky.social"
 
 
@@ -150,7 +149,9 @@ class BlueskyClient:
             body=payload,
         )
         if status != 200:
-            raise BlueskyError(data.get("message") or data.get("error") or "Failed to connect to Bluesky")
+            raise BlueskyError(
+                data.get("message") or data.get("error") or "Failed to connect to Bluesky"
+            )
         return data
 
     def _refresh(self, db: Session) -> None:
@@ -161,7 +162,9 @@ class BlueskyClient:
             headers={"Authorization": f"Bearer {self.account.refresh_token}"},
         )
         if status != 200:
-            raise BlueskyError(data.get("message") or data.get("error") or "Failed to refresh Bluesky session")
+            raise BlueskyError(
+                data.get("message") or data.get("error") or "Failed to refresh Bluesky session"
+            )
 
         self.account.access_token = data.get("accessJwt") or self.account.access_token
         self.account.refresh_token = data.get("refreshJwt") or self.account.refresh_token
@@ -172,21 +175,38 @@ class BlueskyClient:
         db.commit()
         self.pds_url = self.account.pds_url or self.pds_url
 
-    def _request(self, db: Session, method: str, path: str, *, params: dict[str, str] | None = None, body: Any | None = None) -> dict[str, Any]:
+    def _request(
+        self,
+        db: Session,
+        method: str,
+        path: str,
+        *,
+        params: dict[str, str] | None = None,
+        body: Any | None = None,
+    ) -> dict[str, Any]:
         query = f"?{urlencode(params)}" if params else ""
         payload = json.dumps(body).encode("utf-8") if body is not None else None
-        headers = {"Accept": "application/json", "Authorization": f"Bearer {self.account.access_token}"}
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {self.account.access_token}",
+        }
         if payload is not None:
             headers["Content-Type"] = "application/json"
 
-        status, data = _http_json(method, self.pds_url, f"{path}{query}", headers=headers, body=payload)
+        status, data = _http_json(
+            method, self.pds_url, f"{path}{query}", headers=headers, body=payload
+        )
         if status == 401 and self.account.refresh_token:
             self._refresh(db)
             headers["Authorization"] = f"Bearer {self.account.access_token}"
-            status, data = _http_json(method, self.pds_url, f"{path}{query}", headers=headers, body=payload)
+            status, data = _http_json(
+                method, self.pds_url, f"{path}{query}", headers=headers, body=payload
+            )
 
         if status >= 400:
-            raise BlueskyError(data.get("message") or data.get("error") or f"Bluesky error ({status})")
+            raise BlueskyError(
+                data.get("message") or data.get("error") or f"Bluesky error ({status})"
+            )
         return data
 
     def get_profile(self, db: Session) -> dict[str, Any]:
@@ -225,7 +245,9 @@ class BlueskyClient:
                 body=data,
             )
         if status >= 400:
-            raise BlueskyError(payload.get("message") or payload.get("error") or f"Upload failed ({status})")
+            raise BlueskyError(
+                payload.get("message") or payload.get("error") or f"Upload failed ({status})"
+            )
         return payload.get("blob") or payload
 
     def create_post(self, db: Session, payload: BlueskyPost) -> None:
