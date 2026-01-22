@@ -8,7 +8,7 @@ Use it as a living checklist. Mark items as you complete them.
 - Keep notes next to any item that needs follow-up.
 - Each phase has clear exit criteria. Do not move on until those are met.
 
-Last updated: 2026-01-17
+Last updated: 2026-01-21
 
 ## Phase 1 - Lock the Machine (stability + data safety)
 Goal: the platform runs clean, stable, and predictable.
@@ -73,7 +73,7 @@ Goal: the control room feels real and reliable.
 - [x] Ignore zero-page entries in Reader Analytics (click-only entries no longer show reads).
 - [ ] Revamp analytics UX to surface actionable insights (retention, drop-off points, popular entries).
 - [ ] Add retention + session summary metrics with clear definitions.
-- [ ] Consider time-based comparisons (this week vs last week).
+- [x] Consider time-based comparisons (this week vs last week). *(Reader analytics shows Δ vs previous window; verified 2026-01-21)*
 
 ### Exit criteria
 - [ ] Common admin tasks require no terminal access.
