@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 
 from ..content_store import (
     apply_media_items_save,
+    delete_media_item_by_path,
     get_page_config,
     list_media_items,
     save_page_config,
@@ -461,13 +462,31 @@ def delete_image(payload: DeleteImageRequest, request: Request, db: Session = De
     except ValueError:
         return JSONResponse(status_code=400, content={"error": "Invalid path"})
 
+    is_media_path = (
+        (
+            rel_path.startswith("media/")
+            and not rel_path.startswith("media/previews/")
+            and not rel_path.startswith("media/post-assets/")
+        )
+        or (
+            rel_path.startswith("protected/media/")
+            and not rel_path.startswith("protected/media/previews/")
+            and not rel_path.startswith("protected/media/post-assets/")
+        )
+    )
     if not abs_path.exists():
+        if is_media_path:
+            delete_media_item_by_path(db, rel_path)
+            return {"status": "deleted", "path": rel_path, "note": "file missing"}
         return JSONResponse(status_code=404, content={"error": "File not found"})
 
     try:
         abs_path.unlink()
     except Exception as exc:
         return JSONResponse(status_code=500, content={"error": str(exc)})
+
+    if is_media_path:
+        delete_media_item_by_path(db, rel_path)
 
     return {"status": "deleted", "path": rel_path}
 

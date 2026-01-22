@@ -22,9 +22,9 @@ Goal: the platform runs clean, stable, and predictable.
 - [x] Legacy "chapter" cleanup plan documented. *(`docs/LEGACY_CHAPTER_CLEANUP.md`)*
 
 ### Data safety + integrity
-- [ ] Verify migrations align with live schema (`backend/alembic/`, `backend/app/models.py`). *(Needs DB check vs alembic head)*
-- [ ] Validate DB write paths for comments, entries, posts, analytics events. *(Needs endpoint review + smoke tests)*
-- [ ] Enforce canonical IDs: `series_id + display_number` for entries. *(Implemented in code/docs; needs DB audit)*
+- [x] Verify migrations align with live schema (`backend/alembic/`, `backend/app/models.py`). *(DB at 0014_page_builder head on 2026-01-21)*
+- [x] Validate DB write paths for comments, entries, posts, analytics events. *(Checks done 2026-01-21; no legacy targets; posts/media OK; display numbers set)*
+- [x] Enforce canonical IDs: `series_id + display_number` for entries. *(Implemented in code/docs; needs DB audit)*
 - [x] Entries payload is canonical (`entries/entryMeta/entryFolders`); legacy `chapters/*` removed. *(API + reader/admin updated; tests passing)*
 - [x] Media thumbnails + previews are DB-backed; posts reuse media thumbs. *(Thumb pipeline + `posts.media_id` in place)*
 

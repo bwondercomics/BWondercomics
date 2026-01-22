@@ -185,6 +185,7 @@ def series_data_payload(db: Session, series_id: str) -> dict[str, Any]:
             chapter_folders[entry.title] = entry.folder_path
         label = label_by_id.get(entry.entry_label_id) or default_label
         meta = {
+            "entryId": str(entry.id),
             "premium": bool(entry.premium_only),
             "showInDropdown": bool(entry.show_in_dropdown),
             "showInGallery": bool(entry.show_in_gallery),
@@ -332,6 +333,7 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
     if not isinstance(payload, dict):
         raise ValueError("Invalid series data payload")
     sid = sanitize_series_id(series_id)
+    allow_deletions = bool(payload.get("allowDeletions"))
 
     series = db.get(Series, sid)
     if not series:
@@ -440,6 +442,7 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
     db.add(series)
 
     requested_titles: set[str] = set()
+    requested_entry_ids: set[UUID] = set()
     fallback_index = 0
 
     for raw_title, raw_pages in chapters.items():
@@ -497,7 +500,22 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
             store_url = str(meta.get("storeUrl") or meta.get("store_url") or "").strip()
             cover_image = str(meta.get("coverImage") or meta.get("cover") or "").strip()
 
-        entry = db.scalar(select(Entry).where(Entry.series_id == sid, Entry.title == title))
+        entry_id: UUID | None = None
+        if isinstance(meta, dict):
+            raw_entry_id = meta.get("entryId") or meta.get("entry_id")
+            if raw_entry_id:
+                try:
+                    entry_id = UUID(str(raw_entry_id))
+                except Exception:
+                    entry_id = None
+
+        entry = None
+        if entry_id is not None:
+            entry = db.get(Entry, entry_id)
+            if entry and entry.series_id != sid:
+                entry = None
+        if entry is None:
+            entry = db.scalar(select(Entry).where(Entry.series_id == sid, Entry.title == title))
         existing_cover = entry.cover_image if entry else ""
         existing_thumb = entry.cover_thumb_path if entry else ""
         if not entry:
@@ -528,6 +546,7 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
                 updated_at=_now(),
             )
         else:
+            entry.title = title[:200]
             entry.folder_path = folder_path
             entry.premium_only = premium_only
             entry.entry_label_id = entry_label_id
@@ -551,6 +570,7 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
         fallback_index += 1
         db.add(entry)
         db.flush()
+        requested_entry_ids.add(entry.id)
 
         expected_thumb = entry_cover_thumb_rel_path(str(entry.id)) if cover_image else ""
         thumb_ok = False
@@ -607,8 +627,17 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
             )
 
     # Delete entries that were removed from the payload (hard cut).
+    removed_entries = []
     for entry in db.scalars(select(Entry).where(Entry.series_id == sid)).all():
-        if entry.title not in requested_titles:
-            db.delete(entry)
+        keep_by_id = entry.id in requested_entry_ids if requested_entry_ids else False
+        keep_by_title = entry.title in requested_titles
+        if not keep_by_id and not keep_by_title:
+            removed_entries.append(entry)
+    if removed_entries and not allow_deletions:
+        raise ValueError(
+            f"Refusing to delete {len(removed_entries)} entries without allowDeletions=true"
+        )
+    for entry in removed_entries:
+        db.delete(entry)
 
     db.commit()

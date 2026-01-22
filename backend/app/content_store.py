@@ -307,6 +307,18 @@ def apply_media_items_save(db: Session, payload: Any) -> None:
     db.commit()
 
 
+def delete_media_item_by_path(db: Session, path: str) -> None:
+    if not path:
+        return
+    record = db.scalar(select(MediaItem).where(MediaItem.path == path))
+    media_id = record.id if record else media_id_from_path(path)
+    if record:
+        db.delete(record)
+        db.flush()
+    _sync_media_previews(db, [], {media_id})
+    db.commit()
+
+
 def get_page_config(db: Session, series_id: str | None) -> dict[str, Any] | None:
     sid = sanitize_series_id(series_id) if series_id else DEFAULT_SERIES_ID
     record = db.get(PageConfig, sid)
