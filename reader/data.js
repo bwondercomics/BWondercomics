@@ -6,6 +6,8 @@
 import { sanitizeEntries, sortEntryNamesWithMeta } from './entries.js';
 import { getSeriesDataPath, getSeriesPageConfigPath, getActiveSeriesId } from './series.js';
 import { logger } from './logger.js';
+import { renderModule, initEmailForms, initPromoCarousels } from './page-renderer.js';
+import { initFeedModules } from './feed-panel.js';
 
 /**
  * Loads entry data from the public series endpoint
@@ -206,6 +208,43 @@ function applyPageTheme(page) {
   logger.log('✓ Applied page theme');
 }
 
+function resolveAssetUrl(path = '') {
+  if (!path) return '';
+  const raw = String(path || '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  if (raw.startsWith('/')) return raw;
+  const cleaned = raw.replace(/^assets\//, '');
+  return `/assets/${cleaned}`;
+}
+
+function applyPanelBackgrounds(page) {
+  const backgrounds = page?.meta?.panelBackgrounds || {};
+  const leftPanel = document.getElementById('leftPanel');
+  const rightPanel = document.getElementById('rightPanel');
+
+  const applyToPanel = (panel, config) => {
+    if (!panel) return;
+    if (!config || !config.path) {
+      panel.style.removeProperty('--panel-bg-image');
+      panel.style.removeProperty('--panel-bg-size');
+      panel.style.removeProperty('--panel-bg-position');
+      panel.style.removeProperty('--panel-bg-opacity');
+      return;
+    }
+    const url = resolveAssetUrl(config.path);
+    panel.style.setProperty('--panel-bg-image', `url("${url}")`);
+    panel.style.setProperty('--panel-bg-size', config.fit || 'cover');
+    panel.style.setProperty('--panel-bg-position', config.focus || 'center');
+    if (config.opacity !== undefined && config.opacity !== null) {
+      panel.style.setProperty('--panel-bg-opacity', String(config.opacity));
+    }
+  };
+
+  applyToPanel(leftPanel, backgrounds.left);
+  applyToPanel(rightPanel, backgrounds.right);
+}
+
 /**
  * Apply page builder modules to the existing DOM elements.
  * Updates header, panels, and other elements based on module config.
@@ -216,6 +255,7 @@ export function applyBuilderPageToDOM(page) {
 
   // Apply theme first
   applyPageTheme(page);
+  applyPanelBackgrounds(page);
 
   // Find modules by type across all sections
   const findModulesByType = (type) => {
@@ -230,24 +270,39 @@ export function applyBuilderPageToDOM(page) {
     return results;
   };
 
-  // Find modules by column index in multi-column sections
-  const findModulesInColumn = (columnIndex) => {
+  const PANEL_MODULE_TYPES = new Set([
+    'text',
+    'image',
+    'html',
+    'social',
+    'email-signup',
+    'buttons',
+    'promo',
+    'feed',
+    'gallery',
+    'video'
+  ]);
+
+  const findPanelModules = (side) => {
     const results = [];
     for (const section of page.sections) {
       const layout = section.layout || '1';
       const colCount = layout.split('-').length;
-      if (colCount >= 3) {
-        for (const mod of section.modules || []) {
-          if (mod.columnIndex === columnIndex) {
-            results.push({ module: mod, section });
-          }
+      const leftIndex = 0;
+      const rightIndex = colCount > 1 ? colCount - 1 : 0;
+      for (const mod of section.modules || []) {
+        if (!PANEL_MODULE_TYPES.has(mod.moduleType)) continue;
+        if (side === 'left' && mod.columnIndex === leftIndex) {
+          results.push({ module: mod, section });
+        } else if (side === 'right' && colCount > 1 && mod.columnIndex === rightIndex) {
+          results.push({ module: mod, section });
         }
       }
     }
     return results;
   };
 
-  // Apply header module (title)
+  // Apply header module (title/subtitle)
   const headers = findModulesByType('header');
   if (headers.length > 0) {
     const config = headers[0].module.config || {};
@@ -255,15 +310,17 @@ export function applyBuilderPageToDOM(page) {
     if (titleEl && config.title) {
       titleEl.textContent = config.title;
     }
+    const subtitleEl = document.getElementById('subtitle');
+    if (subtitleEl && config.subtitle) {
+      subtitleEl.textContent = config.subtitle;
+    }
   }
 
-  // Apply left panel content (column 0)
-  const leftModules = findModulesInColumn(0);
-  applyPanelModules('left', leftModules);
-
-  // Apply right panel content (column 2)
-  const rightModules = findModulesInColumn(2);
-  applyPanelModules('right', rightModules);
+  // Apply left/right panel content based on columns
+  const leftModules = findPanelModules('left');
+  const rightModules = findPanelModules('right');
+  renderPanelStack('left', leftModules);
+  renderPanelStack('right', rightModules);
 
   // Check panel visibility from section settings
   for (const section of page.sections) {
@@ -288,75 +345,47 @@ export function applyBuilderPageToDOM(page) {
 }
 
 /**
- * Apply modules to a side panel.
+ * Render builder modules into panel stacks.
  */
-function applyPanelModules(side, modules) {
-  if (modules.length === 0) return;
-
+function renderPanelStack(side, modules) {
   const panelId = side === 'left' ? 'leftPanel' : 'rightPanel';
   const panel = document.getElementById(panelId);
   if (!panel) return;
 
+  const legacyRightSelectors = ['#rightPanelFeedBar', '#latestUpdate', '#rightPanelFeed', '.right-stack'];
+  if (side === 'right') {
+    legacyRightSelectors.forEach((selector) => {
+      const el = panel.querySelector(selector);
+      if (el) el.style.display = 'none';
+    });
+  }
+
+  let container = null;
+  if (side === 'left') {
+    container = panel.querySelector('.left-panel-content') || panel;
+    container.classList.add('panel-builder');
+  } else {
+    container = panel.querySelector('.right-panel-builder');
+    if (!container) {
+      container = document.createElement('div');
+      container.className = 'right-panel-builder panel-builder';
+      panel.appendChild(container);
+    }
+    container.classList.add('panel-builder');
+  }
+
   // Sort by sortIndex
   modules.sort((a, b) => (a.module.sortIndex || 0) - (b.module.sortIndex || 0));
 
-  for (const { module } of modules) {
-    const config = module.config || {};
-    const type = module.moduleType;
-
-    if (type === 'text') {
-      if (side === 'left') {
-        const topText = panel.querySelector('.left-panel-text-top');
-        if (topText && config.content) {
-          topText.innerHTML = config.content;
-        }
-      }
-    } else if (type === 'image') {
-      const previewId = side === 'left' ? 'leftPreview' : 'rightPreview';
-      const preview = document.getElementById(previewId);
-      if (preview && config.src) {
-        const img = preview.querySelector('img');
-        if (img) {
-          img.src = config.src;
-          if (config.alt) img.alt = config.alt;
-        }
-      }
-    } else if (type === 'html') {
-      if (side === 'left') {
-        const bottomText = panel.querySelector('.left-panel-text-bottom');
-        if (bottomText && config.code) {
-          bottomText.innerHTML = config.code;
-        }
-      }
-    } else if (type === 'social') {
-      if (side === 'right' && Array.isArray(config.buttons) && config.buttons.length > 0) {
-        const container = document.getElementById('dynamicButtons');
-        if (container) {
-          container.innerHTML = config.buttons.map(btn => {
-            const icon = escapeHtml(btn.icon || '');
-            const text = escapeHtml(btn.text || '');
-            const url = escapeHtml(btn.url || '#');
-            const isImg = /\.(png|jpe?g|webp|gif|svg)$/i.test(icon);
-            const iconHtml = isImg
-              ? `<img src="${icon}" alt="${text}" />`
-              : `<span style="font-size:24px;">${icon}</span>`;
-            // Wrap each character of text in span for wiggle animation
-            const textChars = text.split('').map(c => `<span>${c === ' ' ? '&nbsp;' : c}</span>`).join('');
-            return `<a href="${url}" class="panel-btn" target="_blank" rel="noopener noreferrer"><div class="panel-btn-icon">${iconHtml}</div><div class="panel-btn-text">${textChars}</div></a>`;
-          }).join('');
-        }
-      }
-    }
+  if (!modules.length) {
+    container.innerHTML = '<div class="pb-page-empty">No panel modules.</div>';
+    return;
   }
-}
 
-function escapeHtml(str) {
-  if (!str) return '';
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  container.innerHTML = modules.map(({ module }) => renderModule(module)).join('');
+  initEmailForms(container);
+  initPromoCarousels(container);
+  initFeedModules(container);
 }
 
 /**
@@ -369,6 +398,9 @@ function escapeHtml(str) {
 export async function loadPageConfigWithFallback(setSubtitlesFn, seriesId = null) {
   const sid = seriesId || getActiveSeriesId();
 
+  // Check for no-fallback mode via localStorage (set in page builder admin)
+  const noFallback = localStorage.getItem('pb-no-fallback') === '1';
+
   // Try page builder first
   const builderPage = await loadBuilderPage('reader', sid);
   if (builderPage) {
@@ -377,7 +409,19 @@ export async function loadPageConfigWithFallback(setSubtitlesFn, seriesId = null
       setSubtitlesFn(subtitles);
     }
     logger.log(`✓ Loaded reader page from page builder for series: ${sid}`);
+    console.log('PAGE BUILDER DATA:', builderPage);
+    console.log('Sections:', builderPage.sections?.length || 0);
+    builderPage.sections?.forEach((s, i) => {
+      console.log(`  Section ${i}: layout=${s.layout}, modules=${s.modules?.length || 0}`);
+      s.modules?.forEach(m => console.log(`    - ${m.moduleType} (col ${m.columnIndex})`));
+    });
     return { source: 'builder', page: builderPage };
+  }
+
+  // No fallback mode - stop here and show what we got (nothing)
+  if (noFallback) {
+    console.warn('NO-FALLBACK MODE: Page builder returned nothing. No legacy fallback applied.');
+    return { source: 'none' };
   }
 
   // Fall back to legacy page-config

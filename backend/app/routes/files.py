@@ -444,6 +444,72 @@ def upload_entry_images(
     return JSONResponse(status_code=status, content={"paths": stored_paths, "errors": errors})
 
 
+class UploadAssetRequest(BaseModel):
+    file: UploadImageFile
+
+
+@router.get("/api/admin/assets")
+def list_assets(request: Request, db: Session = Depends(get_db)):
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    assets_dir = safe_path("assets/uploads")
+    if not assets_dir.exists():
+        return {"items": []}
+
+    base_dir = safe_path("").resolve()
+    items: list[dict[str, str]] = []
+    for root, _dirs, files in os.walk(assets_dir):
+        for name in files:
+            ext = os.path.splitext(name)[1].lower()
+            if ext in ALLOWED_IMAGE_EXTENSIONS:
+                rel = os.path.join(root, name)
+                rel_path = os.path.relpath(rel, base_dir).replace(os.sep, "/")
+                items.append({"path": rel_path, "name": name})
+
+    items.sort(key=lambda item: item["path"])
+    return {"items": items}
+
+
+@router.post("/api/admin/assets/upload")
+def upload_asset(payload: UploadAssetRequest, request: Request, db: Session = Depends(get_db)):
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    file_info = payload.file
+    name = (file_info.name or "").strip()
+    b64_data = file_info.data
+    if not name or not b64_data:
+        return JSONResponse(status_code=400, content={"error": "file (name, data) is required"})
+
+    ext = os.path.splitext(name)[1].lower()
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        return JSONResponse(status_code=400, content={"error": "Unsupported file type"})
+
+    try:
+        raw = base64.b64decode(b64_data)
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid base64 data"})
+
+    dest_dir = safe_path("assets/uploads")
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
+    base_name = re.sub(r"[^a-zA-Z0-9_-]", "_", os.path.splitext(name)[0]) or "asset"
+    candidate = f"{base_name}{ext}"
+    counter = 1
+    while (dest_dir / candidate).exists():
+        candidate = f"{base_name}_{counter}{ext}"
+        counter += 1
+
+    dest_path = dest_dir / candidate
+    try:
+        dest_path.write_bytes(raw)
+    except Exception as exc:
+        return JSONResponse(status_code=500, content={"error": str(exc)})
+
+    return {"path": f"assets/uploads/{candidate}"}
+
+
 class DeleteImageRequest(BaseModel):
     path: str
 

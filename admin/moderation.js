@@ -137,24 +137,24 @@ function renderComments(comments = [], total = 0) {
 
   comments.forEach((comment) => {
     const item = document.createElement("div");
-    item.className = "chapter-item moderation-comment";
+    item.className = "entry-item moderation-comment";
     if (comment.hidden) item.style.opacity = "0.7";
 
     const info = document.createElement("div");
-    info.className = "chapter-info";
+    info.className = "entry-info";
 
     const title = document.createElement("div");
-    title.className = "chapter-name";
+    title.className = "entry-name";
     title.textContent = comment.displayName || comment.userEmail || "User";
     info.appendChild(title);
 
     const meta = document.createElement("div");
-    meta.className = "chapter-meta moderation-meta";
+    meta.className = "entry-meta moderation-meta";
     meta.textContent = `${targetLabel(comment.targetType)}: ${comment.targetId || "-"}`;
     info.appendChild(meta);
 
     const meta2 = document.createElement("div");
-    meta2.className = "chapter-meta moderation-meta";
+    meta2.className = "entry-meta moderation-meta";
     const ip = comment.ipAddress ? ` • IP ${comment.ipAddress}` : "";
     meta2.textContent = `${comment.userEmail || "Unknown"} • ${formatDateTime(comment.createdAt)}${ip}`;
     info.appendChild(meta2);
@@ -165,7 +165,7 @@ function renderComments(comments = [], total = 0) {
     info.appendChild(message);
 
     const actions = document.createElement("div");
-    actions.className = "chapter-actions";
+    actions.className = "entry-actions";
 
     const hideBtn = document.createElement("button");
     hideBtn.className = "btn-small btn-edit";
@@ -258,28 +258,28 @@ function renderBannedUsers(users = []) {
 
   users.forEach((user) => {
     const item = document.createElement("div");
-    item.className = "chapter-item";
+    item.className = "entry-item";
 
     const info = document.createElement("div");
-    info.className = "chapter-info";
+    info.className = "entry-info";
 
     const title = document.createElement("div");
-    title.className = "chapter-name";
+    title.className = "entry-name";
     title.textContent = user.displayName || user.email || "User";
     info.appendChild(title);
 
     const meta = document.createElement("div");
-    meta.className = "chapter-meta";
+    meta.className = "entry-meta";
     meta.textContent = user.email || "";
     info.appendChild(meta);
 
     const meta2 = document.createElement("div");
-    meta2.className = "chapter-meta";
+    meta2.className = "entry-meta";
     meta2.textContent = `Banned ${formatDateTime(user.bannedAt)}${user.banReason ? ` • ${user.banReason}` : ""}`;
     info.appendChild(meta2);
 
     const actions = document.createElement("div");
-    actions.className = "chapter-actions";
+    actions.className = "entry-actions";
     const unbanBtn = document.createElement("button");
     unbanBtn.className = "btn-small btn-edit";
     unbanBtn.type = "button";
@@ -311,22 +311,22 @@ function renderBannedIps(ips = []) {
 
   ips.forEach((entry) => {
     const item = document.createElement("div");
-    item.className = "chapter-item";
+    item.className = "entry-item";
 
     const info = document.createElement("div");
-    info.className = "chapter-info";
+    info.className = "entry-info";
     const title = document.createElement("div");
-    title.className = "chapter-name";
+    title.className = "entry-name";
     title.textContent = entry.ipAddress || "IP";
     info.appendChild(title);
 
     const meta = document.createElement("div");
-    meta.className = "chapter-meta";
+    meta.className = "entry-meta";
     meta.textContent = `Banned ${formatDateTime(entry.bannedAt)}${entry.reason ? ` • ${entry.reason}` : ""}`;
     info.appendChild(meta);
 
     const actions = document.createElement("div");
-    actions.className = "chapter-actions";
+    actions.className = "entry-actions";
     const unbanBtn = document.createElement("button");
     unbanBtn.className = "btn-small btn-edit";
     unbanBtn.type = "button";
@@ -357,22 +357,22 @@ function renderWords(words = []) {
 
   words.forEach((word) => {
     const item = document.createElement("div");
-    item.className = "chapter-item";
+    item.className = "entry-item";
 
     const info = document.createElement("div");
-    info.className = "chapter-info";
+    info.className = "entry-info";
     const title = document.createElement("div");
-    title.className = "chapter-name";
+    title.className = "entry-name";
     title.textContent = word.phrase || "";
     info.appendChild(title);
 
     const meta = document.createElement("div");
-    meta.className = "chapter-meta";
+    meta.className = "entry-meta";
     meta.textContent = `Added ${formatDateTime(word.createdAt)}`;
     info.appendChild(meta);
 
     const actions = document.createElement("div");
-    actions.className = "chapter-actions";
+    actions.className = "entry-actions";
     const deleteBtn = document.createElement("button");
     deleteBtn.className = "btn-small btn-delete";
     deleteBtn.type = "button";

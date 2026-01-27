@@ -94,14 +94,14 @@ import { buildEntryTargetId } from './comment-targets.js';
     function getCurrentTargetId() {
         // Target ID combines series + chapter slug to keep threads scoped per entry.
         const seriesId = (typeof getActiveSeriesId === 'function' ? getActiveSeriesId() : 'battle-bros') || 'battle-bros';
-        const select = document.getElementById('chapter');
+        const select = document.getElementById('entry');
         const rawValue = select
-            ? (select.value || select.options[select.selectedIndex]?.value || 'chapter-1')
-            : 'chapter-1';
+            ? (select.value || select.options[select.selectedIndex]?.value || 'entry-1')
+            : 'entry-1';
         const entryNumber = getEntryNumberFromSelect(select, rawValue);
         return buildEntryTargetId({
             seriesId,
-            entryName: rawValue || 'chapter',
+            entryName: rawValue || 'entry',
             displayNumber: entryNumber
         });
     }
@@ -180,7 +180,7 @@ import { buildEntryTargetId } from './comment-targets.js';
         ctx.signoutBtn.addEventListener('click', () => handleLogout(ctx));
         ctx.commentForm.addEventListener('submit', (e) => handleCommentSubmit(e, ctx));
         window.addEventListener('entryChanged', () => handleChapterChange(ctx));
-        const entrySelect = document.getElementById('chapter');
+        const entrySelect = document.getElementById('entry');
         if (entrySelect) {
             entrySelect.addEventListener('change', () => handleChapterChange(ctx));
         }

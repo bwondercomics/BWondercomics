@@ -1515,24 +1515,24 @@ export function createEntriesApi({
       if (meta.showInGallery === false) metaParts.push('No gallery');
       if (comingSoonLabel) metaParts.push(comingSoonLabel);
       const item = document.createElement('div');
-      item.className = 'chapter-item';
+      item.className = 'entry-item';
       item.innerHTML = `
-        <div class="chapter-info">
-          <div class="chapter-name">${escapeHtml(displayLabel)}</div>
-          <div class="chapter-meta">${escapeHtml(metaParts.join(' | '))}</div>
+        <div class="entry-info">
+          <div class="entry-name">${escapeHtml(displayLabel)}</div>
+          <div class="entry-meta">${escapeHtml(metaParts.join(' | '))}</div>
         </div>
-        <div class="chapter-actions">
-          <button class="btn-small btn-edit" data-chapter="${escapeHtml(name)}">Edit</button>
-          <button class="btn-small btn-delete" data-chapter="${escapeHtml(name)}">Delete</button>
+        <div class="entry-actions">
+          <button class="btn-small btn-edit" data-entry="${escapeHtml(name)}">Edit</button>
+          <button class="btn-small btn-delete" data-entry="${escapeHtml(name)}">Delete</button>
         </div>
       `;
       el.entryList.appendChild(item);
     });
     el.entryList.querySelectorAll('.btn-edit').forEach(btn => {
-      btn.addEventListener('click', () => editEntry(btn.dataset.chapter));
+      btn.addEventListener('click', () => editEntry(btn.dataset.entry));
     });
     el.entryList.querySelectorAll('.btn-delete').forEach(btn => {
-      btn.addEventListener('click', () => deleteEntry(btn.dataset.chapter));
+      btn.addEventListener('click', () => deleteEntry(btn.dataset.entry));
     });
   }
 

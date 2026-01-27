@@ -375,12 +375,12 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
       currentMediaOrder = [];
       currentMediaIndex = -1;
       const emptyList = document.createElement("div");
-      emptyList.className = "chapter-item media-item";
+      emptyList.className = "entry-item media-item";
       emptyList.textContent = "No media found. Add an item above.";
       el.mediaList.appendChild(emptyList);
 
       const emptyGallery = document.createElement("div");
-      emptyGallery.className = "chapter-item";
+      emptyGallery.className = "entry-item";
       emptyGallery.textContent = "No media to preview.";
       el.mediaGallery.appendChild(emptyGallery);
       renderMediaPreview(null, 0);
@@ -395,24 +395,24 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
       const tagsText = (item.tags || []).join(", ");
       const visibilityText = getAccessLabel(item);
       const div = document.createElement("div");
-      div.className = "chapter-item media-item";
+      div.className = "entry-item media-item";
       if (item.id === selectedMediaId) {
         div.classList.add("media-item--selected");
       }
       div.innerHTML = `
-        <div class="chapter-info">
-          <div class="chapter-name">${escapeHtml(item.path)}</div>
-          <div class="chapter-meta" style="opacity:0.8;">${escapeHtml(
+        <div class="entry-info">
+          <div class="entry-name">${escapeHtml(item.path)}</div>
+          <div class="entry-meta" style="opacity:0.8;">${escapeHtml(
             tagsText || "No tags",
           )}</div>
-          <div class="chapter-meta" style="opacity:0.7;">${escapeHtml(
+          <div class="entry-meta" style="opacity:0.7;">${escapeHtml(
             usageCount ? `Used in ${usageCount} post(s)` : "Unused",
           )}</div>
-          <div class="chapter-meta" style="opacity:0.7;">${escapeHtml(
+          <div class="entry-meta" style="opacity:0.7;">${escapeHtml(
             visibilityText,
           )}</div>
         </div>
-        <div class="chapter-actions">
+        <div class="entry-actions">
           <button class="btn-small btn-edit" data-use="${escapeHtml(
             item.id,
           )}">Use</button>

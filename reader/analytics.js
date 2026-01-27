@@ -84,7 +84,7 @@ function getEntryTrackingInfo() {
   let entryNumber = null;
   let entryDescriptor = "";
 
-  const select = document.getElementById("chapter");
+  const select = document.getElementById("entry");
   if (select && select.options && select.options.length) {
     let option = select.options[select.selectedIndex];
     if (entryName && option && option.value !== entryName) {

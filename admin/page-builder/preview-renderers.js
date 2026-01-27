@@ -1,31 +1,4 @@
-/**
- * Page Renderer: Renders pages built with the page builder.
- * Fetches page config from the API and renders modules to HTML.
- */
-
-import { getActiveSeriesId } from "./series.js";
-import { logger } from "./logger.js";
-
-/**
- * Escape HTML special characters.
- */
-function escapeHtml(str) {
-  if (!str) return "";
-  return String(str)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function resolveImageUrl(path = "") {
-  const raw = String(path || "").trim();
-  if (!raw) return "";
-  if (/^https?:\/\//i.test(raw)) return raw;
-  if (raw.startsWith("/")) return raw;
-  return `/${raw}`;
-}
+import { escapeHtml, normalizeFit, resolveAssetUrl } from "./helpers.js";
 
 function clampOpacity(value, fallback = 1) {
   const num = typeof value === "number" ? value : parseFloat(value);
@@ -45,10 +18,7 @@ function hexToRgba(color, opacity) {
   return `rgba(${r}, ${g}, ${b}, ${opacity})`;
 }
 
-/**
- * Module renderers - each takes a config object and returns HTML.
- */
-export const MODULE_RENDERERS = {
+export const PREVIEW_RENDERERS = {
   header: (config) => {
     const title = escapeHtml(config.title || "");
     const subtitle = escapeHtml(config.subtitle || "");
@@ -67,7 +37,7 @@ export const MODULE_RENDERERS = {
   },
 
   image: (config) => {
-    const src = escapeHtml(resolveImageUrl(config.src || ""));
+    const src = escapeHtml(resolveAssetUrl(config.src || ""));
     const alt = escapeHtml(config.alt || "");
     const caption = escapeHtml(config.caption || "");
     if (!src) return '<div class="pb-image pb-image--empty">No image set</div>';
@@ -87,7 +57,7 @@ export const MODULE_RENDERERS = {
     }
     const imagesHtml = images
       .map((img) => {
-        const src = escapeHtml(resolveImageUrl(img.src || img));
+        const src = escapeHtml(resolveAssetUrl(img.src || img));
         const alt = escapeHtml(img.alt || "");
         return `<div class="pb-gallery-item"><img src="${src}" alt="${alt}" loading="lazy" /></div>`;
       })
@@ -214,7 +184,7 @@ export const MODULE_RENDERERS = {
       <div class="pb-reader-mount"
            data-show-panels="${showPanels}"
            data-show-comments="${showComments}">
-        <!-- Reader will be mounted here -->
+        <div class="pb-mount-placeholder">Reader Component (renders on live page)</div>
       </div>
     `;
   },
@@ -226,7 +196,7 @@ export const MODULE_RENDERERS = {
       <div class="pb-entry-gallery-mount"
            data-columns="${columns}"
            data-show-labels="${showLabels}">
-        <!-- Entry gallery will be mounted here -->
+        <div class="pb-mount-placeholder">Entry Gallery (renders on live page)</div>
       </div>
     `;
   },
@@ -268,12 +238,12 @@ export const MODULE_RENDERERS = {
             ${showAuthor ? `<div class="latest-author">${author}</div>` : ""}
           </div>
           <div class="latest-body pb-feed-latest-body">
-            <div class="latest-loading">Loading...</div>
+            <div class="latest-loading">Latest update preview</div>
           </div>
         </div>
         <div class="latest-update right-panel-feed pb-feed-panel" id="${panelId}" aria-hidden="true">
           <div class="latest-body pb-feed-body">
-            <div class="latest-loading">Loading...</div>
+            <div class="latest-loading">Feed preview</div>
           </div>
         </div>
       </div>
@@ -325,10 +295,10 @@ export const MODULE_RENDERERS = {
         const intensity = style.imageGlowIntensity || 0.5;
         imageStyles.push(`box-shadow: 0 0 ${20 * intensity}px ${glowColor}, 0 0 ${40 * intensity}px ${glowColor}`);
       }
-      const imageFit = (item.imageFit || "cover").toString();
+      const imageFit = normalizeFit(item.imageFit || "cover");
       const imageFocus = item.imageFocus || "center";
       const imageZoom = Math.max(1, Number(item.imageZoom) || 1);
-      imageStyles.push(`object-fit: ${imageFit === "contain" ? "contain" : "cover"}`);
+      imageStyles.push(`object-fit: ${imageFit}`);
       imageStyles.push(`object-position: ${imageFocus}`);
       if (imageZoom !== 1) {
         imageStyles.push(`transform: scale(${imageZoom})`);
@@ -359,7 +329,7 @@ export const MODULE_RENDERERS = {
         bottomTextStyles.push(`text-shadow: 0 0 10px ${glowColor}, 0 0 20px ${glowColor}`);
       }
 
-      const imageSrc = escapeHtml(resolveImageUrl(item.image || ""));
+      const imageSrc = escapeHtml(resolveAssetUrl(item.image || ""));
       const topText = item.topText ? `<div class="pb-promo-top-text" style="${topTextStyles.join(";")}">${escapeHtml(item.topText)}</div>` : "";
       const bottomText = item.bottomText ? `<div class="pb-promo-bottom-text" style="${bottomTextStyles.join(";")}">${item.bottomText}</div>` : "";
 
@@ -433,30 +403,20 @@ export const MODULE_RENDERERS = {
   },
 };
 
-/**
- * Render a single module.
- */
-export function renderModule(mod) {
+export function renderPreviewModule(mod) {
   const type = mod.moduleType || "text";
   const config = mod.config || {};
-
-  const renderer = MODULE_RENDERERS[type];
+  const renderer = PREVIEW_RENDERERS[type];
   if (!renderer) {
-    logger.warn(`Unknown module type: ${type}`);
-    return `<div class="pb-module pb-module--unknown">[Unknown module: ${type}]</div>`;
+    return `<div class="pb-module pb-module--unknown">[Unknown: ${type}]</div>`;
   }
-
-  const content = renderer(config, mod);
-  return `<div class="pb-module pb-module--${type}">${content}</div>`;
+  const moduleIdAttr = mod?.id ? ` data-module-id="${mod.id}"` : "";
+  return `<div class="pb-module pb-module--${type}"${moduleIdAttr}>${renderer(config, mod)}</div>`;
 }
 
-/**
- * Render a section with its columns and modules.
- */
-function renderSection(section) {
+export function renderPreviewSection(section) {
   const layout = section.layout || "1";
   const columnCount = layout.split("-").length;
-  const sectionType = section.sectionType || "row";
   const settings = section.settings || {};
 
   let style = "";
@@ -465,9 +425,7 @@ function renderSection(section) {
   if (settings.paddingBottom) style += `padding-bottom: ${settings.paddingBottom}px;`;
 
   const columnModules = {};
-  for (let i = 0; i < columnCount; i++) {
-    columnModules[i] = [];
-  }
+  for (let i = 0; i < columnCount; i++) columnModules[i] = [];
   for (const mod of section.modules || []) {
     const colIdx = mod.columnIndex || 0;
     if (!columnModules[colIdx]) columnModules[colIdx] = [];
@@ -478,119 +436,35 @@ function renderSection(section) {
     .sort((a, b) => Number(a) - Number(b))
     .map((colIdx) => {
       const modules = columnModules[colIdx];
-      const modulesHtml = modules.map((mod) => renderModule(mod)).join("");
+      const modulesHtml = modules.map((mod) => renderPreviewModule(mod)).join("");
       return `<div class="pb-column">${modulesHtml}</div>`;
     })
     .join("");
 
   return `
-    <section class="pb-section pb-section--${sectionType}" data-layout="${layout}" style="${style}">
-      <div class="pb-section-columns pb-layout--${layout}">
-        ${columnsHtml}
-      </div>
+    <section class="pb-section" data-layout="${layout}" style="${style}">
+      <div class="pb-section-columns pb-layout--${layout}">${columnsHtml}</div>
     </section>
   `;
 }
 
-/**
- * Render a complete page to HTML.
- */
-export function renderPage(page) {
-  if (!page || !page.sections) {
-    return '<div class="pb-page-empty">Page not configured.</div>';
-  }
-
-  const sectionsHtml = page.sections.map((section) => renderSection(section)).join("");
-
-  return `<div class="pb-page" data-page-id="${page.id || ''}">${sectionsHtml}</div>`;
+export function renderPreviewPage(page) {
+  if (!page?.sections) return '<div class="pb-page-empty">No sections configured</div>';
+  const sectionsHtml = page.sections.map((s) => renderPreviewSection(s)).join("");
+  return `<div class="pb-page">${sectionsHtml}</div>`;
 }
 
-/**
- * Fetch a page by slug from the API.
- */
-export async function fetchPage(slug, seriesId = null) {
-  const sid = seriesId || getActiveSeriesId();
-  try {
-    const res = await fetch(`/api/pages/${encodeURIComponent(sid)}/${encodeURIComponent(slug)}`);
-    if (!res.ok) {
-      if (res.status === 404) {
-        logger.log(`Page "${slug}" not found for series "${sid}"`);
-        return null;
-      }
-      throw new Error(`Failed to fetch page: ${res.status}`);
-    }
-    const data = await res.json();
-    return data.page || null;
-  } catch (err) {
-    logger.error("fetchPage error:", err);
-    return null;
-  }
-}
-
-/**
- * Mount a page into a container element.
- */
-export async function mountPage(container, slug, seriesId = null) {
-  if (!container) {
-    logger.error("mountPage: container is required");
-    return;
-  }
-
-  container.innerHTML = '<div class="pb-loading">Loading...</div>';
-
-  const page = await fetchPage(slug, seriesId);
-  if (!page) {
-    container.innerHTML = '<div class="pb-error">Page not found.</div>';
-    return;
-  }
-
-  container.innerHTML = renderPage(page);
-
-  // Initialize interactive modules
-  initEmailForms(container);
-  initPromoCarousels(container);
-}
-
-/**
- * Initialize email signup forms within a container.
- */
-export function initEmailForms(container) {
-  if (!container) return;
+export function initPreviewEmailForms(container) {
   container.querySelectorAll("[data-email-signup]").forEach((form) => {
-    form.addEventListener("submit", async (e) => {
+    form.addEventListener("submit", (e) => {
       e.preventDefault();
-      const input = form.querySelector('input[type="email"]');
       const status = form.parentElement.querySelector(".pb-email-status");
-      const email = input?.value?.trim();
-
-      if (!email) return;
-
-      try {
-        const res = await fetch("/api/email/subscribe", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email }),
-        });
-
-        if (res.ok) {
-          if (status) status.textContent = "Thanks for subscribing!";
-          if (input) input.value = "";
-        } else {
-          const data = await res.json();
-          if (status) status.textContent = data.error || "Failed to subscribe.";
-        }
-      } catch {
-        if (status) status.textContent = "Failed to subscribe.";
-      }
+      if (status) status.textContent = "Form works! (Preview mode - not submitted)";
     });
   });
 }
 
-/**
- * Initialize promo carousel modules within a container.
- */
-export function initPromoCarousels(container) {
-  if (!container) return;
+export function initPreviewPromoCarousels(container) {
   container.querySelectorAll(".pb-promo[data-item-count]").forEach((promo) => {
     const itemCount = parseInt(promo.dataset.itemCount, 10);
     if (itemCount <= 1) return;
@@ -603,86 +477,44 @@ export function initPromoCarousels(container) {
     const nextBtn = promo.querySelector(".pb-promo-nav--next");
 
     let currentIndex = 0;
-    let autoRotateTimer = null;
-    let isPaused = false;
+    let timer = null;
 
     function showSlide(index) {
       currentIndex = (index + itemCount) % itemCount;
-      slides.forEach((slide, i) => {
-        slide.classList.toggle("active", i === currentIndex);
-      });
-      indicators.forEach((ind, i) => {
-        ind.classList.toggle("active", i === currentIndex);
-      });
+      slides.forEach((s, i) => s.classList.toggle("active", i === currentIndex));
+      indicators.forEach((ind, i) => ind.classList.toggle("active", i === currentIndex));
     }
 
-    function nextSlide() {
-      showSlide(currentIndex + 1);
-    }
-
-    function prevSlide() {
-      showSlide(currentIndex - 1);
-    }
-
-    function startAutoRotate() {
-      if (autoRotate && !isPaused) {
-        stopAutoRotate();
-        autoRotateTimer = setInterval(nextSlide, interval);
+    function startTimer() {
+      if (autoRotate) {
+        stopTimer();
+        timer = setInterval(() => showSlide(currentIndex + 1), interval);
       }
     }
 
-    function stopAutoRotate() {
-      if (autoRotateTimer) {
-        clearInterval(autoRotateTimer);
-        autoRotateTimer = null;
+    function stopTimer() {
+      if (timer) {
+        clearInterval(timer);
+        timer = null;
       }
     }
 
     prevBtn?.addEventListener("click", () => {
-      prevSlide();
-      startAutoRotate();
+      showSlide(currentIndex - 1);
+      startTimer();
     });
-
     nextBtn?.addEventListener("click", () => {
-      nextSlide();
-      startAutoRotate();
+      showSlide(currentIndex + 1);
+      startTimer();
     });
-
     indicators.forEach((ind) => {
       ind.addEventListener("click", () => {
         showSlide(parseInt(ind.dataset.index, 10));
-        startAutoRotate();
+        startTimer();
       });
     });
-
-    promo.addEventListener("mouseenter", () => {
-      isPaused = true;
-      stopAutoRotate();
-    });
-
-    promo.addEventListener("mouseleave", () => {
-      isPaused = false;
-      startAutoRotate();
-    });
-
-    let touchStartX = 0;
-    promo.addEventListener("touchstart", (e) => {
-      touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
-
-    promo.addEventListener("touchend", (e) => {
-      const touchEndX = e.changedTouches[0].screenX;
-      const diff = touchStartX - touchEndX;
-      if (Math.abs(diff) > 50) {
-        if (diff > 0) {
-          nextSlide();
-        } else {
-          prevSlide();
-        }
-        startAutoRotate();
-      }
-    }, { passive: true });
-
-    startAutoRotate();
+    promo.addEventListener("mouseenter", stopTimer);
+    promo.addEventListener("mouseleave", startTimer);
+    startTimer();
   });
 }

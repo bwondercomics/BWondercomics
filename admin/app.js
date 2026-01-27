@@ -694,12 +694,6 @@ function attachEventHandlers() {
       await usersManager.generatePremiumCodes();
     });
   }
-  if (el.btnMediaPicker) {
-    el.btnMediaPicker.addEventListener("click", () => {
-      state.pendingMediaSelection = "post";
-      mediaManager.showMediaSection();
-    });
-  }
   if (el.btnAddMedia) {
     el.btnAddMedia.addEventListener("click", mediaManager.addMediaItem);
   }

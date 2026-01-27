@@ -1,6 +1,7 @@
 import { el } from "./dom.js";
 import { state, POST_DRAFT_KEY } from "./state.js";
 import { sanitizeHtml } from "./core.js";
+import { openImagePicker } from "./image-picker.js";
 import { escapeHtml, parseTags, readFileAsBase64 } from "./utils.js";
 
 const POSTS_API = "/api/admin/posts";
@@ -49,6 +50,111 @@ function createPostsManager({
     typeof upsertMediaEntry === "function"
       ? upsertMediaEntry
       : async () => {};
+
+  function normalizeFit(value) {
+    const raw = String(value || "").trim().toLowerCase();
+    return raw === "contain" ? "contain" : "cover";
+  }
+
+  function parseFocus(value) {
+    const raw = String(value || "").trim().toLowerCase();
+    if (!raw || raw === "center") return { x: 50, y: 50 };
+    if (raw.includes("%")) {
+      const parts = raw.split(/\s+/).filter(Boolean);
+      if (parts.length >= 2) {
+        const x = parseFloat(parts[0]);
+        const y = parseFloat(parts[1]);
+        if (Number.isFinite(x) && Number.isFinite(y)) {
+          return { x: Math.max(0, Math.min(100, x)), y: Math.max(0, Math.min(100, y)) };
+        }
+      }
+    }
+    const map = {
+      top: [50, 0],
+      bottom: [50, 100],
+      left: [0, 50],
+      right: [100, 50],
+      "top left": [0, 0],
+      "left top": [0, 0],
+      "top right": [100, 0],
+      "right top": [100, 0],
+      "bottom left": [0, 100],
+      "left bottom": [0, 100],
+      "bottom right": [100, 100],
+      "right bottom": [100, 100],
+    };
+    if (map[raw]) {
+      const [x, y] = map[raw];
+      return { x, y };
+    }
+    return { x: 50, y: 50 };
+  }
+
+  function formatFocus({ x, y }) {
+    const safeX = Math.max(0, Math.min(100, Math.round(Number(x) || 50)));
+    const safeY = Math.max(0, Math.min(100, Math.round(Number(y) || 50)));
+    return `${safeX}% ${safeY}%`;
+  }
+
+  function resolveMediaSrc(path = "") {
+    if (!path) return "";
+    if (/^https?:\/\//i.test(path)) return path;
+    if (path.startsWith("/")) return path;
+    if (path.startsWith("protected/")) {
+      const rel = path.replace(/^protected\//, "");
+      return `/api/protected/${rel}`;
+    }
+    return `/${path}`;
+  }
+
+  async function fetchMediaItems() {
+    const response = await fetch("/media.json", { cache: "no-store" });
+    const data = await response.json().catch(() => []);
+    if (!response.ok) {
+      throw new Error("Failed to load media library");
+    }
+    const items = Array.isArray(data) ? data : [];
+    return items.map((item) => ({
+      id: item.id,
+      path: item.path,
+      label: item.path?.split("/").pop() || item.path,
+      thumbSrc: item.thumbPath || item.previewPath || item.path,
+    }));
+  }
+
+  async function openMediaPicker() {
+    try {
+      const currentPath = (el.postImage?.value || "").trim();
+      const focusValue = el.postImageFocus?.value || "center";
+      const fitValue = normalizeFit(el.postImageFit?.value || "cover");
+      const focus = parseFocus(focusValue);
+      await openImagePicker({
+        title: "Select Feed Image",
+        getItems: fetchMediaItems,
+        resolveSrc: resolveMediaSrc,
+        initialSelection: {
+          path: currentPath,
+          fit: fitValue,
+          x: focus.x,
+          y: focus.y,
+        },
+        onApply: ({ item, fit, x, y }) => {
+          if (el.postImage) el.postImage.value = item?.path || "";
+          if (el.postImageFocus) el.postImageFocus.value = formatFocus({ x, y });
+          if (el.postImageFit) el.postImageFit.value = normalizeFit(fit);
+          updateBlueskyCounter();
+        },
+      });
+    } catch (error) {
+      console.error("Media picker failed:", error);
+      setPostStatus(error.message || "Unable to load media picker.", true);
+    }
+  }
+
+  function resetPostImageFocus() {
+    if (el.postImageFocus) el.postImageFocus.value = "center";
+    if (el.postImageFit) el.postImageFit.value = "cover";
+  }
 
   function setPostStatus(message, isError = false) {
     if (!el.postStatus) return;
@@ -116,6 +222,7 @@ function createPostsManager({
       el.blogSection.scrollIntoView({ behavior: "smooth", block: "start" });
     }
     renderPosts();
+    bindImagePickerControls();
     if (setActiveNav) setActiveNav(el.btnBlog);
   }
 
@@ -126,6 +233,7 @@ function createPostsManager({
     if (el.postImageFile) el.postImageFile.value = "";
     if (el.postImageTags) el.postImageTags.value = "";
     if (el.postImageFocus) el.postImageFocus.value = "center";
+    if (el.postImageFit) el.postImageFit.value = "cover";
     if (el.postPublishAt) el.postPublishAt.value = "";
     if (el.postContent) el.postContent.innerHTML = "";
     el.postShare.checked = true;
@@ -133,6 +241,27 @@ function createPostsManager({
     el.btnSavePost.textContent = "Publish Post";
     if (el.btnSaveDraft) el.btnSaveDraft.textContent = "Save Draft";
     updateBlueskyCounter();
+  }
+
+  function bindImagePickerControls() {
+    if (el.btnMediaPicker && !el.btnMediaPicker.dataset.bound) {
+      el.btnMediaPicker.dataset.bound = "true";
+      el.btnMediaPicker.addEventListener("click", () => {
+        openMediaPicker();
+      });
+    }
+    if (el.btnPostImageFocus && !el.btnPostImageFocus.dataset.bound) {
+      el.btnPostImageFocus.dataset.bound = "true";
+      el.btnPostImageFocus.addEventListener("click", () => {
+        openMediaPicker();
+      });
+    }
+    if (el.btnPostImageFocusReset && !el.btnPostImageFocusReset.dataset.bound) {
+      el.btnPostImageFocusReset.dataset.bound = "true";
+      el.btnPostImageFocusReset.addEventListener("click", () => {
+        resetPostImageFocus();
+      });
+    }
   }
 
   function getPostPreview(content = "") {
@@ -156,7 +285,7 @@ function createPostsManager({
 
     if (!state.posts.length) {
       const empty = document.createElement("div");
-      empty.className = "chapter-item";
+      empty.className = "entry-item";
       empty.textContent = "No posts yet. Create the first update!";
       el.postList.appendChild(empty);
       return;
@@ -169,7 +298,7 @@ function createPostsManager({
 
     sorted.forEach((post) => {
       const item = document.createElement("div");
-      item.className = "chapter-item";
+      item.className = "entry-item";
       const dateLabel = formatPostDate(post.date);
       const preview = getPostPreview(
         (post.content || "").replace(/<[^>]+>/g, ""),
@@ -198,28 +327,28 @@ function createPostsManager({
           : "";
 
       item.innerHTML = `
-        <div class="chapter-info">
-          <div class="chapter-name">${escapeHtml(post.title?.trim() || "Update")}</div>
-          <div class="chapter-meta">${dateLabel} - ${shareLabel} - ${blueskyLabel} - ${statusLabel}</div>
+        <div class="entry-info">
+          <div class="entry-name">${escapeHtml(post.title?.trim() || "Update")}</div>
+          <div class="entry-meta">${dateLabel} - ${shareLabel} - ${blueskyLabel} - ${statusLabel}</div>
           ${
             tagText
-              ? `<div class="chapter-meta" style="opacity:0.8;">${escapeHtml(
+              ? `<div class="entry-meta" style="opacity:0.8;">${escapeHtml(
                 tagText,
               )}</div>`
               : ""
           }
-          <div class="chapter-meta" style="opacity:0.8;">${escapeHtml(
+          <div class="entry-meta" style="opacity:0.8;">${escapeHtml(
             preview,
           )}</div>
           ${
             blueskyError
-              ? `<div class="chapter-meta" style="color: var(--danger);">${escapeHtml(
+              ? `<div class="entry-meta" style="color: var(--danger);">${escapeHtml(
                 blueskyError,
               )}</div>`
               : ""
           }
         </div>
-        <div class="chapter-actions">
+        <div class="entry-actions">
           <button type="button" class="btn-small btn-edit" data-post="${
             post.id
           }">Edit</button>
@@ -261,6 +390,7 @@ function createPostsManager({
         .map((p) => ({
           ...p,
           status: p.status || "published",
+          imageFit: p.imageFit || "cover",
           imageFocus: p.imageFocus || "center",
           share: p.share !== false,
           shareBluesky: p.shareBluesky === true,
@@ -295,20 +425,26 @@ function createPostsManager({
         if (el.postImageTags) {
           el.postImageTags.value = (draft.imageTags || []).join(", ");
         }
+        if (el.postImageFit && draft.imageFit) {
+          el.postImageFit.value = normalizeFit(draft.imageFit);
+        }
+        if (el.postImageFocus && draft.imageFocus) {
+          el.postImageFocus.value = draft.imageFocus;
+        }
         if (el.postPublishAt && draft.publishAt) {
           el.postPublishAt.value = String(draft.publishAt || "");
         }
         if (el.postContent) {
           el.postContent.innerHTML = draft.content || "";
         }
-      if (el.postShare) el.postShare.checked = draft.share !== false;
-      if (el.postShareBluesky && draft.shareBluesky !== undefined) {
-        el.postShareBluesky.checked = draft.shareBluesky === true;
+        if (el.postShare) el.postShare.checked = draft.share !== false;
+        if (el.postShareBluesky && draft.shareBluesky !== undefined) {
+          el.postShareBluesky.checked = draft.shareBluesky === true;
+        }
+        updateBlueskyCounter();
+        setPostStatus("Loaded saved draft from browser storage.");
       }
-      updateBlueskyCounter();
-      setPostStatus("Loaded saved draft from browser storage.");
-    }
-  } catch (e) {
+    } catch (e) {
       console.warn("Could not load local draft", e);
     }
   }
@@ -322,6 +458,7 @@ function createPostsManager({
     if (el.postImageTags) {
       el.postImageTags.value = (post.imageTags || []).join(", ");
     }
+    if (el.postImageFit) el.postImageFit.value = normalizeFit(post.imageFit || "cover");
     if (el.postImageFocus) el.postImageFocus.value = post.imageFocus || "center";
     if (el.postPublishAt) {
       el.postPublishAt.value = isoToDateTimeLocal(post.date || "");
@@ -395,6 +532,7 @@ function createPostsManager({
     const title = el.postTitle.value.trim();
     const imageTags = parseTags(el.postImageTags?.value || "");
     const imageFocus = el.postImageFocus?.value || "center";
+    const imageFit = normalizeFit(el.postImageFit?.value || "cover");
     const rawContent = (el.postContent?.innerHTML || "").trim();
     const content = sanitizeHtml(rawContent);
     const share = el.postShare.checked;
@@ -473,6 +611,7 @@ function createPostsManager({
       title,
       image,
       imageTags,
+      imageFit,
       imageFocus,
       content,
       date: publishAtIso || null,
@@ -492,6 +631,7 @@ function createPostsManager({
           share: safeShare,
           shareBluesky: safeShareBluesky,
           status,
+          imageFit,
           imageFocus,
           publishAt: el.postPublishAt?.value || "",
         }),
@@ -519,6 +659,7 @@ function createPostsManager({
       const normalized = {
         ...saved,
         status: saved.status || "published",
+        imageFit: saved.imageFit || "cover",
         imageFocus: saved.imageFocus || "center",
         share: saved.share !== false,
         shareBluesky: saved.shareBluesky === true,
@@ -591,6 +732,7 @@ function createPostsManager({
     if (el.postImageTags) {
       el.postImageTags.value = (item.tags || []).join(", ");
     }
+    resetPostImageFocus();
     updateBlueskyCounter();
     state.pendingMediaSelection = null;
     showBlogSection();
@@ -604,6 +746,8 @@ function createPostsManager({
     deletePost,
     loadLocalDraft,
     loadPosts,
+    openMediaPicker,
+    resetPostImageFocus,
     renderPosts,
     resetPostForm,
     savePost,

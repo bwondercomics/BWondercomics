@@ -113,6 +113,7 @@ class Post(Base):
         String(120), ForeignKey("media_items.id", ondelete="SET NULL"), nullable=True
     )
     image_tags: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    image_fit: Mapped[str] = mapped_column(String(20), nullable=False, default="cover")
     image_focus: Mapped[str] = mapped_column(String(20), nullable=False, default="center")
     share: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     share_bluesky: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)

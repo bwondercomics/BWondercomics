@@ -3,12 +3,37 @@
 This roadmap is scoped to the current codebase in `/srv/bw-quality`.
 Use it as a living checklist. Mark items as you complete them.
 
+## Condensed flow map
+0) **Builder Core** → system-wide UI/reader foundations
+1) **Lock the Machine** → stability + data safety
+2) **Admin & Ops Polish** → reliable control room
+3) **Platform Setup System** → repeatable installs
+4) **Pages & Reader UX** → builder-driven UI + mobile pass
+5) **Freeze and Ship** → tag 1.0 + runbook
+
+**1.0.0 definition:** All phases in this roadmap are complete, plus the linked plans below are fully done.
+
 ## How to use
 - Update the "Last updated" line when you check items.
 - Keep notes next to any item that needs follow-up.
 - Each phase has clear exit criteria. Do not move on until those are met.
+- Related plans:
+  - `docs/BUILDER_PLAN.md`
+  - `docs/TEMP_THUMBNAIL_PLAN.md`
+  - Both plans must be fully completed for 1.0.0
 
-Last updated: 2026-01-21
+Last updated: 2026-01-24
+
+## Phase 0 - Builder Core (system-wide foundations)
+Goal: finalize the builder-driven reader architecture before more stabilization work.
+
+- [ ] Execute `docs/BUILDER_PLAN.md` (schema + renderer + builder UI).
+- [ ] Remove legacy fallbacks in reader UI (dev mode).
+- [ ] Confirm series isolation, main page rules, and drag-and-drop layout editor.
+- [ ] Validate new builder workflow end-to-end on dev server.
+- [ ] Page system foundation (About/Projects/Contact + landing/series pages) via builder.
+
+---
 
 ## Phase 1 - Lock the Machine (stability + data safety)
 Goal: the platform runs clean, stable, and predictable.
@@ -18,7 +43,7 @@ Goal: the platform runs clean, stable, and predictable.
 - [x] Remove dead code and unused imports in `backend/app/`, `admin/*.js`, `reader/*.js`. *(Unused imports removed; dead-code pass completed 2026-01-21)*
 - [x] Add/confirm lint + format scripts in `package.json` and backend tooling. *(Ruff config + scripts wired; lint/format verified 2026-01-21)*
 - [x] JS lint passes for `admin/` + `reader/`. *(`npm run lint` clean 2026-01-13)*
-- [x] JS test suite passes. *(`npm test` clean 2026-01-13)*
+- [x] JS test suite passes. *(`npm test` clean 2026-01-13; re-run after current reader/admin changes)*
 - [x] Legacy "chapter" cleanup plan documented. *(`docs/LEGACY_CHAPTER_CLEANUP.md`)*
 
 ### Data safety + integrity
@@ -74,6 +99,7 @@ Goal: the control room feels real and reliable.
 - [ ] Revamp analytics UX to surface actionable insights (retention, drop-off points, popular entries).
 - [ ] Add retention + session summary metrics with clear definitions.
 - [x] Consider time-based comparisons (this week vs last week). *(Reader analytics shows Δ vs previous window; verified 2026-01-21)*
+- [ ] Make sure evertything works in analytics, and it actually record visitors views.
 
 ### Exit criteria
 - [ ] Common admin tasks require no terminal access.
@@ -102,8 +128,7 @@ Goal: new installs feel professional and repeatable.
 Goal: the site feels like a place, not a dev sandbox.
 
 ### Page system
-- [ ] Basic pages (About, Projects, Contact) using DB-backed content.
-- [ ] Rehabilitate designer flow for landing/series pages.
+- [ ] Covered by Phase 0 Builder Core (see `docs/BUILDER_PLAN.md`).
 
 ### Reader stability
 - [ ] Fast loads, no crashes, tracking works.
@@ -127,6 +152,5 @@ Goal: call it done.
 Items moved here to keep 1.0 scope manageable:
 
 - [ ] "Ops Narrator" - AI summary that reports health/analytics anomalies without making changes.
-- [ ] Configurable site branding/theme (only needed if shipping as a platform to others).
 - [ ] Additional social connectors beyond Bluesky.
 - [ ] Advanced analytics (cohort analysis, funnel visualization).

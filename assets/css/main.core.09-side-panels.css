@@ -18,6 +18,10 @@
       overflow: hidden;
       z-index: 10;
       position: relative;
+      --panel-bg-image: none;
+      --panel-bg-size: cover;
+      --panel-bg-position: center;
+      --panel-bg-opacity: 0.18;
     }
 
     .side-panel::before {
@@ -41,6 +45,7 @@
 
     .side-panel.left {
       position: relative;
+      --panel-bg-image: url("/cityB.png");
     }
 
     /* Let popouts (COM1C_NET) spill outside the right rail */
@@ -49,12 +54,26 @@
       position: relative;
     }
 
-    .side-panel.left::after {
+    .right-panel-builder {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      gap: 12px;
+      overflow-x: hidden;
+      overflow-y: auto;
+      padding: 8px 6px 10px 6px;
+    }
+
+    .side-panel::after {
       content: "";
       position: absolute;
       inset: 0;
-      background: url("/cityB.png") center/cover no-repeat;
-      opacity: 0.18;
+      background-image: var(--panel-bg-image);
+      background-position: var(--panel-bg-position);
+      background-size: var(--panel-bg-size);
+      background-repeat: no-repeat;
+      opacity: var(--panel-bg-opacity);
       filter: saturate(1.1);
       z-index: 0;
       pointer-events: none;
@@ -73,6 +92,25 @@
       height: 100%;
       padding: 20px;
       gap: 16px;
+    }
+
+    .side-panel .panel-builder {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-x: hidden;
+      overflow-y: auto;
+      gap: 12px;
+      align-items: stretch;
+      justify-content: flex-start;
+      padding: 8px 6px 10px 6px;
+    }
+
+    .side-panel.left .left-panel-content.panel-builder {
+      align-items: stretch;
+      justify-content: flex-start;
+      height: auto;
     }
 
     .side-panel.left .left-panel-text-top,
@@ -176,7 +214,7 @@
         border-color 0.3s;
     }
 
-    .preview-arrow {
+    .side-panel.left .preview-arrow {
       width: 0;
       height: 0;
       border-left: 12px solid transparent;
@@ -189,4 +227,3 @@
       transform: scale(1.05);
       border-color: var(--accent);
     }
-

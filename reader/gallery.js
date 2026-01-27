@@ -1,6 +1,6 @@
 import { el } from "./dom.js";
 import { state } from "./state.js";
-import { changeChapter as changeChapterFromOverlays } from "./overlays.js";
+import { changeEntry as changeEntryFromOverlays } from "./overlays.js";
 
 // Entry gallery overlay with lazy-loaded thumbnails and promo cards.
 
@@ -149,7 +149,7 @@ export function renderGallery(entryOrder, entries, options = {}) {
 
     card.onclick = () => {
       if (el.entry) el.entry.value = name;
-      changeChapterFromOverlays(name, entries, entryMetaPayload);
+      changeEntryFromOverlays(name, entries, entryMetaPayload);
       toggleGallery();
     };
 

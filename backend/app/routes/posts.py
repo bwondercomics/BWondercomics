@@ -217,6 +217,7 @@ def _post_to_dict(post: Post, media_lookup: dict[str, MediaItem] | None = None) 
         "mediaId": post.media_id or "",
         "thumbPath": thumb_path,
         "imageTags": list(post.image_tags or []),
+        "imageFit": post.image_fit or "cover",
         "imageFocus": post.image_focus or "center",
         "content": post.content,
         "date": _iso_z(post.publish_at),
@@ -422,6 +423,7 @@ class PostUpsertRequest(BaseModel):
     content: str
     image: str | None = None
     image_tags: list[str] | str | None = Field(default=None, alias="imageTags")
+    image_fit: str | None = Field(default=None, alias="imageFit")
     image_focus: str | None = Field(default=None, alias="imageFocus")
     share: bool = True
     share_bluesky: bool | None = Field(default=None, alias="shareBluesky")
@@ -433,6 +435,13 @@ def _normalize_status(raw: str | None) -> str:
     value = (raw or "published").strip().lower()
     if value not in {"draft", "scheduled", "published"}:
         return "published"
+    return value
+
+
+def _normalize_fit(raw: str | None) -> str:
+    value = (raw or "cover").strip().lower()
+    if value not in {"cover", "contain"}:
+        return "cover"
     return value
 
 
@@ -476,6 +485,7 @@ def admin_create_post(payload: PostUpsertRequest, request: Request, db: Session 
         image = _prepare_post_image(db, payload.image)
     except ValueError as exc:
         return JSONResponse(status_code=400, content={"error": str(exc)})
+    image_fit = _normalize_fit(payload.image_fit)
     image_focus = (payload.image_focus or "center").strip() or "center"
     image_tags = _normalize_tags(payload.image_tags)
     media_item = _ensure_media_item(db, payload.image, image_tags, now)
@@ -496,6 +506,7 @@ def admin_create_post(payload: PostUpsertRequest, request: Request, db: Session 
         image=image,
         image_tags=image_tags,
         media_id=media_item.id if media_item else None,
+        image_fit=image_fit,
         image_focus=image_focus[:20],
         share=share,
         share_bluesky=share_bluesky,
@@ -549,6 +560,7 @@ def admin_update_post(
         image = _prepare_post_image(db, payload.image)
     except ValueError as exc:
         return JSONResponse(status_code=400, content={"error": str(exc)})
+    image_fit = _normalize_fit(payload.image_fit or post.image_fit)
     image_focus = (payload.image_focus or post.image_focus or "center").strip() or "center"
     image_tags = (
         _normalize_tags(payload.image_tags)
@@ -575,6 +587,7 @@ def admin_update_post(
     post.content = content
     post.image = image
     post.image_tags = image_tags
+    post.image_fit = image_fit
     post.image_focus = image_focus[:20]
     post.media_id = media_item.id if media_item else None
     post.share = share

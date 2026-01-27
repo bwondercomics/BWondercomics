@@ -1,4 +1,4 @@
-import { latestPreviewText } from './latest.js';
+import { latestPreviewText, renderLatestUpdate } from './latest.js';
 
 const FALLBACK_IMAGE = '/assets/image-missing.png';
 
@@ -102,10 +102,10 @@ function renderFeedItem(post, index) {
     thumb.src = imageSrc;
     thumb.alt = titleText || 'Feed update image';
     thumb.loading = 'lazy';
-    if (post.imageFocus) {
-      thumb.style.objectPosition = post.imageFocus;
-      thumb.style.objectFit = 'cover';
-    }
+    const focus = post.imageFocus || 'center';
+    const fit = post.imageFit || 'cover';
+    thumb.style.objectPosition = focus;
+    thumb.style.objectFit = fit;
     thumb.onerror = () => {
       if (thumb.src.endsWith(FALLBACK_IMAGE)) return;
       thumb.src = FALLBACK_IMAGE;
@@ -175,22 +175,44 @@ function renderFeedItem(post, index) {
   return item;
 }
 
-async function loadFeed(body) {
+export async function loadFeedInto(body, limit = null) {
   body.innerHTML = '<div class="latest-loading">Loading...</div>';
   try {
     const posts = await fetchFeedPosts();
+    const limitedPosts = Number.isFinite(limit) && limit > 0 ? posts.slice(0, limit) : posts;
     body.innerHTML = '';
-    if (!posts.length) {
+    if (!limitedPosts.length) {
       body.innerHTML = '<div class="latest-empty">No updates yet. Check back soon!</div>';
       return true;
     }
 
     const fragment = document.createDocumentFragment();
-    posts.forEach((post, index) => fragment.appendChild(renderFeedItem(post, index)));
+    limitedPosts.forEach((post, index) => fragment.appendChild(renderFeedItem(post, index)));
     body.appendChild(fragment);
     return true;
   } catch (err) {
     console.error('Feed panel error:', err);
+    body.innerHTML = '<div class="latest-empty" style="color: var(--danger);">Could not load updates.</div>';
+    return false;
+  }
+}
+
+async function loadLatestInto(body, options = {}) {
+  if (!body) return false;
+  body.innerHTML = '<div class="latest-loading">Loading...</div>';
+  try {
+    const response = await fetch('/api/posts/latest', { cache: 'no-store' });
+    if (!response.ok) throw new Error('Failed to load latest post');
+    const data = await response.json().catch(() => ({}));
+    const post = data && typeof data === 'object' ? data.post : null;
+    if (!post) {
+      body.innerHTML = '<div class="latest-empty">No updates yet.</div>';
+      return true;
+    }
+    renderLatestUpdate(post, { container: body, ...options });
+    return true;
+  } catch (err) {
+    console.error('Latest update widget error:', err);
     body.innerHTML = '<div class="latest-empty" style="color: var(--danger);">Could not load updates.</div>';
     return false;
   }
@@ -213,7 +235,7 @@ export function initRightPanelFeed() {
     feedPanel.setAttribute('aria-hidden', String(!active));
     headingBtn.setAttribute('aria-expanded', String(active));
     if (active && !loadedOnce) {
-      const ok = await loadFeed(feedBody);
+      const ok = await loadFeedInto(feedBody);
       loadedOnce = ok;
     }
   };
@@ -233,4 +255,78 @@ export function initRightPanelFeed() {
 
   if (exitBtn) exitBtn.addEventListener('click', () => setMode(false));
   if (linksBtn) linksBtn.addEventListener('click', () => setMode(false));
+}
+
+export function initFeedModules(container) {
+  if (!container) return;
+  container.querySelectorAll('.pb-feed-module').forEach((moduleEl) => {
+    const feedPanel = moduleEl.querySelector('.pb-feed-panel');
+    const feedBody = moduleEl.querySelector('.pb-feed-body');
+    const latestBody = moduleEl.querySelector('.pb-feed-latest-body');
+    const toggleBtn = moduleEl.querySelector('.pb-feed-toggle');
+    const exitBtn = moduleEl.querySelector('.pb-feed-exit');
+    const bar = moduleEl.querySelector('.pb-feed-bar');
+    const feedLink = moduleEl.querySelector('.pb-feed-link');
+    const mediaLink = moduleEl.querySelector('.pb-feed-media');
+
+    const limitRaw = moduleEl.dataset.feedLimit;
+    const limit = limitRaw ? Number.parseInt(limitRaw, 10) : null;
+    const showDropdown = moduleEl.dataset.showDropdown !== 'false';
+    const showMedia = moduleEl.dataset.showMedia !== 'false';
+    const feedHref = moduleEl.dataset.feedHref || 'feed.html';
+    const feedLabel = moduleEl.dataset.feedLabel || 'Open feed';
+    const mediaHref = moduleEl.dataset.mediaHref || 'media.html';
+    const mediaLabel = moduleEl.dataset.mediaLabel || 'Media';
+
+    if (feedLink) {
+      feedLink.href = feedHref;
+      feedLink.textContent = feedLabel;
+    }
+    if (mediaLink) {
+      if (!showMedia || !mediaHref) {
+        mediaLink.remove();
+      } else {
+        mediaLink.href = mediaHref;
+        mediaLink.textContent = mediaLabel;
+      }
+    }
+
+    loadLatestInto(latestBody, {
+      feedHref,
+      feedLabel,
+      mediaHref,
+      mediaLabel,
+      showMedia,
+    });
+
+    if (!showDropdown) {
+      if (toggleBtn) toggleBtn.disabled = true;
+      if (bar) bar.remove();
+      if (feedPanel) feedPanel.remove();
+      return;
+    }
+
+    let loadedOnce = false;
+    const setMode = async (active) => {
+      moduleEl.classList.toggle('feed-mode', active);
+      const panel = moduleEl.closest('.side-panel');
+      if (panel) panel.classList.toggle('feed-mode', active);
+      const panelBuilder = moduleEl.closest('.panel-builder');
+      if (panelBuilder) panelBuilder.classList.toggle('feed-mode', active);
+      if (feedPanel) feedPanel.setAttribute('aria-hidden', String(!active));
+      if (toggleBtn) toggleBtn.setAttribute('aria-expanded', String(active));
+      if (active && feedBody && !loadedOnce) {
+        const ok = await loadFeedInto(feedBody, Number.isFinite(limit) ? limit : null);
+        loadedOnce = ok;
+      }
+    };
+
+    if (toggleBtn) {
+      toggleBtn.addEventListener('click', () => {
+        const active = moduleEl.classList.contains('feed-mode');
+        setMode(!active);
+      });
+    }
+    if (exitBtn) exitBtn.addEventListener('click', () => setMode(false));
+  });
 }

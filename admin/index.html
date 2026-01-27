@@ -10,8 +10,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Righteous&family=Bebas+Neue&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="diagnostics.css" />
-
   <link rel="stylesheet" href="admin.css" />
+  <link rel="stylesheet" href="/assets/css/main.core.18-page-builder.css" />
 </head>
 
 <body>
@@ -426,18 +426,20 @@
             style="margin-bottom: 10px;">
           <button type="button" class="btn-secondary" id="btnMediaPicker" style="margin-bottom: 10px;">Choose from
             Media</button>
-          <label class="form-label" for="postImageFocus">Image focal point (for thumbnails)</label>
-          <select id="postImageFocus" class="form-input" style="margin-bottom: 10px;">
-            <option value="center" selected>Center</option>
-            <option value="top">Top</option>
-            <option value="bottom">Bottom</option>
-            <option value="left">Left</option>
-            <option value="right">Right</option>
-            <option value="top left">Top Left</option>
-            <option value="top right">Top Right</option>
-            <option value="bottom left">Bottom Left</option>
-            <option value="bottom right">Bottom Right</option>
-          </select>
+          <label class="form-label" for="postImageFocus">Thumbnail crop (feed + gallery)</label>
+          <div style="display: grid; gap: 8px; margin-bottom: 10px;">
+            <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+              <input type="text" id="postImageFocus" class="form-input" readonly value="center"
+                style="min-width: 160px; flex: 1 1 200px;">
+              <select id="postImageFit" class="form-input" style="max-width: 140px;">
+                <option value="cover" selected>Fill (crop)</option>
+                <option value="contain">Fit (no crop)</option>
+              </select>
+              <button type="button" class="btn-secondary" id="btnPostImageFocus">Edit crop</button>
+              <button type="button" class="btn-secondary" id="btnPostImageFocusReset">Center</button>
+            </div>
+            <small style="opacity: 0.8;">Set how thumbnails crop the feed image.</small>
+          </div>
           <label class="form-label" for="postPublishAt">Publish date/time (optional)</label>
           <input type="datetime-local" id="postPublishAt" class="form-input" style="margin-bottom: 10px;">
           <p style="font-size: 0.85rem; opacity: 0.8; margin: -4px 0 10px;">Leave blank to publish now. Set a future
@@ -584,6 +586,15 @@
           <div class="page-builder-header">
             <h2 class="section-title">Page Builder</h2>
             <div class="page-builder-actions">
+              <label class="pb-toggle-label">
+                <input type="checkbox" id="pbNoFallback" />
+                <span>Disable Fallback</span>
+              </label>
+              <label class="pb-toggle-label">
+                <input type="checkbox" id="pbPublished" />
+                <span>Published</span>
+              </label>
+              <button type="button" class="btn-secondary" id="pbToggleEditor">Expand Editor</button>
               <button type="button" class="btn-secondary" id="pbAddPage">+ New Page</button>
               <button type="button" class="btn-primary" id="pbSave">Save Changes</button>
             </div>
@@ -605,6 +616,13 @@
 
             <!-- Main Canvas Area -->
             <main class="page-builder-canvas">
+              <div class="pb-canvas-header">
+                <div class="pb-view-toggle">
+                  <button class="pb-view-btn pb-view-btn--active" id="pbViewEdit" data-view="edit">Edit</button>
+                  <button class="pb-view-btn" id="pbViewPreview" data-view="preview">Preview</button>
+                </div>
+                <span class="pb-page-title" id="pbPageTitle"></span>
+              </div>
               <div id="pbCanvas" class="pb-canvas">
                 <div class="pb-canvas-empty">
                   <p>Select a page from the sidebar or create a new one to get started.</p>
@@ -648,7 +666,7 @@
             <select id="previewChapterSelect" class="form-input" style="max-width: 240px;"></select>
             <div id="previewPageLabel" style="font-size: 0.9rem; opacity: 0.8;"></div>
           </div>
-          <div id="previewEmpty" class="chapter-item" style="display: none;">No pages to preview.</div>
+          <div id="previewEmpty" class="entry-item" style="display: none;">No pages to preview.</div>
           <div id="previewFrame"
             style="position: relative; background: #0f1629; border: 1px solid var(--primary); border-radius: 8px; padding: 12px; display: none;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">

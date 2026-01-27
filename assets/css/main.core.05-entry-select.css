@@ -1,5 +1,5 @@
     /* ==================== CHAPTER SELECT ==================== */
-    select#chapter,
+    select#entry,
     .entry-select-trigger {
       background: linear-gradient(135deg,
           rgba(0, 217, 255, 0.15),
@@ -27,7 +27,7 @@
       text-align: left;
     }
 
-    select#chapter:hover,
+    select#entry:hover,
     .entry-select-trigger:hover {
       background: linear-gradient(135deg,
           rgba(0, 217, 255, 0.25),
@@ -39,7 +39,7 @@
       transform: translateY(-2px);
     }
 
-    select#chapter:active,
+    select#entry:active,
     .entry-select-trigger:active {
       transform: translateY(0);
       box-shadow:
@@ -48,7 +48,7 @@
         0 0 12px rgba(255, 0, 234, 0.25);
     }
 
-    select#chapter option {
+    select#entry option {
       background: var(--bg-panel);
       color: var(--text);
       padding: 8px;

@@ -51,5 +51,5 @@ export function changeEntry(name, entries, entryMeta = {}) {
   setActiveEntry();
   render();
   saveProgress(state);
-  window.dispatchEvent(new CustomEvent("entryChanged", { detail: { chapter: name } }));
+  window.dispatchEvent(new CustomEvent("entryChanged", { detail: { entry: name } }));
 }

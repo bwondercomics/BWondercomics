@@ -87,7 +87,7 @@ function createUsersManager({ hideAllSections, setActiveNav } = {}) {
 
     if (!users.length) {
       const empty = document.createElement("div");
-      empty.className = "chapter-item";
+      empty.className = "entry-item";
       empty.textContent = "No users found yet.";
       el.usersList.appendChild(empty);
       return;
@@ -105,26 +105,26 @@ function createUsersManager({ hideAllSections, setActiveNav } = {}) {
             ? "Premium access: code"
             : "Premium access: inactive";
       const item = document.createElement("div");
-      item.className = "chapter-item";
+      item.className = "entry-item";
       item.innerHTML = `
-        <div class="chapter-info">
-          <div class="chapter-name">${escapeHtml(
+        <div class="entry-info">
+          <div class="entry-name">${escapeHtml(
             u.displayName || u.email || "User",
           )}</div>
-          <div class="chapter-meta" style="opacity:0.9;">${escapeHtml(
+          <div class="entry-meta" style="opacity:0.9;">${escapeHtml(
             u.email || "",
           )}</div>
-          <div class="chapter-meta" style="opacity:0.8;">Role: ${escapeHtml(
+          <div class="entry-meta" style="opacity:0.8;">Role: ${escapeHtml(
             role,
           )}</div>
-          <div class="chapter-meta" style="opacity:0.75;">${escapeHtml(
+          <div class="entry-meta" style="opacity:0.75;">${escapeHtml(
             emailStatus,
           )}</div>
-          <div class="chapter-meta" style="opacity:0.7;">${escapeHtml(
+          <div class="entry-meta" style="opacity:0.7;">${escapeHtml(
             premiumStatus,
           )}</div>
         </div>
-        <div class="chapter-actions" style="gap: 8px; flex-wrap: wrap;">
+        <div class="entry-actions" style="gap: 8px; flex-wrap: wrap;">
           <select class="form-input" style="max-width: 150px; padding: 8px 10px;" data-role="${escapeHtml(
             u.id,
           )}">
@@ -212,13 +212,13 @@ function createUsersManager({ hideAllSections, setActiveNav } = {}) {
       const metaText = metaParts.length ? metaParts.join(" • ") : "No details yet.";
 
       const item = document.createElement("div");
-      item.className = "chapter-item";
+      item.className = "entry-item";
       item.innerHTML = `
-        <div class="chapter-info">
-          <div class="chapter-name">${escapeHtml(sub.email || "Subscriber")}</div>
-          <div class="chapter-meta" style="opacity:0.75;">${escapeHtml(metaText)}</div>
+        <div class="entry-info">
+          <div class="entry-name">${escapeHtml(sub.email || "Subscriber")}</div>
+          <div class="entry-meta" style="opacity:0.75;">${escapeHtml(metaText)}</div>
         </div>
-        <div class="chapter-actions" style="gap: 8px; flex-wrap: wrap;">
+        <div class="entry-actions" style="gap: 8px; flex-wrap: wrap;">
           <button class="btn-danger" type="button" data-delete-subscriber="${escapeHtml(
             sub.id,
           )}">Remove</button>
@@ -285,13 +285,13 @@ function createUsersManager({ hideAllSections, setActiveNav } = {}) {
       const metaText = metaParts.join(" • ");
 
       const item = document.createElement("div");
-      item.className = "chapter-item";
+      item.className = "entry-item";
       item.innerHTML = `
-        <div class="chapter-info">
+        <div class="entry-info">
           <div class="premium-code-value">${escapeHtml(code.code || "")}</div>
           <div class="premium-code-meta">${escapeHtml(metaText)}</div>
         </div>
-        <div class="chapter-actions premium-code-actions">
+        <div class="entry-actions premium-code-actions">
           <button class="btn-small btn-edit" type="button" data-copy-code="${escapeHtml(
             code.code || "",
           )}">Copy</button>
@@ -351,7 +351,7 @@ function createUsersManager({ hideAllSections, setActiveNav } = {}) {
     el.usersList.innerHTML = "";
     setUsersCount(0);
     const loading = document.createElement("div");
-    loading.className = "chapter-item";
+    loading.className = "entry-item";
     loading.textContent = "Loading users...";
     el.usersList.appendChild(loading);
 
@@ -373,7 +373,7 @@ function createUsersManager({ hideAllSections, setActiveNav } = {}) {
       el.usersList.innerHTML = "";
       setUsersCount(0);
       const error = document.createElement("div");
-      error.className = "chapter-item";
+      error.className = "entry-item";
       error.textContent = err.message || "Failed to load users.";
       el.usersList.appendChild(error);
     }
@@ -385,7 +385,7 @@ function createUsersManager({ hideAllSections, setActiveNav } = {}) {
     setEmailListEmpty(false);
     setEmailListCount(0);
     const loading = document.createElement("div");
-    loading.className = "chapter-item";
+    loading.className = "entry-item";
     loading.textContent = "Loading email subscribers...";
     el.emailList.appendChild(loading);
 
@@ -404,7 +404,7 @@ function createUsersManager({ hideAllSections, setActiveNav } = {}) {
       el.emailList.innerHTML = "";
       setEmailListCount(0);
       const error = document.createElement("div");
-      error.className = "chapter-item";
+      error.className = "entry-item";
       error.textContent = err.message || "Failed to load email list.";
       el.emailList.appendChild(error);
     }
@@ -443,7 +443,7 @@ function createUsersManager({ hideAllSections, setActiveNav } = {}) {
     setPremiumCodesEmpty(false);
     setPremiumCodesCount(0);
     const loading = document.createElement("div");
-    loading.className = "chapter-item";
+    loading.className = "entry-item";
     loading.textContent = "Loading premium codes...";
     el.premiumCodesList.appendChild(loading);
 
@@ -462,7 +462,7 @@ function createUsersManager({ hideAllSections, setActiveNav } = {}) {
       el.premiumCodesList.innerHTML = "";
       setPremiumCodesCount(0);
       const error = document.createElement("div");
-      error.className = "chapter-item";
+      error.className = "entry-item";
       error.textContent = err.message || "Failed to load premium codes.";
       el.premiumCodesList.appendChild(error);
     }

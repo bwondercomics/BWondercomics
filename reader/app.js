@@ -131,6 +131,11 @@ import { getActiveSeriesId } from "./series.js";
   let unitLabelSingular = "Entry";
   let unitLabelPlural = "Entries";
   let entrySelectBound = false;
+  let fullEntries = {};
+  let fullEntryOrder = [];
+  let fullEntryMeta = {};
+  let fullStatusMessage = "";
+  let fullPremiumOnly = false;
 
   function getUnitLabels() {
     const singular = String(unitLabelSingular || "").trim() || "Entry";
@@ -157,6 +162,78 @@ import { getActiveSeriesId } from "./series.js";
     const rawNumber = entryMeta?.[name]?.displayNumber;
     const parsed = Number.isFinite(rawNumber) ? rawNumber : parseInt(rawNumber, 10);
     return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  function applyPremiumGating(user) {
+    const role = (user?.role || "").toString().toLowerCase();
+    const isPremiumUser =
+      role === "admin" || role === "premium" || !!user?.premiumActive;
+    const baseEntries = fullEntries && typeof fullEntries === "object" ? fullEntries : {};
+    const baseOrder = Array.isArray(fullEntryOrder) && fullEntryOrder.length
+      ? fullEntryOrder
+      : Object.keys(baseEntries);
+    const baseMeta = fullEntryMeta && typeof fullEntryMeta === "object" ? fullEntryMeta : {};
+    let nextEntries = baseEntries;
+    let nextOrder = baseOrder;
+    const lockedEntries = [];
+
+    statusMessage = fullStatusMessage;
+    premiumOnly = fullPremiumOnly;
+
+    if (!isPremiumUser) {
+      if (premiumOnly) {
+        lockedEntries.push(...baseOrder);
+        nextEntries = {};
+        nextOrder = [];
+        statusMessage = "PREMIUM_ONLY";
+      } else {
+        lockedEntries.push(...baseOrder.filter((name) => baseMeta?.[name]?.premium));
+        nextOrder = baseOrder.filter((name) => !(baseMeta?.[name]?.premium));
+        nextEntries = {};
+        nextOrder.forEach((name) => {
+          nextEntries[name] = baseEntries[name];
+        });
+      }
+    } else {
+      nextEntries = { ...baseEntries };
+      nextOrder = [...baseOrder];
+    }
+
+    entries = nextEntries;
+    entryOrder = nextOrder;
+    entryMeta = baseMeta;
+    return { lockedEntries, isPremiumUser };
+  }
+
+  function refreshEntriesForSession(user) {
+    const { lockedEntries } = applyPremiumGating(user);
+    const current = state.currentEntry;
+    const currentExists = current && entries[current];
+    if (!currentExists) {
+      const next = entryOrder.length ? entryOrder[0] : "";
+      state.currentEntry = next;
+      state.pageIndex = 0;
+    }
+    if (state.currentEntry && entries[state.currentEntry]) {
+      state.pages = entries[state.currentEntry];
+    } else {
+      state.pages = [];
+    }
+    state.entryMeta = entryMeta?.[state.currentEntry] || null;
+    setActiveEntry();
+    if (el.entry) {
+      initEntrySelect();
+      if (state.currentEntry) {
+        el.entry.value = state.currentEntry;
+      }
+      syncEntrySelectDisplay();
+    }
+    render();
+    renderGallery(entryOrder, entries, {
+      lockedEntries,
+      entryMeta: fullEntryMeta,
+      unitLabelSingular,
+    });
   }
 
   function formatEntryLabel(name) {
@@ -795,12 +872,17 @@ import { getActiveSeriesId } from "./series.js";
         entryOrder = data.entryOrder;
         statusMessage = data.statusMessage;
         entryMeta = data.entryMeta || {};
+        fullEntries = entries && typeof entries === "object" ? entries : {};
+        fullEntryOrder = Array.isArray(entryOrder) ? [...entryOrder] : [];
+        fullEntryMeta = entryMeta && typeof entryMeta === "object" ? entryMeta : {};
+        fullStatusMessage = statusMessage;
+        fullPremiumOnly = !!data.premiumOnly;
         entryLabels = Array.isArray(data.entryLabels) ? data.entryLabels : [];
         entryLabelsById = entryLabels.reduce((acc, label) => {
           if (label && label.id) acc[label.id] = label;
           return acc;
         }, {});
-        premiumOnly = !!data.premiumOnly;
+        premiumOnly = fullPremiumOnly;
         unitLabelSingular = data.unitLabelSingular || "Entry";
         unitLabelPlural = data.unitLabelPlural || "Entries";
         applyUnitLabels();
@@ -810,9 +892,6 @@ import { getActiveSeriesId } from "./series.js";
       handleDataLoadError(err);
       return;
     }
-
-    const fullEntryOrder = Array.isArray(entryOrder) ? [...entryOrder] : [];
-    const fullEntryMeta = entryMeta && typeof entryMeta === "object" ? entryMeta : {};
 
     // Apply premium gating (client-side UX; server enforces for protected folders too)
     let sessionUser = null;
@@ -829,33 +908,10 @@ import { getActiveSeriesId } from "./series.js";
     updatePatronWelcome(sessionUser);
 
     const role = (sessionUser?.role || "").toString().toLowerCase();
-    const isPremiumUser =
-      role === "admin" || role === "premium" || !!sessionUser?.premiumActive;
+    const { lockedEntries, isPremiumUser } = applyPremiumGating(sessionUser);
     const adminNavLink = document.getElementById("adminNavLink");
     if (adminNavLink) {
       adminNavLink.style.display = role === "admin" ? "inline-flex" : "none";
-    }
-    let lockedEntries = [];
-    if (!isPremiumUser) {
-      if (premiumOnly) {
-        lockedEntries = fullEntryOrder.length ? fullEntryOrder : Object.keys(entries);
-      } else {
-        lockedEntries = fullEntryOrder.filter((name) => fullEntryMeta?.[name]?.premium);
-      }
-    }
-
-    if (premiumOnly && !isPremiumUser) {
-      entries = {};
-      entryOrder = [];
-      statusMessage = "PREMIUM_ONLY";
-    } else if (!isPremiumUser && entryMeta && typeof entryMeta === "object") {
-      const filteredOrder = entryOrder.filter((name) => !(entryMeta[name]?.premium));
-      const filteredEntries = {};
-      filteredOrder.forEach((name) => {
-        filteredEntries[name] = entries[name];
-      });
-      entries = filteredEntries;
-      entryOrder = filteredOrder;
     }
 
     renderGallery(entryOrder, entries, {
@@ -879,6 +935,7 @@ import { getActiveSeriesId } from "./series.js";
       adminNavLink.style.display = role === "admin" ? "inline-flex" : "none";
     }
     updatePatronWelcome(user);
+    refreshEntriesForSession(user);
   });
 
   window.addEventListener("entryChanged", () => {

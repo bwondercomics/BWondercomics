@@ -8,8 +8,8 @@ export function latestPreviewText(text = '') {
 
 const FALLBACK_IMAGE = '/assets/image-missing.png';
 
-export function renderLatestUpdate(post) {
-  const body = document.getElementById('latestBody');
+export function renderLatestUpdate(post, options = {}) {
+  const body = options.container || document.getElementById('latestBody');
   if (!body) return;
 
   body.innerHTML = '';
@@ -22,10 +22,10 @@ export function renderLatestUpdate(post) {
     thumb.src = imageSrc;
     thumb.alt = titleText || 'Latest update image';
     thumb.loading = 'lazy';
-    if (post.imageFocus) {
-      thumb.style.objectPosition = post.imageFocus;
-      thumb.style.objectFit = 'cover';
-    }
+    const focus = post.imageFocus || 'center';
+    const fit = post.imageFit || 'cover';
+    thumb.style.objectPosition = focus;
+    thumb.style.objectFit = fit;
     thumb.onerror = () => {
       if (thumb.src.endsWith(FALLBACK_IMAGE)) return;
       thumb.src = FALLBACK_IMAGE;
@@ -61,26 +61,32 @@ export function renderLatestUpdate(post) {
   const actions = document.createElement('div');
   actions.className = 'latest-actions';
 
-  const feedHref = post.id ? `feed.html#${post.id}` : 'feed.html';
+  const feedHref = options.feedHref || (post.id ? `feed.html#${post.id}` : 'feed.html');
+  const feedLabel = options.feedLabel || 'Open feed';
   const feedLink = document.createElement('a');
   feedLink.className = 'latest-link latest-link--left';
   feedLink.href = feedHref;
-  feedLink.textContent = 'Open feed';
+  feedLink.textContent = feedLabel;
   feedLink.setAttribute('aria-label', 'Open feed for latest update');
 
-  const topFeedLink = document.getElementById('rightPanelOpenFeed');
-  if (topFeedLink) {
-    topFeedLink.href = feedHref;
+  if (!options.container) {
+    const topFeedLink = document.getElementById('rightPanelOpenFeed');
+    if (topFeedLink) {
+      topFeedLink.href = feedHref;
+    }
   }
 
-  const mediaLink = document.createElement('a');
-  mediaLink.className = 'latest-link latest-link--right';
-  mediaLink.href = 'media.html';
-  mediaLink.textContent = 'Media';
-  mediaLink.setAttribute('aria-label', 'Open media library');
-
   actions.appendChild(feedLink);
-  actions.appendChild(mediaLink);
+
+  const showMedia = options.showMedia !== false;
+  if (showMedia) {
+    const mediaLink = document.createElement('a');
+    mediaLink.className = 'latest-link latest-link--right';
+    mediaLink.href = options.mediaHref || 'media.html';
+    mediaLink.textContent = options.mediaLabel || 'Media';
+    mediaLink.setAttribute('aria-label', 'Open media library');
+    actions.appendChild(mediaLink);
+  }
 
   meta.appendChild(label);
   meta.appendChild(name);
