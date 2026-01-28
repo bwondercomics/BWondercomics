@@ -96,6 +96,15 @@ sudo ufw delete allow from 10.0.0.0/24 to any port 5173 proto tcp
 Vite proxies these to the API (so data.json/series.json work):
 `/api`, `/data.json`, `/series.json`, `/page-config.json`, `/media.json`, `/series/*`, `/analytics.js`.
 
+## Recent Builder / Promo Changes (2026-01-28)
+- Page Builder is now **edit-only**: preview toggle removed.
+- Builder header toggles removed: **Disable Fallback** and **Published** are no longer in UI.
+- Promo image picker is **simple select/upload** (no crop/focus/zoom editor).
+- Promo slides support per‑item **Image Fit**:
+  - `Fill (cover)` or `Fit (contain)`; defaults to cover.
+- Promo border issues tracked in `docs/PROMO_MODULE_PLAN.md`.
+- DB migration head currently at `0015_post_image_fit`.
+
 ## Caddy Routing (deploy/Caddyfile)
 - Proxies `/api/*` to `bwondercomics-api:8000`
 - Proxies `/data.json`, `/series.json`, `/page-config.json`, `/media.json`, `/series/*` to the API

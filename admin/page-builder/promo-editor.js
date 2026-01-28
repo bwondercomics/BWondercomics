@@ -1,4 +1,4 @@
-import { escapeAttr, escapeHtml, formatFocus, normalizeFit, parseFocus, resolveAssetUrl } from "./helpers.js";
+import { escapeAttr, escapeHtml, resolveAssetUrl } from "./helpers.js";
 
 export function generatePromoItemId() {
   return "promo-" + Date.now() + "-" + Math.random().toString(36).substr(2, 9);
@@ -26,23 +26,6 @@ export function getDefaultPromoItemStyle() {
   };
 }
 
-function getPromoCropRatio(moduleId, height) {
-  const heightValue = Number(height) || 400;
-  const previewPromo = document.querySelector(
-    `.pb-preview-container .pb-module[data-module-id="${moduleId}"] .pb-promo`
-  );
-  if (previewPromo) {
-    const rect = previewPromo.getBoundingClientRect();
-    if (rect.width && rect.height) {
-      const ratio = rect.width / rect.height;
-      if (ratio > 0.35 && ratio < 3) return ratio;
-    }
-  }
-
-  const panelWidth = Math.min(400, Math.max(250, window.innerWidth * 0.2));
-  return panelWidth / heightValue;
-}
-
 export function renderPromoEditor(config) {
   const items = config.items || [];
 
@@ -66,10 +49,14 @@ export function renderPromoEditor(config) {
               <button type="button" class="btn-secondary pb-promo-pick" data-item-index="${index}">Choose</button>
               <button type="button" class="btn-secondary pb-promo-clear" data-item-index="${index}">Clear</button>
             </div>
-            <small class="pb-editor-hint pb-promo-image-meta" data-item-index="${index}">Fit: ${normalizeFit(item.imageFit || "cover")} · Focus: ${item.imageFocus || "center"}</small>
-            <input type="hidden" class="pb-promo-input" data-item-index="${index}" data-item-key="imageFit" value="${normalizeFit(item.imageFit || "cover")}">
-            <input type="hidden" class="pb-promo-input" data-item-index="${index}" data-item-key="imageFocus" value="${escapeAttr(item.imageFocus || "center")}">
-            <input type="hidden" class="pb-promo-input" data-item-index="${index}" data-item-key="imageZoom" value="${Number(item.imageZoom || 1)}">
+            <small class="pb-editor-hint pb-promo-image-meta" data-item-index="${index}">${item.image ? "Image selected" : "No image selected"}</small>
+            <div class="pb-editor-field">
+              <label class="pb-editor-label">Image Fit</label>
+              <select class="pb-editor-select pb-promo-input" data-item-index="${index}" data-item-key="imageFit">
+                <option value="cover" ${item.imageFit !== "contain" ? "selected" : ""}>Fill (cover)</option>
+                <option value="contain" ${item.imageFit === "contain" ? "selected" : ""}>Fit (contain)</option>
+              </select>
+            </div>
           </div>
 
           <div class="pb-editor-field">
@@ -237,15 +224,39 @@ export function bindPromoEditorEvents({
   if (!selectedModule || selectedModule.moduleType !== "promo") return;
 
   const config = { ...selectedModule.config } || {};
-  const items = [...(config.items || [])];
+
+  const sanitizeItem = (item = {}) => ({
+    id: item.id || generatePromoItemId(),
+    image: item.image || "",
+    imageFit: item.imageFit === "contain" ? "contain" : "cover",
+    topText: item.topText || "",
+    bottomText: item.bottomText || "",
+    textPosition: item.textPosition || "overlay",
+    style: item.style || getDefaultPromoItemStyle(),
+  });
+
+  const items = [...(config.items || [])].map(sanitizeItem);
 
   // Helper to save and re-render
-  async function savePromoConfig(newConfig) {
-    const updated = await updateModule(selectedModuleId, { config: newConfig });
+  // rerenderEditor: true for structural changes (add/remove/move), false for field edits
+  async function savePromoConfig(newConfig, rerenderEditor = false) {
+    // Merge with existing config to preserve all settings
+    const merged = {
+      ...config,
+      ...newConfig,
+      items: (newConfig.items || items).map(sanitizeItem)
+    };
+    const updated = await updateModule(selectedModuleId, { config: merged });
     if (updated) {
       selectedModule.config = updated.config;
+      // Update local references so subsequent saves include all data
+      Object.assign(config, updated.config);
+      items.length = 0;
+      items.push(...(updated.config.items || []).map(sanitizeItem));
       renderCanvas();
-      renderEditorPanel();
+      if (rerenderEditor) {
+        renderEditorPanel();
+      }
     }
   }
 
@@ -255,30 +266,19 @@ export function bindPromoEditorEvents({
       id: generatePromoItemId(),
       image: "",
       imageFit: "cover",
-      imageFocus: "center",
-      imageZoom: 1,
       topText: "",
       bottomText: "",
       textPosition: "overlay",
       style: getDefaultPromoItemStyle(),
     });
-    savePromoConfig({ ...config, items });
+    savePromoConfig({ ...config, items }, true);
   });
 
   const updatePromoImageUi = (itemEl, item) => {
     const imageInput = itemEl.querySelector('[data-item-key="image"]');
-    const fitInput = itemEl.querySelector('[data-item-key="imageFit"]');
-    const focusInput = itemEl.querySelector('[data-item-key="imageFocus"]');
-    const zoomInput = itemEl.querySelector('[data-item-key="imageZoom"]');
     const meta = itemEl.querySelector(".pb-promo-image-meta");
     if (imageInput) imageInput.value = item.image || "";
-    if (fitInput) fitInput.value = normalizeFit(item.imageFit || "cover");
-    if (focusInput) focusInput.value = item.imageFocus || "center";
-    if (zoomInput) zoomInput.value = String(Number(item.imageZoom) || 1);
-    if (meta) {
-      const zoom = Number(item.imageZoom) || 1;
-      meta.textContent = `Fit: ${normalizeFit(item.imageFit || "cover")} · Focus: ${item.imageFocus || "center"} · Zoom: ${zoom.toFixed(2)}x`;
-    }
+    if (meta) meta.textContent = item.image ? "Image selected" : "No image selected";
   };
 
   // Remove/move buttons on items
@@ -287,50 +287,38 @@ export function bindPromoEditorEvents({
 
     itemEl.querySelector('[data-action="remove"]')?.addEventListener("click", () => {
       items.splice(index, 1);
-      savePromoConfig({ ...config, items });
+      savePromoConfig({ ...config, items }, true);
     });
 
     itemEl.querySelector('[data-action="move-up"]')?.addEventListener("click", () => {
       if (index > 0) {
         [items[index - 1], items[index]] = [items[index], items[index - 1]];
-        savePromoConfig({ ...config, items });
+        savePromoConfig({ ...config, items }, true);
       }
     });
 
     itemEl.querySelector('[data-action="move-down"]')?.addEventListener("click", () => {
       if (index < items.length - 1) {
         [items[index], items[index + 1]] = [items[index + 1], items[index]];
-        savePromoConfig({ ...config, items });
+        savePromoConfig({ ...config, items }, true);
       }
     });
 
     itemEl.querySelector(".pb-promo-pick")?.addEventListener("click", async () => {
       const current = items[index] || {};
-      const focus = parseFocus(current.imageFocus || "center");
-      const fit = normalizeFit(current.imageFit || "cover");
-      const zoom = Number(current.imageZoom) || 1;
-      const cropRatio = getPromoCropRatio(selectedModuleId, config.height || 400);
       await openImagePicker({
         title: "Select promo image",
         getItems: fetchAssets,
         allowUpload: true,
         uploadHandler: uploadAssetFile,
         resolveSrc: resolveAssetUrl,
-        allowCrop: true,
-        cropRatio: Number.isFinite(cropRatio) ? cropRatio : null,
+        showEditor: false,
         initialSelection: {
-          path: current.image || "",
-          fit,
-          x: focus.x,
-          y: focus.y,
-          zoom,
+          path: current.image || ""
         },
-        onApply: ({ item, fit: nextFit, x, y, zoom: nextZoom }) => {
+        onApply: ({ item }) => {
           if (!items[index]) return;
           items[index].image = item?.path || "";
-          items[index].imageFit = normalizeFit(nextFit);
-          items[index].imageFocus = formatFocus({ x, y });
-          items[index].imageZoom = Number(nextZoom) || 1;
           updatePromoImageUi(itemEl, items[index]);
           savePromoConfig({ ...config, items });
         },
@@ -340,9 +328,6 @@ export function bindPromoEditorEvents({
     itemEl.querySelector(".pb-promo-clear")?.addEventListener("click", () => {
       if (!items[index]) return;
       items[index].image = "";
-      items[index].imageFit = "cover";
-      items[index].imageFocus = "center";
-      items[index].imageZoom = 1;
       updatePromoImageUi(itemEl, items[index]);
       savePromoConfig({ ...config, items });
     });
@@ -355,6 +340,7 @@ export function bindPromoEditorEvents({
       const key = input.dataset.itemKey;
       if (items[index]) {
         items[index][key] = input.value;
+        savePromoConfig({ ...config, items });
       }
     });
   });
@@ -373,6 +359,7 @@ export function bindPromoEditorEvents({
         } else {
           items[index].style[key] = input.value;
         }
+        savePromoConfig({ ...config, items });
       }
     });
   });
@@ -384,6 +371,39 @@ export function bindPromoEditorEvents({
     if (intervalField) {
       intervalField.style.display = autoRotateCheckbox.checked ? "" : "none";
     }
+    savePromoConfig({ ...config, items, autoRotate: autoRotateCheckbox.checked });
+  });
+
+  // Interval input
+  const intervalInput = document.getElementById("pbPromoInterval");
+  intervalInput?.addEventListener("change", () => {
+    const seconds = parseFloat(/** @type {HTMLInputElement} */ (intervalInput).value) || 5;
+    savePromoConfig({ ...config, items, interval: seconds * 1000 });
+  });
+
+  // Show navigation checkbox
+  const showNavCheckbox = /** @type {HTMLInputElement} */ (document.getElementById("pbPromoShowNav"));
+  showNavCheckbox?.addEventListener("change", () => {
+    savePromoConfig({ ...config, items, showNavigation: showNavCheckbox.checked });
+  });
+
+  // Show indicators checkbox
+  const showIndicatorsCheckbox = /** @type {HTMLInputElement} */ (document.getElementById("pbPromoShowIndicators"));
+  showIndicatorsCheckbox?.addEventListener("change", () => {
+    savePromoConfig({ ...config, items, showIndicators: showIndicatorsCheckbox.checked });
+  });
+
+  // Height input
+  const heightInput = document.getElementById("pbPromoHeight");
+  heightInput?.addEventListener("change", () => {
+    const height = parseInt(/** @type {HTMLInputElement} */ (heightInput).value, 10) || 400;
+    savePromoConfig({ ...config, items, height });
+  });
+
+  // Transition select
+  const transitionSelect = document.getElementById("pbPromoTransition");
+  transitionSelect?.addEventListener("change", () => {
+    savePromoConfig({ ...config, items, transition: /** @type {HTMLSelectElement} */ (transitionSelect).value });
   });
 }
 
@@ -395,8 +415,6 @@ export function collectPromoConfig(el) {
       id: generatePromoItemId(),
       image: "",
       imageFit: "cover",
-      imageFocus: "center",
-      imageZoom: 1,
       topText: "",
       bottomText: "",
       textPosition: "overlay",

@@ -3861,17 +3861,6 @@
       gap: 8px;
     }
 
-    .pb-toggle-label {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 0.85rem;
-      color: rgba(255, 255, 255, 0.85);
-    }
-
-    .pb-toggle-label input {
-      accent-color: var(--primary);
-    }
 
     .page-builder-layout {
       display: grid;
@@ -4056,47 +4045,6 @@
       padding: 8px 12px;
       background: rgba(0, 0, 0, 0.3);
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    }
-
-    .pb-view-toggle {
-      display: flex;
-      gap: 0;
-    }
-
-    .pb-view-btn {
-      padding: 6px 16px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      background: rgba(255, 255, 255, 0.05);
-      color: rgba(255, 255, 255, 0.6);
-      cursor: pointer;
-      font-size: 13px;
-      font-weight: 500;
-      transition: all 0.2s;
-    }
-
-    .pb-view-btn:first-child {
-      border-radius: 4px 0 0 4px;
-      border-right: none;
-    }
-
-    .pb-view-btn:last-child {
-      border-radius: 0 4px 4px 0;
-    }
-
-    .pb-view-btn:hover {
-      background: rgba(255, 255, 255, 0.1);
-      color: rgba(255, 255, 255, 0.8);
-    }
-
-    .pb-view-btn--active {
-      background: var(--accent, #00d9ff);
-      color: #000;
-      border-color: var(--accent, #00d9ff);
-    }
-
-    .pb-view-btn--active:hover {
-      background: var(--accent, #00d9ff);
-      color: #000;
     }
 
     .pb-page-title {

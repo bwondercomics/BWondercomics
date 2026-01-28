@@ -1,4 +1,4 @@
-import { escapeHtml, normalizeFit, resolveAssetUrl } from "./helpers.js";
+import { escapeHtml, resolveAssetUrl } from "./helpers.js";
 
 function clampOpacity(value, fallback = 1) {
   const num = typeof value === "number" ? value : parseFloat(value);
@@ -295,15 +295,9 @@ export const PREVIEW_RENDERERS = {
         const intensity = style.imageGlowIntensity || 0.5;
         imageStyles.push(`box-shadow: 0 0 ${20 * intensity}px ${glowColor}, 0 0 ${40 * intensity}px ${glowColor}`);
       }
-      const imageFit = normalizeFit(item.imageFit || "cover");
-      const imageFocus = item.imageFocus || "center";
-      const imageZoom = Math.max(1, Number(item.imageZoom) || 1);
-      imageStyles.push(`object-fit: ${imageFit}`);
-      imageStyles.push(`object-position: ${imageFocus}`);
-      if (imageZoom !== 1) {
-        imageStyles.push(`transform: scale(${imageZoom})`);
-        imageStyles.push(`transform-origin: ${imageFocus}`);
-      }
+      const fit = item.imageFit === "contain" ? "contain" : "cover";
+      imageStyles.push(`object-fit: ${fit}`);
+      imageStyles.push(`object-position: center`);
 
       const topTextStyles = [];
       topTextStyles.push(`color: ${style.topTextColor || "#ffed00"}`);

@@ -7,14 +7,18 @@ Goal: move the reader UI to builder‑controlled modules with **one unified code
 - Builder config becomes the canonical description of the UI.
 - **No fallback UI in dev.** The reader should either work or visibly break so changes are obvious. Fallbacks hide failures and slow iteration.
 
+Related docs:
+- `docs/PROMO_MODULE_PLAN.md`
+
 ## Dev workflow (expected behavior)
-1) Edit in page builder → preview updates immediately.
+1) Edit in page builder (edit-only canvas).
 2) Save → dev server reflects the saved builder page (root reader).
 3) Verify on dev server (no fallback masking).
 4) Build → deploy live.
 
 ## Draft vs publish UX
-- Replace the publish toggle with explicit actions:
+- Publish toggle **removed from UI** (builder is edit-only).
+- Next step: replace with explicit actions:
   - **Save Draft** (keeps `isPublished=false`)
   - **Publish Changes** (sets `isPublished=true`)
 This removes ambiguity and matches the intended workflow.
@@ -29,25 +33,21 @@ This removes ambiguity and matches the intended workflow.
 3) Module type mismatch
    - Constrain module types per slot.
    - Warn when a module won't render in reader.
-4) No‑fallback dev mode
-   - Show a "No‑fallback mode ON" banner.
+4) No‑fallback dev mode (enforced)
    - Render a clear empty state instead of silent failure.
-5) Preview vs reader mismatch
-   - Share the same renderer between preview + reader.
-   - Add "Preview uses reader renderer" toggle.
-6) Panel clearing logic
+5) Panel clearing logic
    - Clear panel DOM when module list is empty.
    - Add "Reset panel" action.
-7) Dev server auth limits
+6) Dev server auth limits
    - Proxy dev server over HTTPS for auth.
    - Or test via published reader only.
-8) Mixed legacy + builder state
+7) Mixed legacy + builder state
    - Remove legacy page-config fallback from reader.
    - Checklist each UI surface moved to builder.
-9) Module schema drift
+8) Module schema drift
    - Version module configs.
    - Migrate configs on load.
-10) Global refactor risk
+9) Global refactor risk
    - Convert one surface at a time.
    - Add dev-only logs for missing config.
 
@@ -138,6 +138,13 @@ Modules can be placed in either panel and ordered:
 - Email Signup
 - Promo (modify existing promo module; do not add a new one)
 - Gallery (optional future)
+
+### Recent builder changes (current state)
+- **Preview toggle removed** (edit-only canvas).
+- **Disable fallback** toggle removed (no dev fallbacks in UI).
+- **Published** toggle removed (publish actions pending).
+- **Promo image picker simplified**: no crop/focus/zoom editor.
+- **Promo per-slide Image Fit** added (Fill/cover vs Fit/contain).
 
 Panel container config:
 - panelEnabled.left/right

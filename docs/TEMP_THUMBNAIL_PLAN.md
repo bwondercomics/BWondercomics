@@ -2,6 +2,9 @@
 
 Goal: DB-backed thumbnails/previews with premium cover visibility and no fake blur.
 
+Recent related changes (builder/promos):
+- Promo image picker is now **simple select/upload** (no crop/focus/zoom). This does **not** affect thumbnail generation or media previews.
+
 
 ## 1) Inventory (read-only)
 - [x] Map entry gallery cover source (DB-backed `entryMeta.coverImage` or first page path in `entries`).

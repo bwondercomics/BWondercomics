@@ -31,6 +31,7 @@ export async function openImagePicker(options = {}) {
     uploadHandler = null,
     initialSelection = null,
     resolveSrc = resolveDefaultSrc,
+    showEditor = true,
     allowCrop = false,
     cropRatio = null,
   } = options;
@@ -124,7 +125,13 @@ export async function openImagePicker(options = {}) {
   let focus = { fit: "cover", x: 50, y: 50, zoom: 1 };
   let dragState = null;
 
-  if (allowCrop) {
+  if (!showEditor) {
+    modal.classList.add("ip-no-editor");
+    const editorControls = modal.querySelector(".ip-editor-controls");
+    if (editorControls) editorControls.style.display = "none";
+    if (focusDot) focusDot.style.display = "none";
+    if (cropBox) cropBox.style.display = "none";
+  } else if (allowCrop) {
     previewImg.classList.add("ip-preview-img--crop");
     if (cropBox) cropBox.style.display = "block";
   } else if (cropBox) {
@@ -197,20 +204,27 @@ export async function openImagePicker(options = {}) {
       y: clampPercent(next.y),
       zoom: Math.max(1, Number(next.zoom) || 1),
     };
-    fitSelect.value = focus.fit;
-    rangeX.value = String(focus.x);
-    rangeY.value = String(focus.y);
-    rangeXValue.textContent = `${focus.x}%`;
-    rangeYValue.textContent = `${focus.y}%`;
-    const appliedFit = allowCrop ? "contain" : focus.fit;
-    previewImg.style.objectFit = appliedFit;
-    previewImg.style.objectPosition = `${focus.x}% ${focus.y}%`;
-    previewImg.style.transform = allowCrop ? `scale(${focus.zoom})` : "";
-    previewImg.style.transformOrigin = `${focus.x}% ${focus.y}%`;
-    if (focusDot) {
-      focusDot.style.display = allowCrop ? "none" : "";
-      focusDot.style.left = `${focus.x}%`;
-      focusDot.style.top = `${focus.y}%`;
+    if (fitSelect) fitSelect.value = focus.fit;
+    if (rangeX) rangeX.value = String(focus.x);
+    if (rangeY) rangeY.value = String(focus.y);
+    if (rangeXValue) rangeXValue.textContent = `${focus.x}%`;
+    if (rangeYValue) rangeYValue.textContent = `${focus.y}%`;
+    if (showEditor) {
+      const appliedFit = allowCrop ? "contain" : focus.fit;
+      previewImg.style.objectFit = appliedFit;
+      previewImg.style.objectPosition = `${focus.x}% ${focus.y}%`;
+      previewImg.style.transform = allowCrop ? `scale(${focus.zoom})` : "";
+      previewImg.style.transformOrigin = `${focus.x}% ${focus.y}%`;
+      if (focusDot) {
+        focusDot.style.display = allowCrop ? "none" : "";
+        focusDot.style.left = `${focus.x}%`;
+        focusDot.style.top = `${focus.y}%`;
+      }
+    } else {
+      previewImg.style.objectFit = "contain";
+      previewImg.style.objectPosition = "center";
+      previewImg.style.transform = "";
+      previewImg.style.transformOrigin = "center";
     }
     updateCropBox();
   };
@@ -272,16 +286,17 @@ export async function openImagePicker(options = {}) {
   modal.querySelector(".ip-cancel").addEventListener("click", close);
   modal.querySelector(".ip-backdrop").addEventListener("click", close);
 
-  fitSelect.addEventListener("change", () => setFocus({ ...focus, fit: fitSelect.value }));
-  rangeX.addEventListener("input", () => setFocus({ ...focus, x: rangeX.value }));
-  rangeY.addEventListener("input", () => setFocus({ ...focus, y: rangeY.value }));
+  if (showEditor) {
+    fitSelect?.addEventListener("change", () => setFocus({ ...focus, fit: fitSelect.value }));
+    rangeX?.addEventListener("input", () => setFocus({ ...focus, x: rangeX.value }));
+    rangeY?.addEventListener("input", () => setFocus({ ...focus, y: rangeY.value }));
+    previewImg.addEventListener("pointerdown", (event) => {
+      if (!selectedItem) return;
+      updateFocusFromPointer(event);
+    });
+  }
 
-  previewImg.addEventListener("pointerdown", (event) => {
-    if (!selectedItem) return;
-    updateFocusFromPointer(event);
-  });
-
-  if (cropBox) {
+  if (showEditor && cropBox) {
     cropBox.addEventListener("pointerdown", (event) => {
       if (!allowCrop || !selectedItem) return;
       const handle = event.target.closest(".ip-crop-handle");

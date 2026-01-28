@@ -4,7 +4,6 @@ import { DEFAULT_SERIES_ID } from "./state.js";
 import { readFileAsBase64 } from "./utils.js";
 import { LAYOUT_OPTIONS, MODULE_TYPES } from "./page-builder/constants.js";
 import { escapeAttr, escapeHtml, resolveAssetUrl } from "./page-builder/helpers.js";
-import { renderPreviewPage, initPreviewEmailForms, initPreviewPromoCarousels } from "./page-builder/preview-renderers.js";
 import { renderThemeEditorContent, bindThemeEditorEvents } from "./page-builder/theme-editor.js";
 import { renderModuleEditorContent, bindModuleEditorEvents } from "./page-builder/module-editor.js";
 import {
@@ -124,7 +123,6 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
   let currentPage = null;
   let selectedModuleId = null;
   let activeEditorTab = "modules"; // "modules" or "theme"
-  let currentView = "edit"; // "edit" or "preview"
 
   function getSeriesId() {
     return sanitizeSeriesId(getActiveSeriesId()) || DEFAULT_SERIES_ID;
@@ -255,12 +253,6 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
           <p>Select a page from the sidebar or create a new one to get started.</p>
         </div>
       `;
-      return;
-    }
-
-    // Preview mode - render using page-renderer
-    if (currentView === "preview") {
-      renderPreview();
       return;
     }
 
@@ -423,43 +415,6 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     });
   }
 
-  function renderPreview() {
-    if (!el.pbCanvas || !currentPage) return;
-
-    // Apply theme colors as CSS variables
-    const theme = currentPage.meta?.theme || {};
-    const themeStyles = [
-      `--primary: ${theme.primary || "#00d9ff"}`,
-      `--secondary: ${theme.secondary || "#ff00ea"}`,
-      `--accent: ${theme.accent || "#ffed00"}`,
-      `--bg-dark: ${theme.bgDark || "#0a0a12"}`,
-      `--bg-panel: ${theme.bgPanel || "#1a1a2e"}`,
-      `--text: ${theme.text || "#ffffff"}`,
-      `--danger: ${theme.danger || "#ff3838"}`
-    ].join(";");
-
-    // Render the page with current (unsaved) state
-    el.pbCanvas.innerHTML = `
-      <div class="pb-preview-container" style="${themeStyles}">
-        ${renderPreviewPage(currentPage)}
-      </div>
-    `;
-
-    // Initialize interactive modules
-    const previewContainer = el.pbCanvas.querySelector(".pb-preview-container");
-    if (previewContainer) {
-      initPreviewEmailForms(previewContainer);
-      initPreviewPromoCarousels(previewContainer);
-    }
-  }
-
-  function setView(view) {
-    currentView = view;
-    el.pbViewEdit?.classList.toggle("pb-view-btn--active", view === "edit");
-    el.pbViewPreview?.classList.toggle("pb-view-btn--active", view === "preview");
-    renderCanvas();
-  }
-
   function renderEditorPanel() {
     if (!el.pbModuleEditor) return;
 
@@ -535,22 +490,10 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     if (page) {
       currentPage = page;
       selectedModuleId = null;
-      syncPublishedToggle();
       renderPageList();
       renderCanvas();
       renderModuleEditor();
     }
-  }
-
-  function syncPublishedToggle() {
-    if (!el.pbPublished) return;
-    if (!currentPage) {
-      el.pbPublished.checked = false;
-      el.pbPublished.disabled = true;
-      return;
-    }
-    el.pbPublished.disabled = false;
-    el.pbPublished.checked = !!currentPage.isPublished;
   }
 
   // ==================== Public Methods ====================
@@ -603,38 +546,11 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
       if (newPage) {
         await loadPages();
         currentPage = newPage;
-        syncPublishedToggle();
         renderPageList();
         renderCanvas();
         renderModuleEditor();
       }
     });
-
-    // View toggle buttons
-    el.pbViewEdit?.addEventListener("click", () => setView("edit"));
-    el.pbViewPreview?.addEventListener("click", () => setView("preview"));
-
-    // No-fallback toggle - saves to localStorage
-    if (el.pbNoFallback) {
-      el.pbNoFallback.checked = localStorage.getItem('pb-no-fallback') === '1';
-      el.pbNoFallback.addEventListener("change", () => {
-        if (el.pbNoFallback.checked) {
-          localStorage.setItem('pb-no-fallback', '1');
-        } else {
-          localStorage.removeItem('pb-no-fallback');
-        }
-      });
-    }
-
-    if (el.pbPublished) {
-      el.pbPublished.addEventListener("change", () => {
-        if (!currentPage) return;
-        currentPage.isPublished = !!el.pbPublished.checked;
-        renderPageList();
-        renderCanvas();
-      });
-      syncPublishedToggle();
-    }
 
     // Save button - saves all modules in the current page
     el.pbSave?.addEventListener("click", async () => {
