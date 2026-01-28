@@ -6,6 +6,9 @@ export function renderThemeEditorContent(currentPage) {
   const panelBackgrounds = currentPage?.meta?.panelBackgrounds || {};
   const leftBg = panelBackgrounds.left || {};
   const rightBg = panelBackgrounds.right || {};
+  const panelSpacing = currentPage?.meta?.panelSpacing || {};
+  const leftGap = panelSpacing.left ?? "";
+  const rightGap = panelSpacing.right ?? "";
 
   const colorsHtml = THEME_COLORS.map((color) => {
     const value = theme[color.key] || color.default;
@@ -44,6 +47,10 @@ export function renderThemeEditorContent(currentPage) {
             <button type="button" class="btn-secondary pb-panel-bg-pick" data-panel="left">Choose</button>
             <button type="button" class="btn-secondary pb-panel-bg-clear" data-panel="left">Clear</button>
           </div>
+          <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+            <label class="pb-editor-label" style="margin:0;">Module Spacing (px)</label>
+            <input type="number" class="pb-editor-input pb-panel-gap" data-panel="left" min="0" step="1" placeholder="12" value="${leftGap}">
+          </div>
           <small class="pb-editor-hint pb-panel-bg-meta" data-panel="left">Fit: ${normalizeFit(leftBg.fit || "cover")} · Focus: ${leftBg.focus || "center"}</small>
         </div>
         <div class="pb-editor-field">
@@ -52,6 +59,10 @@ export function renderThemeEditorContent(currentPage) {
             <input type="text" class="pb-editor-input pb-panel-bg-path" data-panel="right" value="${escapeAttr(rightBg.path || "")}" placeholder="assets/uploads/..." readonly>
             <button type="button" class="btn-secondary pb-panel-bg-pick" data-panel="right">Choose</button>
             <button type="button" class="btn-secondary pb-panel-bg-clear" data-panel="right">Clear</button>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+            <label class="pb-editor-label" style="margin:0;">Module Spacing (px)</label>
+            <input type="number" class="pb-editor-input pb-panel-gap" data-panel="right" min="0" step="1" placeholder="12" value="${rightGap}">
           </div>
           <small class="pb-editor-hint pb-panel-bg-meta" data-panel="right">Fit: ${normalizeFit(rightBg.fit || "cover")} · Focus: ${rightBg.focus || "center"}</small>
         </div>
@@ -89,6 +100,14 @@ export function bindThemeEditorEvents({
     page.meta = page.meta || {};
     if (!page.meta.panelBackgrounds) page.meta.panelBackgrounds = {};
     return page.meta.panelBackgrounds;
+  };
+
+  const ensurePanelSpacing = () => {
+    const page = getCurrentPage();
+    if (!page) return null;
+    page.meta = page.meta || {};
+    if (!page.meta.panelSpacing) page.meta.panelSpacing = {};
+    return page.meta.panelSpacing;
   };
 
   const updatePanelBgUi = (side) => {
@@ -143,6 +162,24 @@ export function bindThemeEditorEvents({
       if (!backgrounds) return;
       delete backgrounds[side];
       updatePanelBgUi(side);
+    });
+  });
+
+  el.pbModuleEditor.querySelectorAll(".pb-panel-gap").forEach((input) => {
+    input.addEventListener("change", () => {
+      const side = input.dataset.panel;
+      const spacing = ensurePanelSpacing();
+      if (!spacing || !side) return;
+      const raw = String(input.value || "").trim();
+      if (!raw) {
+        delete spacing[side];
+        input.value = "";
+        return;
+      }
+      const parsed = Number(raw);
+      if (Number.isNaN(parsed)) return;
+      spacing[side] = Math.max(0, Math.round(parsed));
+      input.value = spacing[side];
     });
   });
 

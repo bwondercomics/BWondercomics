@@ -263,6 +263,10 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
         const layoutValue = section.layout || "1";
         const columnCount = layoutValue.split("-").length;
         const columnIndices = Array.from({ length: columnCount }, (_, i) => i);
+        const settings = section.settings || {};
+        const moduleGap = settings.moduleGap ?? "";
+        const columnGap = settings.columnGap ?? "";
+        const sectionGap = settings.sectionGap ?? "";
 
         return `
         <div class="pb-section" data-section-id="${section.id}">
@@ -274,6 +278,20 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
                         data-layout="${opt.value}">${opt.label}</button>
               `
               ).join("")}
+            </div>
+            <div class="pb-section-spacing">
+              <label class="pb-section-spacing-label">
+                Modules
+                <input type="number" class="pb-section-input" data-setting="moduleGap" min="0" step="1" placeholder="16" value="${moduleGap}">
+              </label>
+              <label class="pb-section-spacing-label">
+                Columns
+                <input type="number" class="pb-section-input" data-setting="columnGap" min="0" step="1" placeholder="16" value="${columnGap}">
+              </label>
+              <label class="pb-section-spacing-label">
+                Section
+                <input type="number" class="pb-section-input" data-setting="sectionGap" min="0" step="1" placeholder="24" value="${sectionGap}">
+              </label>
             </div>
             <button class="pb-page-action delete" data-action="delete-section" title="Delete section">\u00D7</button>
           </div>
@@ -343,6 +361,33 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
             renderCanvas();
           }
         }
+      });
+
+      // Section spacing settings
+      sectionEl.querySelectorAll(".pb-section-input").forEach((input) => {
+        input.addEventListener("change", async () => {
+          const key = input.dataset.setting;
+          if (!key) return;
+          const section = currentPage.sections.find((s) => s.id === sectionId);
+          if (!section) return;
+          const settings = { ...(section.settings || {}) };
+          const raw = String(input.value || "").trim();
+
+          if (!raw) {
+            delete settings[key];
+          } else {
+            const parsed = Number(raw);
+            if (Number.isNaN(parsed)) return;
+            settings[key] = Math.max(0, Math.round(parsed));
+            input.value = settings[key];
+          }
+
+          const updated = await updateSection(sectionId, { settings });
+          if (updated) {
+            section.settings = settings;
+            renderCanvas();
+          }
+        });
       });
     });
 

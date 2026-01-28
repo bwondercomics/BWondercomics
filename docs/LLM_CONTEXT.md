@@ -102,7 +102,6 @@ Vite proxies these to the API (so data.json/series.json work):
 - Promo image picker is **simple select/upload** (no crop/focus/zoom editor).
 - Promo slides support per‑item **Image Fit**:
   - `Fill (cover)` or `Fit (contain)`; defaults to cover.
-- Promo border issues tracked in `docs/PROMO_MODULE_PLAN.md`.
 - DB migration head currently at `0015_post_image_fit`.
 
 ## Caddy Routing (deploy/Caddyfile)

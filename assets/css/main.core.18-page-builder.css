@@ -6,12 +6,12 @@
 
 .pb-section {
   width: 100%;
-  margin-bottom: 24px;
+  margin-bottom: var(--pb-section-gap, 24px);
 }
 
 .pb-section-columns {
   display: grid;
-  gap: 16px;
+  gap: var(--pb-column-gap, 16px);
   width: 100%;
 }
 
@@ -44,7 +44,7 @@
 }
 
 .pb-module {
-  margin-bottom: 16px;
+  margin-bottom: var(--pb-module-gap, 16px);
 }
 
 .pb-module:last-child {
@@ -471,7 +471,7 @@
 }
 
 .pb-promo-slide--bg-blur .pb-promo-image-container,
-.pb-promo-slide--bg-blur .preview {
+.pb-promo-slide--bg-blur .pb-promo-preview {
   position: relative;
   z-index: 2;
 }
@@ -509,6 +509,44 @@
   height: 100%;
   overflow: hidden;
   border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pb-promo-image-frame {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.pb-promo-image-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  display: block;
+}
+
+.pb-promo-image-frame[data-fit="contain"] {
+  position: relative;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+.pb-promo-image-frame[data-fit="contain"] img {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
 }
 
 .pb-promo-slide--outside .pb-promo-image-container {
@@ -524,17 +562,10 @@
   min-height: 0;
   box-sizing: border-box;
   gap: 12px;
-  padding-bottom: calc(16px + var(--promo-indicator-space));
+  padding-bottom: 16px;
 }
 
-.pb-promo-image-container img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 0;
-  box-sizing: border-box;
-  display: block;
-}
+/* img styling now lives under .pb-promo-image-frame img */
 
 .pb-promo-image-container .pb-promo-preview {
   width: 100%;
@@ -649,6 +680,25 @@
   display: flex;
   gap: 8px;
   z-index: 10;
+}
+
+.pb-promo[data-has-outside="true"][data-show-indicators="true"] {
+  display: flex;
+  flex-direction: column;
+}
+
+.pb-promo[data-has-outside="true"][data-show-indicators="true"] .pb-promo-slides {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+.pb-promo[data-has-outside="true"][data-show-indicators="true"] .pb-promo-indicators {
+  position: relative;
+  bottom: auto;
+  left: auto;
+  transform: none;
+  justify-content: center;
+  margin: 8px auto 12px;
 }
 
 .pb-promo-indicator {

@@ -54,17 +54,6 @@
       position: relative;
     }
 
-    .right-panel-builder {
-      display: flex;
-      flex-direction: column;
-      flex: 1 1 auto;
-      min-height: 0;
-      gap: 12px;
-      overflow-x: hidden;
-      overflow-y: auto;
-      padding: 8px 6px 10px 6px;
-    }
-
     .side-panel::after {
       content: "";
       position: absolute;
@@ -94,27 +83,39 @@
       gap: 16px;
     }
 
-    .side-panel .panel-builder {
-      display: flex;
-      flex-direction: column;
-      flex: 1 1 auto;
-      min-height: 0;
-      overflow-x: hidden;
-      overflow-y: auto;
-      gap: 12px;
-      align-items: stretch;
-      justify-content: flex-start;
-      padding: 8px 6px 10px 6px;
-    }
+.side-panel .panel-builder {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  gap: var(--pb-panel-gap, 12px);
+  align-items: stretch;
+  justify-content: flex-start;
+  padding: 8px 6px 10px 6px;
+}
+
+.panel-builder .pb-module {
+  margin-bottom: 0;
+}
+
+@media (min-width: 1024px) {
+  .side-panel .panel-builder {
+    overflow-y: hidden;
+  }
+}
 
     .side-panel.left .left-panel-content.panel-builder {
       align-items: stretch;
       justify-content: flex-start;
       height: auto;
+      padding: 8px 6px 10px 6px;
+      gap: var(--pb-panel-gap, 12px);
     }
 
-    .side-panel.left .left-panel-text-top,
-    .side-panel.left .left-panel-text-bottom {
+    .side-panel .left-panel-text-top,
+    .side-panel .left-panel-text-bottom {
       font-family: "Bebas Neue", sans-serif;
       text-align: center;
       color: var(--text);
@@ -124,7 +125,7 @@
       text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
     }
 
-    .side-panel.left .left-panel-text-top {
+    .side-panel .left-panel-text-top {
       font-size: 24px;
       font-weight: 900;
       color: var(--accent);

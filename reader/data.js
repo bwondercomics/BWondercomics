@@ -256,6 +256,7 @@ export function applyBuilderPageToDOM(page) {
   // Apply theme first
   applyPageTheme(page);
   applyPanelBackgrounds(page);
+  const panelSpacing = page?.meta?.panelSpacing || {};
 
   // Find modules by type across all sections
   const findModulesByType = (type) => {
@@ -319,8 +320,8 @@ export function applyBuilderPageToDOM(page) {
   // Apply left/right panel content based on columns
   const leftModules = findPanelModules('left');
   const rightModules = findPanelModules('right');
-  renderPanelStack('left', leftModules);
-  renderPanelStack('right', rightModules);
+  renderPanelStack('left', leftModules, panelSpacing);
+  renderPanelStack('right', rightModules, panelSpacing);
 
   // Check panel visibility from section settings
   for (const section of page.sections) {
@@ -347,7 +348,7 @@ export function applyBuilderPageToDOM(page) {
 /**
  * Render builder modules into panel stacks.
  */
-function renderPanelStack(side, modules) {
+function renderPanelStack(side, modules, panelSpacing = {}) {
   const panelId = side === 'left' ? 'leftPanel' : 'rightPanel';
   const panel = document.getElementById(panelId);
   if (!panel) return;
@@ -358,20 +359,35 @@ function renderPanelStack(side, modules) {
       const el = panel.querySelector(selector);
       if (el) el.style.display = 'none';
     });
+    panel.querySelectorAll('.right-panel-builder').forEach((el) => el.remove());
   }
 
   let container = null;
   if (side === 'left') {
-    container = panel.querySelector('.left-panel-content') || panel;
-    container.classList.add('panel-builder');
-  } else {
-    container = panel.querySelector('.right-panel-builder');
+    container = panel.querySelector('.left-panel-content');
     if (!container) {
       container = document.createElement('div');
-      container.className = 'right-panel-builder panel-builder';
       panel.appendChild(container);
     }
-    container.classList.add('panel-builder');
+  } else {
+    container = panel.querySelector('.panel-builder--right');
+    if (!container) {
+      container = document.createElement('div');
+      panel.appendChild(container);
+    }
+  }
+  container.classList.add('panel-builder');
+  container.classList.toggle('panel-builder--left', side === 'left');
+  container.classList.toggle('panel-builder--right', side === 'right');
+
+  const gapValue = panelSpacing?.[side];
+  if (gapValue !== undefined && gapValue !== null && gapValue !== "") {
+    const parsed = Number(gapValue);
+    if (!Number.isNaN(parsed)) {
+      container.style.setProperty('--pb-panel-gap', `${Math.max(0, parsed)}px`);
+    }
+  } else {
+    container.style.removeProperty('--pb-panel-gap');
   }
 
   // Sort by sortIndex

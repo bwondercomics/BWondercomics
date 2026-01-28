@@ -287,16 +287,18 @@ export const PREVIEW_RENDERERS = {
       }
 
       const imageStyles = [];
+      const frameStyles = [];
       if (style.imageBorder) {
-        imageStyles.push(`border: 2px solid ${style.imageBorderColor || "#00d9ff"}`);
+        frameStyles.push(`border: 2px solid ${style.imageBorderColor || "#00d9ff"}`);
       }
       if (style.imageGlow) {
         const glowColor = style.imageGlowColor || "#00d9ff";
         const intensity = style.imageGlowIntensity || 0.5;
-        imageStyles.push(`box-shadow: 0 0 ${20 * intensity}px ${glowColor}, 0 0 ${40 * intensity}px ${glowColor}`);
+        frameStyles.push(`box-shadow: 0 0 ${20 * intensity}px ${glowColor}, 0 0 ${40 * intensity}px ${glowColor}`);
       }
       const fit = item.imageFit === "contain" ? "contain" : "cover";
-      imageStyles.push(`object-fit: ${fit}`);
+    const objectFit = fit === "contain" ? "contain" : "cover";
+      imageStyles.push(`object-fit: ${objectFit}`);
       imageStyles.push(`object-position: center`);
 
       const topTextStyles = [];
@@ -327,15 +329,17 @@ export const PREVIEW_RENDERERS = {
       const topText = item.topText ? `<div class="pb-promo-top-text" style="${topTextStyles.join(";")}">${escapeHtml(item.topText)}</div>` : "";
       const bottomText = item.bottomText ? `<div class="pb-promo-bottom-text" style="${bottomTextStyles.join(";")}">${item.bottomText}</div>` : "";
 
-      const imageHtml = imageSrc
-        ? `<img src="${imageSrc}" alt="" loading="lazy" style="${imageStyles.join(";")}" class="pb-promo-img" />`
-        : '<div class="pb-promo-no-image"></div>';
+    const imageHtml = imageSrc
+      ? `<div class="pb-promo-image-frame" data-fit="${fit}"${frameStyles.length ? ` style="${frameStyles.join(";")}"` : ""}>
+           <img src="${imageSrc}" alt="" loading="lazy" data-fit="${fit}" style="${imageStyles.join(";")}" class="pb-promo-img" />
+         </div>`
+      : '<div class="pb-promo-no-image"></div>';
 
-      const previewHtml = imageSrc && !isOverlay
-        ? `<div class="preview pb-promo-preview">
-             ${imageHtml}
-           </div>`
-        : imageHtml;
+    const previewHtml = imageSrc && !isOverlay
+      ? `<div class="pb-promo-preview">
+           ${imageHtml}
+         </div>`
+      : imageHtml;
 
       const slideClasses = [
         "pb-promo-slide",
@@ -381,12 +385,15 @@ export const PREVIEW_RENDERERS = {
       <button class="pb-promo-nav pb-promo-nav--next" data-dir="next" aria-label="Next slide">\u203A</button>
     ` : "";
 
-    return `
-      <div class="pb-promo pb-promo--${transition}" data-bg-blur="${hasBlurBackground}" data-show-indicators="${showIndicators && items.length > 1}"
-           style="--promo-height: ${height}px;"
-           data-auto-rotate="${autoRotate}"
-           data-interval="${interval}"
-           data-item-count="${items.length}">
+  const hasOutside = items.some((item) => item.textPosition === "outside");
+
+  return `
+    <div class="pb-promo pb-promo--${transition}" data-bg-blur="${hasBlurBackground}" data-show-indicators="${showIndicators && items.length > 1}"
+         data-has-outside="${hasOutside}"
+         style="--promo-height: ${height}px;"
+         data-auto-rotate="${autoRotate}"
+         data-interval="${interval}"
+         data-item-count="${items.length}">
         <div class="pb-promo-slides">
           ${slidesHtml}
         </div>
@@ -417,6 +424,15 @@ export function renderPreviewSection(section) {
   if (settings.backgroundColor) style += `background-color: ${settings.backgroundColor};`;
   if (settings.paddingTop) style += `padding-top: ${settings.paddingTop}px;`;
   if (settings.paddingBottom) style += `padding-bottom: ${settings.paddingBottom}px;`;
+  if (settings.moduleGap !== undefined && settings.moduleGap !== null) {
+    style += `--pb-module-gap: ${Number(settings.moduleGap)}px;`;
+  }
+  if (settings.columnGap !== undefined && settings.columnGap !== null) {
+    style += `--pb-column-gap: ${Number(settings.columnGap)}px;`;
+  }
+  if (settings.sectionGap !== undefined && settings.sectionGap !== null) {
+    style += `--pb-section-gap: ${Number(settings.sectionGap)}px;`;
+  }
 
   const columnModules = {};
   for (let i = 0; i < columnCount; i++) columnModules[i] = [];

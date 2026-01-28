@@ -1,0 +1,69 @@
+/* ==================== RESPONSIVE ==================== */
+    @media (max-width: 768px) {
+      .admin-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .admin-header-main {
+        width: 100%;
+      }
+
+      .admin-nav {
+        padding: 12px;
+      }
+
+      .admin-layout--top .admin-nav-footer {
+        margin-left: 0;
+      }
+
+      .admin-title {
+        font-size: 1.5rem;
+      }
+
+      .header-series {
+        width: 100%;
+        margin-left: 0;
+      }
+
+      .entry-item {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .modal-content {
+        padding: 20px;
+      }
+
+      .login-container {
+        padding: 30px 20px;
+      }
+    }
+
+    @media (max-width: 768px) and (orientation: portrait) {
+      .admin-shell {
+        --admin-nav-width: 72px;
+      }
+
+      .admin-nav {
+        padding: 12px 10px;
+        gap: 12px;
+      }
+
+      .admin-nav .nav-btn {
+        justify-content: center;
+        padding: 10px;
+      }
+
+      .nav-btn-label {
+        display: none;
+      }
+
+      .admin-layout--top .admin-nav {
+        justify-content: center;
+      }
+
+      .admin-layout--top .admin-nav-footer {
+        margin-left: 0;
+      }
+    }

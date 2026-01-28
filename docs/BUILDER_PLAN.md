@@ -8,7 +8,6 @@ Goal: move the reader UI to builder‑controlled modules with **one unified code
 - **No fallback UI in dev.** The reader should either work or visibly break so changes are obvious. Fallbacks hide failures and slow iteration.
 
 Related docs:
-- `docs/PROMO_MODULE_PLAN.md`
 
 ## Dev workflow (expected behavior)
 1) Edit in page builder (edit-only canvas).
@@ -145,6 +144,11 @@ Modules can be placed in either panel and ordered:
 - **Published** toggle removed (publish actions pending).
 - **Promo image picker simplified**: no crop/focus/zoom editor.
 - **Promo per-slide Image Fit** added (Fill/cover vs Fit/contain).
+
+### Promo module status (current)
+- **Unstable layout**: border/fit/fill/text spacing still inconsistent across slides.
+- Treat promo as **needs rebuild** once builder foundations are stable.
+- Keep decisions: **no crop editor**, **per-slide Fit/Fill**, **simple picker** only.
 
 Panel container config:
 - panelEnabled.left/right

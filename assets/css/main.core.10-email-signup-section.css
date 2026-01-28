@@ -1,858 +1,132 @@
-    /* ==================== EMAIL SIGNUP SECTION ==================== */
-    .email-signup-section {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-      margin-top: 8px;
-    }
-
-    .email-signup-label {
-      font-family: "Bebas Neue", sans-serif;
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--text);
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      text-align: center;
-      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
-    }
-
-    .email-signup-form {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      align-items: center;
-    }
-
-    .email-input {
-      width: 100%;
-      max-width: 280px;
-      padding: 10px 12px;
-      background: rgba(26, 26, 46, 0.8);
-      border: 3px solid var(--primary);
-      color: var(--text);
-      font-family: "Righteous", sans-serif;
-      font-size: 14px;
-      text-align: center;
-      transition: all 0.2s;
-      box-shadow:
-        0 0 10px rgba(0, 217, 255, 0.3),
-        inset 0 2px 4px rgba(0, 0, 0, 0.4);
-    }
-
-    .email-input::placeholder {
-      color: rgba(255, 255, 255, 0.4);
-      font-size: 13px;
-    }
-
-    .email-input:focus {
-      outline: none;
-      border-color: var(--accent);
-      box-shadow:
-        0 0 20px rgba(255, 237, 0, 0.5),
-        inset 0 2px 4px rgba(0, 0, 0, 0.4);
-      background: rgba(26, 26, 46, 0.95);
-    }
-
-    .email-submit-btn {
-      padding: 10px 32px;
-      background: linear-gradient(135deg, var(--accent), var(--primary));
-      border: 3px solid var(--accent);
-      color: var(--bg-dark);
-      font-family: "Bebas Neue", sans-serif;
-      font-size: 18px;
-      font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      cursor: pointer;
-      transition: all 0.2s;
-      box-shadow:
-        0 4px 0 rgba(0, 0, 0, 0.5),
-        0 0 20px rgba(255, 237, 0, 0.4);
-      position: relative;
-    }
-
-    .email-submit-btn:hover {
-      background: linear-gradient(135deg, var(--primary), var(--accent));
-      transform: translateY(-2px);
-      box-shadow:
-        0 6px 0 rgba(0, 0, 0, 0.5),
-        0 0 30px rgba(255, 237, 0, 0.7);
-    }
-
-    .email-submit-btn:active {
-      transform: translateY(0);
-      box-shadow:
-        0 2px 0 rgba(0, 0, 0, 0.5),
-        0 0 15px rgba(255, 237, 0, 0.4);
-    }
-
-    .email-submit-btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    .email-signup-cta {
-      font-family: "Bebas Neue", sans-serif;
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--accent);
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      text-align: center;
-      text-shadow:
-        2px 2px 0 rgba(0, 0, 0, 0.5),
-        0 0 10px rgba(255, 237, 0, 0.4);
-    }
-
-    .email-form-message {
-      font-family: "Righteous", sans-serif;
-      font-size: 14px;
-      text-align: center;
-      padding: 8px 12px;
-      border-radius: 4px;
-      margin-top: 8px;
-      max-width: 280px;
-    }
-
-    .email-form-message.success {
-      background: rgba(0, 217, 255, 0.2);
-      border: 2px solid var(--primary);
-      color: var(--primary);
-    }
-
-    .email-form-message.error {
-      background: rgba(255, 56, 56, 0.2);
-      border: 2px solid var(--danger);
-      color: var(--danger);
-    }
-
-    .side-panel.right {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      padding: 16px;
-      background-image: url("/banner3.png");
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      position: relative;
-      isolation: isolate;
-    }
-
-    .right-stack {
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-      flex: 1 1 auto;
-      justify-content: space-between;
-      min-height: 0;
-      position: relative;
-      overflow: visible;
-    }
-
-    .latest-update {
-      border: 2px solid var(--accent);
-      background:
-        linear-gradient(135deg,
-          rgba(255, 237, 0, 0.2),
-          rgba(0, 217, 255, 0.18)),
-        radial-gradient(circle at 20% 20%,
-          rgba(0, 0, 0, 0.25),
-          transparent 40%),
-        rgba(10, 10, 18, 0.95);
-      border-radius: 10px;
-      padding: 12px;
-      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.65);
-    }
-
-    .latest-heading-row {
-      display: flex;
-      align-items: flex-end;
-      gap: 6px;
-      margin-bottom: 10px;
-      flex-wrap: wrap;
-    }
-
-    .latest-heading {
-      font-family: "Bebas Neue", cursive;
-      letter-spacing: 1px;
-      font-size: 1.2rem;
-      color: var(--bg-dark);
-      background: var(--accent);
-      padding: 6px 10px;
-      border-radius: 6px;
-      display: inline-flex;
-      border: none;
-      cursor: pointer;
-      appearance: none;
-    }
-
-    .latest-heading:hover {
-      box-shadow: 0 0 0 2px rgba(255, 237, 0, 0.35);
-    }
-
-    .latest-heading:focus-visible {
-      outline: 2px solid var(--primary);
-      outline-offset: 2px;
-    }
-
-    .latest-author {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 2px 8px;
-      border-radius: 6px;
-      border: 1px solid var(--primary);
-      background: transparent;
-      box-shadow: none;
-      font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
-      color: #7ef5e3;
-      letter-spacing: 0.6px;
-      transform: translateY(2px);
-    }
-
-    .latest-body {
-      display: grid;
-      gap: 10px;
-    }
-
-    .latest-thumb {
-      width: 100%;
-      height: 140px;
-      object-fit: cover;
-      border-radius: 8px;
-      border: 2px solid rgba(0, 217, 255, 0.4);
-      background: #05050a;
-    }
-
-    .latest-thumb.placeholder {
-      display: grid;
-      place-items: center;
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 0.9rem;
-      letter-spacing: 0.5px;
-    }
-
-    .latest-meta {
-      display: grid;
-      gap: 4px;
-    }
-
-    .latest-label {
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 0.85rem;
-    }
-
-    .latest-name {
-      font-family: "Bebas Neue", cursive;
-      font-size: 1.4rem;
-      color: var(--accent);
-      letter-spacing: 1px;
-    }
-
-    .latest-name.is-placeholder {
-      color: rgba(255, 255, 255, 0.85);
-      letter-spacing: 0.6px;
-    }
-
-    .latest-date {
-      color: var(--primary);
-      font-size: 0.9rem;
-    }
-
-    .latest-preview {
-      color: rgba(255, 255, 255, 0.85);
-      font-size: 0.95rem;
-      line-height: 1.3;
-    }
-
-    .latest-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 6px;
-      color: var(--bg-dark);
-      background: var(--primary);
-      border: 2px solid var(--primary);
-      padding: 6px 10px;
-      border-radius: 6px;
-      text-decoration: none;
-      font-family: "Bebas Neue", sans-serif;
-      font-weight: 400;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-
-    .latest-link:hover {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: var(--bg-dark);
-    }
-
-    .latest-actions {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0;
-      margin-top: 6px;
-    }
-
-    .latest-actions .latest-link {
-      margin-top: 0;
-      justify-content: center;
-      width: 100%;
-    }
-
-    .latest-link--left {
-      border-top-right-radius: 0;
-      border-bottom-right-radius: 0;
-      border-right: 1px solid rgba(10, 10, 18, 0.35);
-    }
-
-    .latest-link--right {
-      border-top-left-radius: 0;
-      border-bottom-left-radius: 0;
-      border-left: 1px solid rgba(10, 10, 18, 0.35);
-    }
-
-    .latest-loading,
-    .latest-empty {
-      color: rgba(255, 255, 255, 0.8);
-      font-size: 0.95rem;
-    }
-
-    .right-panel-feed-bar {
-      display: none;
-      grid-template-columns: 44px minmax(0, 1fr) minmax(0, 1fr);
-      align-items: stretch;
-      gap: 6px;
-      margin-bottom: 8px;
-      height: 46px;
-      padding: 6px;
-      border-radius: 12px;
-      border: 2px solid rgba(0, 217, 255, 0.35);
-      background: rgba(10, 10, 18, 0.78);
-      box-shadow: 0 10px 18px rgba(0, 0, 0, 0.4);
-    }
-
-    .feed-exit-btn {
-      width: 100%;
-      height: 100%;
-      border-radius: 10px;
-      border: 2px solid rgba(255, 237, 0, 0.4);
-      background: rgba(10, 10, 18, 0.7);
-      color: var(--accent);
-      font-family: "Bebas Neue", sans-serif;
-      font-size: 18px;
-      line-height: 1;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .feed-exit-btn:hover {
-      transform: translateY(-1px);
-      border-color: rgba(255, 237, 0, 0.8);
-      box-shadow: 0 0 12px rgba(255, 237, 0, 0.25);
-    }
-
-    .right-panel-feed-bar .latest-actions {
-      margin: 0;
-      width: 100%;
-      height: 100%;
-      grid-column: 2 / 4;
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 0;
-    }
-
-    .right-panel-feed-bar .latest-link {
-      margin: 0;
-      height: 100%;
-      justify-content: center;
-      padding: 0 10px;
-      font-family: "Bebas Neue", sans-serif;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-
-    .right-panel-feed {
-      display: none;
-      flex-direction: column;
-      gap: 10px;
-      flex: 1 1 auto;
-      min-height: 0;
-    }
-
-    .pb-feed-module {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      min-height: 0;
-    }
-
-    .pb-feed-module .right-panel-feed-bar {
-      display: none;
-      flex: 0 0 auto;
-    }
-
-    .pb-feed-module .right-panel-feed {
-      display: none;
-      flex: 1 1 auto;
-      min-height: 0;
-    }
-
-    .pb-feed-module.feed-mode .right-panel-feed-bar {
-      display: grid;
-    }
-
-    .pb-feed-module.feed-mode .pb-feed-latest {
-      display: none;
-    }
-
-    .pb-feed-module.feed-mode .right-panel-feed {
-      display: flex;
-      flex: 1 1 auto;
-      min-height: 0;
-    }
-
-    .pb-feed-module.feed-mode {
-      flex: 1 1 auto;
-      min-height: 0;
-      height: 100%;
-      overflow: hidden;
-    }
-
-    .pb-feed-module .latest-body {
-      min-height: 0;
-    }
-
-    .pb-feed-module.feed-mode .right-panel-feed .latest-body {
-      flex: 1 1 auto;
-      min-height: 0;
-      overflow-y: auto;
-      max-height: none;
-      padding-top: 0;
-    }
-
-    .panel-builder.feed-mode .pb-module {
-      display: none;
-    }
-
-    .panel-builder.feed-mode .pb-module--feed {
-      display: flex;
-      flex: 1 1 auto;
-      min-height: 0;
-    }
-
-    .panel-builder.feed-mode {
-      flex: 1 1 auto;
-      min-height: 0;
-    }
-
-    .right-panel-feed .latest-body {
-      display: grid;
-      gap: 10px;
-      overflow-y: auto;
-      padding-right: 4px;
-      padding-bottom: 60px;
-      scrollbar-width: thin;
-      align-content: start;
-    }
-
-    .feed-item {
-      display: grid;
-      grid-template-columns: 110px 1fr;
-      gap: 10px;
-      padding: 8px;
-      border-radius: 8px;
-      border: 1px solid rgba(0, 217, 255, 0.25);
-      background: rgba(10, 10, 18, 0.75);
-      text-decoration: none;
-      color: inherit;
-      transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-    }
-
-    .feed-item:hover {
-      transform: translateY(-1px);
-      border-color: rgba(255, 237, 0, 0.6);
-      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.35);
-    }
-
-    .feed-item-thumb.placeholder {
-      display: grid;
-      place-items: center;
-      color: rgba(255, 255, 255, 0.65);
-      font-size: 0.75rem;
-      letter-spacing: 0.4px;
-    }
-
-    .feed-item-media {
-      position: relative;
-      align-self: stretch;
-      overflow: hidden;
-      border-radius: 6px;
-      height: 120px;
-    }
-
-    .feed-item-toggle {
-      border: 2px solid rgba(0, 217, 255, 0.35);
-      background: rgba(10, 10, 18, 0.75);
-      color: var(--primary);
-      border-radius: 8px;
-      width: 104px;
-      height: 36px;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-      position: absolute;
-      left: 6px;
-      bottom: 6px;
-      z-index: 2;
-    }
-
-    .feed-item-toggle:hover {
-      transform: translateY(-1px);
-      border-color: rgba(255, 237, 0, 0.6);
-      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3);
-    }
-
-    .feed-item-toggle-icon {
-      width: 28px;
-      height: 28px;
-      transition: transform 0.2s ease;
-    }
-
-    .feed-item-thumb {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: calc(100% - 42px);
-      object-fit: cover;
-      border-radius: 0;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      background: #05050a;
-    }
-
-    .feed-item-toggle[aria-expanded="true"] .feed-item-toggle-icon {
-      transform: rotate(90deg);
-    }
-
-    .feed-item-meta {
-      display: grid;
-      gap: 4px;
-      overflow: hidden;
-    }
-
-    .feed-item-title {
-      font-family: "Bebas Neue", cursive;
-      font-size: 1.1rem;
-      color: var(--accent);
-      letter-spacing: 0.8px;
-      text-decoration: none;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-
-    .feed-item-title.is-placeholder {
-      color: rgba(255, 255, 255, 0.85);
-      letter-spacing: 0.4px;
-    }
-
-    .feed-item-date {
-      color: var(--primary);
-      font-size: 0.8rem;
-    }
-
-    .feed-item-preview {
-      color: rgba(255, 255, 255, 0.8);
-      font-size: 0.85rem;
-      line-height: 1.2;
-      display: -webkit-box;
-      -webkit-line-clamp: 3;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-
-    .feed-item-body {
-      grid-column: 1 / -1;
-      display: none;
-      padding: 10px;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 237, 0, 0.35);
-      background: rgba(10, 10, 18, 0.6);
-      color: rgba(255, 255, 255, 0.9);
-      font-size: 0.9rem;
-      line-height: 1.4;
-      white-space: pre-wrap;
-    }
-
-    .feed-item.is-open .feed-item-body {
-      display: block;
-    }
-
-    .links-grid-btn {
-      position: absolute;
-      right: 16px;
-      bottom: 16px;
-      width: 44px;
-      height: 44px;
-      border-radius: 12px;
-      border: 2px solid rgba(0, 217, 255, 0.5);
-      background: rgba(10, 10, 18, 0.75);
-      display: none;
-      grid-template-columns: repeat(3, 1fr);
-      grid-template-rows: repeat(3, 1fr);
-      gap: 4px;
-      padding: 8px;
-      cursor: pointer;
-      box-shadow: 0 0 14px rgba(0, 217, 255, 0.2);
-      transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
-      z-index: 5;
-    }
-
-    .links-grid-btn span {
-      width: 100%;
-      height: 100%;
-      border-radius: 2px;
-      background: var(--primary);
-    }
-
-    .links-grid-btn:hover {
-      transform: translateY(-2px);
-      border-color: rgba(0, 217, 255, 0.9);
-      box-shadow: 0 0 20px rgba(0, 217, 255, 0.35);
-    }
-
-    .side-panel.right.feed-mode .right-panel-feed-bar {
-      display: grid;
-    }
-
-    .side-panel.right.feed-mode #latestUpdate {
-      display: none;
-    }
-
-    .side-panel.right.feed-mode .right-stack {
-      display: none;
-    }
-
-    .side-panel.right.feed-mode .right-panel-feed {
-      display: flex;
-    }
-
-    .side-panel.right.feed-mode .links-grid-btn {
-      display: grid;
-    }
-
-    .side-panel.right.feed-mode {
-      overflow: hidden;
-    }
-
-    .side-panel.feed-mode {
-      overflow: hidden;
-    }
-
-    .side-panel.right .preview {
-      display: none;
-      flex: 0 0 auto;
-      max-height: 0;
-      min-height: 0;
-      height: 0;
-      margin: 0;
-    }
-
-    .panel-buttons {
-      flex: 1 1 auto;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      justify-content: flex-start;
-      padding: 8px 6px 0 6px;
-      margin-top: 0;
-      min-height: 50%;
-      max-height: none;
-      overflow-y: visible;
-      scrollbar-width: thin;
-      align-items: flex-end;
-      background: linear-gradient(180deg,
-          rgba(0, 0, 0, 0) 0%,
-          rgba(0, 0, 0, 0.18) 100%);
-      position: relative;
-    }
-
-    .panel-btn {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 12px;
-      background: rgba(0, 0, 0, 0.18);
-      border: 1px solid rgba(255, 255, 255, 0.35);
-      border-radius: 10px;
-      cursor: pointer;
-      transition: all 0.16s ease;
-      text-decoration: none;
-      color: var(--text);
-      position: relative;
-      box-shadow: none;
-      text-shadow:
-        0 1px 2px rgba(0, 0, 0, 0.65),
-        0 0 0.5px rgba(0, 0, 0, 0.8);
-      backdrop-filter: blur(1px);
-      width: 45%;
-      min-width: 200px;
-      justify-content: flex-start;
-    }
-
-    .panel-btn:hover {
-      background: rgba(0, 0, 0, 0.24);
-      border-color: rgba(255, 255, 255, 0.7);
-      transform: translateY(-1px);
-      box-shadow: 0 0 12px rgba(0, 0, 0, 0.35);
-      backdrop-filter: blur(5px);
-    }
-
-    .panel-btn:active {
-      transform: translateY(0);
-      background: rgba(0, 0, 0, 0.2);
-    }
-
-    .panel-btn-icon {
-      width: 36px;
-      height: 36px;
-      min-width: 36px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0, 0, 0, 0.28);
-      border: 1px solid rgba(255, 255, 255, 0.35);
-      border-radius: 10px;
-      box-shadow: none;
-      overflow: hidden;
-      padding: 4px;
-    }
-
-    .panel-btn-icon img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      display: block;
-      /* No filter - showing original icon colors */
-    }
-
-    .comicnet-panel {
-      position: absolute;
-      top: 50%;
-      right: calc(100% + 14px);
-      transform: translateY(-50%);
-      width: 240px;
-      max-width: 260px;
-      padding: 12px;
-      background: rgba(10, 10, 18, 0.9);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 10px;
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
-      backdrop-filter: blur(8px);
-      display: none;
-      z-index: 90;
-    }
-
-    .comicnet-panel h4 {
-      margin: 0 0 8px 0;
-      font-family: "Bebas Neue";
-      letter-spacing: 1px;
-      font-size: 16px;
-      color: var(--accent);
-    }
-
-    .comicnet-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .comicnet-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .comicnet-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      color: var(--text);
-      text-decoration: none;
-      font-family: "Righteous", sans-serif;
-      font-size: 14px;
-      line-height: 1.4;
-      flex: 1;
-    }
-
-    .comicnet-link:hover {
-      color: var(--primary);
-    }
-
-    .comicnet-avatar {
-      width: 42px;
-      height: 42px;
-      border-radius: 8px;
-      object-fit: cover;
-      border: 1px solid rgba(255, 255, 255, 0.35);
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-      flex-shrink: 0;
-    }
-
-    .panel-btn-text {
-      flex: 0 0 auto;
-      font-family: "Bebas Neue";
-      font-size: 18px;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      color: var(--text);
-      text-shadow: none;
-      font-weight: 800;
-      padding: 4px 8px;
-      background: rgba(0, 0, 0, 0.32);
-      border-radius: 6px;
-      width: auto;
-      display: inline-flex;
-      align-items: center;
-      gap: 1px;
-    }
-
-    .panel-btn-text span {
-      display: inline-block;
-      transition: transform 0.25s ease;
-    }
-
-    .panel-btn:hover .panel-btn-text span {
-      animation: nav-wiggle 0.5s ease both;
-    }
-
-    @keyframes nav-wiggle {
-      0% {
-        transform: translateY(0);
-      }
-
-      30% {
-        transform: translateY(-3px);
-      }
-
-      60% {
-        transform: translateY(1px);
-      }
-
-      100% {
-        transform: translateY(0);
-      }
-    }
+/* ==================== EMAIL SIGNUP SECTION ==================== */
+.email-signup-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.email-signup-label {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  text-align: center;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.email-signup-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.email-input {
+  width: 100%;
+  max-width: 280px;
+  padding: 10px 12px;
+  background: rgba(26, 26, 46, 0.8);
+  border: 3px solid var(--primary);
+  color: var(--text);
+  font-family: "Righteous", sans-serif;
+  font-size: 14px;
+  text-align: center;
+  transition: all 0.2s;
+  box-shadow:
+    0 0 10px rgba(0, 217, 255, 0.3),
+    inset 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.email-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+}
+
+.email-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow:
+    0 0 20px rgba(255, 237, 0, 0.5),
+    inset 0 2px 4px rgba(0, 0, 0, 0.4);
+  background: rgba(26, 26, 46, 0.95);
+}
+
+.email-submit-btn {
+  padding: 10px 32px;
+  background: linear-gradient(135deg, var(--accent), var(--primary));
+  border: 3px solid var(--accent);
+  color: var(--bg-dark);
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 18px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow:
+    0 4px 0 rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(255, 237, 0, 0.4);
+  position: relative;
+}
+
+.email-submit-btn:hover {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  transform: translateY(-2px);
+  box-shadow:
+    0 6px 0 rgba(0, 0, 0, 0.5),
+    0 0 30px rgba(255, 237, 0, 0.7);
+}
+
+.email-submit-btn:active {
+  transform: translateY(0);
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.5),
+    0 0 15px rgba(255, 237, 0, 0.4);
+}
+
+.email-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.email-signup-cta {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  text-align: center;
+  text-shadow:
+    2px 2px 0 rgba(0, 0, 0, 0.5),
+    0 0 10px rgba(255, 237, 0, 0.4);
+}
+
+.email-form-message {
+  font-family: "Righteous", sans-serif;
+  font-size: 14px;
+  text-align: center;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-top: 8px;
+  max-width: 280px;
+}
+
+.email-form-message.success {
+  background: rgba(0, 217, 255, 0.2);
+  border: 2px solid var(--primary);
+  color: var(--primary);
+}
+
+.email-form-message.error {
+  background: rgba(255, 56, 56, 0.2);
+  border: 2px solid var(--danger);
+  color: var(--danger);
+}
