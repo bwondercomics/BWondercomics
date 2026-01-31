@@ -582,26 +582,18 @@
       <!-- Page Builder Section -->
       <section class="section" id="pageBuilderSection" style="display: none;">
         <div class="page-builder">
-          <!-- Page Builder Header -->
-          <div class="page-builder-header">
-            <h2 class="section-title">Page Builder</h2>
-            <div class="page-builder-actions">
-              <button type="button" class="btn-secondary" id="pbToggleEditor">Expand Editor</button>
-              <button type="button" class="btn-secondary" id="pbAddPage">+ New Page</button>
-              <button type="button" class="btn-primary" id="pbSave">Save Changes</button>
-            </div>
-          </div>
-
           <!-- Page Builder Layout -->
           <div class="page-builder-layout">
             <!-- Left Sidebar: Page List -->
             <aside class="page-builder-sidebar">
-              <div class="pb-sidebar-section">
-                <h3 class="pb-sidebar-title">Pages</h3>
+              <div class="pb-sidebar-tabs">
+                <button class="pb-sidebar-tab active" data-tab="pages">Pages</button>
+                <button class="pb-sidebar-tab" data-tab="modules">Modules</button>
+              </div>
+              <div class="pb-sidebar-content" data-content="pages">
                 <div id="pbPageList" class="pb-page-list"></div>
               </div>
-              <div class="pb-sidebar-section">
-                <h3 class="pb-sidebar-title">Modules</h3>
+              <div class="pb-sidebar-content" data-content="modules" hidden>
                 <div id="pbModulePalette" class="pb-module-palette"></div>
               </div>
             </aside>
@@ -610,6 +602,11 @@
             <main class="page-builder-canvas">
               <div class="pb-canvas-header">
                 <span class="pb-page-title" id="pbPageTitle"></span>
+                <div class="page-builder-actions">
+                  <button type="button" class="btn-small btn-secondary" id="pbToggleEditor">Expand</button>
+                  <button type="button" class="btn-small btn-secondary" id="pbAddPage">+ Page</button>
+                  <button type="button" class="btn-small btn-primary" id="pbSave">Save</button>
+                </div>
               </div>
               <div id="pbCanvas" class="pb-canvas">
                 <div class="pb-canvas-empty">

@@ -1,30 +1,44 @@
 /* ==================== PAGE BUILDER ==================== */
+
+    /* When page builder is active, make section fill content area */
+    .admin-shell.admin-page-builder-open .admin-content {
+      display: flex;
+      flex-direction: column;
+      height: calc(100vh - var(--admin-header-offset, 76px));
+      overflow: hidden;
+      padding: 10px;
+    }
+
+    .admin-shell.admin-page-builder-open #pageBuilderSection {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      margin-bottom: 0;
+      padding: 10px;
+    }
+
     .page-builder {
       display: flex;
       flex-direction: column;
-      gap: 16px;
-      min-height: 600px;
-    }
-
-    .page-builder-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      flex-wrap: wrap;
+      flex: 1;
+      min-height: 0;
       gap: 12px;
     }
 
     .page-builder-actions {
       display: flex;
-      gap: 8px;
+      gap: 6px;
+      flex-shrink: 0;
     }
-
 
     .page-builder-layout {
       display: grid;
       grid-template-columns: 200px 1fr 260px;
+      grid-template-rows: minmax(0, 1fr);
       gap: 16px;
-      min-height: calc(100vh - 180px);
+      flex: 1;
+      min-height: 0;
     }
 
     .page-builder-layout.pb-editor-expanded {
@@ -38,16 +52,62 @@
       border-radius: 8px;
       padding: 12px;
       overflow-y: auto;
-      max-height: calc(100vh - 180px);
+      min-height: 0;
     }
 
     .page-builder-canvas {
       background: var(--bg-panel);
       border: 1px solid rgba(255, 255, 255, 0.1);
       border-radius: 8px;
-      padding: 16px;
+      min-height: 0;
       overflow-y: auto;
-      max-height: calc(100vh - 180px);
+    }
+
+    /* Sidebar Tabs */
+    .page-builder-sidebar {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .pb-sidebar-tabs {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 12px;
+      flex-shrink: 0;
+    }
+
+    .pb-sidebar-tab {
+      flex: 1;
+      padding: 8px 4px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      color: rgba(255, 255, 255, 0.7);
+      cursor: pointer;
+      font-size: 0.8rem;
+      font-weight: 500;
+      transition: all 0.15s ease;
+    }
+
+    .pb-sidebar-tab:hover {
+      background: rgba(255, 255, 255, 0.1);
+      color: #fff;
+    }
+
+    .pb-sidebar-tab.active {
+      background: var(--primary);
+      color: var(--bg-dark);
+      border-color: var(--primary);
+    }
+
+    .pb-sidebar-content {
+      flex: 1;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    .pb-sidebar-content[hidden] {
+      display: none;
     }
 
     .pb-sidebar-section {
@@ -203,6 +263,7 @@
       padding: 8px 12px;
       background: rgba(0, 0, 0, 0.3);
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      flex-shrink: 0;
     }
 
     .pb-page-title {
@@ -213,9 +274,10 @@
     /* Preview Container */
     .pb-preview-container {
       background: var(--bg-dark, #0a0a12);
-      min-height: 500px;
+      flex: 1;
+      min-height: 0;
       padding: 20px;
-      overflow: auto;
+      overflow-y: auto;
     }
 
     /* Mount placeholders for special modules in preview */
@@ -231,7 +293,10 @@
 
     /* Canvas */
     .pb-canvas {
-      min-height: 400px;
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 16px;
     }
 
     .pb-canvas-empty,

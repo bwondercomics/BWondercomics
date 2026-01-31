@@ -550,7 +550,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
       el.adminDashboard.classList.add("admin-page-builder-open");
     }
     if (el.pageBuilderSection) {
-      el.pageBuilderSection.style.display = "block";
+      el.pageBuilderSection.style.display = "";
       el.pageBuilderSection.scrollIntoView({ behavior: "smooth", block: "start" });
     }
     setActiveNav(el.btnDesigner);
@@ -569,7 +569,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
       const key = "pb-editor-expanded";
       const applyState = (isExpanded) => {
         layout.classList.toggle("pb-editor-expanded", isExpanded);
-        el.pbToggleEditor.textContent = isExpanded ? "Shrink Editor" : "Expand Editor";
+        el.pbToggleEditor.textContent = isExpanded ? "Shrink" : "Expand";
       };
       const saved = localStorage.getItem(key) === "1";
       applyState(saved);
@@ -577,6 +577,21 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
         const next = !layout.classList.contains("pb-editor-expanded");
         localStorage.setItem(key, next ? "1" : "0");
         applyState(next);
+      });
+    }
+
+    // Sidebar tabs
+    const sidebar = document.querySelector(".page-builder-sidebar");
+    if (sidebar) {
+      sidebar.querySelectorAll(".pb-sidebar-tab").forEach((tab) => {
+        tab.addEventListener("click", () => {
+          sidebar.querySelectorAll(".pb-sidebar-tab").forEach((t) => t.classList.remove("active"));
+          tab.classList.add("active");
+          const target = tab.dataset.tab;
+          sidebar.querySelectorAll(".pb-sidebar-content").forEach((c) => {
+            c.hidden = c.dataset.content !== target;
+          });
+        });
       });
     }
 
