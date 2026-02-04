@@ -1,5 +1,6 @@
 import { escapeAttr, escapeHtml } from "./helpers.js";
 import { renderPromoEditor, bindPromoEditorEvents, collectPromoConfig } from "./promo-editor.js";
+import { renderSocialEditor, bindSocialEditorEvents, collectSocialConfig } from "./social-editor.js";
 
 export function renderModuleEditorContent({ currentPage, selectedModuleId }) {
   if (!selectedModuleId) {
@@ -172,6 +173,10 @@ export function renderModuleEditorContent({ currentPage, selectedModuleId }) {
       fieldsHtml = renderPromoEditor(config);
       break;
 
+    case "social":
+      fieldsHtml = renderSocialEditor(config);
+      break;
+
     case "feed":
       fieldsHtml = `
         <div class="pb-editor-field">
@@ -281,6 +286,21 @@ export function bindModuleEditorEvents({
     });
   }
 
+  // Bind social-specific events if social module
+  if (selectedModule.moduleType === "social") {
+    bindSocialEditorEvents({
+      el,
+      currentPage,
+      selectedModuleId,
+      updateModule,
+      renderCanvas,
+      renderEditorPanel,
+      openImagePicker,
+      fetchAssets,
+      uploadAssetFile,
+    });
+  }
+
   // Bind save button
   document.getElementById("pbSaveModule")?.addEventListener("click", async () => {
     let newConfig;
@@ -288,6 +308,8 @@ export function bindModuleEditorEvents({
     // Special handling for promo modules
     if (selectedModule.moduleType === "promo") {
       newConfig = collectPromoConfig(el);
+    } else if (selectedModule.moduleType === "social") {
+      newConfig = collectSocialConfig(el);
     } else {
       newConfig = { ...config };
 

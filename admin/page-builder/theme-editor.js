@@ -6,6 +6,8 @@ export function renderThemeEditorContent(currentPage) {
   const panelBackgrounds = currentPage?.meta?.panelBackgrounds || {};
   const leftBg = panelBackgrounds.left || {};
   const rightBg = panelBackgrounds.right || {};
+  const leftOpacity = typeof leftBg.opacity === "number" ? leftBg.opacity : 0.18;
+  const rightOpacity = typeof rightBg.opacity === "number" ? rightBg.opacity : 0.18;
   const panelSpacing = currentPage?.meta?.panelSpacing || {};
   const leftGap = panelSpacing.left ?? "";
   const rightGap = panelSpacing.right ?? "";
@@ -51,7 +53,11 @@ export function renderThemeEditorContent(currentPage) {
             <label class="pb-editor-label" style="margin:0;">Module Spacing (px)</label>
             <input type="number" class="pb-editor-input pb-panel-gap" data-panel="left" min="0" step="1" placeholder="12" value="${leftGap}">
           </div>
-          <small class="pb-editor-hint pb-panel-bg-meta" data-panel="left">Fit: ${normalizeFit(leftBg.fit || "cover")} · Focus: ${leftBg.focus || "center"}</small>
+          <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+            <label class="pb-editor-label" style="margin:0;">Background Opacity</label>
+            <input type="range" class="pb-panel-bg-opacity" data-panel="left" min="0" max="1" step="0.05" value="${leftOpacity}">
+          </div>
+          <small class="pb-editor-hint pb-panel-bg-meta" data-panel="left">Fit: ${normalizeFit(leftBg.fit || "cover")} · Focus: ${leftBg.focus || "center"} · Opacity: ${leftOpacity}</small>
         </div>
         <div class="pb-editor-field">
           <label class="pb-editor-label">Right Panel</label>
@@ -64,7 +70,11 @@ export function renderThemeEditorContent(currentPage) {
             <label class="pb-editor-label" style="margin:0;">Module Spacing (px)</label>
             <input type="number" class="pb-editor-input pb-panel-gap" data-panel="right" min="0" step="1" placeholder="12" value="${rightGap}">
           </div>
-          <small class="pb-editor-hint pb-panel-bg-meta" data-panel="right">Fit: ${normalizeFit(rightBg.fit || "cover")} · Focus: ${rightBg.focus || "center"}</small>
+          <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+            <label class="pb-editor-label" style="margin:0;">Background Opacity</label>
+            <input type="range" class="pb-panel-bg-opacity" data-panel="right" min="0" max="1" step="0.05" value="${rightOpacity}">
+          </div>
+          <small class="pb-editor-hint pb-panel-bg-meta" data-panel="right">Fit: ${normalizeFit(rightBg.fit || "cover")} · Focus: ${rightBg.focus || "center"} · Opacity: ${rightOpacity}</small>
         </div>
       </div>
       <div class="pb-editor-actions">
@@ -115,9 +125,12 @@ export function bindThemeEditorEvents({
     const data = page?.meta?.panelBackgrounds?.[side] || {};
     const pathInput = el.pbModuleEditor.querySelector(`.pb-panel-bg-path[data-panel="${side}"]`);
     const metaEl = el.pbModuleEditor.querySelector(`.pb-panel-bg-meta[data-panel="${side}"]`);
+    const opacityInput = el.pbModuleEditor.querySelector(`.pb-panel-bg-opacity[data-panel="${side}"]`);
     if (pathInput) pathInput.value = data.path || "";
+    const opacityValue = typeof data.opacity === "number" ? data.opacity : 0.18;
+    if (opacityInput) opacityInput.value = String(opacityValue);
     if (metaEl) {
-      metaEl.textContent = `Fit: ${normalizeFit(data.fit || "cover")} · Focus: ${data.focus || "center"}`;
+      metaEl.textContent = `Fit: ${normalizeFit(data.fit || "cover")} · Focus: ${data.focus || "center"} · Opacity: ${opacityValue}`;
     }
   };
 
@@ -129,6 +142,7 @@ export function bindThemeEditorEvents({
       const current = page?.meta?.panelBackgrounds?.[side] || {};
       const focus = parseFocus(current.focus || "center");
       const fit = normalizeFit(current.fit || "cover");
+      const opacity = typeof current.opacity === "number" ? current.opacity : 0.18;
       await openImagePicker({
         title: `Select ${side} panel background`,
         getItems: fetchAssets,
@@ -148,6 +162,7 @@ export function bindThemeEditorEvents({
             path: item?.path || "",
             fit: normalizeFit(nextFit),
             focus: formatFocus({ x, y }),
+            opacity,
           };
           updatePanelBgUi(side);
         },
@@ -161,6 +176,20 @@ export function bindThemeEditorEvents({
       const backgrounds = ensurePanelBackgrounds();
       if (!backgrounds) return;
       delete backgrounds[side];
+      updatePanelBgUi(side);
+    });
+  });
+
+  el.pbModuleEditor.querySelectorAll(".pb-panel-bg-opacity").forEach((input) => {
+    input.addEventListener("change", () => {
+      const side = input.dataset.panel;
+      if (!side) return;
+      const backgrounds = ensurePanelBackgrounds();
+      if (!backgrounds) return;
+      const raw = parseFloat(input.value);
+      const nextOpacity = Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0.18;
+      if (!backgrounds[side]) backgrounds[side] = {};
+      backgrounds[side].opacity = nextOpacity;
       updatePanelBgUi(side);
     });
   });

@@ -22,7 +22,7 @@ Use it as a living checklist. Mark items as you complete them.
   - `docs/TEMP_THUMBNAIL_PLAN.md`
   - Both plans must be fully completed for 1.0.0
 
-Last updated: 2026-01-28
+Last updated: 2026-02-04
 
 ## Phase 0 - Builder Core (system-wide foundations)
 Goal: finalize the builder-driven reader architecture before more stabilization work.
@@ -50,7 +50,7 @@ Goal: the platform runs clean, stable, and predictable.
 ### Data safety + integrity
 - [x] Verify migrations align with live schema (`backend/alembic/`, `backend/app/models.py`). *(DB at 0015_post_image_fit head on 2026-01-28)*
 - [x] Validate DB write paths for comments, entries, posts, analytics events. *(Checks done 2026-01-21; no legacy targets; posts/media OK; display numbers set)*
-- [x] Enforce canonical IDs: `series_id + display_number` for entries. *(Implemented in code/docs; needs DB audit)*
+- [x] Enforce canonical IDs: `series_id + display_number` for entries. *(DB audit complete; all entries have display_number as of 2026-01-28)*
 - [x] Entries payload is canonical (`entries/entryMeta/entryFolders`); legacy `chapters/*` removed. *(API + reader/admin updated; tests passing)*
 - [x] Media thumbnails + previews are DB-backed; posts reuse media thumbs. *(Thumb pipeline + `posts.media_id` in place)*
 

@@ -57,6 +57,10 @@ export function renderPromoEditor(config) {
                 <option value="contain" ${item.imageFit === "contain" ? "selected" : ""}>Fit (contain)</option>
               </select>
             </div>
+            <div class="pb-editor-field">
+              <label class="pb-editor-label">Link URL</label>
+              <input type="text" class="pb-editor-input pb-promo-input" data-item-index="${index}" data-item-key="linkUrl" value="${escapeAttr(item.linkUrl || "")}">
+            </div>
           </div>
 
           <div class="pb-editor-field">
@@ -414,6 +418,7 @@ export function collectPromoConfig(el) {
     const item = {
       id: generatePromoItemId(),
       image: "",
+      linkUrl: "",
       imageFit: "cover",
       topText: "",
       bottomText: "",

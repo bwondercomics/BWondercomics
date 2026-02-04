@@ -1,4 +1,4 @@
-import { latestPreviewText, renderLatestUpdate } from './latest.js';
+import { latestPreviewHtml, renderLatestUpdate } from './latest.js';
 
 const FALLBACK_IMAGE = '/assets/image-missing.png';
 
@@ -90,7 +90,7 @@ function renderFeedItem(post, index) {
   const item = document.createElement('div');
   item.className = 'feed-item';
   const titleText = String(post.title || '').trim();
-  const previewText = latestPreviewText(post.content || '');
+  const previewHtml = latestPreviewHtml(post.content || '');
 
   const media = document.createElement('div');
   media.className = 'feed-item-media';
@@ -148,7 +148,7 @@ function renderFeedItem(post, index) {
 
   const preview = document.createElement('div');
   preview.className = 'feed-item-preview';
-  preview.textContent = previewText;
+  preview.innerHTML = previewHtml;
 
   const body = document.createElement('div');
   body.className = 'feed-item-body';

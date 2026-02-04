@@ -68,7 +68,8 @@
       pointer-events: none;
     }
 
-    .side-panel.left>* {
+    .side-panel.left>*,
+    .side-panel.right>*:not(.user-settings-btn):not(.links-grid-btn) {
       position: relative;
       z-index: 1;
     }

@@ -1,9 +1,76 @@
 // Latest update widget helpers for the reader sidebar.
-export function latestPreviewText(text = '') {
-  // Strip HTML and truncate to a short summary.
-  const condensed = text.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
-  if (!condensed) return 'No summary yet.';
-  return condensed.length > 120 ? `${condensed.slice(0, 120)}...` : condensed;
+export function latestPreviewHtml(html = '', maxLen = 120) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+  const allowed = new Set(['b', 'strong', 'i', 'em', 'u', 'br', 'p', 'span']);
+
+  const walk = (node) => {
+    [...node.childNodes].forEach((child) => {
+      if (child.nodeType !== Node.ELEMENT_NODE) return;
+      const tag = child.tagName.toLowerCase();
+      if (!allowed.has(tag)) {
+        const fragment = document.createDocumentFragment();
+        while (child.firstChild) fragment.appendChild(child.firstChild);
+        child.replaceWith(fragment);
+        return;
+      }
+      [...child.attributes].forEach((attr) => child.removeAttribute(attr.name));
+      walk(child);
+    });
+  };
+
+  walk(doc.body);
+
+  const text = doc.body.textContent.replace(/\s+/g, ' ').trim();
+  if (!text) return 'No summary yet.';
+  if (!Number.isFinite(maxLen) || maxLen <= 0) {
+    return doc.body.innerHTML.trim() || text;
+  }
+
+  let remaining = maxLen;
+  const truncatedRoot = document.createElement('div');
+
+  const appendNode = (node, parent) => {
+    if (remaining <= 0) return;
+    if (node.nodeType === Node.TEXT_NODE) {
+      const raw = node.textContent || '';
+      if (!raw.trim()) {
+        parent.appendChild(document.createTextNode(raw));
+        return;
+      }
+      const normalized = raw.replace(/\s+/g, ' ');
+      if (normalized.length <= remaining) {
+        parent.appendChild(document.createTextNode(normalized));
+        remaining -= normalized.length;
+      } else {
+        parent.appendChild(document.createTextNode(normalized.slice(0, remaining)));
+        remaining = 0;
+      }
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+    const tag = node.tagName.toLowerCase();
+    if (!allowed.has(tag)) {
+      [...node.childNodes].forEach((child) => appendNode(child, parent));
+      return;
+    }
+
+    const clone = document.createElement(tag);
+    parent.appendChild(clone);
+    [...node.childNodes].forEach((child) => appendNode(child, clone));
+  };
+
+  [...doc.body.childNodes].forEach((child) => appendNode(child, truncatedRoot));
+
+  const truncatedText = truncatedRoot.textContent.replace(/\s+/g, ' ').trim();
+  if (!truncatedText) return 'No summary yet.';
+
+  if (text.length > maxLen) {
+    truncatedRoot.appendChild(document.createTextNode('...'));
+  }
+
+  return truncatedRoot.innerHTML.trim() || truncatedText;
 }
 
 const FALLBACK_IMAGE = '/assets/image-missing.png';
@@ -56,7 +123,7 @@ export function renderLatestUpdate(post, options = {}) {
 
   const preview = document.createElement('div');
   preview.className = 'latest-preview';
-  preview.textContent = latestPreviewText(post.content || '');
+  preview.innerHTML = latestPreviewHtml(post.content || '');
 
   const actions = document.createElement('div');
   actions.className = 'latest-actions';

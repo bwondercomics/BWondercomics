@@ -5,6 +5,7 @@
 
 import { getActiveSeriesId } from "./series.js";
 import { logger } from "./logger.js";
+import { renderPromoModule } from "../admin/page-builder/promo-renderer.js";
 
 /**
  * Escape HTML special characters.
@@ -27,23 +28,6 @@ function resolveImageUrl(path = "") {
   return `/${raw}`;
 }
 
-function clampOpacity(value, fallback = 1) {
-  const num = typeof value === "number" ? value : parseFloat(value);
-  if (!Number.isFinite(num)) return fallback;
-  return Math.min(1, Math.max(0, num));
-}
-
-function hexToRgba(color, opacity) {
-  if (!color || color === "transparent") return "transparent";
-  if (!color.startsWith("#")) return color;
-  const hex = color.replace("#", "");
-  const normalized = hex.length === 3 ? hex.split("").map((c) => c + c).join("") : hex;
-  if (normalized.length !== 6) return color;
-  const r = parseInt(normalized.slice(0, 2), 16);
-  const g = parseInt(normalized.slice(2, 4), 16);
-  const b = parseInt(normalized.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-}
 
 /**
  * Module renderers - each takes a config object and returns HTML.
@@ -126,12 +110,32 @@ export const MODULE_RENDERERS = {
         const icon = escapeHtml(btn.icon || "");
         const text = escapeHtml(btn.text || "");
         const url = escapeHtml(btn.url || "#");
+        const style = btn.style || {};
+
+        const hexToRgba = (hex, opacity) => {
+          const h = (hex || "#000000").replace("#", "");
+          const r = parseInt(h.substring(0, 2), 16) || 0;
+          const g = parseInt(h.substring(2, 4), 16) || 0;
+          const b = parseInt(h.substring(4, 6), 16) || 0;
+          return `rgba(${r},${g},${b},${opacity})`;
+        };
+        const bgOpacity = typeof style.bgOpacity === "number" ? style.bgOpacity : 1;
+        const borderOpacity = typeof style.borderOpacity === "number" ? style.borderOpacity : 1;
+
+        const btnStyles = [];
+        btnStyles.push(`background-color: ${hexToRgba(style.bgColor || "#00d9ff", bgOpacity)}`);
+        if (style.textColor) btnStyles.push(`color: ${style.textColor}`);
+        const bw = style.borderWidth ?? 2;
+        btnStyles.push(`border: ${bw}px solid ${hexToRgba(style.borderColor || "#00d9ff", borderOpacity)}`);
+        if (style.borderRadius != null) btnStyles.push(`border-radius: ${style.borderRadius}px`);
+        const styleAttr = btnStyles.length ? ` style="${btnStyles.join(";")}"` : "";
+
         const isImage = /\.(png|jpe?g|webp|gif|svg)$/i.test(icon);
         const iconHtml = isImage
           ? `<img src="${icon}" alt="${text}" />`
           : `<span class="pb-social-icon-text">${icon}</span>`;
         return `
-          <a href="${url}" class="pb-social-btn" target="_blank" rel="noopener noreferrer">
+          <a href="${url}" class="pb-social-btn"${styleAttr} target="_blank" rel="noopener noreferrer">
             <span class="pb-social-icon">${iconHtml}</span>
             <span class="pb-social-text">${text}</span>
           </a>
@@ -285,153 +289,11 @@ export const MODULE_RENDERERS = {
     return `<div class="pb-html">${code}</div>`;
   },
 
-  promo: (config) => {
-    const items = config.items || [];
-    if (items.length === 0) {
-      return '<div class="pb-promo pb-promo--empty">No promos configured</div>';
-    }
-
-    const height = config.height || 400;
-    const showNav = config.showNavigation !== false;
-    const showIndicators = config.showIndicators !== false;
-    const autoRotate = config.autoRotate !== false;
-    const interval = config.interval || 5000;
-    const transition = config.transition || "fade";
-
-    const hasBlurBackground = items.some((item) => Boolean(item?.style?.backgroundBlur));
-
-    const slidesHtml = items.map((item, index) => {
-      const style = item.style || {};
-      const isOverlay = item.textPosition === "overlay";
-
-      const slideStyles = [];
-      const bgOpacity = clampOpacity(style.backgroundOpacity, 0.6);
-      const bgColor = style.backgroundColor || "transparent";
-      const blurBackground = Boolean(style.backgroundBlur);
-      const bgBaseColor = bgColor === "transparent" ? "#000000" : bgColor;
-      const bgRgba = hexToRgba(bgBaseColor, bgOpacity);
-      if (blurBackground) {
-        slideStyles.push(`--promo-bg-rgba: ${bgRgba}`);
-      } else if (bgColor !== "transparent") {
-        slideStyles.push(`background-color: ${bgRgba}`);
-      }
-
-      const imageStyles = [];
-      const frameStyles = [];
-      if (style.imageBorder) {
-        frameStyles.push(`border: 2px solid ${style.imageBorderColor || "#00d9ff"}`);
-      }
-      if (style.imageGlow) {
-        const glowColor = style.imageGlowColor || "#00d9ff";
-        const intensity = style.imageGlowIntensity || 0.5;
-        frameStyles.push(`box-shadow: 0 0 ${20 * intensity}px ${glowColor}, 0 0 ${40 * intensity}px ${glowColor}`);
-      }
-      const fit = item.imageFit === "contain" ? "contain" : "cover";
-      const objectFit = fit === "contain" ? "contain" : "cover";
-      imageStyles.push(`object-fit: ${objectFit}`);
-      imageStyles.push(`object-position: center`);
-
-      const topTextStyles = [];
-      topTextStyles.push(`color: ${style.topTextColor || "#ffed00"}`);
-      if (style.topTextFont === "display") {
-        topTextStyles.push('font-family: "Bebas Neue", sans-serif');
-      } else if (style.topTextFont === "mono") {
-        topTextStyles.push('font-family: "JetBrains Mono", monospace');
-      }
-      if (style.topTextGlow) {
-        const glowColor = style.topTextGlowColor || "#ffed00";
-        topTextStyles.push(`text-shadow: 0 0 10px ${glowColor}, 0 0 20px ${glowColor}`);
-      }
-
-      const bottomTextStyles = [];
-      bottomTextStyles.push(`color: ${style.bottomTextColor || "#ffffff"}`);
-      if (style.bottomTextFont === "display") {
-        bottomTextStyles.push('font-family: "Bebas Neue", sans-serif');
-      } else if (style.bottomTextFont === "mono") {
-        bottomTextStyles.push('font-family: "JetBrains Mono", monospace');
-      }
-      if (style.bottomTextGlow) {
-        const glowColor = style.bottomTextGlowColor || "#00d9ff";
-        bottomTextStyles.push(`text-shadow: 0 0 10px ${glowColor}, 0 0 20px ${glowColor}`);
-      }
-
-      const imageSrc = escapeHtml(resolveImageUrl(item.image || ""));
-      const topText = item.topText ? `<div class="pb-promo-top-text" style="${topTextStyles.join(";")}">${escapeHtml(item.topText)}</div>` : "";
-      const bottomText = item.bottomText ? `<div class="pb-promo-bottom-text" style="${bottomTextStyles.join(";")}">${item.bottomText}</div>` : "";
-
-      const imageHtml = imageSrc
-        ? `<div class="pb-promo-image-frame" data-fit="${fit}"${frameStyles.length ? ` style="${frameStyles.join(";")}"` : ""}>
-             <img src="${imageSrc}" alt="" loading="lazy" data-fit="${fit}" style="${imageStyles.join(";")}" class="pb-promo-img" />
-           </div>`
-        : '<div class="pb-promo-no-image"></div>';
-
-      const previewHtml = imageSrc && !isOverlay
-        ? `<div class="pb-promo-preview">
-             ${imageHtml}
-           </div>`
-        : imageHtml;
-
-      const slideClasses = [
-        "pb-promo-slide",
-        index === 0 ? "active" : "",
-        blurBackground ? "pb-promo-slide--bg-blur" : "",
-      ]
-        .filter(Boolean)
-        .join(" ");
-
-      if (isOverlay) {
-        return `
-          <div class="${slideClasses}" data-index="${index}" style="${slideStyles.join(";")}">
-            <div class="pb-promo-image-container">
-              ${previewHtml}
-              <div class="pb-promo-overlay">
-                ${topText}
-                ${bottomText}
-              </div>
-            </div>
-          </div>
-        `;
-      } else {
-        return `
-          <div class="${slideClasses} pb-promo-slide--outside" data-index="${index}" style="${slideStyles.join(";")}">
-            ${item.topText ? `<div class="pb-promo-top-text left-panel-text-top" style="${topTextStyles.join(";")}">${escapeHtml(item.topText)}</div>` : ""}
-            <div class="pb-promo-image-container">
-              ${previewHtml}
-            </div>
-            ${item.bottomText ? `<div class="pb-promo-bottom-text left-panel-text-bottom" style="${bottomTextStyles.join(";")}">${item.bottomText}</div>` : ""}
-          </div>
-        `;
-      }
-    }).join("");
-
-    const indicatorsHtml = showIndicators && items.length > 1 ? `
-      <div class="pb-promo-indicators">
-        ${items.map((_, i) => `<button class="pb-promo-indicator ${i === 0 ? "active" : ""}" data-index="${i}" aria-label="Go to slide ${i + 1}"></button>`).join("")}
-      </div>
-    ` : "";
-
-    const navHtml = showNav && items.length > 1 ? `
-      <button class="pb-promo-nav pb-promo-nav--prev" data-dir="prev" aria-label="Previous slide">\u2039</button>
-      <button class="pb-promo-nav pb-promo-nav--next" data-dir="next" aria-label="Next slide">\u203A</button>
-    ` : "";
-
-    const hasOutside = items.some((item) => item.textPosition === "outside");
-
-    return `
-      <div class="pb-promo pb-promo--${transition}" data-bg-blur="${hasBlurBackground}" data-show-indicators="${showIndicators && items.length > 1}"
-           data-has-outside="${hasOutside}"
-           style="--promo-height: ${height}px;"
-           data-auto-rotate="${autoRotate}"
-           data-interval="${interval}"
-           data-item-count="${items.length}">
-        <div class="pb-promo-slides">
-          ${slidesHtml}
-        </div>
-        ${navHtml}
-        ${indicatorsHtml}
-      </div>
-    `;
-  },
+  promo: (config) =>
+    renderPromoModule(config, {
+      escapeHtml,
+      resolveImageUrl,
+    }),
 };
 
 /**

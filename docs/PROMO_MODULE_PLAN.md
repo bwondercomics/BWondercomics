@@ -10,6 +10,15 @@ Scope: promo module only (builder preview + reader runtime). No unrelated UI cha
 
 ---
 
+## Status checklist
+- [ ] Phase 1 — Lock the grid (no clipping)
+- [ ] Phase 2 — Add image frame (foundation)
+- [ ] Phase 3 — Compute frame size (core fix)
+- [ ] Phase 4 — Move border/glow to frame
+- [ ] Phase 5 — CSS baseline for frame
+- [ ] Phase 6 — Recompute on resize / slide change
+- [ ] Phase 7 — Verification + failure-mode checks
+
 ## Summary (one paragraph)
 The promo module fix locks a fixed grid so text/indicators never overlap, adds a sizing frame around the image, computes the frame’s exact bounds for Fit vs Fill using the image’s natural size and container dimensions, moves border/glow to that frame, and adds baseline CSS so the frame—not the image—defines size. It recomputes on slide change and resize, and includes a no‑image safety guard so missing images render the placeholder without errors. Finally it verifies all Fit/Fill + Overlay/Outside combinations in both builder preview and runtime for consistent borders and zero clipping.
 

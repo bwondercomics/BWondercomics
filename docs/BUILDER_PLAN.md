@@ -16,11 +16,11 @@ Related docs:
 4) Build → deploy live.
 
 ## Draft vs publish UX
-- Publish toggle **removed from UI** (builder is edit-only).
-- Next step: replace with explicit actions:
-  - **Save Draft** (keeps `isPublished=false`)
-  - **Publish Changes** (sets `isPublished=true`)
-This removes ambiguity and matches the intended workflow.
+- [x] Publish toggle removed from UI (builder is edit-only).
+- [ ] Replace with explicit actions:
+- [ ] Save Draft (keeps `isPublished=false`).
+- [ ] Publish Changes (sets `isPublished=true`).
+- [ ] Update labels/help text to match the explicit actions.
 
 ## Complications + solutions (least → most complex)
 1) Page ID/series mismatch
@@ -139,11 +139,17 @@ Modules can be placed in either panel and ordered:
 - Gallery (optional future)
 
 ### Recent builder changes (current state)
-- **Preview toggle removed** (edit-only canvas).
-- **Disable fallback** toggle removed (no dev fallbacks in UI).
-- **Published** toggle removed (publish actions pending).
-- **Promo image picker simplified**: no crop/focus/zoom editor.
-- **Promo per-slide Image Fit** added (Fill/cover vs Fit/contain).
+- [x] Preview toggle removed (edit-only canvas).
+- [x] Disable fallback toggle removed (no dev fallbacks in UI).
+- [x] Published toggle removed (publish actions pending).
+- [x] Promo image picker simplified (no crop/focus/zoom editor).
+- [x] Promo per-slide Image Fit added (Fill/cover vs Fit/contain).
+
+## Completed so far (confirmed)
+- Panel modules render correctly on the reader-facing page (left/right panels show expected content).
+- Feed preview renders formatted text and is truncated to a snippet.
+- Social buttons module renders correctly in panels.
+- Social module editor UI is present in the builder.
 
 ### Promo module status (current)
 - **Unstable layout**: border/fit/fill/text spacing still inconsistent across slides.
