@@ -25,6 +25,7 @@ from ..db import get_db
 from ..file_ops import ALLOWED_IMAGE_EXTENSIONS, extract_numbers, renumber_files, safe_path
 from ..models import Entry, EntryPage, MediaItem, PremiumCode, PremiumCodeRedemption, Series, User
 from ..security import get_current_user
+from ..preview_pipeline import resolve_source_path
 from ..series_store import apply_series_data_save, apply_series_index_save, sanitize_series_id
 from ..settings import settings
 from ..validation import is_admin_role, is_premium_role
@@ -215,6 +216,50 @@ def protected_assets(asset_path: str, request: Request, db: Session = Depends(ge
         return JSONResponse(status_code=403, content={"error": "Premium content"})
 
     return FileResponse(abs_path)
+
+
+@router.get("/api/cover/{series_id}/{entry_title:path}")
+def public_entry_cover(series_id: str, entry_title: str, db: Session = Depends(get_db)):
+    """Serve the cover image for any entry without auth (public teaser)."""
+    sid = sanitize_series_id(series_id)
+    series = db.get(Series, sid)
+    if not series or not series.active:
+        return JSONResponse(status_code=404, content={"error": "Not found"})
+
+    entry = db.scalar(
+        select(Entry).where(Entry.series_id == sid, Entry.title == entry_title)
+    )
+    if not entry:
+        return JSONResponse(status_code=404, content={"error": "Not found"})
+
+    # 1. Try the pre-generated cover thumbnail (smallest, fastest).
+    if entry.cover_thumb_path:
+        try:
+            thumb = safe_path(entry.cover_thumb_path)
+            if thumb.is_file():
+                return FileResponse(thumb)
+        except ValueError:
+            pass
+
+    # 2. Try the configured cover image source.
+    if entry.cover_image:
+        source = resolve_source_path(entry.cover_image)
+        if source and source.is_file():
+            return FileResponse(source)
+
+    # 3. Fall back to the first page of the entry.
+    first_page = db.scalar(
+        select(EntryPage)
+        .where(EntryPage.entry_id == entry.id)
+        .order_by(EntryPage.sort_index.asc())
+        .limit(1)
+    )
+    if first_page:
+        source = resolve_source_path(first_page.path)
+        if source and source.is_file():
+            return FileResponse(source)
+
+    return JSONResponse(status_code=404, content={"error": "No cover found"})
 
 
 class SaveRequest(BaseModel):

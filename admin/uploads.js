@@ -164,7 +164,7 @@ function createUploadManager({
 
   function maybeAutoUpload() {
     if (!state.selectedFiles.length || state.isUploading) return;
-    const entryName = entriesApi?.getActiveChapterName();
+    const entryName = entriesApi?.getActiveEntryName();
     const uploadProgress = document.getElementById("uploadProgress");
     if (!entryName) {
       if (uploadProgress) uploadProgress.style.display = "none";
@@ -180,7 +180,7 @@ function createUploadManager({
     const uploadProgress = document.getElementById("uploadProgress");
 
     if (state.isUploading) return;
-    const entryName = entriesApi?.getActiveChapterName();
+    const entryName = entriesApi?.getActiveEntryName();
     if (!entryName) {
       if (showError) showError("Enter an entry name first.");
       if (uploadProgress) {

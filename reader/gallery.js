@@ -22,10 +22,15 @@ const imageObserver = new IntersectionObserver((entries) => {
   rootMargin: '50px' // Start loading 50px before image enters viewport
 });
 
-function getLockedCoverUrl(chapterName, meta) {
+function getLockedCoverUrl(chapterName, meta, seriesId) {
   if (meta && typeof meta === "object") {
     const configured = (meta.coverImage || meta.cover || "").toString().trim();
     if (configured) return configured;
+    const thumb = (meta.coverThumbPath || "").toString().trim();
+    if (thumb) return thumb.startsWith("/") ? thumb : `/${thumb}`;
+  }
+  if (seriesId) {
+    return `/api/cover/${encodeURIComponent(seriesId)}/${encodeURIComponent(chapterName)}`;
   }
   return "";
 }
@@ -69,6 +74,7 @@ export function renderGallery(entryOrder, entries, options = {}) {
   const lockedEntries = Array.isArray(options.lockedEntries) ? options.lockedEntries : [];
   const entryMetaPayload = options.entryMeta && typeof options.entryMeta === "object" ? options.entryMeta : {};
   const unitLabel = options.unitLabelSingular || "Entry";
+  const seriesId = options.seriesId || "";
 
   // Append a promo card for merch or special volume releases.
   const addPromoCard = (cover, variantClass, badgeText) => {
@@ -193,7 +199,7 @@ export function renderGallery(entryOrder, entries, options = {}) {
 
   lockedEntries.forEach((name) => {
     const meta = entryMetaPayload?.[name];
-    const coverUrl = getLockedCoverUrl(name, meta);
+    const coverUrl = getLockedCoverUrl(name, meta, seriesId);
     const displayTitle = formatEntryLabel(name, meta, unitLabel);
 
     const card = document.createElement("div");

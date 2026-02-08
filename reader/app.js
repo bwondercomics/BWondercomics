@@ -136,6 +136,7 @@ import { getActiveSeriesId } from "./series.js";
   let fullEntryMeta = {};
   let fullStatusMessage = "";
   let fullPremiumOnly = false;
+  let currentLockedEntries = [];
 
   function getUnitLabels() {
     const singular = String(unitLabelSingular || "").trim() || "Entry";
@@ -207,6 +208,7 @@ import { getActiveSeriesId } from "./series.js";
 
   function refreshEntriesForSession(user) {
     const { lockedEntries } = applyPremiumGating(user);
+    currentLockedEntries = lockedEntries;
     const current = state.currentEntry;
     const currentExists = current && entries[current];
     if (!currentExists) {
@@ -233,6 +235,7 @@ import { getActiveSeriesId } from "./series.js";
       lockedEntries,
       entryMeta: fullEntryMeta,
       unitLabelSingular,
+      seriesId: getActiveSeriesId(),
     });
   }
 
@@ -389,6 +392,41 @@ import { getActiveSeriesId } from "./series.js";
           el.entry.dispatchEvent(new Event("change", { bubbles: true }));
         }
         setEntryMenuOpen(false);
+      });
+
+      menu.appendChild(button);
+    });
+
+    // Append locked (premium) entries for non-premium users
+    const locked = currentLockedEntries.filter(shouldShowInDropdown);
+    locked.forEach((name) => {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "entry-option entry-option--locked";
+      button.dataset.value = name;
+      button.setAttribute("role", "option");
+      button.setAttribute("aria-selected", "false");
+
+      const label = document.createElement("span");
+      label.className = "entry-option-name";
+      label.textContent = formatEntryLabel(name);
+      button.appendChild(label);
+
+      const patron = document.createElement("span");
+      patron.className = "entry-option-patron";
+      patron.textContent = "Patron";
+      button.appendChild(patron);
+
+      button.addEventListener("click", () => {
+        setEntryMenuOpen(false);
+        const commentsSection = document.getElementById("comicCommentsSection");
+        const toggleBtn = document.getElementById("commentToggleBtn");
+        if (commentsSection && commentsSection.classList.contains("collapsed") && toggleBtn) {
+          toggleBtn.click();
+        }
+        if (commentsSection && typeof commentsSection.scrollIntoView === "function") {
+          commentsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
       });
 
       menu.appendChild(button);
@@ -909,6 +947,7 @@ import { getActiveSeriesId } from "./series.js";
 
     const role = (sessionUser?.role || "").toString().toLowerCase();
     const { lockedEntries, isPremiumUser } = applyPremiumGating(sessionUser);
+    currentLockedEntries = lockedEntries;
     const adminNavLink = document.getElementById("adminNavLink");
     if (adminNavLink) {
       adminNavLink.style.display = role === "admin" ? "inline-flex" : "none";
@@ -918,6 +957,7 @@ import { getActiveSeriesId } from "./series.js";
       lockedEntries,
       entryMeta: fullEntryMeta,
       unitLabelSingular,
+      seriesId,
     });
     const pageConfig = await loadPageConfigWithFallback(setSubtitles, seriesId);
     if (pageConfig.source === 'builder' && pageConfig.page) {

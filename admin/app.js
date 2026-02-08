@@ -367,7 +367,7 @@ const uploadManager = createUploadManager({
 
 // ---------------- RENUMBER ----------------
 async function renumberPages() {
-  const entryName = entriesApi.getActiveChapterName();
+  const entryName = entriesApi.getActiveEntryName();
   const chapterFolder = getChapterFolder(
     entryName,
     state.entryFolders,
@@ -561,7 +561,7 @@ function attachEventHandlers() {
   el.btnCancelEdit.addEventListener("click", entriesApi.hideModal);
   el.editForm.addEventListener("submit", async (e) => {
     e.preventDefault();
-    await entriesApi.saveChapterEdit();
+    await entriesApi.saveEntryEdit();
   });
   el.btnAddPage.addEventListener("click", entriesApi.addPage);
 

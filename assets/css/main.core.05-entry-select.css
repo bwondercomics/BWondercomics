@@ -142,6 +142,15 @@
       color: var(--text);
     }
 
+    .entry-option--locked {
+      opacity: 0.7;
+    }
+
+    .entry-option--locked:hover {
+      background: rgba(57, 255, 126, 0.1);
+      opacity: 1;
+    }
+
     .entry-option-patron {
       display: inline-flex;
       align-items: center;

@@ -8,6 +8,8 @@ export function renderThemeEditorContent(currentPage) {
   const rightBg = panelBackgrounds.right || {};
   const leftOpacity = typeof leftBg.opacity === "number" ? leftBg.opacity : 0.18;
   const rightOpacity = typeof rightBg.opacity === "number" ? rightBg.opacity : 0.18;
+  const leftHideEmpty = !!leftBg.hideEmptyText;
+  const rightHideEmpty = !!rightBg.hideEmptyText;
   const panelSpacing = currentPage?.meta?.panelSpacing || {};
   const leftGap = panelSpacing.left ?? "";
   const rightGap = panelSpacing.right ?? "";
@@ -57,6 +59,10 @@ export function renderThemeEditorContent(currentPage) {
             <label class="pb-editor-label" style="margin:0;">Background Opacity</label>
             <input type="range" class="pb-panel-bg-opacity" data-panel="left" min="0" max="1" step="0.05" value="${leftOpacity}">
           </div>
+          <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+            <label class="pb-editor-label" style="margin:0;">Hide empty panel text</label>
+            <input type="checkbox" class="pb-panel-empty-toggle" data-panel="left" ${leftHideEmpty ? "checked" : ""}>
+          </div>
           <small class="pb-editor-hint pb-panel-bg-meta" data-panel="left">Fit: ${normalizeFit(leftBg.fit || "cover")} · Focus: ${leftBg.focus || "center"} · Opacity: ${leftOpacity}</small>
         </div>
         <div class="pb-editor-field">
@@ -73,6 +79,10 @@ export function renderThemeEditorContent(currentPage) {
           <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
             <label class="pb-editor-label" style="margin:0;">Background Opacity</label>
             <input type="range" class="pb-panel-bg-opacity" data-panel="right" min="0" max="1" step="0.05" value="${rightOpacity}">
+          </div>
+          <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
+            <label class="pb-editor-label" style="margin:0;">Hide empty panel text</label>
+            <input type="checkbox" class="pb-panel-empty-toggle" data-panel="right" ${rightHideEmpty ? "checked" : ""}>
           </div>
           <small class="pb-editor-hint pb-panel-bg-meta" data-panel="right">Fit: ${normalizeFit(rightBg.fit || "cover")} · Focus: ${rightBg.focus || "center"} · Opacity: ${rightOpacity}</small>
         </div>
@@ -126,9 +136,11 @@ export function bindThemeEditorEvents({
     const pathInput = el.pbModuleEditor.querySelector(`.pb-panel-bg-path[data-panel="${side}"]`);
     const metaEl = el.pbModuleEditor.querySelector(`.pb-panel-bg-meta[data-panel="${side}"]`);
     const opacityInput = el.pbModuleEditor.querySelector(`.pb-panel-bg-opacity[data-panel="${side}"]`);
+    const emptyToggle = el.pbModuleEditor.querySelector(`.pb-panel-empty-toggle[data-panel="${side}"]`);
     if (pathInput) pathInput.value = data.path || "";
     const opacityValue = typeof data.opacity === "number" ? data.opacity : 0.18;
     if (opacityInput) opacityInput.value = String(opacityValue);
+    if (emptyToggle) emptyToggle.checked = !!data.hideEmptyText;
     if (metaEl) {
       metaEl.textContent = `Fit: ${normalizeFit(data.fit || "cover")} · Focus: ${data.focus || "center"} · Opacity: ${opacityValue}`;
     }
@@ -143,6 +155,7 @@ export function bindThemeEditorEvents({
       const focus = parseFocus(current.focus || "center");
       const fit = normalizeFit(current.fit || "cover");
       const opacity = typeof current.opacity === "number" ? current.opacity : 0.18;
+      const hideEmptyText = !!current.hideEmptyText;
       await openImagePicker({
         title: `Select ${side} panel background`,
         getItems: fetchAssets,
@@ -163,6 +176,7 @@ export function bindThemeEditorEvents({
             fit: normalizeFit(nextFit),
             focus: formatFocus({ x, y }),
             opacity,
+            hideEmptyText,
           };
           updatePanelBgUi(side);
         },
@@ -190,6 +204,18 @@ export function bindThemeEditorEvents({
       const nextOpacity = Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0.18;
       if (!backgrounds[side]) backgrounds[side] = {};
       backgrounds[side].opacity = nextOpacity;
+      updatePanelBgUi(side);
+    });
+  });
+
+  el.pbModuleEditor.querySelectorAll(".pb-panel-empty-toggle").forEach((input) => {
+    input.addEventListener("change", () => {
+      const side = input.dataset.panel;
+      if (!side) return;
+      const backgrounds = ensurePanelBackgrounds();
+      if (!backgrounds) return;
+      if (!backgrounds[side]) backgrounds[side] = {};
+      backgrounds[side].hideEmptyText = !!input.checked;
       updatePanelBgUi(side);
     });
   });

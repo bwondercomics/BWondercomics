@@ -157,16 +157,17 @@
       bottom: 10px;
       padding: 6px 10px;
       border-radius: 999px;
-      background: rgba(0, 0, 0, 0.55);
-      border: 1px solid rgba(255, 255, 255, 0.25);
+      background: rgba(57, 255, 126, 0.18);
+      border: 1px solid rgba(57, 255, 126, 0.75);
+      color: #39ff7e;
+      font-family: "Bebas Neue", sans-serif;
       font-size: 12px;
       letter-spacing: 1px;
       text-transform: uppercase;
     }
 
     .card--locked .cover img {
-      filter: blur(2px) grayscale(0.25) brightness(0.75);
-      transform: scale(1.02);
+      /* Covers shown clean with Patron badge — no blur/darken */
     }
 
     .card h2 {
@@ -307,8 +308,6 @@
 
     // Use the first readable page as a fallback cover image.
     async function inferCoverFromSeriesData(series, { canAccess, premium }) {
-      if (!canAccess) return null;
-
       const url = getSeriesDataUrl(series.id);
       const res = await fetch(url, { cache: 'no-store' });
       if (!res.ok) return null;
@@ -322,7 +321,10 @@
         if (!Array.isArray(pages) || pages.length === 0) continue;
         const meta = entryMeta[entryName];
         const isPremiumEntry = !!(meta && typeof meta === 'object' && meta.premium);
-        if (isPremiumEntry && !premium) continue;
+        if (isPremiumEntry) {
+          // Use the public cover endpoint for premium entries
+          return `/api/cover/${encodeURIComponent(series.id)}/${encodeURIComponent(entryName)}`;
+        }
 
         const first = pages.find((p) => typeof p === 'string' && p.trim());
         const cover = normalizeCoverUrl(first);
@@ -371,9 +373,9 @@
       if (!canAccess) {
         const badge = document.createElement('div');
         badge.className = 'cover-badge';
-        badge.textContent = series.premiumOnly ? 'Premium' : 'Locked';
+        badge.textContent = 'Patron';
         coverWrap.appendChild(badge);
-        placeholder.textContent = 'Premium (locked)';
+        placeholder.textContent = 'Patron';
       }
 
       const desc = document.createElement('div');

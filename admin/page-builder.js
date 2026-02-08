@@ -171,19 +171,14 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     }
 
     el.pbPageList.innerHTML = pages
-      .map((page) => {
-        const statusLabel = page.isPublished ? "Published" : "Draft";
-        const statusClass = page.isPublished ? "published" : "draft";
-        return `
+      .map((page) => `
       <div class="pb-page-item ${currentPage?.id === page.id ? "active" : ""}" data-page-id="${page.id}">
         <span class="pb-page-item-title">${escapeHtml(page.title || page.slug)}</span>
-        <span class="pb-page-status ${statusClass}">${statusLabel}</span>
         <span class="pb-page-item-actions">
           <button class="pb-page-action delete" data-action="delete" title="Delete page">\u00D7</button>
         </span>
       </div>
-    `;
-      })
+    `)
       .join("");
 
     // Bind click events
@@ -239,12 +234,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
 
     // Update page title display
     if (el.pbPageTitle) {
-      if (currentPage) {
-        const statusLabel = currentPage.isPublished ? "Published" : "Draft";
-        el.pbPageTitle.textContent = `Page: ${currentPage.title} (${statusLabel})`;
-      } else {
-        el.pbPageTitle.textContent = "";
-      }
+      el.pbPageTitle.textContent = currentPage ? `Page: ${currentPage.title}` : "";
     }
 
     if (!currentPage) {
@@ -623,6 +613,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
 
       try {
         // Save page metadata
+        currentPage.isPublished = true;
         await fetch(`/api/admin/pages/${currentPage.id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -630,7 +621,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
             title: currentPage.title,
             slug: currentPage.slug,
             meta: currentPage.meta,
-            isPublished: !!currentPage.isPublished
+            isPublished: true
           })
         });
 

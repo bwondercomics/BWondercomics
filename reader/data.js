@@ -257,6 +257,7 @@ export function applyBuilderPageToDOM(page) {
   applyPageTheme(page);
   applyPanelBackgrounds(page);
   const panelSpacing = page?.meta?.panelSpacing || {};
+  const panelBackgrounds = page?.meta?.panelBackgrounds || {};
 
   // Find modules by type across all sections
   const findModulesByType = (type) => {
@@ -278,6 +279,7 @@ export function applyBuilderPageToDOM(page) {
     'social',
     'email-signup',
     'buttons',
+    'spacer',
     'promo',
     'feed',
     'gallery',
@@ -320,8 +322,8 @@ export function applyBuilderPageToDOM(page) {
   // Apply left/right panel content based on columns
   const leftModules = findPanelModules('left');
   const rightModules = findPanelModules('right');
-  renderPanelStack('left', leftModules, panelSpacing);
-  renderPanelStack('right', rightModules, panelSpacing);
+  renderPanelStack('left', leftModules, panelSpacing, panelBackgrounds);
+  renderPanelStack('right', rightModules, panelSpacing, panelBackgrounds);
 
   // Check panel visibility from section settings
   for (const section of page.sections) {
@@ -348,7 +350,7 @@ export function applyBuilderPageToDOM(page) {
 /**
  * Render builder modules into panel stacks.
  */
-function renderPanelStack(side, modules, panelSpacing = {}) {
+function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {}) {
   const panelId = side === 'left' ? 'leftPanel' : 'rightPanel';
   const panel = document.getElementById(panelId);
   if (!panel) return;
@@ -394,7 +396,8 @@ function renderPanelStack(side, modules, panelSpacing = {}) {
   modules.sort((a, b) => (a.module.sortIndex || 0) - (b.module.sortIndex || 0));
 
   if (!modules.length) {
-    container.innerHTML = '<div class="pb-page-empty">No panel modules.</div>';
+    const hideEmptyText = !!panelBackgrounds?.[side]?.hideEmptyText;
+    container.innerHTML = hideEmptyText ? '' : '<div class="pb-page-empty">No panel modules.</div>';
     return;
   }
 
