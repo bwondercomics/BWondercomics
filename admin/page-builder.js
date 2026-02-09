@@ -86,7 +86,18 @@ function getDefaultConfig(moduleType) {
         feedHref: "feed.html",
         showMediaButton: true,
         mediaLabel: "Media",
-        mediaHref: "media.html"
+        mediaHref: "media.html",
+        style: {
+          headingBgColor: "#ffed00",
+          headingTextColor: "#0a0a12",
+          authorColor: "#7ef5e3",
+          buttonBgColor: "#00d9ff",
+          buttonTextColor: "#0a0a12",
+          itemTitleColor: "#ffed00",
+          itemDateColor: "#00d9ff",
+          itemBorderColor: "#00d9ff",
+          borderColor: "#ffed00",
+        },
       };
     case "html":
       return { code: "" };

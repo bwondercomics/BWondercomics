@@ -109,13 +109,17 @@ export function renderLatestUpdate(post, options = {}) {
   label.className = 'latest-label';
   label.textContent = 'Newest drop';
 
+  const feedStyle = options.feedStyle || {};
+
   const name = document.createElement('div');
   name.className = 'latest-name';
   name.textContent = titleText || 'Update';
   if (!titleText) name.classList.add('is-placeholder');
+  if (feedStyle.itemTitleColor) name.style.color = feedStyle.itemTitleColor;
 
   const date = document.createElement('div');
   date.className = 'latest-date';
+  if (feedStyle.itemDateColor) date.style.color = feedStyle.itemDateColor;
   const parsedDate = post.date ? new Date(post.date) : null;
   date.textContent = parsedDate && !Number.isNaN(parsedDate) ?
     parsedDate.toLocaleDateString(undefined, { dateStyle: 'medium' }) :
@@ -135,6 +139,11 @@ export function renderLatestUpdate(post, options = {}) {
   feedLink.href = feedHref;
   feedLink.textContent = feedLabel;
   feedLink.setAttribute('aria-label', 'Open feed for latest update');
+  if (feedStyle.buttonBgColor) {
+    feedLink.style.background = feedStyle.buttonBgColor;
+    feedLink.style.borderColor = feedStyle.buttonBgColor;
+  }
+  if (feedStyle.buttonTextColor) feedLink.style.color = feedStyle.buttonTextColor;
 
   if (!options.container) {
     const topFeedLink = document.getElementById('rightPanelOpenFeed');
@@ -152,6 +161,11 @@ export function renderLatestUpdate(post, options = {}) {
     mediaLink.href = options.mediaHref || 'media.html';
     mediaLink.textContent = options.mediaLabel || 'Media';
     mediaLink.setAttribute('aria-label', 'Open media library');
+    if (feedStyle.buttonBgColor) {
+      mediaLink.style.background = feedStyle.buttonBgColor;
+      mediaLink.style.borderColor = feedStyle.buttonBgColor;
+    }
+    if (feedStyle.buttonTextColor) mediaLink.style.color = feedStyle.buttonTextColor;
     actions.appendChild(mediaLink);
   }
 

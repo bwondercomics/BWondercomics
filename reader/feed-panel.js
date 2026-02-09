@@ -86,9 +86,10 @@ function safeId(value, fallback) {
   return cleaned || fallback;
 }
 
-function renderFeedItem(post, index) {
+function renderFeedItem(post, index, feedStyle = {}) {
   const item = document.createElement('div');
   item.className = 'feed-item';
+  if (feedStyle.itemBorderColor) item.style.borderColor = feedStyle.itemBorderColor;
   const titleText = String(post.title || '').trim();
   const previewHtml = latestPreviewHtml(post.content || '');
 
@@ -138,9 +139,11 @@ function renderFeedItem(post, index) {
   title.href = feedHref;
   title.textContent = titleText || 'Update';
   if (!titleText) title.classList.add('is-placeholder');
+  if (feedStyle.itemTitleColor) title.style.color = feedStyle.itemTitleColor;
 
   const date = document.createElement('div');
   date.className = 'feed-item-date';
+  if (feedStyle.itemDateColor) date.style.color = feedStyle.itemDateColor;
   const parsedDate = post.date ? new Date(post.date) : null;
   date.textContent = parsedDate && !Number.isNaN(parsedDate)
     ? parsedDate.toLocaleDateString(undefined, { dateStyle: 'medium' })
@@ -175,7 +178,7 @@ function renderFeedItem(post, index) {
   return item;
 }
 
-export async function loadFeedInto(body, limit = null) {
+export async function loadFeedInto(body, limit = null, feedStyle = {}) {
   body.innerHTML = '<div class="latest-loading">Loading...</div>';
   try {
     const posts = await fetchFeedPosts();
@@ -187,7 +190,7 @@ export async function loadFeedInto(body, limit = null) {
     }
 
     const fragment = document.createDocumentFragment();
-    limitedPosts.forEach((post, index) => fragment.appendChild(renderFeedItem(post, index)));
+    limitedPosts.forEach((post, index) => fragment.appendChild(renderFeedItem(post, index, feedStyle)));
     body.appendChild(fragment);
     return true;
   } catch (err) {
@@ -278,9 +281,17 @@ export function initFeedModules(container) {
     const mediaHref = moduleEl.dataset.mediaHref || 'media.html';
     const mediaLabel = moduleEl.dataset.mediaLabel || 'Media';
 
+    let feedStyle = {};
+    try { feedStyle = JSON.parse(moduleEl.dataset.feedStyle || '{}'); } catch { /* ignore */ }
+
     if (feedLink) {
       feedLink.href = feedHref;
       feedLink.textContent = feedLabel;
+      if (feedStyle.buttonBgColor) {
+        feedLink.style.background = feedStyle.buttonBgColor;
+        feedLink.style.borderColor = feedStyle.buttonBgColor;
+      }
+      if (feedStyle.buttonTextColor) feedLink.style.color = feedStyle.buttonTextColor;
     }
     if (mediaLink) {
       if (!showMedia || !mediaHref) {
@@ -288,6 +299,11 @@ export function initFeedModules(container) {
       } else {
         mediaLink.href = mediaHref;
         mediaLink.textContent = mediaLabel;
+        if (feedStyle.buttonBgColor) {
+          mediaLink.style.background = feedStyle.buttonBgColor;
+          mediaLink.style.borderColor = feedStyle.buttonBgColor;
+        }
+        if (feedStyle.buttonTextColor) mediaLink.style.color = feedStyle.buttonTextColor;
       }
     }
 
@@ -297,6 +313,7 @@ export function initFeedModules(container) {
       mediaHref,
       mediaLabel,
       showMedia,
+      feedStyle,
     });
 
     if (!showDropdown) {
@@ -316,7 +333,7 @@ export function initFeedModules(container) {
       if (feedPanel) feedPanel.setAttribute('aria-hidden', String(!active));
       if (toggleBtn) toggleBtn.setAttribute('aria-expanded', String(active));
       if (active && feedBody && !loadedOnce) {
-        const ok = await loadFeedInto(feedBody, Number.isFinite(limit) ? limit : null);
+        const ok = await loadFeedInto(feedBody, Number.isFinite(limit) ? limit : null, feedStyle);
         loadedOnce = ok;
       }
     };

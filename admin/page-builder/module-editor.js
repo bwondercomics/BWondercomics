@@ -177,7 +177,8 @@ export function renderModuleEditorContent({ currentPage, selectedModuleId }) {
       fieldsHtml = renderSocialEditor(config);
       break;
 
-    case "feed":
+    case "feed": {
+      const feedStyle = config.style || {};
       fieldsHtml = `
         <div class="pb-editor-field">
           <label class="pb-editor-label">Heading</label>
@@ -223,8 +224,63 @@ export function renderModuleEditorContent({ currentPage, selectedModuleId }) {
           <label class="pb-editor-label">Media Link</label>
           <input type="text" class="pb-editor-input" data-key="mediaHref" value="${escapeAttr(config.mediaHref || "media.html")}">
         </div>
+        <div class="pb-editor-section-divider"></div>
+        <details class="pb-promo-style-accordion">
+          <summary class="pb-promo-style-toggle">Color Options</summary>
+          <div class="pb-promo-style-content">
+            <div class="pb-style-group">
+              <div class="pb-style-group-title">Heading & Author</div>
+              <div class="pb-editor-field pb-editor-field--row">
+                <label class="pb-editor-label">Heading Background</label>
+                <input type="color" class="pb-promo-style-color" data-style-key="headingBgColor" value="${feedStyle.headingBgColor || "#ffed00"}">
+              </div>
+              <div class="pb-editor-field pb-editor-field--row">
+                <label class="pb-editor-label">Heading Text</label>
+                <input type="color" class="pb-promo-style-color" data-style-key="headingTextColor" value="${feedStyle.headingTextColor || "#0a0a12"}">
+              </div>
+              <div class="pb-editor-field pb-editor-field--row">
+                <label class="pb-editor-label">Author Color</label>
+                <input type="color" class="pb-promo-style-color" data-style-key="authorColor" value="${feedStyle.authorColor || "#7ef5e3"}">
+              </div>
+            </div>
+            <div class="pb-style-group">
+              <div class="pb-style-group-title">Buttons</div>
+              <div class="pb-editor-field pb-editor-field--row">
+                <label class="pb-editor-label">Button Background</label>
+                <input type="color" class="pb-promo-style-color" data-style-key="buttonBgColor" value="${feedStyle.buttonBgColor || "#00d9ff"}">
+              </div>
+              <div class="pb-editor-field pb-editor-field--row">
+                <label class="pb-editor-label">Button Text</label>
+                <input type="color" class="pb-promo-style-color" data-style-key="buttonTextColor" value="${feedStyle.buttonTextColor || "#0a0a12"}">
+              </div>
+            </div>
+            <div class="pb-style-group">
+              <div class="pb-style-group-title">Feed Items</div>
+              <div class="pb-editor-field pb-editor-field--row">
+                <label class="pb-editor-label">Item Title</label>
+                <input type="color" class="pb-promo-style-color" data-style-key="itemTitleColor" value="${feedStyle.itemTitleColor || "#ffed00"}">
+              </div>
+              <div class="pb-editor-field pb-editor-field--row">
+                <label class="pb-editor-label">Item Date</label>
+                <input type="color" class="pb-promo-style-color" data-style-key="itemDateColor" value="${feedStyle.itemDateColor || "#00d9ff"}">
+              </div>
+              <div class="pb-editor-field pb-editor-field--row">
+                <label class="pb-editor-label">Item Border</label>
+                <input type="color" class="pb-promo-style-color" data-style-key="itemBorderColor" value="${feedStyle.itemBorderColor || "#00d9ff"}">
+              </div>
+            </div>
+            <div class="pb-style-group">
+              <div class="pb-style-group-title">Container</div>
+              <div class="pb-editor-field pb-editor-field--row">
+                <label class="pb-editor-label">Border Color</label>
+                <input type="color" class="pb-promo-style-color" data-style-key="borderColor" value="${feedStyle.borderColor || "#ffed00"}">
+              </div>
+            </div>
+          </div>
+        </details>
       `;
       break;
+    }
 
     default:
       fieldsHtml = `

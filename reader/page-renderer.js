@@ -248,6 +248,9 @@ export const MODULE_RENDERERS = {
     const mediaHref = escapeHtml(config.mediaHref || "media.html");
     const moduleId = escapeHtml(mod?.id ? String(mod.id) : `feed-${Math.random().toString(36).slice(2, 9)}`);
     const panelId = `pb-feed-panel-${moduleId}`;
+    const style = config.style || {};
+
+    const btnStyle = `background:${style.buttonBgColor || "#00d9ff"};color:${style.buttonTextColor || "#0a0a12"};border-color:${style.buttonBgColor || "#00d9ff"}`;
 
     return `
       <div class="pb-feed-module"
@@ -257,25 +260,28 @@ export const MODULE_RENDERERS = {
            data-feed-href="${feedHref}"
            data-feed-label="${feedLabel}"
            data-media-href="${mediaHref}"
-           data-media-label="${mediaLabel}">
+           data-media-label="${mediaLabel}"
+           data-feed-style="${escapeHtml(JSON.stringify(style))}">
         <div class="right-panel-feed-bar pb-feed-bar" aria-hidden="true">
           <button class="feed-exit-btn pb-feed-exit" type="button" aria-label="Close feed">\u00D7</button>
           <div class="latest-actions">
-            <a class="latest-link latest-link--left pb-feed-link" href="${feedHref}">${feedLabel}</a>
-            ${showMediaButton ? `<a class="latest-link latest-link--right pb-feed-media" href="${mediaHref}">${mediaLabel}</a>` : ""}
+            <a class="latest-link latest-link--left pb-feed-link" href="${feedHref}" style="${btnStyle}">${feedLabel}</a>
+            ${showMediaButton ? `<a class="latest-link latest-link--right pb-feed-media" href="${mediaHref}" style="${btnStyle}">${mediaLabel}</a>` : ""}
           </div>
         </div>
-        <div class="latest-update pb-feed-latest">
+        <div class="latest-update pb-feed-latest" style="border-color:${style.borderColor || "#ffed00"}">
           <div class="latest-heading-row">
             <button class="latest-heading pb-feed-toggle" type="button"
-              aria-expanded="false" aria-controls="${panelId}">${heading}</button>
-            ${showAuthor ? `<div class="latest-author">${author}</div>` : ""}
+              aria-expanded="false" aria-controls="${panelId}"
+              style="background:${style.headingBgColor || "#ffed00"};color:${style.headingTextColor || "#0a0a12"}">${heading}</button>
+            ${showAuthor ? `<div class="latest-author" style="color:${style.authorColor || "#7ef5e3"}">${author}</div>` : ""}
           </div>
           <div class="latest-body pb-feed-latest-body">
             <div class="latest-loading">Loading...</div>
           </div>
         </div>
-        <div class="latest-update right-panel-feed pb-feed-panel" id="${panelId}" aria-hidden="true">
+        <div class="latest-update right-panel-feed pb-feed-panel" id="${panelId}" aria-hidden="true"
+             style="border-color:${style.borderColor || "#ffed00"}">
           <div class="latest-body pb-feed-body">
             <div class="latest-loading">Loading...</div>
           </div>
