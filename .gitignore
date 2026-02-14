@@ -50,6 +50,8 @@ comics/**
 # Vite build output and cache
 dist/
 dist-ssr/
+deploy/stoat/for-web-dist/
 *.local
 .vite/
 node_modules/.vite/
+deploy/*.env.bak*

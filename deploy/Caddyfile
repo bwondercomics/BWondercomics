@@ -1,6 +1,9 @@
 bwondercomics.com {
 	encode gzip
 	reverse_proxy /api/* bwondercomics-api:8000
+	reverse_proxy /.well-known/openid-configuration bwondercomics-api:8000
+	reverse_proxy /.well-known/jwks.json bwondercomics-api:8000
+	reverse_proxy /oidc/* bwondercomics-api:8000
 	reverse_proxy /data.json bwondercomics-api:8000
 	reverse_proxy /series.json bwondercomics-api:8000
 	reverse_proxy /page-config.json bwondercomics-api:8000
@@ -36,4 +39,145 @@ bwondercomics.com {
 
 	root * /srv/bwondercomics/dist
 	file_server
+}
+
+chat.bwondercomics.com {
+	encode gzip
+
+	@chat_sso_bootstrap path /sso/bootstrap
+	handle @chat_sso_bootstrap {
+		reverse_proxy bwondercomics-api:8000
+	}
+
+	# Disable service worker registration on chat to avoid stale cached UI bundles.
+	@chat_sw path /sw.js /serviceWorker.js /serviceWorker.js.map
+	handle @chat_sw {
+		respond 404
+	}
+
+	# SSO-hardening: never expose Stoat's native login UI.
+	# Keep /login/callback free for future native OIDC callback support.
+	@chat_login_entry path /login /login/create /login/create/* /login/reset /login/reset/* /login/resend /login/resend/*
+	redir @chat_login_entry https://bwondercomics.com/api/chat/sso/start 302
+
+	# First entry to root should always pass through SSO bootstrap at least once.
+	@chat_root_needs_sso {
+		path /
+		not header Cookie *bb_chat_ready=1*
+	}
+	redir @chat_root_needs_sso https://bwondercomics.com/api/chat/sso/start 302
+
+	@chat_blocked_auth_api path /auth/account/create /auth/account/create/* /auth/account/reverify /auth/account/reverify/* /auth/account/reset_password /auth/account/reset_password/* /api/auth/account/create /api/auth/account/create/* /api/auth/account/reverify /api/auth/account/reverify/* /api/auth/account/reset_password /api/auth/account/reset_password/*
+	respond @chat_blocked_auth_api 404
+
+	# Single-community hardening: disallow creating new servers from the public client/API.
+	@chat_blocked_server_create path /servers/create /servers/create/* /0.8/servers/create /0.8/servers/create/* /api/servers/create /api/servers/create/* /api/0.8/servers/create /api/0.8/servers/create/*
+	respond @chat_blocked_server_create 403
+
+	# Disallow creating new invite links from the public client/API.
+	@chat_blocked_invite_create {
+		method POST
+		path /channels/*/invites /channels/*/invites/* /0.8/channels/*/invites /0.8/channels/*/invites/* /api/channels/*/invites /api/channels/*/invites/* /api/0.8/channels/*/invites /api/0.8/channels/*/invites/*
+	}
+	respond @chat_blocked_invite_create 403
+
+	# Disallow joining arbitrary servers by invite URL from the public chat domain.
+	@chat_blocked_invite_join {
+		method POST
+		path /invites/* /0.8/invites/* /api/invites/* /api/0.8/invites/*
+	}
+	respond @chat_blocked_invite_join 403
+
+	# Compatibility shim: normalize legacy voice-channel create payloads
+	# through the FastAPI proxy before forwarding to Stoat API.
+	@chat_server_channel_create_compat {
+		method POST
+		path /servers/*/channels* /0.8/servers/*/channels* /api/servers/*/channels* /api/0.8/servers/*/channels*
+	}
+	handle @chat_server_channel_create_compat {
+		reverse_proxy bwondercomics-api:8000
+	}
+
+	# Compatibility shim: this Stoat API requires a JSON body for join_call.
+	# Legacy client builds send an empty body, so proxy through FastAPI.
+	@chat_join_call_compat {
+		method POST
+		path /channels/*/join_call* /0.8/channels/*/join_call* /api/channels/*/join_call* /api/0.8/channels/*/join_call*
+	}
+	handle @chat_join_call_compat {
+		reverse_proxy bwondercomics-api:8000
+	}
+
+	@chat_events_ws path /ws /ws/*
+	handle @chat_events_ws {
+		reverse_proxy bwondercomics-api:8000 {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up Connection {header.Connection}
+			header_up Upgrade {header.Upgrade}
+		}
+	}
+
+	@stoat_events path /events /events/*
+	handle @stoat_events {
+		reverse_proxy stoat-events:{$STOAT_EVENTS_INTERNAL_PORT:8080}
+	}
+
+	@stoat_api_prefixed path /api /api/*
+	handle @stoat_api_prefixed {
+		uri strip_prefix /api
+		reverse_proxy stoat-api:{$STOAT_API_INTERNAL_PORT:8080} {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up Connection {header.Connection}
+			header_up Upgrade {header.Upgrade}
+		}
+	}
+
+	@stoat_autumn path /autumn /autumn/*
+	handle @stoat_autumn {
+		uri strip_prefix /autumn
+		reverse_proxy stoat-autumn:{$STOAT_AUTUMN_INTERNAL_PORT:8080} {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up Connection {header.Connection}
+			header_up Upgrade {header.Upgrade}
+		}
+	}
+
+	@stoat_january path /january /january/*
+	handle @stoat_january {
+		uri strip_prefix /january
+		reverse_proxy stoat-january:{$STOAT_JANUARY_INTERNAL_PORT:8080} {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up Connection {header.Connection}
+			header_up Upgrade {header.Upgrade}
+		}
+	}
+
+	@stoat_livekit path /livekit /livekit/*
+	handle @stoat_livekit {
+		uri strip_prefix /livekit
+		reverse_proxy stoat-livekit:{$STOAT_LIVEKIT_INTERNAL_PORT:7880} {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+		}
+	}
+
+	@stoat_api path /auth /auth/* /users /users/* /channels /channels/* /servers /servers/* /invites /invites/* /safety /safety/* /sync /sync/* /bots /bots/* /onboard /onboard/* /custom /custom/* /0.8 /0.8/* /swagger /swagger/*
+	handle @stoat_api {
+		reverse_proxy stoat-api:{$STOAT_API_INTERNAL_PORT:8080} {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up Connection {header.Connection}
+			header_up Upgrade {header.Upgrade}
+		}
+	}
+
+	handle {
+		root * /srv/bwondercomics/root/deploy/stoat/for-web-dist
+		try_files {path} /index.html
+		file_server
+	}
 }

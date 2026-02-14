@@ -445,6 +445,7 @@
   <!-- Core reader modules -->
   <script type="module" src="reader/safe-mode.js"></script>
   <script type="module" src="reader/live-tracking.js"></script>
+  <script type="module" src="reader/chat-sso.js"></script>
   <script type="module" src="reader/app.js"></script>
   <script type="module" src="reader/customization.js"></script>
   <script type="module" src="reader/comic-comments.js"></script>
@@ -529,6 +530,54 @@
         document.addEventListener("DOMContentLoaded", bind);
       } else {
         bind();
+      }
+    })();
+  </script>
+  <script>
+    // Optional deep-link behavior: open comments when openComments=1|true|yes.
+    (() => {
+      const params = new URLSearchParams(window.location.search || "");
+      const flag = (params.get("openComments") || "").toLowerCase();
+      if (!["1", "true", "yes"].includes(flag)) return;
+
+      const tryOpenComments = () => {
+        const panel = document.getElementById("comicCommentsSection");
+        const btn = document.getElementById("commentToggleBtn");
+        if (!panel || !btn) return false;
+
+        if (panel.classList.contains("collapsed")) {
+          if (typeof window.toggleReaderComments === "function") {
+            try {
+              window.toggleReaderComments();
+            } catch (err) {
+              btn.click();
+            }
+          } else {
+            btn.click();
+          }
+        }
+
+        try {
+          panel.scrollIntoView({ behavior: "smooth", block: "start" });
+        } catch (err) { }
+        return true;
+      };
+
+      const waitForReady = () => {
+        const deadline = Date.now() + 5000;
+        const tick = () => {
+          if (tryOpenComments()) return;
+          if (Date.now() < deadline) {
+            window.requestAnimationFrame(tick);
+          }
+        };
+        tick();
+      };
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", waitForReady, { once: true });
+      } else {
+        waitForReady();
       }
     })();
   </script>

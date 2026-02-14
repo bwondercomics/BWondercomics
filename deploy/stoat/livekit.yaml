@@ -1,0 +1,13 @@
+port: 7880
+
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  use_external_ip: true
+
+redis:
+  address: stoat-redis:6379
+
+keys:
+  lk_8f208e977e1778c6: c6400a89d0c8cc7c244bcc0d2a4b715534e7be2fcc2862acec4b43421167895e

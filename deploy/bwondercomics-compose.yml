@@ -30,6 +30,7 @@ services:
       BWC_DB_HOST: bwondercomics-db
       BWC_DB_PORT: 5432
       UMAMI_DB_PASSWORD: ${UMAMI_DB_PASSWORD:-}
+      OIDC_LOGIN_PATH: ${OIDC_LOGIN_PATH:-/?openComments=1}
     ports:
       - "${BWC_API_PORT:-8000}:8000"
     user: "${BWC_UID:-1000}:${BWC_GID:-1000}"
@@ -68,9 +69,229 @@ services:
     ports:
       - "${UMAMI_BIND:-127.0.0.1}:${UMAMI_PORT:-3000}:3000"
 
+  stoat-mongodb:
+    image: mongo:7
+    restart: unless-stopped
+    profiles: ["chat"]
+    command: ["mongod", "--bind_ip_all"]
+    volumes:
+      - stoat-mongodb:/data/db
+    networks:
+      default:
+        aliases:
+          - database
+
+  stoat-redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    profiles: ["chat"]
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - stoat-redis:/data
+    networks:
+      default:
+        aliases:
+          - redis
+
+  stoat-rabbitmq:
+    image: rabbitmq:3.13-alpine
+    restart: unless-stopped
+    profiles: ["chat"]
+    environment:
+      RABBITMQ_DEFAULT_USER: ${STOAT_RABBITMQ_USER:-rabbituser}
+      RABBITMQ_DEFAULT_PASS: ${STOAT_RABBITMQ_PASSWORD:-rabbitpass}
+    volumes:
+      - stoat-rabbitmq:/var/lib/rabbitmq
+    networks:
+      default:
+        aliases:
+          - rabbit
+          - rabbitmq
+
+  stoat-minio:
+    image: minio/minio:latest
+    restart: unless-stopped
+    profiles: ["chat"]
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_ROOT_USER: ${STOAT_MINIO_ROOT_USER:-minioautumn}
+      MINIO_ROOT_PASSWORD: ${STOAT_MINIO_ROOT_PASSWORD:-minioautumn}
+    volumes:
+      - stoat-minio:/data
+    networks:
+      default:
+        aliases:
+          - minio
+
+  stoat-minio-init:
+    image: minio/mc:latest
+    restart: "no"
+    profiles: ["chat"]
+    depends_on:
+      - stoat-minio
+    entrypoint: ["/bin/sh", "-lc"]
+    command:
+      - |
+        set -eu
+        until mc alias set local http://stoat-minio:9000 "${STOAT_MINIO_ROOT_USER:-minioautumn}" "${STOAT_MINIO_ROOT_PASSWORD:-minioautumn}"; do
+          sleep 1
+        done
+        mc mb --ignore-existing "local/${STOAT_S3_BUCKET:-revolt-uploads}"
+    networks:
+      default:
+
+  # Stoat API (Delta) service.
+  # Exact env var names can differ by Stoat release; keep these in bwondercomics.env
+  # and align with the pinned release docs.
+  stoat-api:
+    image: ${STOAT_API_IMAGE:-ghcr.io/revoltchat/server:20250930-2}
+    restart: unless-stopped
+    profiles: ["chat"]
+    depends_on:
+      - stoat-mongodb
+      - stoat-redis
+      - stoat-rabbitmq
+      - stoat-minio
+      - stoat-minio-init
+    env_file:
+      - ./bwondercomics.env
+    environment:
+      STOAT_MONGODB_URI: ${STOAT_MONGODB_URI:-mongodb://stoat-mongodb:27017/revolt}
+      STOAT_REDIS_URI: ${STOAT_REDIS_URI:-redis://stoat-redis:6379}
+      STOAT_PUBLIC_URL: ${CHAT_PUBLIC_URL:-https://chat.bwondercomics.com}
+    volumes:
+      - ./stoat/Revolt.overrides.toml:/home/nonroot/Revolt.overrides.toml:ro
+      - ./stoat/Revolt.overrides.toml:/Revolt.overrides.toml:ro
+    networks:
+      default:
+        aliases:
+          - api
+          - delta
+
+  # Optional dedicated Delta service if your Stoat release separates API and Delta.
+  stoat-delta:
+    image: ${STOAT_DELTA_IMAGE:-ghcr.io/revoltchat/server:20250930-2}
+    restart: unless-stopped
+    profiles: ["chat-delta"]
+    depends_on:
+      - stoat-mongodb
+      - stoat-redis
+      - stoat-rabbitmq
+      - stoat-minio
+      - stoat-minio-init
+    env_file:
+      - ./bwondercomics.env
+    environment:
+      STOAT_MONGODB_URI: ${STOAT_MONGODB_URI:-mongodb://stoat-mongodb:27017/revolt}
+      STOAT_REDIS_URI: ${STOAT_REDIS_URI:-redis://stoat-redis:6379}
+      STOAT_PUBLIC_URL: ${CHAT_PUBLIC_URL:-https://chat.bwondercomics.com}
+    volumes:
+      - ./stoat/Revolt.overrides.toml:/home/nonroot/Revolt.overrides.toml:ro
+      - ./stoat/Revolt.overrides.toml:/Revolt.overrides.toml:ro
+    networks:
+      default:
+        aliases:
+          - delta
+
+  stoat-events:
+    image: ${STOAT_EVENTS_IMAGE:-ghcr.io/revoltchat/bonfire:20250930-2}
+    restart: unless-stopped
+    profiles: ["chat"]
+    depends_on:
+      - stoat-api
+      - stoat-redis
+    networks:
+      default:
+        aliases:
+          - events
+
+  stoat-autumn:
+    image: ${STOAT_AUTUMN_IMAGE:-ghcr.io/revoltchat/autumn:20250930-2}
+    restart: unless-stopped
+    profiles: ["chat"]
+    depends_on:
+      - stoat-mongodb
+      - stoat-redis
+      - stoat-rabbitmq
+      - stoat-minio
+      - stoat-minio-init
+    env_file:
+      - ./bwondercomics.env
+    environment:
+      STOAT_MONGODB_URI: ${STOAT_MONGODB_URI:-mongodb://stoat-mongodb:27017/revolt}
+      STOAT_REDIS_URI: ${STOAT_REDIS_URI:-redis://stoat-redis:6379}
+      STOAT_PUBLIC_URL: ${CHAT_PUBLIC_URL:-https://chat.bwondercomics.com}
+    volumes:
+      - ./stoat/Revolt.overrides.toml:/home/nonroot/Revolt.overrides.toml:ro
+      - ./stoat/Revolt.overrides.toml:/Revolt.overrides.toml:ro
+    networks:
+      default:
+        aliases:
+          - autumn
+
+  stoat-january:
+    image: ${STOAT_JANUARY_IMAGE:-ghcr.io/revoltchat/january:20250930-2}
+    restart: unless-stopped
+    profiles: ["chat"]
+    depends_on:
+      - stoat-api
+      - stoat-redis
+      - stoat-rabbitmq
+      - stoat-minio
+      - stoat-minio-init
+    env_file:
+      - ./bwondercomics.env
+    environment:
+      STOAT_MONGODB_URI: ${STOAT_MONGODB_URI:-mongodb://stoat-mongodb:27017/revolt}
+      STOAT_REDIS_URI: ${STOAT_REDIS_URI:-redis://stoat-redis:6379}
+      STOAT_PUBLIC_URL: ${CHAT_PUBLIC_URL:-https://chat.bwondercomics.com}
+    volumes:
+      - ./stoat/Revolt.overrides.toml:/home/nonroot/Revolt.overrides.toml:ro
+      - ./stoat/Revolt.overrides.toml:/Revolt.overrides.toml:ro
+    networks:
+      default:
+        aliases:
+          - january
+
+  stoat-web:
+    image: ${STOAT_WEB_IMAGE:-ghcr.io/revoltchat/client@sha256:5cc05853c215a02ee3d1f71390ad00af06c7ef53602b4b21f419f8702607d8c8}
+    restart: unless-stopped
+    # Legacy revite frontend; kept only for rollback.
+    # Active chat UI is served statically by Caddy from deploy/stoat/for-web-dist.
+    profiles: ["chat-legacy-ui"]
+    depends_on:
+      - stoat-api
+      - stoat-events
+      - stoat-autumn
+      - stoat-january
+    env_file:
+      - ./bwondercomics.env
+    environment:
+      REVOLT_PUBLIC_URL: ${CHAT_API_PUBLIC_URL:-https://chat.bwondercomics.com/api}
+      REVOLT_APP_URL: ${CHAT_PUBLIC_URL:-https://chat.bwondercomics.com}
+
+  stoat-livekit:
+    image: ${STOAT_LIVEKIT_IMAGE:-livekit/livekit-server:v1.7.2}
+    restart: unless-stopped
+    profiles: ["chat"]
+    depends_on:
+      - stoat-redis
+    command: ["--config", "/etc/livekit.yaml"]
+    volumes:
+      - ./stoat/livekit.yaml:/etc/livekit.yaml:ro
+    ports:
+      - "${STOAT_LIVEKIT_TCP_PORT:-7881}:7881/tcp"
+      - "${STOAT_LIVEKIT_UDP_PORT_RANGE:-50000-50100}:50000-50100/udp"
+    networks:
+      default:
+        aliases:
+          - livekit
+
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    env_file:
+      - ./bwondercomics.env
     ports:
       - "80:80"
       - "443:443"
@@ -89,5 +310,9 @@ services:
 volumes:
   bwondercomics-db:
   umami-db:
+  stoat-mongodb:
+  stoat-redis:
+  stoat-rabbitmq:
+  stoat-minio:
   caddy-data:
   caddy-config:

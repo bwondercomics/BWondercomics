@@ -32,6 +32,60 @@ class User(Base):
     )
 
 
+class OIDCClient(Base):
+    __tablename__ = "oidc_clients"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    client_id: Mapped[str] = mapped_column(String(120), unique=True, index=True, nullable=False)
+    name: Mapped[str] = mapped_column(String(120), nullable=False, default="Stoat Chat")
+    redirect_uris: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    scopes: Mapped[list[str]] = mapped_column(JSON, nullable=False, default=list)
+    active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class OIDCAuthorizationCode(Base):
+    __tablename__ = "oidc_authorization_codes"
+
+    code: Mapped[str] = mapped_column(String(128), primary_key=True)
+    client_id: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    redirect_uri: Mapped[str] = mapped_column(String(500), nullable=False)
+    scope: Mapped[str] = mapped_column(String(300), nullable=False, default="openid")
+    nonce: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    code_challenge: Mapped[str] = mapped_column(String(200), nullable=False)
+    code_challenge_method: Mapped[str] = mapped_column(String(20), nullable=False, default="S256")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class OIDCRefreshToken(Base):
+    __tablename__ = "oidc_refresh_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=False)
+    client_id: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    scope: Mapped[str] = mapped_column(String(300), nullable=False, default="openid")
+    expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class Comment(Base):
     __tablename__ = "comments"
 

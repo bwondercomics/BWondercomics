@@ -19,8 +19,10 @@ from .routes import admin_ops as admin_ops_routes
 from .routes import admin_premium as admin_premium_routes
 from .routes import admin_social as admin_social_routes
 from .routes import auth as auth_routes
+from .routes import chat_sso as chat_sso_routes
 from .routes import comments as comments_routes
 from .routes import files as file_routes
+from .routes import oidc as oidc_routes
 from .routes import page_builder as page_builder_routes
 from .routes import posts as posts_routes
 from .routes import series_json as series_json_routes
@@ -89,6 +91,7 @@ async def premium_gate(request: Request, call_next):
 
 
 app.include_router(auth_routes.router)
+app.include_router(chat_sso_routes.router)
 app.include_router(comments_routes.router)
 app.include_router(admin_routes.router)
 app.include_router(admin_analytics_routes.router)
@@ -104,6 +107,7 @@ app.include_router(series_json_routes.router)
 app.include_router(tracking_routes.router)
 app.include_router(user_routes.router)
 app.include_router(file_routes.router)
+app.include_router(oidc_routes.router)
 
 
 @app.get("/healthz")

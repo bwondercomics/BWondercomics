@@ -56,6 +56,18 @@ export default defineConfig({
             '/analytics.js': {
                 target: 'http://localhost:8001',
                 changeOrigin: true
+            },
+            '/.well-known/openid-configuration': {
+                target: 'http://localhost:8001',
+                changeOrigin: true
+            },
+            '/.well-known/jwks.json': {
+                target: 'http://localhost:8001',
+                changeOrigin: true
+            },
+            '/oidc': {
+                target: 'http://localhost:8001',
+                changeOrigin: true
             }
         }
     },

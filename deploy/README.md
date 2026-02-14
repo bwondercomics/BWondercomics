@@ -160,3 +160,103 @@ Notes:
 - Host Python backend: use `UMAMI_UPSTREAM=http://127.0.0.1:3000` (and keep `UMAMI_BIND=127.0.0.1` so Umami isn’t exposed to the LAN).
 - Don’t set `UMAMI_BASE_PATH` when using the `/umami` proxy (the proxy handles the path rewriting).
 - When you go live, you’ll usually put Umami behind a reverse proxy (e.g. `stats.bwondercomics.com`) and set `UMAMI_BASE_URL=https://stats.bwondercomics.com`.
+
+## Chat (Stoat/Revolt) + OIDC
+
+The compose file includes an optional `chat` profile with:
+- `stoat-web`
+- `stoat-api`
+- `stoat-events`
+- `stoat-autumn`
+- `stoat-january`
+- `stoat-redis`
+- `stoat-mongodb`
+- `stoat-rabbitmq`
+
+There is also an optional `chat-delta` profile with `stoat-delta` for releases that separate API and Delta.
+
+Important compatibility note (2026-02-10):
+- The pinned web image is `ghcr.io/revoltchat/client@sha256:5cc05853c215a02ee3d1f71390ad00af06c7ef53602b4b21f419f8702607d8c8`.
+- This pins the currently working legacy client so deploys are deterministic (no floating `:master`).
+- This client still serves native chat login forms only.
+- It does not currently expose an OIDC callback/provider login UI path in the deployed login bundle.
+- To bridge this gap on x86_64, `GET /api/chat/sso/start` now performs server-side Stoat session bootstrap and redirects to `https://chat.bwondercomics.com/sso/bootstrap`, which hydrates the client auth store automatically.
+- Caddy hardening now redirects `/login`, `/login/create`, `/login/reset`, and `/login/resend` to `https://bwondercomics.com/api/chat/sso/start` (so native chat login UI is not exposed), and blocks public `auth/account/create|reset_password|reverify` endpoints on the chat domain.
+- Caddy hardening also blocks `POST /servers/create` (including `/api` and `/0.8` variants) so regular users cannot create their own servers; this supports a single-community deployment model.
+- Caddy hardening also blocks public invite creation (`POST /channels/{id}/invites`) and invite-join (`POST /invites/{code}`) routes on the chat domain.
+- Optional `CHAT_OFFICIAL_INVITE_CODE` lets backend SSO auto-join every signed-in site user to one official server.
+- `autumn` and `january` are now routed under `https://chat.bwondercomics.com/autumn` and `/january`; this is required for avatar/media and voice workflows in the client.
+- Stoat's newer `for-web` image is the long-term path, but upstream docs currently note no `amd64` web-client build.
+
+### 1) Set env values
+
+In `deploy/bwondercomics.env`, set at least:
+
+```bash
+OIDC_ISSUER=https://bwondercomics.com
+CHAT_PUBLIC_URL=https://chat.bwondercomics.com
+CHAT_API_PUBLIC_URL=https://chat.bwondercomics.com/api
+CHAT_LOGIN_URL=https://chat.bwondercomics.com/login
+OIDC_CLIENT_STOAT_ID=stoat
+OIDC_CLIENT_STOAT_SECRET=<set-a-random-secret>
+OIDC_CLIENT_STOAT_REDIRECT_URIS=https://chat.bwondercomics.com/login/callback
+CHAT_OFFICIAL_INVITE_CODE=<your-main-server-invite-code>
+STOAT_RABBITMQ_USER=rabbituser
+STOAT_RABBITMQ_PASSWORD=rabbitpass
+```
+
+Also set the Stoat image tags and any release-specific env vars required by your pinned Stoat version.
+
+If RabbitMQ was already initialized with different credentials, either:
+- recreate the `stoat-rabbitmq` volume, or
+- add/update the `rabbituser` account in the running broker so it matches `STOAT_RABBITMQ_USER`/`STOAT_RABBITMQ_PASSWORD`.
+
+### 2) Start chat services
+
+```bash
+cd /srv/bwondercomics
+make chat-up
+```
+
+If you only changed the web image tag, you can recreate only the web container:
+
+```bash
+docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-compose.yml --profile chat up -d stoat-web
+```
+
+If your pinned release requires a dedicated Delta service:
+
+```bash
+docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-compose.yml --profile chat --profile chat-delta up -d stoat-delta
+```
+
+### 3) Restart backend after OIDC env changes
+
+```bash
+cd /srv/bwondercomics
+make restart
+```
+
+### 4) Verify OIDC endpoints
+
+```bash
+curl -fsSL https://bwondercomics.com/.well-known/openid-configuration | jq .
+curl -fsSL https://bwondercomics.com/.well-known/jwks.json | jq .
+```
+
+Expected:
+- discovery returns issuer `https://bwondercomics.com`
+- discovery includes `authorization_endpoint` at `https://bwondercomics.com/oidc/authorize`
+- JWKS returns at least one key and the configured `kid`
+
+### 5) Verify chat routing
+
+```bash
+curl -I https://chat.bwondercomics.com/
+```
+
+If you need live logs while testing:
+
+```bash
+make chat-logs
+```
