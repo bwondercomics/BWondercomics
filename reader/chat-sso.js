@@ -2,7 +2,9 @@
   "use strict";
 
   const CHAT_LINK_ID = "chatSsoLink";
-  const CHAT_SSO_ENDPOINT = "/api/chat/sso/start";
+  // Enter through chat root so we don't re-bootstrap auth state on every click.
+  // Caddy still redirects to /api/chat/sso/start automatically when needed.
+  const CHAT_ENTRY_URL = "https://chat.bwondercomics.com/";
 
   function readSafeNextPath() {
     const params = new URLSearchParams(window.location.search);
@@ -62,7 +64,7 @@
 
     const link = document.createElement("a");
     link.id = CHAT_LINK_ID;
-    link.href = CHAT_SSO_ENDPOINT;
+    link.href = CHAT_ENTRY_URL;
     link.textContent = "Go to Chat";
 
     const className = inferLinkClass(container);

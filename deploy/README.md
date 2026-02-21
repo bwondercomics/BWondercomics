@@ -182,7 +182,7 @@ Important compatibility note (2026-02-10):
 - It does not currently expose an OIDC callback/provider login UI path in the deployed login bundle.
 - To bridge this gap on x86_64, `GET /api/chat/sso/start` now performs server-side Stoat session bootstrap and redirects to `https://chat.bwondercomics.com/sso/bootstrap`, which hydrates the client auth store automatically.
 - Caddy hardening now redirects `/login`, `/login/create`, `/login/reset`, and `/login/resend` to `https://bwondercomics.com/api/chat/sso/start` (so native chat login UI is not exposed), and blocks public `auth/account/create|reset_password|reverify` endpoints on the chat domain.
-- Caddy hardening also blocks `POST /servers/create` (including `/api` and `/0.8` variants) so regular users cannot create their own servers; this supports a single-community deployment model.
+- Caddy hardening now proxies `POST /servers/create` (including `/api` and `/0.8` variants) through FastAPI admin-gating so regular users are blocked while site admins can still create/manage servers.
 - Caddy hardening also blocks public invite creation (`POST /channels/{id}/invites`) and invite-join (`POST /invites/{code}`) routes on the chat domain.
 - Optional `CHAT_OFFICIAL_INVITE_CODE` lets backend SSO auto-join every signed-in site user to one official server.
 - `autumn` and `january` are now routed under `https://chat.bwondercomics.com/autumn` and `/january`; this is required for avatar/media and voice workflows in the client.

@@ -25,6 +25,7 @@ from ..db import get_db
 from ..models import User
 from ..security import cookie_secure_for_request, get_current_user, sign_payload, verify_token
 from ..settings import settings
+from ..validation import is_admin_role
 
 router = APIRouter()
 
@@ -32,6 +33,8 @@ _CHAT_BOOTSTRAP_PATH = "/sso/bootstrap"
 _CHAT_READY_COOKIE_NAME = "bb_chat_ready"
 _CHAT_READY_COOKIE_VALUE = "1"
 _CHAT_READY_COOKIE_MAX_AGE_SECONDS = 3600
+_CHAT_ADMIN_BRIDGE_COOKIE_NAME = "bb_chat_admin_bridge"
+_CHAT_ADMIN_BRIDGE_COOKIE_MAX_AGE_SECONDS = 12 * 60 * 60
 
 
 def _build_login_redirect(request: Request) -> str:
@@ -105,6 +108,33 @@ def _clear_chat_sso_cookie(response: RedirectResponse | HTMLResponse) -> None:
     domain = _chat_cookie_domain()
     cookie_args: dict[str, Any] = {
         "key": settings.chat_sso_cookie_name,
+        "path": "/",
+    }
+    if domain:
+        cookie_args["domain"] = domain
+    response.delete_cookie(**cookie_args)
+
+
+def _set_chat_admin_bridge_cookie(response: RedirectResponse, value: str, secure: bool) -> None:
+    domain = _chat_cookie_domain()
+    cookie_args: dict[str, Any] = {
+        "key": _CHAT_ADMIN_BRIDGE_COOKIE_NAME,
+        "value": value,
+        "max_age": _CHAT_ADMIN_BRIDGE_COOKIE_MAX_AGE_SECONDS,
+        "httponly": True,
+        "samesite": "lax",
+        "secure": secure,
+        "path": "/",
+    }
+    if domain:
+        cookie_args["domain"] = domain
+    response.set_cookie(**cookie_args)
+
+
+def _clear_chat_admin_bridge_cookie(response: RedirectResponse | HTMLResponse) -> None:
+    domain = _chat_cookie_domain()
+    cookie_args: dict[str, Any] = {
+        "key": _CHAT_ADMIN_BRIDGE_COOKIE_NAME,
         "path": "/",
     }
     if domain:
@@ -461,6 +491,40 @@ def _make_bootstrap_cookie(user_id: UUID, chat_session: dict[str, Any]) -> str:
     )
 
 
+def _make_chat_admin_bridge_cookie(user_id: UUID, chat_user_id: str) -> str:
+    return sign_payload(
+        {
+            "kind": "chat_admin_bridge",
+            "uid": str(user_id),
+            "chat_uid": chat_user_id,
+            "nonce": secrets.token_urlsafe(12),
+            "exp": int(time.time()) + _CHAT_ADMIN_BRIDGE_COOKIE_MAX_AGE_SECONDS,
+        }
+    )
+
+
+def _get_chat_admin_bridge_identity(request: Request, db: Session) -> tuple[User | None, str | None]:
+    token = request.cookies.get(_CHAT_ADMIN_BRIDGE_COOKIE_NAME)
+    payload = verify_token(token)
+    if not payload or payload.get("kind") != "chat_admin_bridge":
+        return None, None
+
+    raw_uid = str(payload.get("uid") or "").strip()
+    chat_uid = str(payload.get("chat_uid") or "").strip()
+    if not raw_uid or not chat_uid:
+        return None, None
+
+    try:
+        user_id = UUID(raw_uid)
+    except Exception:
+        return None, None
+
+    user = db.get(User, user_id)
+    if not user or not is_admin_role(user.role):
+        return None, None
+    return user, chat_uid
+
+
 def _build_auth_state(chat_session: dict[str, Any]) -> dict[str, Any]:
     user_id = str(chat_session.get("user_id") or chat_session.get("userId") or "").strip()
     token = str(chat_session.get("token") or "").strip()
@@ -651,7 +715,77 @@ def chat_sso_start(request: Request, db: Session = Depends(get_db)):
     bootstrap_url = f"{target_base.rstrip('/')}{_CHAT_BOOTSTRAP_PATH}"
     response = RedirectResponse(url=bootstrap_url, status_code=302)
     _set_chat_sso_cookie(response, signed, secure=cookie_secure_for_request(request))
+    if is_admin_role(user.role):
+        chat_user_id = str(chat_session.get("user_id") or "").strip()
+        if chat_user_id:
+            bridge = _make_chat_admin_bridge_cookie(user.id, chat_user_id)
+            _set_chat_admin_bridge_cookie(
+                response, bridge, secure=cookie_secure_for_request(request)
+            )
+        else:
+            _clear_chat_admin_bridge_cookie(response)
+    else:
+        _clear_chat_admin_bridge_cookie(response)
     return response
+
+
+@router.post("/servers/create")
+@router.post("/servers/create/")
+@router.post("/0.8/servers/create")
+@router.post("/0.8/servers/create/")
+@router.post("/api/servers/create")
+@router.post("/api/servers/create/")
+@router.post("/api/0.8/servers/create")
+@router.post("/api/0.8/servers/create/")
+async def chat_proxy_create_server(request: Request, db: Session = Depends(get_db)) -> JSONResponse:
+    session_token = (request.headers.get("x-session-token") or "").strip()
+    if not session_token:
+        return JSONResponse(status_code=401, content={"error": "Missing chat session token"})
+
+    _admin, expected_chat_uid = _get_chat_admin_bridge_identity(request, db)
+    if not expected_chat_uid:
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    me_status, me_payload = await run_in_threadpool(
+        _chat_api_request,
+        "GET",
+        "/users/@me",
+        None,
+        session_token,
+        10,
+    )
+    if me_status != 200:
+        return JSONResponse(status_code=401, content={"error": "Invalid chat session token"})
+    actual_chat_uid = str(me_payload.get("_id") or "").strip()
+    if not actual_chat_uid or actual_chat_uid != expected_chat_uid:
+        return JSONResponse(status_code=403, content={"error": "Admin identity mismatch"})
+
+    payload: dict[str, Any] = {}
+    try:
+        incoming = await request.json()
+        if not isinstance(incoming, dict):
+            return JSONResponse(status_code=400, content={"error": "Invalid request"})
+        payload = incoming
+    except Exception:
+        payload = {}
+
+    upstream_path = request.url.path
+    if upstream_path.startswith("/api/"):
+        upstream_path = upstream_path[4:]
+    if upstream_path.endswith("/"):
+        upstream_path = upstream_path[:-1]
+
+    status, resp_payload = await run_in_threadpool(
+        _chat_api_request,
+        "POST",
+        upstream_path,
+        payload,
+        session_token,
+        30,
+    )
+    if not status:
+        return JSONResponse(status_code=502, content={"error": "Upstream unavailable"})
+    return JSONResponse(status_code=status, content=resp_payload)
 
 
 @router.post("/servers/{server_id}/channels")

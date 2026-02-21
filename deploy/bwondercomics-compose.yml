@@ -279,9 +279,13 @@ services:
     command: ["--config", "/etc/livekit.yaml"]
     volumes:
       - ./stoat/livekit.yaml:/etc/livekit.yaml:ro
+      - caddy-data:/caddy-data:ro
     ports:
       - "${STOAT_LIVEKIT_TCP_PORT:-7881}:7881/tcp"
+      - "${STOAT_LIVEKIT_TURN_UDP_PORT:-443}:443/udp"
+      - "${STOAT_LIVEKIT_TURN_TLS_PORT:-5349}:5349/tcp"
       - "${STOAT_LIVEKIT_UDP_PORT_RANGE:-50000-50100}:50000-50100/udp"
+      - "${STOAT_LIVEKIT_TURN_RELAY_UDP_PORT_RANGE:-51000-51100}:51000-51100/udp"
     networks:
       default:
         aliases:
@@ -295,7 +299,6 @@ services:
     ports:
       - "80:80"
       - "443:443"
-      - "443:443/udp"
     volumes:
       - ../dist:/srv/bwondercomics/dist:ro
       - ../comics:/srv/bwondercomics/comics:ro

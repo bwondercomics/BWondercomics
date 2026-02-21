@@ -70,9 +70,12 @@ chat.bwondercomics.com {
 	@chat_blocked_auth_api path /auth/account/create /auth/account/create/* /auth/account/reverify /auth/account/reverify/* /auth/account/reset_password /auth/account/reset_password/* /api/auth/account/create /api/auth/account/create/* /api/auth/account/reverify /api/auth/account/reverify/* /api/auth/account/reset_password /api/auth/account/reset_password/*
 	respond @chat_blocked_auth_api 404
 
-	# Single-community hardening: disallow creating new servers from the public client/API.
+	# Single-community hardening: keep server creation admin-gated.
+	# Requests are proxied to FastAPI, which enforces admin-only access.
 	@chat_blocked_server_create path /servers/create /servers/create/* /0.8/servers/create /0.8/servers/create/* /api/servers/create /api/servers/create/* /api/0.8/servers/create /api/0.8/servers/create/*
-	respond @chat_blocked_server_create 403
+	handle @chat_blocked_server_create {
+		reverse_proxy bwondercomics-api:8000
+	}
 
 	# Disallow creating new invite links from the public client/API.
 	@chat_blocked_invite_create {
@@ -137,6 +140,18 @@ chat.bwondercomics.com {
 	@stoat_autumn path /autumn /autumn/*
 	handle @stoat_autumn {
 		uri strip_prefix /autumn
+		reverse_proxy stoat-autumn:{$STOAT_AUTUMN_INTERNAL_PORT:8080} {
+			header_up Host {host}
+			header_up X-Real-IP {remote_host}
+			header_up Connection {header.Connection}
+			header_up Upgrade {header.Upgrade}
+		}
+	}
+
+	# Autumn sometimes redirects to root media paths (e.g. /attachments/*)
+	# instead of /autumn/* for originals. Route those directly to Autumn.
+	@stoat_autumn_direct path /attachments /attachments/* /avatars /avatars/* /backgrounds /backgrounds/* /banners /banners/* /icons /icons/* /emojis /emojis/*
+	handle @stoat_autumn_direct {
 		reverse_proxy stoat-autumn:{$STOAT_AUTUMN_INTERNAL_PORT:8080} {
 			header_up Host {host}
 			header_up X-Real-IP {remote_host}
