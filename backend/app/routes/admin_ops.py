@@ -1,23 +1,18 @@
 """
 Admin Ops API routes.
 
-Execute predefined shell commands from the admin UI:
-- frontend-build, db-backup, restart, etc.
-- Commands run in background with output streaming
-- Execution history stored in admin_ops_runs table
-
-Security: Only runs commands from ADMIN_COMMANDS allowlist.
-Enable with ADMIN_COMMANDS_ENABLED=true in env.
+Ops commands are queued by the API and executed by a separate host worker.
+This keeps admin diagnostics read-only while still allowing a protected ops
+surface to run approved maintenance jobs.
 """
 
 from __future__ import annotations
 
 import json
-import subprocess
-import threading
 import time
 from datetime import datetime, timezone
-from uuid import uuid4
+from pathlib import Path
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
@@ -26,67 +21,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import SessionLocal, get_db
+from ..diagnostics_snapshot import collect_backup_summary
 from ..models import AdminOpsRun
+from ..ops_catalog import get_ops_command, load_ops_catalog
 from ..settings import settings
-from .admin_utils import iso_z, require_admin
+from .admin_utils import client_ip, iso_z, require_host_automation, require_ops_access
 
 router = APIRouter()
 
-MAX_OUTPUT_CHARS = 20000
-COMMAND_TIMEOUT_SECONDS = 1200
-
-OPS_COMMANDS = {
-    "frontend-build": {
-        "label": "Build frontend (snapshot dist first)",
-        "command": ["bash", "scripts/frontend-build.sh"],
-        "disruptsApi": False,
-    },
-    "frontend-rollback": {
-        "label": "Rollback frontend to last snapshot",
-        "command": ["bash", "scripts/frontend-rollback.sh"],
-        "disruptsApi": True,
-    },
-    "frontend-restore-rollback": {
-        "label": "Restore last rollback snapshot",
-        "command": ["bash", "scripts/frontend-restore-rollback.sh"],
-        "disruptsApi": True,
-    },
-    "backup": {
-        "label": "Backup DB + files",
-        "command": ["make", "backup"],
-        "disruptsApi": False,
-    },
-    "migrate": {
-        "label": "Run DB migrations",
-        "command": ["make", "migrate"],
-        "disruptsApi": False,
-    },
-    "restart": {
-        "label": "Restart stack",
-        "command": ["make", "restart"],
-        "disruptsApi": True,
-    },
-    "up": {
-        "label": "Rebuild/restart stack",
-        "command": ["make", "up"],
-        "disruptsApi": True,
-    },
-    "analytics-up": {
-        "label": "Start analytics services",
-        "command": ["make", "analytics-up"],
-        "disruptsApi": False,
-    },
-    "analytics-stop": {
-        "label": "Stop analytics services",
-        "command": ["make", "analytics-stop"],
-        "disruptsApi": False,
-    },
-    "tests": {
-        "label": "Run frontend tests",
-        "command": ["npm", "test"],
-        "disruptsApi": False,
-    },
-}
+MAX_OUTPUT_CHARS = 20_000
+STREAM_POLL_SECONDS = 0.5
 
 
 class RunCommandRequest(BaseModel):
@@ -98,141 +42,215 @@ class RunCommandRequest(BaseModel):
     confirm: bool = False
 
 
+class FinishRunRequest(BaseModel):
+    status: str
+    exit_code: int | None = Field(default=None, alias="exitCode")
+    error_message: str | None = Field(default=None, alias="errorMessage")
+    output_truncated: bool = Field(default=False, alias="outputTruncated")
+
+
+def _ops_root() -> Path:
+    return settings.base_dir / "var" / "ops"
+
+
+def _queue_dir() -> Path:
+    return _ops_root() / "queue"
+
+
+def _logs_dir() -> Path:
+    return _ops_root() / "logs"
+
+
+def _ensure_ops_dirs() -> None:
+    _queue_dir().mkdir(parents=True, exist_ok=True)
+    _logs_dir().mkdir(parents=True, exist_ok=True)
+
+
+def queue_file_path(run_id: str) -> Path:
+    return _queue_dir() / f"{run_id}.json"
+
+
+def log_file_path(run_id: str) -> Path:
+    return _logs_dir() / f"{run_id}.log"
+
+
 def _describe_command(command_id: str) -> dict | None:
-    info = OPS_COMMANDS.get(command_id)
-    if not info:
+    command = get_ops_command(command_id)
+    if not command:
         return None
     return {
-        "id": command_id,
-        "label": info["label"],
-        "command": " ".join(info["command"]),
-        "disruptsApi": bool(info.get("disruptsApi")),
+        "id": command["id"],
+        "label": command["label"],
+        "group": command["group"],
+        "description": command["description"],
+        "command": command["terminal"],
+        "disruptsApi": bool(command["disruptsApi"]),
+        "requiresConfirm": bool(command["requiresConfirm"]),
     }
 
 
-def _record_run(db: Session, command_id: str, user_email: str | None) -> AdminOpsRun:
-    info = OPS_COMMANDS[command_id]
+def _read_run_output(run_id: str) -> tuple[str, bool]:
+    path = log_file_path(run_id)
+    if not path.exists():
+        return "", False
+    content = path.read_text(encoding="utf-8", errors="replace")
+    truncated = len(content) > MAX_OUTPUT_CHARS
+    if truncated:
+        content = content[-MAX_OUTPUT_CHARS:]
+    return content, truncated
+
+
+def _serialize_run(run: AdminOpsRun) -> dict:
+    output, truncated_from_file = _read_run_output(str(run.id))
+    output_truncated = bool(run.output_truncated or truncated_from_file)
+    return {
+        "id": str(run.id),
+        "commandId": run.command_id,
+        "label": run.label or "",
+        "status": run.status,
+        "startedAt": iso_z(run.started_at),
+        "finishedAt": iso_z(run.finished_at),
+        "durationSeconds": run.duration_seconds,
+        "exitCode": run.exit_code,
+        "output": output or (run.output or ""),
+        "outputTruncated": output_truncated,
+        "errorMessage": run.error_message or "",
+        "userEmail": run.user_email or "",
+        "disruptsApi": bool(run.disrupts_api),
+    }
+
+
+def _load_run(run_id: str) -> AdminOpsRun | None:
+    db = SessionLocal()
+    try:
+        return db.get(AdminOpsRun, UUID(str(run_id)))
+    finally:
+        db.close()
+
+
+def enqueue_ops_command(command_id: str, user_email: str | None, db: Session) -> AdminOpsRun:
+    _ensure_ops_dirs()
+    command = get_ops_command(command_id)
+    if not command:
+        raise ValueError("Unknown command")
+
+    now = datetime.now(timezone.utc)
     run = AdminOpsRun(
         id=uuid4(),
         command_id=command_id,
-        label=info.get("label"),
-        status="running",
-        started_at=datetime.now(timezone.utc),
+        label=command["label"],
+        status="queued",
+        started_at=now,
         user_email=user_email,
-        disrupts_api=bool(info.get("disruptsApi")),
+        disrupts_api=bool(command["disruptsApi"]),
     )
+    db.add(run)
+    db.commit()
+    db.refresh(run)
+
+    payload = {
+        "runId": str(run.id),
+        "commandId": command_id,
+        "argv": command["argv"],
+        "queuedAt": iso_z(now),
+        "userEmail": user_email or "",
+    }
+    queue_file_path(str(run.id)).write_text(
+        json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    return run
+
+
+def mark_ops_run_started(run_id: str, db: Session) -> AdminOpsRun | None:
+    run = db.get(AdminOpsRun, UUID(str(run_id)))
+    if not run:
+        return None
+    run.status = "running"
     db.add(run)
     db.commit()
     db.refresh(run)
     return run
 
 
-def _finalize_run(
-    run_id: str, result: subprocess.CompletedProcess | None, error_message: str | None
-) -> None:
-    db = SessionLocal()
-    try:
-        run = db.get(AdminOpsRun, run_id)
-        if not run:
-            return
+def mark_ops_run_finished(
+    run_id: str,
+    status: str,
+    exit_code: int | None,
+    error_message: str | None,
+    output_truncated: bool,
+    db: Session,
+) -> AdminOpsRun | None:
+    run = db.get(AdminOpsRun, UUID(str(run_id)))
+    if not run:
+        return None
 
-        output = ""
-        exit_code = None
-        if result is not None:
-            exit_code = result.returncode
-            output = (result.stdout or "").strip()
+    normalized = str(status or "failed").lower()
+    if normalized not in {"completed", "failed"}:
+        normalized = "failed"
 
-        output_truncated = False
-        if len(output) > MAX_OUTPUT_CHARS:
-            output = output[:MAX_OUTPUT_CHARS]
-            output_truncated = True
-
-        now = datetime.now(timezone.utc)
-        run.status = "completed" if exit_code == 0 else "failed"
-        run.finished_at = now
-        run.duration_seconds = int((now - (run.started_at or now)).total_seconds())
-        run.exit_code = exit_code
-        run.output = output or None
-        run.output_truncated = output_truncated
-        run.error_message = error_message
-        db.add(run)
-        db.commit()
-    finally:
-        db.close()
+    output, truncated_from_file = _read_run_output(run_id)
+    now = datetime.now(timezone.utc)
+    run.status = normalized
+    run.finished_at = now
+    run.duration_seconds = int((now - (run.started_at or now)).total_seconds())
+    run.exit_code = exit_code
+    run.output = output or None
+    run.output_truncated = bool(output_truncated or truncated_from_file)
+    run.error_message = error_message or None
+    db.add(run)
+    db.commit()
+    db.refresh(run)
+    return run
 
 
-def _run_command_background(command_id: str, run_id: str) -> None:
-    info = OPS_COMMANDS.get(command_id)
-    if not info:
-        _finalize_run(run_id, None, "Unknown command")
-        return
-
-    result = None
-    error_message = None
-    try:
-        result = subprocess.run(
-            info["command"],
-            cwd=str(settings.base_dir),
-            capture_output=True,
-            text=True,
-            timeout=COMMAND_TIMEOUT_SECONDS,
-        )
-    except Exception as exc:
-        error_message = str(exc)
-
-    _finalize_run(run_id, result, error_message)
-
-
-def run_ops_command(
-    command_id: str, request: Request, db: Session, confirm: bool
+def _queue_requested_command(
+    command_id: str,
+    request: Request,
+    db: Session,
+    confirm: bool,
 ) -> tuple[dict, int]:
-    admin = require_admin(request, db)
+    admin, error = require_ops_access(request, db)
     if not admin:
-        return {"error": "Admin access required"}, 403
+        return {"error": error or "Ops access denied"}, 403
     if not settings.admin_commands_enabled:
         return {"error": "Command runner disabled"}, 403
 
-    info = OPS_COMMANDS.get(command_id)
-    if not info:
+    command = get_ops_command(command_id)
+    if not command:
         return {"error": "Unknown command"}, 404
-
-    if info.get("disruptsApi") and not confirm:
+    if command["requiresConfirm"] and not confirm:
         return {
             "error": "Confirmation required",
             "requiresConfirm": True,
             "command": _describe_command(command_id),
         }, 409
 
-    run = _record_run(db, command_id, admin.email)
-    thread = threading.Thread(
-        target=_run_command_background, args=(command_id, str(run.id)), daemon=True
-    )
-    thread.start()
-
-    return {
-        "run": {
-            "id": str(run.id),
-            "commandId": run.command_id,
-            "label": run.label or "",
-            "status": run.status,
-            "startedAt": iso_z(run.started_at),
-            "disruptsApi": bool(run.disrupts_api),
-        }
-    }, 200
+    run = enqueue_ops_command(command_id, admin.email, db)
+    return {"run": _serialize_run(run)}, 200
 
 
 @router.get("/api/admin/ops")
 @router.get("/api/admin/diagnostics/ops")
 def list_ops(request: Request, db: Session = Depends(get_db)):
-    if not require_admin(request, db):
-        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+    admin, error = require_ops_access(request, db)
+    if not admin:
+        return JSONResponse(status_code=403, content={"error": error or "Ops access denied"})
 
-    message = "" if settings.admin_commands_enabled else "Command runner disabled."
     return {
-        "commands": [_describe_command(cmd_id) for cmd_id in OPS_COMMANDS.keys()],
+        "commands": [_describe_command(item["id"]) for item in load_ops_catalog()],
         "enabled": settings.admin_commands_enabled,
-        "message": message,
+        "message": "" if settings.admin_commands_enabled else "Command runner disabled.",
+        "callerIp": client_ip(request),
     }
+
+
+@router.get("/api/admin/ops/backups")
+def ops_backups(request: Request, db: Session = Depends(get_db)):
+    admin, error = require_ops_access(request, db)
+    if not admin:
+        return JSONResponse(status_code=403, content={"error": error or "Ops access denied"})
+    return collect_backup_summary()
 
 
 @router.post("/api/admin/ops/run")
@@ -241,7 +259,7 @@ def run_ops(payload: RunCommandRequest, request: Request, db: Session = Depends(
     if not command_id:
         return JSONResponse(status_code=400, content={"error": "commandId is required"})
 
-    body, status = run_ops_command(command_id, request, db, payload.confirm)
+    body, status = _queue_requested_command(command_id, request, db, payload.confirm)
     if status != 200:
         return JSONResponse(status_code=status, content=body)
     return body
@@ -252,119 +270,127 @@ def run_command_alias(payload: RunCommandRequest, request: Request, db: Session 
     return run_ops(payload, request, db)
 
 
-@router.get("/api/admin/ops-history")
-@router.get("/api/admin/ops/history")
-@router.get("/api/admin/diagnostics/ops-history")
-def ops_history(request: Request, db: Session = Depends(get_db), limit: int = 50):
-    if not require_admin(request, db):
-        return JSONResponse(status_code=403, content={"error": "Admin access required"})
-
-    runs = db.scalars(
-        select(AdminOpsRun).order_by(AdminOpsRun.started_at.desc()).limit(limit)
-    ).all()
-
-    return {
-        "runs": [
-            {
-                "id": str(run.id),
-                "commandId": run.command_id,
-                "label": run.label or "",
-                "status": run.status,
-                "startedAt": iso_z(run.started_at),
-                "finishedAt": iso_z(run.finished_at),
-                "durationSeconds": run.duration_seconds,
-                "exitCode": run.exit_code,
-                "output": run.output or "",
-                "outputTruncated": bool(run.output_truncated),
-                "errorMessage": run.error_message or "",
-                "userEmail": run.user_email or "",
-                "disruptsApi": bool(run.disrupts_api),
-            }
-            for run in runs
-        ]
-    }
-
-
 @router.post("/api/admin/run-command-stream")
 def run_command_stream(payload: RunCommandRequest, request: Request, db: Session = Depends(get_db)):
-    admin = require_admin(request, db)
-    if not admin:
-        return JSONResponse(status_code=403, content={"error": "Admin access required"})
-
     command_id = (payload.command_id or payload.command or payload.id or "").strip()
     if not command_id:
         return JSONResponse(status_code=400, content={"error": "commandId is required"})
 
-    info = OPS_COMMANDS.get(command_id)
-    if not info:
-        return JSONResponse(status_code=404, content={"error": "Unknown command"})
+    body, status = _queue_requested_command(command_id, request, db, payload.confirm)
+    if status != 200:
+        return JSONResponse(status_code=status, content=body)
+    run_id = body["run"]["id"]
+    return ops_run_stream(run_id, request, db)
 
-    if info.get("disruptsApi") and not payload.confirm:
-        return JSONResponse(
-            status_code=409,
-            content={
-                "error": "Confirmation required",
-                "requiresConfirm": True,
-                "command": _describe_command(command_id),
-            },
-        )
 
-    run = _record_run(db, command_id, admin.email)
-    command = info["command"]
+@router.get("/api/admin/ops-history")
+@router.get("/api/admin/ops/history")
+@router.get("/api/admin/diagnostics/ops-history")
+def ops_history(request: Request, db: Session = Depends(get_db), limit: int = 50):
+    admin, error = require_ops_access(request, db)
+    if not admin:
+        return JSONResponse(status_code=403, content={"error": error or "Ops access denied"})
+
+    runs = db.scalars(select(AdminOpsRun).order_by(AdminOpsRun.started_at.desc()).limit(limit)).all()
+    return {"runs": [_serialize_run(run) for run in runs]}
+
+
+@router.get("/api/admin/ops/runs/{run_id}")
+def ops_run_detail(run_id: str, request: Request, db: Session = Depends(get_db)):
+    admin, error = require_ops_access(request, db)
+    if not admin:
+        return JSONResponse(status_code=403, content={"error": error or "Ops access denied"})
+
+    try:
+        run_uuid = UUID(str(run_id))
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid run id"})
+
+    run = db.get(AdminOpsRun, run_uuid)
+    if not run:
+        return JSONResponse(status_code=404, content={"error": "Run not found"})
+    return {"run": _serialize_run(run)}
+
+
+@router.get("/api/admin/ops/runs/{run_id}/stream")
+def ops_run_stream(run_id: str, request: Request, db: Session = Depends(get_db)):
+    admin, error = require_ops_access(request, db)
+    if not admin:
+        return JSONResponse(status_code=403, content={"error": error or "Ops access denied"})
+
+    try:
+        run_uuid = UUID(str(run_id))
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid run id"})
+
+    run = db.get(AdminOpsRun, run_uuid)
+    if not run:
+        return JSONResponse(status_code=404, content={"error": "Run not found"})
 
     def stream():
-        output_chunks: list[str] = []
-        output_len = 0
-        truncated = False
-        start = time.monotonic()
-        exit_code = None
-        error_message = None
+        yield f"event: meta\ndata: {json.dumps({'runId': run_id, 'label': run.label or run.command_id})}\n\n"
+        offset = 0
+        while True:
+            path = log_file_path(run_id)
+            if path.exists():
+                with path.open("r", encoding="utf-8", errors="replace") as handle:
+                    handle.seek(offset)
+                    while True:
+                        line = handle.readline()
+                        if not line:
+                            break
+                        offset = handle.tell()
+                        payload = json.dumps({"line": line.rstrip("\n")})
+                        yield f"data: {payload}\n\n"
 
-        try:
-            proc = subprocess.Popen(
-                command,
-                cwd=str(settings.base_dir),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-            )
-            if proc.stdout:
-                for line in proc.stdout:
-                    data = {"line": line.rstrip("\n")}
-                    payload_line = json.dumps(data)
-                    yield f"data: {payload_line}\n\n"
-                    if output_len < MAX_OUTPUT_CHARS:
-                        output_chunks.append(line)
-                        output_len += len(line)
-                    else:
-                        truncated = True
-            exit_code = proc.wait()
-        except Exception as exc:
-            error_message = str(exc)
-        finally:
-            duration = int(time.monotonic() - start)
-            db_local = SessionLocal()
-            try:
-                run_local = db_local.get(AdminOpsRun, run.id)
-                if run_local:
-                    output = "".join(output_chunks).strip()
-                    if len(output) > MAX_OUTPUT_CHARS:
-                        output = output[:MAX_OUTPUT_CHARS]
-                        truncated = True
-                    run_local.status = "completed" if exit_code == 0 else "failed"
-                    run_local.finished_at = datetime.now(timezone.utc)
-                    run_local.duration_seconds = duration
-                    run_local.exit_code = exit_code
-                    run_local.output = output or None
-                    run_local.output_truncated = truncated
-                    run_local.error_message = error_message
-                    db_local.add(run_local)
-                    db_local.commit()
-            finally:
-                db_local.close()
-
-        final_payload = json.dumps({"exitCode": exit_code, "error": error_message})
-        yield f"event: complete\ndata: {final_payload}\n\n"
+            current = _load_run(run_id)
+            if not current:
+                yield "event: complete\ndata: {\"error\":\"Run not found\"}\n\n"
+                break
+            if current.status not in {"queued", "running"}:
+                final_payload = json.dumps({"run": _serialize_run(current)})
+                yield f"event: complete\ndata: {final_payload}\n\n"
+                break
+            time.sleep(STREAM_POLL_SECONDS)
 
     return StreamingResponse(stream(), media_type="text/event-stream")
+
+
+@router.post("/api/internal/ops/runs/{run_id}/start")
+def internal_ops_run_start(run_id: str, request: Request, db: Session = Depends(get_db)):
+    if not require_host_automation(request):
+        return JSONResponse(status_code=403, content={"error": "Host automation token required"})
+
+    try:
+        run = mark_ops_run_started(run_id, db)
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid run id"})
+    if not run:
+        return JSONResponse(status_code=404, content={"error": "Run not found"})
+    return {"run": _serialize_run(run)}
+
+
+@router.post("/api/internal/ops/runs/{run_id}/finish")
+def internal_ops_run_finish(
+    run_id: str,
+    payload: FinishRunRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    if not require_host_automation(request):
+        return JSONResponse(status_code=403, content={"error": "Host automation token required"})
+
+    try:
+        run = mark_ops_run_finished(
+            run_id=run_id,
+            status=payload.status,
+            exit_code=payload.exit_code,
+            error_message=payload.error_message,
+            output_truncated=payload.output_truncated,
+            db=db,
+        )
+    except Exception:
+        return JSONResponse(status_code=400, content={"error": "Invalid run id"})
+    if not run:
+        return JSONResponse(status_code=404, content={"error": "Run not found"})
+    return {"run": _serialize_run(run)}

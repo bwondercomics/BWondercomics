@@ -11,7 +11,9 @@ export async function fetchAdminAPI(url, options = {}) {
     const message =
       (data && (data.error || data.message)) ||
       `Request failed (${response.status})`;
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = response.status;
+    throw error;
   }
 
   return data;

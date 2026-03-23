@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -32,7 +33,7 @@ def _env_int(name: str, default: int) -> int:
 def _split_csv(raw: str | None) -> tuple[str, ...]:
     if not raw:
         return tuple()
-    parts = [item.strip() for item in str(raw).split(",")]
+    parts = [item.strip() for item in re.split(r"[\s,]+", str(raw).strip())]
     return tuple(item for item in parts if item)
 
 
@@ -48,6 +49,8 @@ class Settings:
     invite_code: str
     cookie_secure: bool
     admin_commands_enabled: bool
+    ops_allowed_ips: tuple[str, ...]
+    host_automation_token: str
     database_url: str
     umami_website_id: str
     umami_base_url: str
@@ -93,6 +96,8 @@ def load_settings() -> Settings:
     invite_code = (os.environ.get("INVITE_CODE") or "").strip()
     cookie_secure = _env_bool("COOKIE_SECURE", default=False)
     admin_commands_enabled = _env_bool("ADMIN_COMMANDS_ENABLED", default=False)
+    ops_allowed_ips = _split_csv(os.environ.get("OPS_ALLOWED_IPS"))
+    host_automation_token = (os.environ.get("HOST_AUTOMATION_TOKEN") or "").strip()
 
     database_url = (os.environ.get("DATABASE_URL") or "").strip()
     if not database_url:
@@ -187,6 +192,8 @@ def load_settings() -> Settings:
         invite_code=invite_code,
         cookie_secure=cookie_secure,
         admin_commands_enabled=admin_commands_enabled,
+        ops_allowed_ips=ops_allowed_ips,
+        host_automation_token=host_automation_token,
         database_url=database_url,
         umami_website_id=umami_website_id,
         umami_base_url=umami_base_url,

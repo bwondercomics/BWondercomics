@@ -1,1021 +1,393 @@
-/**
- * Diagnostics and Troubleshooting Panel
- * 
- * Displays system health, configuration, and read-only diagnostics.
- */
-
-import { fetchAdminAPI } from './api.js';
-
-// Health check indicators
-const healthIndicators = {
-    ok: '✅',
-    warning: '⚠️',
-    error: '❌',
-    info: 'ℹ️'
-};
+import { fetchAdminAPI } from "./api.js";
+import { getDiagnosticsSnapshot, refreshDiagnosticsSnapshot } from "./diagnostics-data.js";
 
 let diagnosticsInitialized = false;
-let testSuites = [];
-let opsCommands = [];
-let logStreamSource = null;
 let refreshIndicatorTimer = null;
 
+
 function escapeHtml(value) {
-    return String(value ?? '')
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#39;');
-}
-
-function showRefreshIndicator() {
-    const indicator = document.getElementById('diagnostics-refresh-indicator');
-    if (!indicator) return;
-    indicator.classList.add('refresh-indicator--visible');
-    if (refreshIndicatorTimer) {
-        clearTimeout(refreshIndicatorTimer);
-    }
-    refreshIndicatorTimer = setTimeout(() => {
-        indicator.classList.remove('refresh-indicator--visible');
-    }, 1200);
-}
-
-function lockDiagnosticsBox(container) {
-    if (!container || container.dataset.locked === 'true') return;
-    const height = container.getBoundingClientRect().height;
-    const minHeight = Math.max(120, Math.round(height));
-    container.style.setProperty('--diagnostics-lock-height', `${minHeight}px`);
-    container.classList.add('diagnostics-lock');
-    container.dataset.locked = 'true';
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 
-function captureScrollAnchor() {
-    const scrollY = window.scrollY || 0;
-    const probeY = Math.min(window.innerHeight - 1, 120);
-    const probeX = Math.min(window.innerWidth - 1, Math.floor(window.innerWidth * 0.5));
-    const element = document.elementFromPoint(probeX, probeY);
-    const rect = element?.getBoundingClientRect();
-    return {
-        scrollY,
-        element,
-        top: rect?.top ?? null,
-    };
+function formatDate(value) {
+  if (!value) return "Unavailable";
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "Unavailable" : date.toLocaleString();
 }
 
-function restoreScrollAnchor(anchor) {
-    if (!anchor) return;
-    if (anchor.element && document.contains(anchor.element) && anchor.top != null) {
-        const rect = anchor.element.getBoundingClientRect();
-        const delta = rect.top - anchor.top;
-        if (Math.abs(delta) > 1) {
-            window.scrollBy(0, delta);
-            return;
-        }
-    }
-    if (typeof anchor.scrollY === 'number') {
-        window.scrollTo({ top: anchor.scrollY });
-    }
-}
 
 function formatDuration(totalSeconds) {
-    const seconds = Math.max(0, Number(totalSeconds) || 0);
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (days) return `${days}d ${hours}h ${minutes}m`;
-    if (hours) return `${hours}h ${minutes}m`;
-    if (minutes) return `${minutes}m`;
-    return `${Math.floor(seconds)}s`;
+  const seconds = Math.max(0, Number(totalSeconds) || 0);
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (days) return `${days}d ${hours}h ${minutes}m`;
+  if (hours) return `${hours}h ${minutes}m`;
+  if (minutes) return `${minutes}m`;
+  return `${Math.floor(seconds)}s`;
 }
 
-function setLogsStatus(message, level = '') {
-    const status = document.getElementById('logs-status');
-    if (!status) return;
-    status.textContent = message || '';
-    status.className = 'logs-status';
-    if (level) status.classList.add(`logs-status--${level}`);
+
+function showRefreshIndicator() {
+  const indicator = document.getElementById("diagnostics-refresh-indicator");
+  if (!indicator) return;
+  indicator.classList.add("refresh-indicator--visible");
+  if (refreshIndicatorTimer) clearTimeout(refreshIndicatorTimer);
+  refreshIndicatorTimer = setTimeout(() => {
+    indicator.classList.remove("refresh-indicator--visible");
+  }, 1200);
 }
 
-function appendLogLine(line) {
-    const output = document.getElementById('logs-output');
-    if (!output) return;
-    const next = `${output.textContent}${line}\n`;
-    const maxChars = 200000;
-    output.textContent = next.length > maxChars ? next.slice(-maxChars) : next;
-    const autoScroll = /** @type {HTMLInputElement | null} */ (document.getElementById('logs-autoscroll'));
-    if (autoScroll && autoScroll.checked) {
-        output.scrollTop = output.scrollHeight;
-    }
-}
 
-function updateLogServiceOptions(services = []) {
-    const select = /** @type {HTMLSelectElement | null} */ (document.getElementById('logs-service'));
-    if (!select) return;
-    const current = select.value || 'bwondercomics-api';
-    const labelMap = {
-        'bwondercomics-api': 'API',
-        'bwondercomics-db': 'Database',
-        'caddy': 'Caddy',
-        'umami': 'Umami',
-        'umami-db': 'Umami DB',
-        'all': 'All services',
+function ageLabel(generatedAt) {
+  if (!generatedAt) return { stale: true, label: "No snapshot generated yet." };
+  const generated = new Date(generatedAt);
+  if (Number.isNaN(generated.getTime())) {
+    return { stale: true, label: "Snapshot timestamp is invalid." };
+  }
+  const ageSeconds = Math.max(0, Math.round((Date.now() - generated.getTime()) / 1000));
+  if (ageSeconds > 5400) {
+    return {
+      stale: true,
+      label: `Snapshot is stale (${formatDuration(ageSeconds)} old).`,
     };
-    const unique = Array.from(new Set(services.filter(Boolean)));
-    if (!unique.length) return;
-    const options = unique.map((name) => ({
-        value: name,
-        label: labelMap[name] || name,
-    }));
-    options.push({ value: 'all', label: labelMap.all });
-    select.innerHTML = '';
-    options.forEach((item) => {
-        const opt = document.createElement('option');
-        opt.value = item.value;
-        opt.textContent = item.label;
-        select.appendChild(opt);
-    });
-    select.value = options.some((item) => item.value === current) ? current : options[0].value;
+  }
+  return {
+    stale: false,
+    label: `Snapshot updated ${formatDuration(ageSeconds)} ago.`,
+  };
 }
 
-const fallbackOps = [
-    {
-        id: 'stack-up',
-        group: 'Stack',
-        label: 'Rebuild + restart stack',
-        description: 'Build and start all services (API, DB, Caddy).',
-        command: 'make up',
-        disrupts_api: true
-    },
-    {
-        id: 'stack-restart',
-        group: 'Stack',
-        label: 'Restart containers',
-        description: 'Restart all running services without rebuilding.',
-        command: 'make restart',
-        disrupts_api: true
-    },
-    {
-        id: 'stack-logs',
-        group: 'Stack',
-        label: 'Tail all logs',
-        description: 'Stream logs from every container.',
-        command: 'make logs'
-    },
-    {
-        id: 'host-reboot',
-        group: 'Host',
-        label: 'Reboot host machine',
-        description: 'Reboot the physical/VM host (last resort after container restart).',
-        command: 'sudo shutdown -r now',
-        disrupts_api: true,
-        dangerous: true,
-        available_message: 'Run on host: sudo shutdown -r now (not available inside container).'
-    },
-    {
-        id: 'db-migrate',
-        group: 'Backend / DB',
-        label: 'Run DB migrations',
-        description: 'Apply Alembic migrations inside the API container.',
-        command: 'make migrate'
-    },
-    {
-        id: 'api-logs',
-        group: 'Backend / DB',
-        label: 'API logs',
-        description: 'Tail FastAPI logs only.',
-        command: 'make api-logs'
-    },
-    {
-        id: 'db-shell',
-        group: 'Backend / DB',
-        label: 'Open DB shell',
-        description: 'Launch psql inside the DB container.',
-        command: 'make psql'
-    },
-    {
-        id: 'frontend-build',
-        group: 'Frontend / Analytics',
-        label: 'Save current build + rebuild',
-        description: 'Save current dist/ as a snapshot, then rebuild static assets (admin + reader).',
-        alias: 'npm run build',
-        command: 'sh scripts/frontend-build.sh',
-        streamable: true
-    },
-    {
-        id: 'frontend-rollback',
-        group: 'Frontend / Analytics',
-        label: 'Restore last saved build',
-        description: 'Restore the most recent snapshot and save the current build as a rollback backup.',
-        command: 'sh scripts/frontend-rollback.sh',
-        streamable: true
-    },
-    {
-        id: 'frontend-restore-rollback',
-        group: 'Frontend / Analytics',
-        label: 'Restore last rollback backup',
-        description: 'Restore the build that was saved when you last ran a rollback.',
-        command: 'sh scripts/frontend-restore-rollback.sh',
-        streamable: true
-    },
-    {
-        id: 'analytics-up',
-        group: 'Frontend / Analytics',
-        label: 'Start stack with Umami',
-        description: 'Bring up analytics containers alongside the main stack.',
-        command: 'make up-analytics',
-        disrupts_api: true
-    },
-    {
-        id: 'analytics-logs',
-        group: 'Frontend / Analytics',
-        label: 'Tail Umami logs',
-        description: 'Stream analytics container logs.',
-        command: 'make analytics-logs'
-    },
-    {
-        id: 'backup-all',
-        group: 'Backups',
-        label: 'Create backup (DB + files)',
-        description: 'Write new backups into var/backups.',
-        command: 'make backup',
-        streamable: true
-    },
-    {
-        id: 'backup-db',
-        group: 'Backups',
-        label: 'Backup database only',
-        description: 'Create a database-only backup in var/backups.',
-        command: 'make backup-db',
-        streamable: true
-    },
-    {
-        id: 'backup-files',
-        group: 'Backups',
-        label: 'Backup files only',
-        description: 'Create a files-only backup in var/backups.',
-        command: 'make backup-files',
-        streamable: true
-    },
-    {
-        id: 'restore-db-latest',
-        group: 'Backups',
-        label: 'Restore latest DB backup',
-        description: 'Restore the most recent database backup (destructive).',
-        command: 'make restore-db FILE=var/backups/db-YYYYMMDD-HHMMSS.sql CONFIRM=1',
-        streamable: true,
-        dangerous: true
-    },
-    {
-        id: 'restore-files-latest',
-        group: 'Backups',
-        label: 'Restore latest files backup',
-        description: 'Restore the most recent files backup (destructive).',
-        command: 'make restore-files FILE=var/backups/files-YYYYMMDD-HHMMSS.tar.gz CONFIRM=1',
-        streamable: true,
-        dangerous: true
-    }
-];
 
-export async function initDiagnostics() {
-    const container = document.getElementById('diagnosticsSection');
-    if (!container) return;
+function renderBanner(snapshot, message = "") {
+  const banner = document.getElementById("diagnosticsBanner");
+  const snapshotTime = document.getElementById("diagnosticsSnapshotTime");
+  if (!banner || !snapshotTime) return;
 
-    if (!diagnosticsInitialized) {
-        diagnosticsInitialized = true;
-        // Set up refresh button
-        const refreshBtn = document.getElementById('diagnostics-refresh');
-        if (refreshBtn) {
-            refreshBtn.addEventListener('click', refreshAllDiagnostics);
-        }
-
-        const logsStart = document.getElementById('logs-start');
-        const logsStop = document.getElementById('logs-stop');
-        const logsClear = document.getElementById('logs-clear');
-        if (logsStart) logsStart.addEventListener('click', startLogStream);
-        if (logsStop) logsStop.addEventListener('click', stopLogStream);
-        if (logsClear) {
-            logsClear.addEventListener('click', () => {
-                const output = document.getElementById('logs-output');
-                if (output) output.textContent = '';
-            });
-        }
-    }
-
-    // Initial load
-    await refreshAllDiagnostics();
-}
-
-async function refreshAllDiagnostics() {
-    showRefreshIndicator();
-    loadOperations();
-    loadOpsHistory();
-    await Promise.all([
-        loadSystemHealth(),
-        loadDatabaseStats(),
-        loadDbInsights(),
-        loadDeployStatus(),
-        loadBackups(),
-        loadServiceStatus(),
-        loadTestStatus(),
-        loadConfiguration()
-    ]);
-}
-
-async function loadSystemHealth() {
-    const container = document.getElementById('health-status');
-    if (!container) return;
-
-    const anchor = captureScrollAnchor();
-    container.innerHTML = '<div class="loading">Loading health status...</div>';
-
-    try {
-        const health = await fetchAdminAPI('/api/admin/diagnostics/health');
-
-        const statusClass = health.status === 'healthy' ? 'status-ok' : 'status-warning';
-
-        let html = `
-      <div class="health-summary ${statusClass}">
-        <h3>System Status: ${health.status.toUpperCase()}</h3>
-        <p class="timestamp">Last checked: ${new Date(health.timestamp).toLocaleString()}</p>
-      </div>
-      <div class="health-checks">
+  if (!snapshot) {
+    banner.className = "diagnostics-banner diagnostics-banner--warning";
+    banner.innerHTML = `
+      <strong>Diagnostics snapshot unavailable.</strong>
+      <span>${escapeHtml(message || "Generate a snapshot to populate this panel.")}</span>
     `;
+    snapshotTime.textContent = "Snapshot: unavailable";
+    return;
+  }
 
-        for (const [check, result] of Object.entries(health.checks)) {
-            const indicator = healthIndicators[result.status] || '❓';
-            html += `
-        <div class="health-check">
-          <div class="check-header">
-            <span class="indicator">${indicator}</span>
-            <span class="check-name">${check.replace(/_/g, ' ').toUpperCase()}</span>
-          </div>
-          <div class="check-details">
-            ${result.message || Object.entries(result).filter(([k]) => k !== 'status').map(([k, v]) =>
-                `<div><strong>${k}:</strong> ${v}</div>`
-            ).join('')}
-          </div>
-        </div>
-      `;
-        }
-
-        html += '</div>';
-        container.innerHTML = html;
-    } catch (error) {
-        container.innerHTML = `<div class="error">Failed to load health status: ${error.message}</div>`;
-    } finally {
-        lockDiagnosticsBox(container);
-        requestAnimationFrame(() => restoreScrollAnchor(anchor));
-    }
+  const age = ageLabel(snapshot.generatedAt);
+  const status = age.stale ? "warning" : String(snapshot.overallStatus || "ok").toLowerCase();
+  const summary = message || age.label;
+  banner.className = `diagnostics-banner diagnostics-banner--${status}`;
+  banner.innerHTML = `
+    <strong>Overall status: ${escapeHtml(String(snapshot.overallStatus || "ok").toUpperCase())}</strong>
+    <span>${escapeHtml(summary)}</span>
+  `;
+  snapshotTime.textContent = `Snapshot: ${formatDate(snapshot.generatedAt)}`;
 }
 
-async function loadDatabaseStats() {
-    const container = document.getElementById('database-stats');
-    if (!container) return;
 
-    container.innerHTML = '<div class="loading">Loading database stats...</div>';
+function renderHealth(snapshot) {
+  const container = document.getElementById("diagnosticsHealth");
+  if (!container) return;
+  const checks = (snapshot?.health?.checks && Object.entries(snapshot.health.checks)) || [];
+  if (!checks.length) {
+    container.innerHTML = '<div class="warning">No health data available.</div>';
+    return;
+  }
 
-    try {
-        const stats = await fetchAdminAPI('/api/admin/diagnostics/database-stats');
+  container.innerHTML = `
+    <div class="health-checks">
+      ${checks
+        .map(
+          ([name, item]) => `
+            <div class="health-check">
+              <div class="check-header">
+                <span class="check-name">${escapeHtml(name.replace(/([A-Z])/g, " $1").trim())}</span>
+                <span class="status-pill status-pill--${escapeHtml(item.status || "warning")}">${escapeHtml(item.status || "warning")}</span>
+              </div>
+              <div class="check-details">${escapeHtml(item.message || "")}</div>
+            </div>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
 
-        let html = '<div class="stats-grid">';
 
-        // Users
-        html += `
+function renderServices(snapshot) {
+  const container = document.getElementById("diagnosticsServices");
+  if (!container) return;
+  const items = snapshot?.serviceStatus?.items || [];
+  if (!items.length) {
+    container.innerHTML = '<div class="warning">No service summary available.</div>';
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="service-grid">
+      ${items
+        .map(
+          (item) => `
+            <div class="service-card">
+              <div class="service-title">${escapeHtml(item.label || item.id || "Service")}</div>
+              <div class="service-status service-status--${escapeHtml(item.status || "warning")}">${escapeHtml(item.status || "warning")}</div>
+              <div class="service-meta">${escapeHtml(item.summary || "")}</div>
+              <div class="service-detail">${escapeHtml(item.details || "")}</div>
+            </div>
+          `,
+        )
+        .join("")}
+    </div>
+  `;
+}
+
+
+function renderDatabase(snapshot) {
+  const container = document.getElementById("diagnosticsDatabase");
+  if (!container) return;
+  const stats = snapshot?.databaseStats || {};
+  const overview = snapshot?.databaseOverview || {};
+  const users = stats.users || { total: 0, byRole: {} };
+  const series = stats.series || { total: 0, published: 0, premiumOnly: 0 };
+  const comments = stats.comments || { total: 0, approved: 0 };
+  const database = overview.database || {};
+  const alembic = overview.alembic || {};
+  const connections = overview.connections || {};
+  const tables = Array.isArray(overview.tables) ? overview.tables.slice(0, 8) : [];
+
+  let html = `
+    <div class="stats-grid">
       <div class="stat-card">
         <h4>Users</h4>
-        <div class="stat-value">${stats.users.total}</div>
+        <div class="stat-value">${users.total || 0}</div>
         <div class="stat-breakdown">
-          <div>Regular: ${stats.users.by_role.user || 0}</div>
-          <div>Premium: ${stats.users.by_role.premium || 0}</div>
-          <div>Admin: ${stats.users.by_role.admin || 0}</div>
+          <div>Regular: ${users.byRole?.user || 0}</div>
+          <div>Premium: ${users.byRole?.premium || 0}</div>
+          <div>Admin: ${users.byRole?.admin || 0}</div>
         </div>
       </div>
-    `;
-
-        // Series
-        html += `
       <div class="stat-card">
         <h4>Series</h4>
-        <div class="stat-value">${stats.series.total}</div>
+        <div class="stat-value">${series.total || 0}</div>
         <div class="stat-breakdown">
-          <div>Published: ${stats.series.published}</div>
-          <div>Premium: ${stats.series.premium_only}</div>
+          <div>Published: ${series.published || 0}</div>
+          <div>Premium: ${series.premiumOnly || 0}</div>
         </div>
       </div>
-    `;
-
-        // Comments
-        html += `
       <div class="stat-card">
         <h4>Comments</h4>
-        <div class="stat-value">${stats.comments.total}</div>
+        <div class="stat-value">${comments.total || 0}</div>
         <div class="stat-breakdown">
-          <div>Approved: ${stats.comments.approved}</div>
+          <div>Approved: ${comments.approved || 0}</div>
+          <div>Posts: ${stats.posts || 0}</div>
         </div>
       </div>
-    `;
-
-        // Premium Codes
-        html += `
       <div class="stat-card">
-        <h4>Premium Codes</h4>
-        <div class="stat-value">${stats.premium_codes.total}</div>
+        <h4>Database</h4>
+        <div class="stat-value">${escapeHtml(database.sizePretty || "Unknown")}</div>
         <div class="stat-breakdown">
-          <div>Active: ${stats.premium_codes.active}</div>
+          <div>${escapeHtml(database.name || "Unknown DB")}</div>
+          <div>Alembic: ${escapeHtml(alembic.version || "unknown")}</div>
+          <div>${escapeHtml(`${connections.active || 0} active / ${connections.idle || 0} idle`)}</div>
         </div>
       </div>
-    `;
+    </div>
+  `;
 
-        html += '</div>';
-        container.innerHTML = html;
-    } catch (error) {
-        container.innerHTML = `<div class="error">Failed to load database stats: ${error.message}</div>`;
-    } finally {
-        lockDiagnosticsBox(container);
-    }
+  if (tables.length) {
+    html += `
+      <table class="db-table">
+        <thead>
+          <tr>
+            <th>Table</th>
+            <th>Rows</th>
+            <th>Size</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${tables
+            .map(
+              (row) => `
+                <tr>
+                  <td>${escapeHtml(row.name || "")}</td>
+                  <td>${escapeHtml(String(row.rowsEstimate ?? 0))}</td>
+                  <td>${escapeHtml(row.sizePretty || "")}</td>
+                </tr>
+              `,
+            )
+            .join("")}
+        </tbody>
+      </table>
+    `;
+  }
+
+  container.innerHTML = html;
 }
 
-async function loadDbInsights() {
-    const container = document.getElementById('db-insights');
-    if (!container) return;
 
-    container.innerHTML = '<div class="loading">Loading database overview...</div>';
+function renderDeploy(snapshot) {
+  const container = document.getElementById("diagnosticsDeploy");
+  if (!container) return;
+  const deploy = snapshot?.deployStatus || {};
+  const server = deploy.server || {};
+  const git = deploy.git || {};
+  const dist = deploy.dist || {};
+  const releaseSnapshots = deploy.releaseSnapshots || {};
+  const latestRelease = releaseSnapshots.latest || {};
 
-    try {
-        const payload = await fetchAdminAPI('/api/admin/diagnostics/db-insights');
-        const database = payload.database || {};
-        const connections = payload.connections || {};
-        const alembic = payload.alembic || {};
-        const tables = Array.isArray(payload.tables) ? payload.tables : [];
-
-        const dbName = database.name || 'Unknown';
-        const dbVersion = database.version || 'Unknown';
-        const sizePretty = database.size_pretty || 'Unknown';
-        const alembicVersion = alembic.version || 'Unknown';
-
-        const connectionLabel = `${connections.active || 0} active / ${connections.idle || 0} idle`;
-        const connectionMeta = `Total: ${connections.total || 0} / Max: ${connections.max || 0}`;
-
-        let html = `
-      <div class="db-grid">
-        <div class="db-card">
-          <div class="db-title">Database</div>
-          <div class="db-value">${escapeHtml(dbName)}</div>
-          <div class="db-meta">${escapeHtml(dbVersion)}</div>
-        </div>
-        <div class="db-card">
-          <div class="db-title">Size</div>
-          <div class="db-value">${escapeHtml(sizePretty)}</div>
-          <div class="db-meta">Current database size</div>
-        </div>
-        <div class="db-card">
-          <div class="db-title">Connections</div>
-          <div class="db-value">${escapeHtml(connectionLabel)}</div>
-          <div class="db-meta">${escapeHtml(connectionMeta)}</div>
-        </div>
-        <div class="db-card">
-          <div class="db-title">Alembic</div>
-          <div class="db-value">${escapeHtml(alembicVersion)}</div>
-          <div class="db-meta">Migration version</div>
-        </div>
+  container.innerHTML = `
+    <div class="deploy-grid">
+      <div class="deploy-card">
+        <div class="deploy-title">API Uptime</div>
+        <div class="deploy-value">${escapeHtml(formatDuration(server.uptimeSeconds))}</div>
+        <div class="deploy-meta">Started: ${escapeHtml(formatDate(server.startedAt))}</div>
       </div>
-    `;
-
-        if (tables.length) {
-            html += `
-        <table class="db-table">
-          <thead>
-            <tr>
-              <th>Table</th>
-              <th>Rows (est)</th>
-              <th>Size</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${tables
-                .map(
-                    (row) => `
-              <tr>
-                <td>${escapeHtml(row.name)}</td>
-                <td>${escapeHtml(String(row.rows_estimate ?? 0))}</td>
-                <td>${escapeHtml(row.size_pretty || '')}</td>
-              </tr>
-            `
-                )
-                .join('')}
-          </tbody>
-        </table>
-      `;
-        } else {
-            html += `<div class="warning">${healthIndicators.warning} No table stats available.</div>`;
-        }
-
-        container.innerHTML = html;
-    } catch (error) {
-        container.innerHTML = `<div class="error">Failed to load database overview: ${error.message}</div>`;
-    } finally {
-        lockDiagnosticsBox(container);
-    }
-}
-
-async function loadDeployStatus() {
-    const container = document.getElementById('deploy-status');
-    if (!container) return;
-
-    container.innerHTML = '<div class="loading">Loading deployment status...</div>';
-
-    try {
-        const payload = await fetchAdminAPI('/api/admin/diagnostics/deploy-status');
-        const server = payload.server || {};
-        const dist = payload.dist || {};
-        const git = payload.git || {};
-        const snapshots = payload.snapshots || {};
-
-        const startedAt = server.started_at ? new Date(server.started_at).toLocaleString() : 'Unknown';
-        const uptime = server.uptime_seconds != null ? formatDuration(server.uptime_seconds) : 'Unknown';
-        const distUpdated = dist.last_modified ? new Date(dist.last_modified).toLocaleString() : 'Unknown';
-        const distStatus = dist.exists ? 'Present' : 'Missing';
-
-        const ref = typeof git.ref === 'string' ? git.ref.replace('refs/heads/', '') : '';
-        const commitShort = typeof git.commit === 'string' ? git.commit.slice(0, 7) : '';
-        const commitLabel = commitShort ? `${commitShort}${ref ? ` (${ref})` : ''}` : 'Not available';
-
-        const manifestLabel = dist.manifest ? dist.manifest : 'Not found';
-        const snapshotCount = snapshots.count ?? 0;
-        const latestSnapshot = snapshots.latest || {};
-        const snapshotMeta = latestSnapshot.created_at
-            ? `Latest: ${new Date(latestSnapshot.created_at).toLocaleString()}${latestSnapshot.size_pretty ? ` (${latestSnapshot.size_pretty})` : ''}`
-            : 'Run a build to create a snapshot';
-
-        container.innerHTML = `
-      <div class="deploy-grid">
-        <div class="deploy-card">
-          <div class="deploy-title">API Uptime</div>
-          <div class="deploy-value">${escapeHtml(uptime)}</div>
-          <div class="deploy-meta">Started: ${escapeHtml(startedAt)}</div>
-        </div>
-        <div class="deploy-card">
-          <div class="deploy-title">Frontend Build</div>
-          <div class="deploy-value">${escapeHtml(distStatus)}</div>
-          <div class="deploy-meta">Last build: ${escapeHtml(distUpdated)}</div>
-        </div>
-        <div class="deploy-card">
-          <div class="deploy-title">Build Manifest</div>
-          <div class="deploy-value">${escapeHtml(manifestLabel)}</div>
-          <div class="deploy-meta">dist/assets</div>
-        </div>
-        <div class="deploy-card">
-          <div class="deploy-title">Git Commit</div>
-          <div class="deploy-value">${escapeHtml(commitLabel)}</div>
-          <div class="deploy-meta">Repo state</div>
-        </div>
-        <div class="deploy-card">
-          <div class="deploy-title">Rollback Snapshot</div>
-          <div class="deploy-value">${escapeHtml(snapshotCount ? `${snapshotCount} saved` : 'None')}</div>
-          <div class="deploy-meta">${escapeHtml(snapshotMeta)}</div>
-        </div>
+      <div class="deploy-card">
+        <div class="deploy-title">Frontend Dist</div>
+        <div class="deploy-value">${escapeHtml(dist.exists ? "Present" : "Missing")}</div>
+        <div class="deploy-meta">Last build: ${escapeHtml(formatDate(dist.lastModified))}</div>
       </div>
-    `;
-    } catch (error) {
-        container.innerHTML = `<div class="error">Failed to load deployment status: ${error.message}</div>`;
-    } finally {
-        lockDiagnosticsBox(container);
-    }
-}
-
-async function loadBackups() {
-    const container = document.getElementById('backups-status');
-    if (!container) return;
-
-    const anchor = captureScrollAnchor();
-    container.innerHTML = '<div class="loading">Loading backups...</div>';
-
-    try {
-        const payload = await fetchAdminAPI('/api/admin/diagnostics/backups');
-        const dbBackups = Array.isArray(payload.db) ? payload.db : [];
-        const fileBackups = Array.isArray(payload.files) ? payload.files : [];
-        const rootPath = payload.root || 'var/backups';
-
-        const renderList = (items) => {
-            if (!items.length) {
-                return '<div class="backup-empty">No backups yet.</div>';
-            }
-            const slice = items.slice(0, 6);
-            return `
-        <ul class="backup-list">
-          ${slice
-                .map(
-                    (item) => `
-            <li>
-              <div class="backup-name">${escapeHtml(item.name)}</div>
-              <div class="backup-meta-row">${escapeHtml(new Date(item.created_at).toLocaleString())} · ${escapeHtml(item.size_pretty || '')}</div>
-            </li>
-          `
-                )
-                .join('')}
-        </ul>
-      `;
-        };
-
-        container.innerHTML = `
-      <div class="backup-grid">
-        <div class="backup-card">
-          <div class="backup-title">Database backups</div>
-          <div class="backup-count">Found ${dbBackups.length}</div>
-          ${renderList(dbBackups)}
-        </div>
-        <div class="backup-card">
-          <div class="backup-title">Files backups</div>
-          <div class="backup-count">Found ${fileBackups.length}</div>
-          ${renderList(fileBackups)}
-        </div>
+      <div class="deploy-card">
+        <div class="deploy-title">Git</div>
+        <div class="deploy-value">${escapeHtml((git.commit || "").slice(0, 7) || "Unknown")}</div>
+        <div class="deploy-meta">${escapeHtml(git.ref || "unknown ref")} · ${escapeHtml(git.status || "unknown")}</div>
       </div>
-      <div class="backup-note">Backups live in ${escapeHtml(rootPath)}. Use Operations → Backups to create or restore.</div>
-    `;
-    } catch (error) {
-        container.innerHTML = `<div class="error">Failed to load backups: ${error.message}</div>`;
-    } finally {
-        lockDiagnosticsBox(container);
-        requestAnimationFrame(() => restoreScrollAnchor(anchor));
-    }
-}
-
-async function loadServiceStatus() {
-    const container = document.getElementById('service-status');
-    if (!container) return;
-
-    container.innerHTML = '<div class="loading">Loading service status...</div>';
-
-    try {
-        const payload = await fetchAdminAPI('/api/admin/diagnostics/service-status');
-        const services = Array.isArray(payload.services) ? payload.services : [];
-
-        if (!services.length) {
-            container.innerHTML = `<div class="warning">${healthIndicators.warning} No service status available.</div>`;
-            return;
-        }
-
-        const serviceNames = services.map((item) => item.service).filter(Boolean);
-        updateLogServiceOptions(serviceNames);
-
-        let html = '<div class="service-grid">';
-        services.forEach((service) => {
-            const state = String(service.state || '').toLowerCase();
-            const status = String(service.status || '').trim();
-            let statusClass = 'service-status--warn';
-            if (state.includes('running') || status.toLowerCase().includes('up')) {
-                statusClass = 'service-status--ok';
-            } else if (state.includes('exit') || state.includes('dead') || status.toLowerCase().includes('exited')) {
-                statusClass = 'service-status--error';
-            }
-
-            html += `
-        <div class="service-card">
-          <div class="service-title">${escapeHtml(service.service || service.name || 'Service')}</div>
-          <div class="service-meta">${escapeHtml(service.name || '')}</div>
-          <div class="service-status ${statusClass}">${escapeHtml(status || service.state || 'Unknown')}</div>
-        </div>
-      `;
-        });
-        html += '</div>';
-        container.innerHTML = html;
-    } catch (error) {
-        container.innerHTML = `<div class="warning">${healthIndicators.warning} ${escapeHtml(error.message)}</div>`;
-    } finally {
-        lockDiagnosticsBox(container);
-    }
-}
-
-function startLogStream() {
-    const startBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById('logs-start'));
-    const stopBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById('logs-stop'));
-    const serviceSelect = /** @type {HTMLSelectElement | null} */ (document.getElementById('logs-service'));
-    const tailInput = /** @type {HTMLInputElement | null} */ (document.getElementById('logs-tail'));
-    if (!startBtn || !stopBtn || !serviceSelect || !tailInput) return;
-
-    stopLogStream();
-
-    const service = serviceSelect.value || 'bwondercomics-api';
-    const tail = Math.max(0, Math.min(1000, parseInt(tailInput.value || '200', 10) || 200));
-
-    const params = new URLSearchParams({
-        service,
-        tail: String(tail),
-        follow: '1',
-    });
-    const url = `/api/admin/diagnostics/logs-stream?${params.toString()}`;
-
-    setLogsStatus('Connecting...', 'warn');
-    startBtn.disabled = true;
-    stopBtn.disabled = false;
-
-    const source = new EventSource(url);
-    logStreamSource = source;
-
-    source.addEventListener('meta', (event) => {
-        try {
-            const meta = JSON.parse(event.data || '{}');
-            const label = meta.service ? meta.service.replace('bwondercomics-', '') : service;
-            setLogsStatus(`Streaming ${label} logs...`, 'ok');
-        } catch {
-            setLogsStatus('Streaming logs...', 'ok');
-        }
-    });
-
-    source.onmessage = (event) => {
-        if (event?.data) {
-            appendLogLine(event.data);
-        }
-    };
-
-    source.onerror = () => {
-        if (source.readyState === EventSource.CLOSED) {
-            setLogsStatus('Disconnected. Press Start to reconnect.', 'error');
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-        } else {
-            setLogsStatus('Connection lost. Reconnecting...', 'warn');
-        }
-    };
-}
-
-function stopLogStream() {
-    const startBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById('logs-start'));
-    const stopBtn = /** @type {HTMLButtonElement | null} */ (document.getElementById('logs-stop'));
-    if (logStreamSource) {
-        logStreamSource.close();
-        logStreamSource = null;
-    }
-    if (startBtn) startBtn.disabled = false;
-    if (stopBtn) stopBtn.disabled = true;
-    setLogsStatus('Stopped.', '');
-}
-
-async function loadTestStatus() {
-    const container = document.getElementById('test-status');
-    const hourlyContainer = document.getElementById('test-hourly');
-    if (!container) return;
-
-    container.innerHTML = '<div class="loading">Loading test status...</div>';
-    if (hourlyContainer) {
-        hourlyContainer.innerHTML = '<div class="test-info">Hourly test report: <em>Not configured yet.</em></div>';
-    }
-
-    try {
-        const status = await fetchAdminAPI('/api/admin/diagnostics/test-status');
-        testSuites = Array.isArray(status.suites) ? status.suites : [];
-
-        if (!status.available) {
-            container.innerHTML = `<div class="warning">${healthIndicators.warning} ${status.message || 'No tests found.'}</div>`;
-            return;
-        }
-
-        let html = `
-      <div class="test-info">
-        <p>${healthIndicators.ok} Tests discovered: <strong>${status.count || 0} files</strong></p>
-        <p>Status: <strong>${escapeHtml(status.status || 'unknown')}</strong></p>
-        <p>Last run: ${status.finishedAt ? new Date(status.finishedAt).toLocaleString() : 'No runs yet'}</p>
-        <p>Exit code: ${status.exitCode !== null && status.exitCode !== undefined ? status.exitCode : 'n/a'}</p>
+      <div class="deploy-card">
+        <div class="deploy-title">Release Snapshots</div>
+        <div class="deploy-value">${escapeHtml(String(releaseSnapshots.count || 0))}</div>
+        <div class="deploy-meta">${escapeHtml(latestRelease.name || "No snapshot yet")}</div>
       </div>
-      <div class="test-suite-grid">
-    `;
+    </div>
+  `;
+}
 
-        html += testSuites.map((suite) => renderTestSuiteCard(suite)).join('');
-        html += '</div>';
-        container.innerHTML = html;
-    } catch (error) {
-        container.innerHTML = `<div class="error">Failed to load test status: ${error.message}</div>`;
-    } finally {
-        lockDiagnosticsBox(container);
+
+function renderBackups(snapshot) {
+  const container = document.getElementById("diagnosticsBackups");
+  if (!container) return;
+  const backups = snapshot?.backups || {};
+  const dbBackups = backups.db || [];
+  const fileBackups = backups.files || [];
+  const latestDb = backups.latest?.db;
+  const latestFiles = backups.latest?.files;
+
+  const renderCard = (title, items, latest) => `
+    <div class="backup-card">
+      <div class="backup-title">${escapeHtml(title)}</div>
+      <div class="backup-count">Found ${items.length}</div>
+      <div class="backup-meta-row">Latest: ${escapeHtml(latest?.name || "None")}</div>
+      <div class="backup-meta-row">${escapeHtml(latest?.createdAt ? formatDate(latest.createdAt) : "No recent snapshot")}</div>
+      <div class="backup-meta-row">${escapeHtml(latest?.sizePretty || "")}</div>
+    </div>
+  `;
+
+  container.innerHTML = `
+    <div class="backup-grid">
+      ${renderCard("Database backups", dbBackups, latestDb)}
+      ${renderCard("File backups", fileBackups, latestFiles)}
+    </div>
+    <div class="backup-note">
+      Ops handles creation, restores, and detailed backup history. Backup root: ${escapeHtml(backups.root || "var/backups")}
+    </div>
+  `;
+}
+
+
+function renderTests(snapshot) {
+  const container = document.getElementById("diagnosticsTests");
+  if (!container) return;
+  const testStatus = snapshot?.testStatus || {};
+  const latestRun = testStatus.latestRun || null;
+
+  container.innerHTML = `
+    <div class="test-info">
+      <p>Discovered tests: <strong>${testStatus.discoveredCount || 0}</strong></p>
+      <p>Last run: <strong>${escapeHtml(latestRun?.status || "idle")}</strong></p>
+      <p>Finished: ${escapeHtml(latestRun?.finishedAt ? formatDate(latestRun.finishedAt) : "No recorded run yet")}</p>
+      <p>Exit code: ${escapeHtml(latestRun?.exitCode ?? "n/a")}</p>
+      <p>${testStatus.runnerEnabled ? "Use /ops/ to run the suite." : "Command runner disabled; diagnostics still records the latest known result."}</p>
+    </div>
+  `;
+}
+
+
+function renderLoadingState(message = "Loading diagnostics snapshot...") {
+  const targets = [
+    "diagnosticsHealth",
+    "diagnosticsServices",
+    "diagnosticsDatabase",
+    "diagnosticsDeploy",
+    "diagnosticsBackups",
+    "diagnosticsTests",
+  ];
+  targets.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = `<div class="loading">${escapeHtml(message)}</div>`;
+  });
+}
+
+
+function renderSnapshot(snapshot, message = "") {
+  renderBanner(snapshot, message);
+  renderHealth(snapshot);
+  renderServices(snapshot);
+  renderDatabase(snapshot);
+  renderDeploy(snapshot);
+  renderBackups(snapshot);
+  renderTests(snapshot);
+}
+
+
+async function loadSnapshot(showLoading = false) {
+  if (showLoading) renderLoadingState();
+  showRefreshIndicator();
+  try {
+    const result = await getDiagnosticsSnapshot(fetchAdminAPI);
+    renderSnapshot(result.snapshot, result.fallbackMessage);
+  } catch (error) {
+    const isMissing = /No diagnostics snapshot available/i.test(error.message || "");
+    renderLoadingState("");
+    renderBanner(null, isMissing ? error.message : `Failed to load snapshot: ${error.message}`);
+  }
+}
+
+
+async function refreshSnapshot() {
+  const button = /** @type {HTMLButtonElement | null} */ (document.getElementById("diagnostics-refresh"));
+  if (button) button.disabled = true;
+  showRefreshIndicator();
+  try {
+    const result = await refreshDiagnosticsSnapshot(fetchAdminAPI);
+    renderSnapshot(result.snapshot, result.fallbackMessage || "Snapshot refreshed.");
+  } catch (error) {
+    renderBanner(null, `Failed to refresh snapshot: ${error.message}`);
+  } finally {
+    if (button) button.disabled = false;
+  }
+}
+
+
+export async function initDiagnostics() {
+  const container = document.getElementById("diagnosticsSection");
+  if (!container) return;
+
+  if (!diagnosticsInitialized) {
+    diagnosticsInitialized = true;
+    const refreshBtn = document.getElementById("diagnostics-refresh");
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", refreshSnapshot);
     }
-}
+  }
 
-function renderTestSuiteCard(suite) {
-    const availableIcon = suite.available ? healthIndicators.ok : healthIndicators.warning;
-    const runnerIcon = suite.runner_available ? healthIndicators.ok : healthIndicators.error;
-    const runnerMessage = suite.runner_message || (suite.runner_available ? 'Runner available' : 'Runner not available');
-
-    return `
-      <div class="test-suite-card">
-        <div class="test-suite-header">
-          <div>
-            <div class="test-suite-title">${suite.label || suite.id}</div>
-            <div class="test-suite-desc">${suite.description || ''}</div>
-          </div>
-          <div class="test-suite-status">${availableIcon}</div>
-        </div>
-        <div class="test-suite-meta">
-          <div>Tests: <strong>${suite.count || 0}</strong></div>
-          <div>Runner: ${runnerIcon} ${runnerMessage}</div>
-        </div>
-        <div class="test-files">
-          <strong>Files:</strong>
-          <ul>
-            ${(suite.test_files || []).map((file) => `<li>${file}</li>`).join('')}
-          </ul>
-        </div>
-        <div id="test-results-${suite.id}" class="test-results"></div>
-      </div>
-    `;
-}
-
-async function loadConfiguration() {
-    const container = document.getElementById('configuration');
-    if (!container) return;
-
-    container.innerHTML = '<div class="loading">Loading configuration...</div>';
-
-    try {
-        const config = await fetchAdminAPI('/api/admin/diagnostics/config');
-
-        let html = '<div class="config-list">';
-        for (const [key, value] of Object.entries(config.config)) {
-            html += `
-        <div class="config-item">
-          <span class="config-key">${key}:</span>
-          <span class="config-value">${value}</span>
-        </div>
-      `;
-        }
-        html += '</div>';
-
-        container.innerHTML = html;
-    } catch (error) {
-        container.innerHTML = `<div class="error">Failed to load configuration: ${error.message}</div>`;
-    } finally {
-        lockDiagnosticsBox(container);
-    }
+  await loadSnapshot(true);
 }
 
 
-function loadOperations() {
-    const container = document.getElementById('ops-commands');
-    if (!container) return;
-
-    container.innerHTML = '<div class="loading">Loading operations...</div>';
-
-    fetchAdminAPI('/api/admin/diagnostics/ops')
-        .then((payload) => {
-            opsCommands = Array.isArray(payload.commands) ? payload.commands : [];
-            renderOperations(container, opsCommands, payload.message || '');
-        })
-        .catch((error) => {
-            opsCommands = fallbackOps;
-            renderOperations(container, opsCommands, error.message || 'Operations runner unavailable.');
-        });
-}
-
-function loadOpsHistory() {
-    const container = document.getElementById('ops-history');
-    if (!container) return;
-
-    const anchor = captureScrollAnchor();
-    container.innerHTML = '<div class="loading">Loading operations history...</div>';
-
-    showRefreshIndicator();
-    fetchAdminAPI('/api/admin/diagnostics/ops-history')
-        .then((payload) => {
-            const runs = Array.isArray(payload.runs) ? payload.runs : [];
-            renderOpsHistory(container, runs);
-            requestAnimationFrame(() => restoreScrollAnchor(anchor));
-        })
-        .catch((error) => {
-            const message = error?.message || 'Unable to load history.';
-            container.innerHTML = `<div class="warning">${healthIndicators.warning} ${escapeHtml(message)}</div>`;
-            requestAnimationFrame(() => restoreScrollAnchor(anchor));
-        });
-}
-
-function renderOpsHistory(container, runs) {
-    if (!runs.length) {
-        container.innerHTML = '<div class="warning">No operations recorded yet.</div>';
-        lockDiagnosticsBox(container);
-        return;
-    }
-
-    let html = '<div class="ops-history-grid">';
-    runs.forEach((run) => {
-        const status = String(run.status || 'unknown').toLowerCase();
-        const statusLabel = status === 'success'
-            ? 'Success'
-            : status === 'running'
-                ? 'Running'
-                : status === 'failed'
-                    ? 'Failed'
-                    : status === 'interrupted'
-                        ? 'Interrupted'
-                        : 'Error';
-        const statusClass = status === 'success'
-            ? 'ops-history-status--ok'
-            : status === 'running'
-                ? 'ops-history-status--running'
-                : status === 'interrupted'
-                    ? 'ops-history-status--interrupted'
-                    : 'ops-history-status--fail';
-        const statusSpinner = status === 'running'
-            ? '<span class="ops-history-spinner" aria-hidden="true"></span>'
-            : '';
-        const title = escapeHtml(run.label || run.command_id || 'Operation');
-        const startedAt = run.started_at ? new Date(run.started_at).toLocaleString() : 'Unknown';
-        const duration = run.duration_seconds != null ? `${run.duration_seconds}s` : '—';
-        const userLabel = run.user_email ? `By ${escapeHtml(run.user_email)}` : 'By admin';
-        const noteMessage = status === 'success' && run.error_message
-            ? `<div class="ops-history-note">${escapeHtml(run.error_message)}</div>`
-            : '';
-        const errorMessage = status !== 'success' && run.error_message
-            ? `<div class="ops-history-error">${escapeHtml(run.error_message)}</div>`
-            : '';
-
-        html += `
-      <div class="ops-history-card" data-run-id="${escapeHtml(run.id)}">
-        <div class="ops-history-header">
-          <div class="ops-history-title">${title}</div>
-          <div class="ops-history-status ${statusClass}">${statusSpinner}${statusLabel}</div>
-        </div>
-        <div class="ops-history-meta">
-          <span>Started: ${escapeHtml(startedAt)}</span>
-          <span>Duration: ${escapeHtml(duration)}</span>
-          <span>${userLabel}</span>
-        </div>
-        ${errorMessage}
-        ${noteMessage}
-      </div>
-    `;
-    });
-    html += '</div>';
-
-    container.innerHTML = html;
-}
-
-function renderOperations(container, commands, statusMessage) {
-    const groupMap = new Map();
-    commands.forEach((cmd) => {
-        const group = cmd.group || 'Other';
-        if (!groupMap.has(group)) groupMap.set(group, []);
-        groupMap.get(group).push(cmd);
-    });
-
-    let html = '<p class="ops-note">Reference only. Run these from the repo root (where the Makefile lives).</p>';
-    if (statusMessage) {
-        const safeMessage = escapeHtml(statusMessage);
-        html += `<div class="warning">${healthIndicators.warning} ${safeMessage}</div>`;
-    }
-
-    for (const [group, items] of groupMap.entries()) {
-        const groupLabel = escapeHtml(group);
-        const groupLower = String(group || '').toLowerCase();
-        html += `<div class="ops-group"><h4>${groupLabel}</h4>`;
-        if (groupLower.includes('stack')) {
-            html += `
-        <div class="ops-help">
-          <strong>Restart order:</strong>
-          Restart containers first. If the API is still unhealthy, reboot the host machine.
-        </div>
-      `;
-        }
-        if (groupLower.includes('frontend')) {
-            html += `
-        <div class="ops-help">
-          <strong>Quick guide:</strong>
-          Save current build + rebuild = save a snapshot, then rebuild.
-          Restore last saved build = restore snapshot and save current as rollback backup.
-          Restore last rollback backup = restore the build saved by rollback.
-        </div>
-      `;
-        }
-        html += '<div class="ops-grid">';
-        items.forEach((item) => {
-            const available = item.available !== false;
-            let availability = item.available_message || (available ? 'Available' : 'Unavailable');
-            availability = escapeHtml(availability);
-            const safeLabel = escapeHtml(item.label);
-            const safeDesc = escapeHtml(item.description);
-            const safeCommand = escapeHtml(item.command);
-            const alias = item.alias ? `<div class="ops-alias">Terminal: <code>${escapeHtml(item.alias)}</code></div>` : '';
-            html += `
-        <div class="ops-card ops-card--compact">
-          <div class="ops-title">${safeLabel}</div>
-          <div class="ops-desc">${safeDesc}</div>
-          ${alias}
-          <div class="ops-meta">${availability}</div>
-          <pre class="ops-command">${safeCommand}</pre>
-        </div>
-      `;
-        });
-        html += '</div></div>';
-    }
-
-    container.innerHTML = html;
-}
-
-// Auto-refresh health status every 30 seconds
-setInterval(() => {
-    if (!diagnosticsInitialized) return;
-    showRefreshIndicator();
-    loadSystemHealth();
-}, 30000);
-
-// Expose initDiagnostics for admin panel
-(/** @type {any} */ (window)).initDiagnostics = initDiagnostics;
+window.initDiagnostics = initDiagnostics;

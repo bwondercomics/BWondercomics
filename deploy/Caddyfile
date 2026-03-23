@@ -40,6 +40,16 @@ bwondercomics.com {
 		file_server
 	}
 
+	@ops path /ops /ops/*
+	handle @ops {
+		@ops_allowed remote_ip {$CADDY_OPS_ALLOWED_IPS:127.255.255.255/32}
+		handle @ops_allowed {
+			root * /srv/bwondercomics/root
+			file_server
+		}
+		respond "Ops access denied" 403
+	}
+
 	root * /srv/bwondercomics/dist
 	file_server
 }

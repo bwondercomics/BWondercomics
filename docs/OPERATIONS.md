@@ -93,6 +93,21 @@ DB restore and file restore are destructive by nature.
 - Edit source files in `reader/`, `admin/`, `assets/`, and top-level HTML files.
 - Rebuild static output with `./scripts/frontend-build.sh` (also snapshots `dist/` into `var/releases/`).
 
+## Diagnostics + Ops
+- Admin diagnostics is read-only and backed by `var/diagnostics/admin/latest.json`.
+- The hourly refresh timer calls `deploy/host-status/diagnostics_refresh.py`.
+- `/ops/` is a separate surface for queued commands, run output, and detailed backups.
+- `/ops/` uses the same admin account/session as `/admin/`; if the cookie is missing or expired, the page falls back to its own login form.
+- Protect `/ops/` with both `OPS_ALLOWED_IPS` (backend, comma-separated) and `CADDY_OPS_ALLOWED_IPS` (proxy, space-separated).
+- Recommended local-only policy:
+  `OPS_ALLOWED_IPS=127.0.0.1/32,::1/128,10.0.0.0/24`
+  `CADDY_OPS_ALLOWED_IPS=127.0.0.1/32 ::1/128 10.0.0.0/24`
+- If you change either allowlist in `deploy/bwondercomics.env`, recreate `bwondercomics-api` and `caddy`; restarting containers is not enough to reload env-file changes.
+- Keep `ADMIN_COMMANDS_ENABLED=false` unless you intentionally want host commands enabled.
+- The host ops worker reads queue files from `var/ops/queue/` and writes logs to `var/ops/logs/`.
+- Ensure `var/diagnostics/admin` and `var/ops/{queue,logs}` are writable by the API container user, or refresh/queue actions will fail with permission errors.
+- Install the timer and worker from `deploy/README.md`.
+
 ## Common issues
 - **Admin says “not an admin”**: the first registered account becomes `admin`; after that, an existing admin must promote roles in the **Users** section.
 - **Ports already in use**: change `BWC_API_PORT` / `BWC_DB_PORT` in `deploy/bwondercomics.env`.

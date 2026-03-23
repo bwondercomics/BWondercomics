@@ -10,6 +10,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
+  gap: 20px;
   margin-bottom: 30px;
   padding-bottom: 15px;
   border-bottom: 2px solid #333;
@@ -18,6 +19,52 @@
 .diagnostics-header h2 {
   margin: 0;
   color: #00d9ff;
+}
+
+.diagnostics-subtitle {
+  margin: 8px 0 0;
+  color: #b7ced8;
+}
+
+.diagnostics-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.diagnostics-meta {
+  color: #9fd9e6;
+  font-size: 0.9em;
+}
+
+.diagnostics-banner {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  align-items: center;
+  padding: 14px 16px;
+  border-radius: 10px;
+  margin-bottom: 24px;
+}
+
+.diagnostics-banner--ok {
+  background: rgba(76, 175, 80, 0.14);
+  border: 1px solid rgba(76, 175, 80, 0.35);
+  color: #c9ffd7;
+}
+
+.diagnostics-banner--warning {
+  background: rgba(255, 193, 7, 0.14);
+  border: 1px solid rgba(255, 193, 7, 0.35);
+  color: #ffe59b;
+}
+
+.diagnostics-banner--error {
+  background: rgba(244, 67, 54, 0.14);
+  border: 1px solid rgba(244, 67, 54, 0.35);
+  color: #ffb3ae;
 }
 
 .btn-primary {
@@ -97,6 +144,35 @@
 .check-name {
   flex: 1;
   text-transform: capitalize;
+}
+
+.status-pill {
+  border-radius: 999px;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  font-size: 0.75em;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.status-pill--ok {
+  color: #7dff8c;
+  background: rgba(76, 175, 80, 0.12);
+  border-color: rgba(76, 175, 80, 0.35);
+}
+
+.status-pill--warning {
+  color: #ffd166;
+  background: rgba(255, 193, 7, 0.12);
+  border-color: rgba(255, 193, 7, 0.35);
+}
+
+.status-pill--error {
+  color: #ff8a80;
+  background: rgba(244, 67, 54, 0.12);
+  border-color: rgba(244, 67, 54, 0.35);
 }
 
 .check-details {
@@ -284,8 +360,17 @@
   color: #ffd166;
 }
 
+.service-status--warning {
+  color: #ffd166;
+}
+
 .service-status--error {
   color: #ff8a8a;
+}
+
+.service-detail {
+  color: #d7e8ee;
+  font-size: 0.82em;
 }
 
 /* Live Logs */

@@ -1,0 +1,152 @@
+[
+  {
+    "id": "tests",
+    "label": "Run Frontend Tests",
+    "group": "Verification",
+    "description": "Run the Vitest suite from the repo root.",
+    "argv": ["npm", "test"],
+    "terminal": "npm test",
+    "disruptsApi": false,
+    "requiresConfirm": false
+  },
+  {
+    "id": "backup",
+    "label": "Backup DB + Files",
+    "group": "Backups",
+    "description": "Create a fresh database and file backup in var/backups.",
+    "argv": ["make", "backup"],
+    "terminal": "make backup",
+    "disruptsApi": false,
+    "requiresConfirm": false
+  },
+  {
+    "id": "backup-db",
+    "label": "Backup Database Only",
+    "group": "Backups",
+    "description": "Create a database-only backup in var/backups.",
+    "argv": ["make", "backup-db"],
+    "terminal": "make backup-db",
+    "disruptsApi": false,
+    "requiresConfirm": false
+  },
+  {
+    "id": "backup-files",
+    "label": "Backup Files Only",
+    "group": "Backups",
+    "description": "Create a file-only backup in var/backups.",
+    "argv": ["make", "backup-files"],
+    "terminal": "make backup-files",
+    "disruptsApi": false,
+    "requiresConfirm": false
+  },
+  {
+    "id": "frontend-build",
+    "label": "Build Frontend",
+    "group": "Frontend",
+    "description": "Snapshot dist/ and rebuild the frontend assets.",
+    "argv": ["bash", "scripts/frontend-build.sh"],
+    "terminal": "bash scripts/frontend-build.sh",
+    "disruptsApi": false,
+    "requiresConfirm": false
+  },
+  {
+    "id": "frontend-rollback",
+    "label": "Rollback Frontend",
+    "group": "Frontend",
+    "description": "Restore the latest dist snapshot and save the current build as rollback.",
+    "argv": ["bash", "scripts/frontend-rollback.sh"],
+    "terminal": "bash scripts/frontend-rollback.sh",
+    "disruptsApi": true,
+    "requiresConfirm": true
+  },
+  {
+    "id": "frontend-restore-rollback",
+    "label": "Restore Rollback Snapshot",
+    "group": "Frontend",
+    "description": "Restore the build saved by the last rollback operation.",
+    "argv": ["bash", "scripts/frontend-restore-rollback.sh"],
+    "terminal": "bash scripts/frontend-restore-rollback.sh",
+    "disruptsApi": true,
+    "requiresConfirm": true
+  },
+  {
+    "id": "migrate",
+    "label": "Run DB Migrations",
+    "group": "Database",
+    "description": "Apply Alembic migrations inside the API container.",
+    "argv": ["make", "migrate"],
+    "terminal": "make migrate",
+    "disruptsApi": false,
+    "requiresConfirm": false
+  },
+  {
+    "id": "restart",
+    "label": "Restart Stack",
+    "group": "Stack",
+    "description": "Restart the running containers without rebuilding.",
+    "argv": ["make", "restart"],
+    "terminal": "make restart",
+    "disruptsApi": true,
+    "requiresConfirm": true
+  },
+  {
+    "id": "up",
+    "label": "Rebuild + Restart Stack",
+    "group": "Stack",
+    "description": "Rebuild and restart the main stack.",
+    "argv": ["make", "up"],
+    "terminal": "make up",
+    "disruptsApi": true,
+    "requiresConfirm": true
+  },
+  {
+    "id": "analytics-up",
+    "label": "Start Analytics Services",
+    "group": "Stack",
+    "description": "Start the Umami services.",
+    "argv": ["make", "analytics-up"],
+    "terminal": "make analytics-up",
+    "disruptsApi": false,
+    "requiresConfirm": false
+  },
+  {
+    "id": "analytics-stop",
+    "label": "Stop Analytics Services",
+    "group": "Stack",
+    "description": "Stop the Umami services.",
+    "argv": ["make", "analytics-stop"],
+    "terminal": "make analytics-stop",
+    "disruptsApi": false,
+    "requiresConfirm": false
+  },
+  {
+    "id": "stack-logs",
+    "label": "Capture Stack Logs",
+    "group": "Logs",
+    "description": "Collect the latest 200 lines across the main stack.",
+    "argv": ["bash", "deploy/ops/log_snapshot.sh"],
+    "terminal": "bash deploy/ops/log_snapshot.sh",
+    "disruptsApi": false,
+    "requiresConfirm": false
+  },
+  {
+    "id": "api-logs",
+    "label": "Capture API Logs",
+    "group": "Logs",
+    "description": "Collect the latest 200 API log lines.",
+    "argv": ["bash", "deploy/ops/log_snapshot.sh", "bwondercomics-api"],
+    "terminal": "bash deploy/ops/log_snapshot.sh bwondercomics-api",
+    "disruptsApi": false,
+    "requiresConfirm": false
+  },
+  {
+    "id": "analytics-logs",
+    "label": "Capture Analytics Logs",
+    "group": "Logs",
+    "description": "Collect the latest 200 Umami log lines.",
+    "argv": ["bash", "deploy/ops/log_snapshot.sh", "umami"],
+    "terminal": "bash deploy/ops/log_snapshot.sh umami",
+    "disruptsApi": false,
+    "requiresConfirm": false
+  }
+]

@@ -12,7 +12,8 @@ export default defineConfig({
                 feed: 'feed.html',
                 comics: 'comics.html',
                 media: 'media.html',
-                admin: 'admin/index.html'
+                admin: 'admin/index.html',
+                ops: 'ops/index.html'
             }
         },
         minify: 'terser',

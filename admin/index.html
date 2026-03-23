@@ -1275,89 +1275,47 @@
       <!-- Diagnostics Section -->
       <section class="section diagnostics-panel" id="diagnosticsSection" style="display: none;">
         <div class="diagnostics-header">
-          <h2>🔧 System Diagnostics & Troubleshooting</h2>
-          <button class="btn-primary" id="diagnostics-refresh">🔄 Refresh All</button>
+          <div>
+            <h2>System Diagnostics</h2>
+            <p class="diagnostics-subtitle">Read-only snapshot of core services, build state, backups, and tests.</p>
+          </div>
+          <div class="diagnostics-header-actions">
+            <div id="diagnosticsSnapshotTime" class="diagnostics-meta">Snapshot: unavailable</div>
+            <button class="btn-primary" id="diagnostics-refresh">Refresh Snapshot</button>
+            <a class="btn-secondary" href="/ops/" target="_blank" rel="noopener">Open Ops</a>
+          </div>
+        </div>
+
+        <div id="diagnosticsBanner"></div>
+
+        <div class="diagnostics-section">
+          <h3>Core Health</h3>
+          <div id="diagnosticsHealth"></div>
         </div>
 
         <div class="diagnostics-section">
-          <h3>System Health</h3>
-          <div id="health-status"></div>
+          <h3>Core Services</h3>
+          <div id="diagnosticsServices"></div>
         </div>
 
         <div class="diagnostics-section">
-          <h3>Database Statistics</h3>
-          <div id="database-stats"></div>
+          <h3>Database</h3>
+          <div id="diagnosticsDatabase"></div>
         </div>
 
         <div class="diagnostics-section">
-          <h3>Database Overview</h3>
-          <div id="db-insights"></div>
-        </div>
-
-        <div class="diagnostics-section">
-          <h3>Deployment & Services</h3>
-          <div id="deploy-status"></div>
-          <div id="service-status"></div>
+          <h3>Deployment</h3>
+          <div id="diagnosticsDeploy"></div>
         </div>
 
         <div class="diagnostics-section">
           <h3>Backups</h3>
-          <div id="backups-status"></div>
+          <div id="diagnosticsBackups"></div>
         </div>
 
         <div class="diagnostics-section">
-          <h3>Live Logs</h3>
-          <div class="logs-controls">
-            <div class="logs-control">
-              <label class="form-label" for="logs-service">Service</label>
-              <select id="logs-service" class="form-input">
-                <option value="bwondercomics-api">API</option>
-                <option value="bwondercomics-db">Database</option>
-                <option value="caddy">Caddy</option>
-                <option value="umami">Umami</option>
-                <option value="umami-db">Umami DB</option>
-                <option value="all">All services</option>
-              </select>
-            </div>
-            <div class="logs-control">
-              <label class="form-label" for="logs-tail">Tail (lines)</label>
-              <input type="number" id="logs-tail" class="form-input" min="0" max="1000" value="200" />
-            </div>
-            <div class="logs-control logs-control--checkbox">
-              <label class="settings-toggle">
-                <input type="checkbox" id="logs-autoscroll" checked />
-                <span>Auto-scroll</span>
-              </label>
-            </div>
-            <div class="logs-actions">
-              <button class="btn-primary" id="logs-start">Start</button>
-              <button class="btn-secondary" id="logs-stop" disabled>Stop</button>
-              <button class="btn-secondary" id="logs-clear">Clear</button>
-            </div>
-          </div>
-          <div id="logs-status" class="logs-status"></div>
-          <pre id="logs-output" class="logs-output"></pre>
-        </div>
-
-        <div class="diagnostics-section">
-          <h3>Test Suite</h3>
-          <div id="test-status"></div>
-          <div id="test-hourly"></div>
-        </div>
-
-        <div class="diagnostics-section">
-          <h3>Operations</h3>
-          <div id="ops-commands"></div>
-        </div>
-
-        <div class="diagnostics-section">
-          <h3>Operations History</h3>
-          <div id="ops-history" class="ops-history-scroll"></div>
-        </div>
-
-        <div class="diagnostics-section">
-          <h3>Configuration</h3>
-          <div id="configuration"></div>
+          <h3>Tests</h3>
+          <div id="diagnosticsTests"></div>
         </div>
       </section>
     </main>

@@ -136,6 +136,54 @@ systemctl list-timers | rg bwondercomics-backup || true
 
 Backups land in `/mnt/archive/backups/bwondercomics/` and old backups are pruned after 30 days by default (edit the `RETENTION_DAYS` value in `deploy/bwondercomics-backup.service`).
 
+## Diagnostics Snapshot Timer + Ops Worker
+
+The admin **Diagnostics** tab is now snapshot-backed and read-only. The separate `/ops/` surface handles queued commands, run output, and backup actions.
+
+Set these in `deploy/bwondercomics.env`:
+
+- `HOST_AUTOMATION_TOKEN` (generate: `openssl rand -hex 32`)
+- `OPS_ALLOWED_IPS` (backend allowlist, comma-separated IP/CIDR entries, for example `127.0.0.1/32,::1/128,10.0.0.0/24`)
+- `CADDY_OPS_ALLOWED_IPS` (proxy allowlist, space-separated IP/CIDR entries, for example `127.0.0.1/32 ::1/128 10.0.0.0/24`)
+- `ADMIN_COMMANDS_ENABLED=true` only when you want the `/ops/` page to queue host jobs
+
+Recommended LAN-only setup:
+
+```bash
+OPS_ALLOWED_IPS=127.0.0.1/32,::1/128,10.0.0.0/24
+CADDY_OPS_ALLOWED_IPS=127.0.0.1/32 ::1/128 10.0.0.0/24
+```
+
+Notes:
+
+- Caddy and the backend do not parse allowlists the same way, so keep `OPS_ALLOWED_IPS` and `CADDY_OPS_ALLOWED_IPS` in sync using the formats above.
+- If you change either allowlist in `deploy/bwondercomics.env`, recreate `bwondercomics-api` and `caddy`; a plain container restart will not reload updated env-file values.
+- `/ops/` is intended for LAN/local access. If you browse the public site through a VPN or public egress IP, Caddy will still deny `/ops/` unless that network is explicitly allowlisted.
+
+Install the hourly diagnostics refresh timer:
+
+```bash
+sudo cp /srv/bw-quality/deploy/host-status/diagnostics-refresh.service /etc/systemd/system/diagnostics-refresh.service
+sudo cp /srv/bw-quality/deploy/host-status/diagnostics-refresh.timer /etc/systemd/system/diagnostics-refresh.timer
+sudo systemctl daemon-reload
+sudo systemctl enable --now diagnostics-refresh.timer
+```
+
+Install the host ops worker:
+
+```bash
+sudo cp /srv/bw-quality/deploy/ops/bwondercomics-ops-worker.service /etc/systemd/system/bwondercomics-ops-worker.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now bwondercomics-ops-worker.service
+```
+
+Notes:
+
+- Admin diagnostics reads the latest file in `var/diagnostics/admin/latest.json`.
+- The worker processes queue files from `var/ops/queue/` and writes run logs to `var/ops/logs/`.
+- If `OPS_ALLOWED_IPS` or `CADDY_OPS_ALLOWED_IPS` is empty, `/ops/` stays disabled.
+- Ensure `var/diagnostics`, `var/diagnostics/admin`, `var/diagnostics/admin/history`, `var/ops/queue`, and `var/ops/logs` are writable by the API container user (`uid=1000` in the default compose setup), or diagnostics refreshes and queued ops jobs will fail with permission errors.
+
 ## Analytics (Umami)
 
 Umami is an optional part of the Docker stack (compose profile: `analytics`). The FastAPI backend proxies Umami under `/umami/` and serves `/analytics.js` to inject the tracker into the main site pages.
