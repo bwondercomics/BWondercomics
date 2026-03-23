@@ -2,6 +2,11 @@ import { el } from "./dom.js";
 import { MEDIA_FILE } from "./config.js";
 import { state } from "./state.js";
 import { saveToServer } from "./core.js";
+import {
+  getPageConfigSite,
+  loadDefaultPageConfig,
+  saveDefaultPageConfig,
+} from "./page-config.js";
 import { escapeHtml, parseTags, generateMediaId, readFileAsBase64 } from "./utils.js";
 
 function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) {
@@ -17,6 +22,8 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
   const ACCESS_OPTIONS = ["public", "premium", "private"];
   const PREMIUM_VISIBILITY_OPTIONS = ["blur", "hidden"];
   const POST_ASSET_ROOT = "media/post-assets";
+  const DEFAULT_OG_IMAGE_PATH = "assets/banner1.png";
+  const DEFAULT_FAVICON_PATH = "assets/boywondericon.png";
 
   function normalizeAccess(raw, fallbackPublic = true) {
     const value = String(raw || "").trim().toLowerCase();
@@ -78,6 +85,120 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
     const previewPath = String(item?.previewPath || item?.preview_path || "").trim();
     if (previewPath) return resolveMediaSrc(previewPath);
     return "";
+  }
+
+  function getBrandingSite() {
+    return getPageConfigSite(state.pageConfig);
+  }
+
+  function getConfiguredBrandingPath(key) {
+    const site = getBrandingSite();
+    const raw = site[key];
+    return typeof raw === "string" ? raw.trim() : "";
+  }
+
+  function setBrandingStatus(message, isError = false) {
+    if (!el.mediaBrandingStatus) return;
+    el.mediaBrandingStatus.textContent = message || "";
+    el.mediaBrandingStatus.style.display = message ? "block" : "none";
+    el.mediaBrandingStatus.style.background = isError
+      ? "var(--danger)"
+      : "var(--success)";
+    el.mediaBrandingStatus.style.color = isError ? "var(--text)" : "var(--bg-dark)";
+  }
+
+  async function ensurePageConfigLoaded(force = false) {
+    return loadDefaultPageConfig({ force, fallback: { site: {} } });
+  }
+
+  async function persistPageConfig(nextConfig) {
+    const saved = await saveDefaultPageConfig(nextConfig);
+    renderBrandingPanel();
+    return saved;
+  }
+
+  function renderBrandingPanel() {
+    const ogPath = getConfiguredBrandingPath("ogImagePath");
+    const faviconPath = getConfiguredBrandingPath("faviconPath");
+    const effectiveOgPath = ogPath || DEFAULT_OG_IMAGE_PATH;
+    const effectiveFaviconPath = faviconPath || DEFAULT_FAVICON_PATH;
+
+    if (el.mediaBrandingOgPreview) {
+      el.mediaBrandingOgPreview.src = resolveMediaSrc(effectiveOgPath);
+    }
+    if (el.mediaBrandingOgPath) {
+      el.mediaBrandingOgPath.textContent = ogPath
+        ? ogPath
+        : `Default: ${DEFAULT_OG_IMAGE_PATH}`;
+    }
+    if (el.mediaBrandingFaviconPreview) {
+      el.mediaBrandingFaviconPreview.src = resolveMediaSrc(effectiveFaviconPath);
+    }
+    if (el.mediaBrandingFaviconPath) {
+      el.mediaBrandingFaviconPath.textContent = faviconPath
+        ? faviconPath
+        : `Default: ${DEFAULT_FAVICON_PATH}`;
+    }
+  }
+
+  async function updateBrandingSelection(key, path, successMessage) {
+    await ensurePageConfigLoaded();
+    const nextConfig = state.pageConfig && typeof state.pageConfig === "object"
+      ? JSON.parse(JSON.stringify(state.pageConfig))
+      : {};
+    const site = {
+      ...getPageConfigSite(nextConfig),
+    };
+    if (path) {
+      site[key] = path;
+    } else {
+      delete site[key];
+    }
+    nextConfig.site = site;
+    await persistPageConfig(nextConfig);
+    setBrandingStatus(successMessage, false);
+  }
+
+  async function clearBrandingPaths(paths = [], options = {}) {
+    const targets = paths
+      .map((path) => String(path || "").trim())
+      .filter(Boolean);
+    if (!targets.length) return false;
+    await ensurePageConfigLoaded();
+    const currentOg = getConfiguredBrandingPath("ogImagePath");
+    const currentFavicon = getConfiguredBrandingPath("faviconPath");
+    const shouldClearOg = currentOg && targets.includes(currentOg);
+    const shouldClearFavicon = currentFavicon && targets.includes(currentFavicon);
+    if (!shouldClearOg && !shouldClearFavicon) return false;
+
+    const nextConfig = state.pageConfig && typeof state.pageConfig === "object"
+      ? JSON.parse(JSON.stringify(state.pageConfig))
+      : {};
+    const site = {
+      ...getPageConfigSite(nextConfig),
+    };
+    if (shouldClearOg) delete site.ogImagePath;
+    if (shouldClearFavicon) delete site.faviconPath;
+    nextConfig.site = site;
+    await persistPageConfig(nextConfig);
+    if (options.message) {
+      setBrandingStatus(options.message, false);
+    }
+    return true;
+  }
+
+  async function assignPreviewBranding(key, successMessage) {
+    const selectedItem = state.mediaItems.find((item) => item.id === selectedMediaId);
+    if (!selectedItem) return;
+    if (normalizeAccess(selectedItem.access, selectedItem.public !== false) !== "public") {
+      setBrandingStatus("Only public media can be used for site branding.", true);
+      return;
+    }
+    try {
+      await updateBrandingSelection(key, selectedItem.path, successMessage);
+    } catch (error) {
+      setBrandingStatus(error.message || "Site branding update failed.", true);
+    }
   }
 
   function getPostsUsingMedia(item) {
@@ -339,6 +460,11 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
       el.adminContent.classList.add("media-content-wide");
     }
     bindAddMediaControls();
+    bindBrandingActions();
+    renderBrandingPanel();
+    void ensurePageConfigLoaded().then(() => {
+      renderBrandingPanel();
+    });
     renderMedia();
     if (setActiveNav) setActiveNav(el.btnMedia);
   }
@@ -384,6 +510,7 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
       emptyGallery.textContent = "No media to preview.";
       el.mediaGallery.appendChild(emptyGallery);
       renderMediaPreview(null, 0);
+      renderBrandingPanel();
       return;
     }
 
@@ -478,6 +605,7 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
       selectedItem,
       selectedItem ? usageMap.get(selectedItem.path) || 0 : 0,
     );
+    renderBrandingPanel();
 
     const attachActions = (container) => {
       container.querySelectorAll("[data-use]").forEach((btn) => {
@@ -588,6 +716,12 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
       el.mediaPreviewUsage.textContent = usageText;
     }
     if (el.mediaPreviewUse) el.mediaPreviewUse.dataset.mediaId = item.id;
+    if (el.mediaPreviewSetOg) {
+      el.mediaPreviewSetOg.dataset.mediaId = item.id;
+    }
+    if (el.mediaPreviewSetFavicon) {
+      el.mediaPreviewSetFavicon.dataset.mediaId = item.id;
+    }
     if (el.mediaPreviewCopy) el.mediaPreviewCopy.dataset.mediaId = item.id;
     if (el.mediaPreviewTagsBtn) el.mediaPreviewTagsBtn.dataset.mediaId = item.id;
     if (el.mediaPreviewDelete) el.mediaPreviewDelete.dataset.mediaId = item.id;
@@ -633,6 +767,30 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
     updateAddMediaVisibilityUI();
   }
 
+  function bindBrandingActions() {
+    if (el.mediaBrandingOgReset && !el.mediaBrandingOgReset.dataset.bound) {
+      el.mediaBrandingOgReset.dataset.bound = "true";
+      el.mediaBrandingOgReset.addEventListener("click", async () => {
+        try {
+          await updateBrandingSelection("ogImagePath", "", "Open Graph image reset to default.");
+        } catch (error) {
+          setBrandingStatus(error.message || "Open Graph image reset failed.", true);
+        }
+      });
+    }
+
+    if (el.mediaBrandingFaviconReset && !el.mediaBrandingFaviconReset.dataset.bound) {
+      el.mediaBrandingFaviconReset.dataset.bound = "true";
+      el.mediaBrandingFaviconReset.addEventListener("click", async () => {
+        try {
+          await updateBrandingSelection("faviconPath", "", "Favicon reset to default.");
+        } catch (error) {
+          setBrandingStatus(error.message || "Favicon reset failed.", true);
+        }
+      });
+    }
+  }
+
   function selectMediaByIndex(nextIndex) {
     if (nextIndex < 0 || nextIndex >= currentMediaOrder.length) return;
     const nextId = currentMediaOrder[nextIndex];
@@ -668,6 +826,24 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
         selectedMediaId = item.id;
         onUse(item);
         renderMedia();
+      });
+    }
+
+    if (el.mediaPreviewSetOg && !el.mediaPreviewSetOg.dataset.bound) {
+      el.mediaPreviewSetOg.dataset.bound = "true";
+      el.mediaPreviewSetOg.addEventListener("click", async () => {
+        const id = el.mediaPreviewSetOg.dataset.mediaId;
+        if (id) selectedMediaId = id;
+        await assignPreviewBranding("ogImagePath", "Open Graph image updated.");
+      });
+    }
+
+    if (el.mediaPreviewSetFavicon && !el.mediaPreviewSetFavicon.dataset.bound) {
+      el.mediaPreviewSetFavicon.dataset.bound = "true";
+      el.mediaPreviewSetFavicon.addEventListener("click", async () => {
+        const id = el.mediaPreviewSetFavicon.dataset.mediaId;
+        if (id) selectedMediaId = id;
+        await assignPreviewBranding("faviconPath", "Favicon updated.");
       });
     }
 
@@ -707,6 +883,7 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
         const id = el.mediaPreviewAccess.dataset.mediaId;
         const item = state.mediaItems.find((m) => m.id === id);
         if (!item) return;
+        const previousPath = item.path;
         const nextAccess = normalizeAccess(el.mediaPreviewAccess.value, true);
         const postsUsing = getPostsUsingMedia(item);
         try {
@@ -725,6 +902,15 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
         item.public = nextAccess === "public";
         if (nextAccess !== "premium") {
           item.premiumVisibility = "blur";
+        }
+        if (nextAccess !== "public") {
+          try {
+            await clearBrandingPaths([previousPath, item.path], {
+              message: "Site branding reset to default because the media is no longer public.",
+            });
+          } catch (error) {
+            setBrandingStatus(error.message || "Site branding reset failed.", true);
+          }
         }
         await saveMedia(true);
         renderMedia();
@@ -880,7 +1066,7 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
   }
 
   async function addMediaItem() {
-    let path = (el.mediaPath?.value || "").trim();
+    const path = (el.mediaPath?.value || "").trim();
     const tags = parseTags(el.mediaTags?.value || "");
     const access = normalizeAccess(el.mediaAccess?.value, true);
     const premiumVisibility = normalizePremiumVisibility(el.mediaPremiumVisibility?.value);
@@ -900,6 +1086,7 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
 
     const existing = state.mediaItems.find((m) => m.path === path);
     if (existing) {
+      const previousPath = existing.path;
       const postsUsing = getPostsUsingMedia(existing);
       try {
         const nextPath = await moveMediaPath(existing, access);
@@ -918,6 +1105,15 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
       existing.access = access;
       existing.premiumVisibility = premiumVisibility;
       existing.public = access === "public";
+      if (access !== "public") {
+        try {
+          await clearBrandingPaths([previousPath, path], {
+            message: "Site branding reset to default because the media is no longer public.",
+          });
+        } catch (error) {
+          console.warn("Failed to clear site branding:", error);
+        }
+      }
       if (!silent) setMediaStatus("Updated existing media tags.");
     } else {
       try {
@@ -951,7 +1147,7 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
 
   function uploadMediaPayload(file, base64, onProgress) {
     return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
+      const xhr = new window.XMLHttpRequest();
       xhr.open("POST", "/api/upload-media");
       xhr.setRequestHeader("Content-Type", "application/json");
       xhr.upload.onprogress = (event) => {
@@ -967,7 +1163,7 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
         let payload = {};
         try {
           payload = xhr.responseText ? JSON.parse(xhr.responseText) : {};
-        } catch (error) {
+        } catch {
           payload = {};
         }
         if (xhr.status >= 200 && xhr.status < 300) {
@@ -1147,6 +1343,13 @@ function createMediaManager({ hideAllSections, setActiveNav, onUseMedia } = {}) 
 
     state.mediaItems = state.mediaItems.filter((m) => m.id !== id);
     if (selectedMediaId === id) selectedMediaId = null;
+    try {
+      await clearBrandingPaths([item.path], {
+        message: "Site branding reset to default because the media was deleted.",
+      });
+    } catch (error) {
+      console.warn("Failed to clear site branding:", error);
+    }
     await saveMedia(true);
     renderMedia();
   }

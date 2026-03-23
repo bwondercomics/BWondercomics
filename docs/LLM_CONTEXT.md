@@ -69,6 +69,11 @@ docker restart bwondercomics-bwondercomics-api-1
 ```
 Machine reboot depends on host OS (not in repo). After reboot, verify services with `docker compose ps` and run `up -d` if needed.
 
+If you change public HTML/manifest branding behavior, `deploy/Caddyfile`, or the FastAPI routes that serve branded entry pages, restart both services:
+```
+docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-compose.yml restart bwondercomics-api caddy
+```
+
 ## Vite Dev Server (local testing)
 We now use a Vite dev server to preview **source files** (not `dist/`) for reader changes.
 
@@ -107,11 +112,12 @@ Vite proxies these to the API (so data.json/series.json work):
 ## Caddy Routing (deploy/Caddyfile)
 - Proxies `/api/*` to `bwondercomics-api:8000`
 - Proxies `/data.json`, `/series.json`, `/page-config.json`, `/media.json`, `/series/*` to the API
+- Proxies `/`, `/index.html`, `/feed.html`, `/comics.html`, `/media.html`, and `/manifest.json` to the API so FastAPI can inject site branding into crawler-visible HTML and the web manifest
 #### Serves static:
   - `/assets/*` from `dist/assets` (fallback to repo `/assets`)
   - `/media/*` and `/comics/*` from filesystem (`/chapters/*` is legacy)
   - `/admin/*` from repo root (`/srv/bwondercomics/root`) so admin uses source files
-  - `/` root from `dist/`
+  - remaining public routes from `dist/`
 #### Protected assets:
   - `/protected/*` is **not** served by Caddy.
   - Access goes through the API at `/api/protected/*` (auth + premium checks).
@@ -129,6 +135,13 @@ Admin is currently served from `admin/` (repo source) via Caddy; rebuilding `dis
 
 Avoid editing `dist/` directly. Treat it as build output only.
 
+## Site Branding (OG + favicon)
+- Admin Media now has a `Site Branding` panel backed by the default `page-config.json` record.
+- `site.ogImagePath` controls homepage/root `og:image` and `twitter:image`.
+- `site.faviconPath` controls `rel="icon"`, `rel="apple-touch-icon"`, and `manifest.json` icons when set.
+- Only `public` media can be assigned. If a configured media item is deleted or changed to `premium`/`private`, the admin clears the branding field automatically before saving media changes.
+- FastAPI validates configured branding paths, rejects protected assets, falls back to `assets/banner1.png` for OG and `assets/boywondericon.png` for the favicon, and returns branded HTML/manifest responses with `Cache-Control: no-store`.
+
 ## Entry Cover Gallery (Reader)
 - Overlay root: `#entryCoverGallery`
 - Grid container: `#entryCoverGalleryGrid`
@@ -136,7 +149,7 @@ Avoid editing `dist/` directly. Treat it as build output only.
 - Close button: `#entryCoverGalleryClose`
 - Entry card classes used by the reader gallery: `.entry-card`, `.entry-thumb-wrap`, `.entry-thumb`, `.entry-info`, `.entry-title`
 
-Backend changes do not hot-reload (uvicorn runs without `--reload`), so restart the API container after code changes.
+Backend changes do not hot-reload (uvicorn runs without `--reload`), so restart the API container after code changes. If the change also touches branded public HTML routing or `deploy/Caddyfile`, restart Caddy too.
 
 ## Backend Stack
 - FastAPI app: `backend/app/main.py`

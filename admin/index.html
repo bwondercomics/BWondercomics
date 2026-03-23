@@ -918,6 +918,33 @@
             folder</button>
           <div id="mediaStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
         </div>
+        <div class="form-group media-branding-panel">
+          <div class="media-branding-panel-header">
+            <div>
+              <h3 class="media-branding-title">Site Branding</h3>
+              <p class="media-branding-copy">Global homepage share image and favicon. Only public media can be assigned.</p>
+            </div>
+            <div id="mediaBrandingStatus" class="success-message" style="display: none; margin: 0;"></div>
+          </div>
+          <div class="media-branding-grid">
+            <div class="media-branding-card">
+              <div class="media-branding-label">Open Graph image</div>
+              <div class="media-branding-preview media-branding-preview--wide">
+                <img id="mediaBrandingOgPreview" alt="Current Open Graph image preview" />
+              </div>
+              <div id="mediaBrandingOgPath" class="media-branding-path">Default: assets/banner1.png</div>
+              <button class="btn-secondary" id="mediaBrandingOgReset" type="button">Reset to default</button>
+            </div>
+            <div class="media-branding-card">
+              <div class="media-branding-label">Favicon</div>
+              <div class="media-branding-preview media-branding-preview--icon">
+                <img id="mediaBrandingFaviconPreview" alt="Current favicon preview" />
+              </div>
+              <div id="mediaBrandingFaviconPath" class="media-branding-path">Default: assets/boywondericon.png</div>
+              <button class="btn-secondary" id="mediaBrandingFaviconReset" type="button">Reset to default</button>
+            </div>
+          </div>
+        </div>
         <div class="form-group" style="margin-top: 16px;">
           <div class="media-toolbar">
             <div style="flex: 1; min-width: 220px;">
@@ -992,6 +1019,8 @@
                 <div class="media-preview-footer">
                   <div class="media-preview-actions">
                     <button class="btn-small btn-edit" id="mediaPreviewUse" type="button">Use</button>
+                    <button class="btn-small btn-secondary" id="mediaPreviewSetOg" type="button">Set as OG image</button>
+                    <button class="btn-small btn-secondary" id="mediaPreviewSetFavicon" type="button">Set as favicon</button>
                     <button class="btn-small btn-secondary" id="mediaPreviewCopy" type="button">Copy</button>
                     <button class="btn-small btn-secondary" id="mediaPreviewTagsBtn" type="button">Edit tags</button>
                     <button class="btn-small btn-delete" id="mediaPreviewDelete" type="button">Delete</button>

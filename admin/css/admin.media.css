@@ -23,6 +23,93 @@
       margin-bottom: 12px;
     }
 
+    .media-branding-panel {
+      background: linear-gradient(135deg, rgba(0, 217, 255, 0.08), rgba(255, 237, 0, 0.05));
+      border: 1px solid rgba(0, 217, 255, 0.24);
+      border-radius: 10px;
+      padding: 16px;
+    }
+
+    .media-branding-panel-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+
+    .media-branding-title {
+      margin: 0;
+      color: var(--primary);
+      font-size: 1rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .media-branding-copy {
+      margin: 6px 0 0;
+      font-size: 0.85rem;
+      opacity: 0.78;
+      max-width: 520px;
+    }
+
+    .media-branding-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 14px;
+    }
+
+    .media-branding-card {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 14px;
+      background: rgba(5, 5, 10, 0.48);
+      border: 1px solid rgba(0, 217, 255, 0.18);
+      border-radius: 8px;
+    }
+
+    .media-branding-label {
+      font-size: 0.78rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.72);
+    }
+
+    .media-branding-preview {
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      background: #05050a;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 8px;
+    }
+
+    .media-branding-preview--wide {
+      min-height: 120px;
+    }
+
+    .media-branding-preview--icon {
+      width: 96px;
+      height: 96px;
+    }
+
+    .media-branding-preview img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      background: transparent;
+    }
+
+    .media-branding-path {
+      min-height: 38px;
+      font-size: 0.82rem;
+      line-height: 1.45;
+      color: rgba(255, 255, 255, 0.88);
+      word-break: break-all;
+    }
+
     .media-list {
       display: flex;
       flex-direction: column;
@@ -310,6 +397,11 @@
       .media-preview {
         grid-template-columns: 1fr;
         padding: 16px;
+      }
+
+      .media-branding-preview--icon {
+        width: 80px;
+        height: 80px;
       }
     }
 

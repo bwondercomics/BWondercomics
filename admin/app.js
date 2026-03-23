@@ -31,6 +31,11 @@ import { createPreviewManager } from "./preview.js";
 import { createUploadManager } from "./uploads.js";
 import { createUsersManager } from "./users.js";
 import { initDiagnostics } from "./diagnostics.js";
+import {
+  getPageConfigSite,
+  loadDefaultPageConfig,
+  updateDefaultPageConfig,
+} from "./page-config.js";
 
 const SAFE_MODE_URL = "https://safe.bwondercomics.com";
 const SUPPORT_TEXT_HTML = `<span class="bubble-em">WANT TO SUPPORT THE COMIC?</span>
@@ -77,6 +82,8 @@ const DEFAULT_PAGE_CONFIG = {
   site: {
     safeModeRedirect: false,
     safeModeUrl: SAFE_MODE_URL,
+    ogImagePath: "",
+    faviconPath: "",
   },
 };
 
@@ -191,23 +198,10 @@ function setCountViewsEnabled(enabled) {
   return isEnabled;
 }
 
-async function loadPageConfigForSettings() {
-  try {
-    const response = await fetch("/page-config.json", { cache: "no-store" });
-    if (response.ok) {
-      const data = await response.json();
-      if (data && typeof data === "object") return data;
-    }
-  } catch (err) {
-    console.warn("Failed to load page config for settings.", err);
-  }
-  return getDefaultPageConfig();
-}
-
 async function loadSafeModeSetting() {
   if (!el.safeModeToggle) return;
-  const config = await loadPageConfigForSettings();
-  const site = config?.site && typeof config.site === "object" ? config.site : {};
+  const config = await loadDefaultPageConfig({ fallback: getDefaultPageConfig() });
+  const site = getPageConfigSite(config);
   el.safeModeToggle.checked = site.safeModeRedirect === true;
 }
 
@@ -218,12 +212,16 @@ async function setSafeModeEnabled(enabled) {
   safeModeSaving = true;
   el.safeModeToggle.disabled = true;
   try {
-    const config = await loadPageConfigForSettings();
-    const site = config?.site && typeof config.site === "object" ? { ...config.site } : {};
-    site.safeModeRedirect = Boolean(enabled);
-    site.safeModeUrl = site.safeModeUrl || SAFE_MODE_URL;
-    const nextConfig = { ...config, site };
-    await saveToServer("admin/page-config.json", nextConfig);
+    await updateDefaultPageConfig(
+      (config) => {
+        const site = { ...getPageConfigSite(config) };
+        site.safeModeRedirect = Boolean(enabled);
+        site.safeModeUrl = site.safeModeUrl || SAFE_MODE_URL;
+        config.site = site;
+        return config;
+      },
+      { fallback: getDefaultPageConfig() },
+    );
   } catch (err) {
     const message = err?.message || "Safe mode update failed.";
     showError(message);
@@ -411,6 +409,7 @@ async function showDashboard() {
   el.adminDashboard.style.display = "grid";
   // Load DB-backed data into state before rendering sections.
   dashboardManager.showDashboardSection();
+  await loadDefaultPageConfig({ fallback: getDefaultPageConfig() });
   await loadSafeModeSetting();
   void loadInnerNetTarget();
   loadBlueskyStatus();

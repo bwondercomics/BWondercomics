@@ -16,6 +16,7 @@ const COUNT_VIEWS_KEY = "battlebros_count_views";
 const state = {
   seriesIndex: { version: 1, defaultSeriesId: DEFAULT_SERIES_ID, series: [] },
   activeSeriesId: DEFAULT_SERIES_ID,
+  pageConfig: null,
   entries: {},
   entryFolders: {},
   entryMeta: {},

@@ -26,6 +26,7 @@ from .routes import oidc as oidc_routes
 from .routes import page_builder as page_builder_routes
 from .routes import posts as posts_routes
 from .routes import series_json as series_json_routes
+from .routes import site_branding as site_branding_routes
 from .routes import tracking as tracking_routes
 from .routes import user as user_routes
 from .security import verify_token
@@ -104,6 +105,7 @@ app.include_router(admin_ops_routes.router)
 app.include_router(page_builder_routes.router)
 app.include_router(posts_routes.router)
 app.include_router(series_json_routes.router)
+app.include_router(site_branding_routes.router)
 app.include_router(tracking_routes.router)
 app.include_router(user_routes.router)
 app.include_router(file_routes.router)

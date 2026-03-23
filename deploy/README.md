@@ -11,7 +11,7 @@ Backend: FastAPI + Postgres (`backend/`, `deploy/bwondercomics-db-compose.yml`).
 ### Option A: Docker stack (recommended; no pip/venv on host)
 
 ```bash
-cd /srv/bwondercomics
+cd /srv/bw-quality
 docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-compose.yml up -d --build
 docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-compose.yml exec bwondercomics-api alembic -c backend/alembic.ini upgrade head
 ```
@@ -25,7 +25,7 @@ Open:
 1) Create the env file:
 
 ```bash
-cd /srv/bwondercomics
+cd /srv/bw-quality
 cp deploy/bwondercomics.env.example deploy/bwondercomics.env
 chmod 600 deploy/bwondercomics.env
 ```
@@ -37,14 +37,14 @@ Edit `deploy/bwondercomics.env` and set at least:
 2) Start Postgres (localhost-only):
 
 ```bash
-cd /srv/bwondercomics
+cd /srv/bw-quality
 docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-db-compose.yml up -d
 ```
 
 3) Install backend deps:
 
 ```bash
-cd /srv/bwondercomics
+cd /srv/bw-quality
 python3 -m venv .venv
 . .venv/bin/activate
 pip install -r backend/requirements.txt
@@ -53,7 +53,7 @@ pip install -r backend/requirements.txt
 4) Run migrations:
 
 ```bash
-cd /srv/bwondercomics
+cd /srv/bw-quality
 . .venv/bin/activate
 alembic -c backend/alembic.ini upgrade head
 ```
@@ -61,7 +61,7 @@ alembic -c backend/alembic.ini upgrade head
 5) Run:
 
 ```bash
-cd /srv/bwondercomics
+cd /srv/bw-quality
 set -a
 . ./deploy/bwondercomics.env
 set +a
@@ -78,6 +78,24 @@ Open:
 Use the included units:
 - `deploy/bwondercomics-api.service` (system)
 - `deploy/bwondercomics-api.user.service` (user)
+
+## Deploying public branding changes
+
+The OG image and favicon are controlled through the admin Media tab and stored on the default `page-config.json` record as `site.ogImagePath` and `site.faviconPath`.
+
+When you change the public page head markup, `backend/app/site_branding.py`, `backend/app/routes/site_branding.py`, or `deploy/Caddyfile`, deploy with:
+
+```bash
+cd /srv/bw-quality
+./scripts/frontend-build.sh
+docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-compose.yml restart bwondercomics-api caddy
+```
+
+Notes:
+- Restarting `bwondercomics-api` is required because uvicorn is not running with hot reload.
+- Restarting `caddy` is required if the Caddyfile changed or if the exact-path branding proxy routes were not active yet.
+- Origin HTML/manifest responses use `Cache-Control: no-store`, so the change is visible on the next request. Social platforms may still hold a cached preview.
+- Only `public` media can be used for branding. Invalid or protected paths fall back to `assets/banner1.png` for OG and `assets/boywondericon.png` for favicon.
 
 
 ## Firewall (UFW)
@@ -102,8 +120,8 @@ sudo chown -R dbmelville:dbmelville /mnt/archive/backups/bwondercomics
 2) Install + enable the timer:
 
 ```bash
-sudo cp /srv/bwondercomics/deploy/bwondercomics-backup.service /etc/systemd/system/bwondercomics-backup.service
-sudo cp /srv/bwondercomics/deploy/bwondercomics-backup.timer /etc/systemd/system/bwondercomics-backup.timer
+sudo cp /srv/bw-quality/deploy/bwondercomics-backup.service /etc/systemd/system/bwondercomics-backup.service
+sudo cp /srv/bw-quality/deploy/bwondercomics-backup.timer /etc/systemd/system/bwondercomics-backup.timer
 sudo systemctl daemon-reload
 sudo systemctl enable --now bwondercomics-backup.timer
 ```
@@ -131,7 +149,7 @@ Umami is an optional part of the Docker stack (compose profile: `analytics`). Th
 2) Start Umami (if the stack is already up):
 
 ```bash
-cd /srv/bwondercomics
+cd /srv/bw-quality
 make analytics-up
 ```
 
@@ -214,7 +232,7 @@ If RabbitMQ was already initialized with different credentials, either:
 ### 2) Start chat services
 
 ```bash
-cd /srv/bwondercomics
+cd /srv/bw-quality
 make chat-up
 ```
 

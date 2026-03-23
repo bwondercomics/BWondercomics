@@ -5,8 +5,8 @@ This repo serves a plain HTML/CSS/JS frontend, with a FastAPI backend adding dyn
 ## What runs where
 - **Static frontend** (served by Caddy in production): `index.html` (reader shell), `feed.html`, `media.html`, `comics.html`, plus JS modules under `reader/` and `admin/`. Public pages come from `dist/`; the admin UI is served from `/admin/*` (repo source) per the current Caddyfile.
 - **Static assets** (site chrome): `assets/` (icons, banners, UI images referenced by HTML and page configs).
-- **Reverse proxy + file server**: Caddy (see `deploy/Caddyfile`) serves `/` from `dist/` and proxies `/api/*` + JSON endpoints to the API.
-- **Backend API**: `backend/app/main.py` only serves API routes and JSON views (no static hosting). It also serves protected files via `/api/protected/*`.
+- **Reverse proxy + file server**: Caddy (see `deploy/Caddyfile`) serves static assets/files and proxies `/api/*`, DB-backed JSON endpoints, and exact public page routes used for dynamic branding to the API.
+- **Backend app**: `backend/app/main.py` primarily serves API routes and JSON views. It also serves branded HTML responses for `/`, `/index.html`, `/feed.html`, `/comics.html`, `/media.html`, plus `/manifest.json`, so crawlers receive the configured OG image and favicon.
 - **Database**: Postgres (Docker Compose recommended) stores users/comments, posts, series, and entries.
 
 ## Core data model
@@ -18,6 +18,7 @@ This repo serves a plain HTML/CSS/JS frontend, with a FastAPI backend adding dyn
 - **Media library**: Postgres table for the media index + files under `media/` (public) or `protected/media/` (premium/private). Access is tracked via `media_items.access` (`public`/`premium`/`private`) and `media_items.premium_visibility` (`blur`/`hidden`).
 - **Post assets**: when a post uses premium/private media, the API copies it into `media/post-assets/` so public feeds still show the image.
 - **Premium blur previews**: when a media item is `premium + blur`, the API generates a real blurred JPEG in `media/previews/` for the public gallery (derived output).
+- **Site branding config**: the default `page_configs` record now also carries optional `site.ogImagePath` and `site.faviconPath` values for global branding. These must point to public assets.
 
 ## Routing + contracts (why the frontend still works)
 The backend serves **DB-backed JSON at the existing file paths** (Caddy proxies these to the API) so the reader/admin can keep using the same URLs:
@@ -55,6 +56,13 @@ The admin “save JSON” flow is also kept, but is intercepted and written to P
 4. Admin writes go through `/api/save` (DB-backed for series, entries, media index, and page configs).
 5. File moves/copies (public ↔ protected) go through `/api/move-path` and `/api/copy-path`.
 
+### 2a) Managing site branding (admin media)
+1. Admin opens the Media tab and selects a public media item.
+2. `Set as OG image` writes `site.ogImagePath` on the default page config.
+3. `Set as favicon` writes `site.faviconPath` on the default page config.
+4. The `Site Branding` panel shows current assignments and lets the admin reset either value to the built-in defaults.
+5. If the configured media is deleted or moved off `public`, the admin clears the affected branding field automatically before the media save finishes.
+
 ### 3) Posts + RSS
 - Admin CRUD happens at `/api/admin/posts`.
 - Public feed reads:
@@ -72,6 +80,7 @@ The admin “save JSON” flow is also kept, but is intercepted and written to P
 
 ## Where to read code (entry points)
 - Backend runtime + routing: `backend/app/main.py`
+- Dynamic site-branding helpers/routes: `backend/app/site_branding.py`, `backend/app/routes/site_branding.py`
 - Series/entry JSON views and DB save logic: `backend/app/series_store.py`, `backend/app/routes/series_json.py`, `backend/app/routes/files.py`
 - Reader boot + behavior: `reader/app.js`, `reader/data.js`, `reader/series.js`
-- Admin boot + behavior: `admin/app.js`, `admin/entries.js`
+- Admin boot + behavior: `admin/app.js`, `admin/entries.js`, `admin/media.js`, `admin/page-config.js`
