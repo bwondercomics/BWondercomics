@@ -1,0 +1,269 @@
+{
+  "seriesIndex": {
+    "version": 1,
+    "defaultSeriesId": "battle-bros",
+    "series": [
+      {
+        "id": "battle-bros",
+        "title": "Battle Bros",
+        "description": "Mainline adventures.",
+        "premiumOnly": false,
+        "unitLabelSingular": "Issue",
+        "unitLabelPlural": "Issues",
+        "coverImage": "media/covers/battle-bros.png"
+      },
+      {
+        "id": "stealth-mode",
+        "title": "Stealth Mode",
+        "description": "Premium side stories.",
+        "premiumOnly": true,
+        "unitLabelSingular": "Drop",
+        "unitLabelPlural": "Drops"
+      }
+    ]
+  },
+  "seriesData": {
+    "entries": {
+      "Issue 2": [
+        "protected/comics/battle-bros/issue-2/01.png",
+        "protected/comics/battle-bros/issue-2/02.png"
+      ],
+      "Issue 10": [
+        "protected/comics/battle-bros/issue-10/01.png",
+        "/media/public/issue-10-bonus.png"
+      ],
+      "Store Release": [],
+      "Patron Early Access": [
+        "protected/comics/battle-bros/issue-11/01.png"
+      ]
+    },
+    "entryFolders": {
+      "Issue 2": "comics/battle-bros/entries/issue-2",
+      "Issue 10": "comics/battle-bros/entries/issue-10",
+      "Patron Early Access": "comics/battle-bros/entries/issue-11"
+    },
+    "entryMeta": {
+      "Issue 2": {
+        "entryId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb02",
+        "displayNumber": 2,
+        "premium": false,
+        "showInDropdown": true,
+        "showInGallery": true,
+        "releaseType": "digital",
+        "storeUrl": "",
+        "coverImage": "protected/media/covers/issue-2.png",
+        "coverThumbPath": "media/previews/covers/entry-issue-2.jpg",
+        "entryLabelId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+        "entryLabelSingular": "Issue",
+        "entryLabelPlural": "Issues"
+      },
+      "Issue 10": {
+        "entryId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb0a",
+        "displayNumber": 10,
+        "premium": false,
+        "showInDropdown": true,
+        "showInGallery": true,
+        "releaseType": "digital",
+        "storeUrl": "",
+        "coverImage": "protected/media/covers/issue-10.png",
+        "coverThumbPath": "media/previews/covers/entry-issue-10.jpg",
+        "entryLabelId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+        "entryLabelSingular": "Issue",
+        "entryLabelPlural": "Issues"
+      },
+      "Store Release": {
+        "entryId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb14",
+        "premium": false,
+        "showInDropdown": true,
+        "showInGallery": true,
+        "releaseType": "store",
+        "storeUrl": "https://store.example.com/battle-bros-volume-1",
+        "coverImage": "",
+        "coverThumbPath": "",
+        "entryLabelId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+        "entryLabelSingular": "Issue",
+        "entryLabelPlural": "Issues"
+      },
+      "Patron Early Access": {
+        "entryId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb0b",
+        "displayNumber": 11,
+        "premium": true,
+        "showInDropdown": true,
+        "showInGallery": true,
+        "releaseType": "digital",
+        "storeUrl": "",
+        "coverImage": "protected/media/covers/issue-11.png",
+        "coverThumbPath": "media/previews/covers/entry-issue-11.jpg",
+        "entryLabelId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+        "entryLabelSingular": "Issue",
+        "entryLabelPlural": "Issues"
+      }
+    },
+    "statusMessage": "Ready",
+    "premiumOnly": false,
+    "unitLabelSingular": "Issue",
+    "unitLabelPlural": "Issues",
+    "entryLabels": [
+      {
+        "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+        "slug": "issues",
+        "singular": "Issue",
+        "plural": "Issues",
+        "sortIndex": 0,
+        "isDefault": true
+      }
+    ],
+    "lastUpdated": "2026-03-28T00:00:00Z",
+    "publishedBy": "Database",
+    "payloadVersion": 2
+  },
+  "pageConfig": {
+    "content": {
+      "header": {
+        "subtitles": [
+          "Hero Time",
+          "Lunch Break Justice"
+        ]
+      }
+    },
+    "site": {
+      "ogImagePath": "media/site/og.png",
+      "faviconPath": "media/site/icon.png"
+    }
+  },
+  "builderPage": {
+    "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeee01",
+    "slug": "reader",
+    "title": "Reader",
+    "sections": [
+      {
+        "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeee11",
+        "layout": "1-1",
+        "modules": [
+          {
+            "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeee21",
+            "moduleType": "header",
+            "columnIndex": 0,
+            "config": {
+              "title": "Battle Bros",
+              "subtitle": "Hero Time",
+              "subtitles": [
+                "Hero Time",
+                "Lunch Break Justice"
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "meta": {
+      "theme": {
+        "accent": "#ffcc00"
+      }
+    }
+  },
+  "session": {
+    "guest": {
+      "user": null
+    },
+    "admin": {
+      "user": {
+        "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc01",
+        "email": "admin@example.com",
+        "displayName": "Admin",
+        "role": "admin",
+        "createdAt": "2026-03-28T00:00:00Z"
+      }
+    },
+    "premium": {
+      "user": {
+        "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc02",
+        "email": "premium@example.com",
+        "displayName": "Premium",
+        "role": "premium",
+        "createdAt": "2026-03-28T00:00:00Z"
+      }
+    },
+    "user": {
+      "user": {
+        "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc03",
+        "email": "reader@example.com",
+        "displayName": "Reader",
+        "role": "user",
+        "createdAt": "2026-03-28T00:00:00Z"
+      }
+    }
+  },
+  "latestPost": {
+    "id": "dddddddd-dddd-4ddd-8ddd-dddddddddd01",
+    "title": "Issue 10 Released",
+    "content": "<p>Battle Bros returns with a bigger drop.</p>",
+    "image": "media/posts/issue-10.png",
+    "thumbPath": "media/previews/thumbs/post-issue-10.jpg",
+    "imageFit": "cover",
+    "imageFocus": "center",
+    "date": "2026-03-28T00:00:00Z",
+    "share": true,
+    "shareBluesky": false,
+    "status": "published"
+  },
+  "mediaItems": [
+    {
+      "id": "media-public",
+      "path": "media/gallery/poster.png",
+      "tags": [
+        "poster"
+      ],
+      "public": true,
+      "access": "public",
+      "premiumVisibility": "blur",
+      "thumbPath": "media/previews/thumbs/media-public.jpg",
+      "previewPath": ""
+    },
+    {
+      "id": "media-premium",
+      "path": "protected/media/gallery/teaser.png",
+      "tags": [
+        "premium"
+      ],
+      "public": false,
+      "access": "premium",
+      "premiumVisibility": "blur",
+      "thumbPath": "media/previews/thumbs/media-premium.jpg",
+      "previewPath": "media/previews/blurred/media-premium.jpg"
+    }
+  ],
+  "posts": {
+    "published": {
+      "id": "dddddddd-dddd-4ddd-8ddd-dddddddddd01",
+      "title": "Issue 10 Released",
+      "content": "<p>Battle Bros returns with a bigger drop.</p>",
+      "image": "media/posts/issue-10.png",
+      "imageTags": [
+        "launch",
+        "issue-10"
+      ],
+      "imageFit": "cover",
+      "imageFocus": "center",
+      "date": "2026-03-28T00:00:00Z",
+      "share": true,
+      "shareBluesky": false,
+      "status": "published"
+    },
+    "scheduled": {
+      "id": "dddddddd-dddd-4ddd-8ddd-dddddddddd02",
+      "title": "Patron Early Access",
+      "content": "<p>Patrons get the next issue early.</p>",
+      "image": "protected/media/posts/patron-early-access.png",
+      "imageTags": [
+        "patron"
+      ],
+      "imageFit": "contain",
+      "imageFocus": "top",
+      "date": "2026-04-05T12:00:00Z",
+      "share": true,
+      "shareBluesky": true,
+      "status": "scheduled"
+    }
+  }
+}
