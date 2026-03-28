@@ -1,113 +1,64 @@
-# Battle Bros Reader - Testing Guide
+# Test Guide
 
 ## Overview
+This repo uses two test runners:
 
-This project now includes a comprehensive test suite using [Vitest](https://vitest.dev/), a modern, fast testing framework with native ES modules support.
+- Frontend/admin tests: `Vitest` with `happy-dom`
+- Backend tests: Python `unittest`
 
-## Test Structure
+The frontend suite covers reader helpers, DOM/render regressions, and focused admin manager flows. The backend suite covers diagnostics/ops and site-branding behavior.
 
+## Commands
+Run the frontend suite:
+
+```bash
+npm test
 ```
-tests/
-├── setup.js           # Test environment configuration
-├── chapters.test.js   # Tests for chapter utilities
-├── state.test.js      # Tests for state management
-└── render.test.js     # Tests for rendering logic
+
+Run the backend suite:
+
+```bash
+npm run test:backend
 ```
 
-## Prerequisites
+Run both:
 
-You need Node.js installed to run the tests. Download from: https://nodejs.org/
+```bash
+npm run test:all
+```
 
-## Installation
+Run coverage for the frontend suite:
 
-Install test dependencies:
+```bash
+npm run test:coverage
+```
+
+## Setup
+Install Node dependencies:
 
 ```bash
 npm install
 ```
 
-This will install:
-- `vitest` - Test runner
-- `happy-dom` - Fast DOM simulation
-- `@vitest/ui` - Optional UI for test visualization
+Install backend dev dependencies into the repo virtualenv:
 
-## Running Tests
-
-### Run all tests once
 ```bash
-npm test
+./.venv/bin/pip install -r backend/requirements-dev.txt
 ```
 
-### Watch mode (re-runs on file changes)
-```bash
-npm run test:watch
-```
+## Current Test Areas
+- `tests/entries.test.js`: entry parsing, sorting, and normalization
+- `tests/state.test.js`: reader progress persistence
+- `tests/data.test.js`: reader data/page-config loading
+- `tests/admin-smoke.test.js`: admin app boot against the live markup contract
+- `tests/admin-posts.test.js`: post save/render flow
+- `tests/admin-entries.test.js`: entry create/render flow
+- `tests/admin-media.test.js`: empty media state
+- `tests/media-branding.test.js`: admin branding rules
+- `tests/diagnostics-snapshot.test.js`: diagnostics snapshot rendering and fallbacks
+- `tests/ops-app.test.js`: ops UI rendering states
+- `backend/tests/*.py`: backend diagnostics/ops and branding behavior
 
-### Interactive UI
-```bash
-npm run test:ui
-```
-
-### Coverage report
-```bash
-npm run test:coverage
-```
-
-## Test Coverage
-
-Current test coverage includes:
-
-### ✅ entries.js (100%)
-- `extractChapterNumber()` - Number extraction from chapter names
-- `sortChapterNames()` - Numerical and alphabetical sorting
-- `sanitizeChapters()` - Data normalization and validation
-
-### ✅ state.js (100%)
-- State object initialization
-- `saveProgress()` - localStorage persistence
-- `loadProgress()` - Progress restoration
-- Error handling for storage failures
-
-### ✅ render.js (Partial)
-- `isTwoPageMode()` - Viewport detection logic
-- `canShowTwoPages()` - Two-page availability check
-
-## Writing New Tests
-
-Tests use Vitest's API, which is compatible with Jest:
-
-```javascript
-import { describe, it, expect } from 'vitest';
-import { myFunction } from '../reader/mymodule.js';
-
-describe('myFunction', () => {
-  it('should do something', () => {
-    expect(myFunction('input')).toBe('expected output');
-  });
-});
-```
-
-## Continuous Integration
-
-These tests can be integrated into CI/CD pipelines:
-
-```yaml
-# Example GitHub Actions workflow
-- name: Run tests
-  run: npm test
-```
-
-## Benefits
-
-✅ **Confidence** - Catch bugs before they reach production  
-✅ **Documentation** - Tests serve as usage examples  
-✅ **Refactoring** - Safely improve code with test coverage  
-✅ **Quality** - Maintain high code standards  
-
-## Next Steps
-
-Consider adding tests for:
-- `pointer.js` - Touch/pan/zoom interactions
-- `transform.js` - Additional zoom/fullscreen edge cases beyond the current on-page frame sizing coverage
-- `data.js` - Expand async loader edge cases (timeouts, malformed payloads)
-- `controls.js` - Navigation logic
+## Notes
+- The production code uses `entry` terminology; older references to `chapter` are legacy.
+- `npm run test:coverage` only covers the Vitest suite.

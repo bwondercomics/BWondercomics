@@ -23,6 +23,8 @@ def require_admin(request: Request, db: Session) -> User | None:
 def iso_z(dt: datetime | None) -> str | None:
     if not dt:
         return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
     return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 

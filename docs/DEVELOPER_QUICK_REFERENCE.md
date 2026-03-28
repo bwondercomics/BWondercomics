@@ -16,6 +16,9 @@ grep -r "TODO" reader/ admin/ backend/
 # 3. Run tests
 npm test
 
+# 3b. Run backend tests
+npm run test:backend
+
 # 4. Lint + format (JS)
 npm run lint
 npm run format:check
@@ -392,7 +395,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 test('should save progress to localStorage', () => {
     // ARRANGE - set up test data
     const testState = {
-        currentChapter: 'Chapter 1',
+        currentEntry: 'Issue 1',
         pageIndex: 5
     };
     
@@ -404,7 +407,7 @@ test('should save progress to localStorage', () => {
     expect(saved).toBeTruthy();
     
     const parsed = JSON.parse(saved);
-    expect(parsed.chapter).toBe('Chapter 1');
+    expect(parsed.chapter).toBe('Issue 1');
     expect(parsed.page).toBe(5);
 });
 ```

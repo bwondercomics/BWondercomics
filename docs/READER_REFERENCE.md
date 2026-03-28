@@ -6,12 +6,12 @@ This summarizes the reader runtime after modularization: what each file does, ke
 - `data.json`: entries map, order, statusMessage.
 - `page-config.json`: optional theme/content overrides + subtitles (DB-backed).
 - `/api/posts/latest`: latest update widget (DB-backed; published-only + scheduling support).
-- `localStorage` key `battleBros_progress`: saved chapter/page.
+- `localStorage` key `battleBros_progress`: saved entry/page.
 - Entry page paths may start with `protected/`; those are requested via `/api/protected/<path>`.
 
 ## Module map
 - `reader/config.js`: constants (storage key, cache sizes, zoom steps, breakpoints, animation timings).
-- `reader/entries.js`: entry helpers (`extractChapterNumber`, `sortChapterNames`, `sanitizeChapters`).
+- `reader/entries.js`: entry helpers (`extractEntryNumber`, `sortEntryNames`, `sortEntryNamesWithMeta`, `sanitizeEntries`).
 - `reader/state.js`: shared `state` object; `saveProgress`, `loadProgress`, cached natural page metrics, and the last successful desktop on-page frame.
 - `reader/data.js`: loaders for entry data, page config (subtitles), latest post.
 - `reader/dom.js`: element lookups (`el` map), including `#mainContent`, and `initElements`.
@@ -31,7 +31,7 @@ This summarizes the reader runtime after modularization: what each file does, ke
 ## Flow (runtime)
 1) `index.html` loads `reader/app.js` + `reader/customization.js` as ES modules.
 2) `app.start()`:
-   - `loadChapterData()` → sets entries/order/statusMessage.
+   - `loadEntryData()` → sets entries/order/statusMessage.
    - `loadPageConfig()` → sets subtitles (and other overrides via customization module).
    - `loadLatestPost()` → fetches `/api/posts/latest`, passes to `renderLatestUpdate`.
    - Initializes elements, entry select, status panel, email form, pointer/fullscreen/nav handlers.

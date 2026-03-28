@@ -243,7 +243,7 @@ Global state object containing all runtime state:
 import { state } from './reader/state.js';
 
 // Access state
-console.log(state.currentChapter);
+console.log(state.currentEntry);
 console.log(state.pageIndex);
 console.log(state.scale);
 ```

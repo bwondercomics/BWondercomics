@@ -40,9 +40,8 @@ flowchart TD
 
 ## Key Responsibilities by Module
 - **state.js**
-  - Holds `currentChapter`, `currentPage`, `zoom`, `fitMode`, `isTwoPageMode()`, image preload cache, cached page metrics, and `lastOnPageFrame`.
-  - Persists progress to `localStorage` (key from `config.STORAGE_KEY`) and restores on boot.
-  - Emits derived values used by render (e.g., `getVisiblePages`).
+  - Holds `currentEntry`, `pages`, `pageIndex`, `scale`, `pan`, pointer/cache state, cached page metrics, and `lastOnPageFrame`.
+  - Persists progress to `localStorage` (`battleBros_progress`) and restores on boot.
 - **render.js**
   - Computes the visible page(s), resolves URLs relative to `comics/<seriesId>/entries/`.
   - If a page path starts with `protected/`, it is requested via `/api/protected/<path>`.
@@ -68,7 +67,7 @@ flowchart TD
 - **data.js**
   - Fetches JSON with `cache: 'no-store'` to avoid stale content.
   - Normalizes status message, entry folder mapping, and optional theme/layout overrides from `page-config.json`.
-  - Exposes a unified `loadAll()` that `app.js` uses at startup.
+  - Exposes `loadEntryData()`, `loadPageConfig()`, and `loadLatestPost()` for startup wiring.
 - **latest.js**
   - Selects the newest post (by date) where `share !== false`.
   - Formats date (`toLocaleString`) and safely injects HTML-escaped content preview.
@@ -90,7 +89,7 @@ flowchart TD
 - Zoom/fit: transient in memory; reset on entry change unless the user zooms manually.
 
 ## Testing
-- Vitest suite (`tests/render.test.js`, `tests/state.test.js`, `tests/chapters.test.js`, `tests/transform.test.js`, `tests/on-page-frame.test.js`) covers:
+- Vitest suite (`tests/entries.test.js`, `tests/data.test.js`, `tests/render.test.js`, `tests/state.test.js`, `tests/transform.test.js`, `tests/on-page-frame.test.js`) covers:
   - Page resolution and ordering
   - Progress save/load with localStorage error handling
   - Two-page mode logic

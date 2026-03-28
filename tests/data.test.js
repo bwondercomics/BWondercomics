@@ -3,49 +3,63 @@
  */
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { loadChapterData, loadPageConfig } from '../reader/data.js';
+import { loadEntryData, loadPageConfig } from '../reader/data.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('loadChapterData', () => {
-  it('should normalize entries and order by displayNumber', async () => {
+describe('loadEntryData', () => {
+  it('normalizes entries, rewrites protected paths, and preserves entry labels', async () => {
     const payload = {
       entries: {
+        'Issue 10': ['protected/comics/battle-bros/10/page-1.png', '/media/local.png'],
         'Issue 2': ['b.png'],
-        'Issue 1': ['a.png']
+        'Store Release': []
       },
       entryMeta: {
-        'Issue 1': { displayNumber: 1 },
-        'Issue 2': { displayNumber: 2 }
+        'Issue 10': {
+          displayNumber: '10',
+          coverImage: 'protected/media/covers/issue-10.png'
+        },
+        'Issue 2': { displayNumber: 2 },
+        'Store Release': { releaseType: 'store' }
       },
       statusMessage: 'Ready',
-      premiumOnly: false,
-      unitLabelSingular: 'Issue',
-      unitLabelPlural: 'Issues'
+      premiumOnly: true,
+      entryLabels: [{ id: 'issues', singular: 'Issue', plural: 'Issues' }]
     };
 
-    vi.stubGlobal('fetch', vi.fn(async () => ({
+    const fetchMock = vi.fn(async () => ({
       ok: true,
       json: async () => payload
-    })));
+    }));
+    vi.stubGlobal('fetch', fetchMock);
 
-    const data = await loadChapterData('battle-bros');
-    expect(data.entryOrder).toEqual(['Issue 1', 'Issue 2']);
-    expect(data.entries['Issue 1']).toEqual(['a.png']);
-    expect(data.unitLabelSingular).toBe('Issue');
-    expect(data.unitLabelPlural).toBe('Issues');
+    const data = await loadEntryData('battle-bros');
+
+    expect(fetchMock).toHaveBeenCalledWith('data.json', { cache: 'no-store' });
+    expect(data.entryOrder).toEqual(['Issue 2', 'Issue 10', 'Store Release']);
+    expect(data.entries['Issue 10']).toEqual([
+      '/api/protected/comics/battle-bros/10/page-1.png',
+      '/media/local.png'
+    ]);
+    expect(data.entries['Store Release']).toEqual([]);
+    expect(data.entryMeta['Issue 10'].coverImage).toBe('/api/protected/media/covers/issue-10.png');
+    expect(data.premiumOnly).toBe(true);
+    expect(data.unitLabelSingular).toBe('Entry');
+    expect(data.unitLabelPlural).toBe('Entries');
+    expect(data.entryLabels).toEqual([{ id: 'issues', singular: 'Issue', plural: 'Issues' }]);
   });
 
-  it('should throw on invalid entry payload', async () => {
+  it('throws on invalid entry payload', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true,
       json: async () => ({})
     })));
 
-    await expect(loadChapterData('battle-bros')).rejects.toThrow(
+    await expect(loadEntryData('battle-bros')).rejects.toThrow(
       'Invalid entry data structure'
     );
     errorSpy.mockRestore();

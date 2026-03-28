@@ -17,6 +17,11 @@ Goal: remove internal "chapter" identifiers safely without breaking runtime wiri
   - Reader error message now says “entry data”
   - Admin preview export filename now `battle-bros-entries.json`
 
+## Work Completed (2026-03-28)
+- Reader state now uses `currentEntry`; the stale `currentChapter` state key was removed.
+- Reader data loading docs/tests now reference `loadEntryData()` and `tests/entries.test.js`.
+- Test and reference docs were refreshed to use current entry-based naming.
+
 ## Current Runtime Locations (still using "chapter")
 
 Reader UI + JS
@@ -25,10 +30,10 @@ Reader UI + JS
 - `reader/dom.js` (queries `#chapter` + related nodes)
 - `reader/app.js` (select/menu wiring, `chapterChanged` event)
 - `reader/controls.js`, `reader/overlays.js` (end overlay + navigation)
-- `reader/state.js` (state keys `currentChapter`, `pages`, localStorage payload)
+- `reader/state.js` (localStorage payload still uses the legacy `chapter` key)
 - `reader/gallery.js`, `reader/analytics.js`, `reader/render.js`
 - `reader/comment-targets.js`, `reader/comic-comments.js`
-- `reader/config.js` (`CHAPTER_NUMBER_PATTERN`)
+- `reader/config.js` (`ENTRY_NUMBER_PATTERN` still accepts chapter/issue/entry labels)
 
 Admin UI + JS
 - `admin/index.html` (ids/classes like `chaptersSection`, `chapterList`, `chapterName`, `chapterPremium`, `chapter-item`)
@@ -54,7 +59,7 @@ Backend + schema
 - [ ] Dispatch both events (`entryChanged` + legacy `chapterChanged`) for one release.
 
 ### Phase B — Internal rename with compatibility
-- [ ] Rename reader state keys to `currentEntry` / `pages` (keep mapping for legacy `currentChapter`).
+- [x] Rename reader state keys to `currentEntry` / `pages` (localStorage still serializes to `chapter` for compatibility).
 - [ ] Rename admin state keys (`chapters` -> `entries`, `chapterMeta` -> `entryMeta`) with a migration layer on load/save.
 - [ ] Rename helpers (`getChapterFolder` -> `getEntryFolder`, etc) and keep thin wrappers for old names.
 

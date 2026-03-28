@@ -65,4 +65,4 @@ flowchart LR
 
 ## Testing
 - Test suite: Vitest with happy-dom, covering navigation math, state persistence/error handling, render layout selection, on-page frame sizing math, and DOM regressions for page-shape changes.
-- Files include `tests/chapters.test.js`, `tests/state.test.js`, `tests/render.test.js`, `tests/transform.test.js`, and `tests/on-page-frame.test.js`; config lives in `vitest.config.js` and `tests/setup.js`.
+- Files include `tests/entries.test.js`, `tests/state.test.js`, `tests/data.test.js`, `tests/render.test.js`, `tests/transform.test.js`, and `tests/on-page-frame.test.js`; config lives in `vitest.config.js` and `tests/setup.js`.

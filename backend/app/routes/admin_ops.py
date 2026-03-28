@@ -191,9 +191,12 @@ def mark_ops_run_finished(
 
     output, truncated_from_file = _read_run_output(run_id)
     now = datetime.now(timezone.utc)
+    started_at = run.started_at or now
+    if started_at.tzinfo is None:
+        started_at = started_at.replace(tzinfo=timezone.utc)
     run.status = normalized
     run.finished_at = now
-    run.duration_seconds = int((now - (run.started_at or now)).total_seconds())
+    run.duration_seconds = int((now - started_at).total_seconds())
     run.exit_code = exit_code
     run.output = output or None
     run.output_truncated = bool(output_truncated or truncated_from_file)

@@ -50,6 +50,7 @@ comics/**
 # Vite build output and cache
 dist/
 dist-ssr/
+coverage/
 deploy/stoat/for-web-dist/
 *.local
 .vite/

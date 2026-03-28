@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
 from contextlib import ExitStack
@@ -13,6 +14,8 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 from starlette.requests import Request
+
+os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///tmp/bw-quality-diagnostics-tests.db")
 
 from backend.app.db import Base
 from backend.app.diagnostics_snapshot import load_latest_snapshot, refresh_snapshot
@@ -61,6 +64,22 @@ class DiagnosticsOpsTests(unittest.TestCase):
         self.base_dir = Path(self.temp_dir.name)
         (self.base_dir / "dist" / "assets").mkdir(parents=True, exist_ok=True)
         (self.base_dir / "dist" / "assets" / "app.manifest").write_text("manifest", encoding="utf-8")
+        (self.base_dir / "deploy" / "ops").mkdir(parents=True, exist_ok=True)
+        (self.base_dir / "deploy" / "ops" / "command-catalog.json").write_text(
+            json.dumps(
+                [
+                    {
+                        "id": "tests",
+                        "label": "Run Frontend Tests",
+                        "group": "Verification",
+                        "description": "Run the Vitest suite.",
+                        "argv": ["npm", "test"],
+                        "terminal": "npm test",
+                    }
+                ]
+            ),
+            encoding="utf-8",
+        )
         (self.base_dir / "tests").mkdir(parents=True, exist_ok=True)
         (self.base_dir / "tests" / "ops.test.js").write_text("test", encoding="utf-8")
         (self.base_dir / "var" / "backups").mkdir(parents=True, exist_ok=True)
