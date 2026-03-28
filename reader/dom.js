@@ -7,6 +7,7 @@ export function initElements() {
   el.stageWrap = document.getElementById('stageWrap');
   el.stage = document.getElementById('stage');
   el.viewport = document.getElementById('viewport');
+  el.mainContent = document.getElementById('mainContent');
   el.topbar = document.getElementById('topbar');
   el.statusPanel = document.getElementById('statusPanel');
   el.statusText = document.getElementById('statusText');

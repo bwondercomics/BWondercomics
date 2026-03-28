@@ -108,6 +108,6 @@ These tests can be integrated into CI/CD pipelines:
 
 Consider adding tests for:
 - `pointer.js` - Touch/pan/zoom interactions
-- `transform.js` - Zoom calculations
-- `data.js` - Async data loading (with mocked fetch)
+- `transform.js` - Additional zoom/fullscreen edge cases beyond the current on-page frame sizing coverage
+- `data.js` - Expand async loader edge cases (timeouts, malformed payloads)
 - `controls.js` - Navigation logic

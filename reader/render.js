@@ -7,6 +7,7 @@ import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { el } from './dom.js';
 import { markEntryComplete, trackVisiblePages } from './analytics.js';
+import { clearOnPageFrame, fitOnPageFrame } from './transform.js';
 
 function formatDateTime(value) {
   if (!value) return '';
@@ -75,6 +76,16 @@ function hideEmptyEntryState() {
   if (el.stageWrap) el.stageWrap.style.display = '';
 }
 
+function rememberPageMetric(url, imgEl) {
+  if (!url || !imgEl?.naturalWidth || !imgEl?.naturalHeight) return null;
+  const metric = {
+    width: imgEl.naturalWidth,
+    height: imgEl.naturalHeight
+  };
+  state.pageMetrics.set(url, metric);
+  return metric;
+}
+
 /**
  * Renders the status panel with a typewriter animation effect
  * @param {string} message - Status message to display
@@ -116,7 +127,10 @@ export function preloadImage(url) {
 
   const promise = new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => resolve(img);
+    img.onload = () => {
+      rememberPageMetric(url, img);
+      resolve(img);
+    };
     img.onerror = () => {
       state.imageCache.delete(url);
       reject(new Error('Image load failed: ' + url));
@@ -144,6 +158,7 @@ export function loadImage(imgEl, spinnerEl, url) {
   if (!imgEl) return;
 
   if (!url) {
+    if (imgEl.dataset) imgEl.dataset.pageUrl = '';
     imgEl.removeAttribute('src');
     imgEl.alt = '';
     if (spinnerEl) spinnerEl.style.display = 'none';
@@ -152,17 +167,25 @@ export function loadImage(imgEl, spinnerEl, url) {
 
   if (spinnerEl) spinnerEl.style.display = '';
 
-  const hideSpinner = () => {
+  const settleImageLoad = (loaded) => {
     if (spinnerEl) spinnerEl.style.display = 'none';
-    imgEl.removeEventListener('load', hideSpinner);
-    imgEl.removeEventListener('error', hideSpinner);
+    imgEl.removeEventListener('load', handleLoad);
+    imgEl.removeEventListener('error', handleError);
+    if (loaded && imgEl.dataset?.pageUrl === url) {
+      rememberPageMetric(url, imgEl);
+    }
+    if (imgEl.dataset?.pageUrl === url) fitOnPageFrame();
   };
 
-  imgEl.addEventListener('load', hideSpinner);
-  imgEl.addEventListener('error', hideSpinner);
+  const handleLoad = () => settleImageLoad(true);
+  const handleError = () => settleImageLoad(false);
+
+  imgEl.addEventListener('load', handleLoad);
+  imgEl.addEventListener('error', handleError);
 
   const pageNum = state.pages.indexOf(url) + 1;
   imgEl.alt = `${state.currentEntry} - page ${pageNum}`;
+  if (imgEl.dataset) imgEl.dataset.pageUrl = url;
 
   // Performance: Add lazy loading and async decoding
   imgEl.loading = 'eager'; // Eager loading for comic pages (user is actively reading)
@@ -215,6 +238,7 @@ export function render() {
   if (!state.pages.length) {
     state.isTransitioning = false;
     if (el.stage) el.stage.classList.remove('transitioning');
+    clearOnPageFrame();
     showEmptyEntryState();
     updateUI();
     return;
@@ -241,6 +265,7 @@ export function render() {
     loadImage(el.rightImg, el.rightSpinner, rightUrl);
   }
 
+  fitOnPageFrame();
   updateUI();
   preloadUpcoming();
   trackVisiblePages();

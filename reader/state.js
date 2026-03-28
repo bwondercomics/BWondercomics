@@ -24,11 +24,13 @@ import { STORAGE } from './constants.js';
  * @property {Object|null} pinchCenter - Center point of pinch gesture
  * @property {number} pinchScale - Scale factor from pinch gesture
  * @property {Map} imageCache - FIFO cache of preloaded images
+ * @property {Map<string, { width: number, height: number }>} pageMetrics - Cached natural page dimensions by URL
  * @property {number} lastTap - Timestamp of last tap (for double-tap detection)
  * @property {boolean} isTransitioning - Whether page transition animation is active
  * @property {number|null} rafId - RequestAnimationFrame ID for animations
  * @property {Object|null} prevTransformOrigin - Previous transform origin for animations
  * @property {number} fullscreenBaseScale - Baseline scale when entering fullscreen (used to clamp zoom-out)
+ * @property {{ width: number, height: number }|null} lastOnPageFrame - Last successful on-page frame size
  */
 export const state = {
   currentEntry: '',
@@ -46,11 +48,13 @@ export const state = {
   pinchCenter: null,
   pinchScale: 1,
   imageCache: new Map(),
+  pageMetrics: new Map(),
   lastTap: 0,
   isTransitioning: false,
   rafId: null,
   prevTransformOrigin: null,
-  fullscreenBaseScale: 1
+  fullscreenBaseScale: 1,
+  lastOnPageFrame: null
 };
 
 /**

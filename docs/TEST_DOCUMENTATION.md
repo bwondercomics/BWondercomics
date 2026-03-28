@@ -15,10 +15,12 @@ Note: "chapter" in code/tests is legacy naming for entries (issues/volumes/etc).
 3. [chapters.test.js](#chapterstestjs)
 4. [state.test.js](#statetestjs)
 5. [render.test.js](#rendertestjs)
-6. [Additional Test Files](#additional-test-files)
-7. [Running Tests](#running-tests)
-8. [Writing New Tests](#writing-new-tests)
-9. [Continuous Integration](#continuous-integration)
+6. [transform.test.js](#transformtestjs)
+7. [on-page-frame.test.js](#on-page-frametestjs)
+8. [Additional Test Files](#additional-test-files)
+9. [Running Tests](#running-tests)
+10. [Writing New Tests](#writing-new-tests)
+11. [Continuous Integration](#continuous-integration)
 
 ---
 
@@ -45,10 +47,15 @@ tests/
 ├── chapters.test.js      # Entry/chapter helper tests
 ├── state.test.js         # Reader state persistence tests
 ├── render.test.js        # Rendering logic tests
+├── transform.test.js     # On-page frame sizing math tests
+├── on-page-frame.test.js # DOM/render tests for dynamic on-page sizing
 ├── data.test.js          # reader/data.js loader tests
 ├── series.test.js        # reader/series.js helper tests
 ├── comment-targets.test.js # Comment target ID helpers
+├── media-branding.test.js # Media/admin branding field tests
 ├── utils.test.js         # admin/utils.js helper tests
+├── diagnostics-snapshot.test.js # Admin diagnostics snapshot tests
+├── ops-app.test.js       # Admin ops endpoint/app tests
 ├── admin-smoke.test.js   # Admin UI smoke tests (happy-dom)
 └── README.md             # Testing guide
 ```
@@ -539,12 +546,89 @@ expect(canShowTwoPages()).toBe(false);
 
 ---
 
+## transform.test.js
+
+**File:** `tests/transform.test.js`
+**Covers:** `reader/transform.js` on-page frame sizing math
+
+### Test Suites
+
+#### `calculateOnPageFrameSize` (3 tests)
+
+Tests the pure sizing helper used by the non-fullscreen desktop reader frame.
+
+##### Test: "sizes portrait pages narrower than landscape pages in the same viewport"
+```javascript
+expect(landscape.width).toBeGreaterThan(portrait.width);
+expect(landscape.height).toBeLessThan(portrait.height);
+```
+**Purpose:** Verifies that the computed frame follows the visible page aspect ratio instead of assuming a single portrait/A4-like shape
+
+##### Test: "accounts for spread gap and page chrome when sizing two-page spreads"
+```javascript
+expect(spread.width).toBeGreaterThan(single.width);
+expect(spread.height).toBe(single.height);
+```
+**Purpose:** Confirms two-page spreads include the live stage gap and per-page border chrome in the fitted frame size
+
+##### Test: "falls back to the previous frame when a visible page metric is missing"
+```javascript
+const fallback = { width: 420, height: 610 };
+expect(frame).toEqual(fallback);
+```
+**Purpose:** Keeps the reader from snapping back to CSS defaults while a newly selected page is still loading
+
+---
+
+## on-page-frame.test.js
+
+**File:** `tests/on-page-frame.test.js`
+**Covers:** DOM/render integration for non-fullscreen on-page sizing
+
+### Test Suites
+
+#### `on-page reader frame sizing` (3 tests)
+
+Tests the runtime behavior of the viewport frame in the browser-like happy-dom environment.
+
+##### Test: "updates the viewport frame when render navigates between page ratios"
+```javascript
+render();
+state.pageIndex = 1;
+render();
+
+expect(secondWidth).toBeGreaterThan(firstWidth);
+expect(secondHeight).toBeLessThan(firstHeight);
+```
+**Purpose:** Verifies that normal page navigation recomputes the viewport frame as the visible page shape changes
+
+##### Test: "ignores on-page sizing while fullscreen is active"
+```javascript
+expect(fitOnPageFrame()).not.toBeNull();
+document.fullscreenElement = {};
+expect(fitOnPageFrame()).toBeNull();
+```
+**Purpose:** Confirms fullscreen stays on its existing fit path and does not keep the desktop on-page frame styling active
+
+##### Test: "keeps the responsive stacked layout on the existing full-width path"
+```javascript
+stackedLayout = true;
+expect(fitOnPageFrame()).toBeNull();
+expect(el.viewport.classList.contains('dynamic-frame')).toBe(false);
+```
+**Purpose:** Guards the mobile/stacked layout so it keeps the previous full-width behavior
+
+---
+
 ## Additional Test Files
 
 - `tests/data.test.js` — `reader/data.js` loaders (entry normalization, error handling, subtitles).
 - `tests/utils.test.js` — `admin/utils.js` helpers (tag parsing, page sorting, media IDs, folder sanitizing).
 - `tests/series.test.js` — `reader/series.js` helpers (series ID normalization and data/config paths).
 - `tests/comment-targets.test.js` — comment target ID helpers (`entry-*` and `post:*`).
+- `tests/media-branding.test.js` — media/admin branding fields and normalization coverage.
+- `tests/diagnostics-snapshot.test.js` — admin diagnostics snapshot endpoint coverage.
+- `tests/ops-app.test.js` — admin ops app/endpoint coverage.
 - `tests/admin-smoke.test.js` — admin UI smoke coverage in happy-dom (boot + basic post/entry flows).
 
 ---
@@ -574,21 +658,16 @@ This installs:
 npm test
 ```
 
-**Output (example; counts vary):**
-```
- RUN  v1.0.4 /srv/bw-quality
+**Notes:**
+- Output lists every discovered `*.test.js` file; the inventory above reflects the current suite layout.
+- Use this when you want the full reader + admin test sweep, not just the reader layout/frame coverage.
 
- ✓ tests/chapters.test.js
- ✓ tests/state.test.js
- ✓ tests/render.test.js
- ✓ tests/data.test.js
- ✓ tests/utils.test.js
- ✓ tests/series.test.js
- ✓ tests/comment-targets.test.js
- ✓ tests/admin-smoke.test.js
-
-Test Files  8 passed (8)
+#### Run reader layout/frame tests only
+```bash
+npm test -- tests/render.test.js tests/transform.test.js tests/on-page-frame.test.js
 ```
+
+**Use case:** Verify two-page layout logic and the dynamic non-fullscreen reader frame without running unrelated suites
 
 
 #### Watch mode (re-runs on file changes)
@@ -744,7 +823,7 @@ jobs:
 | Metric | Value |
 |--------|-------|
 | **Total Tests** | Run `npm test` for current totals |
-| **Test Files** | 8 |
+| **Test Files** | Current inventory listed above (`tests/` changes over time) |
 | **Coverage** | Focused unit + smoke coverage |
 | **Framework** | Vitest 1.0.4 |
 
@@ -756,13 +835,13 @@ Consider adding tests for:
 
 ### High Priority
 - **pointer.js** - Touch/pan/zoom gesture handling (complex logic)
-- **transform.js** - Zoom calculation edge cases
 - **data.js** - Expand edge case coverage (bad payloads, timeouts)
+- **controls.js** - Page navigation edge cases
 
 ### Medium Priority
-- **fullscreen.js** - Fullscreen mode transitions
+- **transform.js** - Additional zoom/fullscreen edge cases beyond the current on-page frame sizing coverage
+- **fullscreen.js** - Deeper browser API transition coverage beyond the current on-page frame regression checks
 - **gallery.js** - Gallery rendering and interactions
-- **controls.js** - Page navigation edge cases
 
 ### Low Priority
 - **Integration tests** - Complete user flows (load → navigate → zoom)

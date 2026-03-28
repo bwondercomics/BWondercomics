@@ -2,7 +2,7 @@
 import { CONFIG } from './config.js';
 import { el } from './dom.js';
 import { state } from './state.js';
-import { fitHeightFullscreen } from './transform.js';
+import { clearOnPageFrame, fitHeightFullscreen, fitOnPageFrame } from './transform.js';
 
 let hideTimer = null;
 let mouseOverControls = false;
@@ -65,6 +65,7 @@ export function onFullscreenChange() {
   if (document.fullscreenElement) {
     document.body.classList.add('fullscreen-active');
     if (el.fullscreenBtn) el.fullscreenBtn.textContent = 'EXIT';
+    clearOnPageFrame();
     showControlsBar();
 
     requestAnimationFrame(() => {
@@ -92,6 +93,8 @@ export function onFullscreenChange() {
       clearTimeout(hideTimer);
       hideTimer = null;
     }
+
+    fitOnPageFrame();
   }
 }
 
