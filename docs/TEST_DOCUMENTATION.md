@@ -50,6 +50,9 @@ Install backend dev dependencies into the repo virtualenv:
 - `tests/entries.test.js`: entry parsing, sorting, and normalization helpers in `reader/entries.js`
 - `tests/state.test.js`: `reader/state.js` persistence behavior
 - `tests/data.test.js`: `reader/data.js` loaders
+- `tests/reader-data-builder.test.js`: builder-first page loading, legacy fallback, theme/panel application, and empty-panel handling
+- `tests/reader-page-renderer.test.js`: `reader/page-renderer.js` module rendering contracts and placeholder states
+- `tests/reader-feed-panel.test.js`: `reader/feed-panel.js` and `reader/latest.js` sorting, sanitization, expansion, latest preview, and feed-mode behavior
 - `tests/reader-controls.test.js`: `reader/controls.js` navigation and end-of-entry behavior
 - `tests/reader-fullscreen.test.js`: `reader/fullscreen.js` enter/exit and controls-bar timing
 - `tests/reader-pointer.test.js`: `reader/pointer.js` swipe, drag, double-tap, and edge zones
@@ -68,10 +71,14 @@ Install backend dev dependencies into the repo virtualenv:
 - `tests/admin-series.test.js`: `admin/series.js` series-index contract consumption
 - `tests/admin-preview.test.js`: `admin/preview.js` preview-data contract consumption
 - `tests/admin-page-config.test.js`: `admin/page-config.js` page-config load/save behavior
+- `tests/admin-page-builder-data.test.js`: `admin/page-builder/data.js` page/section/module request wrappers and failure handling
+- `tests/admin-page-builder-shell.test.js`: `admin/page-builder.js` empty states, selection, delete flow, and default module config wiring
+- `tests/admin-page-builder-preview.test.js`: `admin/page-builder/module-editor.js` save/delete flows and `admin/page-builder/preview-renderers.js` preview contracts
+- `tests/admin-designer.test.js`: `admin/designer.js` iframe URL generation, section visibility, and resize messaging
 - `tests/media-branding.test.js`: media/admin branding rules
 - `tests/diagnostics-snapshot.test.js`: diagnostics UI snapshot and legacy fallback behavior
 - `tests/ops-app.test.js`: ops UI rendering states
-- `tests/helpers/contracts.js` and `tests/fixtures/contract-fixtures.json`: shared frontend contract fixtures
+- `tests/helpers/contracts.js` and `tests/fixtures/contract-fixtures.json`: shared frontend contract fixtures for series data, builder pages/modules, feed/latest payloads, tracking payloads, and user-state contracts
 - `tests/helpers/reader-fixture.js`: live reader markup harness from `index.html`
 
 ## Backend Test Files
@@ -80,12 +87,18 @@ Install backend dev dependencies into the repo virtualenv:
 - `backend/tests/test_auth_routes.py`: auth/session/register/login/logout route contracts
 - `backend/tests/test_comments_routes.py`: comment auth, moderation, duplicate/rate-limit, and censored-phrase handling
 - `backend/tests/test_files_routes.py`: page-config/media index contracts, protected asset access, and virtual save behavior
+- `backend/tests/test_page_builder_routes.py`: page-builder admin CRUD, slug uniqueness, homepage exclusivity, section/module move-reorder, and public published-page access
 - `backend/tests/test_posts_routes.py`: public/admin post visibility, scheduled promotion, protected-image copy, and asset cleanup
 - `backend/tests/test_series_contracts.py`: `series.json` and `data.json` payload contracts
-- `backend/tests/helpers.py`: shared in-memory DB, request factory, and contract seeding helpers
+- `backend/tests/test_tracking_routes.py`: visitor-session create/update behavior, dedupe, and validation
+- `backend/tests/test_user_routes.py`: email subscribe/opt-in, user settings, comment self-service, premium redemption, and account deletion rules
+- `backend/tests/helpers.py`: shared in-memory DB, request factory, and contract seeding helpers for series, builder pages, comments, premium codes, and visitor sessions
 
 ## Documentation Rules
 - Do not claim fixed coverage percentages unless they are generated and current.
 - When adding tests, prefer focused module/manager tests over brittle app-wide DOM fixtures.
 - If an admin test depends on the live markup contract, reuse the shared HTML fixture rather than hand-maintaining an incomplete DOM template.
 - Reuse the shared contract fixture layer for reader/admin/backend contract assertions instead of hand-copying payload shapes.
+- Treat `tests/fixtures/contract-fixtures.json` and `backend/tests/helpers.py` as the canonical contract layer; backend payload changes should update those fixtures and at least one frontend plus one backend assertion.
+- Frontend coverage is informational, not a percentage gate. CI should still run `npm run test:coverage` and publish the report artifact.
+- GitHub Actions enforcement should use the same local commands already documented here: `npm test`, `npm run test:coverage`, and `npm run test:backend`.

@@ -428,12 +428,6 @@ export async function loadPageConfigWithFallback(setSubtitlesFn, seriesId = null
       setSubtitlesFn(subtitles);
     }
     logger.log(`✓ Loaded reader page from page builder for series: ${sid}`);
-    console.log('PAGE BUILDER DATA:', builderPage);
-    console.log('Sections:', builderPage.sections?.length || 0);
-    builderPage.sections?.forEach((s, i) => {
-      console.log(`  Section ${i}: layout=${s.layout}, modules=${s.modules?.length || 0}`);
-      s.modules?.forEach(m => console.log(`    - ${m.moduleType} (col ${m.columnIndex})`));
-    });
     return { source: 'builder', page: builderPage };
   }
 

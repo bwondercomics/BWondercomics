@@ -19,6 +19,9 @@ npm test
 # 3b. Run backend tests
 npm run test:backend
 
+# 3c. Generate frontend coverage report (informational, not a gate)
+npm run test:coverage
+
 # 4. Lint + format (JS)
 npm run lint
 npm run format:check
@@ -27,6 +30,10 @@ npm run format:check
 python -m ruff check backend/app
 python -m ruff format backend/app
 ```
+
+### **Contract Fixtures**
+- Treat `tests/fixtures/contract-fixtures.json` and `backend/tests/helpers.py` as the canonical reader/admin/backend contract layer.
+- If a backend payload shape changes, update that shared contract layer and at least one frontend test plus one backend test.
 
 ### **Security**
 - [ ] No hardcoded credentials or API keys

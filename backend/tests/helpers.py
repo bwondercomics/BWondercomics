@@ -9,9 +9,9 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 from starlette.requests import Request
@@ -20,7 +20,11 @@ os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///tmp/bw-quality-route-t
 
 from backend.app.db import Base, get_db
 from backend.app.models import (
+    BuilderModule,
+    BuilderPage,
+    BuilderSection,
     CommentLimit,
+    Comment,
     EmailSubscriber,
     Entry,
     EntryLabel,
@@ -28,8 +32,10 @@ from backend.app.models import (
     MediaItem,
     PageConfig,
     Post,
+    PremiumCode,
     Series,
     User,
+    VisitorSession,
 )
 from backend.app.security import hash_password, issue_session_token
 from backend.app.settings import settings as app_settings
@@ -42,6 +48,7 @@ SETTINGS_PATCH_TARGETS = (
     "backend.app.security.settings",
     "backend.app.routes.auth.settings",
     "backend.app.routes.files.settings",
+    "backend.app.routes.user.settings",
 )
 
 
@@ -97,6 +104,19 @@ class BackendRouteTestCase(unittest.TestCase):
         )
         Base.metadata.create_all(self.engine)
         self.db = Session(self.engine)
+        self.db.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS personal_feed_items ("
+                "id TEXT PRIMARY KEY, user_id TEXT)"
+            )
+        )
+        self.db.execute(
+            text(
+                "CREATE TABLE IF NOT EXISTS visitor_events ("
+                "id TEXT PRIMARY KEY, user_id TEXT)"
+            )
+        )
+        self.db.commit()
 
         self.patches = ExitStack()
         self.test_settings = replace(
@@ -251,6 +271,60 @@ class BackendRouteTestCase(unittest.TestCase):
         self.db.commit()
         return record
 
+    def seed_builder_page(self, fixture_key: str = "builderPage") -> dict:
+        payload = self.contracts[fixture_key]
+        series_id = payload.get("seriesId") or "battle-bros"
+        if not self.db.get(Series, series_id):
+            self.seed_contract_series(series_id=series_id)
+
+        now = parse_iso_z(self.contracts["seriesData"]["lastUpdated"]) or datetime.now(timezone.utc)
+        page = BuilderPage(
+            id=UUID(payload["id"]),
+            series_id=series_id,
+            slug=payload["slug"],
+            title=payload["title"],
+            page_type=payload.get("pageType", "custom"),
+            is_published=bool(payload.get("isPublished")),
+            is_homepage=bool(payload.get("isHomepage")),
+            sort_index=int(payload.get("sortIndex", 0)),
+            meta=payload.get("meta") or {},
+            created_at=now,
+            updated_at=now,
+        )
+        self.db.add(page)
+
+        sections: list[BuilderSection] = []
+        modules: list[BuilderModule] = []
+        for section_payload in payload.get("sections") or []:
+            section = BuilderSection(
+                id=UUID(section_payload["id"]),
+                page_id=page.id,
+                section_type=section_payload.get("sectionType", "row"),
+                layout=section_payload.get("layout", "1"),
+                sort_index=int(section_payload.get("sortIndex", 0)),
+                settings=section_payload.get("settings") or {},
+                created_at=now,
+            )
+            self.db.add(section)
+            sections.append(section)
+
+            for module_payload in section_payload.get("modules") or []:
+                module = BuilderModule(
+                    id=UUID(module_payload["id"]),
+                    section_id=section.id,
+                    module_type=module_payload["moduleType"],
+                    column_index=int(module_payload.get("columnIndex", 0)),
+                    sort_index=int(module_payload.get("sortIndex", 0)),
+                    config=module_payload.get("config") or {},
+                    created_at=now,
+                    updated_at=now,
+                )
+                self.db.add(module)
+                modules.append(module)
+
+        self.db.commit()
+        return {"page": page, "sections": sections, "modules": modules}
+
     def seed_media_items(self) -> list[MediaItem]:
         items: list[MediaItem] = []
         now = parse_iso_z(self.contracts["seriesData"]["lastUpdated"]) or datetime.now(timezone.utc)
@@ -296,6 +370,41 @@ class BackendRouteTestCase(unittest.TestCase):
             seeded[key] = post
         self.db.commit()
         return seeded
+
+    def seed_user_comments(self, user: User, comments: list[dict] | None = None) -> list[Comment]:
+        payloads = comments or self.contracts["userFixtures"]["comments"]
+        seeded: list[Comment] = []
+        for payload in payloads:
+            comment = Comment(
+                id=uuid4(),
+                target_id=payload["targetId"],
+                user_id=user.id,
+                display_name=user.display_name,
+                message=payload["message"],
+                hidden=bool(payload.get("hidden")),
+                created_at=parse_iso_z(payload.get("createdAt")) or datetime.now(timezone.utc),
+                ip_address="198.51.100.25",
+            )
+            self.db.add(comment)
+            seeded.append(comment)
+        self.db.commit()
+        return seeded
+
+    def seed_premium_code(self, *, code: str | None = None, active: bool = True) -> PremiumCode:
+        payload = self.contracts["userFixtures"]["premiumCode"]
+        now = parse_iso_z(self.contracts["seriesData"]["lastUpdated"]) or datetime.now(timezone.utc)
+        record = PremiumCode(
+            code=code or payload["code"],
+            note=payload.get("note"),
+            active=active,
+            created_at=now,
+        )
+        self.db.add(record)
+        self.db.commit()
+        return record
+
+    def list_visitor_sessions(self) -> list[VisitorSession]:
+        return self.db.scalars(select(VisitorSession).order_by(VisitorSession.visitor_id.asc())).all()
 
     def seed_comment_limits(self, **overrides) -> CommentLimit:
         limits = CommentLimit(

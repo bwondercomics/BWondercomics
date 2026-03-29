@@ -6,11 +6,11 @@ from uuid import UUID, uuid4
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import Comment, EmailSubscriber, PremiumCode, PremiumCodeRedemption, User
+from ..models import Comment, EmailSubscriber, PremiumCode, PremiumCodeRedemption, User, VisitorSession
 from ..security import get_current_user, public_user
 from ..settings import settings
 
@@ -280,20 +280,18 @@ def delete_account(request: Request, db: Session = Depends(get_db)):
             status_code=403, content={"error": "Admin accounts cannot be deleted here"}
         )
 
+    uid = str(user.id)
     db.execute(delete(Comment).where(Comment.user_id == user.id))
-    db.execute(text("DELETE FROM personal_feed_items WHERE user_id = :uid"), {"uid": user.id})
-    db.execute(text("DELETE FROM visitor_sessions WHERE user_id = :uid"), {"uid": user.id})
-    db.execute(text("DELETE FROM visitor_events WHERE user_id = :uid"), {"uid": user.id})
-    db.execute(text("DELETE FROM premium_code_redemptions WHERE user_id = :uid"), {"uid": user.id})
+    db.execute(text("DELETE FROM personal_feed_items WHERE user_id = :uid"), {"uid": uid})
+    db.execute(text("DELETE FROM visitor_events WHERE user_id = :uid"), {"uid": uid})
+    db.execute(delete(VisitorSession).where(VisitorSession.user_id == user.id))
+    db.execute(delete(PremiumCodeRedemption).where(PremiumCodeRedemption.user_id == user.id))
     db.execute(
-        text(
-            "UPDATE premium_codes "
-            "SET redeemed_by = NULL, redeemed_at = NULL, redeemed_ip = NULL, active = true "
-            "WHERE redeemed_by = :uid"
-        ),
-        {"uid": user.id},
+        update(PremiumCode)
+        .where(PremiumCode.redeemed_by == user.id)
+        .values(redeemed_by=None, redeemed_at=None, redeemed_ip=None, active=True)
     )
-    db.execute(text("DELETE FROM email_subscribers WHERE email = :email"), {"email": user.email})
+    db.execute(delete(EmailSubscriber).where(EmailSubscriber.email == user.email))
 
     db.delete(user)
     db.commit()
