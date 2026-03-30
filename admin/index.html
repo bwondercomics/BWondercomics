@@ -601,11 +601,12 @@
             <!-- Main Canvas Area -->
             <main class="page-builder-canvas">
               <div class="pb-canvas-header">
-                <span class="pb-page-title" id="pbPageTitle"></span>
+                <div class="pb-page-title" id="pbPageTitle"></div>
                 <div class="page-builder-actions">
                   <button type="button" class="btn-small btn-secondary" id="pbToggleEditor">Expand</button>
                   <button type="button" class="btn-small btn-secondary" id="pbAddPage">+ Page</button>
-                  <button type="button" class="btn-small btn-primary" id="pbSave">Save</button>
+                  <button type="button" class="btn-small btn-secondary" id="pbSaveDraft">Save Draft</button>
+                  <button type="button" class="btn-small btn-primary" id="pbPublish">Publish Changes</button>
                 </div>
               </div>
               <div id="pbCanvas" class="pb-canvas">
@@ -627,7 +628,7 @@
         </div>
       </section>
 
-      <!-- Legacy Designer Section (hidden, kept for migration) -->
+      <!-- Legacy Designer Section (hidden, deprecated, kept only for migration fallback work) -->
       <section class="section" id="designerSection" style="display: none;">
         <iframe id="designerFrame" class="designer-frame" title="Page Designer" loading="lazy"></iframe>
       </section>

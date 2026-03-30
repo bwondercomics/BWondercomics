@@ -4,7 +4,12 @@
  */
 
 import { sanitizeEntries, sortEntryNamesWithMeta } from './entries.js';
-import { getSeriesDataPath, getSeriesPageConfigPath, getActiveSeriesId } from './series.js';
+import {
+  getSeriesDataPath,
+  getSeriesPageConfigPath,
+  getActiveSeriesId,
+  sanitizePageSlug,
+} from './series.js';
 import { logger } from './logger.js';
 import { renderModule, initEmailForms, initPromoCarousels } from './page-renderer.js';
 import { initFeedModules } from './feed-panel.js';
@@ -141,15 +146,28 @@ export async function loadLatestPost() {
  * Loads a page from the page builder API.
  * @param {string} slug - The page slug (e.g., "reader")
  * @param {string} [seriesId] - Optional series ID override
+ * @param {{draft?: boolean}} [options] - Load unpublished pages through the admin API when enabled
  * @returns {Promise<Object|null>} The page data or null if not found
  */
-export async function loadBuilderPage(slug, seriesId = null) {
+export async function loadBuilderPage(slug, seriesId = null, options = {}) {
   const sid = seriesId || getActiveSeriesId();
+  const pageSlug = sanitizePageSlug(slug) || 'reader';
+  const useDraft = !!options?.draft;
+  const requestUrl = useDraft
+    ? `/api/admin/pages/by-slug/${encodeURIComponent(sid)}/${encodeURIComponent(pageSlug)}`
+    : `/api/pages/${encodeURIComponent(sid)}/${encodeURIComponent(pageSlug)}`;
   try {
-    const res = await fetch(`/api/pages/${encodeURIComponent(sid)}/${encodeURIComponent(slug)}`);
+    const res = await fetch(requestUrl, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
     if (!res.ok) {
       if (res.status === 404) {
-        logger.log(`Builder page "${slug}" not found`);
+        logger.log(`Builder page "${pageSlug}" not found`);
+        return null;
+      }
+      if (useDraft && res.status === 403) {
+        logger.warn(`Draft page "${pageSlug}" requires admin access`);
         return null;
       }
       throw new Error(`Failed to load builder page: ${res.status}`);
@@ -409,26 +427,34 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
 
 /**
  * Loads page configuration with fallback.
- * Tries page builder first, then falls back to legacy page-config.
+ * Tries a builder page first, then falls back to legacy page-config for the default reader page only.
  * @param {Function} setSubtitlesFn - Callback to set subtitles
  * @param {string} [seriesId] - Optional series ID override
+ * @param {{pageSlug?: string, draft?: boolean}} [options] - Page selection and draft mode
  * @returns {Promise<{source: string, page?: Object}>} Result with source indicator
  */
-export async function loadPageConfigWithFallback(setSubtitlesFn, seriesId = null) {
+export async function loadPageConfigWithFallback(setSubtitlesFn, seriesId = null, options = {}) {
   const sid = seriesId || getActiveSeriesId();
+  const pageSlug = sanitizePageSlug(options?.pageSlug || '') || 'reader';
+  const useDraft = !!options?.draft;
+  const allowLegacyFallback = pageSlug === 'reader' && !useDraft;
 
   // Check for no-fallback mode via localStorage (set in page builder admin)
   const noFallback = localStorage.getItem('pb-no-fallback') === '1';
 
   // Try page builder first
-  const builderPage = await loadBuilderPage('reader', sid);
+  const builderPage = await loadBuilderPage(pageSlug, sid, { draft: useDraft });
   if (builderPage) {
     const subtitles = extractSubtitlesFromBuilderPage(builderPage);
     if (subtitles.length > 0) {
       setSubtitlesFn(subtitles);
     }
-    logger.log(`✓ Loaded reader page from page builder for series: ${sid}`);
+    logger.log(`✓ Loaded builder page "${pageSlug}" for series: ${sid}`);
     return { source: 'builder', page: builderPage };
+  }
+
+  if (!allowLegacyFallback) {
+    return { source: 'none' };
   }
 
   // No fallback mode - stop here and show what we got (nothing)

@@ -77,7 +77,11 @@ async function handleMouseLeaveControls() {
 import { renderLatestUpdate } from "./latest.js";
 import { initRightPanelFeed } from "./feed-panel.js";
 import { initEmailSignupForm } from "./email.js";
-import { getActiveSeriesId } from "./series.js";
+import {
+  getActiveSeriesId,
+  getRequestedPageSlug,
+  isDraftPageRequested,
+} from "./series.js";
 
 (function () {
   "use strict";
@@ -902,6 +906,7 @@ import { getActiveSeriesId } from "./series.js";
 
   async function start() {
     const seriesId = getActiveSeriesId();
+    const requestedPageSlug = getRequestedPageSlug();
 
     try {
       const data = await loadEntryData(seriesId);
@@ -959,7 +964,10 @@ import { getActiveSeriesId } from "./series.js";
       unitLabelSingular,
       seriesId,
     });
-    const pageConfig = await loadPageConfigWithFallback(setSubtitles, seriesId);
+    const pageConfig = await loadPageConfigWithFallback(setSubtitles, seriesId, {
+      pageSlug: requestedPageSlug,
+      draft: role === "admin" && isDraftPageRequested(),
+    });
     if (pageConfig.source === 'builder' && pageConfig.page) {
       applyBuilderPageToDOM(pageConfig.page);
     }

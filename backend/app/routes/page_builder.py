@@ -100,6 +100,24 @@ def api_get_page(page_id: str, request: Request, db: Session = Depends(get_db)):
     return {"page": page}
 
 
+@router.get("/api/admin/pages/by-slug/{series_id}/{slug}")
+def api_get_page_by_slug_admin(
+    series_id: str,
+    slug: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Get a page by series/slug for admin preview and draft viewing."""
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    page = get_page_by_slug(db, series_id, slug)
+    if not page:
+        return JSONResponse(status_code=404, content={"error": "Page not found"})
+
+    return {"page": page}
+
+
 @router.post("/api/admin/pages")
 def api_create_page(
     payload: CreatePageRequest,

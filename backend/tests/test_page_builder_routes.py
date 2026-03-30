@@ -204,12 +204,27 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         published = page_builder.api_public_page("battle-bros", "reader", self.db)
         draft = page_builder.api_public_page("battle-bros", "about", self.db)
         missing = page_builder.api_public_page("battle-bros", "missing", self.db)
+        admin_draft = page_builder.api_get_page_by_slug_admin(
+            "battle-bros",
+            "about",
+            self.admin_request("/api/admin/pages/by-slug/battle-bros/about"),
+            self.db,
+        )
+        unauthorized_draft = page_builder.api_get_page_by_slug_admin(
+            "battle-bros",
+            "about",
+            build_request("/api/admin/pages/by-slug/battle-bros/about"),
+            self.db,
+        )
 
         self.assertEqual(published["page"]["slug"], "reader")
         self.assertEqual(published["page"]["pageType"], "reader")
         self.assertEqual(draft.status_code, 404)
         self.assertEqual(json_body(draft)["error"], "Page not found")
         self.assertEqual(missing.status_code, 404)
+        self.assertEqual(admin_draft["page"]["slug"], "about")
+        self.assertFalse(admin_draft["page"]["isPublished"])
+        self.assertEqual(unauthorized_draft.status_code, 403)
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   applyBuilderPageToDOM,
+  loadBuilderPage,
   extractSubtitlesFromBuilderPage,
   loadPageConfigWithFallback,
 } from "../reader/data.js";
@@ -52,6 +53,47 @@ describe("reader builder presentation loading", () => {
     expect(console.log).not.toHaveBeenCalled();
   });
 
+  it("loads a published custom builder page by slug without falling back to legacy config", async () => {
+    const aboutPage = buildContractFixture("builderPageDraft", {
+      isPublished: true,
+    });
+    const setSubtitles = vi.fn();
+    const fetchMock = vi.fn(async (url) => {
+      if (url === "/api/pages/battle-bros/about") {
+        return jsonResponse({ page: aboutPage });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await loadPageConfigWithFallback(setSubtitles, "battle-bros", { pageSlug: "about" });
+
+    expect(result).toEqual({ source: "builder", page: aboutPage });
+    expect(setSubtitles).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("loads unpublished draft pages through the admin slug endpoint", async () => {
+    const draftPage = getContractFixture("builderPageDraft");
+    const setSubtitles = vi.fn();
+    const fetchMock = vi.fn(async (url) => {
+      if (url === "/api/admin/pages/by-slug/battle-bros/about") {
+        return jsonResponse({ page: draftPage });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await loadPageConfigWithFallback(setSubtitles, "battle-bros", {
+      pageSlug: "about",
+      draft: true,
+    });
+
+    expect(result).toEqual({ source: "builder", page: draftPage });
+    expect(setSubtitles).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("falls back to the legacy page-config contract when no builder page exists", async () => {
     const setSubtitles = vi.fn();
     const pageConfig = getContractFixture("pageConfig");
@@ -76,6 +118,23 @@ describe("reader builder presentation loading", () => {
     ]);
   });
 
+  it("does not use legacy fallback for non-reader page slugs", async () => {
+    const setSubtitles = vi.fn();
+    const fetchMock = vi.fn(async (url) => {
+      if (url === "/api/pages/battle-bros/about") {
+        return jsonResponse({}, { ok: false, status: 404, statusText: "Not Found" });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await loadPageConfigWithFallback(setSubtitles, "battle-bros", { pageSlug: "about" });
+
+    expect(result).toEqual({ source: "none" });
+    expect(setSubtitles).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("honors pb-no-fallback when the builder page is missing", async () => {
     localStorage.setItem("pb-no-fallback", "1");
     const setSubtitles = vi.fn();
@@ -91,6 +150,21 @@ describe("reader builder presentation loading", () => {
 
     expect(result).toEqual({ source: "none" });
     expect(setSubtitles).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns null when a draft page request is denied", async () => {
+    const fetchMock = vi.fn(async (url) => {
+      if (url === "/api/admin/pages/by-slug/battle-bros/about") {
+        return jsonResponse({}, { ok: false, status: 403, statusText: "Forbidden" });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await loadBuilderPage("about", "battle-bros", { draft: true });
+
+    expect(result).toBeNull();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 

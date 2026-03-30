@@ -129,6 +129,21 @@ function getModulePreview(moduleType, config) {
   }
 }
 
+function getPageDisplayTitle(page) {
+  return page?.title || page?.slug || "Untitled page";
+}
+
+function renderPageStatusBadges(page) {
+  if (!page) return "";
+  const badges = [
+    `<span class="pb-page-status ${page.isPublished ? "published" : "draft"}">${page.isPublished ? "Published" : "Draft"}</span>`,
+  ];
+  if (page.isHomepage) {
+    badges.push('<span class="pb-page-status homepage">Homepage</span>');
+  }
+  return badges.join("");
+}
+
 function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSections, setActiveNav }) {
   let pages = [];
   let currentPage = null;
@@ -145,6 +160,90 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
 
   function setSelectedModuleId(nextId) {
     selectedModuleId = nextId;
+  }
+
+  function getReaderUrl(page) {
+    const params = new URLSearchParams({
+      series: getSeriesId(),
+      page: String(page?.slug || "").trim() || "reader",
+    });
+    if (page?.isPublished === false) {
+      params.set("draft", "1");
+    }
+    return `../index.html?${params.toString()}`;
+  }
+
+  function syncPageSummary(page) {
+    if (!page?.id) return;
+    pages = pages.map((item) => (item.id === page.id ? { ...item, ...page } : item));
+    if (currentPage?.id === page.id) {
+      currentPage = { ...currentPage, ...page };
+    }
+  }
+
+  function setPageActionState(activeButton, busyText) {
+    const buttons = [el.pbSaveDraft, el.pbPublish].filter(Boolean);
+    const original = new Map(buttons.map((button) => [button, button.textContent]));
+    buttons.forEach((button) => {
+      button.disabled = true;
+      if (button === activeButton) {
+        button.textContent = busyText;
+      }
+    });
+
+    return (button, nextText = null, delayMs = 0) => {
+      const restore = () => {
+        buttons.forEach((btn) => {
+          btn.disabled = false;
+          btn.textContent = original.get(btn);
+        });
+        if (button && nextText) {
+          button.textContent = nextText;
+          window.setTimeout(() => {
+            button.textContent = original.get(button);
+          }, 1200);
+        }
+      };
+      if (delayMs > 0) {
+        window.setTimeout(restore, delayMs);
+        return;
+      }
+      restore();
+    };
+  }
+
+  async function updatePublishState(isPublished) {
+    if (!currentPage) return;
+    const activeButton = isPublished ? el.pbPublish : el.pbSaveDraft;
+    if (!activeButton) return;
+
+    const releaseButtons = setPageActionState(
+      activeButton,
+      isPublished ? "Publishing..." : "Saving...",
+    );
+
+    try {
+      const updated = await updatePage(currentPage.id, {
+        title: currentPage.title,
+        slug: currentPage.slug,
+        pageType: currentPage.pageType,
+        meta: currentPage.meta,
+        isPublished,
+      });
+      if (!updated) {
+        throw new Error("Failed to update page status");
+      }
+
+      syncPageSummary(updated);
+      renderPageList();
+      renderCanvas();
+      renderEditorPanel();
+      releaseButtons(activeButton, isPublished ? "Published" : "Draft Saved");
+    } catch (err) {
+      console.error("Page status update error:", err);
+      releaseButtons();
+      alert(isPublished ? "Failed to publish changes." : "Failed to save draft.");
+    }
   }
 
   // ==================== Data helpers ====================
@@ -184,7 +283,11 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     el.pbPageList.innerHTML = pages
       .map((page) => `
       <div class="pb-page-item ${currentPage?.id === page.id ? "active" : ""}" data-page-id="${page.id}">
-        <span class="pb-page-item-title">${escapeHtml(page.title || page.slug)}</span>
+        <div class="pb-page-item-main">
+          <span class="pb-page-item-title">${escapeHtml(getPageDisplayTitle(page))}</span>
+          <span class="pb-page-item-meta">${escapeHtml(page.slug || "reader")} · ${escapeHtml(page.pageType || "custom")}</span>
+        </div>
+        <span class="pb-page-item-badges">${renderPageStatusBadges(page)}</span>
         <span class="pb-page-item-actions">
           <button class="pb-page-action delete" data-action="delete" title="Delete page">\u00D7</button>
         </span>
@@ -245,7 +348,25 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
 
     // Update page title display
     if (el.pbPageTitle) {
-      el.pbPageTitle.textContent = currentPage ? `Page: ${currentPage.title}` : "";
+      if (!currentPage) {
+        el.pbPageTitle.innerHTML = "";
+      } else {
+        el.pbPageTitle.innerHTML = `
+          <div class="pb-page-title-main">
+            <div class="pb-page-title-copy">
+              <span class="pb-page-title-label">Editing Page</span>
+              <span class="pb-page-title-name">${escapeHtml(getPageDisplayTitle(currentPage))}</span>
+              <span class="pb-page-title-meta">Page ID: ${escapeHtml(currentPage.slug || "reader")} · Type: ${escapeHtml(currentPage.pageType || "custom")}</span>
+            </div>
+            <div class="pb-page-title-actions">
+              <span class="pb-page-title-badges">${renderPageStatusBadges(currentPage)}</span>
+              <a class="pb-open-reader-link" href="${escapeAttr(getReaderUrl(currentPage))}" target="_blank" rel="noopener noreferrer">
+                Open Reader
+              </a>
+            </div>
+          </div>
+        `;
+      }
     }
 
     if (!currentPage) {
@@ -613,50 +734,12 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
       }
     });
 
-    // Save button - saves all modules in the current page
-    el.pbSave?.addEventListener("click", async () => {
-      if (!currentPage) return;
+    el.pbSaveDraft?.addEventListener("click", async () => {
+      await updatePublishState(false);
+    });
 
-      const saveBtn = el.pbSave;
-      const originalText = saveBtn.textContent;
-      saveBtn.textContent = "Saving...";
-      saveBtn.disabled = true;
-
-      try {
-        // Save page metadata
-        currentPage.isPublished = true;
-        await fetch(`/api/admin/pages/${currentPage.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: currentPage.title,
-            slug: currentPage.slug,
-            meta: currentPage.meta,
-            isPublished: true
-          })
-        });
-
-        // Save all modules
-        for (const section of currentPage.sections || []) {
-          for (const mod of section.modules || []) {
-            await fetch(`/api/admin/modules/${mod.id}`, {
-              method: "PUT",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ config: mod.config })
-            });
-          }
-        }
-
-        saveBtn.textContent = "Saved \u2713";
-        setTimeout(() => {
-          saveBtn.textContent = originalText;
-          saveBtn.disabled = false;
-        }, 2000);
-      } catch (err) {
-        console.error("Save error:", err);
-        saveBtn.textContent = "Error - Try Again";
-        saveBtn.disabled = false;
-      }
+    el.pbPublish?.addEventListener("click", async () => {
+      await updatePublishState(true);
     });
   }
 

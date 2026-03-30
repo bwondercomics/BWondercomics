@@ -149,7 +149,8 @@ export const el = {
   // Page Builder
   pageBuilderSection: document.getElementById('pageBuilderSection'),
   pbAddPage: document.getElementById('pbAddPage'),
-  pbSave: document.getElementById('pbSave'),
+  pbSaveDraft: document.getElementById('pbSaveDraft'),
+  pbPublish: document.getElementById('pbPublish'),
   pbToggleEditor: document.getElementById('pbToggleEditor'),
   pbPageList: document.getElementById('pbPageList'),
   pbModulePalette: document.getElementById('pbModulePalette'),

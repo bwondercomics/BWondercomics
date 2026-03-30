@@ -9,6 +9,7 @@ async function setupPageBuilder({
   createPageResult = null,
   deletePageResult = true,
   addModuleResult = null,
+  updatePageResult = null,
 } = {}) {
   vi.resetModules();
   mountAdminDom();
@@ -23,6 +24,10 @@ async function setupPageBuilder({
   const fetchPage = vi.fn(async () => fetchPageResult);
   const createPage = vi.fn(async () => createPageResult);
   const deletePage = vi.fn(async () => deletePageResult);
+  const updatePage = vi.fn(async (_pageId, data) => updatePageResult || {
+    ...(fetchPageResult || createPageResult || {}),
+    ...data,
+  });
   const addModule = vi.fn(async (_sectionId, moduleType, columnIndex, config) => ({
     id: "new-module-id",
     moduleType,
@@ -37,7 +42,7 @@ async function setupPageBuilder({
     fetchPage,
     createPage,
     deletePage,
-    updatePage: vi.fn(async (_pageId, data) => ({ id: fetchPageResult?.id, ...data })),
+    updatePage,
     fetchAssets: vi.fn(async () => []),
     uploadAsset: vi.fn(async () => ({})),
     addSection: vi.fn(async () => null),
@@ -81,6 +86,7 @@ async function setupPageBuilder({
       deletePage,
       fetchPage,
       fetchPages,
+      updatePage,
       hideAllSections,
       setActiveNav,
     },
@@ -169,5 +175,46 @@ describe("admin page-builder shell", () => {
         }),
       }),
     );
+  });
+
+  it("renders page status details and supports explicit draft/publish actions", async () => {
+    const selectedPage = getContractFixture("builderPage");
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await manager.showPageBuilderSection();
+
+    document.querySelector(".pb-page-item")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(document.getElementById("pbPageTitle")?.textContent).toContain("Page ID: reader");
+    expect(document.getElementById("pbPageTitle")?.textContent).toContain("Published");
+    expect(document.getElementById("pbPageTitle")?.textContent).toContain("Homepage");
+
+    const link = document.querySelector(".pb-open-reader-link");
+    expect(link?.getAttribute("href")).toContain("../index.html?series=battle-bros&page=reader");
+    expect(link?.getAttribute("href")).not.toContain("draft=1");
+
+    document.getElementById("pbSaveDraft")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.updatePage).toHaveBeenCalledWith(
+      selectedPage.id,
+      expect.objectContaining({ isPublished: false }),
+    );
+    expect(document.getElementById("pbPageTitle")?.textContent).toContain("Draft");
+    expect(document.querySelector(".pb-open-reader-link")?.getAttribute("href")).toContain("draft=1");
+
+    document.getElementById("pbPublish")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.updatePage).toHaveBeenCalledWith(
+      selectedPage.id,
+      expect.objectContaining({ isPublished: true }),
+    );
+    expect(document.getElementById("pbPageTitle")?.textContent).toContain("Published");
+    expect(document.querySelector(".pb-open-reader-link")?.getAttribute("href")).not.toContain("draft=1");
   });
 });
