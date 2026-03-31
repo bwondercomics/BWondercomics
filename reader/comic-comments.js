@@ -4,11 +4,34 @@
 import { getActiveSeriesId } from './series.js';
 import { h } from './dom.js';
 import { buildEntryTargetId } from './comment-targets.js';
+import { fitOnPageFrame } from './transform.js';
 
 (() => {
     'use strict';
 
     let commentCtx = null;
+    let pendingFrameFit = null;
+
+    function scheduleOnPageFrameFit() {
+        const runFit = () => {
+            pendingFrameFit = null;
+            try {
+                fitOnPageFrame();
+            } catch {
+                // Ignore fit failures so comment interactions still complete.
+            }
+        };
+
+        if (typeof window === 'undefined' || typeof window.requestAnimationFrame !== 'function') {
+            runFit();
+            return;
+        }
+
+        if (pendingFrameFit && typeof window.cancelAnimationFrame === 'function') {
+            window.cancelAnimationFrame(pendingFrameFit);
+        }
+        pendingFrameFit = window.requestAnimationFrame(runFit);
+    }
 
     const api = {
         async session() {
@@ -194,6 +217,7 @@ import { buildEntryTargetId } from './comment-targets.js';
         refreshSession(ctx).finally(() => loadComments(ctx));
         commentCtx = ctx;
         syncCommentsToggleButton();
+        scheduleOnPageFrameFit();
     }
 
     function applyAuthMode(ctx) {
@@ -244,6 +268,8 @@ import { buildEntryTargetId } from './comment-targets.js';
                 loadComments(commentCtx);
             }
         }
+
+        scheduleOnPageFrameFit();
     }
 
     // Expose a global helper so the button can call it.
@@ -271,6 +297,7 @@ import { buildEntryTargetId } from './comment-targets.js';
         ctx.authError.textContent = '';
         ctx.commentError.textContent = '';
         applyAuthMode(ctx);
+        scheduleOnPageFrameFit();
     }
 
     async function refreshSession(ctx) {
@@ -444,6 +471,8 @@ import { buildEntryTargetId } from './comment-targets.js';
             renderComments(ctx, comments);
         } catch (err) {
             ctx.listEl.innerHTML = `<div class="comment-empty">${err.message}</div>`;
+        } finally {
+            scheduleOnPageFrameFit();
         }
     }
 
@@ -451,6 +480,7 @@ import { buildEntryTargetId } from './comment-targets.js';
         try {
             ctx.mode = ctx.mode === 'login' ? 'register' : 'login';
             applyAuthMode(ctx);
+            scheduleOnPageFrameFit();
         } catch (err) {
             if (ctx?.authError) {
                 ctx.authError.textContent = err?.message || 'Could not toggle auth mode.';
