@@ -39,6 +39,10 @@ const activeReaderDetails = new Map();
 let readsOverTimeData = [];
 let lastReaderPayload = null;
 let lastReaderSeriesFilter = "all";
+let lastVisitorHistoryPayload = null;
+let visitorHistoryQuery = "";
+let visitorHistorySort = "recent";
+let selectedVisitorHistoryKey = "";
 const LIVE_REFRESH_MS = 5 * 60 * 1000;
 const LIVE_RANGE_OPTIONS = [30, 60, 120, 360, 720, 1440];
 const LIVE_MAX_HISTORY_MS = 24 * 60 * 60 * 1000;
@@ -1033,84 +1037,244 @@ function formatVisitorKey(value) {
   return `${text.slice(0, 8)}…${text.slice(-6)}`;
 }
 
-function renderVisitorHistory(payload) {
-  if (!el.analyticsVisitorHistoryList) return;
+function getVisitorHistoryQuery() {
+  return (el.analyticsVisitorHistorySearch?.value || "").trim().toLowerCase();
+}
+
+function getVisitorHistorySort() {
+  return (el.analyticsVisitorHistorySort?.value || "recent").trim();
+}
+
+function buildVisitorHistorySearchText(visitor) {
+  const issues = Array.isArray(visitor?.issues) ? visitor.issues : [];
+  const issueText = issues
+    .map((issue) => [
+      issue?.seriesTitle,
+      issue?.seriesId,
+      issue?.entryTitle,
+      issue?.entryDisplayNumber,
+      issue?.finished ? "finished" : "in progress",
+    ].join(" "))
+    .join(" ");
+  return [
+    visitor?.visitorKey,
+    visitor?.landingPage,
+    visitor?.lastPath,
+    visitor?.referrer,
+    visitor?.country,
+    visitor?.browser,
+    visitor?.device,
+    issueText,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function sortVisitorHistory(visitors, sortKey) {
+  const list = [...visitors];
+  list.sort((a, b) => {
+    if (sortKey === "pages") {
+      return (Number(b?.pagesRead) || 0) - (Number(a?.pagesRead) || 0);
+    }
+    if (sortKey === "started") {
+      return (Number(b?.issuesStarted) || 0) - (Number(a?.issuesStarted) || 0);
+    }
+    if (sortKey === "finished") {
+      return (Number(b?.issuesFinished) || 0) - (Number(a?.issuesFinished) || 0);
+    }
+    const aTime = new Date(a?.lastSeen || 0).getTime() || 0;
+    const bTime = new Date(b?.lastSeen || 0).getTime() || 0;
+    return bTime - aTime;
+  });
+  return list;
+}
+
+function getFilteredVisitorHistory(payload) {
   const visitors = Array.isArray(payload?.visitors) ? payload.visitors : [];
-  const totalVisitors = Number(payload?.totalVisitors) || visitors.length;
-  const returned = Number(payload?.returned) || visitors.length;
+  const filtered = visitorHistoryQuery
+    ? visitors.filter((visitor) =>
+        buildVisitorHistorySearchText(visitor).includes(visitorHistoryQuery),
+      )
+    : visitors;
+  return sortVisitorHistory(filtered, visitorHistorySort);
+}
+
+function getSelectedVisitor(visitors) {
+  if (!Array.isArray(visitors) || !visitors.length) {
+    selectedVisitorHistoryKey = "";
+    return null;
+  }
+  const active = visitors.find(
+    (visitor) => String(visitor?.visitorKey || "") === selectedVisitorHistoryKey,
+  );
+  if (active) return active;
+  selectedVisitorHistoryKey = String(visitors[0]?.visitorKey || "");
+  return visitors[0] || null;
+}
+
+function renderVisitorHistoryDetail(visitor) {
+  if (!el.analyticsVisitorHistoryDetail) return;
+  if (!visitor) {
+    el.analyticsVisitorHistoryDetail.innerHTML =
+      '<div class="analytics-detail-empty">Select a visitor to inspect their reading history.</div>';
+    return;
+  }
+
+  const issues = Array.isArray(visitor?.issues) ? visitor.issues : [];
+  const sourceBits = [
+    visitor?.referrer || "Direct",
+    visitor?.country || "",
+    visitor?.browser || "",
+    visitor?.device || "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
+  const issueList = issues.length
+    ? issues
+        .map((issue) => {
+          const progressParts = [`${formatStat(issue?.pagesRead)} pages`];
+          if (issue?.maxPageReached) {
+            progressParts.push(`max page ${formatStat(issue.maxPageReached)}`);
+          }
+          if (issue?.totalPages) {
+            progressParts.push(`${formatStat(issue.totalPages)} total`);
+          }
+          progressParts.push(issue?.finished ? "finished" : "in progress");
+          const issueLabel = issue?.entryTitle || `Entry ${issue?.entryDisplayNumber || "?"}`;
+          const seriesLabel = issue?.seriesTitle || issue?.seriesId || "Unknown series";
+          return `
+            <div class="analytics-visitor-issue">
+              <div class="analytics-visitor-issue-title">${escapeHtml(seriesLabel)} · ${escapeHtml(issueLabel)}</div>
+              <div class="analytics-visitor-issue-meta">${escapeHtml(progressParts.join(" · "))}</div>
+            </div>
+          `;
+        })
+        .join("")
+    : '<div class="analytics-pages-empty" style="margin: 0;">No reader activity in this range.</div>';
+
+  el.analyticsVisitorHistoryDetail.innerHTML = `
+    <div class="analytics-visitor-detail-card">
+      <div class="analytics-visitor-detail-header">
+        <div>
+          <div class="analytics-visitor-key" title="${escapeHtml(visitor?.visitorKey || "")}">${escapeHtml(formatVisitorKey(visitor?.visitorKey))}</div>
+          <div class="analytics-visitor-summary-sub">${escapeHtml(sourceBits || "Visitor metadata unavailable")}</div>
+        </div>
+        <div class="analytics-visitor-detail-lastseen">${escapeHtml(formatTimeAgo(visitor?.lastSeen))}</div>
+      </div>
+      <div class="analytics-visitor-detail-metrics">
+        <span>${formatStat(visitor?.pagesRead)} pages</span>
+        <span>${formatStat(visitor?.issuesStarted)} issues</span>
+        <span>${formatStat(visitor?.issuesFinished)} finished</span>
+      </div>
+      <div class="analytics-visitor-fields">
+        <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">First Seen</span><span>${escapeHtml(formatDateTime(visitor?.firstSeen))}</span></div>
+        <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Last Seen</span><span>${escapeHtml(formatDateTime(visitor?.lastSeen))}</span></div>
+        <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Landing Page</span><span>${escapeHtml(visitor?.landingPage || "—")}</span></div>
+        <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Last Path</span><span>${escapeHtml(visitor?.lastPath || "—")}</span></div>
+        <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Referrer</span><span>${escapeHtml(visitor?.referrer || "Direct")}</span></div>
+      </div>
+      <div class="analytics-visitor-detail-section">
+        <div class="analytics-visitor-detail-title">Issue History</div>
+        <div class="analytics-visitor-issues">${issueList}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderVisitorHistoryView() {
+  if (!el.analyticsVisitorHistoryList) return;
+  const existingBody = el.analyticsVisitorHistoryList.querySelector(
+    ".analytics-visitor-list-body",
+  );
+  const preservedScrollTop =
+    existingBody instanceof HTMLElement ? existingBody.scrollTop : 0;
+  const payload = lastVisitorHistoryPayload || {};
+  const visitors = getFilteredVisitorHistory(payload);
+  const returned = Number(payload?.returned) || (Array.isArray(payload?.visitors) ? payload.visitors.length : 0);
+  const totalVisitors = Number(payload?.totalVisitors) || returned;
   const ts = payload?.generatedAt ? new Date(payload.generatedAt) : null;
   const tsText = ts ? ts.toLocaleString() : "just now";
+  const querySuffix = visitorHistoryQuery ? ` · ${formatStat(visitors.length)} match${visitors.length === 1 ? "" : "es"}` : "";
 
   if (el.analyticsVisitorHistoryMeta) {
-    el.analyticsVisitorHistoryMeta.textContent = `Showing ${formatStat(returned)} of ${formatStat(totalVisitors)} visitors. Updated ${tsText}.`;
+    el.analyticsVisitorHistoryMeta.textContent = `Showing ${formatStat(returned)} of ${formatStat(totalVisitors)} visitors${querySuffix}. Updated ${tsText}.`;
+  }
+
+  if (!Array.isArray(payload?.visitors) || !payload.visitors.length) {
+    el.analyticsVisitorHistoryList.innerHTML =
+      '<div class="analytics-pages-empty">No visitor history for this range yet.</div>';
+    renderVisitorHistoryDetail(null);
+    return;
   }
 
   if (!visitors.length) {
     el.analyticsVisitorHistoryList.innerHTML =
-      '<div class="analytics-pages-empty">No visitor history for this range yet.</div>';
+      '<div class="analytics-pages-empty">No visitors match the current search.</div>';
+    renderVisitorHistoryDetail(null);
     return;
   }
 
-  el.analyticsVisitorHistoryList.innerHTML = visitors
-    .map((visitor) => {
-      const issues = Array.isArray(visitor?.issues) ? visitor.issues : [];
-      const metaLine = [
-        visitor?.country || "",
-        visitor?.browser || "",
-        visitor?.device || "",
-      ]
-        .filter(Boolean)
-        .join(" · ");
-      const issuesHtml = issues.length
-        ? issues
-            .map((issue) => {
-              const issueParts = [`${formatStat(issue?.pagesRead)} pages`];
-              if (issue?.maxPageReached) {
-                issueParts.push(`max page ${formatStat(issue.maxPageReached)}`);
-              }
-              if (issue?.totalPages) {
-                issueParts.push(`${formatStat(issue.totalPages)} total`);
-              }
-              issueParts.push(issue?.finished ? "finished" : "in progress");
-              const title = issue?.entryTitle || `Entry ${issue?.entryDisplayNumber || "?"}`;
-              const seriesTitle = issue?.seriesTitle || issue?.seriesId || "Unknown series";
-              return `
-                <div class="analytics-visitor-issue">
-                  <div class="analytics-visitor-issue-title">${escapeHtml(seriesTitle)} · ${escapeHtml(title)}</div>
-                  <div class="analytics-visitor-issue-meta">${escapeHtml(issueParts.join(" · "))}</div>
-                </div>
-              `;
-            })
-            .join("")
-        : '<div class="analytics-pages-empty" style="margin: 0;">No reader activity in this range.</div>';
+  const selectedVisitor = getSelectedVisitor(visitors);
+  el.analyticsVisitorHistoryList.innerHTML = `
+    <div class="analytics-visitor-list-head">
+      <span>Visitor</span>
+      <span>Last Seen</span>
+      <span>Source</span>
+      <span>Activity</span>
+    </div>
+    <div class="analytics-visitor-list-body">
+      ${visitors
+        .map((visitor) => {
+          const visitorKey = String(visitor?.visitorKey || "");
+          const sourceBits = [
+            visitor?.country || "",
+            visitor?.browser || "",
+            visitor?.device || "",
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          const subLine = visitor?.lastPath || visitor?.landingPage || "No path recorded";
+          const isActive = visitorKey === selectedVisitorHistoryKey;
+          return `
+            <button
+              type="button"
+              class="analytics-visitor-list-row ${isActive ? "is-active" : ""}"
+              data-visitor-key="${escapeHtml(visitorKey)}"
+            >
+              <span class="analytics-visitor-list-col analytics-visitor-list-col--identity">
+                <span class="analytics-visitor-list-title" title="${escapeHtml(visitorKey)}">${escapeHtml(formatVisitorKey(visitorKey))}</span>
+                <span class="analytics-visitor-list-sub" title="${escapeHtml(subLine)}">${escapeHtml(subLine)}</span>
+              </span>
+              <span class="analytics-visitor-list-col analytics-visitor-list-col--last" title="${escapeHtml(formatDateTime(visitor?.lastSeen))}">
+                ${escapeHtml(formatTimeAgo(visitor?.lastSeen))}
+              </span>
+              <span class="analytics-visitor-list-col analytics-visitor-list-col--source" title="${escapeHtml(sourceBits || visitor?.referrer || "Direct")}">
+                ${escapeHtml(sourceBits || visitor?.referrer || "Direct")}
+              </span>
+              <span class="analytics-visitor-list-col analytics-visitor-list-col--activity">
+                <span class="analytics-visitor-pill">${formatStat(visitor?.pagesRead)}p</span>
+                <span class="analytics-visitor-pill">${formatStat(visitor?.issuesStarted)}i</span>
+                <span class="analytics-visitor-pill">${formatStat(visitor?.issuesFinished)}f</span>
+              </span>
+            </button>
+          `;
+        })
+        .join("")}
+    </div>
+  `;
+  const nextBody = el.analyticsVisitorHistoryList.querySelector(
+    ".analytics-visitor-list-body",
+  );
+  if (nextBody instanceof HTMLElement) {
+    nextBody.scrollTop = preservedScrollTop;
+  }
+  renderVisitorHistoryDetail(selectedVisitor);
+}
 
-      return `
-        <details class="analytics-visitor-row">
-          <summary class="analytics-visitor-summary">
-            <div class="analytics-visitor-summary-main">
-              <div class="analytics-visitor-key" title="${escapeHtml(visitor?.visitorKey || "")}">${escapeHtml(formatVisitorKey(visitor?.visitorKey))}</div>
-              <div class="analytics-visitor-summary-sub">${escapeHtml(metaLine || "Visitor metadata unavailable")}</div>
-            </div>
-            <div class="analytics-visitor-summary-metrics">
-              <span>${formatStat(visitor?.pagesRead)} pages</span>
-              <span>${formatStat(visitor?.issuesStarted)} issues</span>
-              <span>${formatStat(visitor?.issuesFinished)} finished</span>
-            </div>
-          </summary>
-          <div class="analytics-visitor-body">
-            <div class="analytics-visitor-fields">
-              <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">First Seen</span><span>${escapeHtml(formatDateTime(visitor?.firstSeen))}</span></div>
-              <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Last Seen</span><span>${escapeHtml(formatDateTime(visitor?.lastSeen))}</span></div>
-              <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Landing Page</span><span>${escapeHtml(visitor?.landingPage || "—")}</span></div>
-              <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Last Path</span><span>${escapeHtml(visitor?.lastPath || "—")}</span></div>
-              <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Referrer</span><span>${escapeHtml(visitor?.referrer || "Direct")}</span></div>
-            </div>
-            <div class="analytics-visitor-issues">${issuesHtml}</div>
-          </div>
-        </details>
-      `;
-    })
-    .join("");
+function renderVisitorHistory(payload) {
+  lastVisitorHistoryPayload = payload || {};
+  renderVisitorHistoryView();
 }
 
 async function loadReaderSeries(target, detail, { showLoading = true } = {}) {
@@ -1912,6 +2076,10 @@ async function loadVisitorHistory({ showLoading = true } = {}) {
     if (el.analyticsVisitorHistoryMeta) {
       el.analyticsVisitorHistoryMeta.textContent = "";
     }
+    if (el.analyticsVisitorHistoryDetail) {
+      el.analyticsVisitorHistoryDetail.innerHTML =
+        '<div class="analytics-detail-empty">Loading visitor history…</div>';
+    }
     el.analyticsVisitorHistoryList.innerHTML =
       '<div class="analytics-pages-empty">Loading visitor history…</div>';
     setVisitorHistoryStatus("Loading visitor history…");
@@ -1939,8 +2107,13 @@ async function loadVisitorHistory({ showLoading = true } = {}) {
     renderVisitorHistory(payload || {});
     setVisitorHistoryStatus("");
   } catch (err) {
+    lastVisitorHistoryPayload = null;
     if (el.analyticsVisitorHistoryMeta) {
       el.analyticsVisitorHistoryMeta.textContent = "";
+    }
+    if (el.analyticsVisitorHistoryDetail) {
+      el.analyticsVisitorHistoryDetail.innerHTML =
+        '<div class="analytics-detail-empty">Visitor details will appear here.</div>';
     }
     el.analyticsVisitorHistoryList.innerHTML =
       '<div class="analytics-pages-empty">No visitor history available.</div>';
@@ -2246,6 +2419,37 @@ function initReadsOverTimeControls() {
   });
 }
 
+function initVisitorHistoryControls() {
+  visitorHistoryQuery = getVisitorHistoryQuery();
+  visitorHistorySort = getVisitorHistorySort();
+
+  if (el.analyticsVisitorHistorySearch && !el.analyticsVisitorHistorySearch.dataset.bound) {
+    el.analyticsVisitorHistorySearch.dataset.bound = "true";
+    el.analyticsVisitorHistorySearch.addEventListener("input", () => {
+      visitorHistoryQuery = getVisitorHistoryQuery();
+      renderVisitorHistoryView();
+    });
+  }
+
+  if (el.analyticsVisitorHistorySort && !el.analyticsVisitorHistorySort.dataset.bound) {
+    el.analyticsVisitorHistorySort.dataset.bound = "true";
+    el.analyticsVisitorHistorySort.addEventListener("change", () => {
+      visitorHistorySort = getVisitorHistorySort();
+      renderVisitorHistoryView();
+    });
+  }
+
+  if (el.analyticsVisitorHistoryList && !el.analyticsVisitorHistoryList.dataset.bound) {
+    el.analyticsVisitorHistoryList.dataset.bound = "true";
+    el.analyticsVisitorHistoryList.addEventListener("click", (event) => {
+      const row = event.target.closest(".analytics-visitor-list-row");
+      if (!row || !el.analyticsVisitorHistoryList.contains(row)) return;
+      selectedVisitorHistoryKey = row.dataset.visitorKey || "";
+      renderVisitorHistoryView();
+    });
+  }
+}
+
 function createAnalytics({ hideAllSections, setActiveNav }) {
   function renderReaderAnalyticsView() {
     renderReaderAnalytics(lastReaderPayload || {});
@@ -2284,6 +2488,9 @@ function createAnalytics({ hideAllSections, setActiveNav }) {
 
   // Initialize Reads Over Time controls
   initReadsOverTimeControls();
+
+  // Initialize Visitor History controls
+  initVisitorHistoryControls();
 
   // Initialize Reader Analytics tabs
   initReaderTabs();

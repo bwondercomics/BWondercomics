@@ -286,7 +286,10 @@ export const el = {
   analyticsEventsList: document.getElementById('analyticsEventsList'),
   analyticsVisitorHistoryStatus: document.getElementById('analyticsVisitorHistoryStatus'),
   analyticsVisitorHistoryMeta: document.getElementById('analyticsVisitorHistoryMeta'),
+  analyticsVisitorHistorySearch: /** @type {HTMLInputElement | null} */ (document.getElementById('analyticsVisitorHistorySearch')),
+  analyticsVisitorHistorySort: /** @type {HTMLSelectElement | null} */ (document.getElementById('analyticsVisitorHistorySort')),
   analyticsVisitorHistoryList: document.getElementById('analyticsVisitorHistoryList'),
+  analyticsVisitorHistoryDetail: document.getElementById('analyticsVisitorHistoryDetail'),
   // Reads Over Time chart
   readsOverTimeMode: /** @type {HTMLSelectElement | null} */ (document.getElementById('readsOverTimeMode')),
   readsOverTimeEntry: /** @type {HTMLSelectElement | null} */ (document.getElementById('readsOverTimeEntry')),

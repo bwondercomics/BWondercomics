@@ -816,10 +816,30 @@
               <div class="analytics-pages-title">Visitor History</div>
               <div class="analytics-reader-sub" style="margin-top: 4px;">Uses the sitewide range above.</div>
             </div>
+            <div class="analytics-pages-controls">
+              <label class="settings-label" for="analyticsVisitorHistorySearch">Search</label>
+              <input
+                id="analyticsVisitorHistorySearch"
+                class="form-input"
+                type="search"
+                placeholder="Visitor, path, referrer, issue..."
+                style="max-width: 220px;"
+              />
+              <label class="settings-label" for="analyticsVisitorHistorySort">Sort</label>
+              <select id="analyticsVisitorHistorySort" class="form-input">
+                <option value="recent" selected>Recent</option>
+                <option value="pages">Pages Read</option>
+                <option value="started">Issues Started</option>
+                <option value="finished">Issues Finished</option>
+              </select>
+            </div>
           </div>
           <div id="analyticsVisitorHistoryStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
           <div id="analyticsVisitorHistoryMeta" class="analytics-reader-sub" style="margin-top: 8px;"></div>
-          <div id="analyticsVisitorHistoryList" class="analytics-visitor-history-list"></div>
+          <div class="analytics-visitor-history-shell">
+            <div class="analytics-visitor-history-list" id="analyticsVisitorHistoryList"></div>
+            <div class="analytics-visitor-history-detail" id="analyticsVisitorHistoryDetail"></div>
+          </div>
         </div>
 
         <div class="analytics-reader">

@@ -212,8 +212,8 @@ function buildFetchStub(vi) {
       return jsonResponse({
         generatedAt: "2026-03-30T08:00:00Z",
         range: value.includes("range=30d") ? "30d" : "7d",
-        totalVisitors: 1,
-        returned: 1,
+        totalVisitors: 2,
+        returned: 2,
         visitors: [
           {
             visitorKey: "visitor-a",
@@ -238,6 +238,32 @@ function buildFetchStub(vi) {
                 maxPageReached: 6,
                 totalPages: 6,
                 finished: true,
+              },
+            ],
+          },
+          {
+            visitorKey: "guest-omega",
+            firstSeen: "2026-03-24T08:00:00Z",
+            lastSeen: "2026-03-24T09:15:00Z",
+            landingPage: "/campaign",
+            lastPath: "/reader/issue-12/3",
+            referrer: "newsletter",
+            country: "CA",
+            browser: "Safari",
+            device: "Tablet",
+            pagesRead: 9,
+            issuesStarted: 2,
+            issuesFinished: 0,
+            issues: [
+              {
+                seriesId: "battle-bros",
+                seriesTitle: "Battle Bros",
+                entryDisplayNumber: 12,
+                entryTitle: "Issue 12",
+                pagesRead: 9,
+                maxPageReached: 3,
+                totalPages: 6,
+                finished: false,
               },
             ],
           },
@@ -299,6 +325,8 @@ describe("admin analytics", () => {
     expect(document.getElementById("statUniqueVisitors")).not.toBeNull();
     expect(document.getElementById("analyticsLandingPagesList")).not.toBeNull();
     expect(document.getElementById("analyticsVisitorHistoryList")).not.toBeNull();
+    expect(document.getElementById("analyticsVisitorHistorySearch")).not.toBeNull();
+    expect(document.getElementById("analyticsVisitorHistoryDetail")).not.toBeNull();
   });
 
   it("renders pages-read summaries, ratio cards, and visitor history", async () => {
@@ -345,7 +373,13 @@ describe("admin analytics", () => {
       "visitor-a",
     );
     expect(document.getElementById("analyticsVisitorHistoryList")?.textContent).toContain(
+      "guest-omega",
+    );
+    expect(document.getElementById("analyticsVisitorHistoryDetail")?.textContent).toContain(
       "/landing",
+    );
+    expect(document.getElementById("analyticsVisitorHistoryDetail")?.textContent).toContain(
+      "Issue 10",
     );
     expect(document.getElementById("readsOverTimeTotals")?.textContent).toContain(
       "pages read",
@@ -404,5 +438,46 @@ describe("admin analytics", () => {
         && String(url).includes("metric=completion_rate"),
       ),
     ).toBe(true);
+  });
+
+  it("filters and selects visitor history rows without expanding the whole list", async () => {
+    vi.stubGlobal("fetch", buildFetchStub(vi));
+
+    const { createAnalytics } = await import("../admin/analytics.js");
+    const manager = createAnalytics({
+      hideAllSections: vi.fn(),
+      setActiveNav: vi.fn(),
+    });
+
+    manager.refreshAnalytics({ showLoading: false });
+    await flushAdminUi(5);
+
+    const search = document.getElementById("analyticsVisitorHistorySearch");
+    search.value = "omega";
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(document.getElementById("analyticsVisitorHistoryList")?.textContent).toContain(
+      "guest-omega",
+    );
+    expect(document.getElementById("analyticsVisitorHistoryList")?.textContent).not.toContain(
+      "visitor-a",
+    );
+
+    const listBodyBefore = document.querySelector(".analytics-visitor-list-body");
+    listBodyBefore.scrollTop = 123;
+
+    const row = document.querySelector(".analytics-visitor-list-row");
+    row.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushAdminUi(2);
+
+    const listBodyAfter = document.querySelector(".analytics-visitor-list-body");
+    expect(listBodyAfter.scrollTop).toBe(123);
+    expect(document.getElementById("analyticsVisitorHistoryDetail")?.textContent).toContain(
+      "/campaign",
+    );
+    expect(document.getElementById("analyticsVisitorHistoryDetail")?.textContent).toContain(
+      "Issue 12",
+    );
   });
 });
