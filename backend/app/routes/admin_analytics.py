@@ -145,6 +145,24 @@ def _parse_reader_entry_key(
     return key
 
 
+def _make_entry_key(series_id: str | None, display_num: int | None) -> str:
+    try:
+        return f"{str(series_id or '').strip()}:{int(display_num)}"
+    except (TypeError, ValueError):
+        return ""
+
+
+def _parse_entry_key(entry_key: str | None) -> tuple[str | None, int | None]:
+    raw = str(entry_key or "").strip()
+    if not raw or ":" not in raw:
+        return None, None
+    series_id, display_raw = raw.rsplit(":", 1)
+    try:
+        return series_id, int(display_raw)
+    except (TypeError, ValueError):
+        return None, None
+
+
 def _fetch_page_view_rows(
     umami_db: Session,
     start_time: datetime,
@@ -497,17 +515,33 @@ def admin_live_visitors(
 
     user_ids = {s.user_id for s in sessions if s.user_id}
     user_email_map = {}
+    user_display_map = {}
     if user_ids:
         for user in db.scalars(select(User).where(User.id.in_(user_ids))).all():
             user_email_map[user.id] = user.email
+            user_display_map[user.id] = user.display_name
 
     shaped = []
     for s in sessions:
+        duration_seconds = 0
+        if s.first_seen and s.last_seen:
+            duration_seconds = max(0, int((s.last_seen - s.first_seen).total_seconds()))
+        user_email = user_email_map.get(s.user_id) if s.user_id else None
+        user_display = user_display_map.get(s.user_id) if s.user_id else None
         shaped.append(
             {
                 "visitorId": s.visitor_id,
                 "userId": str(s.user_id) if s.user_id else None,
-                "userEmail": user_email_map.get(s.user_id) if s.user_id else None,
+                "userEmail": user_email,
+                "userDisplayName": user_display,
+                "user": (
+                    {
+                        "displayName": user_display or user_email or "Member",
+                        "email": user_email or "",
+                    }
+                    if s.user_id
+                    else None
+                ),
                 "path": s.path or "",
                 "title": s.title or "",
                 "origin": s.origin or "",
@@ -518,6 +552,7 @@ def admin_live_visitors(
                 "pageNumber": s.page_number,
                 "firstSeen": iso_z(s.first_seen),
                 "lastSeen": iso_z(s.last_seen),
+                "durationSeconds": duration_seconds,
                 "hitCount": int(s.hit_count or 0),
                 "entriesRead": list(s.entries_read or []),
                 "seriesRead": list(s.series_read or []),
@@ -528,6 +563,8 @@ def admin_live_visitors(
     return {
         "generatedAt": iso_z(now),
         "windowSeconds": window_seconds,
+        "activeCount": len(shaped),
+        "visitors": shaped,
         "total": len(shaped),
         "sessions": shaped,
     }
@@ -639,13 +676,15 @@ def _fetch_top_events(
 
     try:
         with get_umami_db() as umami_db:
+            visitor_key_expr = _umami_visitor_key_expr(umami_db)
             rows = umami_db.execute(
                 text(
                     f"""
                     SELECT
                         we.event_name,
-                        COUNT(*) AS event_count
+                        COUNT(DISTINCT {visitor_key_expr}) AS event_count
                     FROM website_event we
+                    LEFT JOIN session s ON we.session_id = s.session_id
                     WHERE we.event_name IS NOT NULL
                         AND we.event_name <> ''
                         AND we.created_at >= :start_time
@@ -695,7 +734,9 @@ def admin_visitor_analytics(
         referrers = fetch_umami_expanded_metrics(
             start_ms, end_ms, metric_type="referrer", limit=limit
         )
-        landing_pages = fetch_umami_expanded_metrics(start_ms, end_ms, metric_type="path", limit=limit)
+        landing_pages = fetch_umami_expanded_metrics(
+            start_ms, end_ms, metric_type="entry", limit=limit
+        )
         countries = fetch_umami_expanded_metrics(start_ms, end_ms, metric_type="country", limit=limit)
         browsers = fetch_umami_expanded_metrics(start_ms, end_ms, metric_type="browser", limit=limit)
         devices = fetch_umami_expanded_metrics(start_ms, end_ms, metric_type="device", limit=limit)
@@ -1016,6 +1057,7 @@ def admin_reader_analytics(
             {
                 "label": label,
                 "value": str(entry_stat["displayNumber"]),
+                "entryKey": _make_entry_key(sid, entry_stat["displayNumber"]),
                 "entryLabel": label,
                 "displayNumber": entry_stat["displayNumber"],
                 "count": page_views,
@@ -1030,6 +1072,7 @@ def admin_reader_analytics(
             {
                 "label": label,
                 "value": str(entry_stat["displayNumber"]),
+                "entryKey": _make_entry_key(sid, entry_stat["displayNumber"]),
                 "entryLabel": label,
                 "displayNumber": entry_stat["displayNumber"],
                 "count": round(finish_rate, 4),
@@ -1130,6 +1173,7 @@ def admin_reader_series_analytics(
     event: str = Query(""),
     prop: str = Query("", alias="property"),
     value: str = Query(""),
+    entry_key: str = Query("", alias="entry_key"),
     metric: str = Query("page_views"),
     points: int = Query(12, ge=1, le=100),
 ):
@@ -1140,6 +1184,7 @@ def admin_reader_series_analytics(
     event = event if isinstance(event, str) else ""
     prop = prop if isinstance(prop, str) else ""
     value = value if isinstance(value, str) else ""
+    entry_key = entry_key if isinstance(entry_key, str) else ""
     metric = metric if isinstance(metric, str) else "page_views"
     days = _range_to_days(time_range, days)
     now = datetime.now(timezone.utc)
@@ -1159,7 +1204,11 @@ def admin_reader_series_analytics(
 
     filter_series_id = None
     filter_display_num = None
-    if prop and value:
+    parsed_series_id, parsed_display_num = _parse_entry_key(entry_key)
+    if parsed_display_num is not None:
+        filter_series_id = parsed_series_id
+        filter_display_num = parsed_display_num
+    elif prop and value:
         normalized_value = value.strip()
         if prop == "entryLabel":
             if normalized_value.isdigit():
@@ -1295,6 +1344,7 @@ def admin_reads_over_time(
     db: Session = Depends(get_db),
     time_range: str = Query("7d", alias="range"),
     entry_id: str = Query(None),
+    entry_key: str = Query(None, alias="entry_key"),
     series_id: str = Query(None),
 ):
     """Daily read counts for time-series chart. Supports aggregate or per-entry view."""
@@ -1302,18 +1352,28 @@ def admin_reads_over_time(
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     entry_id = entry_id if isinstance(entry_id, str) else None
+    entry_key = entry_key if isinstance(entry_key, str) else None
     series_id = series_id if isinstance(series_id, str) else None
     days = _range_to_days(time_range, 7)
     now = datetime.now(timezone.utc)
     start = now - timedelta(days=days)
     website_id = _get_umami_website_id()
-    _entry_lookup, empty_entry_keys = _build_entry_lookup(db)
+    entry_lookup, empty_entry_keys = _build_entry_lookup(db)
 
     mode = "aggregate"
     entry_label_filter = None
+    selected_entry_key = None
     target_display_num = None
+    target_series_id = None
 
-    if entry_id and entry_id != "aggregate":
+    parsed_series_id, parsed_display_num = _parse_entry_key(entry_key)
+    if entry_key and entry_key != "aggregate" and parsed_display_num is not None:
+        mode = "entry"
+        entry_label_filter = entry_key
+        selected_entry_key = entry_key
+        target_display_num = parsed_display_num
+        target_series_id = parsed_series_id
+    elif entry_id and entry_id != "aggregate":
         mode = "entry"
         entry_label_filter = entry_id
         if entry_id.isdigit():
@@ -1336,6 +1396,8 @@ def admin_reads_over_time(
 
                 if series_id and entry_series_id != series_id:
                     continue
+                if target_series_id and entry_series_id != target_series_id:
+                    continue
                 if mode == "entry" and target_display_num is not None and display_num != target_display_num:
                     continue
 
@@ -1352,6 +1414,7 @@ def admin_reads_over_time(
             "range": time_range,
             "mode": mode,
             "entryLabel": entry_label_filter,
+            "entryKey": selected_entry_key,
             "error": f"Umami query failed: {str(e)}",
             "series": [],
             "totals": {"reads": 0, "uniqueVisitors": 0},
@@ -1386,6 +1449,7 @@ def admin_reads_over_time(
         "range": time_range,
         "mode": mode,
         "entryLabel": entry_label_filter,
+        "entryKey": selected_entry_key,
         "series": series,
         "totals": {
             "reads": total_reads,
@@ -1418,7 +1482,7 @@ def admin_weekly_digest(
 
     website_id = _get_umami_website_id()
     website_filter, website_params = _umami_website_filter(website_id)
-    _entry_lookup, empty_entry_keys = _build_entry_lookup(db)
+    entry_lookup, empty_entry_keys = _build_entry_lookup(db)
 
     def calculate_period_stats_umami(start_dt: datetime, end_dt: datetime) -> dict:
         try:

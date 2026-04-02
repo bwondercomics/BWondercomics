@@ -97,7 +97,7 @@ Goal: the control room feels real and reliable.
 ### Analytics revamp
 - [x] Fix analytics data pipeline (tracking → rollups → display). *(Working as of Jan 2026)*
 - [x] Ignore zero-page entries in Reader Analytics (click-only entries no longer show reads).
-- [ ] Revamp analytics UX to surface actionable insights (retention, drop-off points, popular entries).
+- [ ] Revamp analytics UX to surface actionable insights (retention, deeper session summaries, stronger recommendations). *(Moderate cleanup landed 2026-04-02: section hierarchy, landing-entry metrics, top events by visitors, visitor-history readability, series-safe drilldowns.)*
 - [ ] Add retention + session summary metrics with clear definitions.
 - [x] Consider time-based comparisons (this week vs last week). *(Reader analytics shows Δ vs previous window; verified 2026-01-21)*
 - [x] Make sure everything works in analytics, and it actually records visitor views. *(Page reads now use raw reader page views; visitor history + ratio drilldowns verified 2026-04-02.)*

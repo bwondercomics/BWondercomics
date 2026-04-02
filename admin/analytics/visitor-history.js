@@ -159,16 +159,20 @@ function createVisitorHistoryAnalytics() {
           <div class="analytics-visitor-detail-lastseen">${escapeHtml(formatTimeAgo(visitor?.lastSeen))}</div>
         </div>
         <div class="analytics-visitor-detail-metrics">
-          <span>${formatStat(visitor?.pagesRead)} pages</span>
-          <span>${formatStat(visitor?.issuesStarted)} issues</span>
-          <span>${formatStat(visitor?.issuesFinished)} finished</span>
+          <span>${formatStat(visitor?.pagesRead)} pages read</span>
+          <span>${formatStat(visitor?.issuesStarted)} issues started</span>
+          <span>${formatStat(visitor?.issuesFinished)} issues finished</span>
         </div>
         <div class="analytics-visitor-fields">
+          <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Visitor Key</span><span>${escapeHtml(visitor?.visitorKey || "—")}</span></div>
           <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">First Seen</span><span>${escapeHtml(formatDateTime(visitor?.firstSeen))}</span></div>
           <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Last Seen</span><span>${escapeHtml(formatDateTime(visitor?.lastSeen))}</span></div>
           <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Landing Page</span><span>${escapeHtml(visitor?.landingPage || "—")}</span></div>
           <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Last Path</span><span>${escapeHtml(visitor?.lastPath || "—")}</span></div>
           <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Referrer</span><span>${escapeHtml(visitor?.referrer || "Direct")}</span></div>
+          <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Country</span><span>${escapeHtml(visitor?.country || "—")}</span></div>
+          <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Browser</span><span>${escapeHtml(visitor?.browser || "—")}</span></div>
+          <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Device</span><span>${escapeHtml(visitor?.device || "—")}</span></div>
         </div>
         <div class="analytics-visitor-detail-section">
           <div class="analytics-visitor-detail-title">Issue History</div>
@@ -218,7 +222,7 @@ function createVisitorHistoryAnalytics() {
     const selectedVisitor = getSelectedVisitor(visitors);
     el.analyticsVisitorHistoryList.innerHTML = `
       <div class="analytics-visitor-list-head">
-        <span>Visitor</span>
+        <span>Recent Path</span>
         <span>Last Seen</span>
         <span>Source</span>
         <span>Activity</span>
@@ -227,6 +231,15 @@ function createVisitorHistoryAnalytics() {
         ${visitors
           .map((visitor) => {
             const visitorKey = String(visitor?.visitorKey || "");
+            const contextBits = [
+              visitor?.referrer || "Direct",
+              visitor?.landingPage && visitor?.landingPage !== visitor?.lastPath
+                ? `Landing ${visitor.landingPage}`
+                : "",
+              `ID ${formatVisitorKey(visitorKey)}`,
+            ]
+              .filter(Boolean)
+              .join(" · ");
             const sourceBits = [
               visitor?.country || "",
               visitor?.browser || "",
@@ -234,7 +247,7 @@ function createVisitorHistoryAnalytics() {
             ]
               .filter(Boolean)
               .join(" · ");
-            const subLine = visitor?.lastPath || visitor?.landingPage || "No path recorded";
+            const primaryPath = visitor?.lastPath || visitor?.landingPage || "No path recorded";
             const isActive = visitorKey === selectedVisitorHistoryKey;
             return `
               <button
@@ -243,8 +256,8 @@ function createVisitorHistoryAnalytics() {
                 data-visitor-key="${escapeHtml(visitorKey)}"
               >
                 <span class="analytics-visitor-list-col analytics-visitor-list-col--identity">
-                  <span class="analytics-visitor-list-title" title="${escapeHtml(visitorKey)}">${escapeHtml(formatVisitorKey(visitorKey))}</span>
-                  <span class="analytics-visitor-list-sub" title="${escapeHtml(subLine)}">${escapeHtml(subLine)}</span>
+                  <span class="analytics-visitor-list-title" title="${escapeHtml(primaryPath)}">${escapeHtml(primaryPath)}</span>
+                  <span class="analytics-visitor-list-sub" title="${escapeHtml(contextBits)}">${escapeHtml(contextBits)}</span>
                 </span>
                 <span class="analytics-visitor-list-col analytics-visitor-list-col--last" title="${escapeHtml(formatDateTime(visitor?.lastSeen))}">
                   ${escapeHtml(formatTimeAgo(visitor?.lastSeen))}
@@ -253,9 +266,9 @@ function createVisitorHistoryAnalytics() {
                   ${escapeHtml(sourceBits || visitor?.referrer || "Direct")}
                 </span>
                 <span class="analytics-visitor-list-col analytics-visitor-list-col--activity">
-                  <span class="analytics-visitor-pill">${formatStat(visitor?.pagesRead)}p</span>
-                  <span class="analytics-visitor-pill">${formatStat(visitor?.issuesStarted)}i</span>
-                  <span class="analytics-visitor-pill">${formatStat(visitor?.issuesFinished)}f</span>
+                  <span class="analytics-visitor-pill">${formatStat(visitor?.pagesRead)} pages</span>
+                  <span class="analytics-visitor-pill">${formatStat(visitor?.issuesStarted)} started</span>
+                  <span class="analytics-visitor-pill">${formatStat(visitor?.issuesFinished)} finished</span>
                 </span>
               </button>
             `;

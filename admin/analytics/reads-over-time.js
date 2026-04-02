@@ -9,6 +9,15 @@ const READS_OVER_TIME_ENDPOINT = "/api/admin/analytics/reads-over-time";
 function createReadsOverTimeAnalytics() {
   let readsOverTimeData = [];
 
+  function syncReadsOverTimeEntryVisibility(mode) {
+    const shell = document.getElementById("readsOverTimeEntryShell");
+    if (!shell || !el.readsOverTimeEntry) return;
+    const isEntryMode = mode === "entry";
+    shell.classList.toggle("is-hidden", !isEntryMode);
+    el.readsOverTimeEntry.disabled = !isEntryMode;
+    shell.setAttribute("aria-hidden", isEntryMode ? "false" : "true");
+  }
+
   function getReadsOverTimeRange() {
     return (el.readsOverTimeRange?.value || "7d").trim();
   }
@@ -34,23 +43,41 @@ function createReadsOverTimeAnalytics() {
     const validEntries = entryViews
       .filter((item) => item?.displayNumber != null)
       .slice(0, 50);
+    const duplicateDisplayNumbers = new Map();
+    const duplicateLabels = new Map();
+    validEntries.forEach((item) => {
+      const displayKey = String(item?.displayNumber ?? "");
+      duplicateDisplayNumbers.set(
+        displayKey,
+        (duplicateDisplayNumbers.get(displayKey) || 0) + 1,
+      );
+      const label = String(item?.label || `Entry ${item?.displayNumber ?? ""}`);
+      duplicateLabels.set(label, (duplicateLabels.get(label) || 0) + 1);
+    });
 
     const current = getReadsOverTimeEntry();
     el.readsOverTimeEntry.innerHTML = "";
 
     validEntries.forEach((item) => {
       const option = document.createElement("option");
-      option.value = String(item.displayNumber);
-      const label = item.label || `Entry ${item.displayNumber}`;
-      option.textContent = label.length > 25 ? `${label.slice(0, 25)}…` : label;
+      option.value = String(item.entryKey || item.displayNumber);
+      const baseLabel = item.label || `Entry ${item.displayNumber}`;
+      const needsSeriesContext =
+        (duplicateDisplayNumbers.get(String(item.displayNumber)) || 0) > 1 ||
+        (duplicateLabels.get(baseLabel) || 0) > 1;
+      const label = needsSeriesContext && item.seriesTitle
+        ? `${item.seriesTitle} · ${baseLabel}`
+        : baseLabel;
+      option.title = label;
+      option.textContent = label.length > 38 ? `${label.slice(0, 38)}…` : label;
       el.readsOverTimeEntry.appendChild(option);
     });
 
-    const validValues = validEntries.map((item) => String(item.displayNumber));
+    const validValues = validEntries.map((item) => String(item.entryKey || item.displayNumber));
     if (current && validValues.includes(current)) {
       el.readsOverTimeEntry.value = current;
     } else if (validEntries.length) {
-      el.readsOverTimeEntry.value = String(validEntries[0].displayNumber);
+      el.readsOverTimeEntry.value = String(validEntries[0].entryKey || validEntries[0].displayNumber);
     }
   }
 
@@ -181,13 +208,13 @@ function createReadsOverTimeAnalytics() {
     const range = getReadsOverTimeRange();
     const mode = getReadsOverTimeMode();
     const entryId = mode === "entry" ? getReadsOverTimeEntry() : null;
-
-    if (el.readsOverTimeEntry) {
-      el.readsOverTimeEntry.style.display = mode === "entry" ? "inline-block" : "none";
-    }
+    syncReadsOverTimeEntryVisibility(mode);
 
     const params = new URLSearchParams({ range });
-    if (entryId) params.append("entry_id", entryId);
+    if (entryId) {
+      if (entryId.includes(":")) params.append("entry_key", entryId);
+      else params.append("entry_id", entryId);
+    }
 
     if (showLoading) setReadsOverTimeStatus("Loading pages-read chart…");
 
@@ -228,6 +255,8 @@ function createReadsOverTimeAnalytics() {
   }
 
   function initReadsOverTimeControls() {
+    syncReadsOverTimeEntryVisibility(getReadsOverTimeMode());
+
     if (el.readsOverTimeRange) {
       el.readsOverTimeRange.addEventListener("change", () => {
         loadReadsOverTime({ showLoading: true });

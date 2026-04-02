@@ -1,6 +1,6 @@
 # Reader Analytics Redesign Plan
 
-Status: partially implemented in admin as of April 2026.
+Status: largely implemented in admin as of April 2026, with a final audit/correction pass completed on 2026-04-02.
 
 ## User Goals
 - **Primary**: Quick answer to "Is my content performing well?"
@@ -9,7 +9,7 @@ Status: partially implemented in admin as of April 2026.
 ## Current State
 The analytics dashboard currently shows:
 - Summary cards: `Pages Read`, `Entry Starts`, `Start-to-Finish Rate`, `Unique Visitors`
-- Sitewide traffic panels: `Page Reads`, landing pages, referrers, countries, browsers, devices, top events
+- Sitewide traffic panels: `Page Reads`, landing pages, referrers, countries, browsers, devices, top events by visitors
 - `Pages Read Over Time`: line chart using raw `reader_page_view` totals
 - Reader tabs:
   - `Pages Read`
@@ -23,8 +23,14 @@ The analytics dashboard currently shows:
 - Reader reads were redefined to page views where the UI says `Pages Read`.
 - Raw finish lists were replaced by rate lists using unique starts vs unique finishes.
 - Ratio drilldowns now use `/api/admin/analytics/reader-series?metric=completion_rate`.
+- Entry drilldowns and per-entry reads-over-time now use `entryKey = "<seriesId>:<displayNumber>"` so duplicate issue numbers across series do not collide.
 - Historical visitor inspection is available without mixing it into the live visitor panel.
 - Frontend analytics code is now split into focused modules under `admin/analytics/`, with `admin/analytics.js` kept as the facade used by `admin/app.js`.
+- `Top Landing Pages` now uses true landing-entry metrics from Umami `entry`.
+- `Top Events` now means unique visitors per event across both the Umami API path and the DB fallback.
+- The analytics page now has stronger section hierarchy: `Site Traffic`, `Visitor History`, `Reader Engagement`.
+- Visitor history rows are path-first with readable activity chips instead of shorthand counters.
+- Reads-over-time keeps space reserved for the per-entry selector so the control row does not jump when switching modes.
 
 ### Still future work
 - Retention/cohort analysis
@@ -205,12 +211,18 @@ Concern: #ef4444 (red-500)
 
 ## Frontend Architecture (Current)
 - `admin/analytics.js` - Thin coordinator/facade exposing `createAnalytics()`
-- `admin/analytics/traffic.js` - Summary, page reads, landing pages, referrers, countries, browsers, devices, top events
+- `admin/analytics/traffic.js` - Summary, page reads, landing-entry panels, referrers, countries, browsers, devices, top events by visitors
 - `admin/analytics/reader.js` - Health indicator, reader summary, reader cards, filters, drilldowns, weekly digest fetch
 - `admin/analytics/reads-over-time.js` - Pages-read chart and controls
 - `admin/analytics/visitor-history.js` - Search/sort + master-detail visitor history
 - `admin/analytics/live.js` - Live visitors polling, ticker, and chart
 - `admin/analytics/shared.js` - Shared pure formatters/helpers
+
+## Current Contract Notes
+- `GET /api/admin/analytics/live` now returns `activeCount` + `visitors` as the primary frontend contract, while still exposing `total` + `sessions` as temporary compatibility aliases.
+- `GET /api/admin/analytics/reader` adds `entryKey` to entry-ranked payloads.
+- `GET /api/admin/analytics/reads-over-time` and `GET /api/admin/analytics/reader-series` accept `entry_key`.
+- `GET /api/admin/analytics/visitors` returns landing pages from Umami `entry`, and top-event counts represent unique visitors rather than raw event hits.
 
 ## Files to Modify for Future Analytics UI Work
 - `admin/index.html` - Restructure analytics section HTML when layout changes are needed

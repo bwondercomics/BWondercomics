@@ -235,9 +235,13 @@ Admin analytics is now split into three layers:
 - Reader tabs now show:
   - `Pages Read`
   - `Start-to-Finish Rate`
-- Drilldowns on rate cards call `/api/admin/analytics/reader-series?metric=completion_rate`.
+- Entry-specific analytics are series-safe through `entryKey = "<seriesId>:<displayNumber>"`.
+- Drilldowns on rate cards call `/api/admin/analytics/reader-series?metric=completion_rate&entry_key=...`.
 - The old stop/drop-off panel is removed from admin UI.
-- A new `Visitor History` panel shows per-visitor metadata plus issue progress/finished state for the selected sitewide range.
+- `Top Landing Pages` now uses Umami `entry` metrics, not generic `path` metrics.
+- `Top Events by Visitors` uses unique-visitor counts consistently, including the DB fallback path.
+- A new `Visitor History` panel shows per-visitor metadata plus issue progress/finished state for the selected sitewide range. The list is now path-first and keeps the opaque visitor key in the detail pane.
+- The analytics page is visually grouped into `Site Traffic`, `Visitor History`, and `Reader Engagement`.
 
 ### Frontend module layout
 - `admin/analytics.js` is now a thin facade/coordinator that still exports `createAnalytics()`.
@@ -254,13 +258,22 @@ Admin analytics is now split into three layers:
 - `GET /api/admin/analytics/reader`
   - Returns `entryReadsTotal`, `entryStartsTotal`, `entryFinishesTotal`, `finishRate`, `uniqueVisitors`
   - Ranked lists: `entryViews`, `entryRates`, `seriesViews`, `seriesRates`
+  - Entry-level lists include `entryKey`
 - `GET /api/admin/analytics/reads-over-time`
   - `totals.reads` and `series[*].count` are raw page-view totals
+  - Accepts `entry_key` for series-safe per-entry filtering
 - `GET /api/admin/analytics/reader-series`
   - `metric=page_views` → raw page-view buckets
   - `metric=completion_rate` → bucketed `starts`, `finishes`, `completionRate`
+  - Accepts `entry_key` and prefers it over legacy numeric-only entry filters
 - `GET /api/admin/analytics/visitor-history`
   - Range-based historical visitor table from Umami
+- `GET /api/admin/analytics/visitors`
+  - `landingPages` comes from Umami `entry`
+  - `events[*].count` is unique visitors per event
+- `GET /api/admin/analytics/live`
+  - Normalized contract is `generatedAt`, `windowSeconds`, `activeCount`, `visitors`
+  - Compatibility aliases `total` and `sessions` are still returned for one pass
 
 ### Identity + matching rules
 - **Titles are display-only.** Entry identification must use `(series_id, display_number)`, never title string matching.

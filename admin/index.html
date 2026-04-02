@@ -674,7 +674,7 @@
       <!-- Analytics Section -->
       <section class="section" id="analyticsSection" style="display: none;">
         <h2 class="section-title">Analytics</h2>
-        <p style="font-size: 0.9rem; opacity: 0.85; margin-bottom: 12px;">
+        <p class="analytics-note">
           Umami page view counts fetched via API (no embedded dashboard).
         </p>
         <div class="analytics-actions">
@@ -686,221 +686,262 @@
           <div id="analyticsStatus" class="success-message" style="display: none; margin: 0;"></div>
         </div>
 
-        <!-- Health Indicator -->
-        <div class="analytics-health" id="analyticsHealth">
-          <div class="analytics-health-header">
-            <div class="analytics-health-dot neutral" id="healthDot"></div>
-            <div class="analytics-health-title" id="healthTitle">Checking content health...</div>
-          </div>
-          <div class="analytics-health-summary" id="healthSummary">Analyzing your reader engagement data.</div>
-        </div>
-
-        <div class="analytics-grid">
-          <div class="analytics-card">
-            <div class="analytics-label">Pageviews (24h)</div>
-            <div class="analytics-value" id="statViews24h">—</div>
-            <div class="analytics-sub">Visitors <span id="statVisitors24h">—</span></div>
-          </div>
-          <div class="analytics-card">
-            <div class="analytics-label">Pageviews (7d)</div>
-            <div class="analytics-value" id="statViews7d">—</div>
-            <div class="analytics-sub">Visitors <span id="statVisitors7d">—</span></div>
-          </div>
-        </div>
-        <div class="analytics-grid analytics-grid--compact" style="margin-top: 14px;">
-          <div class="analytics-card">
-            <div class="analytics-label">Pages Read</div>
-            <div class="analytics-value"><span id="statEntryReads">—</span> <span id="statEntryReadsTrend" class="analytics-trend"></span></div>
-          </div>
-          <div class="analytics-card">
-            <div class="analytics-label">Entry Starts</div>
-            <div class="analytics-value"><span id="statEntryStarts">—</span> <span id="statEntryStartsTrend" class="analytics-trend"></span></div>
-          </div>
-          <div class="analytics-card">
-            <div class="analytics-label">Start-to-Finish Rate</div>
-            <div class="analytics-value"><span id="statFinishRate">—</span> <span id="statFinishRateTrend" class="analytics-trend"></span></div>
-          </div>
-          <div class="analytics-card">
-            <div class="analytics-label">Unique Visitors</div>
-            <div class="analytics-value" id="statUniqueVisitors">—</div>
-          </div>
-        </div>
-        <div class="analytics-pages">
-          <div class="analytics-pages-header">
-            <div class="analytics-pages-title">Page Reads</div>
-            <div class="analytics-pages-controls">
-              <label class="settings-label" for="analyticsPagesRange">Range</label>
-              <select id="analyticsPagesRange" class="form-input">
-                <option value="24h">Last 24h</option>
-                <option value="7d" selected>Last 7d</option>
-                <option value="30d">Last 30d</option>
-              </select>
-            </div>
-          </div>
-          <div id="analyticsPagesStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
-          <div id="analyticsPagesList" class="analytics-pages-list"></div>
-        </div>
-
-        <!-- NEW: Referrers & Events -->
-        <div class="analytics-traffic"
-          style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 24px; margin-bottom: 24px;">
-          <div class="analytics-pages">
-            <div class="analytics-pages-header">
-              <div class="analytics-pages-title">Top Landing Pages</div>
-            </div>
-            <div id="analyticsLandingPagesList" class="analytics-pages-list" style="min-height: 150px;"></div>
-          </div>
-          <div class="analytics-pages">
-            <div class="analytics-pages-header">
-              <div class="analytics-pages-title">Top Referrers</div>
-            </div>
-            <div id="analyticsReferrersList" class="analytics-pages-list" style="min-height: 150px;"></div>
-          </div>
-          <div class="analytics-pages">
-            <div class="analytics-pages-header">
-              <div class="analytics-pages-title">Countries</div>
-            </div>
-            <div id="analyticsCountriesList" class="analytics-pages-list" style="min-height: 150px;"></div>
-          </div>
-          <div class="analytics-pages">
-            <div class="analytics-pages-header">
-              <div class="analytics-pages-title">Browsers</div>
-            </div>
-            <div id="analyticsBrowsersList" class="analytics-pages-list" style="min-height: 150px;"></div>
-          </div>
-          <div class="analytics-pages">
-            <div class="analytics-pages-header">
-              <div class="analytics-pages-title">Devices</div>
-            </div>
-            <div id="analyticsDevicesList" class="analytics-pages-list" style="min-height: 150px;"></div>
-          </div>
-          <div class="analytics-pages">
-            <div class="analytics-pages-header">
-              <div class="analytics-pages-title">Top Events</div>
-            </div>
-            <div id="analyticsEventsList" class="analytics-pages-list" style="min-height: 150px;"></div>
-          </div>
-        </div>
-
-        <!-- Reads Over Time Chart -->
-        <div class="analytics-reads-over-time" style="margin-top: 24px; margin-bottom: 24px;">
-          <div class="analytics-pages-header">
-            <div class="analytics-pages-title">Pages Read Over Time</div>
-            <div class="analytics-pages-controls">
-              <label class="settings-label" for="readsOverTimeMode">View</label>
-              <select id="readsOverTimeMode" class="form-input">
-                <option value="aggregate" selected>Aggregate</option>
-                <option value="entry">Per Entry</option>
-              </select>
-              <select id="readsOverTimeEntry" class="form-input" style="display: none; max-width: 180px;">
-                <!-- Populated dynamically -->
-              </select>
-              <label class="settings-label" for="readsOverTimeRange">Range</label>
-              <select id="readsOverTimeRange" class="form-input">
-                <option value="7d" selected>Last 7d</option>
-                <option value="30d">Last 30d</option>
-                <option value="90d">Last 90d</option>
-              </select>
-            </div>
-          </div>
-          <div id="readsOverTimeStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
-          <div class="reads-over-time-chart" style="margin-top: 12px;">
-            <canvas id="readsOverTimeCanvas" style="width: 100%; height: 180px;"></canvas>
-          </div>
-          <div class="reads-over-time-totals" id="readsOverTimeTotals" style="margin-top: 8px; font-size: 0.8rem; opacity: 0.8;"></div>
-        </div>
-
-        <div class="analytics-pages analytics-visitor-history" style="margin-top: 24px; margin-bottom: 24px;">
-          <div class="analytics-pages-header">
+        <div class="analytics-section-block analytics-section-block--traffic">
+          <div class="analytics-section-header">
             <div>
-              <div class="analytics-pages-title">Visitor History</div>
-              <div class="analytics-reader-sub" style="margin-top: 4px;">Uses the sitewide range above.</div>
-            </div>
-            <div class="analytics-pages-controls">
-              <label class="settings-label" for="analyticsVisitorHistorySearch">Search</label>
-              <input
-                id="analyticsVisitorHistorySearch"
-                class="form-input"
-                type="search"
-                placeholder="Visitor, path, referrer, issue..."
-                style="max-width: 220px;"
-              />
-              <label class="settings-label" for="analyticsVisitorHistorySort">Sort</label>
-              <select id="analyticsVisitorHistorySort" class="form-input">
-                <option value="recent" selected>Recent</option>
-                <option value="pages">Pages Read</option>
-                <option value="started">Issues Started</option>
-                <option value="finished">Issues Finished</option>
-              </select>
+              <div class="analytics-section-kicker">Site Traffic</div>
+              <div class="analytics-section-copy">Sitewide range powers page reads, landing pages, referrers, geography, browsers, devices, and event visitors.</div>
             </div>
           </div>
-          <div id="analyticsVisitorHistoryStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
-          <div id="analyticsVisitorHistoryMeta" class="analytics-reader-sub" style="margin-top: 8px;"></div>
-          <div class="analytics-visitor-history-shell">
-            <div class="analytics-visitor-history-list" id="analyticsVisitorHistoryList"></div>
-            <div class="analytics-visitor-history-detail" id="analyticsVisitorHistoryDetail"></div>
+
+          <div class="analytics-grid">
+            <div class="analytics-card">
+              <div class="analytics-label">Pageviews (24h)</div>
+              <div class="analytics-value" id="statViews24h">—</div>
+              <div class="analytics-sub">Visitors <span id="statVisitors24h">—</span></div>
+            </div>
+            <div class="analytics-card">
+              <div class="analytics-label">Pageviews (7d)</div>
+              <div class="analytics-value" id="statViews7d">—</div>
+              <div class="analytics-sub">Visitors <span id="statVisitors7d">—</span></div>
+            </div>
+          </div>
+
+          <div class="analytics-pages">
+            <div class="analytics-pages-header">
+              <div class="analytics-pages-title">Page Reads</div>
+              <div class="analytics-pages-controls">
+                <label class="settings-label" for="analyticsPagesRange">Range</label>
+                <select id="analyticsPagesRange" class="form-input">
+                  <option value="24h">Last 24h</option>
+                  <option value="7d" selected>Last 7d</option>
+                  <option value="30d">Last 30d</option>
+                </select>
+              </div>
+            </div>
+            <div id="analyticsPagesStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
+            <div id="analyticsPagesList" class="analytics-pages-list"></div>
+          </div>
+
+          <div class="analytics-traffic-grid">
+            <div class="analytics-pages analytics-panel-min">
+              <div class="analytics-pages-header">
+                <div>
+                  <div class="analytics-pages-title">Top Landing Pages</div>
+                  <div class="analytics-pages-note">Ranked by visitors entering the site.</div>
+                </div>
+              </div>
+              <div id="analyticsLandingPagesList" class="analytics-pages-list analytics-pages-list--metric"></div>
+            </div>
+            <div class="analytics-pages analytics-panel-min">
+              <div class="analytics-pages-header">
+                <div>
+                  <div class="analytics-pages-title">Top Referrers</div>
+                  <div class="analytics-pages-note">Ranked by unique visitors.</div>
+                </div>
+              </div>
+              <div id="analyticsReferrersList" class="analytics-pages-list analytics-pages-list--metric"></div>
+            </div>
+            <div class="analytics-pages analytics-panel-min">
+              <div class="analytics-pages-header">
+                <div>
+                  <div class="analytics-pages-title">Countries</div>
+                  <div class="analytics-pages-note">Ranked by unique visitors.</div>
+                </div>
+              </div>
+              <div id="analyticsCountriesList" class="analytics-pages-list analytics-pages-list--metric"></div>
+            </div>
+            <div class="analytics-pages analytics-panel-min">
+              <div class="analytics-pages-header">
+                <div>
+                  <div class="analytics-pages-title">Browsers</div>
+                  <div class="analytics-pages-note">Ranked by unique visitors.</div>
+                </div>
+              </div>
+              <div id="analyticsBrowsersList" class="analytics-pages-list analytics-pages-list--metric"></div>
+            </div>
+            <div class="analytics-pages analytics-panel-min">
+              <div class="analytics-pages-header">
+                <div>
+                  <div class="analytics-pages-title">Devices</div>
+                  <div class="analytics-pages-note">Ranked by unique visitors.</div>
+                </div>
+              </div>
+              <div id="analyticsDevicesList" class="analytics-pages-list analytics-pages-list--metric"></div>
+            </div>
+            <div class="analytics-pages analytics-panel-min">
+              <div class="analytics-pages-header">
+                <div>
+                  <div class="analytics-pages-title">Top Events by Visitors</div>
+                  <div class="analytics-pages-note">Unique visitors who triggered each event.</div>
+                </div>
+              </div>
+              <div id="analyticsEventsList" class="analytics-pages-list analytics-pages-list--metric"></div>
+            </div>
           </div>
         </div>
 
-        <div class="analytics-reader">
-          <div class="analytics-pages-header">
-            <div class="analytics-pages-title">Reader Analytics</div>
-            <div class="analytics-pages-controls">
-              <label class="settings-label" for="analyticsReaderSeries">Series</label>
-              <select id="analyticsReaderSeries" class="form-input">
-                <option value="all" selected>All series</option>
-              </select>
-              <label class="settings-label" for="analyticsReaderRange">Range</label>
-              <select id="analyticsReaderRange" class="form-input">
-                <option value="24h">Last 24h</option>
-                <option value="7d" selected>Last 7d</option>
-                <option value="30d">Last 30d</option>
-              </select>
-            </div>
-          </div>
-          <div id="analyticsReaderStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
-
-          <!-- Insight sentence -->
-          <div id="analyticsInsight" class="analytics-insight"></div>
-
-          <!-- Tab buttons -->
-          <div class="analytics-tabs">
-            <button class="analytics-tab active" data-tab="entry">Entry Performance</button>
-            <button class="analytics-tab" data-tab="series">Series Performance</button>
-          </div>
-
-          <!-- Entry Performance tab content -->
-          <div id="tabEntry" class="analytics-tab-content active">
-            <div class="analytics-reader-grid analytics-reader-grid--2col">
-              <div class="analytics-reader-card">
-                <div class="analytics-reader-heading">
-                  <div class="analytics-reader-title">Pages Read</div>
-                </div>
-                <div id="analyticsEntryReads"></div>
-              </div>
-              <div class="analytics-reader-card">
-                <div class="analytics-reader-heading">
-                  <div class="analytics-reader-title">Start-to-Finish Rate</div>
-                </div>
-                <div id="analyticsEntryRates"></div>
-              </div>
+        <div class="analytics-section-block analytics-section-block--history">
+          <div class="analytics-section-header">
+            <div>
+              <div class="analytics-section-kicker">Visitor History</div>
+              <div class="analytics-section-copy">Inspect individual visitor sessions, their source context, the pages they read, and which issues they finished.</div>
             </div>
           </div>
 
-          <!-- Series Performance tab content -->
-          <div id="tabSeries" class="analytics-tab-content">
-            <div class="analytics-reader-grid analytics-reader-grid--2col">
-              <div class="analytics-reader-card">
-                <div class="analytics-reader-heading">
-                  <div class="analytics-reader-title">Series Pages Read</div>
-                </div>
-                <div id="analyticsSeriesReads"></div>
+          <div class="analytics-pages analytics-visitor-history">
+            <div class="analytics-pages-header">
+              <div>
+                <div class="analytics-pages-title">Visitor History</div>
+                <div class="analytics-reader-sub analytics-reader-sub--tight">Uses the sitewide range above.</div>
               </div>
-              <div class="analytics-reader-card">
-                <div class="analytics-reader-heading">
-                  <div class="analytics-reader-title">Series Start-to-Finish Rate</div>
+              <div class="analytics-pages-controls">
+                <label class="settings-label" for="analyticsVisitorHistorySearch">Search</label>
+                <input
+                  id="analyticsVisitorHistorySearch"
+                  class="form-input analytics-visitor-history-search"
+                  type="search"
+                  placeholder="Visitor, path, referrer, issue..."
+                />
+                <label class="settings-label" for="analyticsVisitorHistorySort">Sort</label>
+                <select id="analyticsVisitorHistorySort" class="form-input">
+                  <option value="recent" selected>Recent</option>
+                  <option value="pages">Pages Read</option>
+                  <option value="started">Issues Started</option>
+                  <option value="finished">Issues Finished</option>
+                </select>
+              </div>
+            </div>
+            <div id="analyticsVisitorHistoryStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
+            <div id="analyticsVisitorHistoryMeta" class="analytics-reader-sub analytics-reader-sub--tight"></div>
+            <div class="analytics-visitor-history-shell">
+              <div class="analytics-visitor-history-list" id="analyticsVisitorHistoryList"></div>
+              <div class="analytics-visitor-history-detail" id="analyticsVisitorHistoryDetail"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="analytics-section-block analytics-section-block--reader">
+          <div class="analytics-section-header">
+            <div>
+              <div class="analytics-section-kicker">Reader Engagement</div>
+              <div class="analytics-section-copy">Track page-read volume, issue starts, completion rate, and how performance changes across entries and series.</div>
+            </div>
+          </div>
+
+          <div class="analytics-health" id="analyticsHealth">
+            <div class="analytics-health-header">
+              <div class="analytics-health-dot neutral" id="healthDot"></div>
+              <div class="analytics-health-title" id="healthTitle">Checking content health...</div>
+            </div>
+            <div class="analytics-health-summary" id="healthSummary">Analyzing your reader engagement data.</div>
+          </div>
+
+          <div class="analytics-grid analytics-grid--compact analytics-grid--reader-summary">
+            <div class="analytics-card">
+              <div class="analytics-label">Pages Read</div>
+              <div class="analytics-value"><span id="statEntryReads">—</span> <span id="statEntryReadsTrend" class="analytics-trend"></span></div>
+            </div>
+            <div class="analytics-card">
+              <div class="analytics-label">Entry Starts</div>
+              <div class="analytics-value"><span id="statEntryStarts">—</span> <span id="statEntryStartsTrend" class="analytics-trend"></span></div>
+            </div>
+            <div class="analytics-card">
+              <div class="analytics-label">Start-to-Finish Rate</div>
+              <div class="analytics-value"><span id="statFinishRate">—</span> <span id="statFinishRateTrend" class="analytics-trend"></span></div>
+            </div>
+            <div class="analytics-card">
+              <div class="analytics-label">Unique Visitors</div>
+              <div class="analytics-value" id="statUniqueVisitors">—</div>
+            </div>
+          </div>
+
+          <div class="analytics-reads-over-time">
+            <div class="analytics-pages-header">
+              <div class="analytics-pages-title">Pages Read Over Time</div>
+              <div class="analytics-pages-controls">
+                <label class="settings-label" for="readsOverTimeMode">View</label>
+                <select id="readsOverTimeMode" class="form-input">
+                  <option value="aggregate" selected>Aggregate</option>
+                  <option value="entry">Per Entry</option>
+                </select>
+                <div id="readsOverTimeEntryShell" class="analytics-pages-control-slot is-hidden" aria-hidden="true">
+                  <label class="settings-label" for="readsOverTimeEntry">Entry</label>
+                  <select id="readsOverTimeEntry" class="form-input">
+                    <!-- Populated dynamically -->
+                  </select>
                 </div>
-                <div id="analyticsSeriesRates"></div>
+                <label class="settings-label" for="readsOverTimeRange">Range</label>
+                <select id="readsOverTimeRange" class="form-input">
+                  <option value="7d" selected>Last 7d</option>
+                  <option value="30d">Last 30d</option>
+                  <option value="90d">Last 90d</option>
+                </select>
+              </div>
+            </div>
+            <div id="readsOverTimeStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
+            <div class="reads-over-time-chart">
+              <canvas id="readsOverTimeCanvas" class="reads-over-time-canvas"></canvas>
+            </div>
+            <div class="reads-over-time-totals" id="readsOverTimeTotals"></div>
+          </div>
+
+          <div class="analytics-reader">
+            <div class="analytics-pages-header">
+              <div class="analytics-pages-title">Reader Analytics</div>
+              <div class="analytics-pages-controls">
+                <label class="settings-label" for="analyticsReaderSeries">Series</label>
+                <select id="analyticsReaderSeries" class="form-input">
+                  <option value="all" selected>All series</option>
+                </select>
+                <label class="settings-label" for="analyticsReaderRange">Range</label>
+                <select id="analyticsReaderRange" class="form-input">
+                  <option value="24h">Last 24h</option>
+                  <option value="7d" selected>Last 7d</option>
+                  <option value="30d">Last 30d</option>
+                </select>
+              </div>
+            </div>
+            <div id="analyticsReaderStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
+
+            <div id="analyticsInsight" class="analytics-insight"></div>
+
+            <div class="analytics-tabs">
+              <button class="analytics-tab active" data-tab="entry">Entry Performance</button>
+              <button class="analytics-tab" data-tab="series">Series Performance</button>
+            </div>
+
+            <div id="tabEntry" class="analytics-tab-content active">
+              <div class="analytics-reader-grid analytics-reader-grid--2col">
+                <div class="analytics-reader-card">
+                  <div class="analytics-reader-heading">
+                    <div class="analytics-reader-title">Pages Read</div>
+                  </div>
+                  <div id="analyticsEntryReads"></div>
+                </div>
+                <div class="analytics-reader-card">
+                  <div class="analytics-reader-heading">
+                    <div class="analytics-reader-title">Start-to-Finish Rate</div>
+                  </div>
+                  <div id="analyticsEntryRates"></div>
+                </div>
+              </div>
+            </div>
+
+            <div id="tabSeries" class="analytics-tab-content">
+              <div class="analytics-reader-grid analytics-reader-grid--2col">
+                <div class="analytics-reader-card">
+                  <div class="analytics-reader-heading">
+                    <div class="analytics-reader-title">Series Pages Read</div>
+                  </div>
+                  <div id="analyticsSeriesReads"></div>
+                </div>
+                <div class="analytics-reader-card">
+                  <div class="analytics-reader-heading">
+                    <div class="analytics-reader-title">Series Start-to-Finish Rate</div>
+                  </div>
+                  <div id="analyticsSeriesRates"></div>
+                </div>
               </div>
             </div>
           </div>

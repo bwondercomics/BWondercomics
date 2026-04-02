@@ -15,6 +15,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///tmp/bw-quality-route-t
 
 from backend.app.routes import admin_analytics
 
+from backend.app.models import VisitorSession
 from backend.tests.helpers import BackendRouteTestCase, build_request
 
 
@@ -230,6 +231,8 @@ class AdminAnalyticsRouteTests(BackendRouteTestCase):
         self.assertEqual(payload["entryRates"][0]["finishes"], 1)
         self.assertAlmostEqual(payload["entryRates"][0]["completionRate"], 0.5)
         self.assertEqual(payload["seriesRates"][0]["starts"], 2)
+        self.assertEqual(payload["entryViews"][0]["entryKey"], "battle-bros:10")
+        self.assertEqual(payload["entryRates"][0]["entryKey"], "battle-bros:10")
 
     def test_reads_over_time_uses_raw_page_view_counts(self):
         now = datetime.now(timezone.utc)
@@ -337,6 +340,81 @@ class AdminAnalyticsRouteTests(BackendRouteTestCase):
         self.assertEqual(total_starts, 2)
         self.assertEqual(total_finishes, 1)
         self.assertTrue(any("completionRate" in point for point in payload["series"]))
+
+    def test_reader_entry_key_keeps_duplicate_display_numbers_separate(self):
+        now = datetime.now(timezone.utc)
+        self._insert_umami_session("session-a", "visitor-a")
+        self._insert_umami_session("session-b", "visitor-b")
+
+        self._insert_umami_event(
+            session_id="session-a",
+            created_at=now - timedelta(days=3),
+            event_name="reader_page_view",
+            data={
+                "series": "battle-bros",
+                "entryLabel": "battle-bros | Issue 10",
+                "page": 1,
+                "totalPages": 2,
+            },
+        )
+        self._insert_umami_event(
+            session_id="session-a",
+            created_at=now - timedelta(days=2),
+            event_name="reader_entry_complete",
+            data={
+                "series": "battle-bros",
+                "entryLabel": "battle-bros | Issue 10",
+            },
+        )
+        self._insert_umami_event(
+            session_id="session-b",
+            created_at=now - timedelta(days=1),
+            event_name="reader_page_view",
+            data={
+                "series": "rook-and-rabbit",
+                "entryLabel": "rook-and-rabbit | Issue 10",
+                "page": 1,
+                "totalPages": 3,
+            },
+        )
+
+        reader_payload = admin_analytics.admin_reader_analytics(
+            self._admin_request("/api/admin/analytics/reader"),
+            self.db,
+            range="7d",
+        )
+        keyed_entries = {item["entryKey"]: item for item in reader_payload["entryViews"]}
+        self.assertIn("battle-bros:10", keyed_entries)
+        self.assertIn("rook-and-rabbit:10", keyed_entries)
+
+        completion_payload = admin_analytics.admin_reader_series_analytics(
+            self._admin_request("/api/admin/analytics/reader-series"),
+            self.db,
+            time_range="7d",
+            prop="entryLabel",
+            value="10",
+            entry_key="battle-bros:10",
+            metric="completion_rate",
+            points=6,
+        )
+        self.assertEqual(
+            sum(int(point.get("starts") or 0) for point in completion_payload["series"]),
+            1,
+        )
+        self.assertEqual(
+            sum(int(point.get("finishes") or 0) for point in completion_payload["series"]),
+            1,
+        )
+
+        reads_payload = admin_analytics.admin_reads_over_time(
+            self._admin_request("/api/admin/analytics/reads-over-time"),
+            self.db,
+            time_range="7d",
+            entry_key="battle-bros:10",
+        )
+        self.assertEqual(reads_payload["entryKey"], "battle-bros:10")
+        self.assertEqual(reads_payload["totals"]["reads"], 1)
+        self.assertEqual(reads_payload["totals"]["uniqueVisitors"], 1)
 
     def test_visitor_history_aggregates_metadata_and_issue_progress(self):
         now = datetime.now(timezone.utc)
@@ -463,10 +541,44 @@ class AdminAnalyticsRouteTests(BackendRouteTestCase):
         self.assertEqual(payload["entryStartsTotal"], 2)
         self.assertEqual(payload["uniqueVisitors"], 1)
 
+    def test_live_visitors_route_matches_frontend_contract(self):
+        now = datetime.now(timezone.utc)
+        session = VisitorSession(
+            visitor_id="live-visitor",
+            user_id=self.admin_user.id,
+            ip_address="127.0.0.1",
+            origin="Direct",
+            path="/reader/issue-10/1",
+            entry_label="battle-bros | Issue 10",
+            entry_title="Issue 10",
+            entries_read=["Issue 10"],
+            first_seen=now - timedelta(minutes=6),
+            last_seen=now - timedelta(minutes=1),
+            hit_count=4,
+        )
+        self.db.add(session)
+        self.db.commit()
+
+        payload = admin_analytics.admin_live_visitors(
+            self._admin_request("/api/admin/analytics/live"),
+            self.db,
+            window_seconds=600,
+            limit=10,
+        )
+
+        self.assertEqual(payload["activeCount"], 1)
+        self.assertEqual(payload["total"], 1)
+        self.assertEqual(len(payload["visitors"]), 1)
+        self.assertEqual(len(payload["sessions"]), 1)
+        visitor = payload["visitors"][0]
+        self.assertEqual(visitor["user"]["displayName"], self.admin_user.display_name)
+        self.assertEqual(visitor["user"]["email"], self.admin_user.email)
+        self.assertGreaterEqual(visitor["durationSeconds"], 300)
+
     def test_visitors_endpoint_shapes_expanded_umami_metrics(self):
         expanded_rows = {
             "referrer": [{"name": "google.com", "visitors": 9, "visits": 11, "pageviews": 17, "bounces": 4, "totaltime": 660000}],
-            "path": [{"name": "/", "visitors": 7, "visits": 8, "pageviews": 12, "bounces": 2, "totaltime": 420000}],
+            "entry": [{"name": "/launch-campaign", "visitors": 7, "visits": 8, "pageviews": 12, "bounces": 2, "totaltime": 420000}],
             "country": [{"name": "US", "visitors": 5, "visits": 6, "pageviews": 9, "bounces": 1, "totaltime": 300000}],
             "browser": [{"name": "Chrome", "visitors": 6, "visits": 7, "pageviews": 10, "bounces": 2, "totaltime": 360000}],
             "device": [{"name": "Mobile", "visitors": 4, "visits": 5, "pageviews": 8, "bounces": 2, "totaltime": 240000}],
@@ -490,7 +602,7 @@ class AdminAnalyticsRouteTests(BackendRouteTestCase):
             )
 
         self.assertEqual(payload["range"], "30d")
-        self.assertEqual(payload["landingPages"][0]["name"], "/")
+        self.assertEqual(payload["landingPages"][0]["name"], "/launch-campaign")
         self.assertEqual(payload["referrers"][0]["visitors"], 9)
         self.assertEqual(payload["countries"][0]["name"], "US")
         self.assertEqual(payload["browsers"][0]["pageviews"], 10)
@@ -503,7 +615,7 @@ class AdminAnalyticsRouteTests(BackendRouteTestCase):
         now = datetime.now(timezone.utc)
         expanded_rows = {
             "referrer": [{"name": "google.com", "visitors": 9, "visits": 11, "pageviews": 17, "bounces": 4, "totaltime": 660000}],
-            "path": [{"name": "/", "visitors": 7, "visits": 8, "pageviews": 12, "bounces": 2, "totaltime": 420000}],
+            "entry": [{"name": "/launch-campaign", "visitors": 7, "visits": 8, "pageviews": 12, "bounces": 2, "totaltime": 420000}],
             "country": [{"name": "US", "visitors": 5, "visits": 6, "pageviews": 9, "bounces": 1, "totaltime": 300000}],
             "browser": [{"name": "Chrome", "visitors": 6, "visits": 7, "pageviews": 10, "bounces": 2, "totaltime": 360000}],
             "device": [{"name": "Mobile", "visitors": 4, "visits": 5, "pageviews": 8, "bounces": 2, "totaltime": 240000}],
@@ -511,6 +623,7 @@ class AdminAnalyticsRouteTests(BackendRouteTestCase):
 
         self._insert_umami_session("session-a", "visitor-a")
         self._insert_umami_session("session-b", "visitor-b")
+        self._insert_umami_session("session-c", None, distinct_id="visitor-a")
         self._insert_umami_event(
             session_id="session-a",
             created_at=now - timedelta(days=1),
@@ -519,6 +632,11 @@ class AdminAnalyticsRouteTests(BackendRouteTestCase):
         self._insert_umami_event(
             session_id="session-a",
             created_at=now - timedelta(hours=12),
+            event_name="cta-click",
+        )
+        self._insert_umami_event(
+            session_id="session-c",
+            created_at=now - timedelta(hours=10),
             event_name="cta-click",
         )
         self._insert_umami_event(
@@ -545,7 +663,7 @@ class AdminAnalyticsRouteTests(BackendRouteTestCase):
             )
 
         self.assertEqual(payload["events"][0]["name"], "cta-click")
-        self.assertEqual(payload["events"][0]["count"], 2)
+        self.assertEqual(payload["events"][0]["count"], 1)
         self.assertEqual(payload["events"][1]["name"], "reader_entry_complete")
         self.assertEqual(payload["events"][1]["count"], 1)
         self.assertEqual(metrics_mock.call_count, 1)
@@ -593,6 +711,29 @@ class AdminAnalyticsRouteTests(BackendRouteTestCase):
         self.assertEqual(payload["pages"][1]["path"], "/about")
         self.assertEqual(stats_mock.call_count, 1)
         expanded_mock.assert_called_once()
+
+    def test_weekly_digest_uses_reader_entry_lookup(self):
+        now = datetime.now(timezone.utc)
+        self._insert_umami_session("session-a", "visitor-a")
+        self._insert_umami_event(
+            session_id="session-a",
+            created_at=now - timedelta(days=1),
+            event_name="reader_page_view",
+            data={
+                "series": "battle-bros",
+                "entryLabel": "battle-bros | Issue 10",
+                "page": 1,
+                "totalPages": 2,
+            },
+        )
+
+        payload = admin_analytics.admin_weekly_digest(
+            self._admin_request("/api/admin/analytics/weekly-digest"),
+            self.db,
+        )
+
+        self.assertNotIn("error", payload)
+        self.assertGreaterEqual(payload["thisWeek"]["reads"], 1)
 
 
 if __name__ == "__main__":

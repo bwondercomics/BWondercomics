@@ -10,7 +10,7 @@ This document covers the admin panel (content editor) architecture, data flow, a
 
 ## Feature Areas
 - Auth/session: Uses the site's account system (`/api/login`, `/api/session`) and requires an `admin` role.
-- Analytics: `admin/analytics.js` is the public analytics facade used by `admin/app.js`; analytics screen logic now lives under `admin/analytics/` with focused modules for traffic, reader analytics, reads-over-time, visitor history, live visitors, and shared formatters.
+- Analytics: `admin/analytics.js` is the public analytics facade used by `admin/app.js`; analytics screen logic now lives under `admin/analytics/` with focused modules for traffic, reader analytics, reads-over-time, visitor history, live visitors, and shared formatters. The analytics UI is grouped into `Site Traffic`, `Visitor History`, and `Reader Engagement`.
 - Entry management (issues/etc): Load/save entries; add/edit/delete; reconcile pages with disk via `/api/list-entry-images`; reorder pages (drag/drop and up/down); renumber flow with confirmation; premium/private handling moves pages into `protected/`.
 - Page ops: Add/remove pages; ensure entry folder creation via `/api/create-entry`; delete images via `/api/delete-image`; move/copy files with `/api/move-path` + `/api/copy-path`.
 - Status message: Editable site-wide status stored with entry payload.
@@ -72,9 +72,9 @@ flowchart LR
 
 ## Analytics Module Layout
 - `admin/analytics.js` — Coordinator that preserves the stable `createAnalytics()` API used by the rest of admin.
-- `admin/analytics/traffic.js` — Sitewide traffic summary, page reads, landing pages, referrers, countries, browsers, devices, top events.
-- `admin/analytics/reader.js` — Health header, weekly digest, reader summary cards, ranked lists, and drilldowns.
-- `admin/analytics/reads-over-time.js` — Reads-over-time canvas chart and controls.
-- `admin/analytics/visitor-history.js` — Searchable/sortable visitor history master-detail UI.
-- `admin/analytics/live.js` — Live visitors polling, ticker, chart, and live-range controls.
+- `admin/analytics/traffic.js` — Sitewide traffic summary, page reads, landing-entry panels, referrers, countries, browsers, devices, and top events by visitors.
+- `admin/analytics/reader.js` — Health header, weekly digest, reader summary cards, ranked lists, and series-safe drilldowns using `entryKey`.
+- `admin/analytics/reads-over-time.js` — Reads-over-time canvas chart and controls; per-entry mode accepts `entry_key`.
+- `admin/analytics/visitor-history.js` — Searchable/sortable visitor history master-detail UI with path-first list rows and readable activity chips.
+- `admin/analytics/live.js` — Live visitors polling, ticker, chart, and live-range controls; frontend now expects `activeCount` + `visitors`.
 - `admin/analytics/shared.js` — Shared pure formatters and small helper utilities for analytics modules.

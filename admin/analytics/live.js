@@ -383,10 +383,19 @@ function createLiveAnalytics() {
     el.liveVisitorsTrack.innerHTML = list
       .map((visitor) => {
         const user = visitor?.user;
-        const displayName = user?.displayName || "Guest";
-        const email = user?.email || "";
+        const displayName =
+          user?.displayName || visitor?.userDisplayName || visitor?.userEmail || "Guest";
+        const email = user?.email || visitor?.userEmail || "";
         const lastSeen = formatTimeAgo(visitor?.lastSeen);
-        const timeSpent = formatDuration(visitor?.durationSeconds);
+        const derivedDurationSeconds =
+          visitor?.durationSeconds ??
+          (() => {
+            const firstSeen = visitor?.firstSeen ? new Date(visitor.firstSeen).getTime() : NaN;
+            const lastSeenTs = visitor?.lastSeen ? new Date(visitor.lastSeen).getTime() : NaN;
+            if (!Number.isFinite(firstSeen) || !Number.isFinite(lastSeenTs)) return 0;
+            return Math.max(0, Math.round((lastSeenTs - firstSeen) / 1000));
+          })();
+        const timeSpent = formatDuration(derivedDurationSeconds);
         const ipAddress = visitor?.ipAddress || "Unknown";
         const origin = visitor?.origin || "Direct";
         const hitCount = Number(visitor?.hitCount);
@@ -418,11 +427,11 @@ function createLiveAnalytics() {
   }
 
   function renderLiveVisitors(payload) {
-    const count = Number(payload?.activeCount) || 0;
+    const count = Number(payload?.activeCount ?? payload?.total) || 0;
     if (el.liveVisitorsCount) el.liveVisitorsCount.textContent = formatStat(count);
     recordLiveSample(count, payload?.generatedAt);
     renderLiveChart(getLiveRangeMinutes());
-    renderLiveTicker(payload?.visitors);
+    renderLiveTicker(payload?.visitors || payload?.sessions);
   }
 
   async function loadLiveVisitors({ showLoading = true, at = null } = {}) {

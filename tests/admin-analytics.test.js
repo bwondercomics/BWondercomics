@@ -72,7 +72,7 @@ function buildFetchStub(vi) {
         range: value.includes("range=30d") ? "30d" : "7d",
         landingPages: [
           {
-            name: "/",
+            name: "/launch-campaign",
             visitors: 18,
             visits: 24,
             pageviews: 41,
@@ -135,6 +135,7 @@ function buildFetchStub(vi) {
           {
             label: "Issue 10",
             value: "10",
+            entryKey: "battle-bros:10",
             displayNumber: 10,
             count: 18,
             seriesId: "battle-bros",
@@ -142,11 +143,23 @@ function buildFetchStub(vi) {
             delta: 2,
             deltaPct: 0.125,
           },
+          {
+            label: "Issue 10",
+            value: "10",
+            entryKey: "space-racoons:10",
+            displayNumber: 10,
+            count: 9,
+            seriesId: "space-racoons",
+            seriesTitle: "Space Racoons",
+            delta: 1,
+            deltaPct: 0.1,
+          },
         ],
         entryRates: [
           {
             label: "Issue 10",
             value: "10",
+            entryKey: "battle-bros:10",
             displayNumber: 10,
             count: 2 / 3,
             pageViews: 18,
@@ -155,6 +168,19 @@ function buildFetchStub(vi) {
             completionRate: 2 / 3,
             seriesId: "battle-bros",
             seriesTitle: "Battle Bros",
+          },
+          {
+            label: "Issue 10",
+            value: "10",
+            entryKey: "space-racoons:10",
+            displayNumber: 10,
+            count: 0.5,
+            pageViews: 9,
+            starts: 2,
+            finishes: 1,
+            completionRate: 0.5,
+            seriesId: "space-racoons",
+            seriesTitle: "Space Racoons",
           },
         ],
         seriesViews: [
@@ -271,10 +297,11 @@ function buildFetchStub(vi) {
       });
     }
     if (value.startsWith("/api/admin/analytics/reads-over-time")) {
-      if (value.includes("entry_id=10")) {
+      if (value.includes("entry_key=battle-bros%3A10")) {
         return jsonResponse({
           series: [{ date: "2026-03-24", count: 6, uniqueVisitors: 2 }],
           totals: { reads: 6, uniqueVisitors: 2 },
+          entryKey: "battle-bros:10",
         });
       }
       return jsonResponse({
@@ -289,6 +316,7 @@ function buildFetchStub(vi) {
       return jsonResponse({
         generatedAt: "2026-03-30T08:00:00Z",
         activeCount: value.includes("window=60") ? 5 : 3,
+        total: value.includes("window=60") ? 5 : 3,
         visitors: [
           {
             lastSeen: "2026-03-30T07:59:00Z",
@@ -297,7 +325,20 @@ function buildFetchStub(vi) {
             origin: "Direct",
             hitCount: 2,
             entriesRead: ["Issue 10"],
-            user: { displayName: "Guest" },
+            userDisplayName: "Guest",
+            userEmail: "",
+          },
+        ],
+        sessions: [
+          {
+            lastSeen: "2026-03-30T07:59:00Z",
+            durationSeconds: 420,
+            ipAddress: "127.0.0.1",
+            origin: "Direct",
+            hitCount: 2,
+            entriesRead: ["Issue 10"],
+            userDisplayName: "Guest",
+            userEmail: "",
           },
         ],
       });
@@ -404,7 +445,7 @@ describe("admin analytics", () => {
     expect(document.getElementById("analyticsEntryRates")?.textContent).toContain("67%");
     expect(document.getElementById("analyticsEntryRates")?.textContent).toContain("3 starts");
     expect(document.getElementById("analyticsLandingPagesList")?.textContent).toContain(
-      "/ (home)",
+      "/launch-campaign",
     );
     expect(document.getElementById("analyticsReferrersList")?.textContent).toContain(
       "google.com",
@@ -484,7 +525,8 @@ describe("admin analytics", () => {
     expect(
       fetchMock.mock.calls.some(([url]) =>
         String(url).includes("/api/admin/analytics/reader-series?")
-        && String(url).includes("metric=completion_rate"),
+        && String(url).includes("metric=completion_rate")
+        && String(url).includes("entry_key=battle-bros%3A10"),
       ),
     ).toBe(true);
   });
@@ -509,12 +551,13 @@ describe("admin analytics", () => {
 
     expect(
       fetchMock.mock.calls.some(([url]) =>
-        String(url).includes("/api/admin/analytics/reads-over-time?range=7d&entry_id=10"),
+        String(url).includes("/api/admin/analytics/reads-over-time?range=7d&entry_key=battle-bros%3A10"),
       ),
     ).toBe(true);
     expect(document.getElementById("readsOverTimeTotals")?.textContent).toContain(
       "6 pages read",
     );
+    expect(document.getElementById("readsOverTimeEntryShell")?.classList.contains("is-hidden")).toBe(false);
   });
 
   it("loads live visitors and reloads when the live range shifts", async () => {
@@ -589,5 +632,26 @@ describe("admin analytics", () => {
     expect(document.getElementById("analyticsVisitorHistoryDetail")?.textContent).toContain(
       "Issue 12",
     );
+  });
+
+  it("renders visitor history activity chips with readable units", async () => {
+    vi.stubGlobal("fetch", buildFetchStub(vi));
+
+    const { createAnalytics } = await import("../admin/analytics.js");
+    const manager = createAnalytics({
+      hideAllSections: vi.fn(),
+      setActiveNav: vi.fn(),
+    });
+
+    manager.refreshAnalytics({ showLoading: false });
+    await flushAdminUi(5);
+
+    const visitorListText = document.getElementById("analyticsVisitorHistoryList")?.textContent || "";
+    expect(visitorListText).toContain("18 pages");
+    expect(visitorListText).toContain("1 started");
+    expect(visitorListText).toContain("1 finished");
+    expect(visitorListText).not.toContain("18p");
+    expect(visitorListText).not.toContain("1i");
+    expect(visitorListText).not.toContain("1f");
   });
 });

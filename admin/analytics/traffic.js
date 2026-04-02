@@ -111,15 +111,15 @@ function createTrafficAnalytics() {
         const pct = (count / maxVal) * 100;
 
         return `
-          <div class="analytics-page-row" style="margin-bottom: 8px;">
-            <div class="analytics-page-info" style="display: flex; flex-direction: column; width: 100%;">
-              <div class="analytics-page-path" title="${escapeHtml(label)}" style="font-size: 0.9em; margin-bottom: 2px;">${escapeHtml(label)}</div>
-              <div class="analytics-page-bar" style="background: rgba(255, 255, 255, 0.1); border-radius: 4px; overflow: hidden; height: 6px;">
-                <div class="analytics-page-fill" style="width: ${pct}%; background: var(--primary); height: 100%;"></div>
+          <div class="analytics-page-row">
+            <div class="analytics-page-info">
+              <div class="analytics-page-path analytics-page-path--metric" title="${escapeHtml(label)}">${escapeHtml(label)}</div>
+              <div class="analytics-page-bar">
+                <div class="analytics-page-fill" style="width: ${pct}%"></div>
               </div>
             </div>
-            <div class="analytics-page-count" style="font-size: 0.85em; margin-top: 2px; text-align: right;">
-              ${formatStat(count)} <span style="opacity: 0.6; font-size: 0.9em;">${valueLabel}</span>
+            <div class="analytics-page-count">
+              ${formatStat(count)} <span class="analytics-page-count-label">${valueLabel}</span>
             </div>
           </div>
         `;
@@ -144,16 +144,16 @@ function createTrafficAnalytics() {
         const meta = formatExpandedMetricText(item);
 
         return `
-          <div class="analytics-page-row" style="margin-bottom: 8px;">
-            <div class="analytics-page-info" style="display: flex; flex-direction: column; width: 100%;">
-              <div class="analytics-page-path" title="${escapeHtml(label)}" style="font-size: 0.9em; margin-bottom: 2px;">${escapeHtml(label)}</div>
-              <div class="analytics-reader-sub" style="margin-top: 0; margin-bottom: 6px;">${escapeHtml(meta)}</div>
-              <div class="analytics-page-bar" style="background: rgba(255, 255, 255, 0.1); border-radius: 4px; overflow: hidden; height: 6px;">
-                <div class="analytics-page-fill" style="width: ${pct}%; background: var(--primary); height: 100%;"></div>
+          <div class="analytics-page-row">
+            <div class="analytics-page-info">
+              <div class="analytics-page-path analytics-page-path--metric" title="${escapeHtml(label)}">${escapeHtml(label)}</div>
+              <div class="analytics-reader-sub analytics-reader-sub--metric">${escapeHtml(meta)}</div>
+              <div class="analytics-page-bar">
+                <div class="analytics-page-fill" style="width: ${pct}%"></div>
               </div>
             </div>
-            <div class="analytics-page-count" style="font-size: 0.85em; margin-top: 2px; text-align: right;">
-              ${formatStat(visitors)} <span style="opacity: 0.6; font-size: 0.9em;">Visitors</span>
+            <div class="analytics-page-count">
+              ${formatStat(visitors)} <span class="analytics-page-count-label">Visitors</span>
             </div>
           </div>
         `;
@@ -210,7 +210,7 @@ function createTrafficAnalytics() {
       [],
       "No device data available.",
     );
-    renderMetricList("analyticsEventsList", [], "Events", "No event data available.");
+    renderMetricList("analyticsEventsList", [], "Visitors", "No event data available.");
   }
 
   function renderAnalyticsVisitors(payload) {
@@ -242,7 +242,7 @@ function createTrafficAnalytics() {
     renderMetricList(
       "analyticsEventsList",
       payload?.events,
-      "Events",
+      "Visitors",
       "No event data available.",
     );
   }
@@ -373,7 +373,7 @@ function createTrafficAnalytics() {
         [],
         "Loading visitor data…",
       );
-      renderMetricList("analyticsEventsList", [], "Events", "Loading visitor data…");
+      renderMetricList("analyticsEventsList", [], "Visitors", "Loading visitor data…");
     }
 
     try {

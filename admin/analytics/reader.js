@@ -192,6 +192,11 @@ function createReaderAnalytics() {
         starts: item?.starts,
         finishes: item?.finishes,
         pageViews: item?.pageViews,
+        entryKey: item?.entryKey || "",
+        displayNumber: item?.displayNumber,
+        seriesId: item?.seriesId || "",
+        seriesTitle: item?.seriesTitle || "",
+        entryLabel: item?.entryLabel || "",
         avgStopPage: item?.avgStopPage,
         medianStopPage: item?.medianStopPage,
       };
@@ -364,13 +369,14 @@ function createReaderAnalytics() {
           typeof options.valueFormatter === "function"
             ? options.valueFormatter(item)
             : formatStat(item.count);
-        const countAttr = escapeHtml(String(item.count ?? ""));
-        const rateAttr = escapeHtml(String(item.completionRate ?? ""));
-        const startsAttr = escapeHtml(String(item.starts ?? ""));
-        const finishesAttr = escapeHtml(String(item.finishes ?? ""));
-        const pageViewsAttr = escapeHtml(String(item.pageViews ?? ""));
-        const count = Number(item.count) || 0;
-        const rankValue = Number(rankFn(item)) || 0;
+      const countAttr = escapeHtml(String(item.count ?? ""));
+      const rateAttr = escapeHtml(String(item.completionRate ?? ""));
+      const startsAttr = escapeHtml(String(item.starts ?? ""));
+      const finishesAttr = escapeHtml(String(item.finishes ?? ""));
+      const pageViewsAttr = escapeHtml(String(item.pageViews ?? ""));
+      const entryKeyAttr = escapeHtml(String(item.entryKey ?? ""));
+      const count = Number(item.count) || 0;
+      const rankValue = Number(rankFn(item)) || 0;
 
         let colorClass = "";
         if (counts.length > 1) {
@@ -382,7 +388,7 @@ function createReaderAnalytics() {
         }
 
         return `
-          <div class="analytics-reader-item ${colorClass}" data-label="${label}" data-value="${value}" data-count="${countAttr}" data-rate="${rateAttr}" data-starts="${startsAttr}" data-finishes="${finishesAttr}" data-page-views="${pageViewsAttr}" data-sub="${safeSubLabel}" data-event="${options.eventName || ""}" data-property="${options.propertyName || ""}" data-metric="${options.metric || ""}">
+          <div class="analytics-reader-item ${colorClass}" data-label="${label}" data-value="${value}" data-entry-key="${entryKeyAttr}" data-count="${countAttr}" data-rate="${rateAttr}" data-starts="${startsAttr}" data-finishes="${finishesAttr}" data-page-views="${pageViewsAttr}" data-sub="${safeSubLabel}" data-event="${options.eventName || ""}" data-property="${options.propertyName || ""}" data-metric="${options.metric || ""}">
             <div class="analytics-reader-label">
               <div>${label}</div>
               ${subHtml}
@@ -555,6 +561,9 @@ function createReaderAnalytics() {
       range,
       points: "12",
     });
+    if (detail.entryKey) {
+      params.set("entry_key", detail.entryKey);
+    }
 
     try {
       const res = await fetch(
@@ -612,6 +621,7 @@ function createReaderAnalytics() {
       const startsRaw = item.dataset.starts;
       const finishesRaw = item.dataset.finishes;
       const pageViewsRaw = item.dataset.pageViews;
+      const entryKey = item.dataset.entryKey || "";
       const eventName = item.dataset.event || "";
       const propertyName = item.dataset.property || "";
       const metric = item.dataset.metric || "page_views";
@@ -631,6 +641,7 @@ function createReaderAnalytics() {
           finishesRaw !== undefined && finishesRaw !== "" ? Number(finishesRaw) : null,
         pageViews:
           pageViewsRaw !== undefined && pageViewsRaw !== "" ? Number(pageViewsRaw) : null,
+        entryKey,
         metric,
         eventName,
         propertyName,
