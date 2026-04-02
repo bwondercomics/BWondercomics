@@ -651,6 +651,8 @@ function attachEventHandlers() {
   if (el.analyticsPagesRange) {
     el.analyticsPagesRange.addEventListener("change", () => {
       analyticsManager.loadAnalyticsPages({ showLoading: true });
+      analyticsManager.loadAnalyticsVisitors({ showLoading: true });
+      analyticsManager.loadVisitorHistory({ showLoading: true });
     });
   }
   if (el.analyticsReaderRange) {

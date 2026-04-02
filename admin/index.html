@@ -325,20 +325,20 @@
             </div>
             <div class="dashboard-mini-grid" style="margin-top: 12px;">
               <div class="dashboard-mini-card">
-                <div class="dashboard-mini-label">Entry Reads</div>
+                <div class="dashboard-mini-label">Pages Read</div>
                 <div class="dashboard-mini-value" id="dashEntryReads">-</div>
               </div>
               <div class="dashboard-mini-card">
-                <div class="dashboard-mini-label">Entry Finishes</div>
-                <div class="dashboard-mini-value" id="dashEntryFinishes">-</div>
+                <div class="dashboard-mini-label">Entry Starts</div>
+                <div class="dashboard-mini-value" id="dashEntryStarts">-</div>
               </div>
               <div class="dashboard-mini-card">
-                <div class="dashboard-mini-label">Finish Rate</div>
+                <div class="dashboard-mini-label">Start-to-Finish Rate</div>
                 <div class="dashboard-mini-value" id="dashFinishRate">-</div>
               </div>
               <div class="dashboard-mini-card">
-                <div class="dashboard-mini-label">Avg Stop Page</div>
-                <div class="dashboard-mini-value" id="dashAvgStopPage">-</div>
+                <div class="dashboard-mini-label">Unique Visitors</div>
+                <div class="dashboard-mini-value" id="dashUniqueVisitors">-</div>
               </div>
             </div>
             <div id="dashAnalyticsStatus" class="dashboard-status">Waiting for analytics.</div>
@@ -353,14 +353,14 @@
             <div class="dashboard-card-title">Weekly Digest</div>
             <div class="weekly-digest-grid">
               <div class="weekly-digest-metric">
-                <div class="weekly-digest-label">Reads</div>
+                <div class="weekly-digest-label">Pages Read</div>
                 <div class="weekly-digest-value" id="weeklyDigestReads">-</div>
                 <div class="weekly-digest-change" id="weeklyDigestReadsChange"></div>
               </div>
               <div class="weekly-digest-metric">
-                <div class="weekly-digest-label">Finishes</div>
-                <div class="weekly-digest-value" id="weeklyDigestFinishes">-</div>
-                <div class="weekly-digest-change" id="weeklyDigestFinishesChange"></div>
+                <div class="weekly-digest-label">Starts</div>
+                <div class="weekly-digest-value" id="weeklyDigestStarts">-</div>
+                <div class="weekly-digest-change" id="weeklyDigestStartsChange"></div>
               </div>
               <div class="weekly-digest-metric">
                 <div class="weekly-digest-label">Completion</div>
@@ -693,36 +693,6 @@
             <div class="analytics-health-title" id="healthTitle">Checking content health...</div>
           </div>
           <div class="analytics-health-summary" id="healthSummary">Analyzing your reader engagement data.</div>
-          <div class="analytics-health-stats">
-            <div class="analytics-health-stat">
-              <div class="analytics-health-stat-value">
-                <span id="healthReads">—</span>
-                <span class="analytics-health-stat-trend trend-flat" id="healthReadsTrend"></span>
-              </div>
-              <div class="analytics-health-stat-label">Reads</div>
-            </div>
-            <div class="analytics-health-stat">
-              <div class="analytics-health-stat-value">
-                <span id="healthFinishes">—</span>
-                <span class="analytics-health-stat-trend trend-flat" id="healthFinishesTrend"></span>
-              </div>
-              <div class="analytics-health-stat-label">Finishes</div>
-            </div>
-            <div class="analytics-health-stat">
-              <div class="analytics-health-stat-value">
-                <span id="healthRate">—</span>
-                <span class="analytics-health-stat-trend trend-flat" id="healthRateTrend"></span>
-              </div>
-              <div class="analytics-health-stat-label">Finish Rate</div>
-            </div>
-            <div class="analytics-health-stat">
-              <div class="analytics-health-stat-value">
-                <span id="healthVisitors">—</span>
-                <span class="analytics-health-stat-trend trend-flat" id="healthVisitorsTrend"></span>
-              </div>
-              <div class="analytics-health-stat-label">Visitors</div>
-            </div>
-          </div>
         </div>
 
         <div class="analytics-grid">
@@ -739,20 +709,20 @@
         </div>
         <div class="analytics-grid analytics-grid--compact" style="margin-top: 14px;">
           <div class="analytics-card">
-            <div class="analytics-label">Entry Reads</div>
+            <div class="analytics-label">Pages Read</div>
             <div class="analytics-value"><span id="statEntryReads">—</span> <span id="statEntryReadsTrend" class="analytics-trend"></span></div>
           </div>
           <div class="analytics-card">
-            <div class="analytics-label">Entry Finishes</div>
-            <div class="analytics-value"><span id="statEntryFinishes">—</span> <span id="statEntryFinishesTrend" class="analytics-trend"></span></div>
+            <div class="analytics-label">Entry Starts</div>
+            <div class="analytics-value"><span id="statEntryStarts">—</span> <span id="statEntryStartsTrend" class="analytics-trend"></span></div>
           </div>
           <div class="analytics-card">
-            <div class="analytics-label">Finish Rate</div>
+            <div class="analytics-label">Start-to-Finish Rate</div>
             <div class="analytics-value"><span id="statFinishRate">—</span> <span id="statFinishRateTrend" class="analytics-trend"></span></div>
           </div>
           <div class="analytics-card">
-            <div class="analytics-label">Avg Stop Page</div>
-            <div class="analytics-value" id="statAvgStopPage">—</div>
+            <div class="analytics-label">Unique Visitors</div>
+            <div class="analytics-value" id="statUniqueVisitors">—</div>
           </div>
         </div>
         <div class="analytics-pages">
@@ -773,7 +743,13 @@
 
         <!-- NEW: Referrers & Events -->
         <div class="analytics-traffic"
-          style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 24px; margin-bottom: 24px;">
+          style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-top: 24px; margin-bottom: 24px;">
+          <div class="analytics-pages">
+            <div class="analytics-pages-header">
+              <div class="analytics-pages-title">Top Landing Pages</div>
+            </div>
+            <div id="analyticsLandingPagesList" class="analytics-pages-list" style="min-height: 150px;"></div>
+          </div>
           <div class="analytics-pages">
             <div class="analytics-pages-header">
               <div class="analytics-pages-title">Top Referrers</div>
@@ -782,7 +758,25 @@
           </div>
           <div class="analytics-pages">
             <div class="analytics-pages-header">
-              <div class="analytics-pages-title">Top Events (Clicks)</div>
+              <div class="analytics-pages-title">Countries</div>
+            </div>
+            <div id="analyticsCountriesList" class="analytics-pages-list" style="min-height: 150px;"></div>
+          </div>
+          <div class="analytics-pages">
+            <div class="analytics-pages-header">
+              <div class="analytics-pages-title">Browsers</div>
+            </div>
+            <div id="analyticsBrowsersList" class="analytics-pages-list" style="min-height: 150px;"></div>
+          </div>
+          <div class="analytics-pages">
+            <div class="analytics-pages-header">
+              <div class="analytics-pages-title">Devices</div>
+            </div>
+            <div id="analyticsDevicesList" class="analytics-pages-list" style="min-height: 150px;"></div>
+          </div>
+          <div class="analytics-pages">
+            <div class="analytics-pages-header">
+              <div class="analytics-pages-title">Top Events</div>
             </div>
             <div id="analyticsEventsList" class="analytics-pages-list" style="min-height: 150px;"></div>
           </div>
@@ -791,7 +785,7 @@
         <!-- Reads Over Time Chart -->
         <div class="analytics-reads-over-time" style="margin-top: 24px; margin-bottom: 24px;">
           <div class="analytics-pages-header">
-            <div class="analytics-pages-title">Reads Over Time</div>
+            <div class="analytics-pages-title">Pages Read Over Time</div>
             <div class="analytics-pages-controls">
               <label class="settings-label" for="readsOverTimeMode">View</label>
               <select id="readsOverTimeMode" class="form-input">
@@ -814,6 +808,18 @@
             <canvas id="readsOverTimeCanvas" style="width: 100%; height: 180px;"></canvas>
           </div>
           <div class="reads-over-time-totals" id="readsOverTimeTotals" style="margin-top: 8px; font-size: 0.8rem; opacity: 0.8;"></div>
+        </div>
+
+        <div class="analytics-pages analytics-visitor-history" style="margin-top: 24px; margin-bottom: 24px;">
+          <div class="analytics-pages-header">
+            <div>
+              <div class="analytics-pages-title">Visitor History</div>
+              <div class="analytics-reader-sub" style="margin-top: 4px;">Uses the sitewide range above.</div>
+            </div>
+          </div>
+          <div id="analyticsVisitorHistoryStatus" class="success-message" style="display: none; margin-top: 8px;"></div>
+          <div id="analyticsVisitorHistoryMeta" class="analytics-reader-sub" style="margin-top: 8px;"></div>
+          <div id="analyticsVisitorHistoryList" class="analytics-visitor-history-list"></div>
         </div>
 
         <div class="analytics-reader">
@@ -845,24 +851,18 @@
 
           <!-- Entry Performance tab content -->
           <div id="tabEntry" class="analytics-tab-content active">
-            <div class="analytics-reader-grid analytics-reader-grid--3col">
+            <div class="analytics-reader-grid analytics-reader-grid--2col">
               <div class="analytics-reader-card">
                 <div class="analytics-reader-heading">
-                  <div class="analytics-reader-title">Reads</div>
+                  <div class="analytics-reader-title">Pages Read</div>
                 </div>
                 <div id="analyticsEntryReads"></div>
               </div>
               <div class="analytics-reader-card">
                 <div class="analytics-reader-heading">
-                  <div class="analytics-reader-title">Finishes</div>
+                  <div class="analytics-reader-title">Start-to-Finish Rate</div>
                 </div>
-                <div id="analyticsEntryCompletes"></div>
-              </div>
-              <div class="analytics-reader-card">
-                <div class="analytics-reader-heading">
-                  <div class="analytics-reader-title">Where They Stop</div>
-                </div>
-                <div id="analyticsEntryStops"></div>
+                <div id="analyticsEntryRates"></div>
               </div>
             </div>
           </div>
@@ -872,15 +872,15 @@
             <div class="analytics-reader-grid analytics-reader-grid--2col">
               <div class="analytics-reader-card">
                 <div class="analytics-reader-heading">
-                  <div class="analytics-reader-title">Series Reads</div>
+                  <div class="analytics-reader-title">Series Pages Read</div>
                 </div>
                 <div id="analyticsSeriesReads"></div>
               </div>
               <div class="analytics-reader-card">
                 <div class="analytics-reader-heading">
-                  <div class="analytics-reader-title">Series Finishes</div>
+                  <div class="analytics-reader-title">Series Start-to-Finish Rate</div>
                 </div>
-                <div id="analyticsSeriesCompletes"></div>
+                <div id="analyticsSeriesRates"></div>
               </div>
             </div>
           </div>

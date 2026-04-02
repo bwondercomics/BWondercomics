@@ -100,7 +100,7 @@ Goal: the control room feels real and reliable.
 - [ ] Revamp analytics UX to surface actionable insights (retention, drop-off points, popular entries).
 - [ ] Add retention + session summary metrics with clear definitions.
 - [x] Consider time-based comparisons (this week vs last week). *(Reader analytics shows Δ vs previous window; verified 2026-01-21)*
-- [ ] Make sure evertything works in analytics, and it actually record visitors views.
+- [x] Make sure everything works in analytics, and it actually records visitor views. *(Page reads now use raw reader page views; visitor history + ratio drilldowns verified 2026-04-02.)*
 
 ### Exit criteria
 - [ ] Common admin tasks require no terminal access.

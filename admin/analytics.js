@@ -2,7 +2,8 @@
  * Admin Analytics UI
  *
  * Renders analytics data in the admin dashboard:
- * - Summary cards (reads, finishes, finish rate, avg stop page)
+ * - Summary cards (reads, finishes, finish rate, unique visitors)
+ * - Visitor traffic/acquisition panels from Umami
  * - Reader analytics cards with drill-down charts
  * - Reads over time chart (aggregate and per-entry)
  * - Live visitors ticker
@@ -17,6 +18,8 @@ import { el } from "./dom.js";
 import {
   ANALYTICS_ENDPOINT,
   ANALYTICS_PAGES_ENDPOINT,
+  ANALYTICS_VISITORS_ENDPOINT,
+  ANALYTICS_VISITOR_HISTORY_ENDPOINT,
   ANALYTICS_READER_ENDPOINT,
   ANALYTICS_READER_SERIES_ENDPOINT,
   ANALYTICS_LIVE_ENDPOINT,
@@ -95,14 +98,6 @@ function formatPercent(value) {
   return `${Math.round(num * 100)}%`;
 }
 
-function formatDecimal(value) {
-  if (value === null || value === undefined) return "—";
-  const num = Number(value);
-  if (!Number.isFinite(num)) return "—";
-  const rounded = Math.round(num * 10) / 10;
-  return Number.isInteger(rounded) ? formatStat(rounded) : rounded.toFixed(1);
-}
-
 function formatRangeMinutes(value) {
   const minutes = Number(value);
   if (!Number.isFinite(minutes) || minutes <= 0) return "0m";
@@ -136,6 +131,13 @@ function formatTimeAgo(value) {
   return `${days}d ago`;
 }
 
+function formatDateTime(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString();
+}
+
 /**
  * Calculate health status based on finish rate and week-over-week change.
  * Returns: { status: 'good'|'neutral'|'concern', title: string, summary: string }
@@ -157,31 +159,31 @@ function calculateHealthStatus(readerPayload, weeklyDigest) {
     status = 'good';
     title = 'Your content is performing well';
     if (finishRate >= HEALTH_THRESHOLDS.finishRate.good && readsChange > 0) {
-      summary = `Readers are engaged with a ${Math.round(finishRate * 100)}% finish rate and growing.`;
+      summary = `Readers are engaged with a ${Math.round(finishRate * 100)}% start-to-finish rate and page reads are growing.`;
     } else if (finishRate >= HEALTH_THRESHOLDS.finishRate.good) {
-      summary = `Strong ${Math.round(finishRate * 100)}% finish rate shows readers are completing your content.`;
+      summary = `Strong ${Math.round(finishRate * 100)}% start-to-finish rate shows readers are completing your content.`;
     } else {
-      summary = `Readership is up ${Math.round(readsChange * 100)}% from last week.`;
+      summary = `Page reads are up ${Math.round(readsChange * 100)}% from last week.`;
     }
   }
   // Concern: low finish rate AND negative growth
   else if (finishRate < HEALTH_THRESHOLDS.finishRate.concern && readsChange < HEALTH_THRESHOLDS.weekChange.concern) {
     status = 'concern';
     title = 'Content needs attention';
-    summary = `Finish rate (${Math.round(finishRate * 100)}%) and reads are both down. Consider reviewing recent entries.`;
+    summary = `Start-to-finish rate (${Math.round(finishRate * 100)}%) and page reads are both down. Consider reviewing recent entries.`;
   }
   // Concern: very low finish rate
   else if (finishRate < HEALTH_THRESHOLDS.finishRate.concern) {
     status = 'concern';
     title = 'Readers are dropping off early';
-    summary = `Only ${Math.round(finishRate * 100)}% of readers finish. Check where they're leaving.`;
+    summary = `Only ${Math.round(finishRate * 100)}% of starts convert to finishes. Review your opening pages and pacing.`;
   }
   // Neutral with context
   else {
     if (readsChange > 0) {
-      summary = `Reads are up ${Math.round(readsChange * 100)}% this week with ${Math.round(finishRate * 100)}% finish rate.`;
+      summary = `Page reads are up ${Math.round(readsChange * 100)}% this week with ${Math.round(finishRate * 100)}% start-to-finish rate.`;
     } else if (readsChange < 0) {
-      summary = `Reads are down ${Math.round(Math.abs(readsChange) * 100)}% but finish rate is ${Math.round(finishRate * 100)}%.`;
+      summary = `Page reads are down ${Math.round(Math.abs(readsChange) * 100)}% but start-to-finish rate is ${Math.round(finishRate * 100)}%.`;
     }
   }
 
@@ -212,8 +214,6 @@ function renderHealthIndicator(readerPayload, weeklyDigest) {
   if (!el.healthDot || !el.healthTitle) return;
 
   const health = calculateHealthStatus(readerPayload, weeklyDigest);
-  const tw = health.thisWeek || {};
-  const changes = health.changes || {};
 
   // Update dot color
   el.healthDot.className = `analytics-health-dot ${health.status}`;
@@ -224,43 +224,6 @@ function renderHealthIndicator(readerPayload, weeklyDigest) {
   if (el.healthSummary) {
     el.healthSummary.textContent = health.summary;
   }
-
-  // Update stat values with trends
-  if (el.healthReads) {
-    el.healthReads.textContent = formatStat(tw.reads);
-  }
-  if (el.healthReadsTrend) {
-    const trend = formatTrendHtml(changes.reads);
-    el.healthReadsTrend.textContent = trend.html;
-    el.healthReadsTrend.className = `analytics-health-stat-trend ${trend.className}`;
-  }
-
-  if (el.healthFinishes) {
-    el.healthFinishes.textContent = formatStat(tw.finishes);
-  }
-  if (el.healthFinishesTrend) {
-    const trend = formatTrendHtml(changes.finishes);
-    el.healthFinishesTrend.textContent = trend.html;
-    el.healthFinishesTrend.className = `analytics-health-stat-trend ${trend.className}`;
-  }
-
-  if (el.healthRate) {
-    el.healthRate.textContent = formatPercent(tw.completionRate);
-  }
-  if (el.healthRateTrend) {
-    const trend = formatTrendHtml(changes.completionRate);
-    el.healthRateTrend.textContent = trend.html;
-    el.healthRateTrend.className = `analytics-health-stat-trend ${trend.className}`;
-  }
-
-  if (el.healthVisitors) {
-    el.healthVisitors.textContent = formatStat(tw.uniqueVisitors);
-  }
-  if (el.healthVisitorsTrend) {
-    const trend = formatTrendHtml(changes.uniqueVisitors);
-    el.healthVisitorsTrend.textContent = trend.html;
-    el.healthVisitorsTrend.className = `analytics-health-stat-trend ${trend.className}`;
-  }
 }
 
 /**
@@ -269,11 +232,15 @@ function renderHealthIndicator(readerPayload, weeklyDigest) {
 async function fetchWeeklyDigest() {
   try {
     const res = await fetch(WEEKLY_DIGEST_ENDPOINT, { credentials: "include" });
-    if (!res.ok) return null;
+    if (!res.ok) {
+      lastWeeklyDigest = null;
+      return null;
+    }
     const data = await res.json();
     lastWeeklyDigest = data;
     return data;
   } catch {
+    lastWeeklyDigest = null;
     return null;
   }
 }
@@ -290,17 +257,19 @@ function generateInsightSentence(payload) {
   const topLabel = top?.label || top?.entryTitle || "Unknown";
   const topReads = top?.count || 0;
 
-  // Find finish rate for top entry
-  const topCompletion = (payload?.entryCompletions || [])
-    .find(c => c.label === topLabel || c.entryTitle === topLabel);
-  const finishRate = topCompletion?.rate
-    ? Math.round(topCompletion.rate * 100)
+  const topRate = (payload?.entryRates || [])
+    .find((item) =>
+      String(item?.seriesId || "") === String(top?.seriesId || "") &&
+      Number(item?.displayNumber) === Number(top?.displayNumber),
+    );
+  const finishRate = Number.isFinite(Number(topRate?.completionRate))
+    ? Math.round(Number(topRate.completionRate) * 100)
     : null;
 
   if (finishRate !== null) {
-    return `${topLabel} is your top performer this week with ${topReads} reads and ${finishRate}% finish rate.`;
+    return `${topLabel} leads the selected range with ${topReads} pages read and a ${finishRate}% start-to-finish rate.`;
   }
-  return `${topLabel} leads with ${topReads} reads this week.`;
+  return `${topLabel} leads the selected range with ${topReads} pages read.`;
 }
 
 /**
@@ -369,6 +338,13 @@ function setReaderStatus(message, isError = false) {
   el.analyticsReaderStatus.textContent = message || "";
   el.analyticsReaderStatus.style.display = message ? "block" : "none";
   el.analyticsReaderStatus.className = isError ? "error-message" : "success-message";
+}
+
+function setVisitorHistoryStatus(message, isError = false) {
+  if (!el.analyticsVisitorHistoryStatus) return;
+  el.analyticsVisitorHistoryStatus.textContent = message || "";
+  el.analyticsVisitorHistoryStatus.style.display = message ? "block" : "none";
+  el.analyticsVisitorHistoryStatus.className = isError ? "error-message" : "success-message";
 }
 
 function setLiveStatus(message, isError = false) {
@@ -457,6 +433,9 @@ function normalizeAnalyticsItems(items, labelFn, valueFn) {
       delta: item?.delta,
       deltaPct: item?.deltaPct,
       completionRate: item?.completionRate,
+      starts: item?.starts,
+      finishes: item?.finishes,
+      pageViews: item?.pageViews,
       avgStopPage: item?.avgStopPage,
       medianStopPage: item?.medianStopPage,
     };
@@ -478,24 +457,57 @@ function formatDeltaText(item) {
 
 function formatCompletionRateText(item) {
   const rate = Number(item?.completionRate);
-  if (!Number.isFinite(rate)) return "Finish rate —";
+  if (!Number.isFinite(rate)) return "Rate —";
   const pct = Math.round(rate * 100);
-  return `Finish rate ${pct}%`;
+  return `Start-to-finish ${pct}%`;
 }
 
-function formatStopStatsText(item) {
-  const avgRaw = Number(item?.avgStopPage);
-  const medRaw = Number(item?.medianStopPage);
+function formatStartFinishText(item) {
+  const starts = Number(item?.starts);
+  const finishes = Number(item?.finishes);
+  const startText = Number.isFinite(starts) ? formatStat(starts) : "0";
+  const finishText = Number.isFinite(finishes) ? formatStat(finishes) : "0";
+  return `${startText} starts · ${finishText} finishes`;
+}
+
+function formatBounceRate(item) {
+  const visits = Number(item?.visits);
+  const bounces = Number(item?.bounces);
+  if (!Number.isFinite(visits) || visits <= 0 || !Number.isFinite(bounces)) {
+    return "Bounce —";
+  }
+  return `Bounce ${Math.round((bounces / visits) * 100)}%`;
+}
+
+function formatAverageVisitTime(item) {
+  const totalTime = Number(item?.totaltime);
+  const visits = Number(item?.visits);
+  if (!Number.isFinite(totalTime) || totalTime <= 0 || !Number.isFinite(visits) || visits <= 0) {
+    return "Avg time —";
+  }
+  const averageSeconds = totalTime / visits / 1000;
+  return `Avg time ${formatDuration(averageSeconds)}`;
+}
+
+function formatExpandedMetricText(item) {
   const parts = [];
-  if (Number.isFinite(avgRaw) && avgRaw > 0) {
-    const avgText = avgRaw % 1 === 0 ? avgRaw.toFixed(0) : avgRaw.toFixed(1);
-    parts.push(`Avg ${avgText}`);
+  const pageviews = Number(item?.pageviews);
+  const visits = Number(item?.visits);
+  if (Number.isFinite(pageviews) && pageviews > 0) {
+    parts.push(`${formatStat(pageviews)} views`);
   }
-  if (Number.isFinite(medRaw) && medRaw > 0) {
-    const medText = medRaw % 1 === 0 ? medRaw.toFixed(0) : medRaw.toFixed(1);
-    parts.push(`Med ${medText}`);
+  if (Number.isFinite(visits) && visits > 0) {
+    parts.push(`${formatStat(visits)} visits`);
   }
+  parts.push(formatBounceRate(item));
+  parts.push(formatAverageVisitTime(item));
   return parts.join(" · ");
+}
+
+function formatMetricName(item, fallback = "Unknown") {
+  const raw = String(item?.name || item?.label || item?.path || item?.x || "").trim();
+  if (!raw) return fallback;
+  return raw === "/" ? "/ (home)" : raw;
 }
 
 function extractSeriesName(label) {
@@ -566,8 +578,7 @@ function filterEntryItems(items, seriesFilter) {
       return true;
     }
     // Fallback: extract from label format "Series | Entry N"
-    const label =
-      item?.entryLabel || item?.stopLabel || item?.value || item?.label || "";
+    const label = item?.entryLabel || item?.value || item?.label || "";
     const extractedSeries = extractSeriesName(label);
     return extractedSeries === seriesFilter;
   });
@@ -576,8 +587,7 @@ function filterEntryItems(items, seriesFilter) {
 function clearEntryDetails() {
   const targets = new Set([
     el.analyticsEntryReads?.id,
-    el.analyticsEntryCompletes?.id,
-    el.analyticsEntryStops?.id,
+    el.analyticsEntryRates?.id,
   ]);
   targets.forEach((targetId) => {
     if (targetId) activeReaderDetails.delete(targetId);
@@ -585,12 +595,12 @@ function clearEntryDetails() {
 }
 
 
-function renderMetricList(containerId, items, valueLabel = "Views") {
+function renderMetricList(containerId, items, valueLabel = "Views", emptyText = "No data available") {
   const container = document.getElementById(containerId);
   if (!container) return;
 
   if (!items || !items.length) {
-    container.innerHTML = `<div class="analytics-pages-empty">No data available</div>`;
+    container.innerHTML = `<div class="analytics-pages-empty">${escapeHtml(emptyText)}</div>`;
     return;
   }
 
@@ -601,7 +611,7 @@ function renderMetricList(containerId, items, valueLabel = "Views") {
 
   container.innerHTML = items
     .map((item) => {
-      const label = item.path || item.value || item.label || item.x || "Unknown";
+      const label = item.path || item.name || item.value || item.label || item.x || "Unknown";
       const count = Number(item.views || item.count || item.y || 0);
       const pct = (count / maxVal) * 100;
 
@@ -632,10 +642,6 @@ function renderAnalyticsSummary(summary) {
   setAnalyticsValue(el.statViews7d, last7d.pageviews);
   setAnalyticsValue(el.statVisitors7d, last7d.visitors);
 
-  // Render Referrers & Events
-  renderMetricList("analyticsReferrersList", summary.referrers, "Visits");
-  renderMetricList("analyticsEventsList", summary.events, "Clicks");
-
   const ts = summary?.generatedAt ? new Date(summary.generatedAt) : null;
   const tsText = ts ? ts.toLocaleString() : "just now";
   const siteNote = summary?.websiteId ? ` for site ${summary.websiteId}` : "";
@@ -649,19 +655,77 @@ function clearAnalyticsSummary() {
   setAnalyticsValue(el.statVisitors7d, null);
 }
 
+function clearAnalyticsVisitors() {
+  renderExpandedMetricList(
+    el.analyticsLandingPagesList,
+    [],
+    "No landing-page data available.",
+  );
+  renderExpandedMetricList(
+    el.analyticsReferrersList,
+    [],
+    "No referrer data available.",
+  );
+  renderExpandedMetricList(
+    el.analyticsCountriesList,
+    [],
+    "No country data available.",
+  );
+  renderExpandedMetricList(
+    el.analyticsBrowsersList,
+    [],
+    "No browser data available.",
+  );
+  renderExpandedMetricList(
+    el.analyticsDevicesList,
+    [],
+    "No device data available.",
+  );
+  renderMetricList("analyticsEventsList", [], "Events", "No event data available.");
+}
+
+function renderAnalyticsVisitors(payload) {
+  renderExpandedMetricList(
+    el.analyticsLandingPagesList,
+    payload?.landingPages,
+    "No landing-page data available.",
+  );
+  renderExpandedMetricList(
+    el.analyticsReferrersList,
+    payload?.referrers,
+    "No referrer data available.",
+  );
+  renderExpandedMetricList(
+    el.analyticsCountriesList,
+    payload?.countries,
+    "No country data available.",
+  );
+  renderExpandedMetricList(
+    el.analyticsBrowsersList,
+    payload?.browsers,
+    "No browser data available.",
+  );
+  renderExpandedMetricList(
+    el.analyticsDevicesList,
+    payload?.devices,
+    "No device data available.",
+  );
+  renderMetricList("analyticsEventsList", payload?.events, "Events", "No event data available.");
+}
+
 function renderReaderSummary(payload) {
   if (!payload) return;
   if (el.statEntryReads) {
     el.statEntryReads.textContent = formatStat(payload.entryReadsTotal);
   }
-  if (el.statEntryFinishes) {
-    el.statEntryFinishes.textContent = formatStat(payload.entryFinishesTotal);
+  if (el.statEntryStarts) {
+    el.statEntryStarts.textContent = formatStat(payload.entryStartsTotal);
   }
   if (el.statFinishRate) {
     el.statFinishRate.textContent = formatPercent(payload.finishRate);
   }
-  if (el.statAvgStopPage) {
-    el.statAvgStopPage.textContent = formatDecimal(payload.avgStopPage);
+  if (el.statUniqueVisitors) {
+    el.statUniqueVisitors.textContent = formatStat(payload.uniqueVisitors);
   }
   // Update trends from weekly digest if available
   updateSummaryTrends();
@@ -679,10 +743,10 @@ function updateSummaryTrends() {
     el.statEntryReadsTrend.textContent = trend.html;
     el.statEntryReadsTrend.className = `analytics-trend ${trend.className}`;
   }
-  if (el.statEntryFinishesTrend) {
-    const trend = formatTrendHtml(changes.finishes);
-    el.statEntryFinishesTrend.textContent = trend.html;
-    el.statEntryFinishesTrend.className = `analytics-trend ${trend.className}`;
+  if (el.statEntryStartsTrend) {
+    const trend = formatTrendHtml(changes.starts);
+    el.statEntryStartsTrend.textContent = trend.html;
+    el.statEntryStartsTrend.className = `analytics-trend ${trend.className}`;
   }
   if (el.statFinishRateTrend) {
     const trend = formatTrendHtml(changes.completionRate);
@@ -725,7 +789,11 @@ function renderAnalyticsList(target, items, emptyText, labelFn, options = {}) {
   }
 
   // Calculate average for color-coding (relative performance)
-  const counts = list.map(item => Number(item.count) || 0);
+  const rankFn =
+    typeof options.rankFn === "function"
+      ? options.rankFn
+      : (item) => Number(item.count) || 0;
+  const counts = list.map((item) => Number(rankFn(item)) || 0);
   const avg = counts.length ? counts.reduce((a, b) => a + b, 0) / counts.length : 0;
   const max = Math.max(...counts);
 
@@ -741,27 +809,35 @@ function renderAnalyticsList(target, items, emptyText, labelFn, options = {}) {
         ? `<div class="analytics-reader-sub">${safeSubLabel}</div>`
         : "";
       const value = escapeHtml(item.value);
-      const formatted = formatStat(item.count);
+      const formatted =
+        typeof options.valueFormatter === "function"
+          ? options.valueFormatter(item)
+          : formatStat(item.count);
       const countAttr = escapeHtml(String(item.count ?? ""));
+      const rateAttr = escapeHtml(String(item.completionRate ?? ""));
+      const startsAttr = escapeHtml(String(item.starts ?? ""));
+      const finishesAttr = escapeHtml(String(item.finishes ?? ""));
+      const pageViewsAttr = escapeHtml(String(item.pageViews ?? ""));
       const count = Number(item.count) || 0;
+      const rankValue = Number(rankFn(item)) || 0;
 
       // Color-code: top item green, below average red, others neutral
       let colorClass = '';
       if (counts.length > 1) {
-        if (index === 0 && count === max) {
+        if (index === 0 && rankValue === max) {
           colorClass = 'stat-good';
-        } else if (count < avg * 0.5) {
+        } else if (rankValue < avg * 0.5) {
           colorClass = 'stat-concern';
         }
       }
 
       return `
-        <div class="analytics-reader-item ${colorClass}" data-label="${label}" data-value="${value}" data-count="${countAttr}" data-sub="${safeSubLabel}" data-event="${options.eventName || ""}" data-property="${options.propertyName || ""}">
+        <div class="analytics-reader-item ${colorClass}" data-label="${label}" data-value="${value}" data-count="${countAttr}" data-rate="${rateAttr}" data-starts="${startsAttr}" data-finishes="${finishesAttr}" data-page-views="${pageViewsAttr}" data-sub="${safeSubLabel}" data-event="${options.eventName || ""}" data-property="${options.propertyName || ""}" data-metric="${options.metric || ""}">
           <div class="analytics-reader-label">
             <div>${label}</div>
             ${subHtml}
           </div>
-          <div class="analytics-reader-value">${formatted}</div>
+          <div class="analytics-reader-value">${escapeHtml(formatted)}</div>
         </div>
       `;
     })
@@ -774,32 +850,53 @@ function renderReaderDetail(target, detail) {
   const label = escapeHtml(detail.label || detail.value || "Unknown");
   const rangeKey = isValidRange(detail.range) ? detail.range : "7d";
   const rangeLabel = formatRangeLabel(rangeKey);
-  const totalLabelMap = {
-    reader_page_view: "Reads",
-    reader_entry_complete: "Finishes",
-    reader_entry_exit: "Stops",
-  };
-  const totalLabel = totalLabelMap[detail.eventName] || "Total";
-  const hasCount = detail.count !== null && detail.count !== undefined;
-  const hasSubLabel = Boolean(detail.subLabel);
-  const countText = hasCount ? formatStat(detail.count) : "—";
-  const metaHtml =
-    hasCount || hasSubLabel
-      ? `
+  const metric = detail.metric || "page_views";
+  const isRatioMetric = metric === "completion_rate";
+  const metaItems = [];
+  if (isRatioMetric) {
+    metaItems.push({
+      label: "Rate",
+      value: formatPercent(detail.completionRate),
+      note: detail.pageViews !== null && detail.pageViews !== undefined
+        ? `${formatStat(detail.pageViews)} pages read`
+        : "",
+    });
+    metaItems.push({
+      label: "Starts",
+      value: formatStat(detail.starts),
+      note: "",
+    });
+    metaItems.push({
+      label: "Finishes",
+      value: formatStat(detail.finishes),
+      note: detail.subLabel || "",
+    });
+  } else {
+    metaItems.push({
+      label: "Pages Read",
+      value: formatStat(detail.count),
+      note: detail.subLabel || "",
+    });
+  }
+  const metaHtml = metaItems.length
+    ? `
       <div class="analytics-detail-meta">
-        <div class="analytics-detail-meta-item">
-          <div class="analytics-detail-meta-label">${escapeHtml(totalLabel)}</div>
-          <div class="analytics-detail-meta-value">${escapeHtml(countText)}</div>
-          ${hasSubLabel
-        ? `<div class="analytics-detail-meta-note">${escapeHtml(
-          detail.subLabel,
-        )}</div>`
-        : ""
-      }
-        </div>
+        ${metaItems
+          .map(
+            (item) => `
+          <div class="analytics-detail-meta-item">
+            <div class="analytics-detail-meta-label">${escapeHtml(item.label)}</div>
+            <div class="analytics-detail-meta-value">${escapeHtml(item.value)}</div>
+            ${item.note
+              ? `<div class="analytics-detail-meta-note">${escapeHtml(item.note)}</div>`
+              : ""}
+          </div>
+        `,
+          )
+          .join("")}
       </div>
     `
-      : "";
+    : "";
   const hasSeries = Array.isArray(detail.series) && detail.series.length;
   const startLabel = hasSeries ? formatShortDate(detail.series[0]?.start) : "";
   const endLabel = hasSeries
@@ -814,24 +911,38 @@ function renderReaderDetail(target, detail) {
       detail.error,
     )}</div>`;
   } else if (hasSeries) {
-    const max = detail.series.reduce(
-      (acc, point) => Math.max(acc, Number(point.count) || 0),
-      0,
-    );
+    const max = isRatioMetric
+      ? 100
+      : detail.series.reduce(
+          (acc, point) => Math.max(acc, Number(point.count) || 0),
+          0,
+        );
     const bars = detail.series
       .map((point) => {
+        const rate = Number(point?.completionRate) || 0;
         const count = Number(point.count) || 0;
-        const pct = max > 0 ? Math.max(0, (count / max) * 100) : 0;
-        const height = count > 0 ? Math.max(pct, 3) : 0;
-        const titleText = `${formatShortDate(point.start)}: ${formatStat(
-          count,
-        )}`;
-        const countLabel = count > 0 ? formatStat(count) : "";
+        const pointStarts = Number(point?.starts) || 0;
+        const pointFinishes = Number(point?.finishes) || 0;
+        const metricValue = isRatioMetric ? Math.max(0, Math.min(rate * 100, 100)) : count;
+        const pct = max > 0 ? Math.max(0, (metricValue / max) * 100) : 0;
+        const height = metricValue > 0 ? Math.max(pct, 3) : 0;
+        const titleText = isRatioMetric
+          ? `${formatShortDate(point.start)}: ${formatPercent(rate)} (${formatStat(pointStarts)} starts · ${formatStat(pointFinishes)} finishes)`
+          : `${formatShortDate(point.start)}: ${formatStat(count)} pages read`;
+        const countLabel = isRatioMetric
+          ? pointStarts || pointFinishes
+            ? formatPercent(rate)
+            : ""
+          : count > 0
+            ? formatStat(count)
+            : "";
         const timeLabel = formatBucketLabel(rangeKey, point.end || point.start);
         return `
           <div class="analytics-detail-bar-wrap">
             <div class="analytics-detail-bar-body">
-              <div class="analytics-detail-bar-count">${escapeHtml(
+              <div class="analytics-detail-bar-count" title="${escapeHtml(
+          countLabel || "0",
+        )}">${escapeHtml(
           countLabel,
         )}</div>
               <div class="analytics-detail-bar-slot">
@@ -840,7 +951,9 @@ function renderReaderDetail(target, detail) {
         )}" style="height: ${height.toFixed(1)}%"></div>
               </div>
             </div>
-            <div class="analytics-detail-bar-time">${escapeHtml(
+            <div class="analytics-detail-bar-time" title="${escapeHtml(
+          timeLabel,
+        )}">${escapeHtml(
           timeLabel,
         )}</div>
           </div>
@@ -879,6 +992,127 @@ function renderReaderDetail(target, detail) {
   `;
 }
 
+function renderExpandedMetricList(target, items, emptyText) {
+  if (!target) return;
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) {
+    target.innerHTML = `<div class="analytics-pages-empty">${escapeHtml(emptyText)}</div>`;
+    return;
+  }
+
+  const maxVisitors = Math.max(...list.map((item) => Number(item?.visitors) || 0), 1);
+  target.innerHTML = list
+    .map((item) => {
+      const label = formatMetricName(item);
+      const visitors = Number(item?.visitors) || 0;
+      const pct = (visitors / maxVisitors) * 100;
+      const meta = formatExpandedMetricText(item);
+
+      return `
+        <div class="analytics-page-row" style="margin-bottom: 8px;">
+          <div class="analytics-page-info" style="display: flex; flex-direction: column; width: 100%;">
+            <div class="analytics-page-path" title="${escapeHtml(label)}" style="font-size: 0.9em; margin-bottom: 2px;">${escapeHtml(label)}</div>
+            <div class="analytics-reader-sub" style="margin-top: 0; margin-bottom: 6px;">${escapeHtml(meta)}</div>
+            <div class="analytics-page-bar" style="background: rgba(255, 255, 255, 0.1); border-radius: 4px; overflow: hidden; height: 6px;">
+              <div class="analytics-page-fill" style="width: ${pct}%; background: var(--primary); height: 100%;"></div>
+            </div>
+          </div>
+          <div class="analytics-page-count" style="font-size: 0.85em; margin-top: 2px; text-align: right;">
+            ${formatStat(visitors)} <span style="opacity: 0.6; font-size: 0.9em;">Visitors</span>
+          </div>
+        </div>
+      `;
+    })
+    .join("");
+}
+
+function formatVisitorKey(value) {
+  const text = String(value || "").trim();
+  if (!text) return "Unknown visitor";
+  if (text.length <= 18) return text;
+  return `${text.slice(0, 8)}…${text.slice(-6)}`;
+}
+
+function renderVisitorHistory(payload) {
+  if (!el.analyticsVisitorHistoryList) return;
+  const visitors = Array.isArray(payload?.visitors) ? payload.visitors : [];
+  const totalVisitors = Number(payload?.totalVisitors) || visitors.length;
+  const returned = Number(payload?.returned) || visitors.length;
+  const ts = payload?.generatedAt ? new Date(payload.generatedAt) : null;
+  const tsText = ts ? ts.toLocaleString() : "just now";
+
+  if (el.analyticsVisitorHistoryMeta) {
+    el.analyticsVisitorHistoryMeta.textContent = `Showing ${formatStat(returned)} of ${formatStat(totalVisitors)} visitors. Updated ${tsText}.`;
+  }
+
+  if (!visitors.length) {
+    el.analyticsVisitorHistoryList.innerHTML =
+      '<div class="analytics-pages-empty">No visitor history for this range yet.</div>';
+    return;
+  }
+
+  el.analyticsVisitorHistoryList.innerHTML = visitors
+    .map((visitor) => {
+      const issues = Array.isArray(visitor?.issues) ? visitor.issues : [];
+      const metaLine = [
+        visitor?.country || "",
+        visitor?.browser || "",
+        visitor?.device || "",
+      ]
+        .filter(Boolean)
+        .join(" · ");
+      const issuesHtml = issues.length
+        ? issues
+            .map((issue) => {
+              const issueParts = [`${formatStat(issue?.pagesRead)} pages`];
+              if (issue?.maxPageReached) {
+                issueParts.push(`max page ${formatStat(issue.maxPageReached)}`);
+              }
+              if (issue?.totalPages) {
+                issueParts.push(`${formatStat(issue.totalPages)} total`);
+              }
+              issueParts.push(issue?.finished ? "finished" : "in progress");
+              const title = issue?.entryTitle || `Entry ${issue?.entryDisplayNumber || "?"}`;
+              const seriesTitle = issue?.seriesTitle || issue?.seriesId || "Unknown series";
+              return `
+                <div class="analytics-visitor-issue">
+                  <div class="analytics-visitor-issue-title">${escapeHtml(seriesTitle)} · ${escapeHtml(title)}</div>
+                  <div class="analytics-visitor-issue-meta">${escapeHtml(issueParts.join(" · "))}</div>
+                </div>
+              `;
+            })
+            .join("")
+        : '<div class="analytics-pages-empty" style="margin: 0;">No reader activity in this range.</div>';
+
+      return `
+        <details class="analytics-visitor-row">
+          <summary class="analytics-visitor-summary">
+            <div class="analytics-visitor-summary-main">
+              <div class="analytics-visitor-key" title="${escapeHtml(visitor?.visitorKey || "")}">${escapeHtml(formatVisitorKey(visitor?.visitorKey))}</div>
+              <div class="analytics-visitor-summary-sub">${escapeHtml(metaLine || "Visitor metadata unavailable")}</div>
+            </div>
+            <div class="analytics-visitor-summary-metrics">
+              <span>${formatStat(visitor?.pagesRead)} pages</span>
+              <span>${formatStat(visitor?.issuesStarted)} issues</span>
+              <span>${formatStat(visitor?.issuesFinished)} finished</span>
+            </div>
+          </summary>
+          <div class="analytics-visitor-body">
+            <div class="analytics-visitor-fields">
+              <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">First Seen</span><span>${escapeHtml(formatDateTime(visitor?.firstSeen))}</span></div>
+              <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Last Seen</span><span>${escapeHtml(formatDateTime(visitor?.lastSeen))}</span></div>
+              <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Landing Page</span><span>${escapeHtml(visitor?.landingPage || "—")}</span></div>
+              <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Last Path</span><span>${escapeHtml(visitor?.lastPath || "—")}</span></div>
+              <div class="analytics-visitor-field"><span class="analytics-visitor-field-label">Referrer</span><span>${escapeHtml(visitor?.referrer || "Direct")}</span></div>
+            </div>
+            <div class="analytics-visitor-issues">${issuesHtml}</div>
+          </div>
+        </details>
+      `;
+    })
+    .join("");
+}
+
 async function loadReaderSeries(target, detail, { showLoading = true } = {}) {
   if (!target || !detail) return;
   const requestId = (detail.requestId || 0) + 1;
@@ -891,6 +1125,7 @@ async function loadReaderSeries(target, detail, { showLoading = true } = {}) {
     event: detail.eventName || "",
     property: detail.propertyName || "",
     value: detail.value || "",
+    metric: detail.metric || "page_views",
     range,
     points: "12",
   });
@@ -947,8 +1182,13 @@ function bindReaderInteractions(target) {
     const countRaw = item.dataset.count;
     const countValue =
       countRaw !== undefined && countRaw !== "" ? Number(countRaw) : null;
+    const rateRaw = item.dataset.rate;
+    const startsRaw = item.dataset.starts;
+    const finishesRaw = item.dataset.finishes;
+    const pageViewsRaw = item.dataset.pageViews;
     const eventName = item.dataset.event || "";
     const propertyName = item.dataset.property || "";
+    const metric = item.dataset.metric || "page_views";
     if (!value || !eventName || !propertyName) return;
 
     const detail = {
@@ -956,7 +1196,15 @@ function bindReaderInteractions(target) {
       label,
       value,
       subLabel,
-      count: Number.isNaN(countValue) ? null : countValue,
+      count: metric === "completion_rate" || Number.isNaN(countValue) ? null : countValue,
+      completionRate:
+        rateRaw !== undefined && rateRaw !== "" ? Number(rateRaw) : null,
+      starts: startsRaw !== undefined && startsRaw !== "" ? Number(startsRaw) : null,
+      finishes:
+        finishesRaw !== undefined && finishesRaw !== "" ? Number(finishesRaw) : null,
+      pageViews:
+        pageViewsRaw !== undefined && pageViewsRaw !== "" ? Number(pageViewsRaw) : null,
+      metric,
       eventName,
       propertyName,
       range: getReaderRange(),
@@ -996,6 +1244,7 @@ function renderReaderCard(card) {
     detail.title = card.title || detail.title;
     detail.eventName = card.eventName || detail.eventName;
     detail.propertyName = card.propertyName || detail.propertyName;
+    detail.metric = card.metric || detail.metric;
     const readerRange = getReaderRange();
     const targetRange = detail.rangeLocked ? detail.range : readerRange;
     const rangeChanged = detail.range !== targetRange;
@@ -1030,69 +1279,55 @@ function renderReaderAnalytics(payload) {
   }
 
   const entryViews = filterEntryItems(payload?.entryViews, seriesFilter);
-  const entryCompletions = filterEntryItems(
-    payload?.entryCompletions,
+  const entryRates = filterEntryItems(
+    payload?.entryRates,
     seriesFilter,
   );
-  const entryStops = filterEntryItems(payload?.entryStops, seriesFilter);
 
   const cards = [
     {
       target: el.analyticsEntryReads,
-      title: "Reads",
+      title: "Pages Read",
+      metric: "page_views",
       eventName: "reader_page_view",
       propertyName: "entryLabel",
       items: entryViews,
-      emptyText: "No reads yet. Readers will appear here as they engage with your content.",
+      emptyText: "No page reads yet. Reader pageviews will appear here as visitors move through entries.",
       subLabelFn: (item) => formatDeltaText(item),
     },
     {
       target: el.analyticsSeriesReads,
-      title: "Series Reads",
+      title: "Series Pages Read",
+      metric: "page_views",
       eventName: "reader_page_view",
       propertyName: "series",
       items: payload?.seriesViews,
-      emptyText: "No series data yet. This will populate as readers explore your comics.",
+      emptyText: "No series page-read data yet. This will populate as readers explore your comics.",
       subLabelFn: (item) => formatDeltaText(item),
     },
     {
-      target: el.analyticsEntryCompletes,
-      title: "Finishes",
+      target: el.analyticsEntryRates,
+      title: "Start-to-Finish Rate",
+      metric: "completion_rate",
       eventName: "reader_entry_complete",
       propertyName: "entryLabel",
-      items: entryCompletions,
-      emptyText: "No finishes yet. When readers complete entries, you'll see completion rates here.",
-      subLabelFn: (item) => {
-        const rateText = formatCompletionRateText(item);
-        const deltaText = formatDeltaText(item);
-        return deltaText ? `${rateText} · ${deltaText}` : rateText;
-      },
+      items: entryRates,
+      emptyText: "No start-to-finish data yet. Rates will appear once entries have both starts and finishes.",
+      subLabelFn: (item) => formatStartFinishText(item),
+      valueFormatter: (item) => formatPercent(item?.completionRate),
+      rankFn: (item) => Number(item?.completionRate) || 0,
     },
     {
-      target: el.analyticsSeriesCompletes,
-      title: "Series Finishes",
+      target: el.analyticsSeriesRates,
+      title: "Series Start-to-Finish Rate",
+      metric: "completion_rate",
       eventName: "reader_entry_complete",
       propertyName: "series",
-      items: payload?.seriesCompletions,
-      emptyText: "No series finishes yet. Completion data will show up as readers finish your series.",
-      subLabelFn: (item) => {
-        const rateText = formatCompletionRateText(item);
-        const deltaText = formatDeltaText(item);
-        return deltaText ? `${rateText} · ${deltaText}` : rateText;
-      },
-    },
-    {
-      target: el.analyticsEntryStops,
-      title: "Where They Stop",
-      eventName: "reader_entry_exit",
-      propertyName: "stopLabel",
-      items: entryStops,
-      emptyText: "No stop data yet. This shows where readers leave, helping you identify pacing issues.",
-      labelFn: (item) =>
-        `${item?.entryLabel || item?.label || "Unknown entry"} - page ${item?.page ?? "?"
-        }`,
-      valueFn: (item) => item?.stopLabel || item?.value,
-      subLabelFn: (item) => formatStopStatsText(item),
+      items: payload?.seriesRates,
+      emptyText: "No series conversion data yet. Rates will appear once readers start and finish entries.",
+      subLabelFn: (item) => formatStartFinishText(item),
+      valueFormatter: (item) => formatPercent(item?.completionRate),
+      rankFn: (item) => Number(item?.completionRate) || 0,
     },
   ];
 
@@ -1604,8 +1839,120 @@ async function loadAnalyticsPages({ showLoading = true } = {}) {
   }
 }
 
+async function loadAnalyticsVisitors({ showLoading = true } = {}) {
+  if (!el.analyticsReferrersList) return;
+  const range = getAnalyticsRange();
+  const params = new URLSearchParams({
+    range,
+    limit: "8",
+  });
+
+  if (showLoading) {
+    renderExpandedMetricList(
+      el.analyticsLandingPagesList,
+      [],
+      "Loading visitor data…",
+    );
+    renderExpandedMetricList(
+      el.analyticsReferrersList,
+      [],
+      "Loading visitor data…",
+    );
+    renderExpandedMetricList(
+      el.analyticsCountriesList,
+      [],
+      "Loading visitor data…",
+    );
+    renderExpandedMetricList(
+      el.analyticsBrowsersList,
+      [],
+      "Loading visitor data…",
+    );
+    renderExpandedMetricList(
+      el.analyticsDevicesList,
+      [],
+      "Loading visitor data…",
+    );
+    renderMetricList("analyticsEventsList", [], "Events", "Loading visitor data…");
+  }
+
+  try {
+    const res = await fetch(`${ANALYTICS_VISITORS_ENDPOINT}?${params.toString()}`, {
+      cache: "no-store",
+    });
+    let payload = null;
+    try {
+      payload = await res.json();
+    } catch {
+      payload = null;
+    }
+
+    if (!res.ok) {
+      const errorText =
+        (payload && typeof payload === "object" && payload.error) ||
+        `HTTP ${res.status}`;
+      throw new Error(errorText);
+    }
+
+    renderAnalyticsVisitors(payload || {});
+  } catch (_err) {
+    clearAnalyticsVisitors();
+  }
+}
+
+async function loadVisitorHistory({ showLoading = true } = {}) {
+  if (!el.analyticsVisitorHistoryList) return;
+  const range = getAnalyticsRange();
+  const params = new URLSearchParams({
+    range,
+    limit: "50",
+  });
+
+  if (showLoading) {
+    if (el.analyticsVisitorHistoryMeta) {
+      el.analyticsVisitorHistoryMeta.textContent = "";
+    }
+    el.analyticsVisitorHistoryList.innerHTML =
+      '<div class="analytics-pages-empty">Loading visitor history…</div>';
+    setVisitorHistoryStatus("Loading visitor history…");
+  }
+
+  try {
+    const res = await fetch(
+      `${ANALYTICS_VISITOR_HISTORY_ENDPOINT}?${params.toString()}`,
+      { cache: "no-store" },
+    );
+    let payload = null;
+    try {
+      payload = await res.json();
+    } catch {
+      payload = null;
+    }
+
+    if (!res.ok) {
+      const errorText =
+        (payload && typeof payload === "object" && payload.error) ||
+        `HTTP ${res.status}`;
+      throw new Error(errorText);
+    }
+
+    renderVisitorHistory(payload || {});
+    setVisitorHistoryStatus("");
+  } catch (err) {
+    if (el.analyticsVisitorHistoryMeta) {
+      el.analyticsVisitorHistoryMeta.textContent = "";
+    }
+    el.analyticsVisitorHistoryList.innerHTML =
+      '<div class="analytics-pages-empty">No visitor history available.</div>';
+    setVisitorHistoryStatus(
+      `Analytics error: ${err?.message || "Unable to load visitor history."}`,
+      true,
+    );
+  }
+}
+
 async function loadReaderAnalytics({ showLoading = true } = {}) {
-  if (!el.analyticsEntryReads) return;
+  if (!el.analyticsEntryReads || !el.analyticsEntryRates) return;
   if (showLoading) setReaderStatus("Loading reader analytics…");
   const range = getReaderRange();
   const params = new URLSearchParams({
@@ -1702,14 +2049,14 @@ function drawReadsOverTimeChart() {
   if (!ctx) return;
 
   const rect = canvas.getBoundingClientRect();
+  const width = Math.max(1, Math.floor(rect.width || canvas.clientWidth || 0));
+  const height = Math.max(1, Math.floor(rect.height || canvas.clientHeight || 0));
   const dpr = window.devicePixelRatio || 1;
-  canvas.width = rect.width * dpr;
-  canvas.height = rect.height * dpr;
+  canvas.width = Math.max(1, Math.round(width * dpr));
+  canvas.height = Math.max(1, Math.round(height * dpr));
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
-  const width = rect.width;
-  const height = rect.height;
-  const padding = { top: 20, right: 20, bottom: 30, left: 45 };
+  const padding = { top: 20, right: 20, bottom: 34, left: 45 };
 
   ctx.clearRect(0, 0, width, height);
 
@@ -1724,10 +2071,19 @@ function drawReadsOverTimeChart() {
 
   // Calculate scales
   const maxCount = Math.max(...data.map((d) => d.count || 0), 1);
-  const chartWidth = width - padding.left - padding.right;
-  const chartHeight = height - padding.top - padding.bottom;
-  const xScale = chartWidth / Math.max(data.length - 1, 1);
+  const chartWidth = Math.max(1, width - padding.left - padding.right);
+  const chartHeight = Math.max(1, height - padding.top - padding.bottom);
+  const xScale = data.length > 1 ? chartWidth / (data.length - 1) : 0;
   const yScale = chartHeight / maxCount;
+  const points = data.map((point, index) => {
+    const count = Math.max(0, Number(point?.count) || 0);
+    const x =
+      data.length === 1
+        ? padding.left + chartWidth / 2
+        : padding.left + index * xScale;
+    const y = padding.top + chartHeight - count * yScale;
+    return { ...point, count, x, y };
+  });
 
   // Draw grid lines
   ctx.strokeStyle = "rgba(255,255,255,0.12)";
@@ -1749,16 +2105,15 @@ function drawReadsOverTimeChart() {
   gradient.addColorStop(1, "rgba(255, 237, 0, 0)");
 
   ctx.beginPath();
-  data.forEach((point, i) => {
-    const x = padding.left + i * xScale;
-    const y = padding.top + chartHeight - (point.count || 0) * yScale;
+  points.forEach((point, i) => {
+    const { x, y } = point;
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   });
   // Close the path to create the fill area
-  const lastX = padding.left + (data.length - 1) * xScale;
+  const lastX = points[points.length - 1]?.x ?? padding.left;
   ctx.lineTo(lastX, padding.top + chartHeight);
-  ctx.lineTo(padding.left, padding.top + chartHeight);
+  ctx.lineTo(points[0]?.x ?? padding.left, padding.top + chartHeight);
   ctx.closePath();
   ctx.fillStyle = gradient;
   ctx.fill();
@@ -1767,13 +2122,13 @@ function drawReadsOverTimeChart() {
   ctx.strokeStyle = lineColor;
   ctx.lineWidth = 2;
   ctx.lineJoin = "round";
+  ctx.lineCap = "round";
   ctx.shadowColor = glowColor;
   ctx.shadowBlur = 6;
   ctx.beginPath();
 
-  data.forEach((point, i) => {
-    const x = padding.left + i * xScale;
-    const y = padding.top + chartHeight - (point.count || 0) * yScale;
+  points.forEach((point, i) => {
+    const { x, y } = point;
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   });
@@ -1782,11 +2137,11 @@ function drawReadsOverTimeChart() {
 
   // Draw points
   ctx.fillStyle = lineColor;
-  data.forEach((point, i) => {
-    const x = padding.left + i * xScale;
-    const y = padding.top + chartHeight - (point.count || 0) * yScale;
+  const pointRadius = data.length > 21 ? 2 : 3;
+  points.forEach((point) => {
+    const { x, y } = point;
     ctx.beginPath();
-    ctx.arc(x, y, 3, 0, Math.PI * 2);
+    ctx.arc(x, y, pointRadius, 0, Math.PI * 2);
     ctx.fill();
   });
 
@@ -1794,13 +2149,13 @@ function drawReadsOverTimeChart() {
   ctx.fillStyle = "rgba(255,255,255,0.7)";
   ctx.font = "10px sans-serif";
   ctx.textAlign = "center";
-  const step = Math.max(1, Math.floor(data.length / 7));
-  data.forEach((point, i) => {
-    if (i % step === 0 || i === data.length - 1) {
-      const x = padding.left + i * xScale;
+  const maxLabels = Math.max(2, Math.floor(chartWidth / 72));
+  const step = Math.max(1, Math.ceil(data.length / maxLabels));
+  points.forEach((point, i) => {
+    if (i % step === 0 || i === points.length - 1) {
       const date = new Date(point.date);
       const label = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-      ctx.fillText(label, x, height - 10);
+      ctx.fillText(label, point.x, height - 10);
     }
   });
 
@@ -1828,7 +2183,7 @@ async function loadReadsOverTime({ showLoading = true } = {}) {
   const params = new URLSearchParams({ range });
   if (entryId) params.append("entry_id", entryId);
 
-  if (showLoading) setReadsOverTimeStatus("Loading chart data…");
+  if (showLoading) setReadsOverTimeStatus("Loading pages-read chart…");
 
   try {
     const res = await fetch(`${READS_OVER_TIME_ENDPOINT}?${params.toString()}`, {
@@ -1853,7 +2208,7 @@ async function loadReadsOverTime({ showLoading = true } = {}) {
     // Update totals display
     if (el.readsOverTimeTotals && payload?.totals) {
       const { reads, uniqueVisitors } = payload.totals;
-      el.readsOverTimeTotals.textContent = `Total: ${formatStat(reads)} reads · ${formatStat(uniqueVisitors)} visitors`;
+      el.readsOverTimeTotals.textContent = `Total: ${formatStat(reads)} pages read · ${formatStat(uniqueVisitors)} visitors`;
     }
 
     setReadsOverTimeStatus("");
@@ -1899,6 +2254,8 @@ function createAnalytics({ hideAllSections, setActiveNav }) {
   function refreshAnalytics({ showLoading = true } = {}) {
     loadAnalyticsSummary({ showLoading });
     loadAnalyticsPages({ showLoading });
+    loadAnalyticsVisitors({ showLoading });
+    loadVisitorHistory({ showLoading });
 
     // Fetch reader analytics and weekly digest in parallel, then render health indicator
     const readerPromise = loadReaderAnalytics({ showLoading }).then(() => {
@@ -1934,6 +2291,8 @@ function createAnalytics({ hideAllSections, setActiveNav }) {
   return {
     loadAnalyticsSummary,
     loadAnalyticsPages,
+    loadAnalyticsVisitors,
+    loadVisitorHistory,
     loadReaderAnalytics,
     loadReadsOverTime,
     loadLiveVisitors,

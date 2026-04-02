@@ -3,6 +3,8 @@ const DEFAULT_SERIES_ID = "battle-bros";
 const ACTIVE_SERIES_KEY = "battlebros_admin_active_series";
 const ANALYTICS_ENDPOINT = "/api/admin/analytics/summary";
 const ANALYTICS_PAGES_ENDPOINT = "/api/admin/analytics/pages";
+const ANALYTICS_VISITORS_ENDPOINT = "/api/admin/analytics/visitors";
+const ANALYTICS_VISITOR_HISTORY_ENDPOINT = "/api/admin/analytics/visitor-history";
 const ANALYTICS_READER_ENDPOINT = "/api/admin/analytics/reader";
 const ANALYTICS_READER_SERIES_ENDPOINT = "/api/admin/analytics/reader-series";
 const ANALYTICS_LIVE_ENDPOINT = "/api/admin/analytics/live";
@@ -44,6 +46,8 @@ export {
   ACTIVE_SERIES_KEY,
   ANALYTICS_ENDPOINT,
   ANALYTICS_PAGES_ENDPOINT,
+  ANALYTICS_VISITORS_ENDPOINT,
+  ANALYTICS_VISITOR_HISTORY_ENDPOINT,
   ANALYTICS_READER_ENDPOINT,
   ANALYTICS_READER_SERIES_ENDPOINT,
   ANALYTICS_LIVE_ENDPOINT,

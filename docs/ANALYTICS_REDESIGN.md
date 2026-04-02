@@ -1,15 +1,35 @@
 # Reader Analytics Redesign Plan
 
+Status: partially implemented in admin as of April 2026.
+
 ## User Goals
 - **Primary**: Quick answer to "Is my content performing well?"
 - **Priority**: Visual/aesthetic cleanup first
 
 ## Current State
 The analytics dashboard currently shows:
-- Summary cards: Entry Reads, Finishes, Finish Rate, Avg Stop Page
-- Reads Over Time: Line chart with aggregate/per-entry views
-- Five metric cards: Entry Reads, Series Reads, Entry Finishes, Series Finishes, Stop Page
-- Weekly Digest: This week vs last week comparison
+- Summary cards: `Pages Read`, `Entry Starts`, `Start-to-Finish Rate`, `Unique Visitors`
+- Sitewide traffic panels: `Page Reads`, landing pages, referrers, countries, browsers, devices, top events
+- `Pages Read Over Time`: line chart using raw `reader_page_view` totals
+- Reader tabs:
+  - `Pages Read`
+  - `Start-to-Finish Rate`
+- `Visitor History`: range-based expandable table with visitor metadata + issue progress
+- Weekly Digest: this week vs last week comparison using page reads, starts, completion rate, visitors
+
+### Implemented changes
+- Health header kept as dot + headline + summary only.
+- Stop/drop-off UI removed from admin.
+- Reader reads were redefined to page views where the UI says `Pages Read`.
+- Raw finish lists were replaced by rate lists using unique starts vs unique finishes.
+- Ratio drilldowns now use `/api/admin/analytics/reader-series?metric=completion_rate`.
+- Historical visitor inspection is available without mixing it into the live visitor panel.
+
+### Still future work
+- Retention/cohort analysis
+- Funnel visualization
+- Session summaries with clearer visit-level definitions
+- Stronger recommendations/alerts beyond the current health summary
 
 ## Pain Points
 
@@ -21,7 +41,7 @@ The analytics dashboard currently shows:
 ### 2. Missing Context
 - Raw numbers without benchmarks ("Is 14 reads good?")
 - No comparison to typical/expected performance
-- Stop page data doesn't show why readers leave
+- Completion rate still lacks deeper retention context
 
 ### 3. Not Actionable
 - Data tells you what happened, not what to do
@@ -77,13 +97,13 @@ Apply to: summary cards, list items, chart areas
 ### Phase 2: Simplify Information
 Goal: Answer "how am I doing?" without scrolling
 
-#### Consolidate Five Cards → Two
-- "Entry Performance" (combines reads + finishes + stop page)
-- "Series Performance" (series-level summary)
-- Use tabs instead of separate cards
+#### Consolidate Performance Cards
+- [x] Entry/series views moved into tabbed `Entry Performance` and `Series Performance`
+- [x] Stop-page panel removed
+- [x] Right-hand cards changed from raw finishes to `Start-to-Finish Rate`
 
 #### Summary Sentence
-- Auto-generated: "Entry 5 is your top performer this week with 14 reads and 78% finish rate"
+- [x] Auto-generated summary now uses pages read + start-to-finish rate
 - Highlight outliers (unusually good or bad)
 
 #### Better Empty States

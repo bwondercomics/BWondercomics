@@ -51,14 +51,6 @@ function formatPercent(value) {
   return `${Math.round(num * 100)}%`;
 }
 
-function formatDecimal(value) {
-  if (value === null || value === undefined) return "-";
-  const num = Number(value);
-  if (!Number.isFinite(num)) return "-";
-  const rounded = Math.round(num * 10) / 10;
-  return Number.isInteger(rounded) ? formatStat(rounded) : rounded.toFixed(1);
-}
-
 function parseDate(value) {
   if (!value) return null;
   const date = new Date(value);
@@ -393,14 +385,14 @@ function renderReaderSummary(payload) {
   if (el.dashEntryReads) {
     el.dashEntryReads.textContent = formatStat(safe.entryReadsTotal);
   }
-  if (el.dashEntryFinishes) {
-    el.dashEntryFinishes.textContent = formatStat(safe.entryFinishesTotal);
+  if (el.dashEntryStarts) {
+    el.dashEntryStarts.textContent = formatStat(safe.entryStartsTotal);
   }
   if (el.dashFinishRate) {
     el.dashFinishRate.textContent = formatPercent(safe.finishRate);
   }
-  if (el.dashAvgStopPage) {
-    el.dashAvgStopPage.textContent = formatDecimal(safe.avgStopPage);
+  if (el.dashUniqueVisitors) {
+    el.dashUniqueVisitors.textContent = formatStat(safe.uniqueVisitors);
   }
 }
 
@@ -443,8 +435,8 @@ function renderWeeklyDigest(payload) {
   if (el.weeklyDigestReads) {
     el.weeklyDigestReads.textContent = formatStat(tw.reads);
   }
-  if (el.weeklyDigestFinishes) {
-    el.weeklyDigestFinishes.textContent = formatStat(tw.finishes);
+  if (el.weeklyDigestStarts) {
+    el.weeklyDigestStarts.textContent = formatStat(tw.starts);
   }
   if (el.weeklyDigestCompletionRate) {
     el.weeklyDigestCompletionRate.textContent = formatPercent(tw.completionRate);
@@ -456,8 +448,8 @@ function renderWeeklyDigest(payload) {
   if (el.weeklyDigestReadsChange) {
     el.weeklyDigestReadsChange.innerHTML = formatChangeIndicator(changes.reads);
   }
-  if (el.weeklyDigestFinishesChange) {
-    el.weeklyDigestFinishesChange.innerHTML = formatChangeIndicator(changes.finishes);
+  if (el.weeklyDigestStartsChange) {
+    el.weeklyDigestStartsChange.innerHTML = formatChangeIndicator(changes.starts);
   }
   if (el.weeklyDigestCompletionRateChange) {
     el.weeklyDigestCompletionRateChange.innerHTML = formatChangeIndicator(changes.completionRate);

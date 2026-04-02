@@ -2,8 +2,9 @@
 Admin Analytics API routes.
 
 Provides reader analytics data for the admin dashboard:
-- Entry/series reads, finishes, stop pages
+- Entry/series reads and finishes
 - Time-series data for charts
+- Visitor acquisition/technology breakdowns
 - Live visitor counts
 
 Key implementation notes:
@@ -21,12 +22,18 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import func, select, text
+from sqlalchemy import func, inspect as sa_inspect, select, text
 from sqlalchemy.orm import Session
 
 from ..db import get_db, get_umami_db
 from ..models import Entry, EntryPage, Series, User, VisitorSession
 from ..settings import settings
+from ..umami_api import (
+    UmamiAPIError,
+    fetch_umami_expanded_metrics,
+    fetch_umami_metrics,
+    fetch_umami_stats,
+)
 from .admin_utils import iso_z, require_admin
 
 router = APIRouter()
@@ -68,6 +75,404 @@ def _extract_display_number(label: str | None) -> int | None:
         except ValueError:
             return None
     return None
+
+
+def _range_to_days(range_value: str | None, default_days: int) -> int:
+    mapping = {
+        "24h": 1,
+        "7d": 7,
+        "30d": 30,
+        "90d": 90,
+    }
+    return mapping.get((range_value or "").strip(), default_days)
+
+
+def _coerce_datetime(value):
+    if isinstance(value, datetime):
+        return value
+    if isinstance(value, str):
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            return value
+    return value
+
+
+def _build_entry_lookup(db: Session) -> tuple[dict[tuple[str, int], dict], set[tuple[str, int]]]:
+    entries = db.scalars(select(Entry)).all()
+    page_counts = {
+        entry_id: count
+        for entry_id, count in db.execute(
+            select(EntryPage.entry_id, func.count()).group_by(EntryPage.entry_id)
+        ).all()
+    }
+    series_map = {s.id: s for s in db.scalars(select(Series)).all()}
+
+    entry_lookup: dict[tuple[str, int], dict] = {}
+    empty_entry_keys: set[tuple[str, int]] = set()
+    for entry in entries:
+        series_id = entry.series_id or ""
+        display_num = entry.display_number
+        if display_num is None:
+            continue
+
+        key = (series_id, int(display_num))
+        page_count = int(page_counts.get(entry.id) or 0)
+        if page_count <= 0:
+            empty_entry_keys.add(key)
+        entry_lookup[key] = {
+            "seriesId": series_id,
+            "entryTitle": entry.title or "",
+            "pageCount": page_count or None,
+            "seriesTitle": series_map.get(series_id).title if series_id in series_map else None,
+        }
+
+    return entry_lookup, empty_entry_keys
+
+
+def _parse_reader_entry_key(
+    series_id: str | None,
+    entry_label: str | None,
+    empty_entry_keys: set[tuple[str, int]],
+) -> tuple[str, int] | None:
+    sid = series_id or ""
+    display_num = _extract_display_number(entry_label)
+    if display_num is None:
+        return None
+    key = (sid, display_num)
+    if key in empty_entry_keys:
+        return None
+    return key
+
+
+def _fetch_page_view_rows(
+    umami_db: Session,
+    start_time: datetime,
+    end_time: datetime,
+    website_filter: str,
+    website_params: dict,
+):
+    visitor_key_expr = _umami_visitor_key_expr(umami_db)
+    query = text(
+        f"""
+        SELECT
+            we.created_at,
+            we.session_id,
+            {visitor_key_expr} AS visitor_key,
+            ed_series.string_value as series_id,
+            ed_entry.string_value as entry_label,
+            ed_page.number_value as page_number,
+            ed_total.number_value as total_pages
+        FROM website_event we
+        LEFT JOIN session s ON we.session_id = s.session_id
+        LEFT JOIN event_data ed_series ON we.event_id = ed_series.website_event_id AND ed_series.data_key = 'series'
+        LEFT JOIN event_data ed_entry ON we.event_id = ed_entry.website_event_id AND ed_entry.data_key = 'entryLabel'
+        LEFT JOIN event_data ed_page ON we.event_id = ed_page.website_event_id AND ed_page.data_key = 'page'
+        LEFT JOIN event_data ed_total ON we.event_id = ed_total.website_event_id AND ed_total.data_key = 'totalPages'
+        WHERE we.event_name = 'reader_page_view'
+            AND we.created_at >= :start_time
+            AND we.created_at < :end_time
+            {website_filter}
+    """
+    )
+    rows = umami_db.execute(
+        query,
+        {
+            "start_time": start_time,
+            "end_time": end_time,
+            **website_params,
+        },
+    ).fetchall()
+    return [
+        (
+            _coerce_datetime(created_at),
+            session_id,
+            visitor_key,
+            series_id,
+            entry_label,
+            page_number,
+            total_pages,
+        )
+        for created_at, session_id, visitor_key, series_id, entry_label, page_number, total_pages in rows
+    ]
+
+
+def _fetch_completion_rows(
+    umami_db: Session,
+    start_time: datetime,
+    end_time: datetime,
+    website_filter: str,
+    website_params: dict,
+):
+    visitor_key_expr = _umami_visitor_key_expr(umami_db)
+    query = text(
+        f"""
+        SELECT
+            we.created_at,
+            we.session_id,
+            {visitor_key_expr} AS visitor_key,
+            ed_series.string_value as series_id,
+            ed_entry.string_value as entry_label
+        FROM website_event we
+        LEFT JOIN session s ON we.session_id = s.session_id
+        LEFT JOIN event_data ed_series ON we.event_id = ed_series.website_event_id AND ed_series.data_key = 'series'
+        LEFT JOIN event_data ed_entry ON we.event_id = ed_entry.website_event_id AND ed_entry.data_key = 'entryLabel'
+        WHERE we.event_name = 'reader_entry_complete'
+            AND we.created_at >= :start_time
+            AND we.created_at < :end_time
+            {website_filter}
+    """
+    )
+    rows = umami_db.execute(
+        query,
+        {
+            "start_time": start_time,
+            "end_time": end_time,
+            **website_params,
+        },
+    ).fetchall()
+    return [
+        (
+            _coerce_datetime(created_at),
+            session_id,
+            visitor_key,
+            series_id,
+            entry_label,
+        )
+        for created_at, session_id, visitor_key, series_id, entry_label in rows
+    ]
+
+
+def _umami_visitor_key_expr(umami_db: Session) -> str:
+    session_columns = _umami_session_columns(umami_db)
+    if "distinct_id" in session_columns:
+        return "COALESCE(CAST(s.distinct_id AS TEXT), CAST(we.session_id AS TEXT))"
+    if "visitor_id" in session_columns:
+        return "COALESCE(CAST(s.visitor_id AS TEXT), CAST(we.session_id AS TEXT))"
+    return "CAST(we.session_id AS TEXT)"
+
+
+def _umami_session_columns(umami_db: Session) -> set[str]:
+    bind = umami_db.get_bind()
+    cached = getattr(bind, "_bw_umami_session_columns", None)
+    if isinstance(cached, set):
+        return cached
+    try:
+        session_columns = {
+            str(column.get("name") or "")
+            for column in sa_inspect(umami_db.get_bind()).get_columns("session")
+        }
+    except Exception:
+        session_columns = set()
+    try:
+        setattr(bind, "_bw_umami_session_columns", session_columns)
+    except Exception:
+        pass
+    return session_columns
+
+
+def _sql_text_literal(value: str) -> str:
+    escaped = str(value or "").replace("'", "''")
+    return f"'{escaped}'"
+
+
+def _umami_session_text_expr(
+    umami_db: Session,
+    *candidates: str,
+    default: str = "",
+) -> str:
+    session_columns = _umami_session_columns(umami_db)
+    exprs = [
+        f"NULLIF(TRIM(CAST(s.{column} AS TEXT)), '')"
+        for column in candidates
+        if column in session_columns
+    ]
+    if not exprs:
+        return _sql_text_literal(default)
+    return f"COALESCE({', '.join(exprs)}, {_sql_text_literal(default)})"
+
+
+def _build_reader_entry_stat(
+    entry_lookup: dict[tuple[str, int], dict],
+    key: tuple[str, int],
+    total_pages: int | None = None,
+) -> dict:
+    base = entry_lookup.get(key) or {}
+    sid, display_num = key
+    page_count = base.get("pageCount")
+    if not page_count and total_pages:
+        try:
+            page_count = int(total_pages)
+        except (TypeError, ValueError):
+            page_count = None
+    return {
+        "seriesId": sid,
+        "seriesTitle": base.get("seriesTitle"),
+        "entryTitle": base.get("entryTitle") or f"Entry {display_num}",
+        "displayNumber": display_num,
+        "pageCount": page_count,
+        "pagesRead": 0,
+        "startSessions": set(),
+        "finishSessions": set(),
+    }
+
+
+def _collect_reader_window_metrics(
+    umami_db: Session,
+    start_time: datetime,
+    end_time: datetime,
+    website_filter: str,
+    website_params: dict,
+    entry_lookup: dict[tuple[str, int], dict],
+    empty_entry_keys: set[tuple[str, int]],
+) -> dict:
+    stats: dict[tuple[str, int], dict] = {}
+    entry_page_views: dict[tuple[str, int], int] = defaultdict(int)
+    series_page_views: dict[str, int] = defaultdict(int)
+    unique_visitor_ids: set[str] = set()
+
+    page_view_rows = _fetch_page_view_rows(
+        umami_db,
+        start_time,
+        end_time,
+        website_filter,
+        website_params,
+    )
+    completion_rows = _fetch_completion_rows(
+        umami_db,
+        start_time,
+        end_time,
+        website_filter,
+        website_params,
+    )
+
+    for _created_at, session_id, visitor_id, series_id, entry_label, _page_number, total_pages in page_view_rows:
+        key = _parse_reader_entry_key(series_id, entry_label, empty_entry_keys)
+        if not key:
+            continue
+        if visitor_id:
+            unique_visitor_ids.add(str(visitor_id))
+
+        entry_stat = stats.get(key)
+        if not entry_stat:
+            entry_stat = _build_reader_entry_stat(entry_lookup, key, total_pages)
+            stats[key] = entry_stat
+        elif total_pages and not entry_stat.get("pageCount"):
+            try:
+                entry_stat["pageCount"] = int(total_pages)
+            except (TypeError, ValueError):
+                pass
+
+        entry_stat["pagesRead"] += 1
+        entry_page_views[key] += 1
+        series_page_views[key[0]] += 1
+        if session_id:
+            entry_stat["startSessions"].add(str(session_id))
+
+    for _created_at, session_id, visitor_id, series_id, entry_label in completion_rows:
+        key = _parse_reader_entry_key(series_id, entry_label, empty_entry_keys)
+        if not key:
+            continue
+        if visitor_id:
+            unique_visitor_ids.add(str(visitor_id))
+
+        entry_stat = stats.get(key)
+        if not entry_stat:
+            entry_stat = _build_reader_entry_stat(entry_lookup, key)
+            stats[key] = entry_stat
+        if session_id:
+            entry_stat["finishSessions"].add(str(session_id))
+
+    entry_start_counts = {
+        key: len(entry_stat["startSessions"]) for key, entry_stat in stats.items()
+    }
+    entry_finish_counts = {
+        key: len(entry_stat["finishSessions"]) for key, entry_stat in stats.items()
+    }
+    series_start_counts: dict[str, int] = defaultdict(int)
+    series_finish_counts: dict[str, int] = defaultdict(int)
+    for (sid, _display_num), count in entry_start_counts.items():
+        series_start_counts[sid] += count
+    for (sid, _display_num), count in entry_finish_counts.items():
+        series_finish_counts[sid] += count
+
+    total_page_views = sum(entry_page_views.values())
+    total_starts = sum(entry_start_counts.values())
+    total_finishes = sum(entry_finish_counts.values())
+
+    return {
+        "stats": stats,
+        "entryPageViews": entry_page_views,
+        "seriesPageViews": series_page_views,
+        "entryStarts": entry_start_counts,
+        "entryFinishes": entry_finish_counts,
+        "seriesStarts": series_start_counts,
+        "seriesFinishes": series_finish_counts,
+        "totalPageViews": total_page_views,
+        "totalStarts": total_starts,
+        "totalFinishes": total_finishes,
+        "uniqueVisitors": unique_visitor_ids,
+    }
+
+
+def _fetch_visitor_activity_rows(
+    umami_db: Session,
+    start_time: datetime,
+    end_time: datetime,
+    website_filter: str,
+    website_params: dict,
+):
+    visitor_key_expr = _umami_visitor_key_expr(umami_db)
+    referrer_expr = _umami_session_text_expr(
+        umami_db,
+        "referrer_domain",
+        "referrer",
+        "referrer_path",
+        default="",
+    )
+    country_expr = _umami_session_text_expr(umami_db, "country", default="")
+    browser_expr = _umami_session_text_expr(umami_db, "browser", default="")
+    device_expr = _umami_session_text_expr(umami_db, "device", default="")
+    query = text(
+        f"""
+        SELECT
+            we.created_at,
+            we.session_id,
+            {visitor_key_expr} AS visitor_key,
+            COALESCE(CAST(we.url_path AS TEXT), '') AS url_path,
+            {referrer_expr} AS referrer,
+            {country_expr} AS country,
+            {browser_expr} AS browser,
+            {device_expr} AS device
+        FROM website_event we
+        LEFT JOIN session s ON we.session_id = s.session_id
+        WHERE we.created_at >= :start_time
+            AND we.created_at < :end_time
+            {website_filter}
+        ORDER BY we.created_at ASC, we.session_id ASC
+        """
+    )
+    rows = umami_db.execute(
+        query,
+        {
+            "start_time": start_time,
+            "end_time": end_time,
+            **website_params,
+        },
+    ).fetchall()
+    return [
+        (
+            _coerce_datetime(created_at),
+            session_id,
+            str(visitor_key or session_id or "").strip(),
+            str(url_path or "").strip(),
+            str(referrer or "").strip(),
+            str(country or "").strip(),
+            str(browser or "").strip(),
+            str(device or "").strip(),
+        )
+        for created_at, session_id, visitor_key, url_path, referrer, country, browser, device in rows
+    ]
 
 
 @router.get("/api/admin/analytics/live")
@@ -152,74 +557,386 @@ def admin_page_reads(
 
     now = datetime.now(timezone.utc)
     start = now - timedelta(days=days)
-    website_id = _get_umami_website_id()
-    website_filter, website_params = _umami_website_filter(website_id)
+    start_ms = int(start.timestamp() * 1000)
+    end_ms = int(now.timestamp() * 1000)
 
     try:
-        with get_umami_db() as umami_db:
-            # Query total page views from Umami (standard page views have NULL event_name)
-            total_query = text(f"""
-                SELECT COUNT(*)
-                FROM website_event we
-                WHERE we.event_name IS NULL
-                    AND we.created_at >= :start_time
-                    {website_filter}
-            """)
-            total = (
-                umami_db.execute(total_query, {"start_time": start, **website_params}).scalar() or 0
-            )
-
-            # Query page views grouped by path
-            pages_query = text(f"""
-                SELECT
-                    we.url_path as path,
-                    COUNT(*) as views,
-                    COUNT(DISTINCT s.visitor_id) as visitors
-                FROM website_event we
-                JOIN session s ON we.session_id = s.session_id
-                WHERE we.event_name IS NULL
-                    AND we.created_at >= :start_time
-                    {website_filter}
-                GROUP BY we.url_path
-                ORDER BY views DESC
-                LIMIT :limit
-            """)
-            rows = umami_db.execute(
-                pages_query,
-                {
-                    "start_time": start,
-                    "limit": limit,
-                    **website_params,
-                },
-            ).fetchall()
-
-    except Exception as e:
-        return {
-            "generatedAt": iso_z(now),
-            "windowDays": days,
-            "error": f"Umami query failed: {str(e)}",
-            "total": 0,
-            "pages": [],
-        }
+        stats = fetch_umami_stats({"selected": (start_ms, end_ms)})
+        rows = fetch_umami_expanded_metrics(start_ms, end_ms, metric_type="path", limit=limit)
+    except UmamiAPIError as exc:
+        return JSONResponse(status_code=502, content={"error": f"Umami API error: {exc}"})
 
     pages = []
-    for path, views, visitors in rows:
+    for item in rows or []:
+        if not isinstance(item, dict):
+            continue
+        path = str(item.get("name") or "").strip()
+        views = int(item.get("pageviews") or 0)
+        visitors = int(item.get("visitors") or 0)
         if not path:
             continue
         pages.append(
             {
-                "path": path or "",
-                "title": "",  # Umami doesn't store page title in website_event
-                "views": int(views or 0),
-                "visitors": int(visitors or 0),
+                "path": path,
+                "title": "",
+                "views": views,
+                "visitors": visitors,
             }
         )
 
     return {
         "generatedAt": iso_z(now),
         "windowDays": days,
-        "total": int(total),
+        "total": int((stats.get("selected") or {}).get("pageviews") or 0),
         "pages": pages,
+    }
+
+
+def _shape_expanded_metrics(rows: list[dict]) -> list[dict]:
+    shaped = []
+    for item in rows or []:
+        if not isinstance(item, dict):
+            continue
+        name = str(item.get("name") or "").strip()
+        shaped.append(
+            {
+                "name": name,
+                "visitors": int(item.get("visitors") or 0),
+                "visits": int(item.get("visits") or 0),
+                "pageviews": int(item.get("pageviews") or 0),
+                "bounces": int(item.get("bounces") or 0),
+                "totaltime": int(item.get("totaltime") or 0),
+            }
+        )
+    return shaped
+
+
+def _shape_metric_events(rows: list[dict]) -> list[dict]:
+    return [
+        {"name": str(item.get("x") or "").strip(), "count": int(item.get("y") or 0)}
+        for item in rows or []
+        if isinstance(item, dict) and str(item.get("x") or "").strip()
+    ]
+
+
+def _fetch_top_events(
+    start_time: datetime,
+    end_time: datetime,
+    start_ms: int,
+    end_ms: int,
+    website_filter: str,
+    website_params: dict,
+    limit: int,
+) -> list[dict]:
+    try:
+        events = _shape_metric_events(
+            fetch_umami_metrics(start_ms, end_ms, metric_type="event", limit=limit)
+        )
+        if events:
+            return events
+    except UmamiAPIError:
+        pass
+
+    try:
+        with get_umami_db() as umami_db:
+            rows = umami_db.execute(
+                text(
+                    f"""
+                    SELECT
+                        we.event_name,
+                        COUNT(*) AS event_count
+                    FROM website_event we
+                    WHERE we.event_name IS NOT NULL
+                        AND we.event_name <> ''
+                        AND we.created_at >= :start_time
+                        AND we.created_at < :end_time
+                        {website_filter}
+                    GROUP BY we.event_name
+                    ORDER BY event_count DESC, we.event_name ASC
+                    LIMIT :limit
+                    """
+                ),
+                {
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "limit": limit,
+                    **website_params,
+                },
+            ).fetchall()
+    except Exception:
+        return []
+
+    return [
+        {"name": str(event_name).strip(), "count": int(event_count or 0)}
+        for event_name, event_count in rows
+        if str(event_name or "").strip()
+    ]
+
+
+@router.get("/api/admin/analytics/visitors")
+def admin_visitor_analytics(
+    request: Request,
+    db: Session = Depends(get_db),
+    range: str = Query("7d"),
+    limit: int = Query(10, ge=1, le=100),
+):
+    if not require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    now = datetime.now(timezone.utc)
+    days = _range_to_days(range, 7)
+    start = now - timedelta(days=days)
+    start_ms = int(start.timestamp() * 1000)
+    end_ms = int(now.timestamp() * 1000)
+    website_id = _get_umami_website_id()
+    website_filter, website_params = _umami_website_filter(website_id)
+
+    try:
+        referrers = fetch_umami_expanded_metrics(
+            start_ms, end_ms, metric_type="referrer", limit=limit
+        )
+        landing_pages = fetch_umami_expanded_metrics(start_ms, end_ms, metric_type="path", limit=limit)
+        countries = fetch_umami_expanded_metrics(start_ms, end_ms, metric_type="country", limit=limit)
+        browsers = fetch_umami_expanded_metrics(start_ms, end_ms, metric_type="browser", limit=limit)
+        devices = fetch_umami_expanded_metrics(start_ms, end_ms, metric_type="device", limit=limit)
+    except UmamiAPIError as exc:
+        return JSONResponse(status_code=502, content={"error": f"Umami API error: {exc}"})
+
+    events = _fetch_top_events(
+        start,
+        now,
+        start_ms,
+        end_ms,
+        website_filter,
+        website_params,
+        limit,
+    )
+
+    return {
+        "generatedAt": iso_z(now),
+        "range": range,
+        "referrers": _shape_expanded_metrics(referrers),
+        "events": events,
+        "landingPages": _shape_expanded_metrics(landing_pages),
+        "countries": _shape_expanded_metrics(countries),
+        "browsers": _shape_expanded_metrics(browsers),
+        "devices": _shape_expanded_metrics(devices),
+    }
+
+
+@router.get("/api/admin/analytics/visitor-history")
+def admin_visitor_history(
+    request: Request,
+    db: Session = Depends(get_db),
+    range: str = Query("7d"),
+    limit: int = Query(50, ge=1, le=200),
+):
+    if not require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    now = datetime.now(timezone.utc)
+    days = _range_to_days(range, 7)
+    start = now - timedelta(days=days)
+    website_id = _get_umami_website_id()
+    website_filter, website_params = _umami_website_filter(website_id)
+    entry_lookup, empty_entry_keys = _build_entry_lookup(db)
+
+    try:
+        with get_umami_db() as umami_db:
+            visitor_rows = _fetch_visitor_activity_rows(
+                umami_db,
+                start,
+                now,
+                website_filter,
+                website_params,
+            )
+            page_view_rows = _fetch_page_view_rows(
+                umami_db,
+                start,
+                now,
+                website_filter,
+                website_params,
+            )
+            completion_rows = _fetch_completion_rows(
+                umami_db,
+                start,
+                now,
+                website_filter,
+                website_params,
+            )
+    except Exception as exc:
+        return {
+            "generatedAt": iso_z(now),
+            "range": range,
+            "totalVisitors": 0,
+            "returned": 0,
+            "error": f"Umami query failed: {str(exc)}",
+            "visitors": [],
+        }
+
+    visitors: dict[str, dict] = {}
+
+    def ensure_visitor(visitor_key: str) -> dict:
+        visitor = visitors.get(visitor_key)
+        if visitor:
+            return visitor
+        visitor = {
+            "visitorKey": visitor_key,
+            "firstSeen": None,
+            "lastSeen": None,
+            "landingPage": "",
+            "lastPath": "",
+            "referrer": "",
+            "country": "",
+            "browser": "",
+            "device": "",
+            "pagesRead": 0,
+            "issueMap": {},
+        }
+        visitors[visitor_key] = visitor
+        return visitor
+
+    for created_at, session_id, visitor_key, url_path, referrer, country, browser, device in visitor_rows:
+        key = visitor_key or str(session_id or "").strip()
+        if not key:
+            continue
+        visitor = ensure_visitor(key)
+
+        if visitor["firstSeen"] is None or created_at < visitor["firstSeen"]:
+            visitor["firstSeen"] = created_at
+            if url_path:
+                visitor["landingPage"] = url_path
+        elif url_path and not visitor["landingPage"]:
+            visitor["landingPage"] = url_path
+
+        if visitor["lastSeen"] is None or created_at >= visitor["lastSeen"]:
+            visitor["lastSeen"] = created_at
+            if url_path:
+                visitor["lastPath"] = url_path
+
+        if referrer and not visitor["referrer"]:
+            visitor["referrer"] = referrer
+        if country and not visitor["country"]:
+            visitor["country"] = country
+        if browser and not visitor["browser"]:
+            visitor["browser"] = browser
+        if device and not visitor["device"]:
+            visitor["device"] = device
+
+    for _created_at, session_id, visitor_id, series_id, entry_label, page_number, total_pages in page_view_rows:
+        key = str(visitor_id or session_id or "").strip()
+        if not key:
+            continue
+        entry_key = _parse_reader_entry_key(series_id, entry_label, empty_entry_keys)
+        if not entry_key:
+            continue
+
+        visitor = ensure_visitor(key)
+        visitor["pagesRead"] += 1
+
+        issue = visitor["issueMap"].get(entry_key)
+        if not issue:
+            base = entry_lookup.get(entry_key) or {}
+            sid, display_num = entry_key
+            issue = {
+                "seriesId": sid,
+                "seriesTitle": base.get("seriesTitle") or sid,
+                "entryDisplayNumber": display_num,
+                "entryTitle": base.get("entryTitle") or f"Entry {display_num}",
+                "pagesRead": 0,
+                "maxPageReached": None,
+                "totalPages": base.get("pageCount"),
+                "finished": False,
+            }
+            visitor["issueMap"][entry_key] = issue
+
+        issue["pagesRead"] += 1
+        try:
+            page_num = int(page_number) if page_number is not None else None
+        except (TypeError, ValueError):
+            page_num = None
+        if page_num is not None:
+            current_max = issue.get("maxPageReached")
+            issue["maxPageReached"] = max(int(current_max or 0), page_num)
+        try:
+            total_pages_value = int(total_pages) if total_pages is not None else None
+        except (TypeError, ValueError):
+            total_pages_value = None
+        if total_pages_value is not None:
+            current_total = issue.get("totalPages")
+            issue["totalPages"] = max(int(current_total or 0), total_pages_value)
+
+    for _created_at, session_id, visitor_id, series_id, entry_label in completion_rows:
+        key = str(visitor_id or session_id or "").strip()
+        if not key:
+            continue
+        entry_key = _parse_reader_entry_key(series_id, entry_label, empty_entry_keys)
+        if not entry_key:
+            continue
+
+        visitor = ensure_visitor(key)
+        issue = visitor["issueMap"].get(entry_key)
+        if not issue:
+            base = entry_lookup.get(entry_key) or {}
+            sid, display_num = entry_key
+            issue = {
+                "seriesId": sid,
+                "seriesTitle": base.get("seriesTitle") or sid,
+                "entryDisplayNumber": display_num,
+                "entryTitle": base.get("entryTitle") or f"Entry {display_num}",
+                "pagesRead": 0,
+                "maxPageReached": None,
+                "totalPages": base.get("pageCount"),
+                "finished": False,
+            }
+            visitor["issueMap"][entry_key] = issue
+        issue["finished"] = True
+
+    shaped_visitors = []
+    for visitor in visitors.values():
+        issue_map = visitor.pop("issueMap", {})
+        issues = sorted(
+            issue_map.values(),
+            key=lambda item: (
+                -(int(item.get("pagesRead") or 0)),
+                str(item.get("seriesTitle") or item.get("seriesId") or ""),
+                int(item.get("entryDisplayNumber") or 0),
+            ),
+        )
+        issues_finished = sum(1 for item in issues if item.get("finished"))
+        shaped_visitors.append(
+            {
+                "visitorKey": visitor.get("visitorKey", ""),
+                "firstSeen": iso_z(visitor["firstSeen"]) if visitor.get("firstSeen") else None,
+                "lastSeen": iso_z(visitor["lastSeen"]) if visitor.get("lastSeen") else None,
+                "landingPage": visitor.get("landingPage") or "",
+                "lastPath": visitor.get("lastPath") or "",
+                "referrer": visitor.get("referrer") or "",
+                "country": visitor.get("country") or "",
+                "browser": visitor.get("browser") or "",
+                "device": visitor.get("device") or "",
+                "pagesRead": int(visitor.get("pagesRead") or 0),
+                "issuesStarted": len(issues),
+                "issuesFinished": issues_finished,
+                "issues": issues,
+            }
+        )
+
+    shaped_visitors.sort(
+        key=lambda item: (
+            item.get("lastSeen") or "",
+            int(item.get("pagesRead") or 0),
+        ),
+        reverse=True,
+    )
+    limited_visitors = shaped_visitors[:limit]
+
+    return {
+        "generatedAt": iso_z(now),
+        "range": range,
+        "totalVisitors": len(shaped_visitors),
+        "returned": len(limited_visitors),
+        "visitors": limited_visitors,
     }
 
 
@@ -233,346 +950,98 @@ def admin_reader_analytics(
     if not require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    # Convert range parameter to days if provided
-    if range:
-        if range == "24h":
-            days = 1
-        elif range == "7d":
-            days = 7
-        elif range == "30d":
-            days = 30
-        elif range == "90d":
-            days = 90
-
+    days = _range_to_days(range, days)
     now = datetime.now(timezone.utc)
     start = now - timedelta(days=days)
     prev_start = start - timedelta(days=days)
     prev_end = start
     website_id = _get_umami_website_id()
-
-    # Get entry metadata from local DB
-    entries = db.scalars(select(Entry)).all()
-    page_counts = {
-        entry_id: count
-        for entry_id, count in db.execute(
-            select(EntryPage.entry_id, func.count()).group_by(EntryPage.entry_id)
-        ).all()
-    }
-    series_map = {s.id: s for s in db.scalars(select(Series)).all()}
-
-    # Build lookup by (series_id, display_number)
-    entry_lookup: dict[tuple[str, int], dict] = {}
-    empty_entry_keys: set[tuple[str, int]] = set()
-    for entry in entries:
-        series_id = entry.series_id or ""
-        display_num = entry.display_number
-        if display_num is not None:
-            key = (series_id, int(display_num))
-            page_count = int(page_counts.get(entry.id) or 0)
-            if page_count <= 0:
-                empty_entry_keys.add(key)
-            entry_lookup[key] = {
-                "seriesId": series_id,
-                "entryTitle": entry.title or "",
-                "pageCount": page_count or None,
-                "seriesTitle": (
-                    series_map.get(series_id).title if series_id in series_map else None
-                ),
-            }
-
-    # Query Umami for reader analytics
-    stats: dict[tuple[str, int | None], dict] = {}
+    entry_lookup, empty_entry_keys = _build_entry_lookup(db)
     website_filter, website_params = _umami_website_filter(website_id)
 
     try:
         with get_umami_db() as umami_db:
-
-            def _collect_window_counts(start_time: datetime, end_time: datetime):
-                entry_views_window: dict[tuple[str, int], int] = defaultdict(int)
-                series_views_window: dict[str, int] = defaultdict(int)
-                entry_finish_sessions: dict[tuple[str, int], set] = defaultdict(set)
-                series_finish_sessions: dict[str, set] = defaultdict(set)
-
-                page_view_query_window = text(f"""
-                    SELECT
-                        we.session_id,
-                        ed_series.string_value as series_id,
-                        ed_entry.string_value as entry_label
-                    FROM website_event we
-                    LEFT JOIN event_data ed_series ON we.event_id = ed_series.website_event_id AND ed_series.data_key = 'series'
-                    LEFT JOIN event_data ed_entry ON we.event_id = ed_entry.website_event_id AND ed_entry.data_key = 'entryLabel'
-                    WHERE we.event_name = 'reader_page_view'
-                        AND we.created_at >= :start_time
-                        AND we.created_at < :end_time
-                        {website_filter}
-                """)
-
-                events_window = umami_db.execute(
-                    page_view_query_window,
-                    {
-                        "start_time": start_time,
-                        "end_time": end_time,
-                        **website_params,
-                    },
-                ).fetchall()
-
-                for session_id, series_id, entry_label in events_window:
-                    sid = series_id or ""
-                    display_num = _extract_display_number(entry_label)
-                    if display_num is None:
-                        continue
-                    key = (sid, display_num)
-                    if key in empty_entry_keys:
-                        continue
-                    entry_views_window[key] += 1
-                    series_views_window[sid] += 1
-
-                complete_query_window = text(f"""
-                    SELECT
-                        we.session_id,
-                        ed_series.string_value as series_id,
-                        ed_entry.string_value as entry_label
-                    FROM website_event we
-                    LEFT JOIN event_data ed_series ON we.event_id = ed_series.website_event_id AND ed_series.data_key = 'series'
-                    LEFT JOIN event_data ed_entry ON we.event_id = ed_entry.website_event_id AND ed_entry.data_key = 'entryLabel'
-                    WHERE we.event_name = 'reader_entry_complete'
-                        AND we.created_at >= :start_time
-                        AND we.created_at < :end_time
-                        {website_filter}
-                """)
-
-                completions_window = umami_db.execute(
-                    complete_query_window,
-                    {
-                        "start_time": start_time,
-                        "end_time": end_time,
-                        **website_params,
-                    },
-                ).fetchall()
-
-                for session_id, series_id, entry_label in completions_window:
-                    sid = series_id or ""
-                    display_num = _extract_display_number(entry_label)
-                    if display_num is None:
-                        continue
-                    key = (sid, display_num)
-                    if key in empty_entry_keys:
-                        continue
-                    if session_id:
-                        entry_finish_sessions[key].add(str(session_id))
-                        series_finish_sessions[sid].add(str(session_id))
-
-                entry_finishes_window = {
-                    key: len(sessions) for key, sessions in entry_finish_sessions.items()
-                }
-                series_finishes_window = {
-                    sid: len(sessions) for sid, sessions in series_finish_sessions.items()
-                }
-
-                return (
-                    entry_views_window,
-                    entry_finishes_window,
-                    series_views_window,
-                    series_finishes_window,
-                )
-
-            # Query page views with their properties from Umami
-            # Join event_data to get series, entryLabel, page, totalPages
-            page_view_query = text(f"""
-                SELECT
-                    we.session_id,
-                    ed_series.string_value as series_id,
-                    ed_entry.string_value as entry_label,
-                    ed_page.number_value as page_number,
-                    ed_total.number_value as total_pages
-                FROM website_event we
-                LEFT JOIN event_data ed_series ON we.event_id = ed_series.website_event_id AND ed_series.data_key = 'series'
-                LEFT JOIN event_data ed_entry ON we.event_id = ed_entry.website_event_id AND ed_entry.data_key = 'entryLabel'
-                LEFT JOIN event_data ed_page ON we.event_id = ed_page.website_event_id AND ed_page.data_key = 'page'
-                LEFT JOIN event_data ed_total ON we.event_id = ed_total.website_event_id AND ed_total.data_key = 'totalPages'
-                WHERE we.event_name = 'reader_page_view'
-                    AND we.created_at >= :start_time
-                    AND we.created_at < :end_time
-                    {website_filter}
-            """)
-
-            events = umami_db.execute(
-                page_view_query,
-                {
-                    "start_time": start,
-                    "end_time": now,
-                    **website_params,
-                },
-            ).fetchall()
-
-            # Also get completion events
-            complete_query = text(f"""
-                SELECT
-                    we.session_id,
-                    ed_series.string_value as series_id,
-                    ed_entry.string_value as entry_label
-                FROM website_event we
-                LEFT JOIN event_data ed_series ON we.event_id = ed_series.website_event_id AND ed_series.data_key = 'series'
-                LEFT JOIN event_data ed_entry ON we.event_id = ed_entry.website_event_id AND ed_entry.data_key = 'entryLabel'
-                WHERE we.event_name = 'reader_entry_complete'
-                    AND we.created_at >= :start_time
-                    AND we.created_at < :end_time
-                    {website_filter}
-            """)
-
-            completions = umami_db.execute(
-                complete_query,
-                {
-                    "start_time": start,
-                    "end_time": now,
-                    **website_params,
-                },
-            ).fetchall()
-
-            (
-                prev_entry_views,
-                prev_entry_finishes,
-                prev_series_views,
-                prev_series_finishes,
-            ) = _collect_window_counts(prev_start, prev_end)
+            current_metrics = _collect_reader_window_metrics(
+                umami_db,
+                start,
+                now,
+                website_filter,
+                website_params,
+                entry_lookup,
+                empty_entry_keys,
+            )
+            prev_metrics = _collect_reader_window_metrics(
+                umami_db,
+                prev_start,
+                prev_end,
+                website_filter,
+                website_params,
+                entry_lookup,
+                empty_entry_keys,
+            )
 
     except Exception as e:
-        # If Umami query fails, return empty data
         return {
             "generatedAt": iso_z(now),
             "windowDays": days,
             "error": f"Umami query failed: {str(e)}",
             "entryReadsTotal": 0,
+            "entryStartsTotal": 0,
             "entryFinishesTotal": 0,
             "finishRate": 0,
-            "avgStopPage": 0,
+            "uniqueVisitors": 0,
             "entryViews": [],
-            "entryCompletions": [],
-            "entryStops": [],
+            "entryRates": [],
             "seriesViews": [],
-            "seriesCompletions": [],
+            "seriesRates": [],
         }
 
-    # Process page view events
-    for session_id, series_id, entry_label, page_number, total_pages in events:
-        sid = series_id or ""
-        display_num = _extract_display_number(entry_label)
-        if display_num is None:
-            continue
-
-        key = (sid, display_num)
-        if key in empty_entry_keys:
-            continue
-        base = entry_lookup.get(key)
-
-        if key not in stats:
-            stats[key] = {
-                "seriesId": sid,
-                "seriesTitle": base.get("seriesTitle") if base else None,
-                "entryTitle": base.get("entryTitle") if base else f"Entry {display_num}",
-                "displayNumber": display_num,
-                "pageCount": base.get("pageCount")
-                if base
-                else (int(total_pages) if total_pages else None),
-                "readsBySession": set(),
-                "pageViews": 0,
-                "maxPageBySession": {},
-                "completedSessions": set(),
-            }
-
-        entry_stat = stats[key]
-        entry_stat["pageViews"] += 1
-        if session_id:
-            entry_stat["readsBySession"].add(str(session_id))
-            if page_number is not None:
-                current_max = entry_stat["maxPageBySession"].get(str(session_id), 0)
-                entry_stat["maxPageBySession"][str(session_id)] = max(current_max, int(page_number))
-
-    # Process completion events
-    for session_id, series_id, entry_label in completions:
-        sid = series_id or ""
-        display_num = _extract_display_number(entry_label)
-        if display_num is None:
-            continue
-
-        key = (sid, display_num)
-        if key in empty_entry_keys:
-            continue
-        if key in stats and session_id:
-            stats[key]["completedSessions"].add(str(session_id))
-
-    # Build frontend-expected arrays
     entry_views = []
-    entry_completions = []
-    entry_stops = []
+    entry_rates = []
     series_aggregates: dict[str, dict] = {}
-    total_page_views = 0
-    total_readers = 0
-    total_finishes = 0
-    all_stop_pages: list[int] = []
+    current_stats = current_metrics["stats"]
 
-    for entry_stat in stats.values():
-        readers = len(entry_stat["readsBySession"])
-        page_views = int(entry_stat.get("pageViews") or 0)
-        max_pages = list(entry_stat["maxPageBySession"].values())
-        finishes = len(entry_stat["completedSessions"])
-
-        avg_stop = (sum(max_pages) / len(max_pages)) if max_pages else 0
-        finish_rate = (finishes / readers) if readers else 0
-
-        total_page_views += page_views
-        total_readers += readers
-        total_finishes += finishes
-        all_stop_pages.extend(max_pages)
-
+    for entry_stat in current_stats.values():
         sid = entry_stat["seriesId"]
+        key = (sid, entry_stat["displayNumber"])
         label = entry_stat["entryTitle"] or f"Entry {entry_stat['displayNumber']}"
+        page_views = int(entry_stat.get("pagesRead") or 0)
+        starts = len(entry_stat["startSessions"])
+        finishes = len(entry_stat["finishSessions"])
+        finish_rate = (finishes / starts) if starts else 0
 
-        prev_views = int(prev_entry_views.get((sid, entry_stat["displayNumber"]), 0))
-        view_delta = page_views - prev_views
+        prev_page_views = int(prev_metrics["entryPageViews"].get(key, 0))
+        view_delta = page_views - prev_page_views
         entry_views.append(
             {
                 "label": label,
-                "value": str(entry_stat["displayNumber"]),  # Use displayNumber for detail queries
+                "value": str(entry_stat["displayNumber"]),
                 "entryLabel": label,
                 "displayNumber": entry_stat["displayNumber"],
                 "count": page_views,
                 "seriesId": sid,
                 "seriesTitle": entry_stat["seriesTitle"] or "",
                 "delta": view_delta,
-                "deltaPct": (view_delta / prev_views) if prev_views else None,
+                "deltaPct": (view_delta / prev_page_views) if prev_page_views else None,
             }
         )
 
-        prev_finishes = int(prev_entry_finishes.get((sid, entry_stat["displayNumber"]), 0))
-        finish_delta = finishes - prev_finishes
-        entry_completions.append(
+        entry_rates.append(
             {
                 "label": label,
                 "value": str(entry_stat["displayNumber"]),
                 "entryLabel": label,
-                "count": finishes,
+                "displayNumber": entry_stat["displayNumber"],
+                "count": round(finish_rate, 4),
+                "pageViews": page_views,
+                "starts": starts,
+                "finishes": finishes,
                 "completionRate": round(finish_rate, 4),
-                "finishRate": round(finish_rate, 4),
                 "seriesId": sid,
-                "delta": finish_delta,
-                "deltaPct": (finish_delta / prev_finishes) if prev_finishes else None,
+                "seriesTitle": entry_stat["seriesTitle"] or "",
             }
         )
 
-        entry_stops.append(
-            {
-                "label": label,
-                "value": str(entry_stat["displayNumber"]),
-                "entryLabel": label,
-                "page": round(avg_stop, 2),
-                "avgStopPage": round(avg_stop, 2),
-                "pageCount": entry_stat["pageCount"],
-                "seriesId": sid,
-            }
-        )
-
-        # Aggregate by series
         if sid not in series_aggregates:
             series_title = entry_stat["seriesTitle"] or sid or "Unknown Series"
             series_aggregates[sid] = {
@@ -581,63 +1050,74 @@ def admin_reader_analytics(
                 "seriesId": sid,
                 "seriesTitle": series_title,
                 "count": 0,
-                "readers": 0,
+                "starts": 0,
                 "finishes": 0,
             }
         series_aggregates[sid]["count"] += page_views
-        series_aggregates[sid]["readers"] += readers
+        series_aggregates[sid]["starts"] += starts
         series_aggregates[sid]["finishes"] += finishes
 
-    # Sort by count descending
     entry_views.sort(key=lambda x: x.get("count", 0), reverse=True)
-    entry_completions.sort(key=lambda x: x.get("count", 0), reverse=True)
-    entry_stops.sort(key=lambda x: x.get("avgStopPage", 0), reverse=True)
+    entry_rates.sort(
+        key=lambda x: (
+            x.get("completionRate", 0),
+            x.get("starts", 0),
+            x.get("pageViews", 0),
+        ),
+        reverse=True,
+    )
     series_views = sorted(series_aggregates.values(), key=lambda x: x.get("count", 0), reverse=True)
     for item in series_views:
         sid = item.get("seriesId", "")
-        prev_views = int(prev_series_views.get(sid, 0))
+        prev_views = int(prev_metrics["seriesPageViews"].get(sid, 0))
         delta = int(item.get("count", 0)) - prev_views
         item["delta"] = delta
         item["deltaPct"] = (delta / prev_views) if prev_views else None
 
-    # Build series completions from aggregates
-    series_completions = []
+    series_rates = []
     for agg in series_aggregates.values():
-        reads = agg.get("readers", agg.get("count", 0))
+        starts = agg.get("starts", 0)
         finishes = agg.get("finishes", 0)
-        rate = (finishes / reads) if reads else 0
-        prev_finishes = int(prev_series_finishes.get(agg.get("seriesId", ""), 0))
-        finish_delta = finishes - prev_finishes
-        series_completions.append(
+        rate = (finishes / starts) if starts else 0
+        series_rates.append(
             {
                 "label": agg.get("label", ""),
                 "value": agg.get("value", ""),
                 "seriesId": agg.get("seriesId", ""),
                 "seriesTitle": agg.get("seriesTitle", ""),
-                "count": finishes,
+                "count": round(rate, 4),
+                "pageViews": int(agg.get("count", 0)),
+                "starts": int(starts),
+                "finishes": int(finishes),
                 "completionRate": round(rate, 4),
-                "delta": finish_delta,
-                "deltaPct": (finish_delta / prev_finishes) if prev_finishes else None,
             }
         )
-    series_completions.sort(key=lambda x: x.get("count", 0), reverse=True)
+    series_rates.sort(
+        key=lambda x: (
+            x.get("completionRate", 0),
+            x.get("starts", 0),
+            x.get("pageViews", 0),
+        ),
+        reverse=True,
+    )
 
-    # Calculate overall stats
-    overall_finish_rate = (total_finishes / total_readers) if total_readers else 0
-    overall_avg_stop = (sum(all_stop_pages) / len(all_stop_pages)) if all_stop_pages else 0
+    total_page_views = int(current_metrics["totalPageViews"])
+    total_starts = int(current_metrics["totalStarts"])
+    total_finishes = int(current_metrics["totalFinishes"])
+    overall_finish_rate = (total_finishes / total_starts) if total_starts else 0
 
     return {
         "generatedAt": iso_z(now),
         "windowDays": days,
         "entryReadsTotal": total_page_views,
+        "entryStartsTotal": total_starts,
         "entryFinishesTotal": total_finishes,
         "finishRate": round(overall_finish_rate, 4),
-        "avgStopPage": round(overall_avg_stop, 2),
+        "uniqueVisitors": len(current_metrics["uniqueVisitors"]),
         "entryViews": entry_views,
-        "entryCompletions": entry_completions,
-        "entryStops": entry_stops,
+        "entryRates": entry_rates,
         "seriesViews": series_views,
-        "seriesCompletions": series_completions,
+        "seriesRates": series_rates,
     }
 
 
@@ -650,40 +1130,38 @@ def admin_reader_series_analytics(
     event: str = Query(""),
     prop: str = Query("", alias="property"),
     value: str = Query(""),
+    metric: str = Query("page_views"),
     points: int = Query(12, ge=1, le=100),
 ):
     if not require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    # Convert range parameter to days if provided
-    if time_range:
-        if time_range == "24h":
-            days = 1
-        elif time_range == "7d":
-            days = 7
-        elif time_range == "30d":
-            days = 30
-        elif time_range == "90d":
-            days = 90
-
+    time_range = time_range if isinstance(time_range, str) else None
+    event = event if isinstance(event, str) else ""
+    prop = prop if isinstance(prop, str) else ""
+    value = value if isinstance(value, str) else ""
+    metric = metric if isinstance(metric, str) else "page_views"
+    days = _range_to_days(time_range, days)
     now = datetime.now(timezone.utc)
     start = now - timedelta(days=days)
     website_id = _get_umami_website_id()
+    entry_lookup, empty_entry_keys = _build_entry_lookup(db)
 
     # Determine bucket size based on time range
     total_seconds = int((now - start).total_seconds())
     bucket_seconds = max(3600, total_seconds // points)  # Minimum 1 hour buckets
 
-    # Check if we're counting finishes (completions) vs views
-    is_finish_metric = event == "reader_entry_complete"
+    normalized_metric = metric.strip() or ""
+    if normalized_metric not in ("page_views", "completion_rate"):
+        normalized_metric = "completion_rate" if event == "reader_entry_complete" else "page_views"
+    if normalized_metric not in ("page_views", "completion_rate"):
+        return JSONResponse(status_code=400, content={"error": "Unsupported analytics event"})
 
-    # Parse filter values
     filter_series_id = None
     filter_display_num = None
     if prop and value:
         normalized_value = value.strip()
         if prop == "entryLabel":
-            # Check if value is a direct display number
             if normalized_value.isdigit():
                 filter_display_num = int(normalized_value)
             else:
@@ -691,102 +1169,82 @@ def admin_reader_series_analytics(
         elif prop in ("seriesId", "series"):
             filter_series_id = normalized_value
 
-    # Create time buckets
-    buckets: dict[int, int] = defaultdict(int)
+    buckets: dict[int, dict[str, int]] = defaultdict(lambda: {"count": 0, "starts": 0, "finishes": 0})
     website_filter, website_params = _umami_website_filter(website_id)
 
     try:
         with get_umami_db() as umami_db:
-            if is_finish_metric:
-                # Query completion events from Umami
-                query = text(f"""
-                    SELECT
-                        we.created_at,
-                        we.session_id,
-                        ed_series.string_value as series_id,
-                        ed_entry.string_value as entry_label
-                    FROM website_event we
-                    LEFT JOIN event_data ed_series ON we.event_id = ed_series.website_event_id AND ed_series.data_key = 'series'
-                    LEFT JOIN event_data ed_entry ON we.event_id = ed_entry.website_event_id AND ed_entry.data_key = 'entryLabel'
-                    WHERE we.event_name = 'reader_entry_complete'
-                        AND we.created_at >= :start_time
-                        {website_filter}
-                """)
-
-                events = umami_db.execute(
-                    query,
-                    {
-                        "start_time": start,
-                        **website_params,
-                    },
-                ).fetchall()
-
-                # Track unique completions per session+entry
+            if normalized_metric == "completion_rate":
+                start_times: dict[tuple[str, str, int], datetime] = {}
                 completion_times: dict[tuple[str, str, int], datetime] = {}
-
-                for created_at, session_id, series_id, entry_label in events:
-                    sid = series_id or ""
-                    display_num = _extract_display_number(entry_label)
-                    if display_num is None:
+                page_view_events = _fetch_page_view_rows(
+                    umami_db,
+                    start,
+                    now,
+                    website_filter,
+                    website_params,
+                )
+                for created_at, session_id, _visitor_id, series_id, entry_label, _page_number, _total_pages in page_view_events:
+                    if not session_id:
                         continue
-
-                    # Apply filters
+                    key = _parse_reader_entry_key(series_id, entry_label, empty_entry_keys)
+                    if not key:
+                        continue
+                    sid, display_num = key
                     if filter_series_id and sid != filter_series_id:
                         continue
                     if filter_display_num is not None and display_num != filter_display_num:
                         continue
 
-                    # Track first completion time per session+entry
+                    read_key = (str(session_id), sid, display_num)
+                    if read_key not in start_times or created_at < start_times[read_key]:
+                        start_times[read_key] = created_at
+
+                events = _fetch_completion_rows(umami_db, start, now, website_filter, website_params)
+
+                for created_at, session_id, _visitor_id, series_id, entry_label in events:
+                    if not session_id:
+                        continue
+                    key = _parse_reader_entry_key(series_id, entry_label, empty_entry_keys)
+                    if not key:
+                        continue
+                    sid, display_num = key
+
+                    if filter_series_id and sid != filter_series_id:
+                        continue
+                    if filter_display_num is not None and display_num != filter_display_num:
+                        continue
+
                     key = (str(session_id), sid, display_num)
                     if key not in completion_times or created_at < completion_times[key]:
                         completion_times[key] = created_at
 
-                # Bucket the completion times
+                for read_time in start_times.values():
+                    seconds_since_start = int((read_time - start).total_seconds())
+                    bucket_index = seconds_since_start // bucket_seconds
+                    buckets[bucket_index]["starts"] += 1
                 for completion_time in completion_times.values():
                     seconds_since_start = int((completion_time - start).total_seconds())
                     bucket_index = seconds_since_start // bucket_seconds
-                    buckets[bucket_index] += 1
+                    buckets[bucket_index]["finishes"] += 1
             else:
-                # Query page view events from Umami
-                query = text(f"""
-                    SELECT
-                        we.created_at,
-                        we.session_id,
-                        ed_series.string_value as series_id,
-                        ed_entry.string_value as entry_label
-                    FROM website_event we
-                    LEFT JOIN event_data ed_series ON we.event_id = ed_series.website_event_id AND ed_series.data_key = 'series'
-                    LEFT JOIN event_data ed_entry ON we.event_id = ed_entry.website_event_id AND ed_entry.data_key = 'entryLabel'
-                    WHERE we.event_name = 'reader_page_view'
-                        AND we.created_at >= :start_time
-                        {website_filter}
-                """)
+                events = _fetch_page_view_rows(umami_db, start, now, website_filter, website_params)
 
-                events = umami_db.execute(
-                    query,
-                    {
-                        "start_time": start,
-                        **website_params,
-                    },
-                ).fetchall()
-
-                for created_at, session_id, series_id, entry_label in events:
-                    sid = series_id or ""
-                    display_num = _extract_display_number(entry_label)
-
-                    # Apply filters
+                for created_at, session_id, _visitor_id, series_id, entry_label, _page_number, _total_pages in events:
+                    key = _parse_reader_entry_key(series_id, entry_label, empty_entry_keys)
+                    if not key:
+                        continue
+                    sid, display_num = key
                     if filter_series_id and sid != filter_series_id:
                         continue
-                    if filter_display_num is not None:
-                        if display_num is None or display_num != filter_display_num:
-                            continue
+                    if filter_display_num is not None and display_num != filter_display_num:
+                        continue
 
                     seconds_since_start = int((created_at - start).total_seconds())
                     bucket_index = seconds_since_start // bucket_seconds
-                    buckets[bucket_index] += 1
+                    buckets[bucket_index]["count"] += 1
 
     except Exception as e:
-        # If Umami query fails, return empty series
         return {
             "generatedAt": iso_z(now),
             "windowDays": days,
@@ -794,7 +1252,6 @@ def admin_reader_series_analytics(
             "series": [],
         }
 
-    # Build response with time-series data
     series = []
     for i in range(points):
         bucket_start = start + timedelta(seconds=i * bucket_seconds)
@@ -802,14 +1259,24 @@ def admin_reader_series_analytics(
         if bucket_end > now:
             bucket_end = now
 
-        count = buckets.get(i, 0)
-        series.append(
-            {
-                "start": iso_z(bucket_start),
-                "end": iso_z(bucket_end),
-                "count": count,
-            }
-        )
+        bucket = buckets.get(i, {"count": 0, "starts": 0, "finishes": 0})
+        item = {
+            "start": iso_z(bucket_start),
+            "end": iso_z(bucket_end),
+        }
+        if normalized_metric == "completion_rate":
+            starts = int(bucket.get("starts", 0))
+            finishes = int(bucket.get("finishes", 0))
+            item.update(
+                {
+                    "starts": starts,
+                    "finishes": finishes,
+                    "completionRate": round((finishes / starts), 4) if starts else 0,
+                }
+            )
+        else:
+            item["count"] = int(bucket.get("count", 0))
+        series.append(item)
 
         if bucket_end >= now:
             break
@@ -817,6 +1284,7 @@ def admin_reader_series_analytics(
     return {
         "generatedAt": iso_z(now),
         "windowDays": days,
+        "metric": normalized_metric,
         "series": series,
     }
 
@@ -833,15 +1301,14 @@ def admin_reads_over_time(
     if not require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    # Parse range to days
-    days_map = {"7d": 7, "30d": 30, "90d": 90}
-    days = days_map.get(time_range, 7)
-
+    entry_id = entry_id if isinstance(entry_id, str) else None
+    series_id = series_id if isinstance(series_id, str) else None
+    days = _range_to_days(time_range, 7)
     now = datetime.now(timezone.utc)
     start = now - timedelta(days=days)
     website_id = _get_umami_website_id()
+    _entry_lookup, empty_entry_keys = _build_entry_lookup(db)
 
-    # Determine mode and entry filter
     mode = "aggregate"
     entry_label_filter = None
     target_display_num = None
@@ -849,58 +1316,35 @@ def admin_reads_over_time(
     if entry_id and entry_id != "aggregate":
         mode = "entry"
         entry_label_filter = entry_id
-        # entry_id can be a direct display number (e.g., "5") or a label string
         if entry_id.isdigit():
             target_display_num = int(entry_id)
         else:
             target_display_num = _extract_display_number(entry_id)
 
-    # Group by date
     daily_counts: dict[str, dict] = {}
     website_filter, website_params = _umami_website_filter(website_id)
 
     try:
         with get_umami_db() as umami_db:
-            # Query page views from Umami
-            query = text(f"""
-                SELECT
-                    we.created_at,
-                    we.session_id,
-                    ed_series.string_value as series_id,
-                    ed_entry.string_value as entry_label
-                FROM website_event we
-                LEFT JOIN event_data ed_series ON we.event_id = ed_series.website_event_id AND ed_series.data_key = 'series'
-                LEFT JOIN event_data ed_entry ON we.event_id = ed_entry.website_event_id AND ed_entry.data_key = 'entryLabel'
-                WHERE we.event_name = 'reader_page_view'
-                    AND we.created_at >= :start_time
-                    {website_filter}
-            """)
+            events = _fetch_page_view_rows(umami_db, start, now, website_filter, website_params)
 
-            events = umami_db.execute(
-                query,
-                {
-                    "start_time": start,
-                    **website_params,
-                },
-            ).fetchall()
-
-            for created_at, session_id, evt_series_id, entry_label in events:
-                # Apply series filter
-                if series_id and evt_series_id != series_id:
+            for created_at, session_id, visitor_id, evt_series_id, entry_label, _page_number, _total_pages in events:
+                key = _parse_reader_entry_key(evt_series_id, entry_label, empty_entry_keys)
+                if not key:
                     continue
+                entry_series_id, display_num = key
 
-                # Apply entry filter if in entry mode
-                if mode == "entry" and target_display_num is not None:
-                    event_display_num = _extract_display_number(entry_label)
-                    if event_display_num != target_display_num:
-                        continue
+                if series_id and entry_series_id != series_id:
+                    continue
+                if mode == "entry" and target_display_num is not None and display_num != target_display_num:
+                    continue
 
                 date_str = created_at.date().isoformat()
                 if date_str not in daily_counts:
-                    daily_counts[date_str] = {"sessions": set(), "views": 0}
-                daily_counts[date_str]["views"] += 1
-                if session_id:
-                    daily_counts[date_str]["sessions"].add(str(session_id))
+                    daily_counts[date_str] = {"visitorIds": set(), "reads": 0}
+                daily_counts[date_str]["reads"] += 1
+                if visitor_id:
+                    daily_counts[date_str]["visitorIds"].add(visitor_id)
 
     except Exception as e:
         return {
@@ -913,27 +1357,26 @@ def admin_reads_over_time(
             "totals": {"reads": 0, "uniqueVisitors": 0},
         }
 
-    # Build response with all dates in range (including zeros)
     series = []
-    all_sessions: set[str] = set()
-    total_views = 0
+    all_visitor_ids: set[str] = set()
+    total_reads = 0
 
     current = start.date()
     end_date = now.date()
     while current <= end_date:
         date_str = current.isoformat()
-        data = daily_counts.get(date_str, {"sessions": set(), "views": 0})
-        sessions = data["sessions"]
-        views = int(data.get("views") or 0)
+        data = daily_counts.get(date_str, {"visitorIds": set(), "reads": 0})
+        visitor_ids = data["visitorIds"]
+        reads = int(data.get("reads") or 0)
 
-        all_sessions.update(sessions)
-        total_views += views
+        all_visitor_ids.update(visitor_ids)
+        total_reads += reads
 
         series.append(
             {
                 "date": date_str,
-                "count": views,  # Total page views per day
-                "uniqueVisitors": len(sessions),
+                "count": reads,
+                "uniqueVisitors": len(visitor_ids),
             }
         )
         current += timedelta(days=1)
@@ -945,8 +1388,8 @@ def admin_reads_over_time(
         "entryLabel": entry_label_filter,
         "series": series,
         "totals": {
-            "reads": total_views,  # Total page views
-            "uniqueVisitors": len(all_sessions),
+            "reads": total_reads,
+            "uniqueVisitors": len(all_visitor_ids),
         },
     }
 
@@ -975,94 +1418,41 @@ def admin_weekly_digest(
 
     website_id = _get_umami_website_id()
     website_filter, website_params = _umami_website_filter(website_id)
+    _entry_lookup, empty_entry_keys = _build_entry_lookup(db)
 
     def calculate_period_stats_umami(start_dt: datetime, end_dt: datetime) -> dict:
         try:
             with get_umami_db() as umami_db:
-                # Query unique visitors from all reader events
-                visitors_query = text(f"""
-                    SELECT COUNT(DISTINCT s.visitor_id)
-                    FROM website_event we
-                    JOIN session s ON we.session_id = s.session_id
-                    WHERE we.event_name IN ('reader_page_view', 'reader_entry_complete', 'reader_entry_exit')
-                        AND we.created_at >= :start_time
-                        AND we.created_at < :end_time
-                        {website_filter}
-                """)
-                unique_visitors = (
-                    umami_db.execute(
-                        visitors_query,
-                        {
-                            "start_time": start_dt,
-                            "end_time": end_dt,
-                            **website_params,
-                        },
-                    ).scalar()
-                    or 0
-                )
-
-                # Query reads: unique sessions per entry from reader_page_view
-                reads_query = text(f"""
-                    SELECT
-                        ed_entry.string_value as entry_label,
-                        COUNT(DISTINCT we.session_id) as session_count
-                    FROM website_event we
-                    LEFT JOIN event_data ed_entry ON we.event_id = ed_entry.website_event_id
-                        AND ed_entry.data_key = 'entryLabel'
-                    WHERE we.event_name = 'reader_page_view'
-                        AND we.created_at >= :start_time
-                        AND we.created_at < :end_time
-                        AND ed_entry.string_value IS NOT NULL
-                        {website_filter}
-                    GROUP BY ed_entry.string_value
-                """)
-                reads_rows = umami_db.execute(
-                    reads_query,
-                    {
-                        "start_time": start_dt,
-                        "end_time": end_dt,
-                        **website_params,
-                    },
-                ).fetchall()
-
-                total_reads = sum(row[1] for row in reads_rows)
-
-                # Query finishes: unique sessions from reader_entry_complete
-                finishes_query = text(f"""
-                    SELECT COUNT(DISTINCT we.session_id)
-                    FROM website_event we
-                    WHERE we.event_name = 'reader_entry_complete'
-                        AND we.created_at >= :start_time
-                        AND we.created_at < :end_time
-                        {website_filter}
-                """)
-                total_finishes = (
-                    umami_db.execute(
-                        finishes_query,
-                        {
-                            "start_time": start_dt,
-                            "end_time": end_dt,
-                            **website_params,
-                        },
-                    ).scalar()
-                    or 0
+                metrics = _collect_reader_window_metrics(
+                    umami_db,
+                    start_dt,
+                    end_dt,
+                    website_filter,
+                    website_params,
+                    entry_lookup,
+                    empty_entry_keys,
                 )
 
         except Exception:
             return {
                 "reads": 0,
+                "starts": 0,
                 "finishes": 0,
                 "completionRate": 0,
                 "uniqueVisitors": 0,
             }
 
-        completion_rate = total_finishes / total_reads if total_reads > 0 else 0
+        total_reads = int(metrics["totalPageViews"])
+        total_starts = int(metrics["totalStarts"])
+        total_finishes = int(metrics["totalFinishes"])
+        completion_rate = total_finishes / total_starts if total_starts > 0 else 0
 
         return {
             "reads": total_reads,
+            "starts": total_starts,
             "finishes": total_finishes,
             "completionRate": round(completion_rate, 4),
-            "uniqueVisitors": unique_visitors,
+            "uniqueVisitors": len(metrics["uniqueVisitors"]),
         }
 
     this_week = calculate_period_stats_umami(this_week_start, this_week_end)
@@ -1080,6 +1470,7 @@ def admin_weekly_digest(
 
     changes = {
         "reads": calc_change(this_week["reads"], last_week["reads"]),
+        "starts": calc_change(this_week["starts"], last_week["starts"]),
         "finishes": calc_change(this_week["finishes"], last_week["finishes"]),
         "completionRate": calc_change(this_week["completionRate"], last_week["completionRate"]),
         "uniqueVisitors": calc_change(this_week["uniqueVisitors"], last_week["uniqueVisitors"]),
