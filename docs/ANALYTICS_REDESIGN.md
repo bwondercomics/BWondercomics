@@ -14,7 +14,7 @@ The analytics dashboard currently shows:
 - Reader tabs:
   - `Pages Read`
   - `Start-to-Finish Rate`
-- `Visitor History`: range-based expandable table with visitor metadata + issue progress
+- `Visitor History`: compact master-detail visitor list with search/sort and issue-level detail
 - Weekly Digest: this week vs last week comparison using page reads, starts, completion rate, visitors
 
 ### Implemented changes
@@ -24,6 +24,7 @@ The analytics dashboard currently shows:
 - Raw finish lists were replaced by rate lists using unique starts vs unique finishes.
 - Ratio drilldowns now use `/api/admin/analytics/reader-series?metric=completion_rate`.
 - Historical visitor inspection is available without mixing it into the live visitor panel.
+- Frontend analytics code is now split into focused modules under `admin/analytics/`, with `admin/analytics.js` kept as the facade used by `admin/app.js`.
 
 ### Still future work
 - Retention/cohort analysis
@@ -202,10 +203,22 @@ Concern: #ef4444 (red-500)
 
 ---
 
-## Files to Modify
-- `admin/index.html` - Restructure analytics section HTML
-- `admin/analytics.js` - Update rendering functions, add health calculation
-- `admin/styles` (in index.html) - Add color utilities, spacing improvements
+## Frontend Architecture (Current)
+- `admin/analytics.js` - Thin coordinator/facade exposing `createAnalytics()`
+- `admin/analytics/traffic.js` - Summary, page reads, landing pages, referrers, countries, browsers, devices, top events
+- `admin/analytics/reader.js` - Health indicator, reader summary, reader cards, filters, drilldowns, weekly digest fetch
+- `admin/analytics/reads-over-time.js` - Pages-read chart and controls
+- `admin/analytics/visitor-history.js` - Search/sort + master-detail visitor history
+- `admin/analytics/live.js` - Live visitors polling, ticker, and chart
+- `admin/analytics/shared.js` - Shared pure formatters/helpers
+
+## Files to Modify for Future Analytics UI Work
+- `admin/index.html` - Restructure analytics section HTML when layout changes are needed
+- `admin/analytics/traffic.js` - Sitewide traffic panel behavior
+- `admin/analytics/reader.js` - Reader cards, health, and drilldowns
+- `admin/analytics/reads-over-time.js` - Chart behavior and controls
+- `admin/analytics/visitor-history.js` - Historical visitor inspection UI
+- `admin/analytics/live.js` - Live visitor surfaces
 - `backend API` - Possibly add health score calculation endpoint
 
 ## Verification

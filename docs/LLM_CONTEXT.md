@@ -239,6 +239,17 @@ Admin analytics is now split into three layers:
 - The old stop/drop-off panel is removed from admin UI.
 - A new `Visitor History` panel shows per-visitor metadata plus issue progress/finished state for the selected sitewide range.
 
+### Frontend module layout
+- `admin/analytics.js` is now a thin facade/coordinator that still exports `createAnalytics()`.
+- Analytics screen logic is split under `admin/analytics/`:
+  - `traffic.js` for summary + sitewide Umami panels
+  - `reader.js` for health, reader cards, filters, and drilldowns
+  - `reads-over-time.js` for the chart and its controls
+  - `visitor-history.js` for search/sort/master-detail visitor history
+  - `live.js` for active visitor polling, ticker, and live chart
+  - `shared.js` for pure formatting helpers used across modules
+- `admin/app.js` still imports only `createAnalytics()` from `admin/analytics.js`; the public facade contract was preserved during the split.
+
 ### Important endpoints
 - `GET /api/admin/analytics/reader`
   - Returns `entryReadsTotal`, `entryStartsTotal`, `entryFinishesTotal`, `finishRate`, `uniqueVisitors`

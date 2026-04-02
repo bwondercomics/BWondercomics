@@ -271,12 +271,35 @@ function buildFetchStub(vi) {
       });
     }
     if (value.startsWith("/api/admin/analytics/reads-over-time")) {
+      if (value.includes("entry_id=10")) {
+        return jsonResponse({
+          series: [{ date: "2026-03-24", count: 6, uniqueVisitors: 2 }],
+          totals: { reads: 6, uniqueVisitors: 2 },
+        });
+      }
       return jsonResponse({
         series: [
           { date: "2026-03-24", count: 4, uniqueVisitors: 3 },
           { date: "2026-03-25", count: 14, uniqueVisitors: 5 },
         ],
         totals: { reads: 18, uniqueVisitors: 7 },
+      });
+    }
+    if (value.startsWith("/api/admin/analytics/live?")) {
+      return jsonResponse({
+        generatedAt: "2026-03-30T08:00:00Z",
+        activeCount: value.includes("window=60") ? 5 : 3,
+        visitors: [
+          {
+            lastSeen: "2026-03-30T07:59:00Z",
+            durationSeconds: 420,
+            ipAddress: "127.0.0.1",
+            origin: "Direct",
+            hitCount: 2,
+            entriesRead: ["Issue 10"],
+            user: { displayName: "Guest" },
+          },
+        ],
       });
     }
     if (value.startsWith("/api/admin/analytics/reader-series")) {
@@ -327,6 +350,32 @@ describe("admin analytics", () => {
     expect(document.getElementById("analyticsVisitorHistoryList")).not.toBeNull();
     expect(document.getElementById("analyticsVisitorHistorySearch")).not.toBeNull();
     expect(document.getElementById("analyticsVisitorHistoryDetail")).not.toBeNull();
+  });
+
+  it("keeps the analytics facade manager surface stable", async () => {
+    const { createAnalytics } = await import("../admin/analytics.js");
+    const manager = createAnalytics({
+      hideAllSections: vi.fn(),
+      setActiveNav: vi.fn(),
+    });
+
+    expect(Object.keys(manager).sort()).toEqual(
+      [
+        "loadAnalyticsPages",
+        "loadAnalyticsSummary",
+        "loadAnalyticsVisitors",
+        "loadLiveVisitors",
+        "loadReaderAnalytics",
+        "loadReadsOverTime",
+        "loadVisitorHistory",
+        "refreshAnalytics",
+        "renderReaderAnalyticsView",
+        "shiftLiveRange",
+        "showAnalyticsSection",
+        "startLiveVisitors",
+        "stopLiveVisitors",
+      ].sort(),
+    );
   });
 
   it("renders pages-read summaries, ratio cards, and visitor history", async () => {
@@ -438,6 +487,67 @@ describe("admin analytics", () => {
         && String(url).includes("metric=completion_rate"),
       ),
     ).toBe(true);
+  });
+
+  it("reloads reads-over-time when chart controls change", async () => {
+    const fetchMock = buildFetchStub(vi);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { createAnalytics } = await import("../admin/analytics.js");
+    const manager = createAnalytics({
+      hideAllSections: vi.fn(),
+      setActiveNav: vi.fn(),
+    });
+
+    manager.refreshAnalytics({ showLoading: false });
+    await flushAdminUi(5);
+
+    const mode = document.getElementById("readsOverTimeMode");
+    mode.value = "entry";
+    mode.dispatchEvent(new Event("change"));
+    await flushAdminUi(3);
+
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).includes("/api/admin/analytics/reads-over-time?range=7d&entry_id=10"),
+      ),
+    ).toBe(true);
+    expect(document.getElementById("readsOverTimeTotals")?.textContent).toContain(
+      "6 pages read",
+    );
+  });
+
+  it("loads live visitors and reloads when the live range shifts", async () => {
+    const fetchMock = buildFetchStub(vi);
+    vi.stubGlobal("fetch", fetchMock);
+
+    const { createAnalytics } = await import("../admin/analytics.js");
+    const manager = createAnalytics({
+      hideAllSections: vi.fn(),
+      setActiveNav: vi.fn(),
+    });
+
+    manager.startLiveVisitors();
+    await flushAdminUi(3);
+
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).includes("/api/admin/analytics/live?window=30"),
+      ),
+    ).toBe(true);
+    expect(document.getElementById("liveVisitorsCount")?.textContent).toBe("3");
+
+    manager.shiftLiveRange(1);
+    await flushAdminUi(3);
+
+    expect(
+      fetchMock.mock.calls.some(([url]) =>
+        String(url).includes("/api/admin/analytics/live?window=60"),
+      ),
+    ).toBe(true);
+    expect(document.getElementById("liveVisitorsCount")?.textContent).toBe("5");
+
+    manager.stopLiveVisitors();
   });
 
   it("filters and selects visitor history rows without expanding the whole list", async () => {
