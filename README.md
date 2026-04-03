@@ -1,4 +1,4 @@
-# BWonderComics (self-hosted comics platform kit)
+# BWonderComics (self-hosted comics platform kit) early_0.7.8_analytics
 
 Static frontend (built with Vite) + FastAPI backend for the dynamic stuff (auth, comments, post scheduling, RSS, uploads, analytics proxy).
 
