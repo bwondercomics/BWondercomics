@@ -1,103 +1,189 @@
 import { THEME_COLORS, THEME_PRESETS } from "./constants.js";
 import { escapeAttr, formatFocus, normalizeFit, parseFocus } from "./helpers.js";
 
-export function renderThemeEditorContent(currentPage) {
-  const theme = currentPage?.meta?.theme || {};
-  const panelBackgrounds = currentPage?.meta?.panelBackgrounds || {};
+function cloneThemeDraft(draft = {}) {
+  return JSON.parse(JSON.stringify({
+    theme: draft.theme || {},
+    panelBackgrounds: draft.panelBackgrounds || {},
+    panelSpacing: draft.panelSpacing || {},
+  }));
+}
+
+function getThemeSource(currentPage, draftMeta = null) {
+  if (draftMeta) return cloneThemeDraft(draftMeta);
+  return cloneThemeDraft({
+    theme: currentPage?.meta?.theme || {},
+    panelBackgrounds: currentPage?.meta?.panelBackgrounds || {},
+    panelSpacing: currentPage?.meta?.panelSpacing || {},
+  });
+}
+
+function updateThemeInputsFromDraft(root, draft) {
+  if (!root) return;
+
+  THEME_COLORS.forEach((color) => {
+    const value = draft.theme?.[color.key] || color.default;
+    const picker = root.querySelector(`.pb-theme-color-picker[data-key="${color.key}"]`);
+    const textInput = root.querySelector(`.pb-theme-color-text[data-key="${color.key}"]`);
+    if (picker) picker.value = value;
+    if (textInput) textInput.value = value;
+  });
+
+  ["left", "right"].forEach((side) => {
+    const bg = draft.panelBackgrounds?.[side] || {};
+    const spacing = draft.panelSpacing?.[side];
+    const pathInput = root.querySelector(`.pb-panel-bg-path[data-panel="${side}"]`);
+    const metaEl = root.querySelector(`.pb-panel-bg-meta[data-panel="${side}"]`);
+    const opacityInput = root.querySelector(`.pb-panel-bg-opacity[data-panel="${side}"]`);
+    const emptyToggle = root.querySelector(`.pb-panel-empty-toggle[data-panel="${side}"]`);
+    const gapInput = root.querySelector(`.pb-panel-gap[data-panel="${side}"]`);
+    const opacityValue = typeof bg.opacity === "number" ? bg.opacity : 0.18;
+
+    if (pathInput) pathInput.value = bg.path || "";
+    if (metaEl) {
+      metaEl.textContent = `Fit: ${normalizeFit(bg.fit || "cover")} · Focus: ${bg.focus || "center"} · Opacity: ${opacityValue}`;
+    }
+    if (opacityInput) opacityInput.value = String(opacityValue);
+    if (emptyToggle) emptyToggle.checked = !!bg.hideEmptyText;
+    if (gapInput) gapInput.value = spacing ?? "";
+  });
+}
+
+export function renderThemeEditorContent(currentPage, draftMeta = null) {
+  const source = getThemeSource(currentPage, draftMeta);
+  const theme = source.theme || {};
+  const panelBackgrounds = source.panelBackgrounds || {};
+  const panelSpacing = source.panelSpacing || {};
   const leftBg = panelBackgrounds.left || {};
   const rightBg = panelBackgrounds.right || {};
   const leftOpacity = typeof leftBg.opacity === "number" ? leftBg.opacity : 0.18;
   const rightOpacity = typeof rightBg.opacity === "number" ? rightBg.opacity : 0.18;
   const leftHideEmpty = !!leftBg.hideEmptyText;
   const rightHideEmpty = !!rightBg.hideEmptyText;
-  const panelSpacing = currentPage?.meta?.panelSpacing || {};
   const leftGap = panelSpacing.left ?? "";
   const rightGap = panelSpacing.right ?? "";
+
+  const renderSectionCard = (kicker, title, copy, body) => `
+    <section class="pb-editor-section-card">
+      <div class="pb-editor-section-head">
+        <div>
+          <span class="pb-editor-section-kicker">${kicker}</span>
+          <h4 class="pb-editor-section-title">${title}</h4>
+        </div>
+        <p class="pb-editor-section-copy">${copy}</p>
+      </div>
+      ${body}
+    </section>
+  `;
+
+  const renderPanelSurfaceCard = (panel, title, bg, opacity) => `
+    <div class="pb-editor-subcard">
+      <div class="pb-editor-subcard-head">
+        <span class="pb-editor-subcard-title">${title}</span>
+        <span class="pb-editor-subcard-meta">${bg.path ? "Image selected" : "No image"}</span>
+      </div>
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Background Asset</label>
+        <div class="pb-editor-inline-actions">
+          <input
+            type="text"
+            class="pb-editor-input pb-panel-bg-path"
+            data-panel="${panel}"
+            value="${escapeAttr(bg.path || "")}"
+            placeholder="assets/uploads/..."
+            readonly
+          >
+          <button type="button" class="btn-secondary pb-panel-bg-pick" data-panel="${panel}">Choose</button>
+          <button type="button" class="btn-secondary pb-panel-bg-clear" data-panel="${panel}">Clear</button>
+        </div>
+      </div>
+      <div class="pb-editor-field pb-editor-field--row">
+        <label class="pb-editor-label">Opacity</label>
+        <input type="range" class="pb-promo-style-range pb-panel-bg-opacity" data-panel="${panel}" min="0" max="1" step="0.05" value="${opacity}">
+      </div>
+      <small class="pb-editor-hint pb-panel-bg-meta" data-panel="${panel}">Fit: ${normalizeFit(bg.fit || "cover")} · Focus: ${bg.focus || "center"} · Opacity: ${opacity}</small>
+    </div>
+  `;
+
+  const renderPanelSpacingCard = (panel, title, gap, hideEmpty) => `
+    <div class="pb-editor-subcard">
+      <div class="pb-editor-subcard-head">
+        <span class="pb-editor-subcard-title">${title}</span>
+        <span class="pb-editor-subcard-meta">Spacing and empty-panel copy</span>
+      </div>
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Module Spacing (px)</label>
+        <input type="number" class="pb-editor-input pb-panel-gap" data-panel="${panel}" min="0" step="1" placeholder="12" value="${gap}">
+      </div>
+      <div class="pb-editor-field pb-editor-field--row">
+        <label class="pb-editor-label">Hide Empty Text</label>
+        <input type="checkbox" class="pb-panel-empty-toggle" data-panel="${panel}" ${hideEmpty ? "checked" : ""}>
+      </div>
+    </div>
+  `;
 
   const colorsHtml = THEME_COLORS.map((color) => {
     const value = theme[color.key] || color.default;
     return `
-        <div class="pb-theme-color-row">
-          <label class="pb-theme-color-label">${color.label}</label>
-          <div class="pb-theme-color-inputs">
-            <input type="color" class="pb-theme-color-picker" data-key="${color.key}" value="${value}">
-            <input type="text" class="pb-theme-color-text" data-key="${color.key}" value="${value}" maxlength="7">
-          </div>
+      <div class="pb-theme-color-row">
+        <label class="pb-theme-color-label">${color.label}</label>
+        <div class="pb-theme-color-inputs">
+          <input type="color" class="pb-theme-color-picker" data-key="${color.key}" value="${value}">
+          <input type="text" class="pb-theme-color-text" data-key="${color.key}" value="${value}" maxlength="7">
         </div>
-      `;
+      </div>
+    `;
   }).join("");
 
   const presetsHtml = Object.entries(THEME_PRESETS)
-    .map(([key, preset]) => `<button class="pb-theme-preset-btn" data-preset="${key}">${preset.name}</button>`)
+    .map(([key, preset]) => `<button class="pb-theme-preset-btn" type="button" data-preset="${key}">${preset.name}</button>`)
     .join("");
 
   return `
-      <h3>Page Theme</h3>
-      <div class="pb-theme-presets">
-        <label class="pb-editor-label">Quick Presets</label>
-        <div class="pb-theme-preset-grid">${presetsHtml}</div>
-      </div>
-      <div class="pb-theme-colors">
-        <label class="pb-editor-label">Custom Colors</label>
-        ${colorsHtml}
-      </div>
-      <div class="pb-editor-section-divider"></div>
-      <div class="pb-theme-panels">
-        <label class="pb-editor-label">Panel Backgrounds</label>
-        <div class="pb-editor-field">
-          <label class="pb-editor-label">Left Panel</label>
-          <div style="display:flex; gap:8px; flex-wrap: wrap;">
-            <input type="text" class="pb-editor-input pb-panel-bg-path" data-panel="left" value="${escapeAttr(leftBg.path || "")}" placeholder="assets/uploads/..." readonly>
-            <button type="button" class="btn-secondary pb-panel-bg-pick" data-panel="left">Choose</button>
-            <button type="button" class="btn-secondary pb-panel-bg-clear" data-panel="left">Clear</button>
+    <div class="pb-editor-stack">
+      ${renderSectionCard(
+        "Fast Start",
+        "Presets",
+        "Pick a direction, then tune the tokens and side panels below.",
+        `<div class="pb-theme-preset-grid">${presetsHtml}</div>`,
+      )}
+      ${renderSectionCard(
+        "Palette",
+        "Color System",
+        "Primary reader tokens for chrome, accents, and panel surfaces.",
+        `<div class="pb-theme-colors">${colorsHtml}</div>`,
+      )}
+      ${renderSectionCard(
+        "Surfaces",
+        "Panel Backgrounds",
+        "Left and right reader panels can carry separate background art.",
+        `
+          <div class="pb-editor-subgrid">
+            ${renderPanelSurfaceCard("left", "Left Panel", leftBg, leftOpacity)}
+            ${renderPanelSurfaceCard("right", "Right Panel", rightBg, rightOpacity)}
           </div>
-          <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
-            <label class="pb-editor-label" style="margin:0;">Module Spacing (px)</label>
-            <input type="number" class="pb-editor-input pb-panel-gap" data-panel="left" min="0" step="1" placeholder="12" value="${leftGap}">
+        `,
+      )}
+      ${renderSectionCard(
+        "Spacing",
+        "Panel Spacing & Empty States",
+        "Fine-tune the side-panel rhythm and their empty-state behavior.",
+        `
+          <div class="pb-editor-subgrid">
+            ${renderPanelSpacingCard("left", "Left Panel", leftGap, leftHideEmpty)}
+            ${renderPanelSpacingCard("right", "Right Panel", rightGap, rightHideEmpty)}
           </div>
-          <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
-            <label class="pb-editor-label" style="margin:0;">Background Opacity</label>
-            <input type="range" class="pb-panel-bg-opacity" data-panel="left" min="0" max="1" step="0.05" value="${leftOpacity}">
-          </div>
-          <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
-            <label class="pb-editor-label" style="margin:0;">Hide empty panel text</label>
-            <input type="checkbox" class="pb-panel-empty-toggle" data-panel="left" ${leftHideEmpty ? "checked" : ""}>
-          </div>
-          <small class="pb-editor-hint pb-panel-bg-meta" data-panel="left">Fit: ${normalizeFit(leftBg.fit || "cover")} · Focus: ${leftBg.focus || "center"} · Opacity: ${leftOpacity}</small>
-        </div>
-        <div class="pb-editor-field">
-          <label class="pb-editor-label">Right Panel</label>
-          <div style="display:flex; gap:8px; flex-wrap: wrap;">
-            <input type="text" class="pb-editor-input pb-panel-bg-path" data-panel="right" value="${escapeAttr(rightBg.path || "")}" placeholder="assets/uploads/..." readonly>
-            <button type="button" class="btn-secondary pb-panel-bg-pick" data-panel="right">Choose</button>
-            <button type="button" class="btn-secondary pb-panel-bg-clear" data-panel="right">Clear</button>
-          </div>
-          <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
-            <label class="pb-editor-label" style="margin:0;">Module Spacing (px)</label>
-            <input type="number" class="pb-editor-input pb-panel-gap" data-panel="right" min="0" step="1" placeholder="12" value="${rightGap}">
-          </div>
-          <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
-            <label class="pb-editor-label" style="margin:0;">Background Opacity</label>
-            <input type="range" class="pb-panel-bg-opacity" data-panel="right" min="0" max="1" step="0.05" value="${rightOpacity}">
-          </div>
-          <div style="display:flex; gap:8px; align-items:center; margin-top:6px;">
-            <label class="pb-editor-label" style="margin:0;">Hide empty panel text</label>
-            <input type="checkbox" class="pb-panel-empty-toggle" data-panel="right" ${rightHideEmpty ? "checked" : ""}>
-          </div>
-          <small class="pb-editor-hint pb-panel-bg-meta" data-panel="right">Fit: ${normalizeFit(rightBg.fit || "cover")} · Focus: ${rightBg.focus || "center"} · Opacity: ${rightOpacity}</small>
-        </div>
-      </div>
-      <div class="pb-editor-actions">
-        <button class="btn-primary" id="pbSaveTheme">Save Theme</button>
-        <button class="btn-secondary" id="pbResetTheme">Reset to Default</button>
-      </div>
-    `;
+        `,
+      )}
+    </div>
+  `;
 }
 
 export function bindThemeEditorEvents({
   el,
-  getCurrentPage,
-  updatePage,
+  draftMeta,
+  setDraftMeta,
+  markDirty,
   openImagePicker,
   fetchAssets,
   uploadAssetFile,
@@ -105,57 +191,68 @@ export function bindThemeEditorEvents({
 }) {
   if (!el?.pbModuleEditor) return;
 
-  // Sync color picker with text input
+  let draft = getThemeSource(null, draftMeta);
+
+  const commitDraft = (nextDraft, { syncDom = false } = {}) => {
+    draft = cloneThemeDraft(nextDraft);
+    setDraftMeta(draft);
+    markDirty("theme");
+    if (syncDom) {
+      updateThemeInputsFromDraft(el.pbModuleEditor, draft);
+    }
+  };
+
   el.pbModuleEditor.querySelectorAll(".pb-theme-color-picker").forEach((picker) => {
-    picker.addEventListener("input", (e) => {
+    picker.addEventListener("input", () => {
       const key = picker.dataset.key;
+      const nextDraft = cloneThemeDraft(draft);
+      nextDraft.theme[key] = picker.value;
+      commitDraft(nextDraft);
       const textInput = el.pbModuleEditor.querySelector(`.pb-theme-color-text[data-key="${key}"]`);
-      if (textInput) textInput.value = e.target.value;
+      if (textInput) textInput.value = picker.value;
     });
   });
 
-  const ensurePanelBackgrounds = () => {
-    const page = getCurrentPage();
-    if (!page) return null;
-    page.meta = page.meta || {};
-    if (!page.meta.panelBackgrounds) page.meta.panelBackgrounds = {};
-    return page.meta.panelBackgrounds;
-  };
+  el.pbModuleEditor.querySelectorAll(".pb-theme-color-text").forEach((textInput) => {
+    textInput.addEventListener("input", () => {
+      const key = textInput.dataset.key;
+      const value = textInput.value.trim();
+      const nextDraft = cloneThemeDraft(draft);
+      nextDraft.theme[key] = value;
+      commitDraft(nextDraft);
+      if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
+        const picker = el.pbModuleEditor.querySelector(`.pb-theme-color-picker[data-key="${key}"]`);
+        if (picker) picker.value = value;
+      }
+    });
+  });
 
-  const ensurePanelSpacing = () => {
-    const page = getCurrentPage();
-    if (!page) return null;
-    page.meta = page.meta || {};
-    if (!page.meta.panelSpacing) page.meta.panelSpacing = {};
-    return page.meta.panelSpacing;
-  };
+  el.pbModuleEditor.querySelectorAll(".pb-theme-preset-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const preset = THEME_PRESETS[btn.dataset.preset];
+      if (!preset) return;
+      const nextDraft = cloneThemeDraft(draft);
+      nextDraft.theme = { ...nextDraft.theme, ...preset.theme };
+      commitDraft(nextDraft, { syncDom: true });
+    });
+  });
 
   const updatePanelBgUi = (side) => {
-    const page = getCurrentPage();
-    const data = page?.meta?.panelBackgrounds?.[side] || {};
-    const pathInput = el.pbModuleEditor.querySelector(`.pb-panel-bg-path[data-panel="${side}"]`);
+    updateThemeInputsFromDraft(el.pbModuleEditor, draft);
     const metaEl = el.pbModuleEditor.querySelector(`.pb-panel-bg-meta[data-panel="${side}"]`);
-    const opacityInput = el.pbModuleEditor.querySelector(`.pb-panel-bg-opacity[data-panel="${side}"]`);
-    const emptyToggle = el.pbModuleEditor.querySelector(`.pb-panel-empty-toggle[data-panel="${side}"]`);
-    if (pathInput) pathInput.value = data.path || "";
-    const opacityValue = typeof data.opacity === "number" ? data.opacity : 0.18;
-    if (opacityInput) opacityInput.value = String(opacityValue);
-    if (emptyToggle) emptyToggle.checked = !!data.hideEmptyText;
     if (metaEl) {
+      const data = draft.panelBackgrounds?.[side] || {};
+      const opacityValue = typeof data.opacity === "number" ? data.opacity : 0.18;
       metaEl.textContent = `Fit: ${normalizeFit(data.fit || "cover")} · Focus: ${data.focus || "center"} · Opacity: ${opacityValue}`;
     }
   };
 
   el.pbModuleEditor.querySelectorAll(".pb-panel-bg-pick").forEach((btn) => {
     btn.addEventListener("click", async () => {
-      const page = getCurrentPage();
-      if (!page) return;
       const side = btn.dataset.panel;
-      const current = page?.meta?.panelBackgrounds?.[side] || {};
+      if (!side) return;
+      const current = draft.panelBackgrounds?.[side] || {};
       const focus = parseFocus(current.focus || "center");
-      const fit = normalizeFit(current.fit || "cover");
-      const opacity = typeof current.opacity === "number" ? current.opacity : 0.18;
-      const hideEmptyText = !!current.hideEmptyText;
       await openImagePicker({
         title: `Select ${side} panel background`,
         getItems: fetchAssets,
@@ -164,20 +261,23 @@ export function bindThemeEditorEvents({
         resolveSrc: resolveAssetUrl,
         initialSelection: {
           path: current.path || "",
-          fit,
+          fit: normalizeFit(current.fit || "cover"),
           x: focus.x,
           y: focus.y,
         },
         onApply: ({ item, fit: nextFit, x, y }) => {
-          const backgrounds = ensurePanelBackgrounds();
-          if (!backgrounds) return;
-          backgrounds[side] = {
+          const nextDraft = cloneThemeDraft(draft);
+          nextDraft.panelBackgrounds = nextDraft.panelBackgrounds || {};
+          const panel = nextDraft.panelBackgrounds[side] || {};
+          nextDraft.panelBackgrounds[side] = {
+            ...panel,
             path: item?.path || "",
             fit: normalizeFit(nextFit),
             focus: formatFocus({ x, y }),
-            opacity,
-            hideEmptyText,
+            opacity: typeof panel.opacity === "number" ? panel.opacity : 0.18,
+            hideEmptyText: !!panel.hideEmptyText,
           };
+          commitDraft(nextDraft, { syncDom: true });
           updatePanelBgUi(side);
         },
       });
@@ -187,23 +287,27 @@ export function bindThemeEditorEvents({
   el.pbModuleEditor.querySelectorAll(".pb-panel-bg-clear").forEach((btn) => {
     btn.addEventListener("click", () => {
       const side = btn.dataset.panel;
-      const backgrounds = ensurePanelBackgrounds();
-      if (!backgrounds) return;
-      delete backgrounds[side];
+      if (!side) return;
+      const nextDraft = cloneThemeDraft(draft);
+      if (nextDraft.panelBackgrounds) {
+        delete nextDraft.panelBackgrounds[side];
+      }
+      commitDraft(nextDraft, { syncDom: true });
       updatePanelBgUi(side);
     });
   });
 
   el.pbModuleEditor.querySelectorAll(".pb-panel-bg-opacity").forEach((input) => {
-    input.addEventListener("change", () => {
+    input.addEventListener("input", () => {
       const side = input.dataset.panel;
       if (!side) return;
-      const backgrounds = ensurePanelBackgrounds();
-      if (!backgrounds) return;
-      const raw = parseFloat(input.value);
-      const nextOpacity = Number.isFinite(raw) ? Math.min(1, Math.max(0, raw)) : 0.18;
-      if (!backgrounds[side]) backgrounds[side] = {};
-      backgrounds[side].opacity = nextOpacity;
+      const nextDraft = cloneThemeDraft(draft);
+      const panel = nextDraft.panelBackgrounds?.[side] || {};
+      nextDraft.panelBackgrounds[side] = {
+        ...panel,
+        opacity: Number.isFinite(parseFloat(input.value)) ? parseFloat(input.value) : 0.18,
+      };
+      commitDraft(nextDraft);
       updatePanelBgUi(side);
     });
   });
@@ -212,87 +316,31 @@ export function bindThemeEditorEvents({
     input.addEventListener("change", () => {
       const side = input.dataset.panel;
       if (!side) return;
-      const backgrounds = ensurePanelBackgrounds();
-      if (!backgrounds) return;
-      if (!backgrounds[side]) backgrounds[side] = {};
-      backgrounds[side].hideEmptyText = !!input.checked;
-      updatePanelBgUi(side);
+      const nextDraft = cloneThemeDraft(draft);
+      const panel = nextDraft.panelBackgrounds?.[side] || {};
+      nextDraft.panelBackgrounds[side] = {
+        ...panel,
+        hideEmptyText: input.checked,
+      };
+      commitDraft(nextDraft);
     });
   });
 
   el.pbModuleEditor.querySelectorAll(".pb-panel-gap").forEach((input) => {
-    input.addEventListener("change", () => {
+    input.addEventListener("input", () => {
       const side = input.dataset.panel;
-      const spacing = ensurePanelSpacing();
-      if (!spacing || !side) return;
+      if (!side) return;
+      const nextDraft = cloneThemeDraft(draft);
+      nextDraft.panelSpacing = nextDraft.panelSpacing || {};
       const raw = String(input.value || "").trim();
       if (!raw) {
-        delete spacing[side];
-        input.value = "";
-        return;
+        delete nextDraft.panelSpacing[side];
+      } else {
+        const parsed = Number(raw);
+        if (Number.isNaN(parsed)) return;
+        nextDraft.panelSpacing[side] = Math.max(0, Math.round(parsed));
       }
-      const parsed = Number(raw);
-      if (Number.isNaN(parsed)) return;
-      spacing[side] = Math.max(0, Math.round(parsed));
-      input.value = spacing[side];
-    });
-  });
-
-  el.pbModuleEditor.querySelectorAll(".pb-theme-color-text").forEach((textInput) => {
-    textInput.addEventListener("input", (e) => {
-      const key = textInput.dataset.key;
-      const value = e.target.value;
-      if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
-        const picker = el.pbModuleEditor.querySelector(`.pb-theme-color-picker[data-key="${key}"]`);
-        if (picker) picker.value = value;
-      }
-    });
-  });
-
-  // Preset buttons
-  el.pbModuleEditor.querySelectorAll(".pb-theme-preset-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const presetKey = btn.dataset.preset;
-      const preset = THEME_PRESETS[presetKey];
-      if (!preset) return;
-
-      // Apply preset to color inputs
-      Object.entries(preset.theme).forEach(([key, value]) => {
-        const picker = el.pbModuleEditor.querySelector(`.pb-theme-color-picker[data-key="${key}"]`);
-        const textInput = el.pbModuleEditor.querySelector(`.pb-theme-color-text[data-key="${key}"]`);
-        if (picker) picker.value = value;
-        if (textInput) textInput.value = value;
-      });
-    });
-  });
-
-  // Save theme
-  document.getElementById("pbSaveTheme")?.addEventListener("click", async () => {
-    const page = getCurrentPage();
-    if (!page) return;
-
-    const theme = {};
-    el.pbModuleEditor.querySelectorAll(".pb-theme-color-text").forEach((input) => {
-      theme[input.dataset.key] = input.value;
-    });
-
-    const meta = { ...(page.meta || {}), theme };
-    const updated = await updatePage(page.id, { meta });
-    if (updated) {
-      page.meta = updated.meta;
-      alert("Theme saved!");
-    } else {
-      alert("Failed to save theme.");
-    }
-  });
-
-  // Reset theme
-  document.getElementById("pbResetTheme")?.addEventListener("click", () => {
-    THEME_COLORS.forEach((color) => {
-      const picker = el.pbModuleEditor.querySelector(`.pb-theme-color-picker[data-key="${color.key}"]`);
-      const textInput = el.pbModuleEditor.querySelector(`.pb-theme-color-text[data-key="${color.key}"]`);
-      if (picker) picker.value = color.default;
-      if (textInput) textInput.value = color.default;
+      commitDraft(nextDraft);
     });
   });
 }

@@ -48,8 +48,8 @@ export function renderSocialEditor(config) {
 
         <div class="pb-editor-field">
           <label class="pb-editor-label">Icon</label>
-          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-            <input type="text" class="pb-editor-input pb-social-input" data-item-index="${index}" data-item-key="icon" value="${escapeAttr(btn.icon || "")}" placeholder="Emoji or image URL" style="flex:1; min-width:100px;">
+          <div class="pb-editor-inline-actions">
+            <input type="text" class="pb-editor-input pb-social-input pb-social-input--icon" data-item-index="${index}" data-item-key="icon" value="${escapeAttr(btn.icon || "")}" placeholder="Emoji or image URL">
             <button type="button" class="btn-secondary pb-social-icon-pick" data-item-index="${index}">Choose</button>
           </div>
           <small class="pb-editor-hint pb-social-icon-preview" data-item-index="${index}">Current: ${iconPreview}</small>
@@ -105,15 +105,23 @@ export function renderSocialEditor(config) {
   }).join("");
 
   return `
-    <div class="pb-promo-items-section">
-      <div class="pb-editor-field">
-        <label class="pb-editor-label">Social Buttons</label>
-        <button type="button" class="btn-secondary" id="pbSocialAddButton">+ Add Button</button>
+    <section class="pb-editor-section-card">
+      <div class="pb-editor-section-head">
+        <div>
+          <span class="pb-editor-section-kicker">Content</span>
+          <h4 class="pb-editor-section-title">Social Buttons</h4>
+        </div>
+        <p class="pb-editor-section-copy">Manage button order, icon assets, destination URLs, and per-button styling.</p>
       </div>
-      <div class="pb-promo-items-list" id="pbSocialButtonsList">
-        ${buttonsHtml || '<div class="pb-promo-empty">No buttons. Click "+ Add Button" to create one.</div>'}
+      <div class="pb-promo-items-section">
+        <div class="pb-editor-toolbar">
+          <button type="button" class="btn-secondary" id="pbSocialAddButton">+ Add Button</button>
+        </div>
+        <div class="pb-promo-items-list" id="pbSocialButtonsList">
+          ${buttonsHtml || '<div class="pb-promo-empty">No buttons. Click "+ Add Button" to create one.</div>'}
+        </div>
       </div>
-    </div>
+    </section>
   `;
 }
 

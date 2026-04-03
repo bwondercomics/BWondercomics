@@ -20,7 +20,7 @@ Public pages are served from `dist/`.
 ## Docs
 - Overview: `docs/README.md`
 - Architecture: `docs/ARCHITECTURE.md`
-- Admin panel: `docs/admin-overview.md`
+- Admin panel + page builder: `docs/admin-overview.md`
 - Deployment: `deploy/README.md`
 
 ## Static hosting

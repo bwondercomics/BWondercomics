@@ -583,30 +583,47 @@
       <section class="section" id="pageBuilderSection" style="display: none;">
         <div class="page-builder">
           <!-- Page Builder Layout -->
-          <div class="page-builder-layout">
+          <div class="page-builder-layout" data-editor-mode="collapsed">
             <!-- Left Sidebar: Page List -->
             <aside class="page-builder-sidebar">
-              <div class="pb-sidebar-tabs">
-                <button class="pb-sidebar-tab active" data-tab="pages">Pages</button>
-                <button class="pb-sidebar-tab" data-tab="modules">Modules</button>
-              </div>
-              <div class="pb-sidebar-content" data-content="pages">
-                <div id="pbPageList" class="pb-page-list"></div>
-              </div>
-              <div class="pb-sidebar-content" data-content="modules" hidden>
-                <div id="pbModulePalette" class="pb-module-palette"></div>
+              <button
+                type="button"
+                class="btn-small btn-secondary pb-sidebar-rail-toggle"
+                id="pbToggleSidebar"
+                aria-controls="pbSidebarBody"
+                aria-expanded="true"
+              >
+                Collapse
+              </button>
+              <div class="pb-sidebar-collapsed-copy" id="pbSidebarRailLabel" aria-hidden="true">Pages</div>
+              <div class="pb-sidebar-body" id="pbSidebarBody">
+                <div class="pb-sidebar-tabs">
+                  <button class="pb-sidebar-tab active" data-tab="pages">Pages</button>
+                  <button class="pb-sidebar-tab" data-tab="modules">Modules</button>
+                </div>
+                <div class="pb-sidebar-content" data-content="pages">
+                  <div id="pbPageList" class="pb-page-list"></div>
+                </div>
+                <div class="pb-sidebar-content" data-content="modules" hidden>
+                  <div id="pbModulePalette" class="pb-module-palette"></div>
+                </div>
               </div>
             </aside>
 
             <!-- Main Canvas Area -->
             <main class="page-builder-canvas">
               <div class="pb-canvas-header">
-                <div class="pb-page-title" id="pbPageTitle"></div>
-                <div class="page-builder-actions">
-                  <button type="button" class="btn-small btn-secondary" id="pbToggleEditor">Expand</button>
-                  <button type="button" class="btn-small btn-secondary" id="pbAddPage">+ Page</button>
-                  <button type="button" class="btn-small btn-secondary" id="pbSaveDraft">Save Draft</button>
-                  <button type="button" class="btn-small btn-primary" id="pbPublish">Publish Changes</button>
+                <div class="pb-canvas-header-main">
+                  <div class="pb-page-title" id="pbPageTitle"></div>
+                  <div class="pb-canvas-header-actions">
+                    <div class="page-builder-actions pb-canvas-header-actions-group">
+                      <button type="button" class="btn-small btn-secondary" id="pbAddPage">+ Page</button>
+                    </div>
+                    <div class="page-builder-actions pb-canvas-header-actions-group pb-canvas-header-actions-group--publish">
+                      <button type="button" class="btn-small btn-secondary" id="pbSaveDraft">Save Draft</button>
+                      <button type="button" class="btn-small btn-primary" id="pbPublish">Publish Changes</button>
+                    </div>
+                  </div>
                 </div>
               </div>
               <div id="pbCanvas" class="pb-canvas">
@@ -618,6 +635,15 @@
 
             <!-- Right Sidebar: Module Editor -->
             <aside class="page-builder-editor">
+              <button
+                type="button"
+                class="btn-small btn-secondary pb-editor-rail-toggle"
+                id="pbToggleEditor"
+                aria-controls="pbModuleEditor"
+                aria-expanded="true"
+              >
+                Expand
+              </button>
               <div id="pbModuleEditor" class="pb-module-editor">
                 <div class="pb-editor-empty">
                   <p>Click on a module to edit its settings.</p>

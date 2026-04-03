@@ -9,6 +9,9 @@ import {
   deleteSection,
   fetchPage,
   fetchPages,
+  moveModule,
+  reorderModules,
+  reorderSections,
   updateModule,
   updatePage,
   updateSection,
@@ -68,6 +71,7 @@ describe("admin page-builder data layer", () => {
 
   it("handles section and module endpoint wrappers plus page-create failures", async () => {
     const section = getContractFixture("builderPage").sections[0];
+    const secondSection = getContractFixture("builderPage").sections[1];
     const module = getContractFixture("builderModules").feed;
     const updatedSection = { ...section, settings: { moduleGap: 18 } };
     const updatedModule = { ...module, config: { limit: 8 } };
@@ -90,7 +94,16 @@ describe("admin page-builder data layer", () => {
       if (url === `/api/admin/modules/${module.id}` && options.method === "PUT") {
         return jsonResponse({ module: updatedModule });
       }
+      if (url === `/api/admin/modules/${module.id}/move` && options.method === "POST") {
+        return jsonResponse({ module: { ...module, columnIndex: 1, sortIndex: 0 } });
+      }
+      if (url === `/api/admin/sections/${section.id}/modules/reorder` && options.method === "POST") {
+        return jsonResponse({}, { status: 204, statusText: "No Content" });
+      }
       if (url === `/api/admin/modules/${module.id}` && options.method === "DELETE") {
+        return jsonResponse({}, { status: 204, statusText: "No Content" });
+      }
+      if (url === "/api/admin/pages/page-id/sections/reorder" && options.method === "POST") {
         return jsonResponse({}, { status: 204, statusText: "No Content" });
       }
       throw new Error(`Unexpected fetch: ${url}`);
@@ -103,7 +116,14 @@ describe("admin page-builder data layer", () => {
     expect(await updateSection(section.id, { settings: { moduleGap: 18 } })).toEqual(updatedSection);
     expect(await deleteSection(section.id)).toBe(true);
     expect(await addModule(section.id, "feed", 1, module.config)).toEqual(module);
+    expect(await addModule(section.id, "feed", 1, module.config, 2)).toEqual(module);
     expect(await updateModule(module.id, { config: { limit: 8 } })).toEqual(updatedModule);
+    expect(await moveModule(module.id, secondSection.id, 1, 0)).toEqual(expect.objectContaining({
+      columnIndex: 1,
+      sortIndex: 0,
+    }));
+    expect(await reorderModules(section.id, 0, [module.id])).toBe(true);
+    expect(await reorderSections("page-id", [secondSection.id, section.id])).toBe(true);
     expect(await deleteModule(module.id)).toBe(true);
   });
 });

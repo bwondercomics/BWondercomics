@@ -44,7 +44,7 @@ export function renderPromoEditor(config) {
 
           <div class="pb-editor-field">
             <label class="pb-editor-label">Image</label>
-            <div style="display:flex; gap:8px; flex-wrap: wrap;">
+            <div class="pb-editor-inline-actions">
               <input type="text" class="pb-editor-input pb-promo-input" data-item-index="${index}" data-item-key="image" value="${escapeAttr(item.image || "")}" readonly>
               <button type="button" class="btn-secondary pb-promo-pick" data-item-index="${index}">Choose</button>
               <button type="button" class="btn-secondary pb-promo-clear" data-item-index="${index}">Clear</button>
@@ -153,53 +153,69 @@ export function renderPromoEditor(config) {
   }).join("");
 
   return `
-      <div class="pb-promo-items-section">
-        <div class="pb-editor-field">
-          <label class="pb-editor-label">Promo Items</label>
-          <button type="button" class="btn-secondary" id="pbPromoAddItem">+ Add Item</button>
+      <section class="pb-editor-section-card">
+        <div class="pb-editor-section-head">
+          <div>
+            <span class="pb-editor-section-kicker">Content</span>
+            <h4 class="pb-editor-section-title">Promo Items</h4>
+          </div>
+          <p class="pb-editor-section-copy">Manage slide order, image assets, CTA copy, and slide-specific appearance settings.</p>
+        </div>
+        <div class="pb-promo-items-section">
+          <div class="pb-editor-toolbar">
+            <label class="pb-editor-label">Slides</label>
+            <button type="button" class="btn-secondary" id="pbPromoAddItem">+ Add Item</button>
+          </div>
         </div>
         <div class="pb-promo-items-list" id="pbPromoItemsList">
           ${itemsHtml || '<div class="pb-promo-empty">No promo items. Click "Add Item" to create one.</div>'}
         </div>
-      </div>
+      </section>
 
-      <div class="pb-editor-section-divider"></div>
+      <section class="pb-editor-section-card">
+        <div class="pb-editor-section-head">
+          <div>
+            <span class="pb-editor-section-kicker">Behavior</span>
+            <h4 class="pb-editor-section-title">Carousel Behavior</h4>
+          </div>
+          <p class="pb-editor-section-copy">Control autoplay, navigation, height, and motion for the entire promo module.</p>
+        </div>
+        <div class="pb-editor-field">
+          <label class="pb-editor-label">
+            <input type="checkbox" id="pbPromoAutoRotate" ${config.autoRotate !== false ? "checked" : ""}> Auto-rotate slides
+          </label>
+        </div>
 
-      <div class="pb-editor-field">
-        <label class="pb-editor-label">
-          <input type="checkbox" id="pbPromoAutoRotate" ${config.autoRotate !== false ? "checked" : ""}> Auto-rotate slides
-        </label>
-      </div>
+        <div class="pb-editor-field" id="pbPromoIntervalField" style="${config.autoRotate !== false ? "" : "display:none"}">
+          <label class="pb-editor-label">Rotation Interval (seconds)</label>
+          <input type="number" class="pb-editor-input" id="pbPromoInterval" value="${(config.interval || 5000) / 1000}" min="1" max="30" step="0.5">
+        </div>
 
-      <div class="pb-editor-field" id="pbPromoIntervalField" style="${config.autoRotate !== false ? "" : "display:none"}">
-        <label class="pb-editor-label">Rotation Interval (seconds)</label>
-        <input type="number" class="pb-editor-input" id="pbPromoInterval" value="${(config.interval || 5000) / 1000}" min="1" max="30" step="0.5">
-      </div>
+        <div class="pb-editor-field">
+          <label class="pb-editor-label">
+            <input type="checkbox" id="pbPromoShowNav" ${config.showNavigation !== false ? "checked" : ""}> Show navigation arrows
+          </label>
+        </div>
 
-      <div class="pb-editor-field">
-        <label class="pb-editor-label">
-          <input type="checkbox" id="pbPromoShowNav" ${config.showNavigation !== false ? "checked" : ""}> Show navigation arrows
-        </label>
-      </div>
+        <div class="pb-editor-field">
+          <label class="pb-editor-label">
+            <input type="checkbox" id="pbPromoShowIndicators" ${config.showIndicators !== false ? "checked" : ""}> Show dot indicators
+          </label>
+        </div>
 
-      <div class="pb-editor-field">
-        <label class="pb-editor-label">
-          <input type="checkbox" id="pbPromoShowIndicators" ${config.showIndicators !== false ? "checked" : ""}> Show dot indicators
-        </label>
-      </div>
+        <div class="pb-editor-field">
+          <label class="pb-editor-label">Module Height (px)</label>
+          <input type="number" class="pb-editor-input" id="pbPromoHeight" value="${config.height || 400}" min="200" max="1200">
+        </div>
 
-      <div class="pb-editor-field">
-        <label class="pb-editor-label">Module Height (px)</label>
-        <input type="number" class="pb-editor-input" id="pbPromoHeight" value="${config.height || 400}" min="200" max="1200">
-      </div>
-
-      <div class="pb-editor-field">
-        <label class="pb-editor-label">Transition Style</label>
-        <select class="pb-editor-select" id="pbPromoTransition">
-          <option value="fade" ${config.transition === "fade" ? "selected" : ""}>Fade</option>
-          <option value="slide" ${config.transition === "slide" ? "selected" : ""}>Slide</option>
-        </select>
-      </div>
+        <div class="pb-editor-field">
+          <label class="pb-editor-label">Transition Style</label>
+          <select class="pb-editor-select" id="pbPromoTransition">
+            <option value="fade" ${config.transition === "fade" ? "selected" : ""}>Fade</option>
+            <option value="slide" ${config.transition === "slide" ? "selected" : ""}>Slide</option>
+          </select>
+        </div>
+      </section>
     `;
 }
 

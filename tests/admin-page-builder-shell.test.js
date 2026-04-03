@@ -3,6 +3,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildContractFixture, getContractFixture } from "./helpers/contracts.js";
 import { flushAdminUi, mountAdminDom, stubAdminGlobals } from "./helpers/admin-fixture.js";
 
+function setViewportWidth(width) {
+  Object.defineProperty(window, "innerWidth", {
+    configurable: true,
+    writable: true,
+    value: width,
+  });
+}
+
 async function setupPageBuilder({
   fetchPagesResults = [],
   fetchPageResult = null,
@@ -10,11 +18,15 @@ async function setupPageBuilder({
   deletePageResult = true,
   addModuleResult = null,
   updatePageResult = null,
+  useRealEditors = false,
+  viewportWidth = 1600,
 } = {}) {
   vi.resetModules();
   mountAdminDom();
   stubAdminGlobals(vi);
   vi.spyOn(console, "error").mockImplementation(() => {});
+  window.localStorage.clear();
+  setViewportWidth(viewportWidth);
 
   const fetchPages = vi.fn();
   fetchPagesResults.forEach((result) => fetchPages.mockResolvedValueOnce(result));
@@ -28,7 +40,14 @@ async function setupPageBuilder({
     ...(fetchPageResult || createPageResult || {}),
     ...data,
   });
-  const addModule = vi.fn(async (_sectionId, moduleType, columnIndex, config) => ({
+  const addSection = vi.fn(async () => ({
+    id: "new-section-id",
+    layout: "1",
+    modules: [],
+    settings: {},
+  }));
+  const reorderSections = vi.fn(async () => true);
+  const addModule = vi.fn(async (_sectionId, moduleType, columnIndex, config, _sortIndex) => ({
     id: "new-module-id",
     moduleType,
     columnIndex,
@@ -36,6 +55,13 @@ async function setupPageBuilder({
     config,
     ...(addModuleResult || {}),
   }));
+  const moveModule = vi.fn(async (_moduleId, _sectionId, columnIndex, sortIndex) => ({
+    id: "moved-module-id",
+    columnIndex,
+    sortIndex,
+    config: {},
+  }));
+  const reorderModules = vi.fn(async () => true);
 
   vi.doMock("../admin/page-builder/data.js", () => ({
     fetchPages,
@@ -45,21 +71,29 @@ async function setupPageBuilder({
     updatePage,
     fetchAssets: vi.fn(async () => []),
     uploadAsset: vi.fn(async () => ({})),
-    addSection: vi.fn(async () => null),
+    addSection,
     updateSection: vi.fn(async () => null),
     deleteSection: vi.fn(async () => false),
+    reorderSections,
     addModule,
     updateModule: vi.fn(async () => null),
+    moveModule,
+    reorderModules,
     deleteModule: vi.fn(async () => false),
   }));
-  vi.doMock("../admin/page-builder/theme-editor.js", () => ({
-    renderThemeEditorContent: vi.fn(() => "<div>Theme Editor</div>"),
-    bindThemeEditorEvents: vi.fn(),
-  }));
-  vi.doMock("../admin/page-builder/module-editor.js", () => ({
-    renderModuleEditorContent: vi.fn(() => "<div>Module Editor</div>"),
-    bindModuleEditorEvents: vi.fn(),
-  }));
+  if (useRealEditors) {
+    vi.doUnmock("../admin/page-builder/theme-editor.js");
+    vi.doUnmock("../admin/page-builder/module-editor.js");
+  } else {
+    vi.doMock("../admin/page-builder/theme-editor.js", () => ({
+      renderThemeEditorContent: vi.fn(() => "<div>Theme Editor</div>"),
+      bindThemeEditorEvents: vi.fn(),
+    }));
+    vi.doMock("../admin/page-builder/module-editor.js", () => ({
+      renderModuleEditorContent: vi.fn(() => "<div>Module Editor</div>"),
+      bindModuleEditorEvents: vi.fn(),
+    }));
+  }
   vi.doMock("../admin/image-picker.js", () => ({
     openImagePicker: vi.fn(),
   }));
@@ -82,10 +116,14 @@ async function setupPageBuilder({
     manager,
     mocks: {
       addModule,
+      addSection,
       createPage,
       deletePage,
       fetchPage,
       fetchPages,
+      moveModule,
+      reorderModules,
+      reorderSections,
       updatePage,
       hideAllSections,
       setActiveNav,
@@ -97,6 +135,145 @@ describe("admin page-builder shell", () => {
   afterEach(() => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
+  });
+
+  it("mounts the editor toggle beside the inspector rail and persists wide-screen mode changes", async () => {
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[]],
+      viewportWidth: 1600,
+    });
+
+    await manager.showPageBuilderSection();
+
+    const layout = document.querySelector(".page-builder-layout");
+    const toggle = document.getElementById("pbToggleEditor");
+
+    expect(toggle?.closest(".page-builder-editor")).not.toBeNull();
+    expect(document.querySelector(".pb-canvas-header #pbToggleEditor")).toBeNull();
+    expect(layout?.dataset.editorMode).toBe("docked");
+    expect(layout?.style.getPropertyValue("--pb-editor-width")).toBe("520px");
+
+    toggle?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(layout?.dataset.editorMode).toBe("collapsed");
+    expect(layout?.style.getPropertyValue("--pb-editor-width")).toBe("320px");
+    expect(window.localStorage.getItem("pb-editor-mode")).toBe("collapsed");
+
+    toggle?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(layout?.dataset.editorMode).toBe("docked");
+    expect(window.localStorage.getItem("pb-editor-mode")).toBe("docked");
+  });
+
+  it("routes nav-collapsed free space into the editor panel instead of the canvas", async () => {
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[]],
+      viewportWidth: 1600,
+    });
+
+    await manager.showPageBuilderSection();
+
+    const layout = document.querySelector(".page-builder-layout");
+    const navToggle = document.getElementById("adminNavToggle");
+    const dashboard = document.getElementById("adminDashboard");
+    const editorToggle = document.getElementById("pbToggleEditor");
+
+    expect(layout?.style.getPropertyValue("--pb-editor-width")).toBe("520px");
+
+    dashboard?.classList.add("nav-collapsed");
+    navToggle?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushAdminUi(1);
+
+    expect(layout?.style.getPropertyValue("--pb-editor-width")).toBe("620px");
+
+    editorToggle?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(layout?.style.getPropertyValue("--pb-editor-width")).toBe("420px");
+  });
+
+  it("lets the left rail collapse and sends that recovered width to the inspector", async () => {
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[]],
+      viewportWidth: 1600,
+    });
+
+    await manager.showPageBuilderSection();
+
+    const layout = document.querySelector(".page-builder-layout");
+    const sidebarToggle = document.getElementById("pbToggleSidebar");
+    const railLabel = document.getElementById("pbSidebarRailLabel");
+
+    expect(layout?.dataset.sidebarMode).toBe("expanded");
+    expect(layout?.style.getPropertyValue("--pb-sidebar-width")).toBe("200px");
+    expect(layout?.style.getPropertyValue("--pb-editor-width")).toBe("520px");
+    expect(railLabel?.textContent).toBe("Pages");
+
+    sidebarToggle?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    expect(layout?.dataset.sidebarMode).toBe("collapsed");
+    expect(layout?.style.getPropertyValue("--pb-sidebar-width")).toBe("72px");
+    expect(layout?.style.getPropertyValue("--pb-editor-width")).toBe("648px");
+    expect(window.localStorage.getItem("pb-sidebar-mode")).toBe("collapsed");
+    expect(sidebarToggle?.getAttribute("aria-label")).toBe("Expand left panel");
+
+    sidebarToggle?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    expect(layout?.dataset.sidebarMode).toBe("expanded");
+    expect(layout?.style.getPropertyValue("--pb-sidebar-width")).toBe("200px");
+    expect(layout?.style.getPropertyValue("--pb-editor-width")).toBe("520px");
+    expect(window.localStorage.getItem("pb-sidebar-mode")).toBe("expanded");
+  });
+
+  it("switches the inspector to overlay mode on narrower desktop widths", async () => {
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[]],
+      viewportWidth: 1280,
+    });
+
+    await manager.showPageBuilderSection();
+
+    const layout = document.querySelector(".page-builder-layout");
+    expect(layout?.dataset.editorMode).toBe("overlay");
+    expect(layout?.dataset.viewportBand).toBe("medium");
+
+    setViewportWidth(1600);
+    window.dispatchEvent(new Event("resize"));
+
+    expect(layout?.dataset.editorMode).toBe("docked");
+    expect(layout?.dataset.viewportBand).toBe("wide");
+  });
+
+  it("blocks inspector tab switches until dirty theme edits are saved or discarded", async () => {
+    const selectedPage = getContractFixture("builderPage");
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+      viewportWidth: 1600,
+    });
+
+    await manager.showPageBuilderSection();
+
+    document.querySelector(".pb-page-item")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushAdminUi(3);
+
+    document.querySelector('.pb-editor-tab[data-tab="theme"]')?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushAdminUi(1);
+
+    const primaryInput = document.querySelector('.pb-theme-color-text[data-key="primary"]');
+    primaryInput.value = "#112233";
+    primaryInput.dispatchEvent(new Event("input", { bubbles: true }));
+    await flushAdminUi(1);
+
+    document.querySelector('.pb-editor-tab[data-tab="modules"]')?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushAdminUi(1);
+
+    expect(document.querySelector('.pb-editor-tab.active[data-tab="theme"]')).not.toBeNull();
+    expect(document.querySelector(".pb-editor-footer-status")?.textContent).toContain("unsaved");
+
+    document.getElementById("pbDiscardTheme")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushAdminUi(1);
+    document.querySelector('.pb-editor-tab[data-tab="modules"]')?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushAdminUi(1);
+
+    expect(document.querySelector('.pb-editor-tab.active[data-tab="modules"]')).not.toBeNull();
   });
 
   it("renders the empty state and adds a new page through the current prompts flow", async () => {
@@ -152,14 +329,11 @@ describe("admin page-builder shell", () => {
     expect(mocks.deletePage).toHaveBeenCalledWith(firstPage.id);
     expect(document.querySelectorAll(".pb-page-item")).toHaveLength(1);
 
-    const dropZone = document.querySelector(".pb-drop-zone");
-    const dropEvent = new Event("drop", { bubbles: true, cancelable: true });
-    Object.assign(dropEvent, {
-      dataTransfer: {
-        getData: () => "feed",
-      },
-    });
-    dropZone?.dispatchEvent(dropEvent);
+    document.querySelector('.pb-inline-insert-trigger')?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await flushAdminUi(1);
+    document.querySelector('[data-action="insert-module-type"][data-module-type="feed"]')?.dispatchEvent(
+      new MouseEvent("click", { bubbles: true }),
+    );
     await flushAdminUi(3);
 
     expect(mocks.addModule).toHaveBeenCalledWith(
@@ -174,7 +348,9 @@ describe("admin page-builder shell", () => {
           itemBorderColor: "#00d9ff",
         }),
       }),
+      null,
     );
+    expect(mocks.reorderModules).toHaveBeenCalledWith(selectedPage.sections[0].id, 0, expect.any(Array));
   });
 
   it("renders page status details and supports explicit draft/publish actions", async () => {
@@ -189,7 +365,8 @@ describe("admin page-builder shell", () => {
     document.querySelector(".pb-page-item")?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
     await flushAdminUi(3);
 
-    expect(document.getElementById("pbPageTitle")?.textContent).toContain("Page ID: reader");
+    expect(document.getElementById("pbPageTitle")?.textContent).not.toContain("Page ID:");
+    expect(document.getElementById("pbPageTitle")?.textContent).toContain("reader");
     expect(document.getElementById("pbPageTitle")?.textContent).toContain("Published");
     expect(document.getElementById("pbPageTitle")?.textContent).toContain("Homepage");
 

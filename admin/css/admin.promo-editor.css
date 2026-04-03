@@ -1,34 +1,21 @@
 /* ==================== PROMO MODULE EDITOR ==================== */
 
     .pb-promo-items-section {
-      margin-bottom: 16px;
-    }
-
-    .pb-editor-section-header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 10px;
-    }
-
-    .pb-editor-section-divider {
-      height: 1px;
-      background: rgba(255, 255, 255, 0.1);
-      margin: 16px 0;
+      margin-bottom: 0;
     }
 
     .pb-promo-items-list {
       display: flex;
       flex-direction: column;
       gap: 12px;
-      max-height: 400px;
+      max-height: 420px;
       overflow-y: auto;
     }
 
     .pb-promo-item {
       background: rgba(255, 255, 255, 0.03);
       border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 6px;
+      border-radius: 10px;
       padding: 12px;
     }
 
@@ -36,26 +23,29 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
+      gap: 10px;
       margin-bottom: 10px;
       padding-bottom: 8px;
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      flex-wrap: wrap;
     }
 
     .pb-promo-item-num {
-      font-weight: 600;
+      font-weight: 700;
       color: var(--primary);
     }
 
     .pb-promo-item-actions {
       display: flex;
       gap: 4px;
+      flex-wrap: wrap;
     }
 
     .pb-promo-action {
       padding: 4px 8px;
       background: rgba(255, 255, 255, 0.1);
       border: none;
-      border-radius: 3px;
+      border-radius: 6px;
       color: var(--text);
       cursor: pointer;
       font-size: 0.8rem;
@@ -81,151 +71,7 @@
       text-align: center;
       color: rgba(255, 255, 255, 0.5);
       font-size: 0.9rem;
-    }
-
-    .pb-editor-hint {
-      display: block;
-      margin-top: 4px;
-      font-size: 0.75rem;
-      color: rgba(255, 255, 255, 0.4);
-    }
-
-    /* Style Accordion */
-    .pb-promo-style-accordion {
-      margin-top: 12px;
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 4px;
-      overflow: hidden;
-    }
-
-    .pb-promo-style-toggle {
-      padding: 8px 12px;
-      background: rgba(255, 255, 255, 0.05);
-      cursor: pointer;
-      font-size: 0.85rem;
-      color: rgba(255, 255, 255, 0.7);
-      transition: all 0.15s ease;
-    }
-
-    .pb-promo-style-toggle:hover {
-      background: rgba(255, 255, 255, 0.08);
-      color: var(--primary);
-    }
-
-    .pb-promo-style-content {
-      padding: 12px;
-      background: rgba(0, 0, 0, 0.2);
-    }
-
-    .pb-style-group {
-      margin-bottom: 12px;
-      padding-bottom: 12px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    }
-
-    .pb-style-group:last-child {
-      margin-bottom: 0;
-      padding-bottom: 0;
-      border-bottom: none;
-    }
-
-    .pb-style-group-title {
-      font-size: 0.75rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      color: rgba(255, 255, 255, 0.5);
-      margin-bottom: 8px;
-    }
-
-    .pb-editor-field--row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 6px;
-    }
-
-    .pb-editor-field--row label {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-      font-size: 0.8rem;
-      color: rgba(255, 255, 255, 0.7);
-      white-space: nowrap;
-    }
-
-    .pb-promo-style-color {
-      width: 32px;
-      height: 24px;
-      padding: 0;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 3px;
-      cursor: pointer;
-      background: none;
-    }
-
-    .pb-promo-style-range {
-      flex: 1;
-      max-width: 80px;
-      height: 4px;
-      background: rgba(255, 255, 255, 0.1);
-      border-radius: 2px;
-      appearance: none;
-    }
-
-    .pb-promo-style-range::-webkit-slider-thumb {
-      appearance: none;
-      width: 12px;
-      height: 12px;
-      background: var(--primary);
-      border-radius: 50%;
-      cursor: pointer;
-    }
-
-    .btn-small {
-      padding: 4px 10px;
-      font-size: 0.8rem;
-      background: rgba(0, 217, 255, 0.15);
-      border: 1px solid rgba(0, 217, 255, 0.3);
-      border-radius: 4px;
-      color: var(--primary);
-      cursor: pointer;
-      transition: all 0.15s ease;
-    }
-
-    .btn-small:hover {
-      background: rgba(0, 217, 255, 0.25);
-      border-color: var(--primary);
-    }
-
-    .btn-add {
-      background: rgba(0, 255, 136, 0.1);
-      border-color: rgba(0, 255, 136, 0.3);
-      color: var(--success);
-    }
-
-    .btn-add:hover {
-      background: rgba(0, 255, 136, 0.2);
-      border-color: var(--success);
-    }
-
-    /* Responsive */
-    @media (max-width: 1200px) {
-      .page-builder-layout {
-        grid-template-columns: 160px 1fr 200px;
-      }
-    }
-
-    @media (max-width: 900px) {
-      .page-builder-layout {
-        grid-template-columns: 1fr;
-      }
-
-      .page-builder-sidebar,
-      .page-builder-editor {
-        max-height: none;
-      }
-
-      .pb-module-palette {
-        grid-template-columns: repeat(4, 1fr);
-      }
+      border: 1px dashed rgba(255, 255, 255, 0.12);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.02);
     }

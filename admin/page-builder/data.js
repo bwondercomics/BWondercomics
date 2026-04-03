@@ -138,12 +138,17 @@ export async function deleteSection(sectionId) {
   }
 }
 
-export async function addModule(sectionId, moduleType, columnIndex = 0, config = {}) {
+export async function addModule(sectionId, moduleType, columnIndex = 0, config = {}, sortIndex = null) {
   try {
     const res = await fetch(`/api/admin/sections/${sectionId}/modules`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ moduleType, columnIndex, config }),
+      body: JSON.stringify({
+        moduleType,
+        columnIndex,
+        config,
+        ...(sortIndex === null ? {} : { sortIndex }),
+      }),
     });
     if (!res.ok) throw new Error("Failed to add module");
     return (await res.json()).module;
@@ -168,12 +173,55 @@ export async function updateModule(moduleId, data) {
   }
 }
 
+export async function moveModule(moduleId, targetSectionId, columnIndex, sortIndex) {
+  try {
+    const res = await fetch(`/api/admin/modules/${moduleId}/move`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ targetSectionId, columnIndex, sortIndex }),
+    });
+    if (!res.ok) throw new Error("Failed to move module");
+    return (await res.json()).module;
+  } catch (err) {
+    console.error("moveModule error:", err);
+    return null;
+  }
+}
+
+export async function reorderModules(sectionId, columnIndex, moduleIds) {
+  try {
+    const res = await fetch(`/api/admin/sections/${sectionId}/modules/reorder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ columnIndex, moduleIds }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error("reorderModules error:", err);
+    return false;
+  }
+}
+
 export async function deleteModule(moduleId) {
   try {
     const res = await fetch(`/api/admin/modules/${moduleId}`, { method: "DELETE" });
     return res.ok;
   } catch (err) {
     console.error("deleteModule error:", err);
+    return false;
+  }
+}
+
+export async function reorderSections(pageId, sectionIds) {
+  try {
+    const res = await fetch(`/api/admin/pages/${pageId}/sections/reorder`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sectionIds }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error("reorderSections error:", err);
     return false;
   }
 }
