@@ -6,9 +6,11 @@ This document covers the admin panel (content editor) architecture, data flow, a
 - `admin/app.js` — Main script; initializes the UI and wires up entries, posts, media, analytics, designer, and page-builder tools.
 - `admin/config.js` — Constants: storage keys and API endpoints.
 - `admin/dom.js` — Centralized DOM lookups for forms, buttons, lists, modals, and status elements.
-- `admin/admin.css` — Extracted styles from `admin/index.html` (admin UI styling lives here now).
+- `admin/admin.css` — Extracted styles from `admin/index.html`; this remains the single admin stylesheet entrypoint and imports the section-level CSS files.
 - `admin/page-builder.js` — Page-builder coordinator for the page list, canvas, inspector shell, explicit-save drafts, and structure editing interactions.
 - `admin/page-builder/` — Focused helpers for data access, theme editing, module editing, and module-type-specific editors.
+- `admin/css/admin.page-builder.css` — Stable page-builder stylesheet facade imported by `admin/admin.css`.
+- `admin/css/page-builder/` — Internal page-builder stylesheet split by ownership (`layout`, `sidebar`, `canvas`, `insertions`, `inspector`, `controls`, `theme`, `responsive`) so layout and inspector work can evolve without one monolithic CSS file.
 
 ## Feature Areas
 - Auth/session: Uses the site's account system (`/api/login`, `/api/session`) and requires an `admin` role.
@@ -77,6 +79,7 @@ flowchart LR
 - Immediate structure editing: sections and modules can be inserted inline at exact positions; module drag handles support reorder within a column or move across sections/columns; section drag handles reorder sections vertically.
 - Theme behavior: theme save persists color tokens, panel backgrounds, panel spacing, and empty-state metadata together. `Discard` restores the current page state, and `Reset to Default` rebuilds the full theme draft instead of only resetting colors.
 - Canvas density: section headers stay compact by default, while spacing and secondary section controls live in a `Section Settings` drawer for the active section.
+- Styling structure: page-builder CSS now stays behind the existing `admin.page-builder.css` import, but the actual rules live under `admin/css/page-builder/` so shell layout, canvas, inspector, shared controls, theme styling, and responsive behavior are maintained in separate files.
 
 ## Near-Term Modularization Targets
 - Split `admin/app.js` by concern: auth/session, chapters/pages, posts/blog, media library, preview/export, utilities.

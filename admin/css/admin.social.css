@@ -180,11 +180,15 @@
       white-space: nowrap;
     }
 
-    .social-placeholder {
+.social-placeholder {
       padding: 20px;
       border-radius: 10px;
       border: 2px dashed rgba(255, 237, 0, 0.35);
       color: rgba(255, 255, 255, 0.75);
       text-align: center;
       margin-top: 16px;
+    }
+
+.pb-social-input--icon {
+      min-width: 180px;
     }

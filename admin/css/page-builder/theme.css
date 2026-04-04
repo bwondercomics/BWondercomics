@@ -1,0 +1,75 @@
+/* ==================== PAGE BUILDER THEME ==================== */
+
+.pb-theme-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pb-theme-preset-btn {
+  padding: 12px 10px;
+  background: linear-gradient(135deg, rgba(0, 217, 255, 0.1), rgba(255, 0, 234, 0.08));
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.pb-theme-preset-btn:hover {
+  transform: translateY(-1px);
+  background: linear-gradient(135deg, rgba(0, 217, 255, 0.2), rgba(255, 0, 234, 0.16));
+  border-color: rgba(0, 217, 255, 0.4);
+  box-shadow: 0 14px 22px rgba(0, 217, 255, 0.16);
+}
+
+.pb-theme-colors {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pb-theme-color-row {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.pb-theme-color-label {
+  font-size: 0.84rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.pb-theme-color-inputs {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.pb-theme-color-picker {
+  width: 44px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  background: none;
+}
+
+.pb-theme-color-picker::-webkit-color-swatch-wrapper {
+  padding: 3px;
+}
+
+.pb-theme-color-picker::-webkit-color-swatch {
+  border: none;
+  border-radius: 5px;
+}
+
+.pb-theme-color-text {
+  font-family: monospace;
+  text-transform: uppercase;
+}

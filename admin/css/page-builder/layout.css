@@ -1,0 +1,189 @@
+/* ==================== PAGE BUILDER LAYOUT ==================== */
+
+.admin-shell.admin-page-builder-open .admin-content {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - var(--admin-header-offset, 76px));
+  overflow: hidden;
+  padding: 10px;
+}
+
+.admin-shell.admin-page-builder-open #pageBuilderSection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin-bottom: 0;
+  padding: 10px;
+}
+
+.page-builder {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 12px;
+}
+
+.page-builder-layout {
+  --pb-sidebar-width: 200px;
+  --pb-editor-width: 320px;
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--pb-sidebar-width) minmax(560px, 1fr) var(--pb-editor-width);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 16px;
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.page-builder-layout[data-editor-mode="docked"] {
+  --pb-editor-width: 520px;
+}
+
+.page-builder-sidebar,
+.page-builder-canvas,
+.page-builder-editor {
+  min-height: 0;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
+    var(--bg-panel);
+  box-shadow: 0 20px 45px rgba(0, 0, 0, 0.26);
+}
+
+.page-builder-canvas {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.page-builder-editor {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  overflow: visible;
+  transition:
+    width 0.18s ease,
+    transform 0.18s ease,
+    opacity 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.page-builder-layout[data-editor-mode="overlay"],
+.page-builder-layout[data-viewport-band="medium"][data-editor-mode="collapsed"] {
+  grid-template-columns: var(--pb-sidebar-width) minmax(0, 1fr);
+}
+
+.page-builder-layout[data-editor-mode="overlay"] .page-builder-editor,
+.page-builder-layout[data-viewport-band="medium"][data-editor-mode="collapsed"] .page-builder-editor {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(var(--pb-editor-width), calc(100vw - 300px));
+  max-width: calc(100% - var(--pb-sidebar-width) - 16px);
+  z-index: 14;
+  box-shadow: 0 28px 65px rgba(0, 0, 0, 0.5);
+}
+
+.page-builder-layout[data-viewport-band="medium"][data-editor-mode="collapsed"] .page-builder-editor {
+  width: 0;
+  max-width: 0;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateX(24px);
+}
+
+.page-builder-layout[data-viewport-band="stacked"] {
+  grid-template-columns: 1fr;
+  grid-auto-rows: auto;
+  overflow-y: auto;
+  padding-right: 0;
+}
+
+.page-builder-layout[data-viewport-band="stacked"] .page-builder-sidebar,
+.page-builder-layout[data-viewport-band="stacked"] .page-builder-canvas,
+.page-builder-layout[data-viewport-band="stacked"] .page-builder-editor {
+  grid-column: 1;
+}
+
+.page-builder-layout[data-viewport-band="stacked"] .page-builder-editor {
+  position: relative;
+  width: 100%;
+  max-width: none;
+  min-height: 360px;
+}
+
+.page-builder-layout[data-viewport-band="stacked"][data-editor-mode="collapsed"] .page-builder-editor {
+  min-height: 0;
+  height: 0;
+  width: 100%;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-18px);
+}
+
+.page-builder-layout[data-viewport-band="stacked"][data-editor-mode="collapsed"] .pb-editor-rail-toggle {
+  top: -18px;
+  left: 14px;
+  right: auto;
+  transform: none;
+}
+
+.pb-editor-rail-toggle,
+.pb-sidebar-rail-toggle {
+  position: absolute;
+  z-index: 20;
+  width: 42px;
+  min-width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 0.9;
+  color: var(--text);
+  background: linear-gradient(
+    135deg,
+    rgba(0, 217, 255, 0.4),
+    rgba(255, 0, 234, 0.4)
+  );
+  border: 2px solid rgba(255, 255, 255, 0.32);
+  box-shadow:
+    0 12px 28px rgba(0, 0, 0, 0.28),
+    0 0 0 1px rgba(0, 217, 255, 0.16);
+  white-space: nowrap;
+  backdrop-filter: blur(10px);
+}
+
+.pb-editor-rail-toggle {
+  top: 18px;
+  left: 0;
+  transform: translateX(-56%);
+}
+
+.pb-sidebar-rail-toggle {
+  top: 18px;
+  right: 0;
+  transform: translateX(56%);
+}
+
+.pb-editor-rail-toggle:hover,
+.pb-sidebar-rail-toggle:hover {
+  filter: brightness(1.03);
+}
