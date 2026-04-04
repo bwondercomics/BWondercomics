@@ -1,9 +1,9 @@
-import { el } from "./dom.js";
-import { createLiveAnalytics } from "./analytics/live.js";
-import { createReaderAnalytics } from "./analytics/reader.js";
-import { createReadsOverTimeAnalytics } from "./analytics/reads-over-time.js";
-import { createTrafficAnalytics } from "./analytics/traffic.js";
-import { createVisitorHistoryAnalytics } from "./analytics/visitor-history.js";
+import { el } from './dom.js';
+import { createLiveAnalytics } from './analytics/live.js';
+import { createReaderAnalytics } from './analytics/reader.js';
+import { createReadsOverTimeAnalytics } from './analytics/reads-over-time.js';
+import { createTrafficAnalytics } from './analytics/traffic.js';
+import { createVisitorHistoryAnalytics } from './analytics/visitor-history.js';
 
 function createAnalytics({ hideAllSections, setActiveNav }) {
   const visitorHistory = createVisitorHistoryAnalytics();
@@ -67,8 +67,8 @@ function createAnalytics({ hideAllSections, setActiveNav }) {
   function showAnalyticsSection() {
     hideAllSections();
     if (el.analyticsSection) {
-      el.analyticsSection.style.display = "block";
-      el.analyticsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      el.analyticsSection.style.display = 'block';
+      el.analyticsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     setActiveNav(el.btnAnalytics);
     refreshAnalytics({ showLoading: true });

@@ -1,5 +1,5 @@
-import { el } from "../dom.js";
-import { ANALYTICS_LIVE_ENDPOINT } from "../state.js";
+import { el } from '../dom.js';
+import { ANALYTICS_LIVE_ENDPOINT } from '../state.js';
 import {
   escapeHtml,
   formatDuration,
@@ -7,12 +7,12 @@ import {
   formatStat,
   formatTimeAgo,
   getCssVar,
-} from "./shared.js";
+} from './shared.js';
 
 const LIVE_REFRESH_MS = 5 * 60 * 1000;
 const LIVE_RANGE_OPTIONS = [30, 60, 120, 360, 720, 1440];
 const LIVE_MAX_HISTORY_MS = 24 * 60 * 60 * 1000;
-const LIVE_HISTORY_STORAGE_KEY = "battlebros_admin_live_history";
+const LIVE_HISTORY_STORAGE_KEY = 'battlebros_admin_live_history';
 const LIVE_HISTORY_MAX_ITEMS = 300;
 
 function createLiveAnalytics() {
@@ -57,35 +57,35 @@ function createLiveAnalytics() {
 
   function getLiveColors() {
     return {
-      line: getCssVar("--accent", "#ffed00"),
-      glow: getCssVar("--secondary", "#ff00ea"),
-      grid: "rgba(255, 255, 255, 0.12)",
-      baseline: "rgba(0, 217, 255, 0.35)",
-      now: "rgba(255, 255, 255, 0.2)",
-      text: "rgba(255, 255, 255, 0.7)",
+      line: getCssVar('--accent', '#ffed00'),
+      glow: getCssVar('--secondary', '#ff00ea'),
+      grid: 'rgba(255, 255, 255, 0.12)',
+      baseline: 'rgba(0, 217, 255, 0.35)',
+      now: 'rgba(255, 255, 255, 0.2)',
+      text: 'rgba(255, 255, 255, 0.7)',
     };
   }
 
   function setLiveStatus(message, isError = false) {
     if (!el.liveVisitorsStatus) return;
-    el.liveVisitorsStatus.textContent = message || "";
-    el.liveVisitorsStatus.style.display = message ? "block" : "none";
-    el.liveVisitorsStatus.className = isError ? "error-message" : "success-message";
+    el.liveVisitorsStatus.textContent = message || '';
+    el.liveVisitorsStatus.style.display = message ? 'block' : 'none';
+    el.liveVisitorsStatus.className = isError ? 'error-message' : 'success-message';
   }
 
   function isLiveVisitorsVisible() {
     if (!el.liveVisitorsChart) return false;
-    const section = el.liveVisitorsChart.closest("section");
+    const section = el.liveVisitorsChart.closest('section');
     if (section && section instanceof HTMLElement) {
-      return section.style.display !== "none";
+      return section.style.display !== 'none';
     }
-    if (el.moderationSection) return el.moderationSection.style.display !== "none";
-    if (el.analyticsSection) return el.analyticsSection.style.display !== "none";
+    if (el.moderationSection) return el.moderationSection.style.display !== 'none';
+    if (el.analyticsSection) return el.analyticsSection.style.display !== 'none';
     return true;
   }
 
   function getLiveRangeMinutes() {
-    const raw = el.liveVisitorsRange?.value || "30";
+    const raw = el.liveVisitorsRange?.value || '30';
     const value = Number.parseInt(raw, 10);
     if (!Number.isFinite(value) || value <= 0) return 30;
     return value;
@@ -133,12 +133,12 @@ function createLiveAnalytics() {
     }
 
     if (!canvas.dataset.clickAttached) {
-      canvas.dataset.clickAttached = "true";
-      canvas.addEventListener("click", handleLiveChartClick);
-      canvas.style.cursor = "crosshair";
+      canvas.dataset.clickAttached = 'true';
+      canvas.addEventListener('click', handleLiveChartClick);
+      canvas.style.cursor = 'crosshair';
     }
 
-    const ctx = canvas.getContext("2d");
+    const ctx = canvas.getContext('2d');
     if (!ctx) return null;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     liveCanvasSize = { width, height };
@@ -148,7 +148,7 @@ function createLiveAnalytics() {
 
   function clearLiveSelection() {
     selectedLiveTime = null;
-    const btn = document.getElementById("btnLiveReset");
+    const btn = document.getElementById('btnLiveReset');
     if (btn) btn.remove();
     loadLiveVisitors();
     drawLiveSeismometer();
@@ -169,15 +169,15 @@ function createLiveAnalytics() {
     loadLiveVisitors({ at: targetTime });
     drawLiveSeismometer();
 
-    const container = document.querySelector(".analytics-live-meta");
-    if (container && !document.getElementById("btnLiveReset")) {
-      const btn = document.createElement("button");
-      btn.id = "btnLiveReset";
-      btn.className = "btn-secondary";
-      btn.style.padding = "2px 8px";
-      btn.style.fontSize = "0.7rem";
-      btn.style.marginLeft = "8px";
-      btn.textContent = "Reset to Live";
+    const container = document.querySelector('.analytics-live-meta');
+    if (container && !document.getElementById('btnLiveReset')) {
+      const btn = document.createElement('button');
+      btn.id = 'btnLiveReset';
+      btn.className = 'btn-secondary';
+      btn.style.padding = '2px 8px';
+      btn.style.fontSize = '0.7rem';
+      btn.style.marginLeft = '8px';
+      btn.textContent = 'Reset to Live';
       btn.onclick = clearLiveSelection;
       container.appendChild(btn);
     }
@@ -191,9 +191,7 @@ function createLiveAnalytics() {
     const rangeMs = rangeMinutes * 60 * 1000;
     const now = Date.now();
     const cutoff = now - rangeMs;
-    const points = liveHistory
-      .filter((item) => item.ts >= cutoff)
-      .sort((a, b) => a.ts - b.ts);
+    const points = liveHistory.filter((item) => item.ts >= cutoff).sort((a, b) => a.ts - b.ts);
 
     syncLiveRangeLabel(rangeMinutes);
     syncLiveAxisLabel(rangeMinutes);
@@ -220,24 +218,21 @@ function createLiveAnalytics() {
     if (!points.length) {
       ctx.save();
       ctx.fillStyle = colors.text;
-      ctx.font = "12px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("No live data yet.", width / 2, height / 2);
+      ctx.font = '12px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('No live data yet.', width / 2, height / 2);
       ctx.restore();
       return;
     }
 
-    const maxCount = points.reduce(
-      (acc, item) => Math.max(acc, Number(item.count) || 0),
-      1,
-    );
+    const maxCount = points.reduce((acc, item) => Math.max(acc, Number(item.count) || 0), 1);
     const amplitudeScale = height * 0.35;
 
     ctx.save();
     ctx.strokeStyle = colors.line;
     ctx.lineWidth = 2;
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
     ctx.shadowColor = colors.glow;
     ctx.shadowBlur = 8;
     ctx.beginPath();
@@ -278,7 +273,7 @@ function createLiveAnalytics() {
       const x = width - ((now - selectedLiveTime) / rangeMs) * width;
       if (x >= 0 && x <= width) {
         ctx.save();
-        ctx.strokeStyle = colors.accent || "#ffed00";
+        ctx.strokeStyle = colors.accent || '#ffed00';
         ctx.lineWidth = 2;
         ctx.setLineDash([4, 4]);
         ctx.beginPath();
@@ -363,9 +358,9 @@ function createLiveAnalytics() {
 
   function formatEntryList(entries) {
     const list = Array.isArray(entries) ? entries.filter(Boolean) : [];
-    if (!list.length) return "No reads yet";
+    if (!list.length) return 'No reads yet';
     const slice = list.slice(-2);
-    const summary = slice.join(" · ");
+    const summary = slice.join(' · ');
     const more = list.length - slice.length;
     return more > 0 ? `${summary} +${more} more` : summary;
   }
@@ -384,8 +379,8 @@ function createLiveAnalytics() {
       .map((visitor) => {
         const user = visitor?.user;
         const displayName =
-          user?.displayName || visitor?.userDisplayName || visitor?.userEmail || "Guest";
-        const email = user?.email || visitor?.userEmail || "";
+          user?.displayName || visitor?.userDisplayName || visitor?.userEmail || 'Guest';
+        const email = user?.email || visitor?.userEmail || '';
         const lastSeen = formatTimeAgo(visitor?.lastSeen);
         const derivedDurationSeconds =
           visitor?.durationSeconds ??
@@ -396,10 +391,10 @@ function createLiveAnalytics() {
             return Math.max(0, Math.round((lastSeenTs - firstSeen) / 1000));
           })();
         const timeSpent = formatDuration(derivedDurationSeconds);
-        const ipAddress = visitor?.ipAddress || "Unknown";
-        const origin = visitor?.origin || "Direct";
+        const ipAddress = visitor?.ipAddress || 'Unknown';
+        const origin = visitor?.origin || 'Direct';
         const hitCount = Number(visitor?.hitCount);
-        const connections = Number.isFinite(hitCount) ? String(hitCount) : "0";
+        const connections = Number.isFinite(hitCount) ? String(hitCount) : '0';
         const entries =
           Array.isArray(visitor?.entriesRead) && visitor.entriesRead.length
             ? visitor.entriesRead
@@ -408,7 +403,7 @@ function createLiveAnalytics() {
         const metaParts = [];
         if (email) metaParts.push(email);
         if (lastSeen) metaParts.push(lastSeen);
-        const metaText = metaParts.join(" · ");
+        const metaText = metaParts.join(' · ');
         return `
           <div class="analytics-live-card">
             <div class="analytics-live-card-title">${escapeHtml(displayName)}</div>
@@ -421,7 +416,7 @@ function createLiveAnalytics() {
           </div>
         `;
       })
-      .join("");
+      .join('');
 
     startLiveTicker();
   }
@@ -436,16 +431,16 @@ function createLiveAnalytics() {
 
   async function loadLiveVisitors({ showLoading = true, at = null } = {}) {
     if (!el.liveVisitorsChart) return null;
-    if (showLoading) setLiveStatus("Loading live visitors…");
+    if (showLoading) setLiveStatus('Loading live visitors…');
     const params = new URLSearchParams({
       window: String(getLiveRangeMinutes()),
-      limit: "200",
+      limit: '200',
     });
-    if (at) params.append("at", String(at));
+    if (at) params.append('at', String(at));
 
     try {
       const res = await fetch(`${ANALYTICS_LIVE_ENDPOINT}?${params.toString()}`, {
-        cache: "no-store",
+        cache: 'no-store',
       });
       let payload = null;
       try {
@@ -456,22 +451,18 @@ function createLiveAnalytics() {
 
       if (!res.ok) {
         const errorText =
-          (payload && typeof payload === "object" && payload.error) ||
-          `HTTP ${res.status}`;
+          (payload && typeof payload === 'object' && payload.error) || `HTTP ${res.status}`;
         throw new Error(errorText);
       }
 
       renderLiveVisitors(payload || {});
 
       const ts = payload?.generatedAt ? new Date(payload.generatedAt) : null;
-      const tsText = ts ? ts.toLocaleString() : "just now";
+      const tsText = ts ? ts.toLocaleString() : 'just now';
       setLiveStatus(`Updated ${tsText}.`);
       return payload || {};
     } catch (err) {
-      setLiveStatus(
-        `Live visitors error: ${err?.message || "Unable to load live data."}`,
-        true,
-      );
+      setLiveStatus(`Live visitors error: ${err?.message || 'Unable to load live data.'}`, true);
       return null;
     }
   }
@@ -499,10 +490,7 @@ function createLiveAnalytics() {
     if (!el.liveVisitorsRange) return;
     const current = getLiveRangeMinutes();
     const index = LIVE_RANGE_OPTIONS.indexOf(current);
-    const nextIndex = Math.max(
-      0,
-      Math.min(LIVE_RANGE_OPTIONS.length - 1, index + direction),
-    );
+    const nextIndex = Math.max(0, Math.min(LIVE_RANGE_OPTIONS.length - 1, index + direction));
     el.liveVisitorsRange.value = String(LIVE_RANGE_OPTIONS[nextIndex]);
     loadLiveVisitors({ showLoading: true });
   }

@@ -1,6 +1,7 @@
 # Test Guide
 
 ## Overview
+
 This repo uses two test runners:
 
 - Frontend/admin tests: `Vitest` with `happy-dom`
@@ -9,6 +10,7 @@ This repo uses two test runners:
 The frontend suite covers reader helpers, interaction flows, builder-driven presentation, DOM/render regressions, and focused admin manager flows. The backend suite covers diagnostics/ops, branding, and the core auth/comment/file/post/series/page-builder/tracking/user route contracts.
 
 ## Commands
+
 Run the frontend suite:
 
 ```bash
@@ -34,6 +36,7 @@ npm run test:coverage
 ```
 
 ## Setup
+
 Install Node dependencies:
 
 ```bash
@@ -47,6 +50,7 @@ Install backend dev dependencies into the repo virtualenv:
 ```
 
 ## Current Test Areas
+
 - `tests/entries.test.js`: entry parsing, sorting, and normalization
 - `tests/state.test.js`: reader progress persistence
 - `tests/data.test.js`: reader data/page-config loading
@@ -77,6 +81,7 @@ Install backend dev dependencies into the repo virtualenv:
 - `backend/tests/test_*.py`: backend diagnostics/ops, branding, and core route contract behavior including page-builder, tracking, and user flows
 
 ## Notes
+
 - The production code uses `entry` terminology; older references to `chapter` are legacy.
 - `npm run test:coverage` only covers the Vitest suite.
 - Coverage is informational in this repo right now; CI should run it and publish the report, but it is not a percentage gate.

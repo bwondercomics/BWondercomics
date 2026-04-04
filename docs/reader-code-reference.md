@@ -3,6 +3,7 @@
 This guide maps the reader-side modules, their responsibilities, and how they collaborate to render and navigate entries.
 
 ## Module Inventory
+
 - `reader/app.js` — Composition root; wires modules together, bootstraps data load, kicks off render, and binds global events.
 - `reader/config.js` — Constants for storage keys, debounce timings, UI thresholds (e.g., two-page breakpoints), and default options.
 - `reader/dom.js` — Centralized DOM lookups; a single source of element references used across modules, including `#mainContent` for on-page frame sizing.
@@ -24,6 +25,7 @@ This guide maps the reader-side modules, their responsibilities, and how they co
 - `assets/css/main.core.11-viewport.css` — Viewport layout rules, including the `.viewport.dynamic-frame` mode used by desktop on-page sizing.
 
 ## Execution Flow (high level)
+
 ```mermaid
 flowchart TD
   A[startup] --> B[load data.json + page-config.json + /api/posts/latest]
@@ -39,6 +41,7 @@ flowchart TD
 ```
 
 ## Key Responsibilities by Module
+
 - **state.js**
   - Holds `currentEntry`, `pages`, `pageIndex`, `scale`, `pan`, pointer/cache state, cached page metrics, and `lastOnPageFrame`.
   - Persists progress to `localStorage` (`battleBros_progress`) and restores on boot.
@@ -77,18 +80,21 @@ flowchart TD
   - Exposes `window.BattleBros` helpers; updates DOM for subtitle/banner/button tweaks at runtime.
 
 ## Data Sources
+
 - `data.json` — Entries, entryFolders, statusMessage.
 - `/api/posts/latest` — DB-backed latest blog post for the “Latest update” widget.
 - `/page-config.json` (and `/series/<id>/page-config.json`) — Optional theming, header/panel content, button list, and layout ordering (DB-backed).
 - `localStorage` — Reading progress (`battleBros_progress` via `config`).
 
 ## Persistence & Progress
+
 - Progress: saved per entry/page in `state.saveProgress()`; restored on load.
 - Two-page mode: derived from viewport width/aspect (thresholds in `config.js`).
 - On-page frame: in the fixed-height desktop layout, `fitOnPageFrame()` resizes the viewport to the current visible page or spread; stacked/mobile keeps the existing full-width flow, and fullscreen uses the existing height-fit path.
 - Zoom/fit: transient in memory; reset on entry change unless the user zooms manually.
 
 ## Testing
+
 - Vitest suite (`tests/entries.test.js`, `tests/data.test.js`, `tests/render.test.js`, `tests/state.test.js`, `tests/transform.test.js`, `tests/on-page-frame.test.js`) covers:
   - Page resolution and ordering
   - Progress save/load with localStorage error handling
@@ -98,10 +104,12 @@ flowchart TD
   - Entry sorting and normalization
 
 ## Common Extension Points
+
 - Add a new header button: edit page config in admin (stored in DB and served at `/page-config.json`); `customization.js` renders them at startup.
 - Change theme/branding: edit page config in admin (theme vars stored in DB); `customization.js` applies to CSS variables.
 
 ## Gotchas / Notes
+
 - Admin auth is minimal; reader fetches data anonymously. Ensure `data.json` and assets are publicly readable on your host.
 - Image paths must live under `comics/<seriesId>/entries/`, `protected/comics/<seriesId>/entries/`, or be absolute URLs for the preview/reader to resolve them.
 - Double-check `statusMessage`: shown both on the reader ticker and in admin; comes from `data.json`.

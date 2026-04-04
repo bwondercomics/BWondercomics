@@ -23,26 +23,36 @@ Environment-aware logging utility that suppresses debug logs in production.
 ### Functions
 
 #### `logger.log(...args)`
+
 Log informational messages (development only).
+
 - **Parameters**: `...args` - Any values to log
 - **Example**: `logger.log('User clicked button', buttonId);`
 
 #### `logger.info(...args)`
+
 Alias for `log()`. Informational messages (development only).
+
 - **Parameters**: `...args` - Any values to log
 
 #### `logger.warn(...args)`
+
 Log warning messages (always shown).
+
 - **Parameters**: `...args` - Any values to log
 - **Example**: `logger.warn('API response slow', responseTime);`
 
 #### `logger.error(...args)`
+
 Log error messages (always shown).
+
 - **Parameters**: `...args` - Any values to log
 - **Example**: `logger.error('Failed to load', error);`
 
 #### `logger.isDev()`
+
 Check if running in development mode.
+
 - **Returns**: `boolean` - True if development, false if production
 
 ---
@@ -56,29 +66,39 @@ Centralized constants for the entire application.
 ### Categories
 
 #### TOUCH
+
 Touch and gesture constants.
+
 - `DOUBLE_TAP_DELAY` - Max time between taps (300ms)
 - `PINCH_THRESHOLD` - Min distance for pinch (10px)
 - `SWIPE_THRESHOLD` - Min distance for swipe (50px)
 
 #### ZOOM
+
 Zoom and scale constants.
+
 - `MIN_SCALE` - Minimum zoom (0.5)
 - `MAX_SCALE` - Maximum zoom (4.0)
 - `ZOOM_STEP` - Zoom increment (0.2)
 
 #### ANIMATION
+
 Animation timing constants.
+
 - `TRANSITION_DURATION` - Standard transition (300ms)
 - `DEBOUNCE_DELAY` - Debounce delay (150ms)
 
 #### STORAGE
+
 LocalStorage keys.
+
 - `PROGRESS_KEY` - Reading progress key
 - `CONFIG_KEY_PREFIX` - Page config prefix
 
 #### API
+
 API endpoint URLs.
+
 - `ENDPOINTS.SESSION` - Session endpoint
 - `ENDPOINTS.LOGIN` - Login endpoint
 - `ENDPOINTS.COMMENTS` - Comments endpoint
@@ -96,12 +116,16 @@ Complete authentication management system.
 #### Methods
 
 ##### `checkSession()`
+
 Check current session status.
+
 - **Returns**: `Promise<Object|null>` - User object or null
 - **Example**: `const user = await auth.checkSession();`
 
 ##### `login(email, password)`
+
 Login with credentials.
+
 - **Parameters**:
   - `email` (string) - User email
   - `password` (string) - User password
@@ -110,12 +134,16 @@ Login with credentials.
 - **Example**: `await auth.login('user@example.com', 'password');`
 
 ##### `logout()`
+
 Logout current user.
+
 - **Returns**: `Promise<void>`
 - **Example**: `await auth.logout();`
 
 ##### `register(email, password, displayName, inviteCode)`
+
 Register a new user.
+
 - **Parameters**:
   - `email` (string) - User email
   - `password` (string) - User password
@@ -125,7 +153,9 @@ Register a new user.
 - **Throws**: `Error` on registration failure
 
 ##### `onChange(callback)`
+
 Register callback for auth state changes.
+
 - **Parameters**: `callback` (Function) - Called with user object
 - **Returns**: `Function` - Unsubscribe function
 - **Example**:
@@ -137,19 +167,27 @@ Register callback for auth state changes.
   ```
 
 ##### `isAdmin()`
+
 Check if current user is admin.
+
 - **Returns**: `boolean`
 
 ##### `isPremium()`
+
 Check if current user has premium access.
+
 - **Returns**: `boolean`
 
 ##### `getUser()`
+
 Get current user object.
+
 - **Returns**: `Object|null`
 
 ##### `isAuthenticated()`
+
 Check if user is authenticated.
+
 - **Returns**: `boolean`
 
 ### Global Instance
@@ -171,7 +209,9 @@ Centralized API request handling with error management.
 ### Core Functions
 
 #### `apiGet(url, options)`
+
 Make a GET request.
+
 - **Parameters**:
   - `url` (string) - API endpoint
   - `options` (Object, optional) - Fetch options
@@ -179,7 +219,9 @@ Make a GET request.
 - **Throws**: `Error` on failure
 
 #### `apiPost(url, data, options)`
+
 Make a POST request.
+
 - **Parameters**:
   - `url` (string) - API endpoint
   - `data` (Object) - Request body
@@ -187,41 +229,54 @@ Make a POST request.
 - **Returns**: `Promise<any>` - Parsed JSON response
 
 #### `apiPut(url, data, options)`
+
 Make a PUT request.
 
 #### `apiDelete(url, options)`
+
 Make a DELETE request.
 
 ### Convenience Functions
 
 #### `fetchComments(targetId)`
+
 Fetch comments for a target.
+
 - **Parameters**: `targetId` (string) - Target identifier
 - **Returns**: `Promise<Array>` - Array of comments
 - **Example**: `const comments = await fetchComments('battle-bros:entry-1');`
 
 #### `postComment(targetId, message)`
+
 Post a new comment.
+
 - **Parameters**:
   - `targetId` (string) - Target identifier
   - `message` (string) - Comment message
 - **Returns**: `Promise<Object>` - Created comment
 
 **Target IDs**
+
 - Entries: `series-id:entry-<display_number>` (example: `battle-bros:entry-1`)
 - Posts: `post:<uuid>`
 
 #### `fetchLatestPost()`
+
 Fetch the latest post.
+
 - **Returns**: `Promise<Object|null>` - Latest post or null
 
 #### `fetchPosts(params)`
+
 Fetch all posts.
+
 - **Parameters**: `params` (Object, optional) - Query parameters
 - **Returns**: `Promise<Array>` - Array of posts
 
 #### `saveData(filename, content)`
+
 Save data to server.
+
 - **Parameters**:
   - `filename` (string) - File path
   - `content` (Object|string) - Content to save
@@ -251,12 +306,16 @@ console.log(state.scale);
 ### Functions
 
 #### `saveProgress(stateObj)`
+
 Save reading progress to localStorage.
+
 - **Parameters**: `stateObj` (Object, optional) - State to save (defaults to global state)
 - **Example**: `saveProgress();`
 
 #### `loadProgress()`
+
 Load saved reading progress.
+
 - **Returns**: `Object|null` - Saved progress or null
 - **Example**: `const progress = loadProgress();`
 
@@ -269,20 +328,26 @@ These are backend endpoints used by admin tooling and server-side flows. They ar
 ### Protected Assets
 
 #### `GET /api/protected/{path}`
+
 Serve a premium/private file (entry pages or media) with auth checks.
+
 - **Auth**: required for premium; admin-only for private.
 - **Example**: `/api/protected/media/banner.png`
 
 ### File Ops (Admin only)
 
 #### `POST /api/move-path`
+
 Move a file or folder on disk (public ↔ protected).
+
 - **Body**:
   - `from` (string) - source path (web-relative)
   - `to` (string) - destination path (web-relative)
 
 #### `POST /api/copy-path`
+
 Copy a file on disk (used for post asset copies).
+
 - **Body**:
   - `from` (string) - source path (web-relative)
   - `to` (string) - destination path (web-relative)
@@ -361,6 +426,7 @@ const progress = localStorage.getItem(STORAGE.PROGRESS_KEY);
 ## Type Checking
 
 The project includes `jsconfig.json` for better IDE support. VSCode will provide:
+
 - Autocomplete for all functions
 - Parameter hints
 - Type checking based on JSDoc comments

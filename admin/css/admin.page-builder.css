@@ -1,9 +1,9 @@
 /* Page builder styles are split by responsibility. Keep this file as the stable import facade. */
-@import "./page-builder/layout.css";
-@import "./page-builder/sidebar.css";
-@import "./page-builder/canvas.css";
-@import "./page-builder/insertions.css";
-@import "./page-builder/inspector.css";
-@import "./page-builder/controls.css";
-@import "./page-builder/theme.css";
-@import "./page-builder/responsive.css";
+@import './page-builder/layout.css';
+@import './page-builder/sidebar.css';
+@import './page-builder/canvas.css';
+@import './page-builder/insertions.css';
+@import './page-builder/inspector.css';
+@import './page-builder/controls.css';
+@import './page-builder/theme.css';
+@import './page-builder/responsive.css';

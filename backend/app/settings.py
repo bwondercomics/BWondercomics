@@ -162,9 +162,10 @@ def load_settings() -> Settings:
     stoat_api_internal_port = _env_int("STOAT_API_INTERNAL_PORT", 14702)
     stoat_events_internal_port = _env_int("STOAT_EVENTS_INTERNAL_PORT", 14703)
     chat_api_internal_url = (
-        os.environ.get("CHAT_API_INTERNAL_URL")
-        or f"http://stoat-api:{stoat_api_internal_port}"
-    ).strip().rstrip("/")
+        (os.environ.get("CHAT_API_INTERNAL_URL") or f"http://stoat-api:{stoat_api_internal_port}")
+        .strip()
+        .rstrip("/")
+    )
     chat_events_internal_url = (
         os.environ.get("CHAT_EVENTS_INTERNAL_URL")
         or f"ws://stoat-events:{stoat_events_internal_port}/ws"
@@ -175,9 +176,7 @@ def load_settings() -> Settings:
     if not chat_sso_device_name:
         chat_sso_device_name = "BWonderComics SSO"
     chat_sso_password_secret = (
-        os.environ.get("CHAT_SSO_PASSWORD_SECRET")
-        or app_secret
-        or "change-me"
+        os.environ.get("CHAT_SSO_PASSWORD_SECRET") or app_secret or "change-me"
     ).strip()
     chat_official_invite_code = (os.environ.get("CHAT_OFFICIAL_INVITE_CODE") or "").strip()
 

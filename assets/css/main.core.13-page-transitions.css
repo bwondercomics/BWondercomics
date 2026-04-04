@@ -1,31 +1,30 @@
-    /* ==================== PAGE TRANSITIONS ==================== */
-    .flashOverlay {
-      pointer-events: none;
-      position: absolute;
-      inset: 0;
-      background: #000;
-      opacity: 0;
-      transition: opacity 140ms linear;
-      z-index: 25;
-    }
+/* ==================== PAGE TRANSITIONS ==================== */
+.flashOverlay {
+  pointer-events: none;
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  transition: opacity 140ms linear;
+  z-index: 25;
+}
 
-    .slide-out-left {
-      transition: transform 160ms cubic-bezier(0.2, 0.9, 0.2, 1);
-      transform: translateX(-18px);
-    }
+.slide-out-left {
+  transition: transform 160ms cubic-bezier(0.2, 0.9, 0.2, 1);
+  transform: translateX(-18px);
+}
 
-    .slide-out-right {
-      transition: transform 160ms cubic-bezier(0.2, 0.9, 0.2, 1);
-      transform: translateX(18px);
-    }
+.slide-out-right {
+  transition: transform 160ms cubic-bezier(0.2, 0.9, 0.2, 1);
+  transform: translateX(18px);
+}
 
-    .slide-in-left {
-      transition: transform 200ms cubic-bezier(0.2, 0.9, 0.2, 1);
-      transform: translateX(0);
-    }
+.slide-in-left {
+  transition: transform 200ms cubic-bezier(0.2, 0.9, 0.2, 1);
+  transform: translateX(0);
+}
 
-    .slide-in-right {
-      transition: transform 200ms cubic-bezier(0.2, 0.9, 0.2, 1);
-      transform: translateX(0);
-    }
-
+.slide-in-right {
+  transition: transform 200ms cubic-bezier(0.2, 0.9, 0.2, 1);
+  transform: translateX(0);
+}

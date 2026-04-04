@@ -3,11 +3,14 @@
 This is the “don’t make me think” guide for running and maintaining the self‑hosted BWonderComics stack.
 
 ## Prereqs
+
 - Docker + Docker Compose (v2) installed
 - A filled env file at `deploy/bwondercomics.env`
 
 ## Active services (current)
+
 As of **2026-01-17**, the live stack is running:
+
 - `bwondercomics-api` (FastAPI) — host `:8001` → container `:8000`
 - `bwondercomics-db` (Postgres) — `127.0.0.1:5434` → `:5432`
 - `caddy` (reverse proxy/static) — `:80`, `:443`
@@ -20,6 +23,7 @@ To verify current state on the server:
 Note: update this section whenever services or ports change.
 
 ## The easy way (Makefile)
+
 From the repo root:
 
 - Start/update the stack: `make up`
@@ -33,6 +37,7 @@ If you don’t have `make`, run the equivalent commands shown in `Makefile`.
 ## Day‑to‑day recipes
 
 ### First run
+
 1. Create env file: `make env` (or `cp deploy/bwondercomics.env.example deploy/bwondercomics.env`)
 2. Start services: `make up`
 3. Run migrations: `make migrate`
@@ -42,12 +47,14 @@ If you don’t have `make`, run the equivalent commands shown in `Makefile`.
    - API (direct, debug only): `http://localhost:8000/healthz`
 
 ### Deploy/update on a server
+
 1. Pull latest code: `git pull`
 2. Rebuild/restart: `make up`
 3. Run migrations: `make migrate`
 4. Optional: tail logs: `make api-logs`
 
 ### Enable analytics (Umami)
+
 1. In `deploy/bwondercomics.env`, set:
    - `UMAMI_DB_PASSWORD` (generate: `openssl rand -hex 24`)
    - `UMAMI_APP_SECRET` (generate: `openssl rand -hex 32`)
@@ -59,7 +66,9 @@ If you don’t have `make`, run the equivalent commands shown in `Makefile`.
 4. After creating a site in Umami, set `UMAMI_WEBSITE_ID=...` in `deploy/bwondercomics.env`, then run `make restart`.
 
 ### Back up everything that matters
+
 The project has two kinds of “state”:
+
 - **Database state (Postgres)**: users, comments, posts, series, entries, media index, page configs
 - **File state (on disk)**:
   - Public entry pages: `comics/*/entries/`
@@ -70,15 +79,18 @@ The project has two kinds of “state”:
   - Premium blur previews (derived): `media/previews/`
 
 Run:
+
 - `make backup` (writes to `var/backups/` by default)
 
 ### Restore (be careful)
+
 DB restore and file restore are destructive by nature.
 
 - Restore DB: `make restore-db FILE=var/backups/db-YYYYMMDD-HHMMSS.sql CONFIRM=1`
 - Restore files: `make restore-files FILE=var/backups/files-YYYYMMDD-HHMMSS.tar.gz CONFIRM=1`
 
 ## Where data lives
+
 - Postgres data is stored in a Docker volume (`bwondercomics-db`).
   - The database name inside Postgres can differ (e.g., `bwondercomics_quality` via `BWC_DB_NAME`).
   - Volume name and database name are separate; they do not need to match.
@@ -90,10 +102,12 @@ DB restore and file restore are destructive by nature.
 - `protected/` is server-only and ignored by git (tracked only via `protected/.gitkeep`).
 
 ## Frontend builds
+
 - Edit source files in `reader/`, `admin/`, `assets/`, and top-level HTML files.
 - Rebuild static output with `./scripts/frontend-build.sh` (also snapshots `dist/` into `var/releases/`).
 
 ## Diagnostics + Ops
+
 - Admin diagnostics is read-only and backed by `var/diagnostics/admin/latest.json`.
 - The hourly refresh timer calls `deploy/host-status/diagnostics_refresh.py`.
 - `/ops/` is a separate surface for queued commands, run output, and detailed backups.
@@ -109,6 +123,7 @@ DB restore and file restore are destructive by nature.
 - Install the timer and worker from `deploy/README.md`.
 
 ## Common issues
+
 - **Admin says “not an admin”**: the first registered account becomes `admin`; after that, an existing admin must promote roles in the **Users** section.
 - **Ports already in use**: change `BWC_API_PORT` / `BWC_DB_PORT` in `deploy/bwondercomics.env`.
 - **403 on admin saves**: make sure you’re signed in and your account role is `admin`.

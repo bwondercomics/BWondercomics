@@ -1,6 +1,6 @@
-import { el } from "./dom.js";
-import { state } from "./state.js";
-import { sortPagesByFilename } from "./utils.js";
+import { el } from './dom.js';
+import { state } from './state.js';
+import { sortPagesByFilename } from './utils.js';
 
 function createPreviewManager({
   hideAllSections,
@@ -9,16 +9,14 @@ function createPreviewManager({
   showError,
 } = {}) {
   async function loadPreviewPayload() {
-    if (el.previewData) el.previewData.textContent = "Loading...";
+    if (el.previewData) el.previewData.textContent = 'Loading...';
     state.previewPayload = null;
     try {
       const url =
-        typeof getChaptersDataFileUrl === "function"
-          ? getChaptersDataFileUrl()
-          : "data.json";
+        typeof getChaptersDataFileUrl === 'function' ? getChaptersDataFileUrl() : 'data.json';
       // DB-only snapshot for Preview panel (no fallback).
-      const res = await fetch(url, { cache: "no-store" });
-      if (!res.ok) throw new Error("Failed to load database preview data.");
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load database preview data.');
       const payload = await res.json();
       state.previewPayload = payload;
       if (el.previewData) {
@@ -26,9 +24,9 @@ function createPreviewManager({
       }
       return payload;
     } catch (err) {
-      const message = err?.message || "Failed to load database preview data.";
+      const message = err?.message || 'Failed to load database preview data.';
       if (el.previewData) el.previewData.textContent = message;
-      console.warn("Preview fetch failed:", err);
+      console.warn('Preview fetch failed:', err);
     }
     return null;
   }
@@ -36,38 +34,36 @@ function createPreviewManager({
   function showPreviewSection() {
     if (hideAllSections) hideAllSections();
     if (el.previewSection) {
-      el.previewSection.style.display = "block";
-      el.previewSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      el.previewSection.style.display = 'block';
+      el.previewSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     if (setActiveNav) setActiveNav(el.btnPreview);
   }
 
   // Populate preview selector from the currently loaded chapter state.
-  function updatePreviewChapters(selectedName = "") {
+  function updatePreviewChapters(selectedName = '') {
     if (!el.previewChapterSelect) return;
-    const names = Object.keys(state.entries).filter(
-      (name) => name && name !== "undefined",
-    );
+    const names = Object.keys(state.entries).filter((name) => name && name !== 'undefined');
     if (
       state.currentEditingEntry &&
-      state.currentEditingEntry !== "undefined" &&
+      state.currentEditingEntry !== 'undefined' &&
       !names.includes(state.currentEditingEntry)
     ) {
       names.push(state.currentEditingEntry);
     }
-    el.previewChapterSelect.innerHTML = "";
+    el.previewChapterSelect.innerHTML = '';
     names.forEach((name) => {
-      const opt = document.createElement("option");
+      const opt = document.createElement('option');
       opt.value = name;
       opt.textContent = name;
       el.previewChapterSelect.appendChild(opt);
     });
-    const target = names.includes(selectedName) ? selectedName : names[0] || "";
+    const target = names.includes(selectedName) ? selectedName : names[0] || '';
     if (target) {
       el.previewChapterSelect.value = target;
       setPreviewChapter(target);
     } else {
-      state.previewState = { chapter: "", pages: [], index: 0 };
+      state.previewState = { chapter: '', pages: [], index: 0 };
       renderPreviewImage();
     }
   }
@@ -88,9 +84,9 @@ function createPreviewManager({
     if (!el.previewFrame || !el.previewEmpty) return;
     const { pages } = state.previewState;
     if (!pages.length) {
-      el.previewFrame.style.display = "none";
-      el.previewEmpty.style.display = "block";
-      if (el.previewPageLabel) el.previewPageLabel.textContent = "";
+      el.previewFrame.style.display = 'none';
+      el.previewEmpty.style.display = 'block';
+      if (el.previewPageLabel) el.previewPageLabel.textContent = '';
       return;
     }
 
@@ -99,30 +95,23 @@ function createPreviewManager({
     }
 
     const src = pages[state.previewState.index];
-    const resolvedSrc = src.startsWith("http")
-      ? src
-      : src.startsWith("/")
-        ? src
-        : `../${src}`;
+    const resolvedSrc = src.startsWith('http') ? src : src.startsWith('/') ? src : `../${src}`;
     if (el.previewImg) el.previewImg.src = resolvedSrc;
     if (el.previewPageLabel) {
-      el.previewPageLabel.textContent = `Page ${
-        state.previewState.index + 1
-      } / ${pages.length}`;
+      el.previewPageLabel.textContent = `Page ${state.previewState.index + 1} / ${pages.length}`;
     }
 
-    el.previewFrame.style.display = "block";
-    el.previewEmpty.style.display = "none";
+    el.previewFrame.style.display = 'block';
+    el.previewEmpty.style.display = 'none';
     if (el.previewPrev) el.previewPrev.disabled = state.previewState.index <= 0;
     if (el.previewNext) {
-      el.previewNext.disabled =
-        state.previewState.index >= pages.length - 1;
+      el.previewNext.disabled = state.previewState.index >= pages.length - 1;
     }
   }
 
   function copyToClipboard() {
     if (!state.previewPayload) {
-      if (showError) showError("Preview data not loaded from database.");
+      if (showError) showError('Preview data not loaded from database.');
       return;
     }
     const jsonData = JSON.stringify(state.previewPayload, null, 2);
@@ -130,29 +119,29 @@ function createPreviewManager({
       .writeText(jsonData)
       .then(() => {
         if (!el.copySuccess) return;
-        el.copySuccess.textContent = "Copied to clipboard!";
-        el.copySuccess.className = "success-message";
-        el.copySuccess.style.display = "block";
+        el.copySuccess.textContent = 'Copied to clipboard!';
+        el.copySuccess.className = 'success-message';
+        el.copySuccess.style.display = 'block';
         setTimeout(() => {
-          el.copySuccess.style.display = "none";
+          el.copySuccess.style.display = 'none';
         }, 3000);
       })
       .catch((err) => {
-        alert("Failed to copy: " + err);
+        alert('Failed to copy: ' + err);
       });
   }
 
   function downloadJSON() {
     if (!state.previewPayload) {
-      if (showError) showError("Preview data not loaded from database.");
+      if (showError) showError('Preview data not loaded from database.');
       return;
     }
     const jsonData = JSON.stringify(state.previewPayload, null, 2);
-    const blob = new Blob([jsonData], { type: "application/json" });
+    const blob = new Blob([jsonData], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
+    const a = document.createElement('a');
     a.href = url;
-    a.download = "battle-bros-entries.json";
+    a.download = 'battle-bros-entries.json';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

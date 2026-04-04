@@ -1,32 +1,32 @@
-import { API } from "./constants.js";
+import { API } from './constants.js';
 
 (() => {
-  "use strict";
+  'use strict';
 
-  const overlay = document.getElementById("userSettingsOverlay");
-  const openBtn = document.getElementById("userSettingsBtn");
-  const closeBtn = document.getElementById("userSettingsClose");
-  const statusEl = document.getElementById("userSettingsStatus");
-  const authSection = document.getElementById("userSettingsAuth");
-  const contentSection = document.getElementById("userSettingsContent");
-  const loginForm = document.getElementById("userSettingsLoginForm");
-  const loginEmail = document.getElementById("userSettingsLoginEmail");
-  const loginPassword = document.getElementById("userSettingsLoginPassword");
-  const identityEl = document.getElementById("userSettingsIdentity");
-  const roleEl = document.getElementById("userSettingsRole");
-  const emailToggle = document.getElementById("userSettingsEmailOptIn");
-  const emailStatus = document.getElementById("userSettingsEmailStatus");
-  const premiumInput = document.getElementById("userSettingsPremiumCode");
-  const redeemBtn = document.getElementById("userSettingsRedeem");
-  const premiumStatus = document.getElementById("userSettingsPremiumStatus");
-  const supporterBadge = document.getElementById("userSettingsSupporterBadge");
-  const commentCountEl = document.getElementById("userSettingsCommentCount");
-  const commentsList = document.getElementById("userSettingsCommentsList");
-  const commentsEmpty = document.getElementById("userSettingsCommentsEmpty");
-  const loadMoreBtn = document.getElementById("userSettingsLoadMore");
-  const deleteCommentsBtn = document.getElementById("userSettingsDeleteComments");
-  const logoutBtn = document.getElementById("userSettingsLogout");
-  const deleteAccountBtn = document.getElementById("userSettingsDeleteAccount");
+  const overlay = document.getElementById('userSettingsOverlay');
+  const openBtn = document.getElementById('userSettingsBtn');
+  const closeBtn = document.getElementById('userSettingsClose');
+  const statusEl = document.getElementById('userSettingsStatus');
+  const authSection = document.getElementById('userSettingsAuth');
+  const contentSection = document.getElementById('userSettingsContent');
+  const loginForm = document.getElementById('userSettingsLoginForm');
+  const loginEmail = document.getElementById('userSettingsLoginEmail');
+  const loginPassword = document.getElementById('userSettingsLoginPassword');
+  const identityEl = document.getElementById('userSettingsIdentity');
+  const roleEl = document.getElementById('userSettingsRole');
+  const emailToggle = document.getElementById('userSettingsEmailOptIn');
+  const emailStatus = document.getElementById('userSettingsEmailStatus');
+  const premiumInput = document.getElementById('userSettingsPremiumCode');
+  const redeemBtn = document.getElementById('userSettingsRedeem');
+  const premiumStatus = document.getElementById('userSettingsPremiumStatus');
+  const supporterBadge = document.getElementById('userSettingsSupporterBadge');
+  const commentCountEl = document.getElementById('userSettingsCommentCount');
+  const commentsList = document.getElementById('userSettingsCommentsList');
+  const commentsEmpty = document.getElementById('userSettingsCommentsEmpty');
+  const loadMoreBtn = document.getElementById('userSettingsLoadMore');
+  const deleteCommentsBtn = document.getElementById('userSettingsDeleteComments');
+  const logoutBtn = document.getElementById('userSettingsLogout');
+  const deleteAccountBtn = document.getElementById('userSettingsDeleteAccount');
   let currentCommentCount = 0;
   let commentsOffset = 0;
   const commentsLimit = 15;
@@ -36,110 +36,105 @@ import { API } from "./constants.js";
 
   function setStatus(message, isError = false) {
     if (!statusEl) return;
-    statusEl.textContent = message || "";
-    statusEl.style.display = message ? "block" : "none";
-    statusEl.style.borderColor = isError
-      ? "rgba(255, 56, 56, 0.6)"
-      : "rgba(0, 217, 255, 0.4)";
-    statusEl.style.background = isError
-      ? "rgba(255, 56, 56, 0.15)"
-      : "rgba(0, 217, 255, 0.12)";
+    statusEl.textContent = message || '';
+    statusEl.style.display = message ? 'block' : 'none';
+    statusEl.style.borderColor = isError ? 'rgba(255, 56, 56, 0.6)' : 'rgba(0, 217, 255, 0.4)';
+    statusEl.style.background = isError ? 'rgba(255, 56, 56, 0.15)' : 'rgba(0, 217, 255, 0.12)';
   }
 
   function dispatchSession(user) {
     try {
-      window.dispatchEvent(new CustomEvent("bbSessionChanged", { detail: { user } }));
+      window.dispatchEvent(new CustomEvent('bbSessionChanged', { detail: { user } }));
     } catch {
       // Ignore dispatch errors.
     }
   }
 
   function showAuth() {
-    if (authSection) authSection.style.display = "block";
-    if (contentSection) contentSection.style.display = "none";
+    if (authSection) authSection.style.display = 'block';
+    if (contentSection) contentSection.style.display = 'none';
   }
 
   function showContent() {
-    if (authSection) authSection.style.display = "none";
-    if (contentSection) contentSection.style.display = "block";
+    if (authSection) authSection.style.display = 'none';
+    if (contentSection) contentSection.style.display = 'block';
   }
 
   async function fetchJson(url, options = {}) {
     const res = await fetch(url, {
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
       ...options,
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || "Request failed");
+      throw new Error(data.error || 'Request failed');
     }
     return data;
   }
 
   function formatDate(value) {
-    if (!value) return "";
+    if (!value) return '';
     const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
-    return date.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+    if (Number.isNaN(date.getTime())) return '';
+    return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
   }
 
   function updateUserView(user, commentCount) {
     if (user) {
       currentUser = user;
     }
-    if (typeof commentCount === "number") {
+    if (typeof commentCount === 'number') {
       currentCommentCount = commentCount;
     }
     if (identityEl) {
       identityEl.textContent = currentUser?.displayName
         ? `${currentUser.displayName} (${currentUser.email})`
-        : currentUser?.email || "-";
+        : currentUser?.email || '-';
     }
-    if (roleEl) roleEl.textContent = `Role: ${currentUser?.role || "user"}`;
-    const role = (currentUser?.role || "").toLowerCase();
+    if (roleEl) roleEl.textContent = `Role: ${currentUser?.role || 'user'}`;
+    const role = (currentUser?.role || '').toLowerCase();
     const premiumActive = !!currentUser?.premiumActive;
-    const hasPremium =
-      role === "admin" || role === "premium" || premiumActive;
+    const hasPremium = role === 'admin' || role === 'premium' || premiumActive;
     if (premiumStatus) {
       if (hasPremium) {
         if (premiumActive) {
-          premiumStatus.textContent = "Premium access: active (supporter code).";
-        } else if (role === "admin") {
-          premiumStatus.textContent = "Premium access: active (admin).";
-        } else if (role === "premium") {
-          premiumStatus.textContent = "Premium access: active (premium role).";
+          premiumStatus.textContent = 'Premium access: active (supporter code).';
+        } else if (role === 'admin') {
+          premiumStatus.textContent = 'Premium access: active (admin).';
+        } else if (role === 'premium') {
+          premiumStatus.textContent = 'Premium access: active (premium role).';
         } else {
-          premiumStatus.textContent = "Premium access: active.";
+          premiumStatus.textContent = 'Premium access: active.';
         }
       } else {
-        premiumStatus.textContent = "Premium access: inactive.";
+        premiumStatus.textContent = 'Premium access: inactive.';
       }
     }
     if (supporterBadge) {
-      supporterBadge.style.display = premiumActive ? "inline-flex" : "none";
+      supporterBadge.style.display = premiumActive ? 'inline-flex' : 'none';
     }
     if (emailToggle) emailToggle.checked = !!currentUser?.emailOptIn;
     if (emailStatus) {
       emailStatus.textContent = currentUser?.emailOptIn
-        ? `Subscribed ${formatDate(currentUser.emailOptInAt) || ""}`.trim()
-        : "Not subscribed.";
+        ? `Subscribed ${formatDate(currentUser.emailOptInAt) || ''}`.trim()
+        : 'Not subscribed.';
     }
     if (commentCountEl) {
       commentCountEl.textContent = `You have ${currentCommentCount} comment${
-        currentCommentCount === 1 ? "" : "s"
+        currentCommentCount === 1 ? '' : 's'
       }.`;
     }
   }
 
   function setCommentsEmpty(isEmpty) {
     if (!commentsEmpty) return;
-    commentsEmpty.style.display = isEmpty ? "block" : "none";
+    commentsEmpty.style.display = isEmpty ? 'block' : 'none';
   }
 
   function renderComments(comments = [], { append = false } = {}) {
     if (!commentsList) return;
-    if (!append) commentsList.innerHTML = "";
+    if (!append) commentsList.innerHTML = '';
     if (!comments.length && !append) {
       setCommentsEmpty(true);
       return;
@@ -147,41 +142,41 @@ import { API } from "./constants.js";
     setCommentsEmpty(false);
 
     comments.forEach((comment) => {
-      const item = document.createElement("div");
-      item.className = "user-comment-item";
+      const item = document.createElement('div');
+      item.className = 'user-comment-item';
       item.dataset.commentId = comment.id;
 
-      const meta = document.createElement("div");
-      meta.className = "user-comment-meta";
-      const time = formatDate(comment.createdAt) || "Unknown time";
-      meta.textContent = `Target: ${comment.targetId || "unknown"} • ${time}${
-        comment.hidden ? " • Hidden" : ""
+      const meta = document.createElement('div');
+      meta.className = 'user-comment-meta';
+      const time = formatDate(comment.createdAt) || 'Unknown time';
+      meta.textContent = `Target: ${comment.targetId || 'unknown'} • ${time}${
+        comment.hidden ? ' • Hidden' : ''
       }`;
 
-      const message = document.createElement("div");
-      message.className = "user-comment-message";
-      message.textContent = comment.message || "";
+      const message = document.createElement('div');
+      message.className = 'user-comment-message';
+      message.textContent = comment.message || '';
 
-      const actions = document.createElement("div");
-      actions.className = "user-comment-actions";
-      const deleteBtn = document.createElement("button");
-      deleteBtn.className = "btn user-settings-danger";
-      deleteBtn.type = "button";
-      deleteBtn.textContent = "Delete";
-      deleteBtn.addEventListener("click", async () => {
-        const ok = confirm("Delete this comment?");
+      const actions = document.createElement('div');
+      actions.className = 'user-comment-actions';
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'btn user-settings-danger';
+      deleteBtn.type = 'button';
+      deleteBtn.textContent = 'Delete';
+      deleteBtn.addEventListener('click', async () => {
+        const ok = confirm('Delete this comment?');
         if (!ok) return;
         try {
-          await fetchJson(`${API.ENDPOINTS.USER_COMMENTS}/${comment.id}`, { method: "DELETE" });
+          await fetchJson(`${API.ENDPOINTS.USER_COMMENTS}/${comment.id}`, { method: 'DELETE' });
           item.remove();
           currentCommentCount = Math.max(0, currentCommentCount - 1);
           updateUserView(currentUser, currentCommentCount);
-          setStatus("Comment deleted.");
+          setStatus('Comment deleted.');
           if (commentsList && !commentsList.children.length) {
             setCommentsEmpty(true);
           }
         } catch (err) {
-          setStatus(err.message || "Failed to delete comment.", true);
+          setStatus(err.message || 'Failed to delete comment.', true);
         }
       });
       actions.appendChild(deleteBtn);
@@ -195,9 +190,9 @@ import { API } from "./constants.js";
 
   async function loadSettings() {
     try {
-      const data = await fetchJson(API.ENDPOINTS.USER_SETTINGS, { method: "GET" });
+      const data = await fetchJson(API.ENDPOINTS.USER_SETTINGS, { method: 'GET' });
       const user = data.user || null;
-      if (!user) throw new Error("Not authenticated");
+      if (!user) throw new Error('Not authenticated');
       updateUserView(user, data.commentCount || 0);
       showContent();
       dispatchSession(user);
@@ -206,10 +201,10 @@ import { API } from "./constants.js";
       showAuth();
       currentUser = null;
       currentCommentCount = 0;
-      if (commentCountEl) commentCountEl.textContent = "You have 0 comments.";
-      if (commentsList) commentsList.innerHTML = "";
+      if (commentCountEl) commentCountEl.textContent = 'You have 0 comments.';
+      if (commentsList) commentsList.innerHTML = '';
       setCommentsEmpty(true);
-      if (loadMoreBtn) loadMoreBtn.style.display = "none";
+      if (loadMoreBtn) loadMoreBtn.style.display = 'none';
     }
   }
 
@@ -219,16 +214,16 @@ import { API } from "./constants.js";
     }
     try {
       const url = `${API.ENDPOINTS.USER_COMMENTS}?limit=${commentsLimit}&offset=${commentsOffset}`;
-      const data = await fetchJson(url, { method: "GET" });
+      const data = await fetchJson(url, { method: 'GET' });
       const comments = Array.isArray(data.comments) ? data.comments : [];
       renderComments(comments, { append: !reset });
       commentsOffset += comments.length;
       if (loadMoreBtn) {
-        const total = typeof data.total === "number" ? data.total : commentsOffset;
-        loadMoreBtn.style.display = commentsOffset < total ? "inline-flex" : "none";
+        const total = typeof data.total === 'number' ? data.total : commentsOffset;
+        loadMoreBtn.style.display = commentsOffset < total ? 'inline-flex' : 'none';
       }
     } catch (err) {
-      setStatus(err.message || "Failed to load comments.", true);
+      setStatus(err.message || 'Failed to load comments.', true);
     }
   }
 
@@ -238,21 +233,21 @@ import { API } from "./constants.js";
     const email = loginEmail.value.trim();
     const password = loginPassword.value;
     if (!email || !password) {
-      setStatus("Email and password are required.", true);
+      setStatus('Email and password are required.', true);
       return;
     }
     try {
-      setStatus("");
+      setStatus('');
       await fetchJson(API.ENDPOINTS.LOGIN, {
-        method: "POST",
+        method: 'POST',
         body: JSON.stringify({ email, password }),
       });
-      loginEmail.value = "";
-      loginPassword.value = "";
+      loginEmail.value = '';
+      loginPassword.value = '';
       await loadSettings();
-      setStatus("Signed in.");
+      setStatus('Signed in.');
     } catch (err) {
-      setStatus(err.message || "Sign in failed.", true);
+      setStatus(err.message || 'Sign in failed.', true);
     }
   }
 
@@ -260,14 +255,14 @@ import { API } from "./constants.js";
     if (!emailToggle) return;
     try {
       const data = await fetchJson(API.ENDPOINTS.USER_EMAIL_OPT, {
-        method: "POST",
+        method: 'POST',
         body: JSON.stringify({ emailOptIn: emailToggle.checked }),
       });
       updateUserView(data.user, undefined);
-      setStatus(emailToggle.checked ? "Email list enabled." : "Email list disabled.");
+      setStatus(emailToggle.checked ? 'Email list enabled.' : 'Email list disabled.');
     } catch (err) {
       emailToggle.checked = !emailToggle.checked;
-      setStatus(err.message || "Failed to update email preference.", true);
+      setStatus(err.message || 'Failed to update email preference.', true);
     }
   }
 
@@ -275,102 +270,102 @@ import { API } from "./constants.js";
     if (!premiumInput) return;
     const code = premiumInput.value.trim();
     if (!code) {
-      setStatus("Enter a premium code.", true);
+      setStatus('Enter a premium code.', true);
       return;
     }
     try {
       const data = await fetchJson(API.ENDPOINTS.USER_REDEEM_PREMIUM, {
-        method: "POST",
+        method: 'POST',
         body: JSON.stringify({ code }),
       });
-      premiumInput.value = "";
+      premiumInput.value = '';
       updateUserView(data.user, undefined);
-      setStatus("Premium access activated.");
+      setStatus('Premium access activated.');
       dispatchSession(data.user);
     } catch (err) {
-      setStatus(err.message || "Failed to redeem code.", true);
+      setStatus(err.message || 'Failed to redeem code.', true);
     }
   }
 
   async function handleDeleteComments() {
-    if (!confirm("Delete all of your comments? This cannot be undone.")) return;
+    if (!confirm('Delete all of your comments? This cannot be undone.')) return;
     try {
-      await fetchJson(API.ENDPOINTS.USER_DELETE_COMMENTS, { method: "POST" });
+      await fetchJson(API.ENDPOINTS.USER_DELETE_COMMENTS, { method: 'POST' });
       if (commentCountEl) {
         currentCommentCount = 0;
-        commentCountEl.textContent = "You have 0 comments.";
+        commentCountEl.textContent = 'You have 0 comments.';
       }
-      if (commentsList) commentsList.innerHTML = "";
+      if (commentsList) commentsList.innerHTML = '';
       setCommentsEmpty(true);
-      if (loadMoreBtn) loadMoreBtn.style.display = "none";
-      setStatus("Your comments were deleted.");
+      if (loadMoreBtn) loadMoreBtn.style.display = 'none';
+      setStatus('Your comments were deleted.');
     } catch (err) {
-      setStatus(err.message || "Failed to delete comments.", true);
+      setStatus(err.message || 'Failed to delete comments.', true);
     }
   }
 
   async function handleLogout() {
     try {
-      await fetchJson(API.ENDPOINTS.LOGOUT, { method: "POST" });
+      await fetchJson(API.ENDPOINTS.LOGOUT, { method: 'POST' });
     } catch {
       // Ignore logout errors.
     }
     dispatchSession(null);
     showAuth();
-    setStatus("Signed out.");
+    setStatus('Signed out.');
     currentUser = null;
     currentCommentCount = 0;
-    if (supporterBadge) supporterBadge.style.display = "none";
-    if (commentCountEl) commentCountEl.textContent = "You have 0 comments.";
-    if (commentsList) commentsList.innerHTML = "";
+    if (supporterBadge) supporterBadge.style.display = 'none';
+    if (commentCountEl) commentCountEl.textContent = 'You have 0 comments.';
+    if (commentsList) commentsList.innerHTML = '';
     setCommentsEmpty(true);
-    if (loadMoreBtn) loadMoreBtn.style.display = "none";
+    if (loadMoreBtn) loadMoreBtn.style.display = 'none';
   }
 
   async function handleDeleteAccount() {
     const confirmed = confirm(
-      "Delete your account and all of your comments? This cannot be undone.",
+      'Delete your account and all of your comments? This cannot be undone.'
     );
     if (!confirmed) return;
     try {
-      await fetchJson(API.ENDPOINTS.USER_DELETE_ACCOUNT, { method: "DELETE" });
+      await fetchJson(API.ENDPOINTS.USER_DELETE_ACCOUNT, { method: 'DELETE' });
       dispatchSession(null);
       hideOverlay();
-      setStatus("Account deleted.");
+      setStatus('Account deleted.');
       window.location.reload();
     } catch (err) {
-      setStatus(err.message || "Failed to delete account.", true);
+      setStatus(err.message || 'Failed to delete account.', true);
     }
   }
 
   function showOverlay() {
-    overlay.classList.add("active");
-    overlay.setAttribute("aria-hidden", "false");
-    setStatus("");
+    overlay.classList.add('active');
+    overlay.setAttribute('aria-hidden', 'false');
+    setStatus('');
     loadSettings();
   }
 
   function hideOverlay() {
-    overlay.classList.remove("active");
-    overlay.setAttribute("aria-hidden", "true");
+    overlay.classList.remove('active');
+    overlay.setAttribute('aria-hidden', 'true');
   }
 
-  openBtn.addEventListener("click", showOverlay);
-  if (closeBtn) closeBtn.addEventListener("click", hideOverlay);
-  overlay.addEventListener("click", (event) => {
+  openBtn.addEventListener('click', showOverlay);
+  if (closeBtn) closeBtn.addEventListener('click', hideOverlay);
+  overlay.addEventListener('click', (event) => {
     if (event.target === overlay) hideOverlay();
   });
-  document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && overlay.classList.contains("active")) {
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && overlay.classList.contains('active')) {
       hideOverlay();
     }
   });
 
-  if (loginForm) loginForm.addEventListener("submit", handleLogin);
-  if (emailToggle) emailToggle.addEventListener("change", handleEmailToggle);
-  if (redeemBtn) redeemBtn.addEventListener("click", handleRedeem);
-  if (loadMoreBtn) loadMoreBtn.addEventListener("click", () => loadComments(false));
-  if (deleteCommentsBtn) deleteCommentsBtn.addEventListener("click", handleDeleteComments);
-  if (logoutBtn) logoutBtn.addEventListener("click", handleLogout);
-  if (deleteAccountBtn) deleteAccountBtn.addEventListener("click", handleDeleteAccount);
+  if (loginForm) loginForm.addEventListener('submit', handleLogin);
+  if (emailToggle) emailToggle.addEventListener('change', handleEmailToggle);
+  if (redeemBtn) redeemBtn.addEventListener('click', handleRedeem);
+  if (loadMoreBtn) loadMoreBtn.addEventListener('click', () => loadComments(false));
+  if (deleteCommentsBtn) deleteCommentsBtn.addEventListener('click', handleDeleteComments);
+  if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+  if (deleteAccountBtn) deleteAccountBtn.addEventListener('click', handleDeleteAccount);
 })();

@@ -32,7 +32,9 @@ export function getRequestedPageSlug() {
 
 export function isDraftPageRequested() {
   const params = new URLSearchParams(window.location.search);
-  const raw = String(params.get('draft') || '').trim().toLowerCase();
+  const raw = String(params.get('draft') || '')
+    .trim()
+    .toLowerCase();
   return raw === '1' || raw === 'true' || raw === 'yes';
 }
 
@@ -45,7 +47,5 @@ export function getSeriesDataPath(seriesId = DEFAULT_SERIES_ID) {
 export function getSeriesPageConfigPath(seriesId = DEFAULT_SERIES_ID) {
   // DB-backed page config JSON endpoint.
   const id = sanitizeSeriesId(seriesId) || DEFAULT_SERIES_ID;
-  return id === DEFAULT_SERIES_ID
-    ? 'page-config.json'
-    : `series/${id}/page-config.json`;
+  return id === DEFAULT_SERIES_ID ? 'page-config.json' : `series/${id}/page-config.json`;
 }

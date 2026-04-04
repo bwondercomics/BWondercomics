@@ -45,9 +45,7 @@ def public_asset_url(path: str) -> str:
 
 
 def build_absolute_asset_url(request: Request, path: str) -> str:
-    forwarded_proto = (
-        (request.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
-    )
+    forwarded_proto = (request.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
     scheme = forwarded_proto if forwarded_proto in {"http", "https"} else request.url.scheme
     host = (
         (request.headers.get("X-Forwarded-Host") or request.headers.get("Host") or "")

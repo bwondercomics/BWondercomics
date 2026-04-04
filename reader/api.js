@@ -14,21 +14,21 @@ import { logger } from './logger.js';
  * @throws {Error} On network or HTTP errors
  */
 async function apiFetch(url, options = {}) {
-    const defaultOptions = {
-        credentials: 'include',
-        headers: {
-            'Content-Type': 'application/json',
-            ...options.headers
-        }
-    };
+  const defaultOptions = {
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    },
+  };
 
-    try {
-        const response = await fetch(url, { ...defaultOptions, ...options });
-        return response;
-    } catch (err) {
-        logger.error(`API request failed: ${url}`, err);
-        throw new Error(`Network error: ${err.message}`);
-    }
+  try {
+    const response = await fetch(url, { ...defaultOptions, ...options });
+    return response;
+  } catch (err) {
+    logger.error(`API request failed: ${url}`, err);
+    throw new Error(`Network error: ${err.message}`);
+  }
 }
 
 /**
@@ -38,14 +38,14 @@ async function apiFetch(url, options = {}) {
  * @returns {Promise<any>} Parsed JSON response
  */
 export async function apiGet(url, options = {}) {
-    const response = await apiFetch(url, { method: 'GET', ...options });
+  const response = await apiFetch(url, { method: 'GET', ...options });
 
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Request failed' }));
-        throw new Error(error.error || `HTTP ${response.status}`);
-    }
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Request failed' }));
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
 
-    return response.json();
+  return response.json();
 }
 
 /**
@@ -56,18 +56,18 @@ export async function apiGet(url, options = {}) {
  * @returns {Promise<any>} Parsed JSON response
  */
 export async function apiPost(url, data, options = {}) {
-    const response = await apiFetch(url, {
-        method: 'POST',
-        body: JSON.stringify(data),
-        ...options
-    });
+  const response = await apiFetch(url, {
+    method: 'POST',
+    body: JSON.stringify(data),
+    ...options,
+  });
 
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Request failed' }));
-        throw new Error(error.error || `HTTP ${response.status}`);
-    }
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Request failed' }));
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
 
-    return response.json();
+  return response.json();
 }
 
 /**
@@ -78,18 +78,18 @@ export async function apiPost(url, data, options = {}) {
  * @returns {Promise<any>} Parsed JSON response
  */
 export async function apiPut(url, data, options = {}) {
-    const response = await apiFetch(url, {
-        method: 'PUT',
-        body: JSON.stringify(data),
-        ...options
-    });
+  const response = await apiFetch(url, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+    ...options,
+  });
 
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Request failed' }));
-        throw new Error(error.error || `HTTP ${response.status}`);
-    }
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Request failed' }));
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
 
-    return response.json();
+  return response.json();
 }
 
 /**
@@ -99,14 +99,14 @@ export async function apiPut(url, data, options = {}) {
  * @returns {Promise<any>} Parsed JSON response
  */
 export async function apiDelete(url, options = {}) {
-    const response = await apiFetch(url, { method: 'DELETE', ...options });
+  const response = await apiFetch(url, { method: 'DELETE', ...options });
 
-    if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Request failed' }));
-        throw new Error(error.error || `HTTP ${response.status}`);
-    }
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Request failed' }));
+    throw new Error(error.error || `HTTP ${response.status}`);
+  }
 
-    return response.json();
+  return response.json();
 }
 
 /**
@@ -115,13 +115,15 @@ export async function apiDelete(url, options = {}) {
  * @returns {Promise<Array>} Array of comments
  */
 export async function fetchComments(targetId) {
-    try {
-        const data = await apiGet(`${API.ENDPOINTS.COMMENTS}?target_id=${encodeURIComponent(targetId)}`);
-        return data.comments || [];
-    } catch (err) {
-        logger.error('Failed to fetch comments:', err);
-        return [];
-    }
+  try {
+    const data = await apiGet(
+      `${API.ENDPOINTS.COMMENTS}?target_id=${encodeURIComponent(targetId)}`
+    );
+    return data.comments || [];
+  } catch (err) {
+    logger.error('Failed to fetch comments:', err);
+    return [];
+  }
 }
 
 /**
@@ -131,10 +133,10 @@ export async function fetchComments(targetId) {
  * @returns {Promise<Object>} Created comment
  */
 export async function postComment(targetId, message) {
-    return apiPost(API.ENDPOINTS.COMMENTS, {
-        target_id: targetId,
-        message: message
-    });
+  return apiPost(API.ENDPOINTS.COMMENTS, {
+    target_id: targetId,
+    message: message,
+  });
 }
 
 /**
@@ -142,13 +144,13 @@ export async function postComment(targetId, message) {
  * @returns {Promise<Object|null>} Latest post or null
  */
 export async function fetchLatestPost() {
-    try {
-        const data = await apiGet(API.ENDPOINTS.POSTS_LATEST);
-        return data.post || null;
-    } catch (err) {
-        logger.error('Failed to fetch latest post:', err);
-        return null;
-    }
+  try {
+    const data = await apiGet(API.ENDPOINTS.POSTS_LATEST);
+    return data.post || null;
+  } catch (err) {
+    logger.error('Failed to fetch latest post:', err);
+    return null;
+  }
 }
 
 /**
@@ -157,15 +159,15 @@ export async function fetchLatestPost() {
  * @returns {Promise<Array>} Array of posts
  */
 export async function fetchPosts(params = {}) {
-    try {
-        const queryString = new URLSearchParams(params).toString();
-        const url = queryString ? `${API.ENDPOINTS.POSTS}?${queryString}` : API.ENDPOINTS.POSTS;
-        const data = await apiGet(url);
-        return data.posts || [];
-    } catch (err) {
-        logger.error('Failed to fetch posts:', err);
-        return [];
-    }
+  try {
+    const queryString = new URLSearchParams(params).toString();
+    const url = queryString ? `${API.ENDPOINTS.POSTS}?${queryString}` : API.ENDPOINTS.POSTS;
+    const data = await apiGet(url);
+    return data.posts || [];
+  } catch (err) {
+    logger.error('Failed to fetch posts:', err);
+    return [];
+  }
 }
 
 /**
@@ -175,12 +177,12 @@ export async function fetchPosts(params = {}) {
  * @returns {Promise<Object>} Save response
  */
 export async function saveData(filename, content) {
-    const body = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
+  const body = typeof content === 'string' ? content : JSON.stringify(content, null, 2);
 
-    return apiPost(API.ENDPOINTS.SAVE, {
-        filename: filename,
-        content: body
-    });
+  return apiPost(API.ENDPOINTS.SAVE, {
+    filename: filename,
+    content: body,
+  });
 }
 
 /**
@@ -189,7 +191,7 @@ export async function saveData(filename, content) {
  * @returns {boolean}
  */
 export function isSuccessStatus(status) {
-    return status >= 200 && status < 300;
+  return status >= 200 && status < 300;
 }
 
 /**
@@ -198,7 +200,7 @@ export function isSuccessStatus(status) {
  * @returns {boolean}
  */
 export function isClientError(status) {
-    return status >= 400 && status < 500;
+  return status >= 400 && status < 500;
 }
 
 /**
@@ -207,5 +209,5 @@ export function isClientError(status) {
  * @returns {boolean}
  */
 export function isServerError(status) {
-    return status >= 500;
+  return status >= 500;
 }

@@ -3,11 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  slugifyTarget,
-  buildEntryTargetId,
-  buildPostTargetId
-} from '../reader/comment-targets.js';
+import { slugifyTarget, buildEntryTargetId, buildPostTargetId } from '../reader/comment-targets.js';
 
 describe('slugifyTarget', () => {
   it('should normalize to lowercase and hyphenate', () => {
@@ -24,7 +20,7 @@ describe('buildEntryTargetId', () => {
     const target = buildEntryTargetId({
       seriesId: 'battle-bros',
       entryName: 'Start Here',
-      displayNumber: 1
+      displayNumber: 1,
     });
     expect(target).toBe('battle-bros:entry-1');
   });
@@ -32,7 +28,7 @@ describe('buildEntryTargetId', () => {
   it('should fall back to slugified name when no displayNumber', () => {
     const target = buildEntryTargetId({
       seriesId: 'battle-bros',
-      entryName: 'Start Here'
+      entryName: 'Start Here',
     });
     expect(target).toBe('battle-bros:start-here');
   });

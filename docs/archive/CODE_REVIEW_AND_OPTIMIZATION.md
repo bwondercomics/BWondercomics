@@ -15,6 +15,7 @@ Legacy note: This review reflects a static-first snapshot and is not aligned wit
 BWonderComics is a **well-architected, production-ready webcomic platform** with excellent separation of concerns, modular design, and comprehensive documentation. The codebase demonstrates professional development practices with good test coverage, clear documentation, and thoughtful optimization.
 
 ### **Strengths** ✅
+
 - Clean modular JavaScript architecture (17+ focused modules)
 - Comprehensive JSDoc documentation
 - Strong separation of frontend/backend concerns
@@ -25,6 +26,7 @@ BWonderComics is a **well-architected, production-ready webcomic platform** with
 - Accessibility features implemented
 
 ### **Areas for Improvement** 🔧
+
 - Some code duplication opportunities
 - CSS organization could be more modular
 - Performance monitoring needs implementation
@@ -38,6 +40,7 @@ BWonderComics is a **well-architected, production-ready webcomic platform** with
 ### 1. Architecture Review
 
 #### **Frontend Structure** ⭐⭐⭐⭐⭐
+
 **Excellent modular design** - The reader JavaScript is split into 17 focused modules:
 
 ```
@@ -56,12 +59,14 @@ reader/
 ```
 
 **Why this is great:**
+
 - Each module has a single responsibility
 - Easy to test in isolation
 - Low coupling, high cohesion
 - Clear dependency tree
 
 **Suggested improvements:**
+
 ```javascript
 // Consider adding a module bundler for production
 // to reduce HTTP requests while keeping dev modularity
@@ -74,6 +79,7 @@ export * from './controls.js';
 ```
 
 #### **Backend Structure** ⭐⭐⭐⭐
+
 **Clean FastAPI architecture** with proper route separation:
 
 ```python
@@ -90,6 +96,7 @@ backend/app/
 ```
 
 **Great practices:**
+
 - Dependency injection
 - Middleware for cross-cutting concerns (auth, premium gating)
 - Proper separation of models/routes/logic
@@ -101,12 +108,14 @@ backend/app/
 #### **JavaScript Quality** ⭐⭐⭐⭐
 
 **Strengths:**
+
 - Excellent JSDoc documentation (see `state.js`)
 - Modern ES6+ features (modules, async/await, destructuring)
 - Error handling with try-catch blocks
 - Consistent naming conventions
 
 **Example of good documentation:**
+
 ```javascript
 // From state.js - EXCELLENT documentation
 /**
@@ -127,14 +136,17 @@ export const state = {
 ```
 
 **Issues Found:**
+
 1. **Console.log statements in production** (5 instances found):
+
    ```javascript
    // reader/app.js:391
-   console.log("🎬 Battle Bros Reader initialized");
-   
+   console.log('🎬 Battle Bros Reader initialized');
+
    // reader/customization.js:61
    console.log(`Loaded config from ${configPath}`);
    ```
+
    **Fix**: Use a logger utility with environment-based levels
 
 2. **Magic numbers** in several places:
@@ -147,25 +159,27 @@ export const state = {
 #### **Python Quality** ⭐⭐⭐⭐⭐
 
 **Excellent practices:**
+
 - Type hints throughout (`from __future__ import annotations`)
 - Proper async/await usage
 - Good error handling
 - Security best practices (parameterized queries)
 
 **Example:**
+
 ```python
 # From main.py - excellent async handling
 async def _load_role() -> str | None:
     from .db import SessionLocal
     from .models import User
-    
+
     def _query():
         db = SessionLocal()
         try:
             # ... safe DB query
         finally:
             db.close()
-    
+
     return await run_in_threadpool(_query)
 ```
 
@@ -178,20 +192,30 @@ async def _load_role() -> str | None:
 ```javascript
 // From state.test.js - comprehensive testing
 describe('loadProgress', () => {
-    it('should load saved progress', () => { /* ... */ });
-    it('should return null if no progress saved', () => { /* ... */ });
-    it('should return null for invalid JSON', () => { /* ... */ });
-    it('should handle localStorage errors gracefully', () => { /* ... */ });
+  it('should load saved progress', () => {
+    /* ... */
+  });
+  it('should return null if no progress saved', () => {
+    /* ... */
+  });
+  it('should return null for invalid JSON', () => {
+    /* ... */
+  });
+  it('should handle localStorage errors gracefully', () => {
+    /* ... */
+  });
 });
 ```
 
 **Test files found:**
+
 - `tests/state.test.js` (138 lines)
 - `tests/render.test.js`
 - `tests/chapters.test.js`
 - `tests/admin-smoke.test.js`
 
 **Package.json test scripts:**
+
 ```json
 {
   "scripts": {
@@ -204,6 +228,7 @@ describe('loadProgress', () => {
 ```
 
 **Recommendations:**
+
 1. Add E2E tests (consider Playwright)
 2. Set coverage threshold (aim for 80%+)
 3. Add visual regression tests for UI
@@ -215,11 +240,13 @@ describe('loadProgress', () => {
 #### **Current Optimizations** ✅
 
 1. **Font Preconnect:**
+
    ```html
    <link rel="preconnect" href="https://fonts.googleapis.com" />
    ```
 
 2. **Image Caching:**
+
    ```javascript
    // From state.js
    imageCache: new Map(), // FIFO cache of preloaded images
@@ -235,8 +262,8 @@ describe('loadProgress', () => {
    // Mentioned in optimization docs
    let resizeTimer;
    window.addEventListener('resize', () => {
-       clearTimeout(resizeTimer);
-       resizeTimer = setTimeout(handleResize, 150);
+     clearTimeout(resizeTimer);
+     resizeTimer = setTimeout(handleResize, 150);
    });
    ```
 
@@ -245,22 +272,23 @@ describe('loadProgress', () => {
 **High Impact:**
 
 1. **Implement Code Splitting** (Est. 40% faster initial load)
+
    ```javascript
    // Use dynamic imports for heavy features
    const openGallery = async () => {
-       const { Gallery } = await import('./gallery.js');
-       Gallery.open();
+     const { Gallery } = await import('./gallery.js');
+     Gallery.open();
    };
    ```
 
 2. **Add Service Worker for Offline Support** (PWA manifest exists!)
+
    ```javascript
    // sw.js
    self.addEventListener('fetch', (event) => {
-       event.respondWith(
-           caches.match(event.request)
-               .then(response => response || fetch(event.request))
-       );
+     event.respondWith(
+       caches.match(event.request).then((response) => response || fetch(event.request))
+     );
    });
    ```
 
@@ -268,21 +296,22 @@ describe('loadProgress', () => {
    - Convert to WebP/AVIF
    - Generate responsive image sets
    - Lazy load off-screen images
+
    ```html
-   <img 
-       srcset="chapter1-p1-480w.webp 480w,
-               chapter1-p1-800w.webp 800w"
-       sizes="(max-width: 600px) 480px, 800px"
-       loading="lazy"
-       alt="Chapter 1, Page 1"
+   <img
+     srcset="chapter1-p1-480w.webp 480w, chapter1-p1-800w.webp 800w"
+     sizes="(max-width: 600px) 480px, 800px"
+     loading="lazy"
+     alt="Chapter 1, Page 1"
    />
    ```
 
 4. **Bundle and Minify for Production**
+
    ```bash
    # Add to package.json
    npm install --save-dev vite
-   
+
    # vite.config.js
    export default {
        build: {
@@ -304,9 +333,10 @@ describe('loadProgress', () => {
    - Consider CSS modules or Tailwind
 
 6. **Add Resource Hints**
+
    ```html
-   <link rel="prefetch" href="/api/posts/latest">
-   <link rel="preload" as="image" href="assets/panel.png">
+   <link rel="prefetch" href="/api/posts/latest" />
+   <link rel="preload" as="image" href="assets/panel.png" />
    ```
 
 7. **Implement Virtual Scrolling** for long chapters
@@ -324,6 +354,7 @@ describe('loadProgress', () => {
    - Each has similar meta tags, fonts, CSS variables
 
    **Solution**: Create shared header template or use a build step
+
    ```html
    <!-- shared/head-common.html -->
    <meta charset="utf-8" />
@@ -332,18 +363,19 @@ describe('loadProgress', () => {
    ```
 
 2. **CSS Variable Definitions** repeated in multiple files:
+
    ```css
    /* Appears in index.html, feed.html, etc. */
    :root {
-       --primary: #00d9ff;
-       --secondary: #ff00ea;
-       --accent: #ffed00;
-       --bg-dark: #0a0a12;
-       --bg-panel: #1a1a2e;
-       --text: #ffffff;
+     --primary: #00d9ff;
+     --secondary: #ff00ea;
+     --accent: #ffed00;
+     --bg-dark: #0a0a12;
+     --bg-panel: #1a1a2e;
+     --text: #ffffff;
    }
    ```
-   
+
    **Solution**: Extract to `assets/theme.css`
 
 3. **Auth Logic Duplication**:
@@ -355,46 +387,46 @@ describe('loadProgress', () => {
 ```javascript
 // Create reader/auth.js
 export class AuthManager {
-    constructor() {
-        this.user = null;
-        this.callbacks = [];
+  constructor() {
+    this.user = null;
+    this.callbacks = [];
+  }
+
+  async login(email, password) {
+    const response = await fetch('/api/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (response.ok) {
+      await this.refreshSession();
+      return true;
     }
-    
-    async login(email, password) {
-        const response = await fetch('/api/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password })
-        });
-        
-        if (response.ok) {
-            await this.refreshSession();
-            return true;
-        }
-        return false;
+    return false;
+  }
+
+  async refreshSession() {
+    const response = await fetch('/api/session');
+    if (response.ok) {
+      this.user = await response.json();
+      this.notifyListeners();
     }
-    
-    async refreshSession() {
-        const response = await fetch('/api/session');
-        if (response.ok) {
-            this.user = await response.json();
-            this.notifyListeners();
-        }
-    }
-    
-    onChange(callback) {
-        this.callbacks.push(callback);
-    }
-    
-    notifyListeners() {
-        this.callbacks.forEach(cb => cb(this.user));
-    }
+  }
+
+  onChange(callback) {
+    this.callbacks.push(callback);
+  }
+
+  notifyListeners() {
+    this.callbacks.forEach((cb) => cb(this.user));
+  }
 }
 
 // Usage in feed.html and index.html
 import { AuthManager } from './reader/auth.js';
 const auth = new AuthManager();
-auth.onChange(user => updateUI(user));
+auth.onChange((user) => updateUI(user));
 ```
 
 ---
@@ -404,6 +436,7 @@ auth.onChange(user => updateUI(user));
 **Excellent security practices:**
 
 1. **JWT Token Authentication:**
+
    ```python
    # backend/app/security.py
    def verify_token(token):
@@ -415,6 +448,7 @@ auth.onChange(user => updateUI(user));
    - No string interpolation in queries
 
 3. **Cookie Security:**
+
    ```python
    settings.session_cookie_name  # Configurable
    # HTTPOnly, SameSite flags should be set
@@ -430,11 +464,13 @@ auth.onChange(user => updateUI(user));
 **Recommendations:**
 
 1. **Add CSRF Protection** for state-changing operations:
+
    ```python
    from fastapi_csrf_protect import CsrfProtect
    ```
 
 2. **Add Rate Limiting** to prevent abuse:
+
    ```python
    from slowapi import Limiter
    @app.post("/api/login")
@@ -443,6 +479,7 @@ auth.onChange(user => updateUI(user));
    ```
 
 3. **Content Security Policy** headers:
+
    ```python
    response.headers["Content-Security-Policy"] = (
        "default-src 'self'; "
@@ -452,9 +489,10 @@ auth.onChange(user => updateUI(user));
    ```
 
 4. **Sanitize User Input** in comments:
+
    ```python
    import bleach
-   
+
    def sanitize_comment(text):
        allowed_tags = ['p', 'br', 'strong', 'em']
        return bleach.clean(text, tags=allowed_tags, strip=True)
@@ -467,12 +505,13 @@ auth.onChange(user => updateUI(user));
 **Great accessibility features:**
 
 1. **Motion Preferences:**
+
    ```css
    @media (prefers-reduced-motion: reduce) {
-       * {
-           animation: none !important;
-           transition: none !important;
-       }
+     * {
+       animation: none !important;
+       transition: none !important;
+     }
    }
    ```
 
@@ -491,28 +530,29 @@ auth.onChange(user => updateUI(user));
 **Recommendations:**
 
 1. **Add ARIA Labels:**
+
    ```html
    <button aria-label="Next page" onclick="nextPage()">
-       <svg>...</svg>
+     <svg>...</svg>
    </button>
    ```
 
 2. **Skip Links:**
+
    ```html
    <a href="#main-content" class="skip-link">Skip to content</a>
    ```
 
 3. **Alt Text for Comic Pages:**
+
    ```html
-   <img src="chapter1-p1.jpg" 
-        alt="Chapter 1, Page 1: Hero stands victorious"
-        loading="lazy" />
+   <img src="chapter1-p1.jpg" alt="Chapter 1, Page 1: Hero stands victorious" loading="lazy" />
    ```
 
 4. **Live Region for Page Changes:**
    ```html
    <div aria-live="polite" class="sr-only">
-       Page <span id="current-page">1</span> of <span id="total-pages">20</span>
+     Page <span id="current-page">1</span> of <span id="total-pages">20</span>
    </div>
    ```
 
@@ -523,11 +563,13 @@ auth.onChange(user => updateUI(user));
 #### **Current State** ⭐⭐⭐
 
 **Pros:**
+
 - Consistent design system (CSS variables)
 - Modern CSS features (Grid, Flexbox, animations)
 - Responsive design
 
 **Cons:**
+
 - All CSS is inline in HTML (73KB in index.html)
 - Duplication across pages
 - Hard to maintain theme variations
@@ -535,6 +577,7 @@ auth.onChange(user => updateUI(user));
 #### **Recommended Architecture**
 
 **Option 1: Modular CSS Files**
+
 ```
 assets/css/
 ├── 01-reset.css         # Normalize browser defaults
@@ -547,6 +590,7 @@ assets/css/
 ```
 
 **Option 2: CSS-in-JS with Build Step**
+
 ```javascript
 // Using something like Vite + PostCSS
 import './styles/main.css';
@@ -556,10 +600,9 @@ import styles from './Button.module.css';
 ```
 
 **Option 3: Tailwind CSS** (if you prefer utility-first)
+
 ```html
-<button class="px-4 py-2 bg-cyan-400 hover:bg-cyan-500 rounded-lg">
-    Next Page
-</button>
+<button class="px-4 py-2 bg-cyan-400 hover:bg-cyan-500 rounded-lg">Next Page</button>
 ```
 
 ---
@@ -586,17 +629,18 @@ import styles from './Button.module.css';
 ```
 
 **Monitor with:**
+
 ```javascript
 // Add to index.html
 if ('PerformanceObserver' in window) {
-    const observer = new PerformanceObserver((list) => {
-        list.getEntries().forEach((entry) => {
-            console.log(`${entry.name}: ${entry.startTime}ms`);
-            // Send to analytics
-        });
+  const observer = new PerformanceObserver((list) => {
+    list.getEntries().forEach((entry) => {
+      console.log(`${entry.name}: ${entry.startTime}ms`);
+      // Send to analytics
     });
-    
-    observer.observe({ entryTypes: ['paint', 'largest-contentful-paint'] });
+  });
+
+  observer.observe({ entryTypes: ['paint', 'largest-contentful-paint'] });
 }
 ```
 
@@ -605,8 +649,8 @@ if ('PerformanceObserver' in window) {
 ```javascript
 // Example: Enhance with advanced features if supported
 const supportsWebP = () => {
-    const canvas = document.createElement('canvas');
-    return canvas.toDataURL('image/webp').indexOf('data:image/webp') === 0;
+  const canvas = document.createElement('canvas');
+  return canvas.toDataURL('image/webp').indexOf('data:image/webp') === 0;
 };
 
 const imageFormat = supportsWebP() ? 'webp' : 'jpg';
@@ -615,12 +659,14 @@ const imageFormat = supportsWebP() ? 'webp' : 'jpg';
 ### **Strategy 3: Use Profiling Tools Regularly**
 
 **Chrome DevTools Workflow:**
+
 1. Performance tab → Record → Stop
 2. Look for long tasks (>50ms)
 3. Check for layout thrashing
 4. Analyze bundle size in Network tab
 
 **Lighthouse CI in GitHub Actions:**
+
 ```yaml
 # .github/workflows/lighthouse.yml
 name: Lighthouse CI
@@ -655,6 +701,7 @@ Before every commit, check:
 ### **Strategy 5: Automate Code Quality**
 
 **Add to package.json:**
+
 ```json
 {
   "scripts": {
@@ -677,6 +724,7 @@ Before every commit, check:
 ```
 
 **ESLint config (.eslintrc.json):**
+
 ```json
 {
   "env": {
@@ -723,35 +771,35 @@ Current state management is good, but for larger apps:
 ```javascript
 // Consider adding state history for undo/redo
 class StateManager {
-    constructor(initialState) {
-        this.current = initialState;
-        this.history = [initialState];
-        this.historyIndex = 0;
+  constructor(initialState) {
+    this.current = initialState;
+    this.history = [initialState];
+    this.historyIndex = 0;
+  }
+
+  setState(newState) {
+    this.historyIndex++;
+    this.history = this.history.slice(0, this.historyIndex);
+    this.history.push(newState);
+    this.current = newState;
+    this.notifyListeners();
+  }
+
+  undo() {
+    if (this.historyIndex > 0) {
+      this.historyIndex--;
+      this.current = this.history[this.historyIndex];
+      this.notifyListeners();
     }
-    
-    setState(newState) {
-        this.historyIndex++;
-        this.history = this.history.slice(0, this.historyIndex);
-        this.history.push(newState);
-        this.current = newState;
-        this.notifyListeners();
+  }
+
+  redo() {
+    if (this.historyIndex < this.history.length - 1) {
+      this.historyIndex++;
+      this.current = this.history[this.historyIndex];
+      this.notifyListeners();
     }
-    
-    undo() {
-        if (this.historyIndex > 0) {
-            this.historyIndex--;
-            this.current = this.history[this.historyIndex];
-            this.notifyListeners();
-        }
-    }
-    
-    redo() {
-        if (this.historyIndex < this.history.length - 1) {
-            this.historyIndex++;
-            this.current = this.history[this.historyIndex];
-            this.notifyListeners();
-        }
-    }
+  }
 }
 ```
 
@@ -889,6 +937,7 @@ class StateManager {
 4. **Monitoring**: Implement performance tracking
 
 **Keep doing what you're doing with:**
+
 - ✅ Modular architecture
 - ✅ Comprehensive testing
 - ✅ Security best practices

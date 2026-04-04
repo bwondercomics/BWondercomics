@@ -1,18 +1,18 @@
-const POST_DRAFT_KEY = "battlebros_post_draft";
-const DEFAULT_SERIES_ID = "battle-bros";
-const ACTIVE_SERIES_KEY = "battlebros_admin_active_series";
-const ANALYTICS_ENDPOINT = "/api/admin/analytics/summary";
-const ANALYTICS_PAGES_ENDPOINT = "/api/admin/analytics/pages";
-const ANALYTICS_VISITORS_ENDPOINT = "/api/admin/analytics/visitors";
-const ANALYTICS_VISITOR_HISTORY_ENDPOINT = "/api/admin/analytics/visitor-history";
-const ANALYTICS_READER_ENDPOINT = "/api/admin/analytics/reader";
-const ANALYTICS_READER_SERIES_ENDPOINT = "/api/admin/analytics/reader-series";
-const ANALYTICS_LIVE_ENDPOINT = "/api/admin/analytics/live";
-const NAV_LAYOUT_KEY = "battlebros_admin_nav_layout";
-const NAV_COLLAPSED_KEY = "battlebros_admin_nav_collapsed";
-const SCANLINES_KEY = "battlebros_admin_scanlines";
-const HEADER_STICKY_KEY = "battlebros_admin_sticky_header";
-const COUNT_VIEWS_KEY = "battlebros_count_views";
+const POST_DRAFT_KEY = 'battlebros_post_draft';
+const DEFAULT_SERIES_ID = 'battle-bros';
+const ACTIVE_SERIES_KEY = 'battlebros_admin_active_series';
+const ANALYTICS_ENDPOINT = '/api/admin/analytics/summary';
+const ANALYTICS_PAGES_ENDPOINT = '/api/admin/analytics/pages';
+const ANALYTICS_VISITORS_ENDPOINT = '/api/admin/analytics/visitors';
+const ANALYTICS_VISITOR_HISTORY_ENDPOINT = '/api/admin/analytics/visitor-history';
+const ANALYTICS_READER_ENDPOINT = '/api/admin/analytics/reader';
+const ANALYTICS_READER_SERIES_ENDPOINT = '/api/admin/analytics/reader-series';
+const ANALYTICS_LIVE_ENDPOINT = '/api/admin/analytics/live';
+const NAV_LAYOUT_KEY = 'battlebros_admin_nav_layout';
+const NAV_COLLAPSED_KEY = 'battlebros_admin_nav_collapsed';
+const SCANLINES_KEY = 'battlebros_admin_scanlines';
+const HEADER_STICKY_KEY = 'battlebros_admin_sticky_header';
+const COUNT_VIEWS_KEY = 'battlebros_count_views';
 
 // Central admin UI state; primary data comes from DB-backed endpoints.
 const state = {
@@ -24,13 +24,13 @@ const state = {
   entryMeta: {},
   entryLabels: [],
   activeEntryLabelId: null,
-  statusMessage: "",
+  statusMessage: '',
   premiumOnly: false,
   currentEditingEntry: null,
   posts: [],
   mediaItems: [],
   editingPostId: null,
-  previewState: { entry: "", pages: [], index: 0 },
+  previewState: { entry: '', pages: [], index: 0 },
   pendingMediaSelection: null,
   selectedFiles: [],
   uploadQueue: [],

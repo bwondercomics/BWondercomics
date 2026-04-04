@@ -1,6 +1,6 @@
-const TRACK_ENDPOINT = "/api/track/visitor";
-const VISITOR_ID_KEY = "battlebros_visitor_id";
-const COUNT_VIEWS_KEY = "battlebros_count_views";
+const TRACK_ENDPOINT = '/api/track/visitor';
+const VISITOR_ID_KEY = 'battlebros_visitor_id';
+const COUNT_VIEWS_KEY = 'battlebros_count_views';
 const HEARTBEAT_MS = 60_000;
 const MIN_UPDATE_MS = 15_000;
 
@@ -9,26 +9,26 @@ let visitorId = null;
 let lastSentAt = 0;
 let memoryVisitorId = null;
 let context = {
-  path: "",
-  title: "",
-  origin: "",
-  referrer: "",
-  seriesId: "",
-  entryTitle: "",
-  entryLabel: "",
+  path: '',
+  title: '',
+  origin: '',
+  referrer: '',
+  seriesId: '',
+  entryTitle: '',
+  entryLabel: '',
   pageNumber: null,
 };
 
 function canTrack() {
   try {
-    return localStorage.getItem(COUNT_VIEWS_KEY) !== "false";
+    return localStorage.getItem(COUNT_VIEWS_KEY) !== 'false';
   } catch {
     return true;
   }
 }
 
 function buildVisitorId() {
-  if (window.crypto && typeof window.crypto.randomUUID === "function") {
+  if (window.crypto && typeof window.crypto.randomUUID === 'function') {
     return window.crypto.randomUUID();
   }
   const rand = Math.random().toString(36).slice(2);
@@ -57,15 +57,14 @@ function getVisitorId() {
 function buildPayload() {
   return {
     visitorId,
-    path: context.path || "",
-    title: context.title || "",
-    origin: context.origin || "",
-    referrer: context.referrer || "",
-    seriesId: context.seriesId || "",
-    entryTitle: context.entryTitle || "",
-    entryLabel: context.entryLabel || "",
-    pageNumber:
-      typeof context.pageNumber === "number" ? context.pageNumber : null,
+    path: context.path || '',
+    title: context.title || '',
+    origin: context.origin || '',
+    referrer: context.referrer || '',
+    seriesId: context.seriesId || '',
+    entryTitle: context.entryTitle || '',
+    entryLabel: context.entryLabel || '',
+    pageNumber: typeof context.pageNumber === 'number' ? context.pageNumber : null,
   };
 }
 
@@ -78,15 +77,15 @@ function sendUpdate({ force = false, keepalive = false } = {}) {
   const payload = buildPayload();
   if (navigator.sendBeacon) {
     const blob = new Blob([JSON.stringify(payload)], {
-      type: "application/json",
+      type: 'application/json',
     });
     navigator.sendBeacon(TRACK_ENDPOINT, blob);
     return;
   }
   fetch(TRACK_ENDPOINT, {
-    method: "POST",
-    credentials: "same-origin",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
     keepalive,
   }).catch(() => {});
@@ -96,19 +95,13 @@ function updateContext(partial) {
   context = { ...context, ...partial };
 }
 
-export function setLiveReaderContext({
-  seriesId,
-  entryTitle,
-  entryLabel,
-  pageNumber,
-} = {}) {
+export function setLiveReaderContext({ seriesId, entryTitle, entryLabel, pageNumber } = {}) {
   if (!started || !canTrack()) return;
   updateContext({
     seriesId: seriesId || context.seriesId,
     entryTitle: entryTitle || context.entryTitle,
     entryLabel: entryLabel || context.entryLabel,
-    pageNumber:
-      typeof pageNumber === "number" ? pageNumber : context.pageNumber,
+    pageNumber: typeof pageNumber === 'number' ? pageNumber : context.pageNumber,
   });
   sendUpdate();
 }
@@ -124,10 +117,10 @@ export function initLiveTracking() {
   started = true;
   visitorId = getVisitorId();
   updateContext({
-    path: `${window.location.pathname}${window.location.search || ""}`,
-    title: document.title || "",
-    origin: window.location.origin || "",
-    referrer: document.referrer || "",
+    path: `${window.location.pathname}${window.location.search || ''}`,
+    title: document.title || '',
+    origin: window.location.origin || '',
+    referrer: document.referrer || '',
   });
   sendUpdate({ force: true });
 
@@ -135,13 +128,13 @@ export function initLiveTracking() {
     sendUpdate();
   }, HEARTBEAT_MS);
 
-  window.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden") {
+  window.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
       sendUpdate({ force: true, keepalive: true });
     }
   });
 
-  window.addEventListener("pagehide", () => {
+  window.addEventListener('pagehide', () => {
     sendUpdate({ force: true, keepalive: true });
   });
 }

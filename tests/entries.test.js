@@ -7,7 +7,7 @@ import {
   extractEntryNumber,
   sortEntryNames,
   sortEntryNamesWithMeta,
-  sanitizeEntries
+  sanitizeEntries,
 } from '../reader/entries.js';
 
 describe('extractEntryNumber', () => {
@@ -65,7 +65,7 @@ describe('sanitizeEntries', () => {
   it('normalizes entry data and preserves sortable order', () => {
     const input = {
       'Entry 1': ['page1.png', 'page2.png'],
-      'Entry 2': ['page1.png']
+      'Entry 2': ['page1.png'],
     };
 
     const result = sanitizeEntries(input);
@@ -78,7 +78,7 @@ describe('sanitizeEntries', () => {
     const input = {
       'Entry 1': ['page1.png'],
       'Empty Entry': [],
-      'Entry 2': ['page1.png']
+      'Entry 2': ['page1.png'],
     };
 
     const result = sanitizeEntries(input);
@@ -90,10 +90,10 @@ describe('sanitizeEntries', () => {
 
   it('keeps empty entries when metadata requires them', () => {
     const input = {
-      'Store Release': []
+      'Store Release': [],
     };
     const meta = {
-      'Store Release': { releaseType: 'store' }
+      'Store Release': { releaseType: 'store' },
     };
 
     const result = sanitizeEntries(input, meta);
@@ -103,7 +103,7 @@ describe('sanitizeEntries', () => {
 
   it('trims whitespace and filters falsy pages', () => {
     const input = {
-      '  Entry 1  ': ['page1.png', null, '', 'page2.png', undefined]
+      '  Entry 1  ': ['page1.png', null, '', 'page2.png', undefined],
     };
 
     const result = sanitizeEntries(input);
@@ -116,13 +116,13 @@ describe('sanitizeEntries', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const input = {
       'Entry 1': ['page1.png'],
-      'entry 1': ['page2.png']
+      'entry 1': ['page2.png'],
     };
 
     const result = sanitizeEntries(input);
 
     expect(result.chapters).toEqual({
-      'Entry 1': ['page1.png']
+      'Entry 1': ['page1.png'],
     });
     expect(warnSpy).toHaveBeenCalledWith('Duplicate entry name ignored: entry 1');
     warnSpy.mockRestore();
@@ -135,24 +135,16 @@ describe('sortEntryNamesWithMeta', () => {
     const meta = {
       'Start Here': { displayNumber: 1 },
       'Issue 2': { displayNumber: 2 },
-      'Issue 10': { displayNumber: 10 }
+      'Issue 10': { displayNumber: 10 },
     };
 
-    expect(sortEntryNamesWithMeta(names, meta)).toEqual([
-      'Start Here',
-      'Issue 2',
-      'Issue 10'
-    ]);
+    expect(sortEntryNamesWithMeta(names, meta)).toEqual(['Start Here', 'Issue 2', 'Issue 10']);
   });
 
   it('falls back to name sorting when displayNumber is missing', () => {
     const names = ['Bonus', 'Issue 2', 'Issue 10'];
     const meta = { 'Issue 10': { displayNumber: 10 } };
 
-    expect(sortEntryNamesWithMeta(names, meta)).toEqual([
-      'Issue 10',
-      'Issue 2',
-      'Bonus'
-    ]);
+    expect(sortEntryNamesWithMeta(names, meta)).toEqual(['Issue 10', 'Issue 2', 'Bonus']);
   });
 });

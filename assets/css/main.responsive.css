@@ -1,485 +1,482 @@
-    @media (max-aspect-ratio: 7/5) {
-
-      html,
-      body {
-        height: auto;
-        overflow-x: hidden;
-        overflow-y: auto;
-      }
-
-      main {
-        height: auto;
-        overflow: visible;
-      }
-
-      .viewerWrap {
-        flex-direction: row;
-        flex-wrap: wrap;
-        padding: 12px;
-        gap: 12px;
-      }
-
-      /* Wrapper contains viewport + controls, ordered as a unit in mobile layout */
-      .viewer-content-wrapper {
-        order: 1;
-        width: 100%;
-        flex: 0 0 100%;
-      }
-
-      /* Viewport and controls use natural document flow within wrapper */
-      .viewport {
-        width: 100%;
-        height: auto;
-        aspect-ratio: auto;
-        min-height: 50vh;
-      }
-
-      .controls {
-        margin: 12px 0 12px 0;
-        padding: 12px 8px;
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: 8px;
-        max-width: 100%;
-        border-width: 3px;
-      }
-
-      .controls .left,
-      .controls .right {
-        gap: 6px;
-      }
-
-      .side-panel {
-        width: calc(50% - 6px) !important;
-        min-width: 0 !important;
-        max-width: none !important;
-        min-height: auto;
-        flex: 0 0 calc(50% - 6px) !important;
-      }
-
-      .side-panel.left {
-        order: 2;
-        height: auto;
-        min-height: 580px;
-        align-self: stretch;
-      }
-
-      .side-panel.left .left-panel-content {
-        padding: 12px;
-        gap: 8px;
-      }
-
-      .side-panel.left .left-panel-text-top {
-        font-size: 18px;
-      }
-
-      .side-panel.left .left-panel-text-bottom {
-        font-size: 11px;
-      }
-
-      .email-signup-section {
-        gap: 8px;
-        margin-top: 4px;
-      }
-
-      .email-signup-label {
-        font-size: 14px;
-      }
-
-      .email-input {
-        max-width: 100%;
-        font-size: 13px;
-        padding: 8px 10px;
-      }
-
-      .email-submit-btn {
-        font-size: 16px;
-        padding: 8px 24px;
-      }
-
-      .email-signup-cta {
-        font-size: 13px;
-      }
-
-      .side-panel.right {
-        order: 3;
-        flex-direction: column;
-        padding: 12px 12px 76px;
-        height: auto;
-        min-height: 320px;
-        align-self: stretch;
-      }
-
-      .side-panel.right .preview {
-        width: 100%;
-        max-height: 0;
-        height: 0;
-        min-height: 0;
-        margin: 0;
-        display: none;
-      }
-
-      .panel-buttons {
-        flex-direction: column;
-        padding: 0;
-        gap: 8px;
-        min-height: 0;
-        max-height: none;
-        margin-top: 0;
-        flex: 1 1 auto;
-      }
-
-      .panel-btn {
-        flex: 1 1 auto;
-        width: 100%;
-        min-width: 0;
-        box-sizing: border-box;
-        padding: 8px 10px;
-      }
-
-      .edgeZone {
-        width: 18%;
-      }
-
-    }
-
-    /* Very narrow/portrait - single column layout */
-    @media (max-aspect-ratio: 5/7) {
-      .viewport {
-        min-height: 40vh;
-      }
-
-      .side-panel.left {
-        height: 180px;
-      }
-
-      .side-panel.left .left-panel-content {
-        padding: 8px;
-        gap: 6px;
-      }
-
-      .side-panel.left .left-panel-text-top {
-        font-size: 16px;
-      }
-
-      .side-panel.left .left-panel-text-bottom {
-        font-size: 10px;
-      }
-
-      .email-signup-section {
-        gap: 6px;
-      }
-
-      .email-signup-label {
-        font-size: 12px;
-      }
-
-      .email-input {
-        font-size: 12px;
-        padding: 7px 8px;
-      }
-
-      .email-submit-btn {
-        font-size: 14px;
-        padding: 7px 20px;
-      }
-
-      .email-signup-cta {
-        font-size: 12px;
-      }
-
-      .side-panel.right {
-        flex-direction: column;
-        padding-bottom: 76px;
-        min-height: 340px;
-      }
-
-      .side-panel.right .preview {
-        width: 100%;
-        height: 160px;
-      }
-
-      .panel-buttons {
-        flex-direction: column;
-      }
-
-      .panel-btn {
-        flex: 1 1 auto;
-        width: 100%;
-        min-width: 0;
-        box-sizing: border-box;
-        padding: 8px 10px;
-        gap: 8px;
-      }
-
-      .controls {
-        padding: 8px 4px;
-        gap: 4px;
-      }
-
-      .controls .left,
-      .controls .right {
-        gap: 3px;
-      }
-
-
-      .btn {
-        height: 40px;
-        min-width: 40px;
-        padding: 0 8px;
-        font-size: 12px;
-      }
-
-      .btn.primary {
-        padding: 0 10px;
-      }
-
-      .status {
-        font-size: 11px;
-        padding: 6px 6px;
-      }
-    }
-
-    /* Smaller side panels on medium screens */
-    @media (max-width: 1400px) {
-      .side-panel {
-        width: 18vw;
-        min-width: 220px;
-      }
-    }
-
-    @media (max-width: 900px) {
-      .status-panel {
-        padding: 3px 6px;
-        max-width: 170px;
-        font-size: 11px;
-      }
-
-      .status-text {
-        max-width: 120px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-    }
-
-    @media (max-width: 620px) {
-      .status-panel {
-        max-width: 120px;
-        font-size: 10px;
-      }
-
-      .status-text {
-        max-width: 80px;
-      }
-    }
-
-    /* ==================== MOBILE HEADER LAYOUT ==================== */
-
-    @media (max-width: 768px) {
-      header.topbar {
-        position: relative;
-        display: flex;
-        flex-direction: column;
-        padding: 4px 8px;
-        gap: 4px;
-      }
-
-      /* Row 1: Brand aligned left */
-      .brand {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        align-self: flex-start;
-      }
-
-      .brand .logo {
-        width: 36px;
-        height: 36px;
-        font-size: 18px;
-      }
-
-      .title h1 {
-        font-size: 16px;
-        letter-spacing: 1px;
-      }
-
-      .title .subtitle {
-        font-size: 8px;
-      }
-
-      /* Status panel: right side of row 1 */
-      .status-panel {
-        position: absolute;
-        top: 4px;
-        right: 8px;
-        text-align: right;
-        font-size: 10px;
-        max-width: calc(100% - 100px);
-      }
-
-      .status-text {
-        max-width: none;
-      }
-
-      /* Row 2: All buttons in one row */
-      .header-actions {
-        display: flex;
-        flex-wrap: nowrap;
-        gap: 4px;
-        align-items: center;
-        width: 100%;
-      }
-
-      .entry-controls {
-        display: flex;
-        flex-direction: row;
-        gap: 4px;
-        min-width: 0;
-        flex: 0 1 auto;
-      }
-
-      .entry-controls .entry-select {
-        flex: 1 1 auto;
-        min-width: 80px;
-      }
-
-      .entry-controls .entry-select-trigger {
-        padding: 1px 5px;
-        font-size: 12px;
-        min-width: auto;
-        gap: 4px;
-      }
-
-      .entry-controls .entry-covers-btn {
-        padding: 1px 11px 1px 6px;
-        font-size: 12px;
-        white-space: nowrap;
-        flex-shrink: 0;
-        min-width: auto;
-      }
-
-      /* Nav-links: row-reverse so Admin pushes Comics left */
-      .nav-links {
-        display: flex;
-        flex-direction: row-reverse;
-        gap: 4px;
-        flex-shrink: 0;
-        margin-left: auto;
-      }
-
-      .nav-links .nav-link {
-        padding: 5px 8px;
-        font-size: 10px;
-        white-space: nowrap;
-      }
-
-      /* Reduce space between header and reader */
-      .viewerWrap {
-        padding: 6px 6px 0 6px;
-      }
-
-      /* Thinner reader border */
-      .viewport {
-        border-width: 2px;
-      }
-
-      /* Reduce space between reader and controls */
-      .controls {
-        margin: 6px auto 8px auto;
-        padding: 8px 10px;
-      }
-    }
-
-    @media (max-width: 480px) {
-      header.topbar {
-        padding: 3px 6px;
-        gap: 3px;
-      }
-
-      .brand .logo {
-        width: 32px;
-        height: 32px;
-        font-size: 16px;
-      }
-
-      .title h1 {
-        font-size: 14px;
-        letter-spacing: 1px;
-      }
-
-      .status-panel {
-        top: 3px;
-        right: 6px;
-        font-size: 9px;
-        max-width: calc(100% - 95px);
-      }
-
-      .status-text {
-        max-width: none;
-      }
-
-      .entry-controls .entry-select {
-        min-width: 70px;
-      }
-
-      .entry-controls .entry-select-trigger {
-        font-size: 11px;
-        padding: 1px 4px;
-        min-width: auto;
-        gap: 3px;
-      }
-
-      .entry-controls .entry-covers-btn {
-        font-size: 11px;
-        padding: 1px 10px 1px 5px;
-        min-width: auto;
-      }
-
-      .nav-links .nav-link {
-        padding: 4px 6px;
-        font-size: 9px;
-      }
-
-      .viewerWrap {
-        padding: 4px 4px 0 4px;
-      }
-
-      .controls {
-        margin: 4px auto 6px auto;
-        padding: 6px 8px;
-      }
-    }
-
-    /* Smartphone-only: entry gallery 2-column + full covers */
-    @media (max-width: 600px) and (pointer: coarse) {
-      .entry-cover-gallery-panel {
-        width: 94vw;
-        max-width: none;
-        height: 90vh;
-        max-height: 90vh;
-        padding: 16px;
-        overflow: hidden;
-      }
-
-      .entry-cover-gallery-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 10px;
-        padding: 6px;
-        flex: 1 1 auto;
-        min-height: 0;
-      }
-
-      .entry-thumb-wrap {
-        width: 100%;
-        aspect-ratio: 2 / 3;
-        overflow: hidden;
-      }
-
-      .entry-thumb {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        display: block;
-        background: #000;
-      }
-    }
+@media (max-aspect-ratio: 7/5) {
+  html,
+  body {
+    height: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  main {
+    height: auto;
+    overflow: visible;
+  }
+
+  .viewerWrap {
+    flex-direction: row;
+    flex-wrap: wrap;
+    padding: 12px;
+    gap: 12px;
+  }
+
+  /* Wrapper contains viewport + controls, ordered as a unit in mobile layout */
+  .viewer-content-wrapper {
+    order: 1;
+    width: 100%;
+    flex: 0 0 100%;
+  }
+
+  /* Viewport and controls use natural document flow within wrapper */
+  .viewport {
+    width: 100%;
+    height: auto;
+    aspect-ratio: auto;
+    min-height: 50vh;
+  }
+
+  .controls {
+    margin: 12px 0 12px 0;
+    padding: 12px 8px;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+    max-width: 100%;
+    border-width: 3px;
+  }
+
+  .controls .left,
+  .controls .right {
+    gap: 6px;
+  }
+
+  .side-panel {
+    width: calc(50% - 6px) !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    min-height: auto;
+    flex: 0 0 calc(50% - 6px) !important;
+  }
+
+  .side-panel.left {
+    order: 2;
+    height: auto;
+    min-height: 580px;
+    align-self: stretch;
+  }
+
+  .side-panel.left .left-panel-content {
+    padding: 12px;
+    gap: 8px;
+  }
+
+  .side-panel.left .left-panel-text-top {
+    font-size: 18px;
+  }
+
+  .side-panel.left .left-panel-text-bottom {
+    font-size: 11px;
+  }
+
+  .email-signup-section {
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .email-signup-label {
+    font-size: 14px;
+  }
+
+  .email-input {
+    max-width: 100%;
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+
+  .email-submit-btn {
+    font-size: 16px;
+    padding: 8px 24px;
+  }
+
+  .email-signup-cta {
+    font-size: 13px;
+  }
+
+  .side-panel.right {
+    order: 3;
+    flex-direction: column;
+    padding: 12px 12px 76px;
+    height: auto;
+    min-height: 320px;
+    align-self: stretch;
+  }
+
+  .side-panel.right .preview {
+    width: 100%;
+    max-height: 0;
+    height: 0;
+    min-height: 0;
+    margin: 0;
+    display: none;
+  }
+
+  .panel-buttons {
+    flex-direction: column;
+    padding: 0;
+    gap: 8px;
+    min-height: 0;
+    max-height: none;
+    margin-top: 0;
+    flex: 1 1 auto;
+  }
+
+  .panel-btn {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 8px 10px;
+  }
+
+  .edgeZone {
+    width: 18%;
+  }
+}
+
+/* Very narrow/portrait - single column layout */
+@media (max-aspect-ratio: 5/7) {
+  .viewport {
+    min-height: 40vh;
+  }
+
+  .side-panel.left {
+    height: 180px;
+  }
+
+  .side-panel.left .left-panel-content {
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .side-panel.left .left-panel-text-top {
+    font-size: 16px;
+  }
+
+  .side-panel.left .left-panel-text-bottom {
+    font-size: 10px;
+  }
+
+  .email-signup-section {
+    gap: 6px;
+  }
+
+  .email-signup-label {
+    font-size: 12px;
+  }
+
+  .email-input {
+    font-size: 12px;
+    padding: 7px 8px;
+  }
+
+  .email-submit-btn {
+    font-size: 14px;
+    padding: 7px 20px;
+  }
+
+  .email-signup-cta {
+    font-size: 12px;
+  }
+
+  .side-panel.right {
+    flex-direction: column;
+    padding-bottom: 76px;
+    min-height: 340px;
+  }
+
+  .side-panel.right .preview {
+    width: 100%;
+    height: 160px;
+  }
+
+  .panel-buttons {
+    flex-direction: column;
+  }
+
+  .panel-btn {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    gap: 8px;
+  }
+
+  .controls {
+    padding: 8px 4px;
+    gap: 4px;
+  }
+
+  .controls .left,
+  .controls .right {
+    gap: 3px;
+  }
+
+  .btn {
+    height: 40px;
+    min-width: 40px;
+    padding: 0 8px;
+    font-size: 12px;
+  }
+
+  .btn.primary {
+    padding: 0 10px;
+  }
+
+  .status {
+    font-size: 11px;
+    padding: 6px 6px;
+  }
+}
+
+/* Smaller side panels on medium screens */
+@media (max-width: 1400px) {
+  .side-panel {
+    width: 18vw;
+    min-width: 220px;
+  }
+}
+
+@media (max-width: 900px) {
+  .status-panel {
+    padding: 3px 6px;
+    max-width: 170px;
+    font-size: 11px;
+  }
+
+  .status-text {
+    max-width: 120px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+@media (max-width: 620px) {
+  .status-panel {
+    max-width: 120px;
+    font-size: 10px;
+  }
+
+  .status-text {
+    max-width: 80px;
+  }
+}
+
+/* ==================== MOBILE HEADER LAYOUT ==================== */
+
+@media (max-width: 768px) {
+  header.topbar {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    padding: 4px 8px;
+    gap: 4px;
+  }
+
+  /* Row 1: Brand aligned left */
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    align-self: flex-start;
+  }
+
+  .brand .logo {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+
+  .title h1 {
+    font-size: 16px;
+    letter-spacing: 1px;
+  }
+
+  .title .subtitle {
+    font-size: 8px;
+  }
+
+  /* Status panel: right side of row 1 */
+  .status-panel {
+    position: absolute;
+    top: 4px;
+    right: 8px;
+    text-align: right;
+    font-size: 10px;
+    max-width: calc(100% - 100px);
+  }
+
+  .status-text {
+    max-width: none;
+  }
+
+  /* Row 2: All buttons in one row */
+  .header-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 4px;
+    align-items: center;
+    width: 100%;
+  }
+
+  .entry-controls {
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    min-width: 0;
+    flex: 0 1 auto;
+  }
+
+  .entry-controls .entry-select {
+    flex: 1 1 auto;
+    min-width: 80px;
+  }
+
+  .entry-controls .entry-select-trigger {
+    padding: 1px 5px;
+    font-size: 12px;
+    min-width: auto;
+    gap: 4px;
+  }
+
+  .entry-controls .entry-covers-btn {
+    padding: 1px 11px 1px 6px;
+    font-size: 12px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: auto;
+  }
+
+  /* Nav-links: row-reverse so Admin pushes Comics left */
+  .nav-links {
+    display: flex;
+    flex-direction: row-reverse;
+    gap: 4px;
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+
+  .nav-links .nav-link {
+    padding: 5px 8px;
+    font-size: 10px;
+    white-space: nowrap;
+  }
+
+  /* Reduce space between header and reader */
+  .viewerWrap {
+    padding: 6px 6px 0 6px;
+  }
+
+  /* Thinner reader border */
+  .viewport {
+    border-width: 2px;
+  }
+
+  /* Reduce space between reader and controls */
+  .controls {
+    margin: 6px auto 8px auto;
+    padding: 8px 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  header.topbar {
+    padding: 3px 6px;
+    gap: 3px;
+  }
+
+  .brand .logo {
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+  }
+
+  .title h1 {
+    font-size: 14px;
+    letter-spacing: 1px;
+  }
+
+  .status-panel {
+    top: 3px;
+    right: 6px;
+    font-size: 9px;
+    max-width: calc(100% - 95px);
+  }
+
+  .status-text {
+    max-width: none;
+  }
+
+  .entry-controls .entry-select {
+    min-width: 70px;
+  }
+
+  .entry-controls .entry-select-trigger {
+    font-size: 11px;
+    padding: 1px 4px;
+    min-width: auto;
+    gap: 3px;
+  }
+
+  .entry-controls .entry-covers-btn {
+    font-size: 11px;
+    padding: 1px 10px 1px 5px;
+    min-width: auto;
+  }
+
+  .nav-links .nav-link {
+    padding: 4px 6px;
+    font-size: 9px;
+  }
+
+  .viewerWrap {
+    padding: 4px 4px 0 4px;
+  }
+
+  .controls {
+    margin: 4px auto 6px auto;
+    padding: 6px 8px;
+  }
+}
+
+/* Smartphone-only: entry gallery 2-column + full covers */
+@media (max-width: 600px) and (pointer: coarse) {
+  .entry-cover-gallery-panel {
+    width: 94vw;
+    max-width: none;
+    height: 90vh;
+    max-height: 90vh;
+    padding: 16px;
+    overflow: hidden;
+  }
+
+  .entry-cover-gallery-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 6px;
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .entry-thumb-wrap {
+    width: 100%;
+    aspect-ratio: 2 / 3;
+    overflow: hidden;
+  }
+
+  .entry-thumb {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    background: #000;
+  }
+}

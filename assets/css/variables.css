@@ -4,69 +4,67 @@
  */
 
 :root {
-    /* ==================== COLORS ==================== */
-    --primary: #00d9ff;
-    --secondary: #ff00ea;
-    --accent: #ffed00;
-    --bg-dark: #0a0a12;
-    --bg-panel: #1a1a2e;
-    --text: #ffffff;
-    --danger: #ff3838;
+  /* ==================== COLORS ==================== */
+  --primary: #00d9ff;
+  --secondary: #ff00ea;
+  --accent: #ffed00;
+  --bg-dark: #0a0a12;
+  --bg-panel: #1a1a2e;
+  --text: #ffffff;
+  --danger: #ff3838;
 
-    /* ==================== SPACING ==================== */
-    --spacing-xs: 4px;
-    --spacing-sm: 8px;
-    --spacing-md: 16px;
-    --spacing-lg: 24px;
-    --spacing-xl: 32px;
-    --spacing-2xl: 48px;
+  /* ==================== SPACING ==================== */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
 
-    /* ==================== TYPOGRAPHY ==================== */
-    --font-primary: 'Righteous', cursive;
-    --font-secondary: 'Bebas Neue', cursive;
-    --font-size-sm: 0.875rem;
-    --font-size-base: 1rem;
-    --font-size-lg: 1.125rem;
-    --font-size-xl: 1.25rem;
-    --font-size-2xl: 1.5rem;
-    --font-size-3xl: 2rem;
+  /* ==================== TYPOGRAPHY ==================== */
+  --font-primary: 'Righteous', cursive;
+  --font-secondary: 'Bebas Neue', cursive;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-size-3xl: 2rem;
 
-    /* ==================== TRANSITIONS ==================== */
-    --transition-fast: 0.15s ease;
-    --transition-normal: 0.25s ease;
-    --transition-slow: 0.4s ease;
+  /* ==================== TRANSITIONS ==================== */
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.25s ease;
+  --transition-slow: 0.4s ease;
 
-    /* ==================== BORDERS ==================== */
-    --border-radius-sm: 5px;
-    --border-radius-md: 8px;
-    --border-radius-lg: 12px;
-    --border-width: 2px;
+  /* ==================== BORDERS ==================== */
+  --border-radius-sm: 5px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 12px;
+  --border-width: 2px;
 
-    /* ==================== SHADOWS ==================== */
-    --shadow-neon: 0 0 10px rgba(0, 217, 255, 0.3);
-    --shadow-glow: 0 0 20px rgba(255, 0, 234, 0.3);
-    --shadow-button:
-        0 4px 0 rgba(0, 0, 0, 0.3),
-        0 0 16px rgba(0, 217, 255, 0.35),
-        0 0 14px rgba(255, 0, 234, 0.25);
+  /* ==================== SHADOWS ==================== */
+  --shadow-neon: 0 0 10px rgba(0, 217, 255, 0.3);
+  --shadow-glow: 0 0 20px rgba(255, 0, 234, 0.3);
+  --shadow-button:
+    0 4px 0 rgba(0, 0, 0, 0.3), 0 0 16px rgba(0, 217, 255, 0.35), 0 0 14px rgba(255, 0, 234, 0.25);
 
-    /* ==================== Z-INDEX ==================== */
-    --z-base: 0;
-    --z-overlay: 1;
-    --z-modal: 100;
-    --z-tooltip: 200;
+  /* ==================== Z-INDEX ==================== */
+  --z-base: 0;
+  --z-overlay: 1;
+  --z-modal: 100;
+  --z-tooltip: 200;
 
-    /* ==================== BREAKPOINTS (for JS) ==================== */
-    --breakpoint-mobile: 768px;
-    --breakpoint-tablet: 1024px;
-    --breakpoint-desktop: 1280px;
+  /* ==================== BREAKPOINTS (for JS) ==================== */
+  --breakpoint-mobile: 768px;
+  --breakpoint-tablet: 1024px;
+  --breakpoint-desktop: 1280px;
 }
 
 /* ==================== ACCESSIBILITY ==================== */
 @media (prefers-reduced-motion: reduce) {
-    :root {
-        --transition-fast: 0s;
-        --transition-normal: 0s;
-        --transition-slow: 0s;
-    }
+  :root {
+    --transition-fast: 0s;
+    --transition-normal: 0s;
+    --transition-slow: 0s;
+  }
 }

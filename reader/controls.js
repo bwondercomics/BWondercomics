@@ -46,9 +46,7 @@ export function nextPage() {
 
   let newIndex;
   if (twoPageMode) {
-    newIndex = state.pageIndex + 2 >= total
-      ? total - 1
-      : state.pageIndex + 2;
+    newIndex = state.pageIndex + 2 >= total ? total - 1 : state.pageIndex + 2;
   } else {
     newIndex = Math.min(total - 1, state.pageIndex + 1);
   }
@@ -98,7 +96,12 @@ function animatePageChange(direction, onMid) {
   state.isTransitioning = true;
   const duration = CONFIG.ANIMATION_DURATION;
 
-  el.stageWrap.classList.remove('slide-in-left', 'slide-in-right', 'slide-out-left', 'slide-out-right');
+  el.stageWrap.classList.remove(
+    'slide-in-left',
+    'slide-in-right',
+    'slide-out-left',
+    'slide-out-right'
+  );
   void el.stageWrap.offsetWidth;
 
   const slideOut = direction === 'next' ? 'slide-out-left' : 'slide-out-right';

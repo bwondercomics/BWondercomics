@@ -9,14 +9,14 @@ describe('calculateOnPageFrameSize', () => {
       availableWidth: 900,
       availableHeight: 600,
       pageHorizontalChrome: 6,
-      pageVerticalChrome: 6
+      pageVerticalChrome: 6,
     });
     const landscape = calculateOnPageFrameSize({
       pages: [{ width: 1600, height: 900 }],
       availableWidth: 900,
       availableHeight: 600,
       pageHorizontalChrome: 6,
-      pageVerticalChrome: 6
+      pageVerticalChrome: 6,
     });
 
     expect(portrait).not.toBeNull();
@@ -31,18 +31,18 @@ describe('calculateOnPageFrameSize', () => {
       availableWidth: 1200,
       availableHeight: 600,
       pageHorizontalChrome: 6,
-      pageVerticalChrome: 6
+      pageVerticalChrome: 6,
     });
     const spread = calculateOnPageFrameSize({
       pages: [
         { width: 600, height: 900 },
-        { width: 600, height: 900 }
+        { width: 600, height: 900 },
       ],
       availableWidth: 1200,
       availableHeight: 600,
       gap: 8,
       pageHorizontalChrome: 6,
-      pageVerticalChrome: 6
+      pageVerticalChrome: 6,
     });
 
     expect(single).not.toBeNull();
@@ -54,16 +54,13 @@ describe('calculateOnPageFrameSize', () => {
   it('falls back to the previous frame when a visible page metric is missing', () => {
     const fallback = { width: 420, height: 610 };
     const frame = calculateOnPageFrameSize({
-      pages: [
-        { width: 600, height: 900 },
-        null
-      ],
+      pages: [{ width: 600, height: 900 }, null],
       availableWidth: 1000,
       availableHeight: 700,
       gap: 8,
       pageHorizontalChrome: 6,
       pageVerticalChrome: 6,
-      fallbackFrame: fallback
+      fallbackFrame: fallback,
     });
 
     expect(frame).toEqual(fallback);

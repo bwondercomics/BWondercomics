@@ -5,7 +5,7 @@ import {
   ensureChapterFolder,
   getChapterFolder,
   normalizePages,
-  pagesEqual
+  pagesEqual,
 } from './utils.js';
 
 /**
@@ -23,17 +23,22 @@ export function createEntriesApi({
   getSaveFilename,
   getChaptersRoot,
   getStorageKey,
-  STORAGE_KEY
+  STORAGE_KEY,
 }) {
-  const getBaseRoot = () => (typeof getChaptersRoot === 'function' ? getChaptersRoot() : 'chapters');
+  const getBaseRoot = () =>
+    typeof getChaptersRoot === 'function' ? getChaptersRoot() : 'chapters';
   const getRootForLabel = (labelId = null) => {
     const base = getBaseRoot();
-    const label = getEntryLabels().find((item) => item && item.id === labelId) || getActiveEntryLabel();
+    const label =
+      getEntryLabels().find((item) => item && item.id === labelId) || getActiveEntryLabel();
     const slug = label?.slug ? String(label.slug).trim().replace(/^\/+/, '') : '';
     if (!slug) return base;
     return `${String(base || 'chapters').replace(/\/+$/g, '')}/${slug}`;
   };
-  const normalizeRoot = (value = '') => String(value || '').replace(/^\/+/, '').replace(/\/+$/, '');
+  const normalizeRoot = (value = '') =>
+    String(value || '')
+      .replace(/^\/+/, '')
+      .replace(/\/+$/, '');
   const stripProtectedPrefix = (value = '') => normalizeRoot(value).replace(/^protected\//, '');
   const isEntryPremium = (entryName, override) => {
     if (typeof override === 'boolean') return override || !!state.premiumOnly;
@@ -68,7 +73,8 @@ export function createEntriesApi({
     return paths.map((path) => replaceRootPrefix(path, cleanFrom, toRoot));
   };
   const getDataUrl = () => (typeof getDataFileUrl === 'function' ? getDataFileUrl() : 'data.json');
-  const getSaveFile = () => (typeof getSaveFilename === 'function' ? getSaveFilename() : 'admin/data.json');
+  const getSaveFile = () =>
+    typeof getSaveFilename === 'function' ? getSaveFilename() : 'admin/data.json';
   const getStorage = () => (typeof getStorageKey === 'function' ? getStorageKey() : STORAGE_KEY);
   const labels = () => {
     const fallback = { singular: 'Entry', plural: 'Entries' };
@@ -76,7 +82,7 @@ export function createEntriesApi({
     if (activeLabel) {
       return {
         singular: String(activeLabel.singular || '').trim() || fallback.singular,
-        plural: String(activeLabel.plural || '').trim() || fallback.plural
+        plural: String(activeLabel.plural || '').trim() || fallback.plural,
       };
     }
     if (typeof getUnitLabels !== 'function') return fallback;
@@ -92,12 +98,13 @@ export function createEntriesApi({
 
   const getEntryLabels = () => (Array.isArray(state.entryLabels) ? state.entryLabels : []);
   const getEntryNames = () => Object.keys(state.entries || {});
-  const getEntryIds = () => getEntryNames()
-    .map((name) => {
-      const meta = state.entryMeta?.[name] || {};
-      return meta.entryId || meta.entry_id || null;
-    })
-    .filter(Boolean);
+  const getEntryIds = () =>
+    getEntryNames()
+      .map((name) => {
+        const meta = state.entryMeta?.[name] || {};
+        return meta.entryId || meta.entry_id || null;
+      })
+      .filter(Boolean);
   const snapshotLoadedEntries = () => {
     state.loadedEntries = getEntryNames();
     state.loadedEntryIds = getEntryIds();
@@ -128,12 +135,14 @@ export function createEntriesApi({
   };
 
   const slugifyLabel = (value) => {
-    return String(value || '')
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9_-]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-      .slice(0, 64) || 'entry';
+    return (
+      String(value || '')
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_-]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 64) || 'entry'
+    );
   };
 
   const ensureUniqueSlug = (base) => {
@@ -150,7 +159,9 @@ export function createEntriesApi({
 
   const STATUS_VALUES = new Set(['published', 'scheduled', 'draft']);
   const normalizeEntryStatus = (raw) => {
-    const value = String(raw || '').trim().toLowerCase();
+    const value = String(raw || '')
+      .trim()
+      .toLowerCase();
     return STATUS_VALUES.has(value) ? value : 'published';
   };
 
@@ -222,7 +233,8 @@ export function createEntriesApi({
   let bottomSpacerEl = null;
   let moveModeEnabled = false;
 
-  const isValidIndex = (value, arr = []) => Number.isInteger(value) && value >= 0 && value < arr.length;
+  const isValidIndex = (value, arr = []) =>
+    Number.isInteger(value) && value >= 0 && value < arr.length;
   const isReorderActive = () => isValidIndex(selectedPageIndex, state.currentPages || []);
 
   const resolvePageSrc = (src = '') => {
@@ -284,10 +296,13 @@ export function createEntriesApi({
   function queueCaretForward(forward, delayMs = 0) {
     if (!el.insertCaret) return;
     if (caretForwardTimer) window.clearTimeout(caretForwardTimer);
-    caretForwardTimer = window.setTimeout(() => {
-      caretForwardTimer = null;
-      setCaretForward(forward);
-    }, Math.max(0, delayMs || 0));
+    caretForwardTimer = window.setTimeout(
+      () => {
+        caretForwardTimer = null;
+        setCaretForward(forward);
+      },
+      Math.max(0, delayMs || 0)
+    );
   }
 
   function setMoveModeEnabled(enabled, { rerender = true } = {}) {
@@ -324,7 +339,7 @@ export function createEntriesApi({
     const listRect = el.pageList.getBoundingClientRect();
     // Use offsetTop directly as pageList is the positioned container
     const relativeTop = item.offsetTop;
-    const perfectCenter = relativeTop - (listRect.height / 2) + (itemRect.height / 2);
+    const perfectCenter = relativeTop - listRect.height / 2 + itemRect.height / 2;
 
     // "Nudge" logic: Move only 25% of the way to the center
     // This gives tactile feedback of selection without losing context
@@ -334,7 +349,7 @@ export function createEntriesApi({
 
     el.pageList.scrollTo({
       top: Math.max(0, currentScroll + nudgeAmount),
-      behavior: 'smooth'
+      behavior: 'smooth',
     });
   }
 
@@ -375,7 +390,7 @@ export function createEntriesApi({
   function isDragClickLocked() {
     if (isDraggingScroll) return true;
     if (!dragReleaseAt) return false;
-    return (Date.now() - dragReleaseAt) < dragClickLockoutMs;
+    return Date.now() - dragReleaseAt < dragClickLockoutMs;
   }
 
   function initDragToScroll() {
@@ -650,8 +665,10 @@ export function createEntriesApi({
         const data = await response.json();
         const entries = data.entries && typeof data.entries === 'object' ? data.entries : null;
         if (entries) {
-          const entryFolders = data.entryFolders && typeof data.entryFolders === 'object' ? data.entryFolders : {};
-          const entryMeta = data.entryMeta && typeof data.entryMeta === 'object' ? data.entryMeta : {};
+          const entryFolders =
+            data.entryFolders && typeof data.entryFolders === 'object' ? data.entryFolders : {};
+          const entryMeta =
+            data.entryMeta && typeof data.entryMeta === 'object' ? data.entryMeta : {};
 
           state.entries = entries;
           state.entryFolders = entryFolders;
@@ -668,8 +685,8 @@ export function createEntriesApi({
                 plural,
                 slug,
                 sortIndex: 0,
-                isDefault: true
-              }
+                isDefault: true,
+              },
             ];
           }
           setActiveEntryLabel(state.activeEntryLabelId);
@@ -679,7 +696,7 @@ export function createEntriesApi({
           if (removed > 0) {
             await saveEntries(false, { allowDeletions: true, skipDeletionConfirm: true });
           }
-          Object.keys(state.entries).forEach(name => {
+          Object.keys(state.entries).forEach((name) => {
             if (!state.entryFolders[name]) {
               const meta = state.entryMeta?.[name] || {};
               const labelId = meta.entryLabelId || meta.entry_label_id || null;
@@ -690,7 +707,7 @@ export function createEntriesApi({
                   name,
                   state.entries,
                   state.currentPages,
-                  stripProtectedPrefix(root),
+                  stripProtectedPrefix(root)
                 );
               }
               if (inferred) {
@@ -753,8 +770,8 @@ export function createEntriesApi({
           plural: defaults.plural || 'Entries',
           slug,
           sortIndex: 0,
-          isDefault: true
-        }
+          isDefault: true,
+        },
       ];
     }
     setActiveEntryLabel(state.activeEntryLabelId);
@@ -774,7 +791,7 @@ export function createEntriesApi({
           entryMeta: state.entryMeta,
           entryLabels: state.entryLabels,
           premiumOnly: !!state.premiumOnly,
-          statusMessage: state.statusMessage
+          statusMessage: state.statusMessage,
         })
       );
     } catch (error) {
@@ -795,9 +812,10 @@ export function createEntriesApi({
       }
       if (removedCount > 0) {
         const label = labels();
-        const labelText = removedCount === 1
-          ? `1 ${label.singular.toLowerCase()}`
-          : `${removedCount} ${label.plural.toLowerCase()}`;
+        const labelText =
+          removedCount === 1
+            ? `1 ${label.singular.toLowerCase()}`
+            : `${removedCount} ${label.plural.toLowerCase()}`;
         const confirmed = window.confirm(
           `You're about to delete ${labelText} from the database. This cannot be undone. Continue?`
         );
@@ -819,7 +837,7 @@ export function createEntriesApi({
       statusMessage: state.statusMessage,
       premiumOnly: !!state.premiumOnly,
       lastUpdated: new Date().toISOString(),
-      publishedBy: 'Admin Panel'
+      publishedBy: 'Admin Panel',
     };
     if (allowDeletions) {
       payload.allowDeletions = true;
@@ -851,7 +869,9 @@ export function createEntriesApi({
       const aIndex = Number.isFinite(a?.sortIndex) ? a.sortIndex : 0;
       const bIndex = Number.isFinite(b?.sortIndex) ? b.sortIndex : 0;
       if (aIndex !== bIndex) return aIndex - bIndex;
-      return String(a?.plural || a?.singular || '').localeCompare(String(b?.plural || b?.singular || ''));
+      return String(a?.plural || a?.singular || '').localeCompare(
+        String(b?.plural || b?.singular || '')
+      );
     });
     el.entryLabelTabs.innerHTML = '';
     labels.forEach((label) => {
@@ -880,7 +900,9 @@ export function createEntriesApi({
       const aIndex = Number.isFinite(a?.sortIndex) ? a.sortIndex : 0;
       const bIndex = Number.isFinite(b?.sortIndex) ? b.sortIndex : 0;
       if (aIndex !== bIndex) return aIndex - bIndex;
-      return String(a?.plural || a?.singular || '').localeCompare(String(b?.plural || b?.singular || ''));
+      return String(a?.plural || a?.singular || '').localeCompare(
+        String(b?.plural || b?.singular || '')
+      );
     });
     el.entryLabelSelect.innerHTML = '';
     labels.forEach((label) => {
@@ -909,7 +931,7 @@ export function createEntriesApi({
       plural: plural || `${singular}s`,
       slug,
       sortIndex: labels.length,
-      isDefault: isFirst
+      isDefault: isFirst,
     });
     state.entryLabels = labels;
     setActiveEntryLabel(id);
@@ -1073,7 +1095,6 @@ export function createEntriesApi({
           </div>
         `;
 
-
         const pageActions = item.querySelector('.page-actions');
         if (pageActions) {
           pageActions.addEventListener('dblclick', (e) => e.stopPropagation());
@@ -1170,7 +1191,9 @@ export function createEntriesApi({
     el.modalTitle.textContent = `Edit ${labels().singular}`;
     el.entryName.value = entryName;
     const meta = state.entryMeta?.[entryName] || {};
-    updateEntryLabelSelect(meta.entryLabelId || meta.entry_label_id || getDefaultEntryLabel()?.id || null);
+    updateEntryLabelSelect(
+      meta.entryLabelId || meta.entry_label_id || getDefaultEntryLabel()?.id || null
+    );
     if (el.entryShowInDropdown) {
       el.entryShowInDropdown.checked = meta.showInDropdown !== false;
     }
@@ -1191,8 +1214,7 @@ export function createEntriesApi({
     }
     if (el.entryDisplayNumber) {
       const value = meta.displayNumber;
-      el.entryDisplayNumber.value =
-        Number.isFinite(value) ? String(value) : "";
+      el.entryDisplayNumber.value = Number.isFinite(value) ? String(value) : '';
     }
     if (el.entryStatus) {
       el.entryStatus.value = normalizeEntryStatus(meta.status);
@@ -1267,11 +1289,15 @@ export function createEntriesApi({
     }
 
     let pages = [...state.currentPages];
-    const selectedLabelId = el.entryLabelSelect?.value || getActiveEntryLabel()?.id || getDefaultEntryLabel()?.id || null;
+    const selectedLabelId =
+      el.entryLabelSelect?.value || getActiveEntryLabel()?.id || getDefaultEntryLabel()?.id || null;
     const premiumFlag = !!el.entryPremium?.checked;
     const releaseType = String(el.entryReleaseType?.value || 'digital').toLowerCase();
     const originalName = state.currentEditingEntry || newName;
-    const entryRoot = getEntryRootForLabel(selectedLabelId, isEntryPremium(originalName, premiumFlag));
+    const entryRoot = getEntryRootForLabel(
+      selectedLabelId,
+      isEntryPremium(originalName, premiumFlag)
+    );
     const publicRoot = getEntryRootForLabel(selectedLabelId, false);
     const protectedRoot = getEntryRootForLabel(selectedLabelId, true);
     let entryFolder = state.entryFolders[originalName] || state.entryFolders[newName] || '';
@@ -1285,16 +1311,26 @@ export function createEntriesApi({
       }
     }
     if (!entryFolder) {
-      entryFolder = ensureChapterFolder(newName, state.entryFolders, state.entries, state.currentPages, entryRoot);
+      entryFolder = ensureChapterFolder(
+        newName,
+        state.entryFolders,
+        state.entries,
+        state.currentPages,
+        entryRoot
+      );
     }
     const needsFolder = releaseType !== 'store' || pages.length > 0;
     let movedFolder = false;
-    if (entryFolder && state.entryFolders[originalName] && entryFolder !== state.entryFolders[originalName]) {
+    if (
+      entryFolder &&
+      state.entryFolders[originalName] &&
+      entryFolder !== state.entryFolders[originalName]
+    ) {
       try {
         const resp = await fetch('/api/move-path', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ from: state.entryFolders[originalName], to: entryFolder })
+          body: JSON.stringify({ from: state.entryFolders[originalName], to: entryFolder }),
         });
         if (!resp.ok) {
           const result = await resp.json().catch(() => ({}));
@@ -1315,7 +1351,7 @@ export function createEntriesApi({
         const resp = await fetch('/api/create-entry', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ entryFolder: entryFolder })
+          body: JSON.stringify({ entryFolder: entryFolder }),
         });
         if (!resp.ok) {
           const result = await resp.json().catch(() => ({}));
@@ -1341,7 +1377,7 @@ export function createEntriesApi({
 
     state.entryFolders[newName] = entryFolder;
     state.entries[newName] = pages;
-    const rawDisplayNumber = el.entryDisplayNumber?.value ?? "";
+    const rawDisplayNumber = el.entryDisplayNumber?.value ?? '';
     const trimmedDisplayNumber = String(rawDisplayNumber).trim();
     let displayNumber = null;
     if (trimmedDisplayNumber) {
@@ -1349,12 +1385,12 @@ export function createEntriesApi({
       if (Number.isFinite(parsed) && parsed >= 0) {
         displayNumber = parsed;
       } else {
-        alert("Entry number must be a non-negative whole number.");
+        alert('Entry number must be a non-negative whole number.');
         return;
       }
     }
     const status = normalizeEntryStatus(el.entryStatus?.value);
-    const publishAtIso = dateTimeLocalToIso(el.entryPublishAt?.value ?? "");
+    const publishAtIso = dateTimeLocalToIso(el.entryPublishAt?.value ?? '');
     const comingSoon = status === 'scheduled' && !!el.entryComingSoon?.checked;
     const autoPost = !!el.entryAutoPost?.checked;
     const shareBluesky = autoPost && !!el.entryShareBluesky?.checked;
@@ -1364,7 +1400,9 @@ export function createEntriesApi({
     const showInGallery = el.entryShowInGallery ? !!el.entryShowInGallery.checked : true;
     const storeUrl = String(el.entryStoreUrl?.value || '').trim();
     const coverImage = String(el.entryCoverImage?.value || '').trim();
-    const entryLabel = getEntryLabels().find((label) => label && label.id === selectedLabelId) || getActiveEntryLabel();
+    const entryLabel =
+      getEntryLabels().find((label) => label && label.id === selectedLabelId) ||
+      getActiveEntryLabel();
     state.entryMeta = state.entryMeta || {};
     state.entryMeta[newName] = {
       ...(state.entryMeta[newName] || {}),
@@ -1429,15 +1467,15 @@ export function createEntriesApi({
       state.entryFolders,
       state.entries,
       state.currentPages,
-      getEntryRootForChapter(entryName),
+      getEntryRootForChapter(entryName)
     );
     const rootPrefix = `${normalizeRoot(entryFolder || '')}/`;
-    if (targetPath && rootPrefix !== "/" && targetPath.startsWith(rootPrefix)) {
+    if (targetPath && rootPrefix !== '/' && targetPath.startsWith(rootPrefix)) {
       try {
         const response = await fetch('/api/delete-image', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ path: targetPath })
+          body: JSON.stringify({ path: targetPath }),
         });
         if (!response.ok && response.status !== 404) {
           const result = await response.json().catch(() => ({}));
@@ -1467,10 +1505,10 @@ export function createEntriesApi({
 
   function renderEntryList() {
     el.entryList.innerHTML = '';
-    const entryNames = Object.keys(state.entries).filter(name => name && name !== 'undefined');
+    const entryNames = Object.keys(state.entries).filter((name) => name && name !== 'undefined');
     const activeLabelId = getActiveEntryLabel()?.id || null;
     const sortedNames = entryNames
-      .map(name => {
+      .map((name) => {
         const displayNumber = state.entryMeta?.[name]?.displayNumber;
         return { name, displayNumber };
       })
@@ -1482,32 +1520,32 @@ export function createEntriesApi({
         if (aNum == null && bNum != null) return 1;
         return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
       })
-      .map(item => item.name)
+      .map((item) => item.name)
       .filter((name) => {
         const meta = state.entryMeta?.[name] || {};
         const labelId = meta.entryLabelId || meta.entry_label_id || null;
         const effectiveId = labelId || getDefaultEntryLabel()?.id || null;
         return !activeLabelId || effectiveId === activeLabelId;
       });
-    sortedNames.forEach(name => {
+    sortedNames.forEach((name) => {
       const pages = state.entries[name];
       const meta = state.entryMeta?.[name] || {};
       const isPremium = !!meta.premium;
       const status = normalizeEntryStatus(meta.status);
       const publishAtLabel = formatDateTime(meta.publishAt);
-      const statusLabel = status === 'draft'
-        ? 'Draft'
-        : status === 'scheduled'
-          ? (publishAtLabel ? `Scheduled - ${publishAtLabel}` : 'Scheduled')
-          : 'Published';
+      const statusLabel =
+        status === 'draft'
+          ? 'Draft'
+          : status === 'scheduled'
+            ? publishAtLabel
+              ? `Scheduled - ${publishAtLabel}`
+              : 'Scheduled'
+            : 'Published';
       const comingSoonLabel = status === 'scheduled' && meta.comingSoon ? 'Coming soon' : '';
-      const displayNumber = Number.isFinite(meta.displayNumber)
-        ? meta.displayNumber
-        : null;
+      const displayNumber = Number.isFinite(meta.displayNumber) ? meta.displayNumber : null;
       const entryLabelSingular = String(meta.entryLabelSingular || '').trim() || labels().singular;
-      const displayLabel = displayNumber != null
-        ? `${entryLabelSingular} ${displayNumber} - ${name}`
-        : name;
+      const displayLabel =
+        displayNumber != null ? `${entryLabelSingular} ${displayNumber} - ${name}` : name;
       const metaParts = [`${pages.length} pages`, statusLabel];
       if (isPremium) metaParts.push('Premium');
       if (meta.releaseType === 'store') metaParts.push('Store');
@@ -1528,17 +1566,19 @@ export function createEntriesApi({
       `;
       el.entryList.appendChild(item);
     });
-    el.entryList.querySelectorAll('.btn-edit').forEach(btn => {
+    el.entryList.querySelectorAll('.btn-edit').forEach((btn) => {
       btn.addEventListener('click', () => editEntry(btn.dataset.entry));
     });
-    el.entryList.querySelectorAll('.btn-delete').forEach(btn => {
+    el.entryList.querySelectorAll('.btn-delete').forEach((btn) => {
       btn.addEventListener('click', () => deleteEntry(btn.dataset.entry));
     });
   }
 
   function pruneInvalidEntries() {
-    const invalid = Object.keys(state.entries || {}).filter(name => !name || name === 'undefined' || name === 'null');
-    invalid.forEach(name => {
+    const invalid = Object.keys(state.entries || {}).filter(
+      (name) => !name || name === 'undefined' || name === 'null'
+    );
+    invalid.forEach((name) => {
       delete state.entries[name];
       if (state.entryFolders[name]) delete state.entryFolders[name];
       if (state.entryMeta && state.entryMeta[name]) delete state.entryMeta[name];
@@ -1564,13 +1604,13 @@ export function createEntriesApi({
       state.entryFolders,
       state.entries,
       state.currentPages,
-      getEntryRootForChapter(entryName),
+      getEntryRootForChapter(entryName)
     );
     try {
       const response = await fetch('/api/list-entry-images', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ entryFolder: entryFolder })
+        body: JSON.stringify({ entryFolder: entryFolder }),
       });
       if (!response.ok) {
         const result = await response.json().catch(() => ({}));
@@ -1618,6 +1658,6 @@ export function createEntriesApi({
     getActiveEntryRoot,
     fetchEntryImages,
     showModal,
-    hideModal
+    hideModal,
   };
 }

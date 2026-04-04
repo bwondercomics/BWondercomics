@@ -9,18 +9,30 @@ export const el = {
   loginError: document.getElementById('loginError'),
   adminDashboard: document.getElementById('adminDashboard'),
   adminHeader: document.getElementById('adminHeader'),
-  adminNavToggle: /** @type {HTMLButtonElement | null} */ (document.getElementById('adminNavToggle')),
+  adminNavToggle: /** @type {HTMLButtonElement | null} */ (
+    document.getElementById('adminNavToggle')
+  ),
   adminNav: document.getElementById('adminNav'),
   btnInnerNet: document.getElementById('btnInnerNet'),
   innerNetPanel: document.getElementById('innerNetPanel'),
   innerNetTarget: document.getElementById('innerNetTarget'),
   btnSettings: document.getElementById('btnSettings'),
   adminSettingsPanel: document.getElementById('adminSettingsPanel'),
-  navLayoutSelect: /** @type {HTMLSelectElement | null} */ (document.getElementById('navLayoutSelect')),
-  scanlinesToggle: /** @type {HTMLInputElement | null} */ (document.getElementById('scanlinesToggle')),
-  stickyHeaderToggle: /** @type {HTMLInputElement | null} */ (document.getElementById('stickyHeaderToggle')),
-  countViewsToggle: /** @type {HTMLInputElement | null} */ (document.getElementById('countViewsToggle')),
-  safeModeToggle: /** @type {HTMLInputElement | null} */ (document.getElementById('safeModeToggle')),
+  navLayoutSelect: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('navLayoutSelect')
+  ),
+  scanlinesToggle: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('scanlinesToggle')
+  ),
+  stickyHeaderToggle: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('stickyHeaderToggle')
+  ),
+  countViewsToggle: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('countViewsToggle')
+  ),
+  safeModeToggle: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('safeModeToggle')
+  ),
   btnDashboard: document.getElementById('btnDashboard'),
   dashboardSection: document.getElementById('dashboardSection'),
   btnDashboardRefresh: document.getElementById('btnDashboardRefresh'),
@@ -73,15 +85,27 @@ export const el = {
   btnOpenSeries: /** @type {HTMLAnchorElement | null} */ (document.getElementById('btnOpenSeries')),
   entryList: document.getElementById('entryList'),
   btnAddEntry: document.getElementById('btnAddEntry'),
-  entryLabelSelect: /** @type {HTMLSelectElement | null} */ (document.getElementById('entryLabelSelect')),
-  entryShowInDropdown: /** @type {HTMLInputElement | null} */ (document.getElementById('entryShowInDropdown')),
-  entryShowInGallery: /** @type {HTMLInputElement | null} */ (document.getElementById('entryShowInGallery')),
-  entryReleaseType: /** @type {HTMLSelectElement | null} */ (document.getElementById('entryReleaseType')),
+  entryLabelSelect: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('entryLabelSelect')
+  ),
+  entryShowInDropdown: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('entryShowInDropdown')
+  ),
+  entryShowInGallery: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('entryShowInGallery')
+  ),
+  entryReleaseType: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('entryReleaseType')
+  ),
   entryStoreUrl: /** @type {HTMLInputElement | null} */ (document.getElementById('entryStoreUrl')),
-  entryCoverImage: /** @type {HTMLInputElement | null} */ (document.getElementById('entryCoverImage')),
+  entryCoverImage: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('entryCoverImage')
+  ),
   entryLabelTabs: document.getElementById('entryLabelTabs'),
   btnAddEntryLabel: document.getElementById('btnAddEntryLabel'),
-  statusMessageInput: /** @type {HTMLInputElement | null} */ (document.getElementById('statusMessageInput')),
+  statusMessageInput: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('statusMessageInput')
+  ),
   btnSaveStatus: document.getElementById('btnSaveStatus'),
   statusMessageStatus: document.getElementById('statusMessageStatus'),
   btnLogout: document.getElementById('btnLogout'),
@@ -108,7 +132,9 @@ export const el = {
   postImage: /** @type {HTMLInputElement | null} */ (document.getElementById('postImage')),
   postImageFile: /** @type {HTMLInputElement | null} */ (document.getElementById('postImageFile')),
   postImageTags: /** @type {HTMLInputElement | null} */ (document.getElementById('postImageTags')),
-  postImageFocus: /** @type {HTMLInputElement | null} */ (document.getElementById('postImageFocus')),
+  postImageFocus: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('postImageFocus')
+  ),
   postImageFit: /** @type {HTMLSelectElement | null} */ (document.getElementById('postImageFit')),
   btnPostImageFocus: document.getElementById('btnPostImageFocus'),
   btnPostImageFocusReset: document.getElementById('btnPostImageFocusReset'),
@@ -116,13 +142,19 @@ export const el = {
   btnMediaPicker: document.getElementById('btnMediaPicker'),
   postContent: document.getElementById('postContent'),
   postShare: /** @type {HTMLInputElement | null} */ (document.getElementById('postShare')),
-  postShareBluesky: /** @type {HTMLInputElement | null} */ (document.getElementById('postShareBluesky')),
+  postShareBluesky: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('postShareBluesky')
+  ),
   blueskyCharCounter: document.getElementById('blueskyCharCounter'),
-  btnBlueskyConnect: /** @type {HTMLButtonElement | null} */ (document.getElementById('btnBlueskyConnect')),
+  btnBlueskyConnect: /** @type {HTMLButtonElement | null} */ (
+    document.getElementById('btnBlueskyConnect')
+  ),
   blueskyStatusNote: document.getElementById('blueskyStatusNote'),
   blueskyCredentialsForm: document.getElementById('blueskyCredentialsForm'),
   blueskyHandle: /** @type {HTMLInputElement | null} */ (document.getElementById('blueskyHandle')),
-  blueskyAppPassword: /** @type {HTMLInputElement | null} */ (document.getElementById('blueskyAppPassword')),
+  blueskyAppPassword: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('blueskyAppPassword')
+  ),
   btnBlueskySubmit: document.getElementById('btnBlueskySubmit'),
   btnBlueskyCancel: document.getElementById('btnBlueskyCancel'),
   blueskyConnectStatus: document.getElementById('blueskyConnectStatus'),
@@ -137,7 +169,9 @@ export const el = {
   btnCopy: document.getElementById('btnCopy'),
   btnDownload: document.getElementById('btnDownload'),
   copySuccess: document.getElementById('copySuccess'),
-  previewChapterSelect: /** @type {HTMLSelectElement | null} */ (document.getElementById('previewChapterSelect')),
+  previewChapterSelect: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('previewChapterSelect')
+  ),
   previewImg: /** @type {HTMLImageElement | null} */ (document.getElementById('previewImg')),
   previewPageLabel: document.getElementById('previewPageLabel'),
   previewPrev: /** @type {HTMLButtonElement | null} */ (document.getElementById('previewPrev')),
@@ -164,14 +198,20 @@ export const el = {
   btnUsers: document.getElementById('btnUsers'),
   btnModeration: document.getElementById('btnModeration'),
   btnAnalytics: document.getElementById('btnAnalytics'),
-  analyticsCountViewsToggle: /** @type {HTMLInputElement | null} */ (document.getElementById('analyticsCountViewsToggle')),
+  analyticsCountViewsToggle: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('analyticsCountViewsToggle')
+  ),
   adminContent: document.querySelector('.admin-content'),
   mediaSection: document.getElementById('mediaSection'),
   mediaList: document.getElementById('mediaList'),
   mediaGallery: document.getElementById('mediaGallery'),
   mediaPreview: document.getElementById('mediaPreview'),
-  mediaPreviewImg: /** @type {HTMLImageElement | null} */ (document.getElementById('mediaPreviewImg')),
-  mediaPreviewBlurImg: /** @type {HTMLImageElement | null} */ (document.getElementById('mediaPreviewBlurImg')),
+  mediaPreviewImg: /** @type {HTMLImageElement | null} */ (
+    document.getElementById('mediaPreviewImg')
+  ),
+  mediaPreviewBlurImg: /** @type {HTMLImageElement | null} */ (
+    document.getElementById('mediaPreviewBlurImg')
+  ),
   mediaPreviewBlurMissing: document.getElementById('mediaPreviewBlurMissing'),
   mediaPreviewInfo: document.getElementById('mediaPreviewInfo'),
   mediaPreviewPath: document.getElementById('mediaPreviewPath'),
@@ -183,29 +223,41 @@ export const el = {
   mediaPreviewUse: document.getElementById('mediaPreviewUse'),
   mediaPreviewCopy: document.getElementById('mediaPreviewCopy'),
   mediaPreviewTagsBtn: document.getElementById('mediaPreviewTagsBtn'),
-  mediaPreviewAccess: /** @type {HTMLSelectElement | null} */ (document.getElementById('mediaPreviewAccess')),
-  mediaPreviewPremiumVisibility: /** @type {HTMLSelectElement | null} */ (document.getElementById('mediaPreviewPremiumVisibility')),
+  mediaPreviewAccess: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('mediaPreviewAccess')
+  ),
+  mediaPreviewPremiumVisibility: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('mediaPreviewPremiumVisibility')
+  ),
   mediaPreviewPremiumRow: document.getElementById('mediaPreviewPremiumRow'),
   mediaPreviewDelete: document.getElementById('mediaPreviewDelete'),
   mediaPreviewClose: document.getElementById('mediaPreviewClose'),
   mediaPreviewPrev: document.getElementById('mediaPreviewPrev'),
   mediaPreviewNext: document.getElementById('mediaPreviewNext'),
-  mediaUploadInput: /** @type {HTMLInputElement | null} */ (document.getElementById('mediaUploadInput')),
+  mediaUploadInput: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('mediaUploadInput')
+  ),
   btnUploadMedia: document.getElementById('btnUploadMedia'),
   mediaPath: /** @type {HTMLInputElement | null} */ (document.getElementById('mediaPath')),
   mediaTags: /** @type {HTMLInputElement | null} */ (document.getElementById('mediaTags')),
   mediaAccess: /** @type {HTMLSelectElement | null} */ (document.getElementById('mediaAccess')),
-  mediaPremiumVisibility: /** @type {HTMLSelectElement | null} */ (document.getElementById('mediaPremiumVisibility')),
+  mediaPremiumVisibility: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('mediaPremiumVisibility')
+  ),
   mediaPremiumVisibilityRow: document.getElementById('mediaPremiumVisibilityRow'),
   mediaSearch: /** @type {HTMLInputElement | null} */ (document.getElementById('mediaSearch')),
   mediaSort: /** @type {HTMLSelectElement | null} */ (document.getElementById('mediaSort')),
   mediaListCount: document.getElementById('mediaListCount'),
   mediaGalleryCount: document.getElementById('mediaGalleryCount'),
   mediaBrandingStatus: document.getElementById('mediaBrandingStatus'),
-  mediaBrandingOgPreview: /** @type {HTMLImageElement | null} */ (document.getElementById('mediaBrandingOgPreview')),
+  mediaBrandingOgPreview: /** @type {HTMLImageElement | null} */ (
+    document.getElementById('mediaBrandingOgPreview')
+  ),
   mediaBrandingOgPath: document.getElementById('mediaBrandingOgPath'),
   mediaBrandingOgReset: document.getElementById('mediaBrandingOgReset'),
-  mediaBrandingFaviconPreview: /** @type {HTMLImageElement | null} */ (document.getElementById('mediaBrandingFaviconPreview')),
+  mediaBrandingFaviconPreview: /** @type {HTMLImageElement | null} */ (
+    document.getElementById('mediaBrandingFaviconPreview')
+  ),
   mediaBrandingFaviconPath: document.getElementById('mediaBrandingFaviconPath'),
   mediaBrandingFaviconReset: document.getElementById('mediaBrandingFaviconReset'),
   btnAddMedia: document.getElementById('btnAddMedia'),
@@ -221,13 +273,21 @@ export const el = {
   emailListCount: document.getElementById('emailListCount'),
   emailList: document.getElementById('emailList'),
   emailListEmpty: document.getElementById('emailListEmpty'),
-  emailListInput: /** @type {HTMLInputElement | null} */ (document.getElementById('emailListInput')),
-  emailListSource: /** @type {HTMLInputElement | null} */ (document.getElementById('emailListSource')),
+  emailListInput: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('emailListInput')
+  ),
+  emailListSource: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('emailListSource')
+  ),
   btnEmailListAdd: document.getElementById('btnEmailListAdd'),
   emailListStatus: document.getElementById('emailListStatus'),
   premiumCodesCount: document.getElementById('premiumCodesCount'),
-  premiumCodesCountInput: /** @type {HTMLInputElement | null} */ (document.getElementById('premiumCodesCountInput')),
-  premiumCodesNote: /** @type {HTMLInputElement | null} */ (document.getElementById('premiumCodesNote')),
+  premiumCodesCountInput: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('premiumCodesCountInput')
+  ),
+  premiumCodesNote: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('premiumCodesNote')
+  ),
   btnGeneratePremiumCodes: document.getElementById('btnGeneratePremiumCodes'),
   premiumCodesStatus: document.getElementById('premiumCodesStatus'),
   premiumCodesList: document.getElementById('premiumCodesList'),
@@ -235,13 +295,25 @@ export const el = {
   moderationSection: document.getElementById('moderationSection'),
   btnModerationRefresh: document.getElementById('btnModerationRefresh'),
   moderationStatus: document.getElementById('moderationStatus'),
-  moderationSearch: /** @type {HTMLInputElement | null} */ (document.getElementById('moderationSearch')),
-  moderationTargetType: /** @type {HTMLSelectElement | null} */ (document.getElementById('moderationTargetType')),
-  moderationTargetId: /** @type {HTMLInputElement | null} */ (document.getElementById('moderationTargetId')),
+  moderationSearch: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('moderationSearch')
+  ),
+  moderationTargetType: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('moderationTargetType')
+  ),
+  moderationTargetId: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('moderationTargetId')
+  ),
   moderationTargetList: document.getElementById('moderationTargetList'),
-  moderationUserFilter: /** @type {HTMLSelectElement | null} */ (document.getElementById('moderationUserFilter')),
-  moderationStatusFilter: /** @type {HTMLSelectElement | null} */ (document.getElementById('moderationStatusFilter')),
-  moderationSort: /** @type {HTMLSelectElement | null} */ (document.getElementById('moderationSort')),
+  moderationUserFilter: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('moderationUserFilter')
+  ),
+  moderationStatusFilter: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('moderationStatusFilter')
+  ),
+  moderationSort: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('moderationSort')
+  ),
   btnModerationApply: document.getElementById('btnModerationApply'),
   btnModerationClear: document.getElementById('btnModerationClear'),
   moderationResults: document.getElementById('moderationResults'),
@@ -251,31 +323,51 @@ export const el = {
   moderationBannedUsersEmpty: document.getElementById('moderationBannedUsersEmpty'),
   moderationBannedIpsList: document.getElementById('moderationBannedIpsList'),
   moderationBannedIpsEmpty: document.getElementById('moderationBannedIpsEmpty'),
-  moderationIpInput: /** @type {HTMLInputElement | null} */ (document.getElementById('moderationIpInput')),
+  moderationIpInput: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('moderationIpInput')
+  ),
   btnModerationBanIp: document.getElementById('btnModerationBanIp'),
   moderationWordsList: document.getElementById('moderationWordsList'),
   moderationWordsEmpty: document.getElementById('moderationWordsEmpty'),
   moderationWordsToggle: document.getElementById('moderationWordsToggle'),
   moderationWordsBody: document.getElementById('moderationWordsBody'),
-  moderationWordInput: /** @type {HTMLInputElement | null} */ (document.getElementById('moderationWordInput')),
+  moderationWordInput: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('moderationWordInput')
+  ),
   btnModerationAddWord: document.getElementById('btnModerationAddWord'),
-  moderationLimitMinInterval: /** @type {HTMLInputElement | null} */ (document.getElementById('moderationLimitMinInterval')),
-  moderationLimitRateWindow: /** @type {HTMLInputElement | null} */ (document.getElementById('moderationLimitRateWindow')),
-  moderationLimitMaxUser: /** @type {HTMLInputElement | null} */ (document.getElementById('moderationLimitMaxUser')),
-  moderationLimitMaxIp: /** @type {HTMLInputElement | null} */ (document.getElementById('moderationLimitMaxIp')),
-  moderationLimitDuplicateWindow: /** @type {HTMLInputElement | null} */ (document.getElementById('moderationLimitDuplicateWindow')),
+  moderationLimitMinInterval: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('moderationLimitMinInterval')
+  ),
+  moderationLimitRateWindow: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('moderationLimitRateWindow')
+  ),
+  moderationLimitMaxUser: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('moderationLimitMaxUser')
+  ),
+  moderationLimitMaxIp: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('moderationLimitMaxIp')
+  ),
+  moderationLimitDuplicateWindow: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('moderationLimitDuplicateWindow')
+  ),
   btnModerationSaveLimits: document.getElementById('btnModerationSaveLimits'),
   moderationLimitsStatus: document.getElementById('moderationLimitsStatus'),
   analyticsSection: document.getElementById('analyticsSection'),
   diagnosticsSection: document.getElementById('diagnosticsSection'),
   analyticsStatus: document.getElementById('analyticsStatus'),
   btnAnalyticsRefresh: document.getElementById('btnAnalyticsRefresh'),
-  analyticsPagesRange: /** @type {HTMLSelectElement | null} */ (document.getElementById('analyticsPagesRange')),
+  analyticsPagesRange: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('analyticsPagesRange')
+  ),
   analyticsPagesStatus: document.getElementById('analyticsPagesStatus'),
   analyticsPagesList: document.getElementById('analyticsPagesList'),
   analyticsReaderStatus: document.getElementById('analyticsReaderStatus'),
-  analyticsReaderSeries: /** @type {HTMLSelectElement | null} */ (document.getElementById('analyticsReaderSeries')),
-  analyticsReaderRange: /** @type {HTMLSelectElement | null} */ (document.getElementById('analyticsReaderRange')),
+  analyticsReaderSeries: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('analyticsReaderSeries')
+  ),
+  analyticsReaderRange: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('analyticsReaderRange')
+  ),
   analyticsEntryReads: document.getElementById('analyticsEntryReads'),
   analyticsSeriesReads: document.getElementById('analyticsSeriesReads'),
   analyticsEntryRates: document.getElementById('analyticsEntryRates'),
@@ -288,18 +380,32 @@ export const el = {
   analyticsEventsList: document.getElementById('analyticsEventsList'),
   analyticsVisitorHistoryStatus: document.getElementById('analyticsVisitorHistoryStatus'),
   analyticsVisitorHistoryMeta: document.getElementById('analyticsVisitorHistoryMeta'),
-  analyticsVisitorHistorySearch: /** @type {HTMLInputElement | null} */ (document.getElementById('analyticsVisitorHistorySearch')),
-  analyticsVisitorHistorySort: /** @type {HTMLSelectElement | null} */ (document.getElementById('analyticsVisitorHistorySort')),
+  analyticsVisitorHistorySearch: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('analyticsVisitorHistorySearch')
+  ),
+  analyticsVisitorHistorySort: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('analyticsVisitorHistorySort')
+  ),
   analyticsVisitorHistoryList: document.getElementById('analyticsVisitorHistoryList'),
   analyticsVisitorHistoryDetail: document.getElementById('analyticsVisitorHistoryDetail'),
   // Reads Over Time chart
-  readsOverTimeMode: /** @type {HTMLSelectElement | null} */ (document.getElementById('readsOverTimeMode')),
-  readsOverTimeEntry: /** @type {HTMLSelectElement | null} */ (document.getElementById('readsOverTimeEntry')),
-  readsOverTimeRange: /** @type {HTMLSelectElement | null} */ (document.getElementById('readsOverTimeRange')),
-  readsOverTimeCanvas: /** @type {HTMLCanvasElement | null} */ (document.getElementById('readsOverTimeCanvas')),
+  readsOverTimeMode: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('readsOverTimeMode')
+  ),
+  readsOverTimeEntry: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('readsOverTimeEntry')
+  ),
+  readsOverTimeRange: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('readsOverTimeRange')
+  ),
+  readsOverTimeCanvas: /** @type {HTMLCanvasElement | null} */ (
+    document.getElementById('readsOverTimeCanvas')
+  ),
   readsOverTimeStatus: document.getElementById('readsOverTimeStatus'),
   readsOverTimeTotals: document.getElementById('readsOverTimeTotals'),
-  liveVisitorsRange: /** @type {HTMLSelectElement | null} */ (document.getElementById('liveVisitorsRange')),
+  liveVisitorsRange: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('liveVisitorsRange')
+  ),
   btnLiveVisitorsZoomOut: document.getElementById('btnLiveVisitorsZoomOut'),
   btnLiveVisitorsZoomIn: document.getElementById('btnLiveVisitorsZoomIn'),
   btnLiveVisitorsRefresh: document.getElementById('btnLiveVisitorsRefresh'),
@@ -334,15 +440,27 @@ export const el = {
   modalTitle: document.getElementById('modalTitle'),
   editForm: document.getElementById('editForm'),
   entryName: document.getElementById('entryName'),
-  entryDisplayNumber: /** @type {HTMLInputElement | null} */ (document.getElementById('entryDisplayNumber')),
+  entryDisplayNumber: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('entryDisplayNumber')
+  ),
   entryPremium: document.getElementById('entryPremium'),
   entryStatus: /** @type {HTMLSelectElement | null} */ (document.getElementById('entryStatus')),
-  entryPublishAt: /** @type {HTMLInputElement | null} */ (document.getElementById('entryPublishAt')),
-  entryComingSoon: /** @type {HTMLInputElement | null} */ (document.getElementById('entryComingSoon')),
+  entryPublishAt: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('entryPublishAt')
+  ),
+  entryComingSoon: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('entryComingSoon')
+  ),
   entryAutoPost: /** @type {HTMLInputElement | null} */ (document.getElementById('entryAutoPost')),
-  entryShareBluesky: /** @type {HTMLInputElement | null} */ (document.getElementById('entryShareBluesky')),
-  entryPostTitle: /** @type {HTMLInputElement | null} */ (document.getElementById('entryPostTitle')),
-  entryPostContent: /** @type {HTMLTextAreaElement | null} */ (document.getElementById('entryPostContent')),
+  entryShareBluesky: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('entryShareBluesky')
+  ),
+  entryPostTitle: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('entryPostTitle')
+  ),
+  entryPostContent: /** @type {HTMLTextAreaElement | null} */ (
+    document.getElementById('entryPostContent')
+  ),
   pageReorderShell: document.getElementById('pageReorderShell'),
   pageList: document.getElementById('pageList'),
   pagePreviewPanel: document.getElementById('pagePreviewPanel'),
@@ -354,18 +472,32 @@ export const el = {
   btnCloseModal: document.getElementById('btnCloseModal'),
   btnCancelEdit: document.getElementById('btnCancelEdit'),
   btnMoveMode: document.getElementById('btnMoveMode'),
-  btnRenumberPages: /** @type {HTMLButtonElement | null} */ (document.getElementById('btnRenumberPages')),
+  btnRenumberPages: /** @type {HTMLButtonElement | null} */ (
+    document.getElementById('btnRenumberPages')
+  ),
   seriesModal: document.getElementById('seriesModal'),
   seriesModalTitle: document.getElementById('seriesModalTitle'),
   seriesModalStatus: document.getElementById('seriesModalStatus'),
   seriesForm: /** @type {HTMLFormElement | null} */ (document.getElementById('seriesForm')),
   seriesIdInput: /** @type {HTMLInputElement | null} */ (document.getElementById('seriesIdInput')),
-  seriesTitleInput: /** @type {HTMLInputElement | null} */ (document.getElementById('seriesTitleInput')),
-  seriesDescriptionInput: /** @type {HTMLTextAreaElement | null} */ (document.getElementById('seriesDescriptionInput')),
-  seriesCoverInput: /** @type {HTMLInputElement | null} */ (document.getElementById('seriesCoverInput')),
-  seriesUnitSingular: /** @type {HTMLInputElement | null} */ (document.getElementById('seriesUnitSingular')),
-  seriesUnitPlural: /** @type {HTMLInputElement | null} */ (document.getElementById('seriesUnitPlural')),
-  seriesPremiumOnly: /** @type {HTMLInputElement | null} */ (document.getElementById('seriesPremiumOnly')),
+  seriesTitleInput: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('seriesTitleInput')
+  ),
+  seriesDescriptionInput: /** @type {HTMLTextAreaElement | null} */ (
+    document.getElementById('seriesDescriptionInput')
+  ),
+  seriesCoverInput: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('seriesCoverInput')
+  ),
+  seriesUnitSingular: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('seriesUnitSingular')
+  ),
+  seriesUnitPlural: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('seriesUnitPlural')
+  ),
+  seriesPremiumOnly: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('seriesPremiumOnly')
+  ),
   seriesModalClose: document.getElementById('seriesModalClose'),
   seriesModalCancel: document.getElementById('seriesModalCancel'),
   seriesModalDelete: document.getElementById('seriesModalDelete'),
@@ -374,5 +506,5 @@ export const el = {
   confirmModal: document.getElementById('confirmModal'),
   changesList: document.getElementById('changesList'),
   btnConfirmRenumber: document.getElementById('btnConfirmRenumber'),
-  btnCancelRenumber: document.getElementById('btnCancelRenumber')
+  btnCancelRenumber: document.getElementById('btnCancelRenumber'),
 };

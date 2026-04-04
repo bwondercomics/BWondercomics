@@ -1,481 +1,491 @@
 <!doctype html>
 <html lang="en">
-
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>BWC Comics</title>
-  <!-- SITE_BRANDING_ICONS_START -->
-  <link rel="icon" type="image/png" sizes="32x32" href="/assets/boywondericon.png" />
-  <link rel="apple-touch-icon" href="/assets/boywondericon.png" />
-  <link rel="manifest" href="/manifest.json" />
-  <!-- SITE_BRANDING_ICONS_END -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Righteous&family=Bebas+Neue&display=swap" rel="stylesheet" />
-  <style>
-    :root {
-      --primary: #00d9ff;
-      --secondary: #ff00ea;
-      --accent: #ffed00;
-      --bg-dark: #0a0a12;
-      --bg-panel: #1a1a2e;
-      --text: #ffffff;
-      --danger: #ff3838;
-      --success: #00ff88;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    html,
-    body {
-      height: 100%;
-    }
-
-    body {
-      margin: 0;
-      font-family: "Righteous", sans-serif;
-      background: radial-gradient(circle at 20% 20%, rgba(0, 217, 255, 0.08), transparent 35%),
-        radial-gradient(circle at 80% 30%, rgba(255, 0, 234, 0.06), transparent 40%),
-        linear-gradient(180deg, rgba(10, 10, 18, 1), rgba(6, 6, 12, 1));
-      color: var(--text);
-    }
-
-    header {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      padding: 14px 18px;
-      border-bottom: 3px solid var(--primary);
-      background: linear-gradient(135deg, rgba(10, 10, 18, 0.95), rgba(26, 26, 46, 0.95));
-      position: sticky;
-      top: 0;
-      z-index: 10;
-      backdrop-filter: blur(8px);
-    }
-
-    .brand h1 {
-      font-family: "Bebas Neue", sans-serif;
-      margin: 0;
-      font-size: 34px;
-      letter-spacing: 2px;
-      color: var(--primary);
-      text-shadow: 0 0 14px rgba(0, 217, 255, 0.35);
-    }
-
-    .brand .sub {
-      margin-top: 2px;
-      font-size: 12px;
-      opacity: 0.85;
-      letter-spacing: 0.6px;
-      text-transform: uppercase;
-    }
-
-    .nav a {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 10px 12px;
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      border-radius: 10px;
-      color: var(--text);
-      text-decoration: none;
-      background: rgba(0, 0, 0, 0.25);
-    }
-
-    .nav a:hover {
-      border-color: var(--accent);
-      box-shadow: 0 0 18px rgba(255, 237, 0, 0.2);
-    }
-
-    main {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 20px 16px 50px;
-    }
-
-    .status {
-      margin: 14px 0 18px;
-      padding: 12px 14px;
-      border-radius: 12px;
-      border: 1px solid rgba(0, 217, 255, 0.25);
-      background: rgba(0, 217, 255, 0.08);
-      font-size: 0.95rem;
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 14px;
-    }
-
-    .card {
-      display: flex;
-      flex-direction: column;
-      border: 2px solid rgba(0, 217, 255, 0.3);
-      background: rgba(26, 26, 46, 0.85);
-      border-radius: 14px;
-      padding: 14px;
-      box-shadow: 0 0 18px rgba(0, 217, 255, 0.12);
-    }
-
-    .cover {
-      position: relative;
-      width: 100%;
-      aspect-ratio: 2 / 3;
-      border-radius: 12px;
-      overflow: hidden;
-      border: 1px solid rgba(255, 255, 255, 0.15);
-      background:
-        radial-gradient(circle at 30% 20%, rgba(0, 217, 255, 0.12), transparent 55%),
-        radial-gradient(circle at 70% 30%, rgba(255, 0, 234, 0.1), transparent 60%),
-        linear-gradient(180deg, rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.1));
-      margin-bottom: 10px;
-    }
-
-    .cover img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
-    }
-
-    .cover-placeholder {
-      position: absolute;
-      inset: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 12px;
-      text-align: center;
-      opacity: 0.75;
-      font-size: 0.95rem;
-      letter-spacing: 0.3px;
-    }
-
-    .cover-badge {
-      position: absolute;
-      left: 10px;
-      bottom: 10px;
-      padding: 6px 10px;
-      border-radius: 999px;
-      background: rgba(57, 255, 126, 0.18);
-      border: 1px solid rgba(57, 255, 126, 0.75);
-      color: #39ff7e;
-      font-family: "Bebas Neue", sans-serif;
-      font-size: 12px;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-    }
-
-    .card--locked .cover img {
-      /* Covers shown clean with Patron badge — no blur/darken */
-    }
-
-    .card h2 {
-      font-family: "Bebas Neue", sans-serif;
-      letter-spacing: 1.5px;
-      margin: 0 0 6px;
-      font-size: 26px;
-    }
-
-    .meta {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin: 8px 0 12px;
-      font-size: 12px;
-      opacity: 0.9;
-    }
-
-    .pill {
-      border: 1px solid rgba(255, 255, 255, 0.25);
-      border-radius: 999px;
-      padding: 4px 8px;
-      background: rgba(0, 0, 0, 0.2);
-    }
-
-    .pill.premium {
-      border-color: rgba(255, 237, 0, 0.45);
-      color: var(--accent);
-    }
-
-    .actions {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      align-items: center;
-    }
-
-    .btn {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      padding: 10px 12px;
-      border-radius: 10px;
-      text-decoration: none;
-      color: var(--bg-dark);
-      background: linear-gradient(135deg, var(--primary), var(--secondary));
-      font-weight: 800;
-      border: none;
-      cursor: pointer;
-    }
-
-    .btn[aria-disabled="true"] {
-      opacity: 0.45;
-      cursor: not-allowed;
-      filter: grayscale(0.4);
-    }
-
-    .muted {
-      opacity: 0.75;
-      line-height: 1.4;
-      font-size: 0.95rem;
-    }
-  </style>
-</head>
-
-<body>
-  <script type="module" src="reader/safe-mode.js"></script>
-  <script type="module" src="reader/live-tracking.js"></script>
-  <script type="module" src="reader/chat-sso.js"></script>
-  <header>
-    <div class="brand">
-      <h1>BWONDERCOMICS</h1>
-      <div class="sub">Comics library</div>
-    </div>
-    <div class="nav">
-      <a href="index.html">Back to Reader</a>
-      <a href="feed.html">Feed</a>
-    </div>
-  </header>
-
-  <main>
-    <div class="status" id="status">Loading…</div>
-    <div class="grid" id="grid"></div>
-  </main>
-
-  <script type="module">
-    // Comics library: load series metadata and render access-aware cards.
-    const statusEl = document.getElementById('status');
-    const gridEl = document.getElementById('grid');
-    // Default series lives at the public data.json endpoint.
-    const DEFAULT_SERIES_ID = 'battle-bros';
-
-    // Premium access is granted to admin or premium roles.
-    const isPremiumUser = (user) => {
-      const role = (user && user.role) ? String(user.role).toLowerCase() : '';
-      return role === 'admin' || role === 'premium';
-    };
-
-    // Load the current session for access gating.
-    async function loadSession() {
-      try {
-        const res = await fetch('/api/session', { cache: 'no-store', credentials: 'same-origin' });
-        if (!res.ok) return null;
-        const data = await res.json();
-        return data.user || null;
-      } catch {
-        return null;
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>BWC Comics</title>
+    <!-- SITE_BRANDING_ICONS_START -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/boywondericon.png" />
+    <link rel="apple-touch-icon" href="/assets/boywondericon.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <!-- SITE_BRANDING_ICONS_END -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Righteous&family=Bebas+Neue&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --primary: #00d9ff;
+        --secondary: #ff00ea;
+        --accent: #ffed00;
+        --bg-dark: #0a0a12;
+        --bg-panel: #1a1a2e;
+        --text: #ffffff;
+        --danger: #ff3838;
+        --success: #00ff88;
       }
-    }
 
-    // Load the list of series from the public series.json endpoint.
-    async function loadSeriesIndex() {
-      const res = await fetch('/series.json', { cache: 'no-store' });
-      if (!res.ok) throw new Error('Could not load /series.json');
-      const data = await res.json();
-      const series = Array.isArray(data.series) ? data.series : [];
-      return { defaultSeriesId: data.defaultSeriesId || 'battle-bros', series };
-    }
+      * {
+        box-sizing: border-box;
+      }
 
-    // Sanitize cover URLs to avoid unsafe or malformed paths.
-    function normalizeCoverUrl(raw) {
-      const value = String(raw || '').trim();
-      if (!value) return null;
+      html,
+      body {
+        height: 100%;
+      }
 
-      const lowered = value.toLowerCase();
-      if (lowered.startsWith('javascript:')) return null;
-      if (value.includes('..')) return null;
-      if (lowered.startsWith('http://') || lowered.startsWith('https://')) return value;
-      if (value.startsWith('/')) return value;
-      return `/${value.replace(/^\.\//, '')}`;
-    }
+      body {
+        margin: 0;
+        font-family: 'Righteous', sans-serif;
+        background:
+          radial-gradient(circle at 20% 20%, rgba(0, 217, 255, 0.08), transparent 35%),
+          radial-gradient(circle at 80% 30%, rgba(255, 0, 234, 0.06), transparent 40%),
+          linear-gradient(180deg, rgba(10, 10, 18, 1), rgba(6, 6, 12, 1));
+        color: var(--text);
+      }
 
-    // Resolve the per-series data JSON location.
-    function getSeriesDataUrl(seriesId) {
-      const id = String(seriesId || '').trim();
-      if (!id) return '/data.json';
-      return id === DEFAULT_SERIES_ID ? '/data.json' : `/series/${encodeURIComponent(id)}/data.json`;
-    }
+      header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 18px;
+        border-bottom: 3px solid var(--primary);
+        background: linear-gradient(135deg, rgba(10, 10, 18, 0.95), rgba(26, 26, 46, 0.95));
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        backdrop-filter: blur(8px);
+      }
 
-    // Use the first readable page as a fallback cover image.
-    async function inferCoverFromSeriesData(series, { canAccess, premium }) {
-      const url = getSeriesDataUrl(series.id);
-      const res = await fetch(url, { cache: 'no-store' });
-      if (!res.ok) return null;
-      const data = await res.json().catch(() => null);
-      if (!data || typeof data !== 'object') return null;
+      .brand h1 {
+        font-family: 'Bebas Neue', sans-serif;
+        margin: 0;
+        font-size: 34px;
+        letter-spacing: 2px;
+        color: var(--primary);
+        text-shadow: 0 0 14px rgba(0, 217, 255, 0.35);
+      }
 
-      const entries = (data.entries && typeof data.entries === 'object') ? data.entries : {};
-      const entryMeta = (data.entryMeta && typeof data.entryMeta === 'object') ? data.entryMeta : {};
+      .brand .sub {
+        margin-top: 2px;
+        font-size: 12px;
+        opacity: 0.85;
+        letter-spacing: 0.6px;
+        text-transform: uppercase;
+      }
 
-      for (const [entryName, pages] of Object.entries(entries)) {
-        if (!Array.isArray(pages) || pages.length === 0) continue;
-        const meta = entryMeta[entryName];
-        const isPremiumEntry = !!(meta && typeof meta === 'object' && meta.premium);
-        if (isPremiumEntry) {
-          // Use the public cover endpoint for premium entries
-          return `/api/cover/${encodeURIComponent(series.id)}/${encodeURIComponent(entryName)}`;
+      .nav a {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 10px;
+        color: var(--text);
+        text-decoration: none;
+        background: rgba(0, 0, 0, 0.25);
+      }
+
+      .nav a:hover {
+        border-color: var(--accent);
+        box-shadow: 0 0 18px rgba(255, 237, 0, 0.2);
+      }
+
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 20px 16px 50px;
+      }
+
+      .status {
+        margin: 14px 0 18px;
+        padding: 12px 14px;
+        border-radius: 12px;
+        border: 1px solid rgba(0, 217, 255, 0.25);
+        background: rgba(0, 217, 255, 0.08);
+        font-size: 0.95rem;
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 14px;
+      }
+
+      .card {
+        display: flex;
+        flex-direction: column;
+        border: 2px solid rgba(0, 217, 255, 0.3);
+        background: rgba(26, 26, 46, 0.85);
+        border-radius: 14px;
+        padding: 14px;
+        box-shadow: 0 0 18px rgba(0, 217, 255, 0.12);
+      }
+
+      .cover {
+        position: relative;
+        width: 100%;
+        aspect-ratio: 2 / 3;
+        border-radius: 12px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        background:
+          radial-gradient(circle at 30% 20%, rgba(0, 217, 255, 0.12), transparent 55%),
+          radial-gradient(circle at 70% 30%, rgba(255, 0, 234, 0.1), transparent 60%),
+          linear-gradient(180deg, rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.1));
+        margin-bottom: 10px;
+      }
+
+      .cover img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+      }
+
+      .cover-placeholder {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px;
+        text-align: center;
+        opacity: 0.75;
+        font-size: 0.95rem;
+        letter-spacing: 0.3px;
+      }
+
+      .cover-badge {
+        position: absolute;
+        left: 10px;
+        bottom: 10px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(57, 255, 126, 0.18);
+        border: 1px solid rgba(57, 255, 126, 0.75);
+        color: #39ff7e;
+        font-family: 'Bebas Neue', sans-serif;
+        font-size: 12px;
+        letter-spacing: 1px;
+        text-transform: uppercase;
+      }
+
+      .card--locked .cover img {
+        /* Covers shown clean with Patron badge — no blur/darken */
+      }
+
+      .card h2 {
+        font-family: 'Bebas Neue', sans-serif;
+        letter-spacing: 1.5px;
+        margin: 0 0 6px;
+        font-size: 26px;
+      }
+
+      .meta {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin: 8px 0 12px;
+        font-size: 12px;
+        opacity: 0.9;
+      }
+
+      .pill {
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 999px;
+        padding: 4px 8px;
+        background: rgba(0, 0, 0, 0.2);
+      }
+
+      .pill.premium {
+        border-color: rgba(255, 237, 0, 0.45);
+        color: var(--accent);
+      }
+
+      .actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 12px;
+        border-radius: 10px;
+        text-decoration: none;
+        color: var(--bg-dark);
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        font-weight: 800;
+        border: none;
+        cursor: pointer;
+      }
+
+      .btn[aria-disabled='true'] {
+        opacity: 0.45;
+        cursor: not-allowed;
+        filter: grayscale(0.4);
+      }
+
+      .muted {
+        opacity: 0.75;
+        line-height: 1.4;
+        font-size: 0.95rem;
+      }
+    </style>
+  </head>
+
+  <body>
+    <script type="module" src="reader/safe-mode.js"></script>
+    <script type="module" src="reader/live-tracking.js"></script>
+    <script type="module" src="reader/chat-sso.js"></script>
+    <header>
+      <div class="brand">
+        <h1>BWONDERCOMICS</h1>
+        <div class="sub">Comics library</div>
+      </div>
+      <div class="nav">
+        <a href="index.html">Back to Reader</a>
+        <a href="feed.html">Feed</a>
+      </div>
+    </header>
+
+    <main>
+      <div class="status" id="status">Loading…</div>
+      <div class="grid" id="grid"></div>
+    </main>
+
+    <script type="module">
+      // Comics library: load series metadata and render access-aware cards.
+      const statusEl = document.getElementById('status');
+      const gridEl = document.getElementById('grid');
+      // Default series lives at the public data.json endpoint.
+      const DEFAULT_SERIES_ID = 'battle-bros';
+
+      // Premium access is granted to admin or premium roles.
+      const isPremiumUser = (user) => {
+        const role = user && user.role ? String(user.role).toLowerCase() : '';
+        return role === 'admin' || role === 'premium';
+      };
+
+      // Load the current session for access gating.
+      async function loadSession() {
+        try {
+          const res = await fetch('/api/session', {
+            cache: 'no-store',
+            credentials: 'same-origin',
+          });
+          if (!res.ok) return null;
+          const data = await res.json();
+          return data.user || null;
+        } catch {
+          return null;
+        }
+      }
+
+      // Load the list of series from the public series.json endpoint.
+      async function loadSeriesIndex() {
+        const res = await fetch('/series.json', { cache: 'no-store' });
+        if (!res.ok) throw new Error('Could not load /series.json');
+        const data = await res.json();
+        const series = Array.isArray(data.series) ? data.series : [];
+        return { defaultSeriesId: data.defaultSeriesId || 'battle-bros', series };
+      }
+
+      // Sanitize cover URLs to avoid unsafe or malformed paths.
+      function normalizeCoverUrl(raw) {
+        const value = String(raw || '').trim();
+        if (!value) return null;
+
+        const lowered = value.toLowerCase();
+        if (lowered.startsWith('javascript:')) return null;
+        if (value.includes('..')) return null;
+        if (lowered.startsWith('http://') || lowered.startsWith('https://')) return value;
+        if (value.startsWith('/')) return value;
+        return `/${value.replace(/^\.\//, '')}`;
+      }
+
+      // Resolve the per-series data JSON location.
+      function getSeriesDataUrl(seriesId) {
+        const id = String(seriesId || '').trim();
+        if (!id) return '/data.json';
+        return id === DEFAULT_SERIES_ID
+          ? '/data.json'
+          : `/series/${encodeURIComponent(id)}/data.json`;
+      }
+
+      // Use the first readable page as a fallback cover image.
+      async function inferCoverFromSeriesData(series, { canAccess, premium }) {
+        const url = getSeriesDataUrl(series.id);
+        const res = await fetch(url, { cache: 'no-store' });
+        if (!res.ok) return null;
+        const data = await res.json().catch(() => null);
+        if (!data || typeof data !== 'object') return null;
+
+        const entries = data.entries && typeof data.entries === 'object' ? data.entries : {};
+        const entryMeta =
+          data.entryMeta && typeof data.entryMeta === 'object' ? data.entryMeta : {};
+
+        for (const [entryName, pages] of Object.entries(entries)) {
+          if (!Array.isArray(pages) || pages.length === 0) continue;
+          const meta = entryMeta[entryName];
+          const isPremiumEntry = !!(meta && typeof meta === 'object' && meta.premium);
+          if (isPremiumEntry) {
+            // Use the public cover endpoint for premium entries
+            return `/api/cover/${encodeURIComponent(series.id)}/${encodeURIComponent(entryName)}`;
+          }
+
+          const first = pages.find((p) => typeof p === 'string' && p.trim());
+          const cover = normalizeCoverUrl(first);
+          if (cover) return cover;
         }
 
-        const first = pages.find((p) => typeof p === 'string' && p.trim());
-        const cover = normalizeCoverUrl(first);
-        if (cover) return cover;
+        return null;
       }
 
-      return null;
-    }
-
-    // Prefer configured covers, otherwise infer from entry data.
-    async function resolveCover(series, opts) {
-      const configured = normalizeCoverUrl(series.coverImage || series.cover || '');
-      if (configured) return configured;
-      return inferCoverFromSeriesData(series, opts);
-    }
-
-    // Build a series card with access-aware actions.
-    function renderCard(series, canAccess) {
-      const card = document.createElement('div');
-      card.className = canAccess ? 'card' : 'card card--locked';
-
-      const title = document.createElement('h2');
-      title.textContent = series.title || series.id || 'Untitled';
-
-      const coverWrap = document.createElement('div');
-      coverWrap.className = 'cover';
-
-      const coverImg = document.createElement('img');
-      coverImg.setAttribute('data-cover', '1');
-      coverImg.alt = `${series.title || series.id || 'Series'} cover`;
-      coverImg.loading = 'lazy';
-      coverImg.decoding = 'async';
-
-      const placeholder = document.createElement('div');
-      placeholder.className = 'cover-placeholder';
-      placeholder.textContent = 'No cover yet';
-
-      coverImg.addEventListener('error', () => {
-        placeholder.textContent = canAccess ? 'Cover failed to load' : 'Premium (locked)';
-        coverWrap.appendChild(placeholder);
-      });
-
-      coverWrap.appendChild(coverImg);
-      coverWrap.appendChild(placeholder);
-
-      if (!canAccess) {
-        const badge = document.createElement('div');
-        badge.className = 'cover-badge';
-        badge.textContent = 'Patron';
-        coverWrap.appendChild(badge);
-        placeholder.textContent = 'Patron';
+      // Prefer configured covers, otherwise infer from entry data.
+      async function resolveCover(series, opts) {
+        const configured = normalizeCoverUrl(series.coverImage || series.cover || '');
+        if (configured) return configured;
+        return inferCoverFromSeriesData(series, opts);
       }
 
-      const desc = document.createElement('div');
-      desc.className = 'muted';
-      desc.textContent = series.description || '';
+      // Build a series card with access-aware actions.
+      function renderCard(series, canAccess) {
+        const card = document.createElement('div');
+        card.className = canAccess ? 'card' : 'card card--locked';
 
-      const meta = document.createElement('div');
-      meta.className = 'meta';
+        const title = document.createElement('h2');
+        title.textContent = series.title || series.id || 'Untitled';
 
-      const idPill = document.createElement('span');
-      idPill.className = 'pill';
-      idPill.textContent = `ID: ${series.id}`;
-      meta.appendChild(idPill);
+        const coverWrap = document.createElement('div');
+        coverWrap.className = 'cover';
 
-      if (series.premiumOnly) {
-        const premiumPill = document.createElement('span');
-        premiumPill.className = 'pill premium';
-        premiumPill.textContent = 'PREMIUM';
-        meta.appendChild(premiumPill);
-      }
+        const coverImg = document.createElement('img');
+        coverImg.setAttribute('data-cover', '1');
+        coverImg.alt = `${series.title || series.id || 'Series'} cover`;
+        coverImg.loading = 'lazy';
+        coverImg.decoding = 'async';
 
-      const actions = document.createElement('div');
-      actions.className = 'actions';
+        const placeholder = document.createElement('div');
+        placeholder.className = 'cover-placeholder';
+        placeholder.textContent = 'No cover yet';
 
-      const link = document.createElement('a');
-      link.className = 'btn';
-      link.href = `index.html?series=${encodeURIComponent(series.id)}`;
-      link.textContent = canAccess ? 'Open' : 'Locked';
-      if (!canAccess) {
-        link.setAttribute('aria-disabled', 'true');
-        link.addEventListener('click', (e) => e.preventDefault());
-      }
-      actions.appendChild(link);
-
-      card.appendChild(coverWrap);
-      card.appendChild(title);
-      if (series.description) card.appendChild(desc);
-      card.appendChild(meta);
-      card.appendChild(actions);
-      return card;
-    }
-
-    // Resolve and attach a cover image asynchronously.
-    async function attachCover(card, series, opts) {
-      const img = card.querySelector('img[data-cover="1"]');
-      const placeholder = card.querySelector('.cover-placeholder');
-      if (!img) return;
-
-      try {
-        const coverUrl = await resolveCover(series, opts);
-        if (!coverUrl) return;
-
-        if (placeholder) placeholder.remove();
-        img.src = coverUrl;
-      } catch (err) {
-        console.warn('Failed to resolve cover for', series.id, err);
-      }
-    }
-
-    // Fetch user + series data, then render the grid.
-    async function main() {
-      try {
-        const [user, seriesIndex] = await Promise.all([loadSession(), loadSeriesIndex()]);
-        const premium = isPremiumUser(user);
-        const greeting = user
-          ? `Signed in as ${user.displayName || user.email} (${user.role || 'user'})`
-          : 'Not signed in (premium series will be locked).';
-
-        statusEl.textContent = `${greeting} • Select a series below.`;
-
-        const sorted = [...seriesIndex.series].sort((a, b) => (a.title || a.id || '').localeCompare(b.title || b.id || ''));
-        const jobs = sorted.map((s) => {
-          const canAccess = !s.premiumOnly || premium;
-          const card = renderCard(s, canAccess);
-          gridEl.appendChild(card);
-          return attachCover(card, s, { canAccess, premium });
+        coverImg.addEventListener('error', () => {
+          placeholder.textContent = canAccess ? 'Cover failed to load' : 'Premium (locked)';
+          coverWrap.appendChild(placeholder);
         });
-        await Promise.allSettled(jobs);
-      } catch (err) {
-        statusEl.textContent = err.message || 'Failed to load.';
+
+        coverWrap.appendChild(coverImg);
+        coverWrap.appendChild(placeholder);
+
+        if (!canAccess) {
+          const badge = document.createElement('div');
+          badge.className = 'cover-badge';
+          badge.textContent = 'Patron';
+          coverWrap.appendChild(badge);
+          placeholder.textContent = 'Patron';
+        }
+
+        const desc = document.createElement('div');
+        desc.className = 'muted';
+        desc.textContent = series.description || '';
+
+        const meta = document.createElement('div');
+        meta.className = 'meta';
+
+        const idPill = document.createElement('span');
+        idPill.className = 'pill';
+        idPill.textContent = `ID: ${series.id}`;
+        meta.appendChild(idPill);
+
+        if (series.premiumOnly) {
+          const premiumPill = document.createElement('span');
+          premiumPill.className = 'pill premium';
+          premiumPill.textContent = 'PREMIUM';
+          meta.appendChild(premiumPill);
+        }
+
+        const actions = document.createElement('div');
+        actions.className = 'actions';
+
+        const link = document.createElement('a');
+        link.className = 'btn';
+        link.href = `index.html?series=${encodeURIComponent(series.id)}`;
+        link.textContent = canAccess ? 'Open' : 'Locked';
+        if (!canAccess) {
+          link.setAttribute('aria-disabled', 'true');
+          link.addEventListener('click', (e) => e.preventDefault());
+        }
+        actions.appendChild(link);
+
+        card.appendChild(coverWrap);
+        card.appendChild(title);
+        if (series.description) card.appendChild(desc);
+        card.appendChild(meta);
+        card.appendChild(actions);
+        return card;
       }
-    }
 
-    main();
-  </script>
-  <script>
-    // Load the analytics loader without Vite bundling it.
-    (() => {
-      const script = document.createElement("script");
-      script.defer = true;
-      script.src = "/analytics.js";
-      document.head.appendChild(script);
-    })();
-  </script>
-</body>
+      // Resolve and attach a cover image asynchronously.
+      async function attachCover(card, series, opts) {
+        const img = card.querySelector('img[data-cover="1"]');
+        const placeholder = card.querySelector('.cover-placeholder');
+        if (!img) return;
 
+        try {
+          const coverUrl = await resolveCover(series, opts);
+          if (!coverUrl) return;
+
+          if (placeholder) placeholder.remove();
+          img.src = coverUrl;
+        } catch (err) {
+          console.warn('Failed to resolve cover for', series.id, err);
+        }
+      }
+
+      // Fetch user + series data, then render the grid.
+      async function main() {
+        try {
+          const [user, seriesIndex] = await Promise.all([loadSession(), loadSeriesIndex()]);
+          const premium = isPremiumUser(user);
+          const greeting = user
+            ? `Signed in as ${user.displayName || user.email} (${user.role || 'user'})`
+            : 'Not signed in (premium series will be locked).';
+
+          statusEl.textContent = `${greeting} • Select a series below.`;
+
+          const sorted = [...seriesIndex.series].sort((a, b) =>
+            (a.title || a.id || '').localeCompare(b.title || b.id || '')
+          );
+          const jobs = sorted.map((s) => {
+            const canAccess = !s.premiumOnly || premium;
+            const card = renderCard(s, canAccess);
+            gridEl.appendChild(card);
+            return attachCover(card, s, { canAccess, premium });
+          });
+          await Promise.allSettled(jobs);
+        } catch (err) {
+          statusEl.textContent = err.message || 'Failed to load.';
+        }
+      }
+
+      main();
+    </script>
+    <script>
+      // Load the analytics loader without Vite bundling it.
+      (() => {
+        const script = document.createElement('script');
+        script.defer = true;
+        script.src = '/analytics.js';
+        document.head.appendChild(script);
+      })();
+    </script>
+  </body>
 </html>

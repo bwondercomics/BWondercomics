@@ -6,22 +6,22 @@ function parseDate(value) {
 }
 
 function formatStat(value) {
-  if (value === null || value === undefined) return "—";
+  if (value === null || value === undefined) return '—';
   const num = Number(value);
-  if (Number.isNaN(num)) return "—";
-  return num.toLocaleString("en-US");
+  if (Number.isNaN(num)) return '—';
+  return num.toLocaleString('en-US');
 }
 
 function formatPercent(value) {
-  if (value === null || value === undefined) return "—";
+  if (value === null || value === undefined) return '—';
   const num = Number(value);
-  if (!Number.isFinite(num)) return "—";
+  if (!Number.isFinite(num)) return '—';
   return `${Math.round(num * 100)}%`;
 }
 
 function formatRangeMinutes(value) {
   const minutes = Number(value);
-  if (!Number.isFinite(minutes) || minutes <= 0) return "0m";
+  if (!Number.isFinite(minutes) || minutes <= 0) return '0m';
   if (minutes < 60) return `${minutes}m`;
   const hours = minutes / 60;
   const rounded = Math.round(hours * 10) / 10;
@@ -30,7 +30,7 @@ function formatRangeMinutes(value) {
 
 function formatDuration(seconds) {
   const total = Number(seconds);
-  if (!Number.isFinite(total) || total <= 0) return "0m";
+  if (!Number.isFinite(total) || total <= 0) return '0m';
   const minutes = Math.floor(total / 60);
   const hours = Math.floor(minutes / 60);
   const remainder = minutes % 60;
@@ -39,11 +39,11 @@ function formatDuration(seconds) {
 }
 
 function formatTimeAgo(value) {
-  if (!value) return "just now";
+  if (!value) return 'just now';
   const date = parseDate(value);
-  if (!date) return "just now";
+  if (!date) return 'just now';
   const seconds = Math.max(0, Math.floor((Date.now() - date.getTime()) / 1000));
-  if (seconds < 60) return "just now";
+  if (seconds < 60) return 'just now';
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);
@@ -54,56 +54,54 @@ function formatTimeAgo(value) {
 
 function formatDateTime(value) {
   const date = parseDate(value);
-  if (!date) return "—";
+  if (!date) return '—';
   return date.toLocaleString();
 }
 
 function getCssVar(name, fallback) {
   if (!document?.documentElement) return fallback;
-  const value = getComputedStyle(document.documentElement)
-    .getPropertyValue(name)
-    .trim();
+  const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   return value || fallback;
 }
 
 function escapeHtml(value) {
-  return String(value || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
+  return String(value || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function formatRangeLabel(rangeKey) {
-  if (rangeKey === "24h") return "Last 24h";
-  if (rangeKey === "30d") return "Last 30d";
-  return "Last 7d";
+  if (rangeKey === '24h') return 'Last 24h';
+  if (rangeKey === '30d') return 'Last 30d';
+  return 'Last 7d';
 }
 
 function isValidRange(rangeKey) {
-  return rangeKey === "24h" || rangeKey === "7d" || rangeKey === "30d";
+  return rangeKey === '24h' || rangeKey === '7d' || rangeKey === '30d';
 }
 
 function formatBucketLabel(rangeKey, timestamp) {
-  if (!timestamp) return "";
+  if (!timestamp) return '';
   const date = new Date(timestamp);
-  if (Number.isNaN(date.getTime())) return "";
-  if (rangeKey === "24h") {
-    return date.toLocaleTimeString("en-US", { hour: "numeric" });
+  if (Number.isNaN(date.getTime())) return '';
+  if (rangeKey === '24h') {
+    return date.toLocaleTimeString('en-US', { hour: 'numeric' });
   }
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
   });
 }
 
 function formatShortDate(value) {
   const date = parseDate(value);
-  if (!date) return "";
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
+  if (!date) return '';
+  return date.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
   });
 }
 

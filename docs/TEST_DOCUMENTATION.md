@@ -1,6 +1,7 @@
 # Test Documentation
 
 ## Overview
+
 This repo has two active test surfaces:
 
 - Frontend/admin tests via `Vitest` in `tests/`
@@ -9,6 +10,7 @@ This repo has two active test surfaces:
 The test suite is intended to reflect current production terminology and behavior. Use the codebase as the source of truth: `entry` is the current reader/admin naming, and older `chapter` references are legacy.
 
 ## Runners
+
 Frontend:
 
 ```bash
@@ -33,7 +35,18 @@ Run both:
 npm run test:all
 ```
 
+Quality gates used for the `0.7.9` to `1.0.0` hardening pass:
+
+```bash
+npm run lint
+npm run format:check
+npm run lint:py
+npm run format:py:check
+npm run build
+```
+
 ## Setup
+
 Install JavaScript dependencies:
 
 ```bash
@@ -46,7 +59,10 @@ Install backend dev dependencies into the repo virtualenv:
 ./.venv/bin/pip install -r backend/requirements-dev.txt
 ```
 
+The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the JS format scripts call Prettier through `node ./node_modules/prettier/bin/prettier.cjs` to avoid shell wrapper issues.
+
 ## Frontend Test Files
+
 - `tests/entries.test.js`: entry parsing, sorting, and normalization helpers in `reader/entries.js`
 - `tests/state.test.js`: `reader/state.js` persistence behavior
 - `tests/data.test.js`: `reader/data.js` loaders
@@ -82,6 +98,7 @@ Install backend dev dependencies into the repo virtualenv:
 - `tests/helpers/reader-fixture.js`: live reader markup harness from `index.html`
 
 ## Backend Test Files
+
 - `backend/tests/test_diagnostics_ops.py`: diagnostics snapshots, ops access controls, and internal ops callbacks
 - `backend/tests/test_site_branding.py`: site-branding asset resolution and HTML/manifest branding
 - `backend/tests/test_auth_routes.py`: auth/session/register/login/logout route contracts
@@ -95,6 +112,7 @@ Install backend dev dependencies into the repo virtualenv:
 - `backend/tests/helpers.py`: shared in-memory DB, request factory, and contract seeding helpers for series, builder pages, comments, premium codes, and visitor sessions
 
 ## Documentation Rules
+
 - Do not claim fixed coverage percentages unless they are generated and current.
 - When adding tests, prefer focused module/manager tests over brittle app-wide DOM fixtures.
 - If an admin test depends on the live markup contract, reuse the shared HTML fixture rather than hand-maintaining an incomplete DOM template.

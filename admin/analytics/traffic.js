@@ -1,18 +1,14 @@
-import { el } from "../dom.js";
+import { el } from '../dom.js';
 import {
   ANALYTICS_ENDPOINT,
   ANALYTICS_PAGES_ENDPOINT,
   ANALYTICS_VISITORS_ENDPOINT,
-} from "../state.js";
-import {
-  escapeHtml,
-  formatDuration,
-  formatStat,
-} from "./shared.js";
+} from '../state.js';
+import { escapeHtml, formatDuration, formatStat } from './shared.js';
 
 function createTrafficAnalytics() {
   function getAnalyticsRange() {
-    return (el.analyticsPagesRange?.value || "7d").trim();
+    return (el.analyticsPagesRange?.value || '7d').trim();
   }
 
   function setAnalyticsValue(target, value) {
@@ -22,29 +18,23 @@ function createTrafficAnalytics() {
 
   function setAnalyticsStatus(message, isError = false) {
     if (!el.analyticsStatus) return;
-    el.analyticsStatus.textContent = message || "";
-    el.analyticsStatus.style.display = message ? "block" : "none";
-    el.analyticsStatus.className = isError ? "error-message" : "success-message";
+    el.analyticsStatus.textContent = message || '';
+    el.analyticsStatus.style.display = message ? 'block' : 'none';
+    el.analyticsStatus.className = isError ? 'error-message' : 'success-message';
   }
 
   function setPagesStatus(message, isError = false) {
     if (!el.analyticsPagesStatus) return;
-    el.analyticsPagesStatus.textContent = message || "";
-    el.analyticsPagesStatus.style.display = message ? "block" : "none";
-    el.analyticsPagesStatus.className = isError ? "error-message" : "success-message";
-  }
-
-  function getAnalyticsCount(item) {
-    const value = item?.count ?? item?.views ?? item?.total ?? item?.value ?? 0;
-    const num = Number(value);
-    return Number.isFinite(num) ? num : 0;
+    el.analyticsPagesStatus.textContent = message || '';
+    el.analyticsPagesStatus.style.display = message ? 'block' : 'none';
+    el.analyticsPagesStatus.className = isError ? 'error-message' : 'success-message';
   }
 
   function formatBounceRate(item) {
     const visits = Number(item?.visits);
     const bounces = Number(item?.bounces);
     if (!Number.isFinite(visits) || visits <= 0 || !Number.isFinite(bounces)) {
-      return "Bounce —";
+      return 'Bounce —';
     }
     return `Bounce ${Math.round((bounces / visits) * 100)}%`;
   }
@@ -52,13 +42,8 @@ function createTrafficAnalytics() {
   function formatAverageVisitTime(item) {
     const totalTime = Number(item?.totaltime);
     const visits = Number(item?.visits);
-    if (
-      !Number.isFinite(totalTime) ||
-      totalTime <= 0 ||
-      !Number.isFinite(visits) ||
-      visits <= 0
-    ) {
-      return "Avg time —";
+    if (!Number.isFinite(totalTime) || totalTime <= 0 || !Number.isFinite(visits) || visits <= 0) {
+      return 'Avg time —';
     }
     const averageSeconds = totalTime / visits / 1000;
     return `Avg time ${formatDuration(averageSeconds)}`;
@@ -76,20 +61,20 @@ function createTrafficAnalytics() {
     }
     parts.push(formatBounceRate(item));
     parts.push(formatAverageVisitTime(item));
-    return parts.join(" · ");
+    return parts.join(' · ');
   }
 
-  function formatMetricName(item, fallback = "Unknown") {
-    const raw = String(item?.name || item?.label || item?.path || item?.x || "").trim();
+  function formatMetricName(item, fallback = 'Unknown') {
+    const raw = String(item?.name || item?.label || item?.path || item?.x || '').trim();
     if (!raw) return fallback;
-    return raw === "/" ? "/ (home)" : raw;
+    return raw === '/' ? '/ (home)' : raw;
   }
 
   function renderMetricList(
     containerId,
     items,
-    valueLabel = "Views",
-    emptyText = "No data available",
+    valueLabel = 'Views',
+    emptyText = 'No data available'
   ) {
     const container = document.getElementById(containerId);
     if (!container) return;
@@ -101,12 +86,12 @@ function createTrafficAnalytics() {
 
     const maxVal = Math.max(
       ...items.map((item) => Number(item.views || item.count || item.y || 0)),
-      1,
+      1
     );
 
     container.innerHTML = items
       .map((item) => {
-        const label = item.path || item.name || item.value || item.label || item.x || "Unknown";
+        const label = item.path || item.name || item.value || item.label || item.x || 'Unknown';
         const count = Number(item.views || item.count || item.y || 0);
         const pct = (count / maxVal) * 100;
 
@@ -124,7 +109,7 @@ function createTrafficAnalytics() {
           </div>
         `;
       })
-      .join("");
+      .join('');
   }
 
   function renderExpandedMetricList(target, items, emptyText) {
@@ -158,7 +143,7 @@ function createTrafficAnalytics() {
           </div>
         `;
       })
-      .join("");
+      .join('');
   }
 
   function renderAnalyticsSummary(summary) {
@@ -172,8 +157,8 @@ function createTrafficAnalytics() {
     setAnalyticsValue(el.statVisitors7d, last7d.visitors);
 
     const ts = summary?.generatedAt ? new Date(summary.generatedAt) : null;
-    const tsText = ts ? ts.toLocaleString() : "just now";
-    const siteNote = summary?.websiteId ? ` for site ${summary.websiteId}` : "";
+    const tsText = ts ? ts.toLocaleString() : 'just now';
+    const siteNote = summary?.websiteId ? ` for site ${summary.websiteId}` : '';
     setAnalyticsStatus(`Updated ${tsText}${siteNote}.`);
   }
 
@@ -185,65 +170,45 @@ function createTrafficAnalytics() {
   }
 
   function clearAnalyticsVisitors() {
-    renderExpandedMetricList(
-      el.analyticsLandingPagesList,
-      [],
-      "No landing-page data available.",
-    );
-    renderExpandedMetricList(
-      el.analyticsReferrersList,
-      [],
-      "No referrer data available.",
-    );
-    renderExpandedMetricList(
-      el.analyticsCountriesList,
-      [],
-      "No country data available.",
-    );
-    renderExpandedMetricList(
-      el.analyticsBrowsersList,
-      [],
-      "No browser data available.",
-    );
-    renderExpandedMetricList(
-      el.analyticsDevicesList,
-      [],
-      "No device data available.",
-    );
-    renderMetricList("analyticsEventsList", [], "Visitors", "No event data available.");
+    renderExpandedMetricList(el.analyticsLandingPagesList, [], 'No landing-page data available.');
+    renderExpandedMetricList(el.analyticsReferrersList, [], 'No referrer data available.');
+    renderExpandedMetricList(el.analyticsCountriesList, [], 'No country data available.');
+    renderExpandedMetricList(el.analyticsBrowsersList, [], 'No browser data available.');
+    renderExpandedMetricList(el.analyticsDevicesList, [], 'No device data available.');
+    renderMetricList('analyticsEventsList', [], 'Visitors', 'No event data available.');
   }
 
   function renderAnalyticsVisitors(payload) {
     renderExpandedMetricList(
       el.analyticsLandingPagesList,
       payload?.landingPages,
-      "No landing-page data available.",
+      'No landing-page data available.'
     );
     renderExpandedMetricList(
       el.analyticsReferrersList,
       payload?.referrers,
-      "No referrer data available.",
+      'No referrer data available.'
     );
     renderExpandedMetricList(
       el.analyticsCountriesList,
       payload?.countries,
-      "No country data available.",
+      'No country data available.'
     );
     renderExpandedMetricList(
       el.analyticsBrowsersList,
       payload?.browsers,
-      "No browser data available.",
+      'No browser data available.'
     );
     renderExpandedMetricList(
       el.analyticsDevicesList,
       payload?.devices,
-      "No device data available.",
+      'No device data available.'
     );
     renderMetricList(
-      "analyticsEventsList",
+      'analyticsEventsList',
       payload?.events,
-      "Visitors",
-      "No event data available.",
+      'Visitors',
+      'No event data available.'
     );
   }
 
@@ -257,7 +222,7 @@ function createTrafficAnalytics() {
     }
     el.analyticsPagesList.innerHTML = pages
       .map((page) => {
-        const path = escapeHtml(page?.path || "Unknown");
+        const path = escapeHtml(page?.path || 'Unknown');
         const views = formatStat(page?.views);
         return `
           <div class="analytics-pages-item">
@@ -266,13 +231,13 @@ function createTrafficAnalytics() {
           </div>
         `;
       })
-      .join("");
+      .join('');
   }
 
   async function loadAnalyticsSummary({ showLoading = true } = {}) {
-    if (showLoading) setAnalyticsStatus("Loading analytics…");
+    if (showLoading) setAnalyticsStatus('Loading analytics…');
     try {
-      const res = await fetch(ANALYTICS_ENDPOINT, { cache: "no-store" });
+      const res = await fetch(ANALYTICS_ENDPOINT, { cache: 'no-store' });
       let payload = null;
       try {
         payload = await res.json();
@@ -282,8 +247,7 @@ function createTrafficAnalytics() {
 
       if (!res.ok) {
         const errorText =
-          (payload && typeof payload === "object" && payload.error) ||
-          `HTTP ${res.status}`;
+          (payload && typeof payload === 'object' && payload.error) || `HTTP ${res.status}`;
         throw new Error(errorText);
       }
 
@@ -291,25 +255,22 @@ function createTrafficAnalytics() {
       return payload || {};
     } catch (err) {
       clearAnalyticsSummary();
-      setAnalyticsStatus(
-        `Analytics error: ${err?.message || "Unable to load Umami stats."}`,
-        true,
-      );
+      setAnalyticsStatus(`Analytics error: ${err?.message || 'Unable to load Umami stats.'}`, true);
       return null;
     }
   }
 
   async function loadAnalyticsPages({ showLoading = true } = {}) {
     if (!el.analyticsPagesList) return null;
-    if (showLoading) setPagesStatus("Loading page reads…");
+    if (showLoading) setPagesStatus('Loading page reads…');
     const params = new URLSearchParams({
       range: getAnalyticsRange(),
-      limit: "12",
+      limit: '12',
     });
 
     try {
       const res = await fetch(`${ANALYTICS_PAGES_ENDPOINT}?${params.toString()}`, {
-        cache: "no-store",
+        cache: 'no-store',
       });
       let payload = null;
       try {
@@ -320,22 +281,18 @@ function createTrafficAnalytics() {
 
       if (!res.ok) {
         const errorText =
-          (payload && typeof payload === "object" && payload.error) ||
-          `HTTP ${res.status}`;
+          (payload && typeof payload === 'object' && payload.error) || `HTTP ${res.status}`;
         throw new Error(errorText);
       }
 
       renderAnalyticsPages(payload || {});
       const ts = payload?.generatedAt ? new Date(payload.generatedAt) : null;
-      const tsText = ts ? ts.toLocaleString() : "just now";
+      const tsText = ts ? ts.toLocaleString() : 'just now';
       setPagesStatus(`Updated ${tsText}.`);
       return payload || {};
     } catch (err) {
       renderAnalyticsPages({});
-      setPagesStatus(
-        `Analytics error: ${err?.message || "Unable to load page reads."}`,
-        true,
-      );
+      setPagesStatus(`Analytics error: ${err?.message || 'Unable to load page reads.'}`, true);
       return null;
     }
   }
@@ -344,41 +301,21 @@ function createTrafficAnalytics() {
     if (!el.analyticsReferrersList) return null;
     const params = new URLSearchParams({
       range: getAnalyticsRange(),
-      limit: "8",
+      limit: '8',
     });
 
     if (showLoading) {
-      renderExpandedMetricList(
-        el.analyticsLandingPagesList,
-        [],
-        "Loading visitor data…",
-      );
-      renderExpandedMetricList(
-        el.analyticsReferrersList,
-        [],
-        "Loading visitor data…",
-      );
-      renderExpandedMetricList(
-        el.analyticsCountriesList,
-        [],
-        "Loading visitor data…",
-      );
-      renderExpandedMetricList(
-        el.analyticsBrowsersList,
-        [],
-        "Loading visitor data…",
-      );
-      renderExpandedMetricList(
-        el.analyticsDevicesList,
-        [],
-        "Loading visitor data…",
-      );
-      renderMetricList("analyticsEventsList", [], "Visitors", "Loading visitor data…");
+      renderExpandedMetricList(el.analyticsLandingPagesList, [], 'Loading visitor data…');
+      renderExpandedMetricList(el.analyticsReferrersList, [], 'Loading visitor data…');
+      renderExpandedMetricList(el.analyticsCountriesList, [], 'Loading visitor data…');
+      renderExpandedMetricList(el.analyticsBrowsersList, [], 'Loading visitor data…');
+      renderExpandedMetricList(el.analyticsDevicesList, [], 'Loading visitor data…');
+      renderMetricList('analyticsEventsList', [], 'Visitors', 'Loading visitor data…');
     }
 
     try {
       const res = await fetch(`${ANALYTICS_VISITORS_ENDPOINT}?${params.toString()}`, {
-        cache: "no-store",
+        cache: 'no-store',
       });
       let payload = null;
       try {
@@ -389,8 +326,7 @@ function createTrafficAnalytics() {
 
       if (!res.ok) {
         const errorText =
-          (payload && typeof payload === "object" && payload.error) ||
-          `HTTP ${res.status}`;
+          (payload && typeof payload === 'object' && payload.error) || `HTTP ${res.status}`;
         throw new Error(errorText);
       }
 

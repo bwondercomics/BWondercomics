@@ -47,11 +47,12 @@ function sanitizeContent(html = '') {
       } else {
         [...child.attributes].forEach((attr) => {
           const name = attr.name.toLowerCase();
-          const allowedAttrs = tag === 'a'
-            ? ['href', 'title', 'target', 'rel']
-            : tag === 'img'
-              ? ['src', 'alt', 'title']
-              : [];
+          const allowedAttrs =
+            tag === 'a'
+              ? ['href', 'title', 'target', 'rel']
+              : tag === 'img'
+                ? ['src', 'alt', 'title']
+                : [];
           if (!allowedAttrs.includes(name)) child.removeAttribute(attr.name);
         });
         if (tag === 'a') {
@@ -145,9 +146,10 @@ function renderFeedItem(post, index, feedStyle = {}) {
   date.className = 'feed-item-date';
   if (feedStyle.itemDateColor) date.style.color = feedStyle.itemDateColor;
   const parsedDate = post.date ? new Date(post.date) : null;
-  date.textContent = parsedDate && !Number.isNaN(parsedDate)
-    ? parsedDate.toLocaleDateString(undefined, { dateStyle: 'medium' })
-    : 'Date not set';
+  date.textContent =
+    parsedDate && !Number.isNaN(parsedDate)
+      ? parsedDate.toLocaleDateString(undefined, { dateStyle: 'medium' })
+      : 'Date not set';
 
   const preview = document.createElement('div');
   preview.className = 'feed-item-preview';
@@ -190,12 +192,15 @@ export async function loadFeedInto(body, limit = null, feedStyle = {}) {
     }
 
     const fragment = document.createDocumentFragment();
-    limitedPosts.forEach((post, index) => fragment.appendChild(renderFeedItem(post, index, feedStyle)));
+    limitedPosts.forEach((post, index) =>
+      fragment.appendChild(renderFeedItem(post, index, feedStyle))
+    );
     body.appendChild(fragment);
     return true;
   } catch (err) {
     console.error('Feed panel error:', err);
-    body.innerHTML = '<div class="latest-empty" style="color: var(--danger);">Could not load updates.</div>';
+    body.innerHTML =
+      '<div class="latest-empty" style="color: var(--danger);">Could not load updates.</div>';
     return false;
   }
 }
@@ -216,7 +221,8 @@ async function loadLatestInto(body, options = {}) {
     return true;
   } catch (err) {
     console.error('Latest update widget error:', err);
-    body.innerHTML = '<div class="latest-empty" style="color: var(--danger);">Could not load updates.</div>';
+    body.innerHTML =
+      '<div class="latest-empty" style="color: var(--danger);">Could not load updates.</div>';
     return false;
   }
 }
@@ -282,7 +288,11 @@ export function initFeedModules(container) {
     const mediaLabel = moduleEl.dataset.mediaLabel || 'Media';
 
     let feedStyle = {};
-    try { feedStyle = JSON.parse(moduleEl.dataset.feedStyle || '{}'); } catch { /* ignore */ }
+    try {
+      feedStyle = JSON.parse(moduleEl.dataset.feedStyle || '{}');
+    } catch {
+      /* ignore */
+    }
 
     if (feedLink) {
       feedLink.href = feedHref;

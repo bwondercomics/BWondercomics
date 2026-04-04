@@ -9,7 +9,7 @@
 }
 
 .email-signup-label {
-  font-family: "Bebas Neue", sans-serif;
+  font-family: 'Bebas Neue', sans-serif;
   font-size: 18px;
   font-weight: 700;
   color: var(--text);
@@ -34,7 +34,7 @@
   background: rgba(26, 26, 46, 0.8);
   border: 3px solid var(--primary);
   color: var(--text);
-  font-family: "Righteous", sans-serif;
+  font-family: 'Righteous', sans-serif;
   font-size: 14px;
   text-align: center;
   transition: all 0.2s;
@@ -62,7 +62,7 @@
   background: linear-gradient(135deg, var(--accent), var(--primary));
   border: 3px solid var(--accent);
   color: var(--bg-dark);
-  font-family: "Bebas Neue", sans-serif;
+  font-family: 'Bebas Neue', sans-serif;
   font-size: 18px;
   font-weight: 900;
   text-transform: uppercase;
@@ -97,7 +97,7 @@
 }
 
 .email-signup-cta {
-  font-family: "Bebas Neue", sans-serif;
+  font-family: 'Bebas Neue', sans-serif;
   font-size: 16px;
   font-weight: 700;
   color: var(--accent);
@@ -110,7 +110,7 @@
 }
 
 .email-form-message {
-  font-family: "Righteous", sans-serif;
+  font-family: 'Righteous', sans-serif;
   font-size: 14px;
   text-align: center;
   padding: 8px 12px;

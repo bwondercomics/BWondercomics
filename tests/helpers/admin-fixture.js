@@ -14,7 +14,7 @@ export function jsonResponse(body, options = {}) {
     status,
     statusText,
     json: async () => body,
-    text: async () => JSON.stringify(body)
+    text: async () => JSON.stringify(body),
   };
 }
 
@@ -24,8 +24,14 @@ export function mountAdminDom() {
 
 export function stubAdminGlobals(vi) {
   vi.stubGlobal('alert', vi.fn());
-  vi.stubGlobal('confirm', vi.fn(() => true));
-  vi.stubGlobal('prompt', vi.fn(() => ''));
+  vi.stubGlobal(
+    'confirm',
+    vi.fn(() => true)
+  );
+  vi.stubGlobal(
+    'prompt',
+    vi.fn(() => '')
+  );
   vi.stubGlobal('crypto', { randomUUID: () => 'uuid-123' });
   vi.stubGlobal('requestAnimationFrame', (cb) => setTimeout(() => cb(Date.now()), 0));
   vi.stubGlobal('cancelAnimationFrame', (id) => clearTimeout(id));

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../reader/analytics.js', () => ({
   markEntryComplete: vi.fn(),
-  trackVisiblePages: vi.fn()
+  trackVisiblePages: vi.fn(),
 }));
 
 import { initElements, el } from '../reader/dom.js';
@@ -13,11 +13,11 @@ import { state } from '../reader/state.js';
 function setClientSize(node, width, height) {
   Object.defineProperty(node, 'clientWidth', {
     configurable: true,
-    value: width
+    value: width,
   });
   Object.defineProperty(node, 'clientHeight', {
     configurable: true,
-    value: height
+    value: height,
   });
 }
 
@@ -33,7 +33,7 @@ function setRect(node, width, height) {
     y: 0,
     toJSON() {
       return {};
-    }
+    },
   });
 }
 
@@ -49,7 +49,7 @@ describe('on-page reader frame sizing', () => {
       removeEventListener: vi.fn(),
       addListener: vi.fn(),
       removeListener: vi.fn(),
-      dispatchEvent: vi.fn()
+      dispatchEvent: vi.fn(),
     }));
 
     document.body.className = '';
@@ -89,7 +89,7 @@ describe('on-page reader frame sizing', () => {
 
     Object.defineProperty(document, 'fullscreenElement', {
       configurable: true,
-      value: null
+      value: null,
     });
 
     window.innerWidth = 800;
@@ -104,7 +104,7 @@ describe('on-page reader frame sizing', () => {
     state.pages = ['page-portrait.png', 'page-landscape.png'];
     state.pageMetrics = new Map([
       ['page-portrait.png', { width: 600, height: 900 }],
-      ['page-landscape.png', { width: 1600, height: 900 }]
+      ['page-landscape.png', { width: 1600, height: 900 }],
     ]);
 
     render();
@@ -123,16 +123,14 @@ describe('on-page reader frame sizing', () => {
 
   it('ignores on-page sizing while fullscreen is active', () => {
     state.pages = ['page-portrait.png'];
-    state.pageMetrics = new Map([
-      ['page-portrait.png', { width: 600, height: 900 }]
-    ]);
+    state.pageMetrics = new Map([['page-portrait.png', { width: 600, height: 900 }]]);
 
     expect(fitOnPageFrame()).not.toBeNull();
     expect(el.viewport.classList.contains('dynamic-frame')).toBe(true);
 
     Object.defineProperty(document, 'fullscreenElement', {
       configurable: true,
-      value: {}
+      value: {},
     });
 
     expect(fitOnPageFrame()).toBeNull();
@@ -141,9 +139,7 @@ describe('on-page reader frame sizing', () => {
 
   it('keeps the responsive stacked layout on the existing full-width path', () => {
     state.pages = ['page-portrait.png'];
-    state.pageMetrics = new Map([
-      ['page-portrait.png', { width: 600, height: 900 }]
-    ]);
+    state.pageMetrics = new Map([['page-portrait.png', { width: 600, height: 900 }]]);
     stackedLayout = true;
 
     expect(fitOnPageFrame()).toBeNull();

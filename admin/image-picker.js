@@ -1,18 +1,18 @@
-import { readFileAsBase64 } from "./utils.js";
+import { readFileAsBase64 } from './utils.js';
 
-function resolveDefaultSrc(path = "") {
-  const raw = String(path || "").trim();
-  if (!raw) return "";
+function resolveDefaultSrc(path = '') {
+  const raw = String(path || '').trim();
+  if (!raw) return '';
   if (/^https?:\/\//i.test(raw)) return raw;
-  if (raw.startsWith("/")) return raw;
+  if (raw.startsWith('/')) return raw;
   return `/${raw}`;
 }
 
 function getFileLabel(item) {
-  if (!item) return "";
+  if (!item) return '';
   if (item.label) return item.label;
-  const path = item.path || "";
-  return path.split("/").pop() || path;
+  const path = item.path || '';
+  return path.split('/').pop() || path;
 }
 
 function clampPercent(value) {
@@ -23,7 +23,7 @@ function clampPercent(value) {
 
 export async function openImagePicker(options = {}) {
   const {
-    title = "Select Image",
+    title = 'Select Image',
     getItems,
     onApply,
     onCancel,
@@ -36,19 +36,19 @@ export async function openImagePicker(options = {}) {
     cropRatio = null,
   } = options;
 
-  if (typeof getItems !== "function") {
-    throw new Error("openImagePicker requires getItems()");
+  if (typeof getItems !== 'function') {
+    throw new Error('openImagePicker requires getItems()');
   }
 
   let items = [];
   try {
     items = (await getItems()) || [];
   } catch (err) {
-    console.error("Failed to load image picker items", err);
+    console.error('Failed to load image picker items', err);
   }
 
-  const modal = document.createElement("div");
-  modal.className = "ip-modal";
+  const modal = document.createElement('div');
+  modal.className = 'ip-modal';
   modal.innerHTML = `
     <div class="ip-backdrop" aria-hidden="true"></div>
     <div class="ip-dialog" role="dialog" aria-modal="true" aria-label="${title}">
@@ -60,7 +60,7 @@ export async function openImagePicker(options = {}) {
         <div class="ip-list-pane">
           <div class="ip-list-header">
             <div class="ip-list-title">Images</div>
-            ${allowUpload ? `<label class="ip-upload-btn">Upload<input type="file" accept="image/*" class="ip-upload-input" /></label>` : ""}
+            ${allowUpload ? `<label class="ip-upload-btn">Upload<input type="file" accept="image/*" class="ip-upload-input" /></label>` : ''}
           </div>
           <div class="ip-list"></div>
         </div>
@@ -107,41 +107,41 @@ export async function openImagePicker(options = {}) {
   `;
 
   document.body.appendChild(modal);
-  const listEl = modal.querySelector(".ip-list");
-  const previewEl = modal.querySelector(".ip-preview");
-  const previewImg = modal.querySelector(".ip-preview-img");
-  const focusDot = modal.querySelector(".ip-focus-dot");
-  const cropBox = modal.querySelector(".ip-crop-box");
-  const fitSelect = modal.querySelector(".ip-fit");
-  const rangeX = modal.querySelector(".ip-range-x");
-  const rangeY = modal.querySelector(".ip-range-y");
-  const rangeXValue = modal.querySelector(".ip-range-x-value");
-  const rangeYValue = modal.querySelector(".ip-range-y-value");
-  const applyBtn = modal.querySelector(".ip-apply");
-  const selectedName = modal.querySelector(".ip-selected-name");
-  const uploadInput = modal.querySelector(".ip-upload-input");
+  const listEl = modal.querySelector('.ip-list');
+  const previewEl = modal.querySelector('.ip-preview');
+  const previewImg = modal.querySelector('.ip-preview-img');
+  const focusDot = modal.querySelector('.ip-focus-dot');
+  const cropBox = modal.querySelector('.ip-crop-box');
+  const fitSelect = modal.querySelector('.ip-fit');
+  const rangeX = modal.querySelector('.ip-range-x');
+  const rangeY = modal.querySelector('.ip-range-y');
+  const rangeXValue = modal.querySelector('.ip-range-x-value');
+  const rangeYValue = modal.querySelector('.ip-range-y-value');
+  const applyBtn = modal.querySelector('.ip-apply');
+  const selectedName = modal.querySelector('.ip-selected-name');
+  const uploadInput = modal.querySelector('.ip-upload-input');
 
   let selectedItem = null;
-  let focus = { fit: "cover", x: 50, y: 50, zoom: 1 };
+  let focus = { fit: 'cover', x: 50, y: 50, zoom: 1 };
   let dragState = null;
 
   if (!showEditor) {
-    modal.classList.add("ip-no-editor");
-    const editorControls = modal.querySelector(".ip-editor-controls");
-    if (editorControls) editorControls.style.display = "none";
-    if (focusDot) focusDot.style.display = "none";
-    if (cropBox) cropBox.style.display = "none";
+    modal.classList.add('ip-no-editor');
+    const editorControls = modal.querySelector('.ip-editor-controls');
+    if (editorControls) editorControls.style.display = 'none';
+    if (focusDot) focusDot.style.display = 'none';
+    if (cropBox) cropBox.style.display = 'none';
   } else if (allowCrop) {
-    previewImg.classList.add("ip-preview-img--crop");
-    if (cropBox) cropBox.style.display = "block";
+    previewImg.classList.add('ip-preview-img--crop');
+    if (cropBox) cropBox.style.display = 'block';
   } else if (cropBox) {
-    cropBox.style.display = "none";
+    cropBox.style.display = 'none';
   }
 
   const close = () => {
     modal.remove();
-    window.removeEventListener("resize", updateCropBox);
-    if (typeof onCancel === "function") onCancel();
+    window.removeEventListener('resize', updateCropBox);
+    if (typeof onCancel === 'function') onCancel();
   };
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -175,7 +175,7 @@ export async function openImagePicker(options = {}) {
     const imgRect = getImageRect();
     if (!imgRect) return;
 
-    const ratio = cropRatio || (imgRect.previewRect.width / imgRect.previewRect.height) || 1;
+    const ratio = cropRatio || imgRect.previewRect.width / imgRect.previewRect.height || 1;
     const zoom = Math.max(1, Number(focus.zoom) || 1);
     let boxWidth = imgRect.width / zoom;
     let boxHeight = boxWidth / ratio;
@@ -199,7 +199,7 @@ export async function openImagePicker(options = {}) {
 
   const setFocus = (next) => {
     focus = {
-      fit: next.fit || "cover",
+      fit: next.fit || 'cover',
       x: clampPercent(next.x),
       y: clampPercent(next.y),
       zoom: Math.max(1, Number(next.zoom) || 1),
@@ -210,21 +210,21 @@ export async function openImagePicker(options = {}) {
     if (rangeXValue) rangeXValue.textContent = `${focus.x}%`;
     if (rangeYValue) rangeYValue.textContent = `${focus.y}%`;
     if (showEditor) {
-      const appliedFit = allowCrop ? "contain" : focus.fit;
+      const appliedFit = allowCrop ? 'contain' : focus.fit;
       previewImg.style.objectFit = appliedFit;
       previewImg.style.objectPosition = `${focus.x}% ${focus.y}%`;
-      previewImg.style.transform = allowCrop ? `scale(${focus.zoom})` : "";
+      previewImg.style.transform = allowCrop ? `scale(${focus.zoom})` : '';
       previewImg.style.transformOrigin = `${focus.x}% ${focus.y}%`;
       if (focusDot) {
-        focusDot.style.display = allowCrop ? "none" : "";
+        focusDot.style.display = allowCrop ? 'none' : '';
         focusDot.style.left = `${focus.x}%`;
         focusDot.style.top = `${focus.y}%`;
       }
     } else {
-      previewImg.style.objectFit = "contain";
-      previewImg.style.objectPosition = "center";
-      previewImg.style.transform = "";
-      previewImg.style.transformOrigin = "center";
+      previewImg.style.objectFit = 'contain';
+      previewImg.style.objectPosition = 'center';
+      previewImg.style.transform = '';
+      previewImg.style.transformOrigin = 'center';
     }
     updateCropBox();
   };
@@ -233,10 +233,12 @@ export async function openImagePicker(options = {}) {
     selectedItem = item;
     applyBtn.disabled = !selectedItem;
     if (!selectedItem) return;
-    const src = resolveSrc(selectedItem.previewSrc || selectedItem.thumbSrc || selectedItem.path || "");
+    const src = resolveSrc(
+      selectedItem.previewSrc || selectedItem.thumbSrc || selectedItem.path || ''
+    );
     previewImg.src = src;
-    previewImg.alt = selectedItem.label || selectedItem.path || "Image";
-    selectedName.textContent = selectedItem.label || selectedItem.path || "";
+    previewImg.alt = selectedItem.label || selectedItem.path || 'Image';
+    selectedName.textContent = selectedItem.label || selectedItem.path || '';
 
     const initial = selectedItem.focal || initialSelection || {};
     if (initialSelection && (initialSelection.id || initialSelection.path)) {
@@ -251,23 +253,23 @@ export async function openImagePicker(options = {}) {
   };
 
   const renderList = () => {
-    listEl.innerHTML = "";
+    listEl.innerHTML = '';
     if (!items.length) {
       listEl.innerHTML = '<div class="ip-empty">No images found.</div>';
       return;
     }
     items.forEach((item) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "ip-item";
-      const thumbSrc = resolveSrc(item.thumbSrc || item.previewSrc || item.path || "");
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'ip-item';
+      const thumbSrc = resolveSrc(item.thumbSrc || item.previewSrc || item.path || '');
       button.innerHTML = `
         <img src="${thumbSrc}" alt="" loading="lazy" />
         <div class="ip-item-name">${getFileLabel(item)}</div>
       `;
-      button.addEventListener("click", () => {
-        listEl.querySelectorAll(".ip-item").forEach((el) => el.classList.remove("active"));
-        button.classList.add("active");
+      button.addEventListener('click', () => {
+        listEl.querySelectorAll('.ip-item').forEach((el) => el.classList.remove('active'));
+        button.classList.add('active');
         selectItem(item);
       });
       listEl.appendChild(button);
@@ -282,24 +284,24 @@ export async function openImagePicker(options = {}) {
     setFocus({ ...focus, x, y });
   };
 
-  modal.querySelector(".ip-close").addEventListener("click", close);
-  modal.querySelector(".ip-cancel").addEventListener("click", close);
-  modal.querySelector(".ip-backdrop").addEventListener("click", close);
+  modal.querySelector('.ip-close').addEventListener('click', close);
+  modal.querySelector('.ip-cancel').addEventListener('click', close);
+  modal.querySelector('.ip-backdrop').addEventListener('click', close);
 
   if (showEditor) {
-    fitSelect?.addEventListener("change", () => setFocus({ ...focus, fit: fitSelect.value }));
-    rangeX?.addEventListener("input", () => setFocus({ ...focus, x: rangeX.value }));
-    rangeY?.addEventListener("input", () => setFocus({ ...focus, y: rangeY.value }));
-    previewImg.addEventListener("pointerdown", (event) => {
+    fitSelect?.addEventListener('change', () => setFocus({ ...focus, fit: fitSelect.value }));
+    rangeX?.addEventListener('input', () => setFocus({ ...focus, x: rangeX.value }));
+    rangeY?.addEventListener('input', () => setFocus({ ...focus, y: rangeY.value }));
+    previewImg.addEventListener('pointerdown', (event) => {
       if (!selectedItem) return;
       updateFocusFromPointer(event);
     });
   }
 
   if (showEditor && cropBox) {
-    cropBox.addEventListener("pointerdown", (event) => {
+    cropBox.addEventListener('pointerdown', (event) => {
       if (!allowCrop || !selectedItem) return;
-      const handle = event.target.closest(".ip-crop-handle");
+      const handle = event.target.closest('.ip-crop-handle');
       event.preventDefault();
       const imgRect = getImageRect();
       const boxRect = cropBox.getBoundingClientRect();
@@ -309,9 +311,9 @@ export async function openImagePicker(options = {}) {
         const top = boxRect.top - imgRect.top;
         const right = boxRect.right - imgRect.left;
         const bottom = boxRect.bottom - imgRect.top;
-        if (handle?.className.includes("--nw")) return { x: right, y: bottom };
-        if (handle?.className.includes("--ne")) return { x: left, y: bottom };
-        if (handle?.className.includes("--sw")) return { x: right, y: top };
+        if (handle?.className.includes('--nw')) return { x: right, y: bottom };
+        if (handle?.className.includes('--ne')) return { x: left, y: bottom };
+        if (handle?.className.includes('--sw')) return { x: right, y: top };
         return { x: left, y: top };
       })();
       const centerX = boxRect.left + boxRect.width / 2;
@@ -325,8 +327,8 @@ export async function openImagePicker(options = {}) {
         offsetX: event.clientX - boxRect.left,
         offsetY: event.clientY - boxRect.top,
         pointerId: event.pointerId,
-        mode: handle ? "resize" : "move",
-        handle: handle ? handle.className : "",
+        mode: handle ? 'resize' : 'move',
+        handle: handle ? handle.className : '',
         anchorX: anchor.x,
         anchorY: anchor.y,
         startX: event.clientX,
@@ -341,12 +343,10 @@ export async function openImagePicker(options = {}) {
       cropBox.setPointerCapture(event.pointerId);
     });
 
-    cropBox.addEventListener("pointermove", (event) => {
+    cropBox.addEventListener('pointermove', (event) => {
       if (!dragState) return;
-      const { imgRect, offsetX, offsetY, mode, startZoom, centerX, centerY, startDist } =
-        dragState;
-      const ratio = cropRatio || (imgRect.previewRect.width / imgRect.previewRect.height) || 1;
-      if (mode === "move") {
+      const { imgRect, offsetX, offsetY, mode, startZoom, centerX, centerY, startDist } = dragState;
+      if (mode === 'move') {
         const boxRect = cropBox.getBoundingClientRect();
         const boxWidth = boxRect.width;
         const boxHeight = boxRect.height;
@@ -362,14 +362,17 @@ export async function openImagePicker(options = {}) {
       } else {
         const minSize = 60;
         const maxZoom = Math.max(1, imgRect.width / minSize);
-        const currentDist = Math.max(1, Math.hypot(event.clientX - centerX, event.clientY - centerY));
+        const currentDist = Math.max(
+          1,
+          Math.hypot(event.clientX - centerX, event.clientY - centerY)
+        );
         const scale = currentDist / startDist;
         const zoom = clamp(startZoom / scale, 1, maxZoom);
         setFocus({ ...focus, zoom });
       }
     });
 
-    const endDrag = (event) => {
+    const endDrag = () => {
       if (!dragState) return;
       try {
         cropBox.releasePointerCapture(dragState.pointerId);
@@ -379,12 +382,12 @@ export async function openImagePicker(options = {}) {
       dragState = null;
     };
 
-    cropBox.addEventListener("pointerup", endDrag);
-    cropBox.addEventListener("pointercancel", endDrag);
+    cropBox.addEventListener('pointerup', endDrag);
+    cropBox.addEventListener('pointercancel', endDrag);
   }
 
-  applyBtn.addEventListener("click", () => {
-    if (!selectedItem || typeof onApply !== "function") return;
+  applyBtn.addEventListener('click', () => {
+    if (!selectedItem || typeof onApply !== 'function') return;
     onApply({
       item: selectedItem,
       fit: focus.fit,
@@ -395,8 +398,8 @@ export async function openImagePicker(options = {}) {
     close();
   });
 
-  if (uploadInput && typeof uploadHandler === "function") {
-    uploadInput.addEventListener("change", async (event) => {
+  if (uploadInput && typeof uploadHandler === 'function') {
+    uploadInput.addEventListener('change', async (event) => {
       const file = event.target.files?.[0];
       if (!file) return;
       try {
@@ -406,19 +409,19 @@ export async function openImagePicker(options = {}) {
         if (result?.path) {
           const match = items.find((it) => it.path === result.path);
           if (match) {
-            const buttons = listEl.querySelectorAll(".ip-item");
+            const buttons = listEl.querySelectorAll('.ip-item');
             buttons.forEach((btn) => {
-              const name = btn.querySelector(".ip-item-name")?.textContent || "";
-              if (name === getFileLabel(match)) btn.classList.add("active");
+              const name = btn.querySelector('.ip-item-name')?.textContent || '';
+              if (name === getFileLabel(match)) btn.classList.add('active');
             });
             selectItem(match);
           }
         }
       } catch (err) {
-        console.error("Upload failed", err);
-        alert(err?.message || "Upload failed.");
+        console.error('Upload failed', err);
+        alert(err?.message || 'Upload failed.');
       } finally {
-        uploadInput.value = "";
+        uploadInput.value = '';
       }
     });
   }
@@ -433,20 +436,20 @@ export async function openImagePicker(options = {}) {
       return false;
     });
     if (match) {
-      listEl.querySelectorAll(".ip-item").forEach((el) => el.classList.remove("active"));
-      const btn = Array.from(listEl.querySelectorAll(".ip-item")).find((el) => {
-        const name = el.querySelector(".ip-item-name")?.textContent || "";
+      listEl.querySelectorAll('.ip-item').forEach((el) => el.classList.remove('active'));
+      const btn = Array.from(listEl.querySelectorAll('.ip-item')).find((el) => {
+        const name = el.querySelector('.ip-item-name')?.textContent || '';
         return name === getFileLabel(match);
       });
-      if (btn) btn.classList.add("active");
+      if (btn) btn.classList.add('active');
       selectItem(match);
     }
   }
 
-  previewImg.addEventListener("load", () => {
+  previewImg.addEventListener('load', () => {
     updateCropBox();
   });
-  window.addEventListener("resize", updateCropBox);
+  window.addEventListener('resize', updateCropBox);
 
-  modal.classList.add("is-open");
+  modal.classList.add('is-open');
 }

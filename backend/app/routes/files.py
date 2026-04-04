@@ -24,8 +24,8 @@ from ..content_store import (
 from ..db import get_db
 from ..file_ops import ALLOWED_IMAGE_EXTENSIONS, extract_numbers, renumber_files, safe_path
 from ..models import Entry, EntryPage, MediaItem, PremiumCode, PremiumCodeRedemption, Series, User
-from ..security import get_current_user
 from ..preview_pipeline import resolve_source_path
+from ..security import get_current_user
 from ..series_store import apply_series_data_save, apply_series_index_save, sanitize_series_id
 from ..settings import settings
 from ..validation import is_admin_role, is_premium_role
@@ -226,9 +226,7 @@ def public_entry_cover(series_id: str, entry_title: str, db: Session = Depends(g
     if not series or not series.active:
         return JSONResponse(status_code=404, content={"error": "Not found"})
 
-    entry = db.scalar(
-        select(Entry).where(Entry.series_id == sid, Entry.title == entry_title)
-    )
+    entry = db.scalar(select(Entry).where(Entry.series_id == sid, Entry.title == entry_title))
     if not entry:
         return JSONResponse(status_code=404, content={"error": "Not found"})
 
@@ -574,16 +572,13 @@ def delete_image(payload: DeleteImageRequest, request: Request, db: Session = De
         return JSONResponse(status_code=400, content={"error": "Invalid path"})
 
     is_media_path = (
-        (
-            rel_path.startswith("media/")
-            and not rel_path.startswith("media/previews/")
-            and not rel_path.startswith("media/post-assets/")
-        )
-        or (
-            rel_path.startswith("protected/media/")
-            and not rel_path.startswith("protected/media/previews/")
-            and not rel_path.startswith("protected/media/post-assets/")
-        )
+        rel_path.startswith("media/")
+        and not rel_path.startswith("media/previews/")
+        and not rel_path.startswith("media/post-assets/")
+    ) or (
+        rel_path.startswith("protected/media/")
+        and not rel_path.startswith("protected/media/previews/")
+        and not rel_path.startswith("protected/media/post-assets/")
     )
     if not abs_path.exists():
         if is_media_path:

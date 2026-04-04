@@ -1,8 +1,5 @@
-import { el } from "../dom.js";
-import {
-  ANALYTICS_READER_ENDPOINT,
-  ANALYTICS_READER_SERIES_ENDPOINT,
-} from "../state.js";
+import { el } from '../dom.js';
+import { ANALYTICS_READER_ENDPOINT, ANALYTICS_READER_SERIES_ENDPOINT } from '../state.js';
 import {
   escapeHtml,
   formatBucketLabel,
@@ -11,9 +8,9 @@ import {
   formatShortDate,
   formatStat,
   isValidRange,
-} from "./shared.js";
+} from './shared.js';
 
-const WEEKLY_DIGEST_ENDPOINT = "/api/admin/analytics/weekly-digest";
+const WEEKLY_DIGEST_ENDPOINT = '/api/admin/analytics/weekly-digest';
 
 const HEALTH_THRESHOLDS = {
   finishRate: { good: 0.6, concern: 0.4 },
@@ -24,21 +21,21 @@ function createReaderAnalytics() {
   let lastWeeklyDigest = null;
   const activeReaderDetails = new Map();
   let lastReaderPayload = null;
-  let lastReaderSeriesFilter = "all";
+  let lastReaderSeriesFilter = 'all';
 
   function getReaderRange() {
-    return (el.analyticsReaderRange?.value || el.analyticsPagesRange?.value || "7d").trim();
+    return (el.analyticsReaderRange?.value || el.analyticsPagesRange?.value || '7d').trim();
   }
 
   function getReaderSeriesFilter() {
-    return (el.analyticsReaderSeries?.value || "all").trim();
+    return (el.analyticsReaderSeries?.value || 'all').trim();
   }
 
   function setReaderStatus(message, isError = false) {
     if (!el.analyticsReaderStatus) return;
-    el.analyticsReaderStatus.textContent = message || "";
-    el.analyticsReaderStatus.style.display = message ? "block" : "none";
-    el.analyticsReaderStatus.className = isError ? "error-message" : "success-message";
+    el.analyticsReaderStatus.textContent = message || '';
+    el.analyticsReaderStatus.style.display = message ? 'block' : 'none';
+    el.analyticsReaderStatus.className = isError ? 'error-message' : 'success-message';
   }
 
   function calculateHealthStatus(readerPayload, weeklyDigest) {
@@ -46,9 +43,9 @@ function createReaderAnalytics() {
     const changes = weeklyDigest?.changes || {};
     const thisWeek = weeklyDigest?.thisWeek || {};
 
-    let status = "neutral";
-    let title = "Content is performing steadily";
-    let summary = "Your reader engagement is holding stable.";
+    let status = 'neutral';
+    let title = 'Content is performing steadily';
+    let summary = 'Your reader engagement is holding stable.';
 
     const readsChange = changes.reads?.percent || 0;
 
@@ -56,8 +53,8 @@ function createReaderAnalytics() {
       finishRate >= HEALTH_THRESHOLDS.finishRate.good ||
       readsChange >= HEALTH_THRESHOLDS.weekChange.good
     ) {
-      status = "good";
-      title = "Your content is performing well";
+      status = 'good';
+      title = 'Your content is performing well';
       if (finishRate >= HEALTH_THRESHOLDS.finishRate.good && readsChange > 0) {
         summary = `Readers are engaged with a ${Math.round(finishRate * 100)}% start-to-finish rate and page reads are growing.`;
       } else if (finishRate >= HEALTH_THRESHOLDS.finishRate.good) {
@@ -69,12 +66,12 @@ function createReaderAnalytics() {
       finishRate < HEALTH_THRESHOLDS.finishRate.concern &&
       readsChange < HEALTH_THRESHOLDS.weekChange.concern
     ) {
-      status = "concern";
-      title = "Content needs attention";
+      status = 'concern';
+      title = 'Content needs attention';
       summary = `Start-to-finish rate (${Math.round(finishRate * 100)}%) and page reads are both down. Consider reviewing recent entries.`;
     } else if (finishRate < HEALTH_THRESHOLDS.finishRate.concern) {
-      status = "concern";
-      title = "Readers are dropping off early";
+      status = 'concern';
+      title = 'Readers are dropping off early';
       summary = `Only ${Math.round(finishRate * 100)}% of starts convert to finishes. Review your opening pages and pacing.`;
     } else if (readsChange > 0) {
       summary = `Page reads are up ${Math.round(readsChange * 100)}% this week with ${Math.round(finishRate * 100)}% start-to-finish rate.`;
@@ -86,18 +83,18 @@ function createReaderAnalytics() {
   }
 
   function formatTrendHtml(changeObj) {
-    if (!changeObj || typeof changeObj.percent !== "number") {
-      return { html: "", className: "trend-flat" };
+    if (!changeObj || typeof changeObj.percent !== 'number') {
+      return { html: '', className: 'trend-flat' };
     }
     const pct = changeObj.percent;
     const pctStr = Math.round(Math.abs(pct) * 100);
     if (pct > 0.01) {
-      return { html: `↑${pctStr}%`, className: "trend-up" };
+      return { html: `↑${pctStr}%`, className: 'trend-up' };
     }
     if (pct < -0.01) {
-      return { html: `↓${pctStr}%`, className: "trend-down" };
+      return { html: `↓${pctStr}%`, className: 'trend-down' };
     }
-    return { html: "→", className: "trend-flat" };
+    return { html: '→', className: 'trend-flat' };
   }
 
   function renderHealthIndicator() {
@@ -115,7 +112,7 @@ function createReaderAnalytics() {
 
   async function fetchWeeklyDigest() {
     try {
-      const res = await fetch(WEEKLY_DIGEST_ENDPOINT, { credentials: "include" });
+      const res = await fetch(WEEKLY_DIGEST_ENDPOINT, { credentials: 'include' });
       if (!res.ok) {
         lastWeeklyDigest = null;
         return null;
@@ -131,16 +128,16 @@ function createReaderAnalytics() {
 
   function generateInsightSentence(payload) {
     const entryViews = payload?.entryViews || [];
-    if (!entryViews.length) return "";
+    if (!entryViews.length) return '';
 
     const top = entryViews[0];
-    const topLabel = top?.label || top?.entryTitle || "Unknown";
+    const topLabel = top?.label || top?.entryTitle || 'Unknown';
     const topReads = top?.count || 0;
 
     const topRate = (payload?.entryRates || []).find(
       (item) =>
-        String(item?.seriesId || "") === String(top?.seriesId || "") &&
-        Number(item?.displayNumber) === Number(top?.displayNumber),
+        String(item?.seriesId || '') === String(top?.seriesId || '') &&
+        Number(item?.displayNumber) === Number(top?.displayNumber)
     );
     const finishRate = Number.isFinite(Number(topRate?.completionRate))
       ? Math.round(Number(topRate.completionRate) * 100)
@@ -153,18 +150,18 @@ function createReaderAnalytics() {
   }
 
   function initReaderTabs() {
-    const tabs = document.querySelectorAll(".analytics-tab");
+    const tabs = document.querySelectorAll('.analytics-tab');
     tabs.forEach((tab) => {
-      tab.addEventListener("click", () => {
-        tabs.forEach((item) => item.classList.remove("active"));
-        tab.classList.add("active");
+      tab.addEventListener('click', () => {
+        tabs.forEach((item) => item.classList.remove('active'));
+        tab.classList.add('active');
 
         const tabName = tab.dataset.tab;
         if (el.tabEntry) {
-          el.tabEntry.classList.toggle("active", tabName === "entry");
+          el.tabEntry.classList.toggle('active', tabName === 'entry');
         }
         if (el.tabSeries) {
-          el.tabSeries.classList.toggle("active", tabName === "series");
+          el.tabSeries.classList.toggle('active', tabName === 'series');
         }
       });
     });
@@ -174,29 +171,25 @@ function createReaderAnalytics() {
     const list = Array.isArray(items) ? items : [];
     return list.map((item) => {
       const labelRaw =
-        typeof labelFn === "function"
-          ? labelFn(item)
-          : item?.label || item?.value || "Unknown";
+        typeof labelFn === 'function' ? labelFn(item) : item?.label || item?.value || 'Unknown';
       const valueRaw =
-        typeof valueFn === "function"
-          ? valueFn(item)
-          : item?.value || item?.label || labelRaw;
+        typeof valueFn === 'function' ? valueFn(item) : item?.value || item?.label || labelRaw;
       return {
-        label: String(labelRaw || "Unknown"),
-        value: String(valueRaw || labelRaw || "Unknown"),
+        label: String(labelRaw || 'Unknown'),
+        value: String(valueRaw || labelRaw || 'Unknown'),
         count: Number(item?.count ?? item?.views ?? item?.total ?? item?.value ?? 0) || 0,
-        subLabel: item?.subLabel || "",
+        subLabel: item?.subLabel || '',
         delta: item?.delta,
         deltaPct: item?.deltaPct,
         completionRate: item?.completionRate,
         starts: item?.starts,
         finishes: item?.finishes,
         pageViews: item?.pageViews,
-        entryKey: item?.entryKey || "",
+        entryKey: item?.entryKey || '',
         displayNumber: item?.displayNumber,
-        seriesId: item?.seriesId || "",
-        seriesTitle: item?.seriesTitle || "",
-        entryLabel: item?.entryLabel || "",
+        seriesId: item?.seriesId || '',
+        seriesTitle: item?.seriesTitle || '',
+        entryLabel: item?.entryLabel || '',
         avgStopPage: item?.avgStopPage,
         medianStopPage: item?.medianStopPage,
       };
@@ -205,34 +198,34 @@ function createReaderAnalytics() {
 
   function formatDeltaText(item) {
     const rawDelta = Number(item?.delta);
-    if (!Number.isFinite(rawDelta) || rawDelta === 0) return "";
+    if (!Number.isFinite(rawDelta) || rawDelta === 0) return '';
     const deltaPct = Number(item?.deltaPct);
     if (Number.isFinite(deltaPct) && deltaPct !== 0) {
-      const sign = deltaPct > 0 ? "+" : "";
+      const sign = deltaPct > 0 ? '+' : '';
       const pct = Math.round(deltaPct * 100);
       return `Δ ${sign}${pct}% vs prev`;
     }
-    const sign = rawDelta > 0 ? "+" : "";
+    const sign = rawDelta > 0 ? '+' : '';
     return `Δ ${sign}${formatStat(rawDelta)} vs prev`;
   }
 
   function formatStartFinishText(item) {
     const starts = Number(item?.starts);
     const finishes = Number(item?.finishes);
-    const startText = Number.isFinite(starts) ? formatStat(starts) : "0";
-    const finishText = Number.isFinite(finishes) ? formatStat(finishes) : "0";
+    const startText = Number.isFinite(starts) ? formatStat(starts) : '0';
+    const finishText = Number.isFinite(finishes) ? formatStat(finishes) : '0';
     return `${startText} starts · ${finishText} finishes`;
   }
 
   function extractSeriesName(label) {
-    const parts = String(label || "").split(" | ");
-    return (parts[0] || "").trim();
+    const parts = String(label || '').split(' | ');
+    return (parts[0] || '').trim();
   }
 
   function collectSeriesOptions(payload) {
     const seriesViews = Array.isArray(payload?.seriesViews) ? payload.seriesViews : [];
     const fromSeriesViews = seriesViews
-      .map((item) => String(item?.seriesTitle || item?.label || item?.value || "").trim())
+      .map((item) => String(item?.seriesTitle || item?.label || item?.value || '').trim())
       .filter(Boolean);
     if (fromSeriesViews.length) {
       return Array.from(new Set(fromSeriesViews));
@@ -241,32 +234,30 @@ function createReaderAnalytics() {
     const entryViews = Array.isArray(payload?.entryViews) ? payload.entryViews : [];
     const seriesSet = new Set();
     entryViews.forEach((item) => {
-      const series = item?.seriesTitle || "";
+      const series = item?.seriesTitle || '';
       if (series) seriesSet.add(series);
     });
     return Array.from(seriesSet);
   }
 
   function updateReaderSeriesOptions(payload) {
-    if (!el.analyticsReaderSeries) return "all";
-    const current = getReaderSeriesFilter() || "all";
+    if (!el.analyticsReaderSeries) return 'all';
+    const current = getReaderSeriesFilter() || 'all';
     const seriesOptions = collectSeriesOptions(payload);
-    const normalized = ["all", ...seriesOptions];
-    const nextValue = normalized.includes(current) ? current : "all";
+    const normalized = ['all', ...seriesOptions];
+    const nextValue = normalized.includes(current) ? current : 'all';
 
-    const existing = Array.from(el.analyticsReaderSeries.options).map(
-      (option) => option.value,
-    );
+    const existing = Array.from(el.analyticsReaderSeries.options).map((option) => option.value);
     const needsUpdate =
       existing.length !== normalized.length ||
       normalized.some((value, index) => value !== existing[index]);
 
     if (needsUpdate) {
-      el.analyticsReaderSeries.innerHTML = "";
+      el.analyticsReaderSeries.innerHTML = '';
       normalized.forEach((value) => {
-        const option = document.createElement("option");
+        const option = document.createElement('option');
         option.value = value;
-        option.textContent = value === "all" ? "All series" : value;
+        option.textContent = value === 'all' ? 'All series' : value;
         el.analyticsReaderSeries.appendChild(option);
       });
     }
@@ -277,14 +268,14 @@ function createReaderAnalytics() {
 
   function filterEntryItems(items, seriesFilter) {
     const list = Array.isArray(items) ? items : [];
-    if (!seriesFilter || seriesFilter === "all") return list;
+    if (!seriesFilter || seriesFilter === 'all') return list;
     return list.filter((item) => {
-      const seriesTitle = item?.seriesTitle || "";
-      const seriesId = item?.seriesId || "";
+      const seriesTitle = item?.seriesTitle || '';
+      const seriesId = item?.seriesId || '';
       if (seriesTitle === seriesFilter || seriesId === seriesFilter) {
         return true;
       }
-      const label = item?.entryLabel || item?.value || item?.label || "";
+      const label = item?.entryLabel || item?.value || item?.label || '';
       const extractedSeries = extractSeriesName(label);
       return extractedSeries === seriesFilter;
     });
@@ -337,18 +328,14 @@ function createReaderAnalytics() {
   function renderAnalyticsList(target, items, emptyText, labelFn, options = {}) {
     if (!target) return;
     const list = normalizeAnalyticsItems(items, labelFn, options.valueFn);
-    target.dataset.title = options.title || "";
+    target.dataset.title = options.title || '';
     if (!list.length) {
-      target.innerHTML = `<div class="analytics-pages-empty">${escapeHtml(
-        emptyText,
-      )}</div>`;
+      target.innerHTML = `<div class="analytics-pages-empty">${escapeHtml(emptyText)}</div>`;
       return;
     }
 
     const rankFn =
-      typeof options.rankFn === "function"
-        ? options.rankFn
-        : (item) => Number(item.count) || 0;
+      typeof options.rankFn === 'function' ? options.rankFn : (item) => Number(item.count) || 0;
     const counts = list.map((item) => Number(rankFn(item)) || 0);
     const avg = counts.length ? counts.reduce((acc, value) => acc + value, 0) / counts.length : 0;
     const max = Math.max(...counts);
@@ -357,38 +344,33 @@ function createReaderAnalytics() {
       .map((item, index) => {
         const label = escapeHtml(item.label);
         const subLabel =
-          typeof options.subLabelFn === "function"
-            ? options.subLabelFn(item)
-            : item.subLabel;
-        const safeSubLabel = subLabel ? escapeHtml(subLabel) : "";
-        const subHtml = subLabel
-          ? `<div class="analytics-reader-sub">${safeSubLabel}</div>`
-          : "";
+          typeof options.subLabelFn === 'function' ? options.subLabelFn(item) : item.subLabel;
+        const safeSubLabel = subLabel ? escapeHtml(subLabel) : '';
+        const subHtml = subLabel ? `<div class="analytics-reader-sub">${safeSubLabel}</div>` : '';
         const value = escapeHtml(item.value);
         const formatted =
-          typeof options.valueFormatter === "function"
+          typeof options.valueFormatter === 'function'
             ? options.valueFormatter(item)
             : formatStat(item.count);
-      const countAttr = escapeHtml(String(item.count ?? ""));
-      const rateAttr = escapeHtml(String(item.completionRate ?? ""));
-      const startsAttr = escapeHtml(String(item.starts ?? ""));
-      const finishesAttr = escapeHtml(String(item.finishes ?? ""));
-      const pageViewsAttr = escapeHtml(String(item.pageViews ?? ""));
-      const entryKeyAttr = escapeHtml(String(item.entryKey ?? ""));
-      const count = Number(item.count) || 0;
-      const rankValue = Number(rankFn(item)) || 0;
+        const countAttr = escapeHtml(String(item.count ?? ''));
+        const rateAttr = escapeHtml(String(item.completionRate ?? ''));
+        const startsAttr = escapeHtml(String(item.starts ?? ''));
+        const finishesAttr = escapeHtml(String(item.finishes ?? ''));
+        const pageViewsAttr = escapeHtml(String(item.pageViews ?? ''));
+        const entryKeyAttr = escapeHtml(String(item.entryKey ?? ''));
+        const rankValue = Number(rankFn(item)) || 0;
 
-        let colorClass = "";
+        let colorClass = '';
         if (counts.length > 1) {
           if (index === 0 && rankValue === max) {
-            colorClass = "stat-good";
+            colorClass = 'stat-good';
           } else if (rankValue < avg * 0.5) {
-            colorClass = "stat-concern";
+            colorClass = 'stat-concern';
           }
         }
 
         return `
-          <div class="analytics-reader-item ${colorClass}" data-label="${label}" data-value="${value}" data-entry-key="${entryKeyAttr}" data-count="${countAttr}" data-rate="${rateAttr}" data-starts="${startsAttr}" data-finishes="${finishesAttr}" data-page-views="${pageViewsAttr}" data-sub="${safeSubLabel}" data-event="${options.eventName || ""}" data-property="${options.propertyName || ""}" data-metric="${options.metric || ""}">
+          <div class="analytics-reader-item ${colorClass}" data-label="${label}" data-value="${value}" data-entry-key="${entryKeyAttr}" data-count="${countAttr}" data-rate="${rateAttr}" data-starts="${startsAttr}" data-finishes="${finishesAttr}" data-page-views="${pageViewsAttr}" data-sub="${safeSubLabel}" data-event="${options.eventName || ''}" data-property="${options.propertyName || ''}" data-metric="${options.metric || ''}">
             <div class="analytics-reader-label">
               <div>${label}</div>
               ${subHtml}
@@ -397,42 +379,42 @@ function createReaderAnalytics() {
           </div>
         `;
       })
-      .join("");
+      .join('');
   }
 
   function renderReaderDetail(target, detail) {
     if (!target || !detail) return;
-    const title = escapeHtml(detail.title || "Reader Analytics");
-    const label = escapeHtml(detail.label || detail.value || "Unknown");
-    const rangeKey = isValidRange(detail.range) ? detail.range : "7d";
+    const title = escapeHtml(detail.title || 'Reader Analytics');
+    const label = escapeHtml(detail.label || detail.value || 'Unknown');
+    const rangeKey = isValidRange(detail.range) ? detail.range : '7d';
     const rangeLabel = formatRangeLabel(rangeKey);
-    const metric = detail.metric || "page_views";
-    const isRatioMetric = metric === "completion_rate";
+    const metric = detail.metric || 'page_views';
+    const isRatioMetric = metric === 'completion_rate';
     const metaItems = [];
     if (isRatioMetric) {
       metaItems.push({
-        label: "Rate",
+        label: 'Rate',
         value: formatPercent(detail.completionRate),
         note:
           detail.pageViews !== null && detail.pageViews !== undefined
             ? `${formatStat(detail.pageViews)} pages read`
-            : "",
+            : '',
       });
       metaItems.push({
-        label: "Starts",
+        label: 'Starts',
         value: formatStat(detail.starts),
-        note: "",
+        note: '',
       });
       metaItems.push({
-        label: "Finishes",
+        label: 'Finishes',
         value: formatStat(detail.finishes),
-        note: detail.subLabel || "",
+        note: detail.subLabel || '',
       });
     } else {
       metaItems.push({
-        label: "Pages Read",
+        label: 'Pages Read',
         value: formatStat(detail.count),
-        note: detail.subLabel || "",
+        note: detail.subLabel || '',
       });
     }
     const metaHtml = metaItems.length
@@ -444,43 +426,34 @@ function createReaderAnalytics() {
             <div class="analytics-detail-meta-item">
               <div class="analytics-detail-meta-label">${escapeHtml(item.label)}</div>
               <div class="analytics-detail-meta-value">${escapeHtml(item.value)}</div>
-              ${item.note ? `<div class="analytics-detail-meta-note">${escapeHtml(item.note)}</div>` : ""}
+              ${item.note ? `<div class="analytics-detail-meta-note">${escapeHtml(item.note)}</div>` : ''}
             </div>
-          `,
+          `
             )
-            .join("")}
+            .join('')}
         </div>
       `
-      : "";
+      : '';
     const hasSeries = Array.isArray(detail.series) && detail.series.length;
-    const startLabel = hasSeries ? formatShortDate(detail.series[0]?.start) : "";
-    const endLabel = hasSeries
-      ? formatShortDate(detail.series[detail.series.length - 1]?.end)
-      : "";
+    const startLabel = hasSeries ? formatShortDate(detail.series[0]?.start) : '';
+    const endLabel = hasSeries ? formatShortDate(detail.series[detail.series.length - 1]?.end) : '';
 
     let chartHtml = '<div class="analytics-detail-empty">No data yet.</div>';
     if (detail.loading) {
       chartHtml = '<div class="analytics-detail-empty">Loading chart…</div>';
     } else if (detail.error) {
-      chartHtml = `<div class="error-message" style="margin: 0;">${escapeHtml(
-        detail.error,
-      )}</div>`;
+      chartHtml = `<div class="error-message" style="margin: 0;">${escapeHtml(detail.error)}</div>`;
     } else if (hasSeries) {
       const max = isRatioMetric
         ? 100
-        : detail.series.reduce(
-            (acc, point) => Math.max(acc, Number(point.count) || 0),
-            0,
-          );
+        : detail.series.reduce((acc, point) => Math.max(acc, Number(point.count) || 0), 0);
       const bars = detail.series
         .map((point) => {
           const rate = Number(point?.completionRate) || 0;
           const count = Number(point.count) || 0;
           const pointStarts = Number(point?.starts) || 0;
           const pointFinishes = Number(point?.finishes) || 0;
-          const metricValue = isRatioMetric
-            ? Math.max(0, Math.min(rate * 100, 100))
-            : count;
+          const metricValue = isRatioMetric ? Math.max(0, Math.min(rate * 100, 100)) : count;
           const pct = max > 0 ? Math.max(0, (metricValue / max) * 100) : 0;
           const height = metricValue > 0 ? Math.max(pct, 3) : 0;
           const titleText = isRatioMetric
@@ -489,30 +462,30 @@ function createReaderAnalytics() {
           const countLabel = isRatioMetric
             ? pointStarts || pointFinishes
               ? formatPercent(rate)
-              : ""
+              : ''
             : count > 0
               ? formatStat(count)
-              : "";
+              : '';
           const timeLabel = formatBucketLabel(rangeKey, point.end || point.start);
           return `
             <div class="analytics-detail-bar-wrap">
               <div class="analytics-detail-bar-body">
                 <div class="analytics-detail-bar-count" title="${escapeHtml(
-                  countLabel || "0",
+                  countLabel || '0'
                 )}">${escapeHtml(countLabel)}</div>
                 <div class="analytics-detail-bar-slot">
                   <div class="analytics-detail-bar" title="${escapeHtml(
-                    titleText,
+                    titleText
                   )}" style="height: ${height.toFixed(1)}%"></div>
                 </div>
               </div>
               <div class="analytics-detail-bar-time" title="${escapeHtml(
-                timeLabel,
+                timeLabel
               )}">${escapeHtml(timeLabel)}</div>
             </div>
           `;
         })
-        .join("");
+        .join('');
 
       chartHtml = `
         <div class="analytics-detail-chart">
@@ -531,9 +504,9 @@ function createReaderAnalytics() {
         <div class="analytics-detail-controls">
           <label class="settings-label">Range</label>
           <select class="form-input analytics-detail-select" data-detail-range>
-            <option value="24h" ${rangeKey === "24h" ? "selected" : ""}>Last 24h</option>
-            <option value="7d" ${rangeKey === "7d" ? "selected" : ""}>Last 7d</option>
-            <option value="30d" ${rangeKey === "30d" ? "selected" : ""}>Last 30d</option>
+            <option value="24h" ${rangeKey === '24h' ? 'selected' : ''}>Last 24h</option>
+            <option value="7d" ${rangeKey === '7d' ? 'selected' : ''}>Last 7d</option>
+            <option value="30d" ${rangeKey === '30d' ? 'selected' : ''}>Last 30d</option>
           </select>
         </div>
         <div class="analytics-detail-title">${title}</div>
@@ -554,22 +527,21 @@ function createReaderAnalytics() {
 
     const range = detail.range || getReaderRange();
     const params = new URLSearchParams({
-      event: detail.eventName || "",
-      property: detail.propertyName || "",
-      value: detail.value || "",
-      metric: detail.metric || "page_views",
+      event: detail.eventName || '',
+      property: detail.propertyName || '',
+      value: detail.value || '',
+      metric: detail.metric || 'page_views',
       range,
-      points: "12",
+      points: '12',
     });
     if (detail.entryKey) {
-      params.set("entry_key", detail.entryKey);
+      params.set('entry_key', detail.entryKey);
     }
 
     try {
-      const res = await fetch(
-        `${ANALYTICS_READER_SERIES_ENDPOINT}?${params.toString()}`,
-        { cache: "no-store" },
-      );
+      const res = await fetch(`${ANALYTICS_READER_SERIES_ENDPOINT}?${params.toString()}`, {
+        cache: 'no-store',
+      });
       let payload = null;
       try {
         payload = await res.json();
@@ -579,8 +551,7 @@ function createReaderAnalytics() {
 
       if (!res.ok) {
         const errorText =
-          (payload && typeof payload === "object" && payload.error) ||
-          `HTTP ${res.status}`;
+          (payload && typeof payload === 'object' && payload.error) || `HTTP ${res.status}`;
         throw new Error(errorText);
       }
 
@@ -590,7 +561,7 @@ function createReaderAnalytics() {
     } catch (err) {
       if (detail.requestId !== requestId) return;
       detail.series = [];
-      detail.error = err?.message || "Unable to load item history.";
+      detail.error = err?.message || 'Unable to load item history.';
     }
 
     if (detail.requestId !== requestId) return;
@@ -599,48 +570,43 @@ function createReaderAnalytics() {
   }
 
   function bindReaderInteractions(target) {
-    if (!target || target.dataset.bound === "true") return;
-    target.dataset.bound = "true";
-    target.addEventListener("click", (event) => {
-      const backButton = event.target.closest(".analytics-detail-back");
+    if (!target || target.dataset.bound === 'true') return;
+    target.dataset.bound = 'true';
+    target.addEventListener('click', (event) => {
+      const backButton = event.target.closest('.analytics-detail-back');
       if (backButton && target.contains(backButton)) {
         activeReaderDetails.delete(target.id);
         renderReaderAnalytics(lastReaderPayload || {});
         return;
       }
 
-      const item = event.target.closest(".analytics-reader-item");
+      const item = event.target.closest('.analytics-reader-item');
       if (!item || !target.contains(item)) return;
-      const value = item.dataset.value || "";
-      const label = item.dataset.label || value || "Unknown";
-      const subLabel = item.dataset.sub || "";
+      const value = item.dataset.value || '';
+      const label = item.dataset.label || value || 'Unknown';
+      const subLabel = item.dataset.sub || '';
       const countRaw = item.dataset.count;
-      const countValue =
-        countRaw !== undefined && countRaw !== "" ? Number(countRaw) : null;
+      const countValue = countRaw !== undefined && countRaw !== '' ? Number(countRaw) : null;
       const rateRaw = item.dataset.rate;
       const startsRaw = item.dataset.starts;
       const finishesRaw = item.dataset.finishes;
       const pageViewsRaw = item.dataset.pageViews;
-      const entryKey = item.dataset.entryKey || "";
-      const eventName = item.dataset.event || "";
-      const propertyName = item.dataset.property || "";
-      const metric = item.dataset.metric || "page_views";
+      const entryKey = item.dataset.entryKey || '';
+      const eventName = item.dataset.event || '';
+      const propertyName = item.dataset.property || '';
+      const metric = item.dataset.metric || 'page_views';
       if (!value || !eventName || !propertyName) return;
 
       const detail = {
-        title: target.dataset.title || "Reader Analytics",
+        title: target.dataset.title || 'Reader Analytics',
         label,
         value,
         subLabel,
-        count:
-          metric === "completion_rate" || Number.isNaN(countValue) ? null : countValue,
-        completionRate:
-          rateRaw !== undefined && rateRaw !== "" ? Number(rateRaw) : null,
-        starts: startsRaw !== undefined && startsRaw !== "" ? Number(startsRaw) : null,
-        finishes:
-          finishesRaw !== undefined && finishesRaw !== "" ? Number(finishesRaw) : null,
-        pageViews:
-          pageViewsRaw !== undefined && pageViewsRaw !== "" ? Number(pageViewsRaw) : null,
+        count: metric === 'completion_rate' || Number.isNaN(countValue) ? null : countValue,
+        completionRate: rateRaw !== undefined && rateRaw !== '' ? Number(rateRaw) : null,
+        starts: startsRaw !== undefined && startsRaw !== '' ? Number(startsRaw) : null,
+        finishes: finishesRaw !== undefined && finishesRaw !== '' ? Number(finishesRaw) : null,
+        pageViews: pageViewsRaw !== undefined && pageViewsRaw !== '' ? Number(pageViewsRaw) : null,
         entryKey,
         metric,
         eventName,
@@ -656,12 +622,12 @@ function createReaderAnalytics() {
       loadReaderSeries(target, detail, { showLoading: true });
     });
 
-    target.addEventListener("change", (event) => {
-      const select = event.target.closest(".analytics-detail-select");
+    target.addEventListener('change', (event) => {
+      const select = event.target.closest('.analytics-detail-select');
       if (!select || !target.contains(select)) return;
       const detail = activeReaderDetails.get(target.id);
       if (!detail) return;
-      const nextRange = select.value || "7d";
+      const nextRange = select.value || '7d';
       if (!isValidRange(nextRange)) return;
       detail.range = nextRange;
       detail.rangeLocked = true;
@@ -715,48 +681,48 @@ function createReaderAnalytics() {
     const cards = [
       {
         target: el.analyticsEntryReads,
-        title: "Pages Read",
-        metric: "page_views",
-        eventName: "reader_page_view",
-        propertyName: "entryLabel",
+        title: 'Pages Read',
+        metric: 'page_views',
+        eventName: 'reader_page_view',
+        propertyName: 'entryLabel',
         items: entryViews,
         emptyText:
-          "No page reads yet. Reader pageviews will appear here as visitors move through entries.",
+          'No page reads yet. Reader pageviews will appear here as visitors move through entries.',
         subLabelFn: (item) => formatDeltaText(item),
       },
       {
         target: el.analyticsSeriesReads,
-        title: "Series Pages Read",
-        metric: "page_views",
-        eventName: "reader_page_view",
-        propertyName: "series",
+        title: 'Series Pages Read',
+        metric: 'page_views',
+        eventName: 'reader_page_view',
+        propertyName: 'series',
         items: payload?.seriesViews,
         emptyText:
-          "No series page-read data yet. This will populate as readers explore your comics.",
+          'No series page-read data yet. This will populate as readers explore your comics.',
         subLabelFn: (item) => formatDeltaText(item),
       },
       {
         target: el.analyticsEntryRates,
-        title: "Start-to-Finish Rate",
-        metric: "completion_rate",
-        eventName: "reader_entry_complete",
-        propertyName: "entryLabel",
+        title: 'Start-to-Finish Rate',
+        metric: 'completion_rate',
+        eventName: 'reader_entry_complete',
+        propertyName: 'entryLabel',
         items: entryRates,
         emptyText:
-          "No start-to-finish data yet. Rates will appear once entries have both starts and finishes.",
+          'No start-to-finish data yet. Rates will appear once entries have both starts and finishes.',
         subLabelFn: (item) => formatStartFinishText(item),
         valueFormatter: (item) => formatPercent(item?.completionRate),
         rankFn: (item) => Number(item?.completionRate) || 0,
       },
       {
         target: el.analyticsSeriesRates,
-        title: "Series Start-to-Finish Rate",
-        metric: "completion_rate",
-        eventName: "reader_entry_complete",
-        propertyName: "series",
+        title: 'Series Start-to-Finish Rate',
+        metric: 'completion_rate',
+        eventName: 'reader_entry_complete',
+        propertyName: 'series',
         items: payload?.seriesRates,
         emptyText:
-          "No series conversion data yet. Rates will appear once readers start and finish entries.",
+          'No series conversion data yet. Rates will appear once readers start and finish entries.',
         subLabelFn: (item) => formatStartFinishText(item),
         valueFormatter: (item) => formatPercent(item?.completionRate),
         rankFn: (item) => Number(item?.completionRate) || 0,
@@ -768,15 +734,15 @@ function createReaderAnalytics() {
 
   async function loadReaderAnalytics({ showLoading = true } = {}) {
     if (!el.analyticsEntryReads || !el.analyticsEntryRates) return null;
-    if (showLoading) setReaderStatus("Loading reader analytics…");
+    if (showLoading) setReaderStatus('Loading reader analytics…');
     const params = new URLSearchParams({
       range: getReaderRange(),
-      limit: "12",
+      limit: '12',
     });
 
     try {
       const res = await fetch(`${ANALYTICS_READER_ENDPOINT}?${params.toString()}`, {
-        cache: "no-store",
+        cache: 'no-store',
       });
       let payload = null;
       try {
@@ -787,22 +753,18 @@ function createReaderAnalytics() {
 
       if (!res.ok) {
         const errorText =
-          (payload && typeof payload === "object" && payload.error) ||
-          `HTTP ${res.status}`;
+          (payload && typeof payload === 'object' && payload.error) || `HTTP ${res.status}`;
         throw new Error(errorText);
       }
 
       renderReaderAnalytics(payload || {});
       const ts = payload?.generatedAt ? new Date(payload.generatedAt) : null;
-      const tsText = ts ? ts.toLocaleString() : "just now";
+      const tsText = ts ? ts.toLocaleString() : 'just now';
       setReaderStatus(`Updated ${tsText}.`);
       return payload || {};
     } catch (err) {
       renderReaderAnalytics({});
-      setReaderStatus(
-        `Analytics error: ${err?.message || "Unable to load reader stats."}`,
-        true,
-      );
+      setReaderStatus(`Analytics error: ${err?.message || 'Unable to load reader stats.'}`, true);
       return null;
     }
   }

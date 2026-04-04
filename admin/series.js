@@ -1,16 +1,16 @@
-import { STORAGE_KEY } from "./config.js";
-import { el } from "./dom.js";
-import { DEFAULT_SERIES_ID, ACTIVE_SERIES_KEY, state } from "./state.js";
-import { saveToServer } from "./core.js";
+import { STORAGE_KEY } from './config.js';
+import { el } from './dom.js';
+import { DEFAULT_SERIES_ID, ACTIVE_SERIES_KEY, state } from './state.js';
+import { saveToServer } from './core.js';
 
 function createSeriesManager() {
   let entriesApi = null;
   let setDesignerFrameSrc = null;
   let onPageBuilderSeriesChange = null;
   let showChaptersSection = null;
-  let seriesModalMode = "edit";
+  let seriesModalMode = 'edit';
   let seriesModalBound = false;
-  let seriesModalEditingId = "";
+  let seriesModalEditingId = '';
   let seriesModalLabelsTouched = false;
 
   function bindDependencies({
@@ -45,55 +45,47 @@ function createSeriesManager() {
     };
   }
 
-  function setSeriesModalStatus(message = "", isError = false) {
+  function setSeriesModalStatus(message = '', isError = false) {
     const { status } = getSeriesModalElements();
     if (!status) return;
     if (!message) {
-      status.style.display = "none";
-      status.textContent = "";
-      status.className = "success-message";
+      status.style.display = 'none';
+      status.textContent = '';
+      status.className = 'success-message';
       return;
     }
     status.textContent = message;
-    status.style.display = "block";
-    status.className = isError ? "error-message" : "success-message";
+    status.style.display = 'block';
+    status.className = isError ? 'error-message' : 'success-message';
   }
 
   function closeSeriesModal() {
     const { modal } = getSeriesModalElements();
     if (!modal) return;
-    modal.classList.remove("active");
+    modal.classList.remove('active');
   }
 
   function bindSeriesModal() {
     if (seriesModalBound) return;
-    const {
-      modal,
-      form,
-      closeBtn,
-      cancelBtn,
-      deleteBtn,
-      idInput,
-      unitSingular,
-      unitPlural,
-    } = getSeriesModalElements();
+    const { modal, form, closeBtn, cancelBtn, deleteBtn, idInput, unitSingular, unitPlural } =
+      getSeriesModalElements();
     if (!modal || !form) return;
 
-    if (closeBtn) closeBtn.addEventListener("click", closeSeriesModal);
-    if (cancelBtn) cancelBtn.addEventListener("click", closeSeriesModal);
-    if (deleteBtn) deleteBtn.addEventListener("click", handleSeriesModalDelete);
-    modal.addEventListener("click", (event) => {
+    if (closeBtn) closeBtn.addEventListener('click', closeSeriesModal);
+    if (cancelBtn) cancelBtn.addEventListener('click', closeSeriesModal);
+    if (deleteBtn) deleteBtn.addEventListener('click', handleSeriesModalDelete);
+    modal.addEventListener('click', (event) => {
       if (event.target === modal) closeSeriesModal();
     });
-    form.addEventListener("submit", handleSeriesModalSubmit);
+    form.addEventListener('submit', handleSeriesModalSubmit);
 
     if (idInput) {
-      idInput.addEventListener("blur", () => {
-        if (seriesModalMode !== "create") return;
+      idInput.addEventListener('blur', () => {
+        if (seriesModalMode !== 'create') return;
         idInput.value = sanitizeSeriesId(idInput.value);
         if (!seriesModalLabelsTouched) {
           const defaults = defaultUnitLabelsForSeries(
-            sanitizeSeriesId(idInput.value) || "new-series",
+            sanitizeSeriesId(idInput.value) || 'new-series'
           );
           if (unitSingular) unitSingular.value = defaults.singular;
           if (unitPlural) unitPlural.value = defaults.plural;
@@ -101,12 +93,12 @@ function createSeriesManager() {
       });
     }
     if (unitSingular) {
-      unitSingular.addEventListener("input", () => {
+      unitSingular.addEventListener('input', () => {
         seriesModalLabelsTouched = true;
       });
     }
     if (unitPlural) {
-      unitPlural.addEventListener("input", () => {
+      unitPlural.addEventListener('input', () => {
         seriesModalLabelsTouched = true;
       });
     }
@@ -118,10 +110,10 @@ function createSeriesManager() {
     const { deleteBtn } = getSeriesModalElements();
     if (!deleteBtn) return;
     const canDelete =
-      seriesModalMode === "edit" &&
+      seriesModalMode === 'edit' &&
       seriesModalEditingId &&
       seriesModalEditingId !== DEFAULT_SERIES_ID;
-    deleteBtn.style.display = canDelete ? "inline-flex" : "none";
+    deleteBtn.style.display = canDelete ? 'inline-flex' : 'none';
     deleteBtn.disabled = !canDelete;
   }
 
@@ -142,32 +134,30 @@ function createSeriesManager() {
     if (!modal) return;
 
     seriesModalMode = mode;
-    seriesModalEditingId = series?.id || "";
+    seriesModalEditingId = series?.id || '';
     seriesModalLabelsTouched = false;
-    setSeriesModalStatus("");
+    setSeriesModalStatus('');
 
-    const defaults = defaultUnitLabelsForSeries(
-      seriesModalEditingId || "new-series",
-    );
+    const defaults = defaultUnitLabelsForSeries(seriesModalEditingId || 'new-series');
     if (title) {
-      title.textContent = mode === "create" ? "New Series" : "Edit Series";
+      title.textContent = mode === 'create' ? 'New Series' : 'Edit Series';
     }
     if (saveBtn) {
-      saveBtn.textContent = mode === "create" ? "Create Series" : "Save Series";
+      saveBtn.textContent = mode === 'create' ? 'Create Series' : 'Save Series';
       saveBtn.disabled = false;
     }
     if (idInput) {
-      idInput.value = series?.id || "";
-      idInput.disabled = mode === "edit";
+      idInput.value = series?.id || '';
+      idInput.disabled = mode === 'edit';
     }
     if (titleInput) {
-      titleInput.value = series?.title || series?.id || "";
+      titleInput.value = series?.title || series?.id || '';
     }
     if (descriptionInput) {
-      descriptionInput.value = series?.description || "";
+      descriptionInput.value = series?.description || '';
     }
     if (coverInput) {
-      coverInput.value = series?.coverImage || "";
+      coverInput.value = series?.coverImage || '';
     }
     if (unitSingular) {
       unitSingular.value = String(series?.unitLabelSingular || defaults.singular);
@@ -180,27 +170,27 @@ function createSeriesManager() {
     }
 
     updateSeriesModalDeleteButton();
-    modal.classList.add("active");
-    if (idInput && mode === "create") {
+    modal.classList.add('active');
+    if (idInput && mode === 'create') {
       idInput.focus();
     } else if (titleInput) {
       titleInput.focus();
     }
   }
 
-  function sanitizeSeriesId(raw = "") {
+  function sanitizeSeriesId(raw = '') {
     return String(raw)
       .trim()
       .toLowerCase()
-      .replace(/[^a-z0-9_-]+/g, "-")
-      .replace(/^-+|-+$/g, "")
+      .replace(/[^a-z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
       .slice(0, 64);
   }
 
   function defaultUnitLabelsForSeries(seriesId) {
     const id = sanitizeSeriesId(seriesId) || DEFAULT_SERIES_ID;
-    if (id === DEFAULT_SERIES_ID) return { singular: "Entry", plural: "Entries" };
-    return { singular: "Entry", plural: "Entries" };
+    if (id === DEFAULT_SERIES_ID) return { singular: 'Entry', plural: 'Entries' };
+    return { singular: 'Entry', plural: 'Entries' };
   }
 
   function getActiveSeriesId() {
@@ -216,10 +206,8 @@ function createSeriesManager() {
   function getUnitLabels() {
     const current = getActiveSeriesMeta();
     const defaults = defaultUnitLabelsForSeries(getActiveSeriesId());
-    const singular =
-      String(current?.unitLabelSingular || "").trim() || defaults.singular;
-    const plural =
-      String(current?.unitLabelPlural || "").trim() || defaults.plural;
+    const singular = String(current?.unitLabelSingular || '').trim() || defaults.singular;
+    const plural = String(current?.unitLabelPlural || '').trim() || defaults.plural;
     return { singular: singular.slice(0, 30), plural: plural.slice(0, 30) };
   }
 
@@ -227,37 +215,41 @@ function createSeriesManager() {
     const { singular, plural } = getUnitLabels();
 
     if (el.btnChapters) el.btnChapters.textContent = plural;
-    const title = document.getElementById("chaptersSectionTitle");
+    const title = document.getElementById('chaptersSectionTitle');
     if (title) title.textContent = `${plural} Management`;
     if (el.btnAddEntry) el.btnAddEntry.textContent = `+ Add New ${singular}`;
 
-    const previewLabel = document.getElementById("previewEntryLabel");
+    const previewLabel = document.getElementById('previewEntryLabel');
     if (previewLabel) previewLabel.textContent = singular;
 
-    const nameLabel = document.getElementById("entryNameLabel");
+    const nameLabel = document.getElementById('entryNameLabel');
     if (nameLabel) nameLabel.textContent = `${singular} Name`;
     if (el.entryName) el.entryName.placeholder = `e.g., ${singular} 1`;
 
-    const accessLabel = document.getElementById("entryAccessLabel");
+    const accessLabel = document.getElementById('entryAccessLabel');
     if (accessLabel) accessLabel.textContent = `${singular} Access`;
   }
 
   function getChaptersRoot() {
     const id = getActiveSeriesId();
     const preferredRoot = `comics/${id}/entries`;
-    const legacyRoots = [`comics/${id}/chapters`, "chapters"];
+    const legacyRoots = [`comics/${id}/chapters`, 'chapters'];
     const rootsToCheck = [preferredRoot, ...legacyRoots];
 
-    const normalizePath = (value) => String(value || "").trim().replace(/^\/+/, "");
+    const normalizePath = (value) =>
+      String(value || '')
+        .trim()
+        .replace(/^\/+/, '');
     const hasRootMatch = (path, root) => {
       const normalized = normalizePath(path);
-      const normalizedRoot = normalizePath(root).replace(/\/+$/, "");
+      const normalizedRoot = normalizePath(root).replace(/\/+$/, '');
       return normalized && normalizedRoot && normalized.startsWith(`${normalizedRoot}/`);
     };
 
     const folderPaths = Object.values(state.entryFolders || {});
-    const chapterPages = Object.values(state.entries || {})
-      .flatMap((pages) => (Array.isArray(pages) ? pages : []));
+    const chapterPages = Object.values(state.entries || {}).flatMap((pages) =>
+      Array.isArray(pages) ? pages : []
+    );
 
     for (const root of rootsToCheck) {
       if (folderPaths.some((path) => hasRootMatch(path, root))) return root;
@@ -275,9 +267,7 @@ function createSeriesManager() {
 
   function getChaptersSaveFilename() {
     const id = getActiveSeriesId();
-    return id === DEFAULT_SERIES_ID
-      ? "admin/data.json"
-      : `admin/series/${id}/data.json`;
+    return id === DEFAULT_SERIES_ID ? 'admin/data.json' : `admin/series/${id}/data.json`;
   }
 
   function getChaptersStorageKey() {
@@ -287,12 +277,11 @@ function createSeriesManager() {
   async function loadSeriesIndex() {
     // Pull the DB-backed series index for the series picker.
     try {
-      const res = await fetch("/series.json", { cache: "no-store" });
-      if (!res.ok) throw new Error("Failed to load series.json");
+      const res = await fetch('/series.json', { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load series.json');
       const data = await res.json();
       const series = Array.isArray(data.series) ? data.series : [];
-      const defaultSeriesId =
-        sanitizeSeriesId(data.defaultSeriesId) || DEFAULT_SERIES_ID;
+      const defaultSeriesId = sanitizeSeriesId(data.defaultSeriesId) || DEFAULT_SERIES_ID;
       state.seriesIndex = {
         version: data.version || 1,
         defaultSeriesId,
@@ -310,36 +299,31 @@ function createSeriesManager() {
     if (!state.seriesIndex.series.some((s) => s && s.id === DEFAULT_SERIES_ID)) {
       state.seriesIndex.series.unshift({
         id: DEFAULT_SERIES_ID,
-        title: "Battle Bros",
-        description: "Battle Bros comic reader",
+        title: 'Battle Bros',
+        description: 'Battle Bros comic reader',
         premiumOnly: false,
       });
     }
 
     // Restore last active series from localStorage when possible.
-    const storedActive = sanitizeSeriesId(
-      localStorage.getItem(ACTIVE_SERIES_KEY),
-    );
+    const storedActive = sanitizeSeriesId(localStorage.getItem(ACTIVE_SERIES_KEY));
     const canUseStored =
-      storedActive &&
-      state.seriesIndex.series.some((s) => s.id === storedActive);
-    state.activeSeriesId = canUseStored
-      ? storedActive
-      : state.seriesIndex.defaultSeriesId;
+      storedActive && state.seriesIndex.series.some((s) => s.id === storedActive);
+    state.activeSeriesId = canUseStored ? storedActive : state.seriesIndex.defaultSeriesId;
   }
 
   function renderSeriesSelect() {
     if (!el.seriesSelect) return;
     const current = getActiveSeriesId();
-    el.seriesSelect.innerHTML = "";
+    el.seriesSelect.innerHTML = '';
 
     const sorted = [...(state.seriesIndex.series || [])].sort((a, b) =>
-      (a.title || a.id || "").localeCompare(b.title || b.id || ""),
+      (a.title || a.id || '').localeCompare(b.title || b.id || '')
     );
 
     sorted.forEach((s) => {
       if (!s || !s.id) return;
-      const opt = document.createElement("option");
+      const opt = document.createElement('option');
       opt.value = s.id;
       opt.textContent = s.title ? `${s.title} (${s.id})` : s.id;
       el.seriesSelect.appendChild(opt);
@@ -365,7 +349,7 @@ function createSeriesManager() {
     if (state.hasUnsavedChanges) {
       const { plural } = getUnitLabels();
       const proceed = window.confirm(
-        `You have unsaved changes in ${plural}. Switch series anyway?`,
+        `You have unsaved changes in ${plural}. Switch series anyway?`
       );
       if (!proceed) {
         renderSeriesSelect();
@@ -381,11 +365,7 @@ function createSeriesManager() {
     entriesApi.renderEntryList();
     applyUnitLabels();
     updateSeriesLinks();
-    if (
-      setDesignerFrameSrc &&
-      el.designerSection &&
-      el.designerSection.style.display !== "none"
-    ) {
+    if (setDesignerFrameSrc && el.designerSection && el.designerSection.style.display !== 'none') {
       setDesignerFrameSrc(nextId, true);
     }
     if (onPageBuilderSeriesChange) {
@@ -397,7 +377,7 @@ function createSeriesManager() {
   async function createNewSeriesPrompt() {
     // Create a new series index entry plus empty DB-backed data + page config.
     if (!entriesApi) return;
-    const rawId = prompt("New series ID (letters/numbers/-/_):");
+    const rawId = prompt('New series ID (letters/numbers/-/_):');
     const id = sanitizeSeriesId(rawId);
     if (!id) return;
     if (state.seriesIndex.series.some((s) => s.id === id)) {
@@ -405,17 +385,15 @@ function createSeriesManager() {
       return;
     }
 
-    const title = (prompt("Series title:", id) || id).trim();
-    const premiumOnly = window.confirm("Should this series be premium-only?");
+    const title = (prompt('Series title:', id) || id).trim();
+    const premiumOnly = window.confirm('Should this series be premium-only?');
     const defaults = defaultUnitLabelsForSeries(id);
-    const unitLabelSingular =
-      (
-        prompt("Entry label (singular):", defaults.singular) || defaults.singular
-      ).trim();
-    const unitLabelPlural =
-      (
-        prompt("Entry label (plural):", defaults.plural) || defaults.plural
-      ).trim();
+    const unitLabelSingular = (
+      prompt('Entry label (singular):', defaults.singular) || defaults.singular
+    ).trim();
+    const unitLabelPlural = (
+      prompt('Entry label (plural):', defaults.plural) || defaults.plural
+    ).trim();
 
     const nextIndex = {
       ...state.seriesIndex,
@@ -424,7 +402,7 @@ function createSeriesManager() {
         {
           id,
           title,
-          description: "",
+          description: '',
           premiumOnly,
           unitLabelSingular,
           unitLabelPlural,
@@ -438,10 +416,10 @@ function createSeriesManager() {
 
     const defaultPageConfig = await (async () => {
       try {
-      const res = await fetch("/page-config.json", { cache: "no-store" });
-        if (!res.ok) throw new Error("missing");
+        const res = await fetch('/page-config.json', { cache: 'no-store' });
+        if (!res.ok) throw new Error('missing');
         const cfg = await res.json();
-        return cfg && typeof cfg === "object" ? cfg : {};
+        return cfg && typeof cfg === 'object' ? cfg : {};
       } catch {
         return {};
       }
@@ -458,22 +436,22 @@ function createSeriesManager() {
       },
     };
 
-    await saveToServer("admin/series.json", nextIndex);
+    await saveToServer('admin/series.json', nextIndex);
     await saveToServer(dataFile, {
       chapters: {},
       chapterFolders: {},
       chapterMeta: {},
-      statusMessage: "",
+      statusMessage: '',
       premiumOnly,
       lastUpdated: now,
-      publishedBy: "Admin Panel",
+      publishedBy: 'Admin Panel',
     });
     await saveToServer(pageConfigFile, pageConfig);
 
     // Create the series chapters root folder so uploads work immediately.
-    await fetch("/api/create-entry", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+    await fetch('/api/create-entry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ entryFolder: `comics/${id}/entries` }),
     }).catch(() => {});
 
@@ -490,44 +468,36 @@ function createSeriesManager() {
     const seriesList = state.seriesIndex.series || [];
     const current = seriesList.find((s) => s && s.id === id);
     if (!current) {
-      alert("Series not found.");
+      alert('Series not found.');
       return;
     }
 
-    const title = prompt("Series title:", current.title || id);
+    const title = prompt('Series title:', current.title || id);
     if (title === null) return;
-    const description = prompt(
-      "Series description:",
-      current.description || "",
-    );
+    const description = prompt('Series description:', current.description || '');
     if (description === null) return;
 
     const coverImage = prompt(
-      "Series cover image path (optional).\n\nExamples:\n- assets/banner3.png\n- comics/02/cover.png\n\nLeave blank to auto-pick the first accessible page in the library.",
-      current.coverImage || "",
+      'Series cover image path (optional).\n\nExamples:\n- assets/banner3.png\n- comics/02/cover.png\n\nLeave blank to auto-pick the first accessible page in the library.',
+      current.coverImage || ''
     );
     if (coverImage === null) return;
 
     const premiumOnly = current.premiumOnly
       ? window.confirm(
-        "Series is currently PREMIUM-ONLY.\n\nOK = keep premium-only\nCancel = make public",
-      )
+          'Series is currently PREMIUM-ONLY.\n\nOK = keep premium-only\nCancel = make public'
+        )
       : window.confirm(
-        "Series is currently PUBLIC.\n\nOK = make premium-only\nCancel = keep public",
-      );
+          'Series is currently PUBLIC.\n\nOK = make premium-only\nCancel = keep public'
+        );
 
     const defaults = defaultUnitLabelsForSeries(id);
     const unitLabelSingular = (
-      prompt(
-        "Entry label (singular):",
-        current.unitLabelSingular || defaults.singular,
-      ) || defaults.singular
+      prompt('Entry label (singular):', current.unitLabelSingular || defaults.singular) ||
+      defaults.singular
     ).trim();
     const unitLabelPlural = (
-      prompt(
-        "Entry label (plural):",
-        current.unitLabelPlural || defaults.plural,
-      ) || defaults.plural
+      prompt('Entry label (plural):', current.unitLabelPlural || defaults.plural) || defaults.plural
     ).trim();
 
     const nextIndex = {
@@ -535,38 +505,38 @@ function createSeriesManager() {
       series: seriesList.map((s) =>
         s && s.id === id
           ? (() => {
-            const next = {
-              ...s,
-              title: title.trim() || id,
-              description: description.trim(),
-              premiumOnly,
-              unitLabelSingular,
-              unitLabelPlural,
-            };
-            const cover = String(coverImage || "").trim();
-            if (cover) next.coverImage = cover;
-            else delete next.coverImage;
-            return next;
-          })()
-          : s,
+              const next = {
+                ...s,
+                title: title.trim() || id,
+                description: description.trim(),
+                premiumOnly,
+                unitLabelSingular,
+                unitLabelPlural,
+              };
+              const cover = String(coverImage || '').trim();
+              if (cover) next.coverImage = cover;
+              else delete next.coverImage;
+              return next;
+            })()
+          : s
       ),
     };
 
     state.seriesIndex = nextIndex;
-    await saveToServer("admin/series.json", nextIndex);
+    await saveToServer('admin/series.json', nextIndex);
 
     // Keep the series' data.json flag in sync so the reader can enforce it.
     state.premiumOnly = premiumOnly;
     try {
       await entriesApi.saveEntries(false);
     } catch (e) {
-      console.warn("Failed to persist premiumOnly to data file:", e);
+      console.warn('Failed to persist premiumOnly to data file:', e);
     }
 
     renderSeriesSelect();
     updateSeriesLinks();
     applyUnitLabels();
-    alert("Series updated.");
+    alert('Series updated.');
   }
 
   async function handleSeriesModalSubmit(event) {
@@ -589,13 +559,13 @@ function createSeriesManager() {
     const rawId = idInput.value.trim();
     const id = sanitizeSeriesId(rawId);
     if (!id) {
-      setSeriesModalStatus("Series ID is required.", true);
+      setSeriesModalStatus('Series ID is required.', true);
       return;
     }
     if (rawId !== id) idInput.value = id;
 
     const seriesList = state.seriesIndex.series || [];
-    const isCreate = seriesModalMode === "create";
+    const isCreate = seriesModalMode === 'create';
     const targetId = isCreate ? id : seriesModalEditingId || id;
 
     if (isCreate && seriesList.some((s) => s && s.id === id)) {
@@ -603,27 +573,21 @@ function createSeriesManager() {
       return;
     }
     if (!isCreate && !seriesList.some((s) => s && s.id === targetId)) {
-      setSeriesModalStatus("Series not found.", true);
+      setSeriesModalStatus('Series not found.', true);
       return;
     }
 
     const defaults = defaultUnitLabelsForSeries(targetId || id);
     const title = titleInput.value.trim() || targetId;
-    const description = descriptionInput
-      ? descriptionInput.value.trim()
-      : "";
-    const coverImage = coverInput ? coverInput.value.trim() : "";
-    const unitLabelSingular = (
-      unitSingular.value.trim() || defaults.singular
-    ).slice(0, 30);
-    const unitLabelPlural = (
-      unitPlural.value.trim() || defaults.plural
-    ).slice(0, 30);
+    const description = descriptionInput ? descriptionInput.value.trim() : '';
+    const coverImage = coverInput ? coverInput.value.trim() : '';
+    const unitLabelSingular = (unitSingular.value.trim() || defaults.singular).slice(0, 30);
+    const unitLabelPlural = (unitPlural.value.trim() || defaults.plural).slice(0, 30);
     const premiumOnlyValue = !!premiumOnly.checked;
 
     if (saveBtn) saveBtn.disabled = true;
     try {
-      setSeriesModalStatus("Saving...", false);
+      setSeriesModalStatus('Saving...', false);
       if (isCreate) {
         const nextIndex = {
           ...state.seriesIndex,
@@ -647,10 +611,10 @@ function createSeriesManager() {
 
         const defaultPageConfig = await (async () => {
           try {
-            const res = await fetch("/page-config.json", { cache: "no-store" });
-            if (!res.ok) throw new Error("missing");
+            const res = await fetch('/page-config.json', { cache: 'no-store' });
+            if (!res.ok) throw new Error('missing');
             const cfg = await res.json();
-            return cfg && typeof cfg === "object" ? cfg : {};
+            return cfg && typeof cfg === 'object' ? cfg : {};
           } catch {
             return {};
           }
@@ -667,21 +631,21 @@ function createSeriesManager() {
           },
         };
 
-        await saveToServer("admin/series.json", nextIndex);
+        await saveToServer('admin/series.json', nextIndex);
         await saveToServer(dataFile, {
           chapters: {},
           chapterFolders: {},
           chapterMeta: {},
-          statusMessage: "",
+          statusMessage: '',
           premiumOnly: premiumOnlyValue,
           lastUpdated: now,
-          publishedBy: "Admin Panel",
+          publishedBy: 'Admin Panel',
         });
         await saveToServer(pageConfigFile, pageConfig);
 
-        await fetch("/api/create-entry", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+        await fetch('/api/create-entry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ entryFolder: `comics/${id}/entries` }),
         }).catch(() => {});
 
@@ -703,23 +667,23 @@ function createSeriesManager() {
                     unitLabelSingular,
                     unitLabelPlural,
                   };
-                  const cover = String(coverImage || "").trim();
+                  const cover = String(coverImage || '').trim();
                   if (cover) next.coverImage = cover;
                   else delete next.coverImage;
                   return next;
                 })()
-              : s,
+              : s
           ),
         };
 
         state.seriesIndex = nextIndex;
-        await saveToServer("admin/series.json", nextIndex);
+        await saveToServer('admin/series.json', nextIndex);
 
         state.premiumOnly = premiumOnlyValue;
         try {
           await entriesApi.saveEntries(false);
         } catch (e) {
-          console.warn("Failed to persist premiumOnly to data file:", e);
+          console.warn('Failed to persist premiumOnly to data file:', e);
         }
 
         renderSeriesSelect();
@@ -729,7 +693,7 @@ function createSeriesManager() {
 
       closeSeriesModal();
     } catch (err) {
-      const message = err?.message || "Failed to save series.";
+      const message = err?.message || 'Failed to save series.';
       setSeriesModalStatus(message, true);
     } finally {
       if (saveBtn) saveBtn.disabled = false;
@@ -739,19 +703,19 @@ function createSeriesManager() {
   async function handleSeriesModalDelete() {
     if (!entriesApi) return;
     const { deleteBtn } = getSeriesModalElements();
-    const id = sanitizeSeriesId(seriesModalEditingId || "");
+    const id = sanitizeSeriesId(seriesModalEditingId || '');
     if (!id) {
-      setSeriesModalStatus("Series not found.", true);
+      setSeriesModalStatus('Series not found.', true);
       return;
     }
     if (id === DEFAULT_SERIES_ID) {
-      setSeriesModalStatus("Default series cannot be deleted.", true);
+      setSeriesModalStatus('Default series cannot be deleted.', true);
       return;
     }
     if (state.hasUnsavedChanges) {
       const { plural } = getUnitLabels();
       const proceed = window.confirm(
-        `You have unsaved changes in ${plural}. Deleting the series will discard them. Continue?`,
+        `You have unsaved changes in ${plural}. Deleting the series will discard them. Continue?`
       );
       if (!proceed) return;
     }
@@ -759,29 +723,29 @@ function createSeriesManager() {
     const seriesList = state.seriesIndex.series || [];
     const current = seriesList.find((s) => s && s.id === id);
     if (!current) {
-      setSeriesModalStatus("Series not found.", true);
+      setSeriesModalStatus('Series not found.', true);
       return;
     }
 
     const seriesTitle = current.title || id;
     const confirmed = window.confirm(
-      `Delete series "${seriesTitle}" (${id}) from the series list?\n\nThis hides it from the site but keeps its data in the database.`,
+      `Delete series "${seriesTitle}" (${id}) from the series list?\n\nThis hides it from the site but keeps its data in the database.`
     );
     if (!confirmed) return;
 
     const confirmedAgain = window.confirm(
-      "You can restore it later by creating a series with the same ID.\n\nContinue?",
+      'You can restore it later by creating a series with the same ID.\n\nContinue?'
     );
     if (!confirmedAgain) return;
 
     if (deleteBtn) deleteBtn.disabled = true;
     try {
-      setSeriesModalStatus("Deleting...", false);
+      setSeriesModalStatus('Deleting...', false);
       const nextIndex = {
         ...state.seriesIndex,
         series: seriesList.filter((s) => s && s.id !== id),
       };
-      await saveToServer("admin/series.json", nextIndex);
+      await saveToServer('admin/series.json', nextIndex);
       state.seriesIndex = nextIndex;
 
       if (getActiveSeriesId() === id) {
@@ -794,7 +758,7 @@ function createSeriesManager() {
 
       closeSeriesModal();
     } catch (err) {
-      const message = err?.message || "Failed to delete series.";
+      const message = err?.message || 'Failed to delete series.';
       setSeriesModalStatus(message, true);
     } finally {
       if (deleteBtn) deleteBtn.disabled = false;
@@ -806,7 +770,7 @@ function createSeriesManager() {
       await createNewSeriesPrompt();
       return;
     }
-    openSeriesModal("create", null);
+    openSeriesModal('create', null);
   }
 
   async function editActiveSeries() {
@@ -818,10 +782,10 @@ function createSeriesManager() {
     const seriesList = state.seriesIndex.series || [];
     const current = seriesList.find((s) => s && s.id === id);
     if (!current) {
-      setSeriesModalStatus("Series not found.", true);
+      setSeriesModalStatus('Series not found.', true);
       return;
     }
-    openSeriesModal("edit", current);
+    openSeriesModal('edit', current);
   }
 
   return {

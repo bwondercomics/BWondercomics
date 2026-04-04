@@ -1,65 +1,62 @@
-import { el } from "./dom.js";
-import { state, POST_DRAFT_KEY } from "./state.js";
-import { sanitizeHtml } from "./core.js";
-import { openImagePicker } from "./image-picker.js";
-import { escapeHtml, parseTags, readFileAsBase64 } from "./utils.js";
+import { el } from './dom.js';
+import { state, POST_DRAFT_KEY } from './state.js';
+import { sanitizeHtml } from './core.js';
+import { openImagePicker } from './image-picker.js';
+import { escapeHtml, parseTags, readFileAsBase64 } from './utils.js';
 
-const POSTS_API = "/api/admin/posts";
+const POSTS_API = '/api/admin/posts';
 const BLUESKY_CHAR_LIMIT = 300;
 
-function stripHtmlToText(value = "") {
+function stripHtmlToText(value = '') {
   const parser = new DOMParser();
-  const doc = parser.parseFromString(value, "text/html");
-  return (doc.body.textContent || "").replace(/\s+/g, " ").trim();
+  const doc = parser.parseFromString(value, 'text/html');
+  return (doc.body.textContent || '').replace(/\s+/g, ' ').trim();
 }
 
-function buildBlueskyText(title = "", content = "") {
-  const cleanTitle = String(title || "").trim();
-  const body = stripHtmlToText(content || "");
+function buildBlueskyText(title = '', content = '') {
+  const cleanTitle = String(title || '').trim();
+  const body = stripHtmlToText(content || '');
   const parts = [];
   if (cleanTitle) parts.push(cleanTitle);
   if (body) parts.push(body);
-  return parts.join("\n\n").trim();
+  return parts.join('\n\n').trim();
 }
 
-function isoToDateTimeLocal(iso = "") {
-  const value = String(iso || "").trim();
-  if (!value) return "";
+function isoToDateTimeLocal(iso = '') {
+  const value = String(iso || '').trim();
+  if (!value) return '';
   const dt = new Date(value);
-  if (Number.isNaN(dt.getTime())) return "";
-  const pad = (n) => String(n).padStart(2, "0");
+  if (Number.isNaN(dt.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
   return `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(
-    dt.getDate(),
+    dt.getDate()
   )}T${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
 }
 
-function dateTimeLocalToIso(raw = "") {
-  const value = String(raw || "").trim();
-  if (!value) return "";
+function dateTimeLocalToIso(raw = '') {
+  const value = String(raw || '').trim();
+  if (!value) return '';
   const dt = new Date(value);
-  if (Number.isNaN(dt.getTime())) return "";
+  if (Number.isNaN(dt.getTime())) return '';
   return dt.toISOString();
 }
 
-function createPostsManager({
-  hideAllSections,
-  setActiveNav,
-  upsertMediaEntry,
-} = {}) {
-  const upsertMedia =
-    typeof upsertMediaEntry === "function"
-      ? upsertMediaEntry
-      : async () => {};
+function createPostsManager({ hideAllSections, setActiveNav, upsertMediaEntry } = {}) {
+  const upsertMedia = typeof upsertMediaEntry === 'function' ? upsertMediaEntry : async () => {};
 
   function normalizeFit(value) {
-    const raw = String(value || "").trim().toLowerCase();
-    return raw === "contain" ? "contain" : "cover";
+    const raw = String(value || '')
+      .trim()
+      .toLowerCase();
+    return raw === 'contain' ? 'contain' : 'cover';
   }
 
   function parseFocus(value) {
-    const raw = String(value || "").trim().toLowerCase();
-    if (!raw || raw === "center") return { x: 50, y: 50 };
-    if (raw.includes("%")) {
+    const raw = String(value || '')
+      .trim()
+      .toLowerCase();
+    if (!raw || raw === 'center') return { x: 50, y: 50 };
+    if (raw.includes('%')) {
       const parts = raw.split(/\s+/).filter(Boolean);
       if (parts.length >= 2) {
         const x = parseFloat(parts[0]);
@@ -74,14 +71,14 @@ function createPostsManager({
       bottom: [50, 100],
       left: [0, 50],
       right: [100, 50],
-      "top left": [0, 0],
-      "left top": [0, 0],
-      "top right": [100, 0],
-      "right top": [100, 0],
-      "bottom left": [0, 100],
-      "left bottom": [0, 100],
-      "bottom right": [100, 100],
-      "right bottom": [100, 100],
+      'top left': [0, 0],
+      'left top': [0, 0],
+      'top right': [100, 0],
+      'right top': [100, 0],
+      'bottom left': [0, 100],
+      'left bottom': [0, 100],
+      'bottom right': [100, 100],
+      'right bottom': [100, 100],
     };
     if (map[raw]) {
       const [x, y] = map[raw];
@@ -96,40 +93,40 @@ function createPostsManager({
     return `${safeX}% ${safeY}%`;
   }
 
-  function resolveMediaSrc(path = "") {
-    if (!path) return "";
+  function resolveMediaSrc(path = '') {
+    if (!path) return '';
     if (/^https?:\/\//i.test(path)) return path;
-    if (path.startsWith("/")) return path;
-    if (path.startsWith("protected/")) {
-      const rel = path.replace(/^protected\//, "");
+    if (path.startsWith('/')) return path;
+    if (path.startsWith('protected/')) {
+      const rel = path.replace(/^protected\//, '');
       return `/api/protected/${rel}`;
     }
     return `/${path}`;
   }
 
   async function fetchMediaItems() {
-    const response = await fetch("/media.json", { cache: "no-store" });
+    const response = await fetch('/media.json', { cache: 'no-store' });
     const data = await response.json().catch(() => []);
     if (!response.ok) {
-      throw new Error("Failed to load media library");
+      throw new Error('Failed to load media library');
     }
     const items = Array.isArray(data) ? data : [];
     return items.map((item) => ({
       id: item.id,
       path: item.path,
-      label: item.path?.split("/").pop() || item.path,
+      label: item.path?.split('/').pop() || item.path,
       thumbSrc: item.thumbPath || item.previewPath || item.path,
     }));
   }
 
   async function openMediaPicker() {
     try {
-      const currentPath = (el.postImage?.value || "").trim();
-      const focusValue = el.postImageFocus?.value || "center";
-      const fitValue = normalizeFit(el.postImageFit?.value || "cover");
+      const currentPath = (el.postImage?.value || '').trim();
+      const focusValue = el.postImageFocus?.value || 'center';
+      const fitValue = normalizeFit(el.postImageFit?.value || 'cover');
       const focus = parseFocus(focusValue);
       await openImagePicker({
-        title: "Select Feed Image",
+        title: 'Select Feed Image',
         getItems: fetchMediaItems,
         resolveSrc: resolveMediaSrc,
         initialSelection: {
@@ -139,45 +136,43 @@ function createPostsManager({
           y: focus.y,
         },
         onApply: ({ item, fit, x, y }) => {
-          if (el.postImage) el.postImage.value = item?.path || "";
+          if (el.postImage) el.postImage.value = item?.path || '';
           if (el.postImageFocus) el.postImageFocus.value = formatFocus({ x, y });
           if (el.postImageFit) el.postImageFit.value = normalizeFit(fit);
           updateBlueskyCounter();
         },
       });
     } catch (error) {
-      console.error("Media picker failed:", error);
-      setPostStatus(error.message || "Unable to load media picker.", true);
+      console.error('Media picker failed:', error);
+      setPostStatus(error.message || 'Unable to load media picker.', true);
     }
   }
 
   function resetPostImageFocus() {
-    if (el.postImageFocus) el.postImageFocus.value = "center";
-    if (el.postImageFit) el.postImageFit.value = "cover";
+    if (el.postImageFocus) el.postImageFocus.value = 'center';
+    if (el.postImageFit) el.postImageFit.value = 'cover';
   }
 
   function setPostStatus(message, isError = false) {
     if (!el.postStatus) return;
     el.postStatus.textContent = message;
-    el.postStatus.style.display = "block";
-    el.postStatus.style.background = isError
-      ? "var(--danger)"
-      : "var(--success)";
-    el.postStatus.style.color = isError ? "var(--text)" : "var(--bg-dark)";
+    el.postStatus.style.display = 'block';
+    el.postStatus.style.background = isError ? 'var(--danger)' : 'var(--success)';
+    el.postStatus.style.color = isError ? 'var(--text)' : 'var(--bg-dark)';
     setTimeout(() => {
-      el.postStatus.style.display = "none";
+      el.postStatus.style.display = 'none';
     }, 3000);
   }
 
   function getBlueskyTextFromForm() {
-    const title = el.postTitle?.value || "";
-    const rawContent = (el.postContent?.innerHTML || "").trim();
+    const title = el.postTitle?.value || '';
+    const rawContent = (el.postContent?.innerHTML || '').trim();
     const content = sanitizeHtml(rawContent);
     return buildBlueskyText(title, content);
   }
 
   function hasBlueskyImage() {
-    const imageValue = (el.postImage?.value || "").trim();
+    const imageValue = (el.postImage?.value || '').trim();
     const hasFile = !!el.postImageFile?.files?.length;
     return Boolean(imageValue || hasFile);
   }
@@ -188,38 +183,33 @@ function createPostsManager({
     const count = text.length;
     const active = el.postShareBluesky?.checked === true;
     const imageOnly = !text && hasBlueskyImage();
-    const suffix = imageOnly ? " (image only)" : " (title + content)";
+    const suffix = imageOnly ? ' (image only)' : ' (title + content)';
 
     el.blueskyCharCounter.textContent = `Bluesky text: ${count}/${BLUESKY_CHAR_LIMIT}${suffix}`;
-    el.blueskyCharCounter.classList.toggle(
-      "is-over",
-      active && count > BLUESKY_CHAR_LIMIT,
-    );
-    el.blueskyCharCounter.classList.toggle("is-muted", !active);
+    el.blueskyCharCounter.classList.toggle('is-over', active && count > BLUESKY_CHAR_LIMIT);
+    el.blueskyCharCounter.classList.toggle('is-muted', !active);
 
     if (el.btnSavePost) {
-      const blocked =
-        active &&
-        (count > BLUESKY_CHAR_LIMIT || (!text && !hasBlueskyImage()));
+      const blocked = active && (count > BLUESKY_CHAR_LIMIT || (!text && !hasBlueskyImage()));
       el.btnSavePost.disabled = blocked;
     }
   }
 
   function bindBlueskyCounter() {
     const handler = () => updateBlueskyCounter();
-    if (el.postTitle) el.postTitle.addEventListener("input", handler);
-    if (el.postContent) el.postContent.addEventListener("input", handler);
-    if (el.postShareBluesky) el.postShareBluesky.addEventListener("change", handler);
-    if (el.postImage) el.postImage.addEventListener("input", handler);
-    if (el.postImageFile) el.postImageFile.addEventListener("change", handler);
+    if (el.postTitle) el.postTitle.addEventListener('input', handler);
+    if (el.postContent) el.postContent.addEventListener('input', handler);
+    if (el.postShareBluesky) el.postShareBluesky.addEventListener('change', handler);
+    if (el.postImage) el.postImage.addEventListener('input', handler);
+    if (el.postImageFile) el.postImageFile.addEventListener('change', handler);
     updateBlueskyCounter();
   }
 
   function showBlogSection() {
     if (hideAllSections) hideAllSections();
     if (el.blogSection) {
-      el.blogSection.style.display = "block";
-      el.blogSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      el.blogSection.style.display = 'block';
+      el.blogSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
     renderPosts();
     bindImagePickerControls();
@@ -228,85 +218,82 @@ function createPostsManager({
 
   function resetPostForm() {
     state.editingPostId = null;
-    el.postTitle.value = "";
-    el.postImage.value = "";
-    if (el.postImageFile) el.postImageFile.value = "";
-    if (el.postImageTags) el.postImageTags.value = "";
-    if (el.postImageFocus) el.postImageFocus.value = "center";
-    if (el.postImageFit) el.postImageFit.value = "cover";
-    if (el.postPublishAt) el.postPublishAt.value = "";
-    if (el.postContent) el.postContent.innerHTML = "";
+    el.postTitle.value = '';
+    el.postImage.value = '';
+    if (el.postImageFile) el.postImageFile.value = '';
+    if (el.postImageTags) el.postImageTags.value = '';
+    if (el.postImageFocus) el.postImageFocus.value = 'center';
+    if (el.postImageFit) el.postImageFit.value = 'cover';
+    if (el.postPublishAt) el.postPublishAt.value = '';
+    if (el.postContent) el.postContent.innerHTML = '';
     el.postShare.checked = true;
     if (el.postShareBluesky) el.postShareBluesky.checked = false;
-    el.btnSavePost.textContent = "Publish Post";
-    if (el.btnSaveDraft) el.btnSaveDraft.textContent = "Save Draft";
+    el.btnSavePost.textContent = 'Publish Post';
+    if (el.btnSaveDraft) el.btnSaveDraft.textContent = 'Save Draft';
     updateBlueskyCounter();
   }
 
   function bindImagePickerControls() {
     if (el.btnMediaPicker && !el.btnMediaPicker.dataset.bound) {
-      el.btnMediaPicker.dataset.bound = "true";
-      el.btnMediaPicker.addEventListener("click", () => {
+      el.btnMediaPicker.dataset.bound = 'true';
+      el.btnMediaPicker.addEventListener('click', () => {
         openMediaPicker();
       });
     }
     if (el.btnPostImageFocus && !el.btnPostImageFocus.dataset.bound) {
-      el.btnPostImageFocus.dataset.bound = "true";
-      el.btnPostImageFocus.addEventListener("click", () => {
+      el.btnPostImageFocus.dataset.bound = 'true';
+      el.btnPostImageFocus.addEventListener('click', () => {
         openMediaPicker();
       });
     }
     if (el.btnPostImageFocusReset && !el.btnPostImageFocusReset.dataset.bound) {
-      el.btnPostImageFocusReset.dataset.bound = "true";
-      el.btnPostImageFocusReset.addEventListener("click", () => {
+      el.btnPostImageFocusReset.dataset.bound = 'true';
+      el.btnPostImageFocusReset.addEventListener('click', () => {
         resetPostImageFocus();
       });
     }
   }
 
-  function getPostPreview(content = "") {
+  function getPostPreview(content = '') {
     const trimmed = content.trim();
-    if (trimmed.length <= 140) return trimmed || "No preview text";
+    if (trimmed.length <= 140) return trimmed || 'No preview text';
     return `${trimmed.slice(0, 140)}...`;
   }
 
   function formatPostDate(dateStr) {
-    if (!dateStr) return "Date not set";
+    if (!dateStr) return 'Date not set';
     const date = new Date(dateStr);
-    if (Number.isNaN(date.getTime())) return "Date not set";
+    if (Number.isNaN(date.getTime())) return 'Date not set';
     return date.toLocaleString(undefined, {
-      dateStyle: "medium",
-      timeStyle: "short",
+      dateStyle: 'medium',
+      timeStyle: 'short',
     });
   }
 
   function renderPosts() {
-    el.postList.innerHTML = "";
+    el.postList.innerHTML = '';
 
     if (!state.posts.length) {
-      const empty = document.createElement("div");
-      empty.className = "entry-item";
-      empty.textContent = "No posts yet. Create the first update!";
+      const empty = document.createElement('div');
+      empty.className = 'entry-item';
+      empty.textContent = 'No posts yet. Create the first update!';
       el.postList.appendChild(empty);
       return;
     }
 
     const sorted = [...state.posts].sort(
-      (a, b) =>
-        new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime(),
+      (a, b) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()
     );
 
     sorted.forEach((post) => {
-      const item = document.createElement("div");
-      item.className = "entry-item";
+      const item = document.createElement('div');
+      item.className = 'entry-item';
       const dateLabel = formatPostDate(post.date);
-      const preview = getPostPreview(
-        (post.content || "").replace(/<[^>]+>/g, ""),
-      );
+      const preview = getPostPreview((post.content || '').replace(/<[^>]+>/g, ''));
       const statusLabel =
-        post.status === "draft"
+        post.status === 'draft'
           ? '<span style="color: var(--accent); font-size: 0.85rem;">Draft</span>'
-          : post.status === "scheduled"
+          : post.status === 'scheduled'
             ? '<span style="color: var(--primary); font-size: 0.85rem;">Scheduled</span>'
             : '<span style="color: var(--success); font-size: 0.85rem;">Published</span>';
       const shareLabel =
@@ -318,54 +305,42 @@ function createPostsManager({
           ? '<span style="color: var(--primary); font-size: 0.85rem;">Bluesky on</span>'
           : '<span style="color: var(--danger); font-size: 0.85rem;">Bluesky off</span>';
       const tagText =
-        post.imageTags && post.imageTags.length
-          ? `Tags: ${post.imageTags.join(", ")}`
-          : "";
+        post.imageTags && post.imageTags.length ? `Tags: ${post.imageTags.join(', ')}` : '';
       const blueskyError =
-        post.blueskyError && post.blueskyError.trim()
-          ? `Bluesky error: ${post.blueskyError}`
-          : "";
+        post.blueskyError && post.blueskyError.trim() ? `Bluesky error: ${post.blueskyError}` : '';
 
       item.innerHTML = `
         <div class="entry-info">
-          <div class="entry-name">${escapeHtml(post.title?.trim() || "Update")}</div>
+          <div class="entry-name">${escapeHtml(post.title?.trim() || 'Update')}</div>
           <div class="entry-meta">${dateLabel} - ${shareLabel} - ${blueskyLabel} - ${statusLabel}</div>
           ${
             tagText
-              ? `<div class="entry-meta" style="opacity:0.8;">${escapeHtml(
-                tagText,
-              )}</div>`
-              : ""
+              ? `<div class="entry-meta" style="opacity:0.8;">${escapeHtml(tagText)}</div>`
+              : ''
           }
-          <div class="entry-meta" style="opacity:0.8;">${escapeHtml(
-            preview,
-          )}</div>
+          <div class="entry-meta" style="opacity:0.8;">${escapeHtml(preview)}</div>
           ${
             blueskyError
               ? `<div class="entry-meta" style="color: var(--danger);">${escapeHtml(
-                blueskyError,
-              )}</div>`
-              : ""
+                  blueskyError
+                )}</div>`
+              : ''
           }
         </div>
         <div class="entry-actions">
-          <button type="button" class="btn-small btn-edit" data-post="${
-            post.id
-          }">Edit</button>
-          <button type="button" class="btn-small btn-delete" data-post="${
-            post.id
-          }">Delete</button>
+          <button type="button" class="btn-small btn-edit" data-post="${post.id}">Edit</button>
+          <button type="button" class="btn-small btn-delete" data-post="${post.id}">Delete</button>
         </div>
       `;
       el.postList.appendChild(item);
     });
 
-    el.postList.querySelectorAll("[data-post]").forEach((btn) => {
-      const id = btn.getAttribute("data-post");
-      if (btn.classList.contains("btn-edit")) {
-        btn.addEventListener("click", () => populatePostForm(id));
-      } else if (btn.classList.contains("btn-delete")) {
-        btn.addEventListener("click", () => deletePost(id));
+    el.postList.querySelectorAll('[data-post]').forEach((btn) => {
+      const id = btn.getAttribute('data-post');
+      if (btn.classList.contains('btn-edit')) {
+        btn.addEventListener('click', () => populatePostForm(id));
+      } else if (btn.classList.contains('btn-delete')) {
+        btn.addEventListener('click', () => deletePost(id));
       }
     });
   }
@@ -374,40 +349,37 @@ function createPostsManager({
     // Fetch admin post list from the DB.
     try {
       const response = await fetch(POSTS_API, {
-        cache: "no-store",
-        credentials: "same-origin",
+        cache: 'no-store',
+        credentials: 'same-origin',
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         throw new Error(
           data.error ||
-            "Unable to load posts. Make sure you are signed in as an admin (via comments login).",
+            'Unable to load posts. Make sure you are signed in as an admin (via comments login).'
         );
       }
       const posts = Array.isArray(data.posts) ? data.posts : [];
       state.posts = posts
-        .filter((p) => p && typeof p === "object")
+        .filter((p) => p && typeof p === 'object')
         .map((p) => ({
           ...p,
-          status: p.status || "published",
-          imageFit: p.imageFit || "cover",
-          imageFocus: p.imageFocus || "center",
+          status: p.status || 'published',
+          imageFit: p.imageFit || 'cover',
+          imageFocus: p.imageFocus || 'center',
           share: p.share !== false,
           shareBluesky: p.shareBluesky === true,
-          blueskyError: p.blueskyError || "",
-          imageTags: Array.isArray(p.imageTags)
-            ? p.imageTags
-            : parseTags(p.imageTags || ""),
+          blueskyError: p.blueskyError || '',
+          imageTags: Array.isArray(p.imageTags) ? p.imageTags : parseTags(p.imageTags || ''),
         }));
       renderPosts();
     } catch (error) {
-      console.error("Error loading posts:", error);
+      console.error('Error loading posts:', error);
       state.posts = [];
       renderPosts();
       setPostStatus(
-        error.message ||
-          "Could not load existing posts. Create a new one to get started.",
-        true,
+        error.message || 'Could not load existing posts. Create a new one to get started.',
+        true
       );
     }
   }
@@ -420,10 +392,10 @@ function createPostsManager({
       if (!draft) return;
       if (state.editingPostId) return;
       if (el.postTitle && !el.postTitle.value) {
-        el.postTitle.value = draft.title || "";
-        el.postImage.value = draft.image || "";
+        el.postTitle.value = draft.title || '';
+        el.postImage.value = draft.image || '';
         if (el.postImageTags) {
-          el.postImageTags.value = (draft.imageTags || []).join(", ");
+          el.postImageTags.value = (draft.imageTags || []).join(', ');
         }
         if (el.postImageFit && draft.imageFit) {
           el.postImageFit.value = normalizeFit(draft.imageFit);
@@ -432,20 +404,20 @@ function createPostsManager({
           el.postImageFocus.value = draft.imageFocus;
         }
         if (el.postPublishAt && draft.publishAt) {
-          el.postPublishAt.value = String(draft.publishAt || "");
+          el.postPublishAt.value = String(draft.publishAt || '');
         }
         if (el.postContent) {
-          el.postContent.innerHTML = draft.content || "";
+          el.postContent.innerHTML = draft.content || '';
         }
         if (el.postShare) el.postShare.checked = draft.share !== false;
         if (el.postShareBluesky && draft.shareBluesky !== undefined) {
           el.postShareBluesky.checked = draft.shareBluesky === true;
         }
         updateBlueskyCounter();
-        setPostStatus("Loaded saved draft from browser storage.");
+        setPostStatus('Loaded saved draft from browser storage.');
       }
     } catch (e) {
-      console.warn("Could not load local draft", e);
+      console.warn('Could not load local draft', e);
     }
   }
 
@@ -453,22 +425,22 @@ function createPostsManager({
     const post = state.posts.find((p) => p.id === postId);
     if (!post) return;
     state.editingPostId = post.id;
-    el.postTitle.value = post.title || "";
-    el.postImage.value = post.image || "";
+    el.postTitle.value = post.title || '';
+    el.postImage.value = post.image || '';
     if (el.postImageTags) {
-      el.postImageTags.value = (post.imageTags || []).join(", ");
+      el.postImageTags.value = (post.imageTags || []).join(', ');
     }
-    if (el.postImageFit) el.postImageFit.value = normalizeFit(post.imageFit || "cover");
-    if (el.postImageFocus) el.postImageFocus.value = post.imageFocus || "center";
+    if (el.postImageFit) el.postImageFit.value = normalizeFit(post.imageFit || 'cover');
+    if (el.postImageFocus) el.postImageFocus.value = post.imageFocus || 'center';
     if (el.postPublishAt) {
-      el.postPublishAt.value = isoToDateTimeLocal(post.date || "");
+      el.postPublishAt.value = isoToDateTimeLocal(post.date || '');
     }
-    if (el.postContent) el.postContent.innerHTML = post.content || "";
+    if (el.postContent) el.postContent.innerHTML = post.content || '';
     el.postShare.checked = post.share !== false;
     if (el.postShareBluesky) {
       el.postShareBluesky.checked = post.shareBluesky === true;
     }
-    el.btnSavePost.textContent = "Update Post";
+    el.btnSavePost.textContent = 'Update Post';
     updateBlueskyCounter();
     showBlogSection();
   }
@@ -483,42 +455,37 @@ function createPostsManager({
       return;
     }
 
-    const confirmed = window.confirm(
-      `Delete the post "${post.title}"? This cannot be undone.`,
-    );
+    const confirmed = window.confirm(`Delete the post "${post.title}"? This cannot be undone.`);
     if (!confirmed) {
       state.isDeletingPost = false;
       return;
     }
 
     // Prevent double clicks while saving
-    el.postList.querySelectorAll(".btn-delete").forEach((btn) => {
+    el.postList.querySelectorAll('.btn-delete').forEach((btn) => {
       if (btn instanceof HTMLButtonElement) {
         btn.disabled = true;
       }
     });
 
     try {
-      const response = await fetch(
-        `${POSTS_API}/${encodeURIComponent(postId)}`,
-        {
-          method: "DELETE",
-          credentials: "same-origin",
-        },
-      );
+      const response = await fetch(`${POSTS_API}/${encodeURIComponent(postId)}`, {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      });
       const result = await response.json().catch(() => ({}));
       if (!response.ok) {
-        throw new Error(result.error || "Failed to delete post");
+        throw new Error(result.error || 'Failed to delete post');
       }
       state.posts = state.posts.filter((p) => p.id !== postId);
       renderPosts();
-      setPostStatus("Post deleted.");
+      setPostStatus('Post deleted.');
     } catch (error) {
-      console.error("Failed to delete post:", error);
-      setPostStatus(error.message || "Failed to delete post.", true);
+      console.error('Failed to delete post:', error);
+      setPostStatus(error.message || 'Failed to delete post.', true);
     } finally {
       state.isDeletingPost = false;
-      el.postList.querySelectorAll(".btn-delete").forEach((btn) => {
+      el.postList.querySelectorAll('.btn-delete').forEach((btn) => {
         if (btn instanceof HTMLButtonElement) {
           btn.disabled = false;
         }
@@ -528,47 +495,47 @@ function createPostsManager({
 
   async function savePost(options = {}) {
     // Validate form, optionally upload image, then upsert via /api/admin/posts.
-    const requestedStatus = options.status || "published";
+    const requestedStatus = options.status || 'published';
     const title = el.postTitle.value.trim();
-    const imageTags = parseTags(el.postImageTags?.value || "");
-    const imageFocus = el.postImageFocus?.value || "center";
-    const imageFit = normalizeFit(el.postImageFit?.value || "cover");
-    const rawContent = (el.postContent?.innerHTML || "").trim();
+    const imageTags = parseTags(el.postImageTags?.value || '');
+    const imageFocus = el.postImageFocus?.value || 'center';
+    const imageFit = normalizeFit(el.postImageFit?.value || 'cover');
+    const rawContent = (el.postContent?.innerHTML || '').trim();
     const content = sanitizeHtml(rawContent);
     const share = el.postShare.checked;
     const shareBluesky = el.postShareBluesky?.checked === true;
     const blueskyText = buildBlueskyText(title, content);
     let image = el.postImage.value.trim();
     const uploadFile = el.postImageFile?.files?.[0];
-    const publishAtIso = dateTimeLocalToIso(el.postPublishAt?.value || "");
+    const publishAtIso = dateTimeLocalToIso(el.postPublishAt?.value || '');
 
     if (!content) {
-      setPostStatus("Post content is required.", true);
+      setPostStatus('Post content is required.', true);
       return;
     }
 
     if (uploadFile) {
       try {
-        setPostStatus("Uploading image...");
+        setPostStatus('Uploading image...');
         const payload = {
           name: uploadFile.name,
           data: await readFileAsBase64(uploadFile),
         };
-        const response = await fetch("/api/upload-media", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+        const response = await fetch('/api/upload-media', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ file: payload }),
         });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error || "Upload failed");
+        if (!response.ok) throw new Error(result.error || 'Upload failed');
         image = result.path || image;
         el.postImage.value = image;
-        if (el.postImageFile) el.postImageFile.value = "";
+        if (el.postImageFile) el.postImageFile.value = '';
         await upsertMedia(image, imageTags);
         updateBlueskyCounter();
-        setPostStatus("Image uploaded and added to media library.");
+        setPostStatus('Image uploaded and added to media library.');
       } catch (error) {
-        console.error("Post image upload failed:", error);
+        console.error('Post image upload failed:', error);
         setPostStatus(`Image upload failed: ${error.message}`, true);
         return;
       }
@@ -579,30 +546,24 @@ function createPostsManager({
     const publishAtDate = publishAtIso ? new Date(publishAtIso) : null;
     let status = requestedStatus;
     if (
-      status === "published" &&
+      status === 'published' &&
       publishAtDate &&
       !Number.isNaN(publishAtDate.getTime()) &&
       publishAtDate.getTime() > Date.now()
     ) {
-      status = "scheduled";
+      status = 'scheduled';
     }
-    const safeShare = status === "draft" ? false : share;
-    const safeShareBluesky = status === "draft" ? false : shareBluesky;
+    const safeShare = status === 'draft' ? false : share;
+    const safeShareBluesky = status === 'draft' ? false : shareBluesky;
     const allowEmptyBluesky = hasBlueskyImage();
 
     if (safeShareBluesky) {
       if (!blueskyText && !allowEmptyBluesky) {
-        setPostStatus(
-          "Bluesky text is required when no image is set.",
-          true,
-        );
+        setPostStatus('Bluesky text is required when no image is set.', true);
         return;
       }
       if (blueskyText.length > BLUESKY_CHAR_LIMIT) {
-        setPostStatus(
-          `Bluesky text exceeds ${BLUESKY_CHAR_LIMIT} characters.`,
-          true,
-        );
+        setPostStatus(`Bluesky text exceeds ${BLUESKY_CHAR_LIMIT} characters.`, true);
         return;
       }
     }
@@ -633,39 +594,39 @@ function createPostsManager({
           status,
           imageFit,
           imageFocus,
-          publishAt: el.postPublishAt?.value || "",
-        }),
+          publishAt: el.postPublishAt?.value || '',
+        })
       );
     } catch (e) {
-      console.warn("Could not persist draft locally", e);
+      console.warn('Could not persist draft locally', e);
     }
 
     try {
       const url = state.editingPostId
         ? `${POSTS_API}/${encodeURIComponent(state.editingPostId)}`
         : POSTS_API;
-      const method = state.editingPostId ? "PUT" : "POST";
+      const method = state.editingPostId ? 'PUT' : 'POST';
       const response = await fetch(url, {
         method,
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
       const result = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(result.error || "Failed to save post");
+      if (!response.ok) throw new Error(result.error || 'Failed to save post');
       const saved = result.post;
-      if (!saved) throw new Error("Server did not return post");
+      if (!saved) throw new Error('Server did not return post');
 
       const normalized = {
         ...saved,
-        status: saved.status || "published",
-        imageFit: saved.imageFit || "cover",
-        imageFocus: saved.imageFocus || "center",
+        status: saved.status || 'published',
+        imageFit: saved.imageFit || 'cover',
+        imageFocus: saved.imageFocus || 'center',
         share: saved.share !== false,
         shareBluesky: saved.shareBluesky === true,
         imageTags: Array.isArray(saved.imageTags)
           ? saved.imageTags
-          : parseTags(saved.imageTags || ""),
+          : parseTags(saved.imageTags || ''),
       };
 
       const idx = state.posts.findIndex((p) => p.id === normalized.id);
@@ -675,51 +636,48 @@ function createPostsManager({
       renderPosts();
       resetPostForm();
 
-      if (normalized.status === "draft") {
-        setPostStatus("Draft saved.");
-      } else if (normalized.status === "scheduled") {
-        setPostStatus("Post scheduled.");
+      if (normalized.status === 'draft') {
+        setPostStatus('Draft saved.');
+      } else if (normalized.status === 'scheduled') {
+        setPostStatus('Post scheduled.');
         localStorage.removeItem(POST_DRAFT_KEY);
       } else {
         if (normalized.blueskyError) {
-          setPostStatus(
-            `Post published, Bluesky failed: ${normalized.blueskyError}`,
-            true,
-          );
+          setPostStatus(`Post published, Bluesky failed: ${normalized.blueskyError}`, true);
         } else {
-          setPostStatus("Post published.");
+          setPostStatus('Post published.');
         }
         localStorage.removeItem(POST_DRAFT_KEY);
       }
     } catch (error) {
-      console.error("Failed to save post:", error);
-      setPostStatus(error.message || "Failed to save post.", true);
+      console.error('Failed to save post:', error);
+      setPostStatus(error.message || 'Failed to save post.', true);
     }
   }
 
   function bindRichTextToolbar() {
-    const toolbar = document.getElementById("postToolbar");
+    const toolbar = document.getElementById('postToolbar');
     if (!toolbar || !el.postContent) return;
-    toolbar.querySelectorAll(".rich-btn").forEach((btn) => {
+    toolbar.querySelectorAll('.rich-btn').forEach((btn) => {
       if (!(btn instanceof HTMLElement)) return;
-      btn.addEventListener("click", (e) => {
+      btn.addEventListener('click', (e) => {
         e.preventDefault();
         const cmd = btn.dataset.cmd;
         if (!cmd) return;
         el.postContent.focus();
-        if (cmd === "createLink") {
-          const url = prompt("Enter URL");
-          if (url) document.execCommand("createLink", false, url);
+        if (cmd === 'createLink') {
+          const url = prompt('Enter URL');
+          if (url) document.execCommand('createLink', false, url);
           return;
         }
-        if (cmd === "insertImage") {
-          const url = prompt("Enter image URL");
-          if (url) document.execCommand("insertImage", false, url);
+        if (cmd === 'insertImage') {
+          const url = prompt('Enter image URL');
+          if (url) document.execCommand('insertImage', false, url);
           return;
         }
-        if (cmd === "formatBlock") {
-          const block = btn.dataset.value || "p";
-          document.execCommand("formatBlock", false, block);
+        if (cmd === 'formatBlock') {
+          const block = btn.dataset.value || 'p';
+          document.execCommand('formatBlock', false, block);
           return;
         }
         document.execCommand(cmd, false, null);
@@ -728,15 +686,15 @@ function createPostsManager({
   }
 
   function applyMediaToPost(item) {
-    if (el.postImage) el.postImage.value = item.path || "";
+    if (el.postImage) el.postImage.value = item.path || '';
     if (el.postImageTags) {
-      el.postImageTags.value = (item.tags || []).join(", ");
+      el.postImageTags.value = (item.tags || []).join(', ');
     }
     resetPostImageFocus();
     updateBlueskyCounter();
     state.pendingMediaSelection = null;
     showBlogSection();
-    setPostStatus("Image selected from media.");
+    setPostStatus('Image selected from media.');
   }
 
   return {

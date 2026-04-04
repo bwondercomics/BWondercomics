@@ -66,7 +66,7 @@ function onPointerDown(e) {
     state.touchStart = {
       x: e.clientX,
       y: e.clientY,
-      time: Date.now()
+      time: Date.now(),
     };
     state.dragStart = { x: e.clientX, y: e.clientY };
     state.panStart = { ...state.pan };
@@ -83,7 +83,7 @@ function onPointerDown(e) {
     state.pinchScale = state.scale;
     state.pinchCenter = {
       x: (points[0].x + points[1].x) / 2,
-      y: (points[0].y + points[1].y) / 2
+      y: (points[0].y + points[1].y) / 2,
     };
     state.panStart = { ...state.pan };
     state.isDragging = false;
@@ -121,13 +121,13 @@ function onPointerMove(e) {
     if (state.pinchDistance && state.pinchScale != null) {
       const scale = state.pinchScale * (newDist / state.pinchDistance);
       const minScale = document.fullscreenElement
-        ? (state.fullscreenBaseScale || 1)
+        ? state.fullscreenBaseScale || 1
         : CONFIG.ZOOM_MIN;
       const newScale = Math.max(minScale, Math.min(CONFIG.ZOOM_MAX, scale));
 
       const newCenter = {
         x: (points[0].x + points[1].x) / 2,
-        y: (points[0].y + points[1].y) / 2
+        y: (points[0].y + points[1].y) / 2,
       };
 
       state.scale = newScale;
@@ -170,7 +170,13 @@ function onPointerUp(e) {
       const allowSwipeWhenZoomed = document.fullscreenElement && e.pointerType === 'touch';
       const isNotZoomed = state.scale <= 1.01 || allowSwipeWhenZoomed;
 
-      if (!skipSwipe && isHorizontalSwipe && isDominantlyHorizontal && isFastEnough && isNotZoomed) {
+      if (
+        !skipSwipe &&
+        isHorizontalSwipe &&
+        isDominantlyHorizontal &&
+        isFastEnough &&
+        isNotZoomed
+      ) {
         dx > 0 ? prevPage() : nextPage();
       }
     }
@@ -196,9 +202,7 @@ function onWheel(e) {
   if (e.ctrlKey) {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    const minScale = document.fullscreenElement
-      ? (state.fullscreenBaseScale || 1)
-      : CONFIG.ZOOM_MIN;
+    const minScale = document.fullscreenElement ? state.fullscreenBaseScale || 1 : CONFIG.ZOOM_MIN;
     state.scale = Math.max(minScale, Math.min(CONFIG.ZOOM_MAX, state.scale + delta));
     applyTransform();
   }

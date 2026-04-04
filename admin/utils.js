@@ -11,9 +11,9 @@ export function escapeHtml(text = '') {
     '<': '&lt;',
     '>': '&gt;',
     '"': '&quot;',
-    "'": '&#39;'
+    "'": '&#39;',
   };
-  return String(text).replace(/[&<>"']/g, char => escapeMap[char]);
+  return String(text).replace(/[&<>"']/g, (char) => escapeMap[char]);
 }
 
 /**
@@ -24,7 +24,7 @@ export function escapeHtml(text = '') {
 export function parseTags(text = '') {
   return text
     .split(',')
-    .map(t => t.trim().toLowerCase())
+    .map((t) => t.trim().toLowerCase())
     .filter(Boolean);
 }
 
@@ -52,7 +52,10 @@ export function sortPagesByFilename(pages = []) {
  * @returns {string} Sanitized folder path
  */
 export function sanitizeFolderFromName(name = '', chaptersRoot = 'chapters') {
-  let slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  let slug = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
   if (!slug) slug = `chapter-${Date.now()}`;
   const root = String(chaptersRoot || 'chapters').replace(/\/+$/g, '');
   return `${root}/${slug}`;
@@ -66,12 +69,17 @@ export function sanitizeFolderFromName(name = '', chaptersRoot = 'chapters') {
  * @param {string} chaptersRoot - Root directory for chapters
  * @returns {string|null} Inferred folder path or null if not found
  */
-export function inferFolderFromPages(name, chapters = {}, currentPages = [], chaptersRoot = 'chapters') {
+export function inferFolderFromPages(
+  name,
+  chapters = {},
+  currentPages = [],
+  chaptersRoot = 'chapters'
+) {
   const pages = chapters[name] || currentPages || [];
   const root = chaptersRoot === null ? '' : String(chaptersRoot || 'chapters').replace(/\/+$/g, '');
   const prefix = root ? `${root}/` : '';
   const counts = {};
-  pages.forEach(p => {
+  pages.forEach((p) => {
     if (typeof p !== 'string') return;
     const normalized = p.trim().replace(/^\/+/, '');
     if (!normalized || normalized.startsWith('http')) return;
@@ -94,7 +102,13 @@ export function inferFolderFromPages(name, chapters = {}, currentPages = [], cha
  * @param {string} chaptersRoot - Root directory for chapters
  * @returns {string} Folder path for the chapter
  */
-export function ensureChapterFolder(name = '', chapterFolders = {}, chapters = {}, currentPages = [], chaptersRoot = 'chapters') {
+export function ensureChapterFolder(
+  name = '',
+  chapterFolders = {},
+  chapters = {},
+  currentPages = [],
+  chaptersRoot = 'chapters'
+) {
   if (chapterFolders[name]) return chapterFolders[name];
 
   const inferred = inferFolderFromPages(name, chapters, currentPages, chaptersRoot);
@@ -112,7 +126,9 @@ export function ensureChapterFolder(name = '', chapterFolders = {}, chapters = {
   const existing = new Set(Object.values(chapterFolders || {}));
   const numberMatch = name.match(/\d+/)?.[0];
   const root = String(chaptersRoot || 'chapters').replace(/\/+$/g, '');
-  const base = numberMatch ? `${root}/${numberMatch.padStart(2, '0')}` : sanitizeFolderFromName(name, root);
+  const base = numberMatch
+    ? `${root}/${numberMatch.padStart(2, '0')}`
+    : sanitizeFolderFromName(name, root);
   let candidate = base;
   let counter = 1;
   while (existing.has(candidate)) {
@@ -131,9 +147,21 @@ export function ensureChapterFolder(name = '', chapterFolders = {}, chapters = {
  * @param {string} chaptersRoot - Root directory for chapters
  * @returns {string} Folder path for the chapter
  */
-export function getChapterFolder(entryName = '', chapterFolders = {}, chapters = {}, currentPages = [], chaptersRoot = 'chapters') {
+export function getChapterFolder(
+  entryName = '',
+  chapterFolders = {},
+  chapters = {},
+  currentPages = [],
+  chaptersRoot = 'chapters'
+) {
   if (chapterFolders[entryName]) return chapterFolders[entryName];
-  return ensureChapterFolder(entryName || 'Entry', chapterFolders, chapters, currentPages, chaptersRoot);
+  return ensureChapterFolder(
+    entryName || 'Entry',
+    chapterFolders,
+    chapters,
+    currentPages,
+    chaptersRoot
+  );
 }
 
 /**
@@ -143,8 +171,8 @@ export function getChapterFolder(entryName = '', chapterFolders = {}, chapters =
  */
 export function normalizePages(pages = []) {
   return (Array.isArray(pages) ? pages : [])
-    .filter(p => typeof p === 'string')
-    .map(p => p.trim())
+    .filter((p) => typeof p === 'string')
+    .map((p) => p.trim())
     .filter(Boolean);
 }
 
@@ -195,7 +223,12 @@ export function generateMediaId(path = '') {
   // Generate a stable hash from the path
   const hash = simpleHash(path);
   // Sanitize the filename for use in ID
-  const filename = path.split('/').pop().replace(/\.[^.]+$/, '').replace(/[^a-z0-9]+/gi, '-').toLowerCase();
+  const filename = path
+    .split('/')
+    .pop()
+    .replace(/\.[^.]+$/, '')
+    .replace(/[^a-z0-9]+/gi, '-')
+    .toLowerCase();
   return `media-${filename}-${hash}`;
 }
 

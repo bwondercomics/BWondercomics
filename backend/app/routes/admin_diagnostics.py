@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from sqlalchemy.orm import Session
@@ -292,7 +293,9 @@ def diagnostics_test_status(request: Request, db: Session = Depends(get_db)):
                 "available": bool(test_status.get("available")),
                 "runner_available": bool(test_status.get("runnerEnabled")),
                 "runner_message": (
-                    "Runner enabled" if test_status.get("runnerEnabled") else "Command runner disabled."
+                    "Runner enabled"
+                    if test_status.get("runnerEnabled")
+                    else "Command runner disabled."
                 ),
                 "count": int(test_status.get("discoveredCount") or 0),
                 "test_files": test_status.get("files") or [],

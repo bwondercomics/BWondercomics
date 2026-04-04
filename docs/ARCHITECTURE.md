@@ -3,6 +3,7 @@
 This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic pieces you can’t do on a purely static host (auth, comments, scheduling, admin write APIs, RSS, analytics proxy).
 
 ## Components
+
 - Frontend (static): `index.html`, `feed.html`, `media.html`, `comics.html`, plus `reader/` + `admin/` JS modules.
 - Static assets (site chrome): `assets/` (icons, banners, UI images used by the site/theme).
 - Reverse proxy + file server: Caddy (see `deploy/Caddyfile`) serves `/` from `dist/` and `/admin/*` from repo source, and proxies API routes.
@@ -10,6 +11,7 @@ This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic p
 - Database: Postgres (recommended) for users, comments, posts, series, entries, and media.
 
 ## Data sources
+
 - Series + entries (including per-series entry labels) + status message: Postgres (served to the frontend as DB-backed JSON at `data.json` and `series/<id>/data.json`; admin aliases still exist).
 - Entry page images: on disk under `comics/<seriesId>/entries/` (public) or `protected/comics/<seriesId>/entries/` (premium/private).
 - Blog/feed posts: Postgres `posts` table (supports draft/scheduled/published).
@@ -20,12 +22,14 @@ This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic p
 - Global site branding: the default page config can include `site.ogImagePath` and `site.faviconPath`, both restricted to public assets.
 
 ## Runtime routing
+
 - Caddy serves static pages and assets, and proxies `/api/*` + JSON endpoints to the FastAPI app.
 - Caddy also proxies `/`, `/index.html`, `/feed.html`, `/comics.html`, `/media.html`, and `/manifest.json` to FastAPI so branded head tags can be generated per request.
 - FastAPI serves API routes under `/api/*`, DB-backed JSON endpoints, `/rss.xml`, branded public HTML shells, and `manifest.json`. It does not serve arbitrary static files.
 - Protected files are served by FastAPI at `/api/protected/*` (Caddy does not serve `/protected/*` directly).
 
 ## API (current contract)
+
 - Series + entries (DB-backed JSON views, used by reader/admin):
   - Public: `GET /series.json`, `GET /data.json`, `GET /series/{id}/data.json`
   - Admin: `GET /admin/series.json`, `GET /admin/data.json`, `GET /admin/series/{id}/data.json`
@@ -50,21 +54,26 @@ This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic p
   - moderation + users: `GET /api/admin/users`, `POST /api/admin/users/role`, `POST /api/admin/comments`
 
 ## Scheduling model (posts)
+
 - `status=draft` → never public, forces `share=false`
 - `status=scheduled` + `date` in the future → becomes public automatically once `date <= now`
 - `status=published` → public immediately
 
 ## Analytics
+
 If Umami is enabled, the backend serves:
+
 - `GET /analytics.js` (injects the Umami tracker script)
 - `/umami/*` proxy (so the tracker + admin API calls can be same-origin)
-Admin analytics pulls Umami stats via API (no embedded dashboard).
-In Docker, Umami runs as an optional compose profile (`analytics`) alongside the main stack.
+  Admin analytics pulls Umami stats via API (no embedded dashboard).
+  In Docker, Umami runs as an optional compose profile (`analytics`) alongside the main stack.
 
 ## Data seeding
+
 - The backend seeds a default series only if the DB is empty. JSON endpoints are always DB-backed; do not treat static JSON or HTML files as a data source.
 
 ## Branding constraints
+
 - Only media with `access=public` can be used for OG or favicon branding.
 - Protected or missing branding assets are ignored and fall back to `assets/banner1.png` for OG and `assets/boywondericon.png` for favicon.
 - Branded HTML and manifest responses are sent with `Cache-Control: no-store`, so origin changes show up on the next request. Social sites may still cache previews independently.

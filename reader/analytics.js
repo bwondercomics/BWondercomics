@@ -1,30 +1,30 @@
 // Reader analytics: track page views, exits, and completion events via Umami.
-import { CONFIG } from "./config.js";
-import { state } from "./state.js";
-import { getActiveSeriesId } from "./series.js";
-import { setLiveReaderContext } from "./live-tracking.js";
+import { CONFIG } from './config.js';
+import { state } from './state.js';
+import { getActiveSeriesId } from './series.js';
+import { setLiveReaderContext } from './live-tracking.js';
 
-const EVENT_PAGE_VIEW = "reader_page_view";
-const EVENT_ENTRY_COMPLETE = "reader_entry_complete";
-const EVENT_ENTRY_EXIT = "reader_entry_exit";
-const COUNT_VIEWS_KEY = "battlebros_count_views";
+const EVENT_PAGE_VIEW = 'reader_page_view';
+const EVENT_ENTRY_COMPLETE = 'reader_entry_complete';
+const EVENT_ENTRY_EXIT = 'reader_entry_exit';
+const COUNT_VIEWS_KEY = 'battlebros_count_views';
 
-let lastVisibleKey = "";
-let lastExitKey = "";
-let completedEntryKey = "";
+let lastVisibleKey = '';
+let lastExitKey = '';
+let completedEntryKey = '';
 let pendingEvents = [];
 
 function getTracker() {
   const tracker = window.umami;
   if (!tracker) return null;
-  if (typeof tracker.track === "function") return tracker.track.bind(tracker);
-  if (typeof tracker === "function") return tracker;
+  if (typeof tracker.track === 'function') return tracker.track.bind(tracker);
+  if (typeof tracker === 'function') return tracker;
   return null;
 }
 
 function canTrackViews() {
   try {
-    return localStorage.getItem(COUNT_VIEWS_KEY) !== "false";
+    return localStorage.getItem(COUNT_VIEWS_KEY) !== 'false';
   } catch {
     return true;
   }
@@ -69,47 +69,43 @@ function parseEntryNumber(raw) {
 }
 
 function formatEntryLabel(seriesId, entryDescriptor) {
-  if (!seriesId || !entryDescriptor) return "";
+  if (!seriesId || !entryDescriptor) return '';
   return `${seriesId} | ${entryDescriptor}`;
 }
 
 function formatPageLabel(seriesId, entryDescriptor, pageNumber) {
-  if (!seriesId || !entryDescriptor) return "";
+  if (!seriesId || !entryDescriptor) return '';
   return `${seriesId} | ${entryDescriptor} | ${pageNumber}`;
 }
 
 function getEntryTrackingInfo() {
   const seriesId = getActiveSeriesId();
-  const entryName = state.currentEntry || "";
+  const entryName = state.currentEntry || '';
   let entryNumber = null;
-  let entryDescriptor = "";
+  let entryDescriptor = '';
 
-  const select = document.getElementById("entry");
+  const select = document.getElementById('entry');
   if (select && select.options && select.options.length) {
     let option = select.options[select.selectedIndex];
     if (entryName && option && option.value !== entryName) {
-      option =
-        Array.from(select.options).find((opt) => opt.value === entryName) ||
-        option;
+      option = Array.from(select.options).find((opt) => opt.value === entryName) || option;
     }
     entryNumber = parseEntryNumber(option?.dataset?.displayNumber);
-    const optionLabel = String(option?.dataset?.entryLabel || "").trim();
+    const optionLabel = String(option?.dataset?.entryLabel || '').trim();
     if (optionLabel) entryDescriptor = optionLabel;
   }
 
   if (!entryDescriptor) {
-    entryDescriptor =
-      entryNumber != null ? `Entry ${entryNumber}` : entryName;
+    entryDescriptor = entryNumber != null ? `Entry ${entryNumber}` : entryName;
   }
 
-  const entryLabel =
-    seriesId && entryDescriptor ? formatEntryLabel(seriesId, entryDescriptor) : "";
+  const entryLabel = seriesId && entryDescriptor ? formatEntryLabel(seriesId, entryDescriptor) : '';
   const entryKey =
     seriesId && entryDescriptor
       ? entryNumber != null
         ? `${seriesId}::entry-${entryNumber}`
         : `${seriesId}::${entryName}`
-      : "";
+      : '';
 
   return { seriesId, entryName, entryNumber, entryDescriptor, entryLabel, entryKey };
 }
@@ -132,31 +128,25 @@ function getVisiblePageIndexes() {
 export function setActiveEntry() {
   const { entryKey } = getEntryTrackingInfo();
   if (entryKey && completedEntryKey && completedEntryKey !== entryKey) {
-    completedEntryKey = "";
+    completedEntryKey = '';
   }
-  lastVisibleKey = "";
-  lastExitKey = "";
+  lastVisibleKey = '';
+  lastExitKey = '';
 }
 
 export function resetEntryCompletion() {
-  completedEntryKey = "";
+  completedEntryKey = '';
 }
 
 export function trackVisiblePages() {
-  const {
-    seriesId,
-    entryName,
-    entryNumber,
-    entryDescriptor,
-    entryLabel,
-  } = getEntryTrackingInfo();
+  const { seriesId, entryName, entryNumber, entryDescriptor, entryLabel } = getEntryTrackingInfo();
   const total = state.pages.length;
   if (!seriesId || !entryDescriptor || !total) return;
 
   const indexes = getVisiblePageIndexes();
   if (!indexes.length) return;
 
-  const visibleKey = `${seriesId}::${entryDescriptor}::${indexes.join(",")}`;
+  const visibleKey = `${seriesId}::${entryDescriptor}::${indexes.join(',')}`;
   if (visibleKey === lastVisibleKey) return;
   lastVisibleKey = visibleKey;
 
@@ -185,14 +175,8 @@ export function trackVisiblePages() {
 }
 
 export function markEntryComplete() {
-  const {
-    seriesId,
-    entryName,
-    entryNumber,
-    entryDescriptor,
-    entryLabel,
-    entryKey,
-  } = getEntryTrackingInfo();
+  const { seriesId, entryName, entryNumber, entryDescriptor, entryLabel, entryKey } =
+    getEntryTrackingInfo();
   const total = state.pages.length;
   if (!seriesId || !entryDescriptor || !total) return;
   if (completedEntryKey === entryKey) return;
@@ -207,15 +191,9 @@ export function markEntryComplete() {
   });
 }
 
-export function trackEntryExit(reason = "exit") {
-  const {
-    seriesId,
-    entryName,
-    entryNumber,
-    entryDescriptor,
-    entryLabel,
-    entryKey,
-  } = getEntryTrackingInfo();
+export function trackEntryExit(reason = 'exit') {
+  const { seriesId, entryName, entryNumber, entryDescriptor, entryLabel, entryKey } =
+    getEntryTrackingInfo();
   const total = state.pages.length;
   if (!seriesId || !entryDescriptor || !total) return;
 
@@ -254,7 +232,7 @@ export function initReaderAnalytics() {
     }
   }, 1000);
 
-  window.addEventListener("pagehide", () => {
-    trackEntryExit("pagehide");
+  window.addEventListener('pagehide', () => {
+    trackEntryExit('pagehide');
   });
 }

@@ -12,6 +12,7 @@ The Page Designer is a standalone visual editor that lets you customize your Bat
 ## ✨ Features
 
 ### 🎨 Theme Editor
+
 - **Color Pickers**: Customize all colors (primary, secondary, accent, backgrounds)
 - **Quick Presets**: One-click themes
   - ⚡ Cyberpunk (default neon theme)
@@ -21,8 +22,9 @@ The Page Designer is a standalone visual editor that lets you customize your Bat
 - **Live Color Sync**: Color picker and hex input stay in sync
 
 ### 📝 Content Editor
+
 - **Header**: Edit title and subtitle
-- **Left Panel**: 
+- **Left Panel**:
   - Top and bottom text
   - Image upload (drag-and-drop or click)
   - URL input for remote images
@@ -32,11 +34,13 @@ The Page Designer is a standalone visual editor that lets you customize your Bat
   - Icon, text, and URL for each button
 
 ### 📐 Layout Control
+
 - **Drag-and-Drop**: Reorder panels (left, viewer, right)
 - **Toggle Visibility**: Show/hide panels
 - **Visual Preview**: See layout changes immediately
 
 ### 👁️ Live Preview
+
 - **Iframe Preview**: See changes in real-time
 - **Responsive Testing**: Switch between desktop/tablet/mobile views
 - **Refresh**: Update preview with latest changes
@@ -44,11 +48,13 @@ The Page Designer is a standalone visual editor that lets you customize your Bat
 ## 💾 Saving Your Work
 
 ### Save Draft
+
 - Click "💾 Save Draft" to save to browser localStorage
 - Your changes persist across sessions
 - Safe to experiment without publishing
 
 ### Publish
+
 - Click "🚀 Publish" to make changes live
 - Saves to the server via `POST /api/save`:
   - Default series: `/admin/page-config.json` (DB-backed)
@@ -95,14 +101,17 @@ The Page Designer is a standalone visual editor that lets you customize your Bat
 ## 📸 Image Uploads
 
 **Supported Methods:**
+
 1. **Drag & Drop**: Drag image files onto upload areas
 2. **Click to Browse**: Click upload area to select files
 3. **URL Input**: Paste image URLs directly
 
 **Supported Formats:**
+
 - PNG, JPG, JPEG, GIF, WebP
 
 **Storage:**
+
 - Images are converted to base64 and stored in the config
 - For production, consider using a CDN or image hosting service
 
@@ -116,6 +125,7 @@ The Page Designer is a standalone visual editor that lets you customize your Bat
 4. Save when satisfied
 
 **Color Tips:**
+
 - Use high contrast for readability
 - Test on different screen sizes
 - Consider color blindness accessibility
@@ -123,16 +133,19 @@ The Page Designer is a standalone visual editor that lets you customize your Bat
 ## 🐛 Troubleshooting
 
 **Preview not loading?**
+
 - Check that local server is running
 - Refresh the preview iframe
 - Check browser console for errors
 
 **Images not uploading?**
+
 - Ensure file is a supported image format
 - Check file size (large images may be slow)
 - Try URL input instead
 
 **Changes not saving?**
+
 - Check browser localStorage is enabled
 - Try a different browser
 - Check browser console for errors

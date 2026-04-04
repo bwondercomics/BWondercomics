@@ -10,7 +10,14 @@ from sqlalchemy import delete, func, select, text, update
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..models import Comment, EmailSubscriber, PremiumCode, PremiumCodeRedemption, User, VisitorSession
+from ..models import (
+    Comment,
+    EmailSubscriber,
+    PremiumCode,
+    PremiumCodeRedemption,
+    User,
+    VisitorSession,
+)
 from ..security import get_current_user, public_user
 from ..settings import settings
 

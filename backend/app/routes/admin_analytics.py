@@ -22,7 +22,8 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse
-from sqlalchemy import func, inspect as sa_inspect, select, text
+from sqlalchemy import func, select, text
+from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import Session
 
 from ..db import get_db, get_umami_db
@@ -364,7 +365,15 @@ def _collect_reader_window_metrics(
         website_params,
     )
 
-    for _created_at, session_id, visitor_id, series_id, entry_label, _page_number, total_pages in page_view_rows:
+    for (
+        _created_at,
+        session_id,
+        visitor_id,
+        series_id,
+        entry_label,
+        _page_number,
+        total_pages,
+    ) in page_view_rows:
         key = _parse_reader_entry_key(series_id, entry_label, empty_entry_keys)
         if not key:
             continue
@@ -737,8 +746,12 @@ def admin_visitor_analytics(
         landing_pages = fetch_umami_expanded_metrics(
             start_ms, end_ms, metric_type="entry", limit=limit
         )
-        countries = fetch_umami_expanded_metrics(start_ms, end_ms, metric_type="country", limit=limit)
-        browsers = fetch_umami_expanded_metrics(start_ms, end_ms, metric_type="browser", limit=limit)
+        countries = fetch_umami_expanded_metrics(
+            start_ms, end_ms, metric_type="country", limit=limit
+        )
+        browsers = fetch_umami_expanded_metrics(
+            start_ms, end_ms, metric_type="browser", limit=limit
+        )
         devices = fetch_umami_expanded_metrics(start_ms, end_ms, metric_type="device", limit=limit)
     except UmamiAPIError as exc:
         return JSONResponse(status_code=502, content={"error": f"Umami API error: {exc}"})
@@ -837,7 +850,16 @@ def admin_visitor_history(
         visitors[visitor_key] = visitor
         return visitor
 
-    for created_at, session_id, visitor_key, url_path, referrer, country, browser, device in visitor_rows:
+    for (
+        created_at,
+        session_id,
+        visitor_key,
+        url_path,
+        referrer,
+        country,
+        browser,
+        device,
+    ) in visitor_rows:
         key = visitor_key or str(session_id or "").strip()
         if not key:
             continue
@@ -864,7 +886,15 @@ def admin_visitor_history(
         if device and not visitor["device"]:
             visitor["device"] = device
 
-    for _created_at, session_id, visitor_id, series_id, entry_label, page_number, total_pages in page_view_rows:
+    for (
+        _created_at,
+        session_id,
+        visitor_id,
+        series_id,
+        entry_label,
+        page_number,
+        total_pages,
+    ) in page_view_rows:
         key = str(visitor_id or session_id or "").strip()
         if not key:
             continue
@@ -1218,7 +1248,9 @@ def admin_reader_series_analytics(
         elif prop in ("seriesId", "series"):
             filter_series_id = normalized_value
 
-    buckets: dict[int, dict[str, int]] = defaultdict(lambda: {"count": 0, "starts": 0, "finishes": 0})
+    buckets: dict[int, dict[str, int]] = defaultdict(
+        lambda: {"count": 0, "starts": 0, "finishes": 0}
+    )
     website_filter, website_params = _umami_website_filter(website_id)
 
     try:
@@ -1233,7 +1265,15 @@ def admin_reader_series_analytics(
                     website_filter,
                     website_params,
                 )
-                for created_at, session_id, _visitor_id, series_id, entry_label, _page_number, _total_pages in page_view_events:
+                for (
+                    created_at,
+                    session_id,
+                    _visitor_id,
+                    series_id,
+                    entry_label,
+                    _page_number,
+                    _total_pages,
+                ) in page_view_events:
                     if not session_id:
                         continue
                     key = _parse_reader_entry_key(series_id, entry_label, empty_entry_keys)
@@ -1249,7 +1289,9 @@ def admin_reader_series_analytics(
                     if read_key not in start_times or created_at < start_times[read_key]:
                         start_times[read_key] = created_at
 
-                events = _fetch_completion_rows(umami_db, start, now, website_filter, website_params)
+                events = _fetch_completion_rows(
+                    umami_db, start, now, website_filter, website_params
+                )
 
                 for created_at, session_id, _visitor_id, series_id, entry_label in events:
                     if not session_id:
@@ -1279,7 +1321,15 @@ def admin_reader_series_analytics(
             else:
                 events = _fetch_page_view_rows(umami_db, start, now, website_filter, website_params)
 
-                for created_at, session_id, _visitor_id, series_id, entry_label, _page_number, _total_pages in events:
+                for (
+                    created_at,
+                    session_id,
+                    _visitor_id,
+                    series_id,
+                    entry_label,
+                    _page_number,
+                    _total_pages,
+                ) in events:
                     key = _parse_reader_entry_key(series_id, entry_label, empty_entry_keys)
                     if not key:
                         continue
@@ -1388,7 +1438,15 @@ def admin_reads_over_time(
         with get_umami_db() as umami_db:
             events = _fetch_page_view_rows(umami_db, start, now, website_filter, website_params)
 
-            for created_at, session_id, visitor_id, evt_series_id, entry_label, _page_number, _total_pages in events:
+            for (
+                created_at,
+                session_id,
+                visitor_id,
+                evt_series_id,
+                entry_label,
+                _page_number,
+                _total_pages,
+            ) in events:
                 key = _parse_reader_entry_key(evt_series_id, entry_label, empty_entry_keys)
                 if not key:
                     continue
@@ -1398,7 +1456,11 @@ def admin_reads_over_time(
                     continue
                 if target_series_id and entry_series_id != target_series_id:
                     continue
-                if mode == "entry" and target_display_num is not None and display_num != target_display_num:
+                if (
+                    mode == "entry"
+                    and target_display_num is not None
+                    and display_num != target_display_num
+                ):
                     continue
 
                 date_str = created_at.date().isoformat()

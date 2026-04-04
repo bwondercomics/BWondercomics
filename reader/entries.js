@@ -101,6 +101,6 @@ export function sanitizeEntries(rawEntries = {}, entryMeta = {}) {
 
   return {
     chapters: clean,
-    order: sortEntryNames(Object.keys(clean))
+    order: sortEntryNames(Object.keys(clean)),
   };
 }

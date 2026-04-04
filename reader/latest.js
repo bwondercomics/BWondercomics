@@ -121,9 +121,10 @@ export function renderLatestUpdate(post, options = {}) {
   date.className = 'latest-date';
   if (feedStyle.itemDateColor) date.style.color = feedStyle.itemDateColor;
   const parsedDate = post.date ? new Date(post.date) : null;
-  date.textContent = parsedDate && !Number.isNaN(parsedDate) ?
-    parsedDate.toLocaleDateString(undefined, { dateStyle: 'medium' }) :
-    'Date not set';
+  date.textContent =
+    parsedDate && !Number.isNaN(parsedDate)
+      ? parsedDate.toLocaleDateString(undefined, { dateStyle: 'medium' })
+      : 'Date not set';
 
   const preview = document.createElement('div');
   preview.className = 'latest-preview';

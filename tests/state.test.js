@@ -41,7 +41,7 @@ describe('saveProgress', () => {
   it('saves reader progress using currentEntry', () => {
     saveProgress({
       currentEntry: 'Issue 7',
-      pageIndex: 5
+      pageIndex: 5,
     });
 
     const saved = localStorage.getItem(STORAGE.PROGRESS_KEY);
@@ -95,7 +95,7 @@ describe('loadProgress', () => {
     const testData = {
       chapter: 'Issue 3',
       page: 7,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
 
     localStorage.setItem(STORAGE.PROGRESS_KEY, JSON.stringify(testData));

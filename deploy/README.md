@@ -17,12 +17,13 @@ docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-compo
 ```
 
 Open:
+
 - Same machine: `http://localhost:8000/`
 - Another device on LAN: `http://<server-lan-ip>:8000/`
 
 ### Option B: Host Python (requires python3-venv + pip)
 
-1) Create the env file:
+1. Create the env file:
 
 ```bash
 cd /srv/bw-quality
@@ -31,17 +32,18 @@ chmod 600 deploy/bwondercomics.env
 ```
 
 Edit `deploy/bwondercomics.env` and set at least:
+
 - `APP_SECRET` (generate: `openssl rand -hex 32`)
 - `BWC_DB_PASSWORD` (generate: `openssl rand -hex 24`)
 
-2) Start Postgres (localhost-only):
+2. Start Postgres (localhost-only):
 
 ```bash
 cd /srv/bw-quality
 docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-db-compose.yml up -d
 ```
 
-3) Install backend deps:
+3. Install backend deps:
 
 ```bash
 cd /srv/bw-quality
@@ -50,7 +52,7 @@ python3 -m venv .venv
 pip install -r backend/requirements.txt
 ```
 
-4) Run migrations:
+4. Run migrations:
 
 ```bash
 cd /srv/bw-quality
@@ -58,7 +60,7 @@ cd /srv/bw-quality
 alembic -c backend/alembic.ini upgrade head
 ```
 
-5) Run:
+5. Run:
 
 ```bash
 cd /srv/bw-quality
@@ -70,12 +72,14 @@ uvicorn backend.app.main:app --host 0.0.0.0 --port 8000 --proxy-headers
 ```
 
 Open:
+
 - Same machine: `http://localhost:8000/`
 - Another device on LAN: `http://<server-lan-ip>:8000/`
 
 ### systemd (FastAPI)
 
 Use the included units:
+
 - `deploy/bwondercomics-api.service` (system)
 - `deploy/bwondercomics-api.user.service` (user)
 
@@ -92,11 +96,11 @@ docker compose --env-file deploy/bwondercomics.env -f deploy/bwondercomics-compo
 ```
 
 Notes:
+
 - Restarting `bwondercomics-api` is required because uvicorn is not running with hot reload.
 - Restarting `caddy` is required if the Caddyfile changed or if the exact-path branding proxy routes were not active yet.
 - Origin HTML/manifest responses use `Cache-Control: no-store`, so the change is visible on the next request. Social platforms may still hold a cached preview.
 - Only `public` media can be used for branding. Invalid or protected paths fall back to `assets/banner1.png` for OG and `assets/boywondericon.png` for favicon.
-
 
 ## Firewall (UFW)
 
@@ -110,14 +114,14 @@ sudo ufw allow from 10.0.0.0/24 to any port 8000 proto tcp
 
 This backs up the persistent data directory (by default, `/srv/bwondercomics/var/bwondercomics`) to your archive drive.
 
-1) Ensure the destination exists and is writable by the service user:
+1. Ensure the destination exists and is writable by the service user:
 
 ```bash
 sudo mkdir -p /mnt/archive/backups/bwondercomics
 sudo chown -R dbmelville:dbmelville /mnt/archive/backups/bwondercomics
 ```
 
-2) Install + enable the timer:
+2. Install + enable the timer:
 
 ```bash
 sudo cp /srv/bw-quality/deploy/bwondercomics-backup.service /etc/systemd/system/bwondercomics-backup.service
@@ -126,7 +130,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now bwondercomics-backup.timer
 ```
 
-3) Run once immediately and check:
+3. Run once immediately and check:
 
 ```bash
 sudo systemctl start bwondercomics-backup.service
@@ -188,25 +192,25 @@ Notes:
 
 Umami is an optional part of the Docker stack (compose profile: `analytics`). The FastAPI backend proxies Umami under `/umami/` and serves `/analytics.js` to inject the tracker into the main site pages.
 
-1) Set the Umami secrets in `deploy/bwondercomics.env`:
+1. Set the Umami secrets in `deploy/bwondercomics.env`:
 
 - `UMAMI_DB_PASSWORD` (generate: `openssl rand -hex 24`)
 - `UMAMI_APP_SECRET` (generate: `openssl rand -hex 32`)
 - `UMAMI_API_USERNAME` + `UMAMI_API_PASSWORD` (create a read-only user in Umami; used by the admin Analytics tab to call the API)
 
-2) Start Umami (if the stack is already up):
+2. Start Umami (if the stack is already up):
 
 ```bash
 cd /srv/bw-quality
 make analytics-up
 ```
 
-3) Open Umami:
+3. Open Umami:
 
 - Via the main site (recommended): `http://<server-lan-ip>:8000/umami/`
 - Default login: `admin` / `umami` (change it right away in Umami settings)
 
-4) Create a website in Umami and copy the Website ID, then add it to the server env:
+4. Create a website in Umami and copy the Website ID, then add it to the server env:
 
 Edit `deploy/bwondercomics.env` and set:
 
@@ -214,13 +218,14 @@ Edit `deploy/bwondercomics.env` and set:
 UMAMI_WEBSITE_ID=<paste-website-id>
 ```
 
-5) Restart the backend so `/analytics.js` picks up the Website ID:
+5. Restart the backend so `/analytics.js` picks up the Website ID:
 
 ```bash
 make restart
 ```
 
 Notes:
+
 - By default, the backend proxies Umami at `/umami`, so the tracker and admin API calls stay same-origin.
 - Docker stack: use `UMAMI_UPSTREAM=http://umami:3000` (this is the backend default when running in Docker).
 - Host Python backend: use `UMAMI_UPSTREAM=http://127.0.0.1:3000` (and keep `UMAMI_BIND=127.0.0.1` so Umami isn’t exposed to the LAN).
@@ -230,6 +235,7 @@ Notes:
 ## Chat (Stoat/Revolt) + OIDC
 
 The compose file includes an optional `chat` profile with:
+
 - `stoat-web`
 - `stoat-api`
 - `stoat-events`
@@ -242,6 +248,7 @@ The compose file includes an optional `chat` profile with:
 There is also an optional `chat-delta` profile with `stoat-delta` for releases that separate API and Delta.
 
 Important compatibility note (2026-02-10):
+
 - The pinned web image is `ghcr.io/revoltchat/client@sha256:5cc05853c215a02ee3d1f71390ad00af06c7ef53602b4b21f419f8702607d8c8`.
 - This pins the currently working legacy client so deploys are deterministic (no floating `:master`).
 - This client still serves native chat login forms only.
@@ -274,6 +281,7 @@ STOAT_RABBITMQ_PASSWORD=rabbitpass
 Also set the Stoat image tags and any release-specific env vars required by your pinned Stoat version.
 
 If RabbitMQ was already initialized with different credentials, either:
+
 - recreate the `stoat-rabbitmq` volume, or
 - add/update the `rabbituser` account in the running broker so it matches `STOAT_RABBITMQ_USER`/`STOAT_RABBITMQ_PASSWORD`.
 
@@ -311,6 +319,7 @@ curl -fsSL https://bwondercomics.com/.well-known/jwks.json | jq .
 ```
 
 Expected:
+
 - discovery returns issuer `https://bwondercomics.com`
 - discovery includes `authorization_endpoint` at `https://bwondercomics.com/oidc/authorize`
 - JWKS returns at least one key and the configured `kid`

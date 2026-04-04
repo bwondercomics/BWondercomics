@@ -1,17 +1,21 @@
 # Chapter Data Loading Implementation (archived)
 
 ## Overview
+
 The comic reader now loads chapter data dynamically from `admin/data.json` at runtime, ensuring the admin panel and reader stay in sync automatically.
 
 ## Changes Made
 
 ### 1. Removed Hardcoded Data
+
 **Before:** Lines 1776-1845 contained a hardcoded `chapters` object with all chapter data.
 **After:** Replaced with `let chapters = {}` that is populated at runtime.
 
 ### 2. Added Application State
+
 **Before:** The `state` object was being used but never declared (bug).
 **After:** Added proper state initialization with all required properties:
+
 - `currentChapter`, `pages`, `pageIndex`
 - `scale`, `pan` for zoom/pan functionality
 - `pointers`, `isDragging`, etc. for touch/mouse interactions
@@ -19,7 +23,9 @@ The comic reader now loads chapter data dynamically from `admin/data.json` at ru
 - `isTransitioning`, `rafId` for animations
 
 ### 3. Dynamic Data Loading
+
 Added `loadChapterData()` async function:
+
 ```javascript
 async function loadChapterData() {
   try {
@@ -28,11 +34,11 @@ async function loadChapterData() {
       throw new Error(`Failed to load chapter data: ${response.status}`);
     }
     const data = await response.json();
-    
+
     if (!data.chapters || typeof data.chapters !== 'object') {
       throw new Error('Invalid chapter data structure');
     }
-    
+
     chapters = data.chapters;
     return true;
   } catch (error) {
@@ -44,7 +50,9 @@ async function loadChapterData() {
 ```
 
 ### 4. Error Handling
+
 When JSON loading fails, the reader displays:
+
 - ⚠️ Error icon with clear heading
 - User-friendly error message
 - Technical error details (for debugging)
@@ -52,7 +60,9 @@ When JSON loading fails, the reader displays:
 - Maintains retro aesthetic with styled error message
 
 ### 5. Modified Initialization Flow
+
 **Before:**
+
 ```javascript
 if (document.readyState === 'complete' || document.readyState === 'interactive') {
   setTimeout(init, 0);
@@ -62,6 +72,7 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
 ```
 
 **After:**
+
 ```javascript
 async function start() {
   const success = await loadChapterData();
@@ -80,6 +91,7 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
 ## Testing Performed
 
 ### ✅ Success Scenario
+
 - Reader successfully loads data from admin/data.json
 - All 6 chapters appear in dropdown
 - Chapter navigation works (tested Chapter 1 → Chapter 3)
@@ -87,12 +99,14 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
 - Console logs: "✓ Chapter data loaded from admin/data.json"
 
 ### ✅ Error Scenario
+
 - Corrupted JSON file handled gracefully
 - User-friendly error message displayed
 - Retry button functional
 - Console logs error details
 
 ### ✅ Functionality Preserved
+
 - Two-page spread mode working
 - Page navigation (prev/next)
 - Zoom and pan
@@ -110,17 +124,14 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
 5. **Bug Fix:** Properly declared state object (was missing before)
 
 ## Data Structure
+
 The reader expects `admin/data.json` in this format:
+
 ```json
 {
   "chapters": {
-    "Chapter 1": [
-      "chapters/01/01.png",
-      "chapters/01/02.png"
-    ],
-    "Chapter 2": [
-      "chapters/02/01.png"
-    ]
+    "Chapter 1": ["chapters/01/01.png", "chapters/01/02.png"],
+    "Chapter 2": ["chapters/02/01.png"]
   },
   "lastUpdated": "2025-11-14T02:49:31.566Z",
   "publishedBy": "Admin Panel"
@@ -130,9 +141,11 @@ The reader expects `admin/data.json` in this format:
 Only the `chapters` property is required. Other properties are ignored by the reader.
 
 ## Backward Compatibility
+
 None required - this is a new feature that replaces hardcoded data.
 
 ## Security Considerations
+
 - Uses standard `fetch()` API (same-origin by default)
 - Validates JSON structure before use
 - No XSS risk (data used for image URLs only)

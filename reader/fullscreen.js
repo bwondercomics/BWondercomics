@@ -8,9 +8,11 @@ let hideTimer = null;
 let mouseOverControls = false;
 
 function isCoarsePointer() {
-  return typeof window !== 'undefined'
-    && typeof window.matchMedia === 'function'
-    && window.matchMedia('(pointer: coarse)').matches;
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches
+  );
 }
 
 function getFullscreenHideDelay() {
@@ -101,7 +103,7 @@ export function onFullscreenChange() {
 export function toggleFullscreen() {
   // Request or exit fullscreen mode.
   if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen().catch(() => { });
+    document.documentElement.requestFullscreen().catch(() => {});
   } else {
     document.exitFullscreen();
   }

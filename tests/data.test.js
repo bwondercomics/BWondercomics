@@ -15,24 +15,24 @@ describe('loadEntryData', () => {
       entries: {
         'Issue 10': ['protected/comics/battle-bros/10/page-1.png', '/media/local.png'],
         'Issue 2': ['b.png'],
-        'Store Release': []
+        'Store Release': [],
       },
       entryMeta: {
         'Issue 10': {
           displayNumber: '10',
-          coverImage: 'protected/media/covers/issue-10.png'
+          coverImage: 'protected/media/covers/issue-10.png',
         },
         'Issue 2': { displayNumber: 2 },
-        'Store Release': { releaseType: 'store' }
+        'Store Release': { releaseType: 'store' },
       },
       statusMessage: 'Ready',
       premiumOnly: true,
-      entryLabels: [{ id: 'issues', singular: 'Issue', plural: 'Issues' }]
+      entryLabels: [{ id: 'issues', singular: 'Issue', plural: 'Issues' }],
     };
 
     const fetchMock = vi.fn(async () => ({
       ok: true,
-      json: async () => payload
+      json: async () => payload,
     }));
     vi.stubGlobal('fetch', fetchMock);
 
@@ -42,7 +42,7 @@ describe('loadEntryData', () => {
     expect(data.entryOrder).toEqual(['Issue 2', 'Issue 10', 'Store Release']);
     expect(data.entries['Issue 10']).toEqual([
       '/api/protected/comics/battle-bros/10/page-1.png',
-      '/media/local.png'
+      '/media/local.png',
     ]);
     expect(data.entries['Store Release']).toEqual([]);
     expect(data.entryMeta['Issue 10'].coverImage).toBe('/api/protected/media/covers/issue-10.png');
@@ -54,14 +54,15 @@ describe('loadEntryData', () => {
 
   it('throws on invalid entry payload', async () => {
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: true,
-      json: async () => ({})
-    })));
-
-    await expect(loadEntryData('battle-bros')).rejects.toThrow(
-      'Invalid entry data structure'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => ({}),
+      }))
     );
+
+    await expect(loadEntryData('battle-bros')).rejects.toThrow('Invalid entry data structure');
     errorSpy.mockRestore();
   });
 });
@@ -73,15 +74,18 @@ describe('loadPageConfig', () => {
     const payload = {
       content: {
         header: {
-          subtitles: ['one', 'two']
-        }
-      }
+          subtitles: ['one', 'two'],
+        },
+      },
     };
 
-    vi.stubGlobal('fetch', vi.fn(async () => ({
-      ok: true,
-      json: async () => payload
-    })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => payload,
+      }))
+    );
 
     const result = await loadPageConfig(setSubtitles, 'battle-bros');
     expect(result).toBe(true);
@@ -91,7 +95,10 @@ describe('loadPageConfig', () => {
 
   it('should return false when config fails to load', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false })));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: false }))
+    );
     const result = await loadPageConfig(() => {}, 'battle-bros');
     expect(result).toBe(false);
     warnSpy.mockRestore();

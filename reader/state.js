@@ -54,7 +54,7 @@ export const state = {
   rafId: null,
   prevTransformOrigin: null,
   fullscreenBaseScale: 1,
-  lastOnPageFrame: null
+  lastOnPageFrame: null,
 };
 
 /**
@@ -67,7 +67,7 @@ export function saveProgress(stateObj = state) {
     const data = {
       chapter: stateObj.currentEntry,
       page: stateObj.pageIndex,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
     localStorage.setItem(STORAGE.PROGRESS_KEY, JSON.stringify(data));
   } catch (e) {

@@ -35,7 +35,8 @@ export async function loadEntryData(seriesId) {
       throw new Error(`Invalid entry data structure in ${dataPath}`);
     }
 
-    const entryMetaPayload = data.entryMeta && typeof data.entryMeta === 'object' ? data.entryMeta : null;
+    const entryMetaPayload =
+      data.entryMeta && typeof data.entryMeta === 'object' ? data.entryMeta : null;
     const entryMeta = entryMetaPayload || {};
 
     const resolveProtectedPath = (raw = '') => {
@@ -51,7 +52,7 @@ export async function loadEntryData(seriesId) {
     const mappedEntries = Object.fromEntries(
       Object.entries(entryPayload).map(([name, pages]) => [
         name,
-        Array.isArray(pages) ? pages.map(resolveProtectedPath) : []
+        Array.isArray(pages) ? pages.map(resolveProtectedPath) : [],
       ])
     );
 
@@ -72,7 +73,7 @@ export async function loadEntryData(seriesId) {
       premiumOnly: !!data.premiumOnly,
       unitLabelSingular: String(data.unitLabelSingular || '').trim() || 'Entry',
       unitLabelPlural: String(data.unitLabelPlural || '').trim() || 'Entries',
-      entryLabels: Array.isArray(data.entryLabels) ? data.entryLabels : []
+      entryLabels: Array.isArray(data.entryLabels) ? data.entryLabels : [],
     };
   } catch (error) {
     console.error('Failed to load entry data:', error);
@@ -137,7 +138,8 @@ export async function loadLatestPost() {
     return post;
   } catch (error) {
     console.error('Latest update widget error:', error);
-    body.innerHTML = '<div class="latest-empty" style="color: var(--danger);">Could not load updates.</div>';
+    body.innerHTML =
+      '<div class="latest-empty" style="color: var(--danger);">Could not load updates.</div>';
     return null;
   }
 }
@@ -301,7 +303,7 @@ export function applyBuilderPageToDOM(page) {
     'promo',
     'feed',
     'gallery',
-    'video'
+    'video',
   ]);
 
   const findPanelModules = (side) => {
@@ -373,7 +375,12 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
   const panel = document.getElementById(panelId);
   if (!panel) return;
 
-  const legacyRightSelectors = ['#rightPanelFeedBar', '#latestUpdate', '#rightPanelFeed', '.right-stack'];
+  const legacyRightSelectors = [
+    '#rightPanelFeedBar',
+    '#latestUpdate',
+    '#rightPanelFeed',
+    '.right-stack',
+  ];
   if (side === 'right') {
     legacyRightSelectors.forEach((selector) => {
       const el = panel.querySelector(selector);
@@ -401,7 +408,7 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
   container.classList.toggle('panel-builder--right', side === 'right');
 
   const gapValue = panelSpacing?.[side];
-  if (gapValue !== undefined && gapValue !== null && gapValue !== "") {
+  if (gapValue !== undefined && gapValue !== null && gapValue !== '') {
     const parsed = Number(gapValue);
     if (!Number.isNaN(parsed)) {
       container.style.setProperty('--pb-panel-gap', `${Math.max(0, parsed)}px`);

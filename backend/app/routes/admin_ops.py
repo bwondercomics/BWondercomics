@@ -294,7 +294,9 @@ def ops_history(request: Request, db: Session = Depends(get_db), limit: int = 50
     if not admin:
         return JSONResponse(status_code=403, content={"error": error or "Ops access denied"})
 
-    runs = db.scalars(select(AdminOpsRun).order_by(AdminOpsRun.started_at.desc()).limit(limit)).all()
+    runs = db.scalars(
+        select(AdminOpsRun).order_by(AdminOpsRun.started_at.desc()).limit(limit)
+    ).all()
     return {"runs": [_serialize_run(run) for run in runs]}
 
 
@@ -348,7 +350,7 @@ def ops_run_stream(run_id: str, request: Request, db: Session = Depends(get_db))
 
             current = _load_run(run_id)
             if not current:
-                yield "event: complete\ndata: {\"error\":\"Run not found\"}\n\n"
+                yield 'event: complete\ndata: {"error":"Run not found"}\n\n'
                 break
             if current.status not in {"queued", "running"}:
                 final_payload = json.dumps({"run": _serialize_run(current)})

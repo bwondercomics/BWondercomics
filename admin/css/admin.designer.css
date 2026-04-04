@@ -1,53 +1,53 @@
 /* ==================== DESIGNER SECTION ==================== */
-    .designer-toolbar {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-bottom: 12px;
-    }
+.designer-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
 
-    .designer-frame {
-      width: 100%;
-      min-height: 70vh;
-      height: min(80vh, 900px);
-      border: 1px solid var(--primary);
-      border-radius: 8px;
-      background: #0f1629;
-      overflow: hidden;
-      display: block;
-    }
+.designer-frame {
+  width: 100%;
+  min-height: 70vh;
+  height: min(80vh, 900px);
+  border: 1px solid var(--primary);
+  border-radius: 8px;
+  background: #0f1629;
+  overflow: hidden;
+  display: block;
+}
 
-    .designer-note {
-      font-size: 0.9rem;
-      opacity: 0.8;
-      margin-top: 10px;
-    }
+.designer-note {
+  font-size: 0.9rem;
+  opacity: 0.8;
+  margin-top: 10px;
+}
 
-    .export-actions {
-      display: flex;
-      gap: 10px;
-      margin-top: 20px;
-      flex-wrap: wrap;
-    }
+.export-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+  flex-wrap: wrap;
+}
 
-    .btn-copy {
-      background: var(--primary);
-      color: var(--bg-dark);
-    }
+.btn-copy {
+  background: var(--primary);
+  color: var(--bg-dark);
+}
 
-    .btn-download {
-      background: var(--secondary);
-      color: var(--text);
-    }
+.btn-download {
+  background: var(--secondary);
+  color: var(--text);
+}
 
-    .success-message {
-      background: var(--success);
-      color: var(--bg-dark);
-      padding: 12px;
-      border-radius: 5px;
-      text-align: center;
-      margin-top: 15px;
-      font-size: 0.9rem;
-      animation: fadeIn 0.3s ease-out;
-    }
+.success-message {
+  background: var(--success);
+  color: var(--bg-dark);
+  padding: 12px;
+  border-radius: 5px;
+  text-align: center;
+  margin-top: 15px;
+  font-size: 0.9rem;
+  animation: fadeIn 0.3s ease-out;
+}

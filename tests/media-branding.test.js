@@ -1,5 +1,5 @@
 /** @vitest-environment happy-dom */
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mediaDom = `
   <div class="admin-content"></div>
@@ -73,64 +73,67 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 async function importMediaModules() {
   const [{ state }, { createMediaManager }] = await Promise.all([
-    import("../admin/state.js"),
-    import("../admin/media.js"),
+    import('../admin/state.js'),
+    import('../admin/media.js'),
   ]);
   return { state, createMediaManager };
 }
 
-describe("admin media branding", () => {
+describe('admin media branding', () => {
   beforeEach(() => {
     vi.resetModules();
     document.body.innerHTML = mediaDom;
-    vi.stubGlobal("alert", vi.fn());
-    vi.stubGlobal("fetch", vi.fn(async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({}),
-      text: async () => "",
-    })));
-    if (typeof Element !== "undefined") {
+    vi.stubGlobal('alert', vi.fn());
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({}),
+        text: async () => '',
+      }))
+    );
+    if (typeof Element !== 'undefined') {
       Element.prototype.scrollIntoView = vi.fn();
     }
   });
 
-  it("loads page-config branding from /page-config.json into shared state", async () => {
+  it('loads page-config branding from /page-config.json into shared state', async () => {
     const payload = {
       site: {
-        ogImagePath: "media/share-card.png",
-        faviconPath: "media/site-icon.png",
+        ogImagePath: 'media/share-card.png',
+        faviconPath: 'media/site-icon.png',
       },
     };
     global.fetch = vi.fn(async (url) => ({
-      ok: url === "/page-config.json",
+      ok: url === '/page-config.json',
       status: 200,
       json: async () => payload,
       text: async () => JSON.stringify(payload),
     }));
 
     const [{ loadDefaultPageConfig }, { state }] = await Promise.all([
-      import("../admin/page-config.js"),
-      import("../admin/state.js"),
+      import('../admin/page-config.js'),
+      import('../admin/state.js'),
     ]);
 
     const config = await loadDefaultPageConfig({ force: true });
-    expect(config.site.ogImagePath).toBe("media/share-card.png");
-    expect(state.pageConfig.site.faviconPath).toBe("media/site-icon.png");
-    expect(global.fetch).toHaveBeenCalledWith("/page-config.json", { cache: "no-store" });
+    expect(config.site.ogImagePath).toBe('media/share-card.png');
+    expect(state.pageConfig.site.faviconPath).toBe('media/site-icon.png');
+    expect(global.fetch).toHaveBeenCalledWith('/page-config.json', { cache: 'no-store' });
   });
 
-  it("saves selected public media as OG image and favicon", async () => {
+  it('saves selected public media as OG image and favicon', async () => {
     const savePayloads = [];
     global.fetch = vi.fn(async (url, init = {}) => {
-      if (url === "/api/save") {
+      if (url === '/api/save') {
         savePayloads.push(JSON.parse(init.body));
       }
       return {
         ok: true,
         status: 200,
         json: async () => ({}),
-        text: async () => "",
+        text: async () => '',
       };
     });
 
@@ -139,12 +142,12 @@ describe("admin media branding", () => {
     state.posts = [];
     state.mediaItems = [
       {
-        id: "hero",
-        path: "media/hero.png",
-        tags: ["cover"],
-        access: "public",
+        id: 'hero',
+        path: 'media/hero.png',
+        tags: ['cover'],
+        access: 'public',
         public: true,
-        premiumVisibility: "blur",
+        premiumVisibility: 'blur',
       },
     ];
 
@@ -155,33 +158,35 @@ describe("admin media branding", () => {
     manager.showMediaSection();
     await flush();
 
-    document.querySelector(".media-card")?.click();
+    document.querySelector('.media-card')?.click();
     await flush();
 
-    document.getElementById("mediaPreviewSetOg").click();
+    document.getElementById('mediaPreviewSetOg').click();
     await flush();
-    document.getElementById("mediaPreviewSetFavicon").click();
+    document.getElementById('mediaPreviewSetFavicon').click();
     await flush();
 
-    const brandingSaves = savePayloads.filter((entry) => entry.filename === "admin/page-config.json");
+    const brandingSaves = savePayloads.filter(
+      (entry) => entry.filename === 'admin/page-config.json'
+    );
     expect(brandingSaves).toHaveLength(2);
-    expect(brandingSaves[0].content.site.ogImagePath).toBe("media/hero.png");
-    expect(brandingSaves[1].content.site.faviconPath).toBe("media/hero.png");
-    expect(state.pageConfig.site.ogImagePath).toBe("media/hero.png");
-    expect(state.pageConfig.site.faviconPath).toBe("media/hero.png");
+    expect(brandingSaves[0].content.site.ogImagePath).toBe('media/hero.png');
+    expect(brandingSaves[1].content.site.faviconPath).toBe('media/hero.png');
+    expect(state.pageConfig.site.ogImagePath).toBe('media/hero.png');
+    expect(state.pageConfig.site.faviconPath).toBe('media/hero.png');
   });
 
-  it("rejects premium media for branding assignment", async () => {
+  it('rejects premium media for branding assignment', async () => {
     const savePayloads = [];
     global.fetch = vi.fn(async (url, init = {}) => {
-      if (url === "/api/save") {
+      if (url === '/api/save') {
         savePayloads.push(JSON.parse(init.body));
       }
       return {
         ok: true,
         status: 200,
         json: async () => ({}),
-        text: async () => "",
+        text: async () => '',
       };
     });
 
@@ -190,12 +195,12 @@ describe("admin media branding", () => {
     state.posts = [];
     state.mediaItems = [
       {
-        id: "premium",
-        path: "media/premium.png",
-        tags: ["cover"],
-        access: "premium",
+        id: 'premium',
+        path: 'media/premium.png',
+        tags: ['cover'],
+        access: 'premium',
         public: false,
-        premiumVisibility: "blur",
+        premiumVisibility: 'blur',
       },
     ];
 
@@ -206,55 +211,55 @@ describe("admin media branding", () => {
     manager.showMediaSection();
     await flush();
 
-    document.querySelector(".media-card")?.click();
+    document.querySelector('.media-card')?.click();
     await flush();
-    document.getElementById("mediaPreviewSetOg").click();
+    document.getElementById('mediaPreviewSetOg').click();
     await flush();
 
     expect(savePayloads).toHaveLength(0);
-    expect(document.getElementById("mediaBrandingStatus").textContent).toContain(
-      "Only public media can be used for site branding.",
+    expect(document.getElementById('mediaBrandingStatus').textContent).toContain(
+      'Only public media can be used for site branding.'
     );
   });
 
-  it("clears branding when configured media becomes premium", async () => {
+  it('clears branding when configured media becomes premium', async () => {
     const savePayloads = [];
     global.fetch = vi.fn(async (url, init = {}) => {
-      if (url === "/api/rename-image") {
+      if (url === '/api/rename-image') {
         return {
           ok: true,
           status: 200,
-          json: async () => ({ status: "renamed" }),
-          text: async () => "",
+          json: async () => ({ status: 'renamed' }),
+          text: async () => '',
         };
       }
-      if (url === "/api/save") {
+      if (url === '/api/save') {
         savePayloads.push(JSON.parse(init.body));
       }
       return {
         ok: true,
         status: 200,
         json: async () => ({}),
-        text: async () => "",
+        text: async () => '',
       };
     });
 
     const { state, createMediaManager } = await importMediaModules();
     state.pageConfig = {
       site: {
-        ogImagePath: "media/hero.png",
-        faviconPath: "media/hero.png",
+        ogImagePath: 'media/hero.png',
+        faviconPath: 'media/hero.png',
       },
     };
     state.posts = [];
     state.mediaItems = [
       {
-        id: "hero",
-        path: "media/hero.png",
-        tags: ["cover"],
-        access: "public",
+        id: 'hero',
+        path: 'media/hero.png',
+        tags: ['cover'],
+        access: 'public',
         public: true,
-        premiumVisibility: "blur",
+        premiumVisibility: 'blur',
       },
     ];
 
@@ -265,57 +270,60 @@ describe("admin media branding", () => {
     manager.showMediaSection();
     await flush();
 
-    document.querySelector(".media-card")?.click();
+    document.querySelector('.media-card')?.click();
     await flush();
-    const accessSelect = document.getElementById("mediaPreviewAccess");
-    accessSelect.value = "premium";
-    accessSelect.dispatchEvent(new Event("change"));
+    const accessSelect = document.getElementById('mediaPreviewAccess');
+    accessSelect.value = 'premium';
+    accessSelect.dispatchEvent(new Event('change'));
     await flush();
 
-    const brandingSave = savePayloads.find((entry) => entry.filename === "admin/page-config.json");
+    const brandingSave = savePayloads.find((entry) => entry.filename === 'admin/page-config.json');
     expect(brandingSave).toBeTruthy();
     expect(brandingSave.content.site.ogImagePath).toBeUndefined();
     expect(brandingSave.content.site.faviconPath).toBeUndefined();
     expect(state.pageConfig.site.ogImagePath).toBeUndefined();
-    expect(document.getElementById("mediaBrandingStatus").textContent).toContain(
-      "no longer public",
+    expect(document.getElementById('mediaBrandingStatus').textContent).toContain(
+      'no longer public'
     );
   });
 
-  it("clears branding when configured media is deleted", async () => {
+  it('clears branding when configured media is deleted', async () => {
     const savePayloads = [];
     global.fetch = vi.fn(async (url, init = {}) => {
-      if (url === "/api/delete-image") {
+      if (url === '/api/delete-image') {
         return {
           ok: true,
           status: 200,
-          json: async () => ({ status: "deleted" }),
-          text: async () => "",
+          json: async () => ({ status: 'deleted' }),
+          text: async () => '',
         };
       }
-      if (url === "/api/save") {
+      if (url === '/api/save') {
         savePayloads.push(JSON.parse(init.body));
       }
       return {
         ok: true,
         status: 200,
         json: async () => ({}),
-        text: async () => "",
+        text: async () => '',
       };
     });
-    vi.stubGlobal("confirm", vi.fn(() => true));
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => true)
+    );
 
     const { state, createMediaManager } = await importMediaModules();
-    state.pageConfig = { site: { ogImagePath: "media/hero.png" } };
+    state.pageConfig = { site: { ogImagePath: 'media/hero.png' } };
     state.posts = [];
     state.mediaItems = [
       {
-        id: "hero",
-        path: "media/hero.png",
-        tags: ["cover"],
-        access: "public",
+        id: 'hero',
+        path: 'media/hero.png',
+        tags: ['cover'],
+        access: 'public',
         public: true,
-        premiumVisibility: "blur",
+        premiumVisibility: 'blur',
       },
     ];
 
@@ -323,13 +331,13 @@ describe("admin media branding", () => {
       hideAllSections: vi.fn(),
       setActiveNav: vi.fn(),
     });
-    await manager.deleteMediaItem("hero");
+    await manager.deleteMediaItem('hero');
     await flush();
 
-    const brandingSave = savePayloads.find((entry) => entry.filename === "admin/page-config.json");
+    const brandingSave = savePayloads.find((entry) => entry.filename === 'admin/page-config.json');
     expect(brandingSave).toBeTruthy();
     expect(brandingSave.content.site.ogImagePath).toBeUndefined();
     expect(state.pageConfig.site.ogImagePath).toBeUndefined();
-    expect(document.getElementById("mediaBrandingStatus").textContent).toContain("was deleted");
+    expect(document.getElementById('mediaBrandingStatus').textContent).toContain('was deleted');
   });
 });

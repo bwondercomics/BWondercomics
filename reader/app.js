@@ -1,25 +1,25 @@
 // Reader bootstrap: loads data, binds UI, and wires view state.
-import { state, loadProgress } from "./state.js";
-import { logger } from "./logger.js";
-import { throttle } from "./utils.js";
-import { loadEntryData, loadPageConfigWithFallback, loadLatestPost, applyBuilderPageToDOM } from "./data.js";
-import { el, initElements } from "./dom.js";
-import { renderStatusPanel, render } from "./render.js";
-import { initReaderAnalytics, setActiveEntry } from "./analytics.js";
+import { state, loadProgress } from './state.js';
+import { logger } from './logger.js';
+import { throttle } from './utils.js';
 import {
-  prevPage,
-  nextPage,
-  restartEntry,
-  hideEndOfEntry,
-} from "./controls.js";
-import { fitToScreen, zoomIn, zoomOut, resetView } from "./transform.js";
-import { initPointerHandlers } from "./pointer.js";
+  loadEntryData,
+  loadPageConfigWithFallback,
+  loadLatestPost,
+  applyBuilderPageToDOM,
+} from './data.js';
+import { el, initElements } from './dom.js';
+import { renderStatusPanel, render } from './render.js';
+import { initReaderAnalytics, setActiveEntry } from './analytics.js';
+import { prevPage, nextPage, restartEntry, hideEndOfEntry } from './controls.js';
+import { fitToScreen, zoomIn, zoomOut, resetView } from './transform.js';
+import { initPointerHandlers } from './pointer.js';
 import {
   toggleShortcutsOverlay,
   closeShortcutsOverlay,
   goToNextEntry,
   changeEntry,
-} from "./overlays.js";
+} from './overlays.js';
 
 // Code splitting: lazy load heavier modules on demand.
 let galleryModule = null;
@@ -27,14 +27,14 @@ let fullscreenModule = null;
 
 async function loadGalleryModule() {
   if (!galleryModule) {
-    galleryModule = await import("./gallery.js");
+    galleryModule = await import('./gallery.js');
   }
   return galleryModule;
 }
 
 async function loadFullscreenModule() {
   if (!fullscreenModule) {
-    fullscreenModule = await import("./fullscreen.js");
+    fullscreenModule = await import('./fullscreen.js');
   }
   return fullscreenModule;
 }
@@ -74,17 +74,13 @@ async function handleMouseLeaveControls() {
   const mod = await loadFullscreenModule();
   return mod.handleMouseLeaveControls();
 }
-import { renderLatestUpdate } from "./latest.js";
-import { initRightPanelFeed } from "./feed-panel.js";
-import { initEmailSignupForm } from "./email.js";
-import {
-  getActiveSeriesId,
-  getRequestedPageSlug,
-  isDraftPageRequested,
-} from "./series.js";
+import { renderLatestUpdate } from './latest.js';
+import { initRightPanelFeed } from './feed-panel.js';
+import { initEmailSignupForm } from './email.js';
+import { getActiveSeriesId, getRequestedPageSlug, isDraftPageRequested } from './series.js';
 
 (function () {
-  "use strict";
+  'use strict';
   // ==================== ENTRY HELPERS ====================
 
   // Helpers now live in reader/entries.js
@@ -101,24 +97,23 @@ import {
   let patronWelcomeTimer = null;
 
   function updatePatronWelcome(user) {
-    const label = document.getElementById("patronWelcome");
+    const label = document.getElementById('patronWelcome');
     if (!label) return;
 
-    const role = (user?.role || "").toString().toLowerCase();
-    const isPremium =
-      role === "admin" || role === "premium" || !!user?.premiumActive;
+    const role = (user?.role || '').toString().toLowerCase();
+    const isPremium = role === 'admin' || role === 'premium' || !!user?.premiumActive;
     if (!isPremium) {
-      label.classList.remove("is-visible");
+      label.classList.remove('is-visible');
       return;
     }
 
-    label.textContent = "WELCOME PATRON";
-    label.classList.add("is-visible");
+    label.textContent = 'WELCOME PATRON';
+    label.classList.add('is-visible');
     if (patronWelcomeTimer) {
       window.clearTimeout(patronWelcomeTimer);
     }
     patronWelcomeTimer = window.setTimeout(() => {
-      label.classList.remove("is-visible");
+      label.classList.remove('is-visible');
       patronWelcomeTimer = null;
     }, PATRON_WELCOME_DURATION_MS);
   }
@@ -127,24 +122,24 @@ import {
   // Entry data is loaded dynamically from the series data endpoint
   let entries = {};
   let entryOrder = [];
-  let statusMessage = "";
+  let statusMessage = '';
   let entryMeta = {};
   let entryLabels = [];
   let entryLabelsById = {};
   let premiumOnly = false;
-  let unitLabelSingular = "Entry";
-  let unitLabelPlural = "Entries";
+  let unitLabelSingular = 'Entry';
+  let unitLabelPlural = 'Entries';
   let entrySelectBound = false;
   let fullEntries = {};
   let fullEntryOrder = [];
   let fullEntryMeta = {};
-  let fullStatusMessage = "";
+  let fullStatusMessage = '';
   let fullPremiumOnly = false;
   let currentLockedEntries = [];
 
   function getUnitLabels() {
-    const singular = String(unitLabelSingular || "").trim() || "Entry";
-    const plural = String(unitLabelPlural || "").trim() || `${singular}s`;
+    const singular = String(unitLabelSingular || '').trim() || 'Entry';
+    const plural = String(unitLabelPlural || '').trim() || `${singular}s`;
     return { singular, plural };
   }
 
@@ -156,8 +151,8 @@ import {
     }
     if (meta.entryLabelSingular || meta.entryLabelPlural) {
       return {
-        singular: String(meta.entryLabelSingular || "").trim() || getUnitLabels().singular,
-        plural: String(meta.entryLabelPlural || "").trim() || getUnitLabels().plural
+        singular: String(meta.entryLabelSingular || '').trim() || getUnitLabels().singular,
+        plural: String(meta.entryLabelPlural || '').trim() || getUnitLabels().plural,
       };
     }
     return getUnitLabels();
@@ -170,14 +165,14 @@ import {
   }
 
   function applyPremiumGating(user) {
-    const role = (user?.role || "").toString().toLowerCase();
-    const isPremiumUser =
-      role === "admin" || role === "premium" || !!user?.premiumActive;
-    const baseEntries = fullEntries && typeof fullEntries === "object" ? fullEntries : {};
-    const baseOrder = Array.isArray(fullEntryOrder) && fullEntryOrder.length
-      ? fullEntryOrder
-      : Object.keys(baseEntries);
-    const baseMeta = fullEntryMeta && typeof fullEntryMeta === "object" ? fullEntryMeta : {};
+    const role = (user?.role || '').toString().toLowerCase();
+    const isPremiumUser = role === 'admin' || role === 'premium' || !!user?.premiumActive;
+    const baseEntries = fullEntries && typeof fullEntries === 'object' ? fullEntries : {};
+    const baseOrder =
+      Array.isArray(fullEntryOrder) && fullEntryOrder.length
+        ? fullEntryOrder
+        : Object.keys(baseEntries);
+    const baseMeta = fullEntryMeta && typeof fullEntryMeta === 'object' ? fullEntryMeta : {};
     let nextEntries = baseEntries;
     let nextOrder = baseOrder;
     const lockedEntries = [];
@@ -190,10 +185,10 @@ import {
         lockedEntries.push(...baseOrder);
         nextEntries = {};
         nextOrder = [];
-        statusMessage = "PREMIUM_ONLY";
+        statusMessage = 'PREMIUM_ONLY';
       } else {
         lockedEntries.push(...baseOrder.filter((name) => baseMeta?.[name]?.premium));
-        nextOrder = baseOrder.filter((name) => !(baseMeta?.[name]?.premium));
+        nextOrder = baseOrder.filter((name) => !baseMeta?.[name]?.premium);
         nextEntries = {};
         nextOrder.forEach((name) => {
           nextEntries[name] = baseEntries[name];
@@ -216,7 +211,7 @@ import {
     const current = state.currentEntry;
     const currentExists = current && entries[current];
     if (!currentExists) {
-      const next = entryOrder.length ? entryOrder[0] : "";
+      const next = entryOrder.length ? entryOrder[0] : '';
       state.currentEntry = next;
       state.pageIndex = 0;
     }
@@ -244,20 +239,20 @@ import {
   }
 
   function formatEntryLabel(name) {
-    if (!name) return "";
+    if (!name) return '';
     const displayNumber = getEntryDisplayNumber(name);
     const meta = entryMeta?.[name] || {};
     const entryLabel = getEntryLabelFor(name);
-    const baseLabel = displayNumber == null
-      ? name
-      : `${entryLabel.singular} ${displayNumber} - ${name}`;
-    const isComingSoon = !!meta.comingSoon || String(meta.status || "").toLowerCase() === "scheduled";
+    const baseLabel =
+      displayNumber == null ? name : `${entryLabel.singular} ${displayNumber} - ${name}`;
+    const isComingSoon =
+      !!meta.comingSoon || String(meta.status || '').toLowerCase() === 'scheduled';
     return isComingSoon ? `${baseLabel} (Coming Soon)` : baseLabel;
   }
 
   function formatEntryTrackingLabel(name) {
     const displayNumber = getEntryDisplayNumber(name);
-    if (displayNumber == null) return "";
+    if (displayNumber == null) return '';
     const entryLabel = getEntryLabelFor(name);
     return `${entryLabel.singular} ${displayNumber}`;
   }
@@ -265,12 +260,12 @@ import {
   function shouldShowInDropdown(name) {
     const meta = entryMeta?.[name] || {};
     if (meta.showInDropdown === false) return false;
-    if (String(meta.releaseType || "").toLowerCase() === "store" && !meta.storeUrl) return false;
+    if (String(meta.releaseType || '').toLowerCase() === 'store' && !meta.storeUrl) return false;
     return true;
   }
 
   function isStoreEntry(name) {
-    return String(entryMeta?.[name]?.releaseType || "").toLowerCase() === "store";
+    return String(entryMeta?.[name]?.releaseType || '').toLowerCase() === 'store';
   }
 
   function getNavigableEntries() {
@@ -283,32 +278,30 @@ import {
     const singularUpper = singular.toUpperCase();
     const pluralUpper = plural.toUpperCase();
 
-    const commentsTitle = document.querySelector(
-      "#comicCommentsSection .comments-title",
-    );
+    const commentsTitle = document.querySelector('#comicCommentsSection .comments-title');
     if (commentsTitle) commentsTitle.textContent = `Discuss This ${singular}`;
 
-    const endTitle = document.querySelector("#entryEndOverlay h2");
+    const endTitle = document.querySelector('#entryEndOverlay h2');
     if (endTitle) endTitle.textContent = `${singularUpper} COMPLETE`;
 
-    const endBody = document.querySelector("#entryEndOverlay p");
+    const endBody = document.querySelector('#entryEndOverlay p');
     if (endBody) {
       endBody.textContent = `You've reached the end of this ${singular.toLowerCase()}! Ready for more?`;
     }
 
-    const nextBtn = document.getElementById("nextEntryBtn");
+    const nextBtn = document.getElementById('nextEntryBtn');
     if (nextBtn) nextBtn.textContent = `Next ${singular}`;
 
-    const restartBtn = document.getElementById("restartEntryBtn");
+    const restartBtn = document.getElementById('restartEntryBtn');
     if (restartBtn) restartBtn.textContent = `Restart ${singular}`;
 
-    const galleryTitle = document.querySelector("#entryCoverGallery h2");
-    if (galleryTitle) galleryTitle.textContent = "COVER GALLERY";
+    const galleryTitle = document.querySelector('#entryCoverGallery h2');
+    if (galleryTitle) galleryTitle.textContent = 'COVER GALLERY';
 
     window.dispatchEvent(
-      new CustomEvent("unitLabelChanged", {
+      new CustomEvent('unitLabelChanged', {
         detail: { singular, plural, singularUpper, pluralUpper },
-      }),
+      })
     );
   }
 
@@ -328,10 +321,10 @@ import {
 
     const names = entryOrder.length ? entryOrder : Object.keys(entries);
     const dropdownNames = names.filter(shouldShowInDropdown);
-    el.entry.innerHTML = "";
+    el.entry.innerHTML = '';
 
     dropdownNames.forEach((name) => {
-      const option = document.createElement("option");
+      const option = document.createElement('option');
       option.value = name;
       option.textContent = name;
       const displayNumber = getEntryDisplayNumber(name);
@@ -350,50 +343,50 @@ import {
 
   function getEntrySelectElements() {
     return {
-      wrap: document.getElementById("entrySelect"),
-      trigger: document.getElementById("entrySelectTrigger"),
-      name: document.getElementById("entrySelectName"),
-      patron: document.getElementById("entrySelectPatron"),
-      menu: document.getElementById("entrySelectMenu"),
+      wrap: document.getElementById('entrySelect'),
+      trigger: document.getElementById('entrySelectTrigger'),
+      name: document.getElementById('entrySelectName'),
+      patron: document.getElementById('entrySelectPatron'),
+      menu: document.getElementById('entrySelectMenu'),
     };
   }
 
   function setEntryMenuOpen(isOpen) {
     const { trigger, menu } = getEntrySelectElements();
     if (!trigger || !menu) return;
-    menu.classList.toggle("open", isOpen);
-    trigger.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    menu.classList.toggle('open', isOpen);
+    trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
   }
 
   function buildEntrySelectMenu(names) {
     const { menu } = getEntrySelectElements();
     if (!menu) return;
-    menu.innerHTML = "";
+    menu.innerHTML = '';
 
     names.forEach((name) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "entry-option";
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'entry-option';
       button.dataset.value = name;
-      button.setAttribute("role", "option");
-      button.setAttribute("aria-selected", "false");
+      button.setAttribute('role', 'option');
+      button.setAttribute('aria-selected', 'false');
 
-      const label = document.createElement("span");
-      label.className = "entry-option-name";
+      const label = document.createElement('span');
+      label.className = 'entry-option-name';
       label.textContent = formatEntryLabel(name);
       button.appendChild(label);
 
       if (entryMeta?.[name]?.premium) {
-        const patron = document.createElement("span");
-        patron.className = "entry-option-patron";
-        patron.textContent = "Patron";
+        const patron = document.createElement('span');
+        patron.className = 'entry-option-patron';
+        patron.textContent = 'Patron';
         button.appendChild(patron);
       }
 
-      button.addEventListener("click", () => {
+      button.addEventListener('click', () => {
         if (el.entry) {
           el.entry.value = name;
-          el.entry.dispatchEvent(new Event("change", { bubbles: true }));
+          el.entry.dispatchEvent(new Event('change', { bubbles: true }));
         }
         setEntryMenuOpen(false);
       });
@@ -404,32 +397,32 @@ import {
     // Append locked (premium) entries for non-premium users
     const locked = currentLockedEntries.filter(shouldShowInDropdown);
     locked.forEach((name) => {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.className = "entry-option entry-option--locked";
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'entry-option entry-option--locked';
       button.dataset.value = name;
-      button.setAttribute("role", "option");
-      button.setAttribute("aria-selected", "false");
+      button.setAttribute('role', 'option');
+      button.setAttribute('aria-selected', 'false');
 
-      const label = document.createElement("span");
-      label.className = "entry-option-name";
+      const label = document.createElement('span');
+      label.className = 'entry-option-name';
       label.textContent = formatEntryLabel(name);
       button.appendChild(label);
 
-      const patron = document.createElement("span");
-      patron.className = "entry-option-patron";
-      patron.textContent = "Patron";
+      const patron = document.createElement('span');
+      patron.className = 'entry-option-patron';
+      patron.textContent = 'Patron';
       button.appendChild(patron);
 
-      button.addEventListener("click", () => {
+      button.addEventListener('click', () => {
         setEntryMenuOpen(false);
-        const commentsSection = document.getElementById("comicCommentsSection");
-        const toggleBtn = document.getElementById("commentToggleBtn");
-        if (commentsSection && commentsSection.classList.contains("collapsed") && toggleBtn) {
+        const commentsSection = document.getElementById('comicCommentsSection');
+        const toggleBtn = document.getElementById('commentToggleBtn');
+        if (commentsSection && commentsSection.classList.contains('collapsed') && toggleBtn) {
           toggleBtn.click();
         }
-        if (commentsSection && typeof commentsSection.scrollIntoView === "function") {
-          commentsSection.scrollIntoView({ behavior: "smooth", block: "start" });
+        if (commentsSection && typeof commentsSection.scrollIntoView === 'function') {
+          commentsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
         }
       });
 
@@ -440,17 +433,17 @@ import {
   function syncEntrySelectDisplay() {
     const { name, patron, menu } = getEntrySelectElements();
     if (!name || !el.entry) return;
-    const value = el.entry.value || "";
+    const value = el.entry.value || '';
     name.textContent = value ? formatEntryLabel(value) : getUnitLabels().singular;
     const isPatron = !!entryMeta?.[value]?.premium;
     if (patron) {
-      patron.style.display = isPatron ? "inline-flex" : "none";
+      patron.style.display = isPatron ? 'inline-flex' : 'none';
     }
     if (menu) {
-      menu.querySelectorAll(".entry-option").forEach((option) => {
+      menu.querySelectorAll('.entry-option').forEach((option) => {
         const selected = option.dataset.value === value;
-        option.setAttribute("aria-selected", selected ? "true" : "false");
-        option.classList.toggle("is-selected", selected);
+        option.setAttribute('aria-selected', selected ? 'true' : 'false');
+        option.classList.toggle('is-selected', selected);
       });
     }
   }
@@ -460,23 +453,23 @@ import {
     const { wrap, trigger, menu } = getEntrySelectElements();
     if (!wrap || !trigger || !menu) return;
 
-    trigger.addEventListener("click", (event) => {
+    trigger.addEventListener('click', (event) => {
       event.stopPropagation();
-      setEntryMenuOpen(!menu.classList.contains("open"));
+      setEntryMenuOpen(!menu.classList.contains('open'));
     });
 
-    menu.addEventListener("click", (event) => {
+    menu.addEventListener('click', (event) => {
       event.stopPropagation();
     });
 
-    document.addEventListener("click", (event) => {
+    document.addEventListener('click', (event) => {
       if (!wrap.contains(event.target)) {
         setEntryMenuOpen(false);
       }
     });
 
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape") {
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
         setEntryMenuOpen(false);
       }
     });
@@ -491,13 +484,13 @@ import {
 
   async function getGifLoopDuration(src) {
     try {
-      const res = await fetch(src, { cache: "force-cache" });
+      const res = await fetch(src, { cache: 'force-cache' });
       if (!res.ok) return null;
       const buffer = await res.arrayBuffer();
       const data = new Uint8Array(buffer);
       if (data.length < 13) return null;
       const header = String.fromCharCode(data[0], data[1], data[2]);
-      if (header !== "GIF") return null;
+      if (header !== 'GIF') return null;
 
       let idx = 6;
       const packed = data[idx + 4];
@@ -572,16 +565,16 @@ import {
             resolve(null);
             return;
           }
-          const canvas = document.createElement("canvas");
+          const canvas = document.createElement('canvas');
           canvas.width = width;
           canvas.height = height;
-          const ctx = canvas.getContext("2d");
+          const ctx = canvas.getContext('2d');
           if (!ctx) {
             resolve(null);
             return;
           }
           ctx.drawImage(loader, 0, 0, width, height);
-          resolve(canvas.toDataURL("image/png"));
+          resolve(canvas.toDataURL('image/png'));
         } catch {
           resolve(null);
         }
@@ -592,7 +585,7 @@ import {
   }
 
   async function initBookTurnGif(img) {
-    const gifSrc = img.getAttribute("src");
+    const gifSrc = img.getAttribute('src');
     if (!gifSrc) return;
 
     const [loopDuration, staticSrc] = await Promise.all([
@@ -600,7 +593,7 @@ import {
       captureStaticFrame(img, gifSrc),
     ]);
     const durationMs = loopDuration || 2000;
-    const stillSrc = staticSrc || "";
+    const stillSrc = staticSrc || '';
     let isPlaying = false;
     let timerId = null;
 
@@ -619,20 +612,20 @@ import {
 
     playLoops(5);
 
-    img.addEventListener("mouseenter", () => {
+    img.addEventListener('mouseenter', () => {
       if (!isPlaying) playLoops(3);
     });
   }
 
   function attachEventHandlers() {
     // Book turn promo click handler
-    const bookTurnPromo = document.getElementById("bookTurnPromo");
+    const bookTurnPromo = document.getElementById('bookTurnPromo');
     if (bookTurnPromo) {
-      bookTurnPromo.addEventListener("click", () => {
+      bookTurnPromo.addEventListener('click', () => {
         window.open(
-          "https://bwondercomics.bigcartel.com/product/battle-bros-volume-1",
-          "_blank",
-          "noopener,noreferrer",
+          'https://bwondercomics.bigcartel.com/product/battle-bros-volume-1',
+          '_blank',
+          'noopener,noreferrer'
         );
       });
       initBookTurnGif(bookTurnPromo);
@@ -640,30 +633,30 @@ import {
     initRightPanelFeed();
 
     // Navigation buttons
-    if (el.prevBtn) el.prevBtn.addEventListener("click", prevPage);
-    if (el.nextBtn) el.nextBtn.addEventListener("click", nextPage);
+    if (el.prevBtn) el.prevBtn.addEventListener('click', prevPage);
+    if (el.nextBtn) el.nextBtn.addEventListener('click', nextPage);
 
     // Zoom and view buttons
-    if (el.zoomIn) el.zoomIn.addEventListener("click", zoomIn);
-    if (el.zoomOut) el.zoomOut.addEventListener("click", zoomOut);
-    if (el.fitBtn) el.fitBtn.addEventListener("click", fitToScreen);
+    if (el.zoomIn) el.zoomIn.addEventListener('click', zoomIn);
+    if (el.zoomOut) el.zoomOut.addEventListener('click', zoomOut);
+    if (el.fitBtn) el.fitBtn.addEventListener('click', fitToScreen);
     if (el.fullscreenBtn) {
-      el.fullscreenBtn.addEventListener("click", toggleFullscreen);
+      el.fullscreenBtn.addEventListener('click', toggleFullscreen);
     }
 
     // Help button
-    const helpBtn = document.getElementById("helpBtn");
-    if (helpBtn) helpBtn.addEventListener("click", toggleShortcutsOverlay);
+    const helpBtn = document.getElementById('helpBtn');
+    if (helpBtn) helpBtn.addEventListener('click', toggleShortcutsOverlay);
     attachGalleryButton();
 
     if (el.edgeLeftBtn) {
-      el.edgeLeftBtn.addEventListener("click", (e) => {
+      el.edgeLeftBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         prevPage();
       });
     }
     if (el.edgeRightBtn) {
-      el.edgeRightBtn.addEventListener("click", (e) => {
+      el.edgeRightBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         nextPage();
       });
@@ -671,42 +664,42 @@ import {
 
     initPointerHandlers();
 
-    document.addEventListener("keydown", (e) => {
+    document.addEventListener('keydown', (e) => {
       // Don't interfere if user is typing in an input
-      if (e.target.matches("input, textarea, select")) return;
+      if (e.target.matches('input, textarea, select')) return;
 
       switch (e.key) {
-        case "ArrowLeft":
+        case 'ArrowLeft':
           e.preventDefault();
           prevPage();
           break;
-        case "ArrowRight":
+        case 'ArrowRight':
           e.preventDefault();
           nextPage();
           break;
-        case "+":
-        case "=":
+        case '+':
+        case '=':
           e.preventDefault();
           zoomIn();
           break;
-        case "-":
+        case '-':
           e.preventDefault();
           zoomOut();
           break;
-        case "0":
+        case '0':
           e.preventDefault();
           resetView();
           break;
-        case "f":
-        case "F":
+        case 'f':
+        case 'F':
           e.preventDefault();
           toggleFullscreen();
           break;
-        case "?":
+        case '?':
           e.preventDefault();
           toggleShortcutsOverlay();
           break;
-        case "Escape":
+        case 'Escape':
           e.preventDefault();
           closeShortcutsOverlay();
           hideEndOfEntry();
@@ -717,36 +710,39 @@ import {
       }
     });
 
-    document.addEventListener("fullscreenchange", onFullscreenChange);
+    document.addEventListener('fullscreenchange', onFullscreenChange);
 
     // Throttle fullscreen edge detection to reduce overhead (100ms = 10fps max)
-    document.addEventListener("mousemove", throttle((e) => {
-      if (document.fullscreenElement) {
-        const vh = window.innerHeight;
-        // Use percentage-based thresholds for better scaling on small screens
-        const topThreshold = Math.min(150, vh * 0.15);
-        const bottomThreshold = Math.min(200, vh * 0.2);
-        const nearEdge = e.clientY < topThreshold || e.clientY > vh - bottomThreshold;
-        if (nearEdge) showControlsBar();
-      }
-    }, 100));
+    document.addEventListener(
+      'mousemove',
+      throttle((e) => {
+        if (document.fullscreenElement) {
+          const vh = window.innerHeight;
+          // Use percentage-based thresholds for better scaling on small screens
+          const topThreshold = Math.min(150, vh * 0.15);
+          const bottomThreshold = Math.min(200, vh * 0.2);
+          const nearEdge = e.clientY < topThreshold || e.clientY > vh - bottomThreshold;
+          if (nearEdge) showControlsBar();
+        }
+      }, 100)
+    );
 
     if (el.topbar) {
-      el.topbar.addEventListener("mouseenter", handleMouseEnterControls);
-      el.topbar.addEventListener("mouseleave", handleMouseLeaveControls);
+      el.topbar.addEventListener('mouseenter', handleMouseEnterControls);
+      el.topbar.addEventListener('mouseleave', handleMouseLeaveControls);
     }
 
     if (el.controls) {
-      el.controls.addEventListener("mouseenter", handleMouseEnterControls);
-      el.controls.addEventListener("mouseleave", handleMouseLeaveControls);
+      el.controls.addEventListener('mouseenter', handleMouseEnterControls);
+      el.controls.addEventListener('mouseleave', handleMouseLeaveControls);
     }
 
     if (el.entry) {
-      el.entry.addEventListener("change", (e) => {
+      el.entry.addEventListener('change', (e) => {
         const nextName = e.target.value;
         const meta = entryMeta?.[nextName] || {};
-        if (String(meta.releaseType || "").toLowerCase() === "store" && meta.storeUrl) {
-          window.open(meta.storeUrl, "_blank", "noopener,noreferrer");
+        if (String(meta.releaseType || '').toLowerCase() === 'store' && meta.storeUrl) {
+          window.open(meta.storeUrl, '_blank', 'noopener,noreferrer');
           el.entry.value = state.currentEntry;
           syncEntrySelectDisplay();
           return;
@@ -757,7 +753,7 @@ import {
 
     // Handle window resize and orientation changes
     let resizeTimeout;
-    window.addEventListener("resize", () => {
+    window.addEventListener('resize', () => {
       // Debounce resize events to avoid excessive re-renders
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(() => {
@@ -766,28 +762,26 @@ import {
     });
 
     // Shortcuts overlay buttons
-    const shortcutsClose = document.getElementById("shortcutsClose");
+    const shortcutsClose = document.getElementById('shortcutsClose');
     if (shortcutsClose) {
-      shortcutsClose.addEventListener("click", closeShortcutsOverlay);
+      shortcutsClose.addEventListener('click', closeShortcutsOverlay);
     }
 
     // End of chapter overlay buttons
-    const nextEntryBtn = document.getElementById("nextEntryBtn");
-    const restartEntryBtn = document.getElementById("restartEntryBtn");
-    const closeEndOverlay = document.getElementById("closeEndOverlay");
+    const nextEntryBtn = document.getElementById('nextEntryBtn');
+    const restartEntryBtn = document.getElementById('restartEntryBtn');
+    const closeEndOverlay = document.getElementById('closeEndOverlay');
 
     if (nextEntryBtn) {
-      nextEntryBtn.addEventListener("click", () =>
-        goToNextEntry(getNavigableEntries(), entries, entryMeta),
+      nextEntryBtn.addEventListener('click', () =>
+        goToNextEntry(getNavigableEntries(), entries, entryMeta)
       );
     }
     if (restartEntryBtn) {
-      restartEntryBtn.addEventListener("click", () =>
-        restartEntry(entries),
-      );
+      restartEntryBtn.addEventListener('click', () => restartEntry(entries));
     }
     if (closeEndOverlay) {
-      closeEndOverlay.addEventListener("click", hideEndOfEntry);
+      closeEndOverlay.addEventListener('click', hideEndOfEntry);
     }
   }
 
@@ -796,7 +790,7 @@ import {
   function setInitialSubtitle() {
     if (!el.subtitle) return;
     if (!SUBTITLES.length) {
-      el.subtitle.textContent = "";
+      el.subtitle.textContent = '';
       return;
     }
     const idx = Math.floor(Math.random() * SUBTITLES.length);
@@ -808,7 +802,7 @@ import {
   // ==================== LATEST UPDATE WIDGET ====================
 
   async function loadLatestUpdate() {
-    const body = document.getElementById("latestBody");
+    const body = document.getElementById('latestBody');
     if (!body) return;
 
     const latest = await loadLatestPost();
@@ -823,7 +817,7 @@ import {
   const statusTimerRef = { current: null };
 
   function handleDataLoadError(error) {
-    const viewport = document.getElementById("viewport");
+    const viewport = document.getElementById('viewport');
     if (viewport) {
       viewport.innerHTML = `
           <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 20px; text-align: center; gap: 16px;">
@@ -852,17 +846,19 @@ import {
     initReaderAnalytics();
     // renderGallery(); // Loaded on open
     setInitialSubtitle();
-    renderStatusPanel(statusMessage || "ready", statusTimerRef);
+    renderStatusPanel(statusMessage || 'ready', statusTimerRef);
     initEmailSignupForm();
 
     const navigableEntries = getNavigableEntries();
     const availableEntries = navigableEntries.length
       ? navigableEntries
-      : (entryOrder.length ? entryOrder : Object.keys(entries));
+      : entryOrder.length
+        ? entryOrder
+        : Object.keys(entries);
 
     if (!availableEntries.length) {
-      if (el.entry) el.entry.innerHTML = "";
-      const viewport = document.getElementById("viewport");
+      if (el.entry) el.entry.innerHTML = '';
+      const viewport = document.getElementById('viewport');
       if (viewport) {
         const message = premiumOnly
           ? `This series is premium-only. Sign in with a premium account to view ${getUnitLabels().plural.toLowerCase()}.`
@@ -893,13 +889,13 @@ import {
     if (el.entry) el.entry.value = state.currentEntry;
     syncEntrySelectDisplay();
     window.dispatchEvent(
-      new CustomEvent("entryChanged", { detail: { chapter: state.currentEntry } }),
+      new CustomEvent('entryChanged', { detail: { chapter: state.currentEntry } })
     );
 
     attachEventHandlers();
     render();
 
-    logger.log("🎬 Battle Bros Reader initialized");
+    logger.log('🎬 Battle Bros Reader initialized');
   }
 
   // ==================== START ====================
@@ -915,9 +911,9 @@ import {
         entryOrder = data.entryOrder;
         statusMessage = data.statusMessage;
         entryMeta = data.entryMeta || {};
-        fullEntries = entries && typeof entries === "object" ? entries : {};
+        fullEntries = entries && typeof entries === 'object' ? entries : {};
         fullEntryOrder = Array.isArray(entryOrder) ? [...entryOrder] : [];
-        fullEntryMeta = entryMeta && typeof entryMeta === "object" ? entryMeta : {};
+        fullEntryMeta = entryMeta && typeof entryMeta === 'object' ? entryMeta : {};
         fullStatusMessage = statusMessage;
         fullPremiumOnly = !!data.premiumOnly;
         entryLabels = Array.isArray(data.entryLabels) ? data.entryLabels : [];
@@ -926,8 +922,8 @@ import {
           return acc;
         }, {});
         premiumOnly = fullPremiumOnly;
-        unitLabelSingular = data.unitLabelSingular || "Entry";
-        unitLabelPlural = data.unitLabelPlural || "Entries";
+        unitLabelSingular = data.unitLabelSingular || 'Entry';
+        unitLabelPlural = data.unitLabelPlural || 'Entries';
         applyUnitLabels();
         logger.log(`Entry data loaded for series: ${seriesId}`);
       }
@@ -939,7 +935,7 @@ import {
     // Apply premium gating (client-side UX; server enforces for protected folders too)
     let sessionUser = null;
     try {
-      const res = await fetch("/api/session", { cache: "no-store", credentials: "same-origin" });
+      const res = await fetch('/api/session', { cache: 'no-store', credentials: 'same-origin' });
       if (res.ok) {
         const data = await res.json();
         sessionUser = data.user || null;
@@ -950,12 +946,12 @@ import {
 
     updatePatronWelcome(sessionUser);
 
-    const role = (sessionUser?.role || "").toString().toLowerCase();
-    const { lockedEntries, isPremiumUser } = applyPremiumGating(sessionUser);
+    const role = (sessionUser?.role || '').toString().toLowerCase();
+    const { lockedEntries } = applyPremiumGating(sessionUser);
     currentLockedEntries = lockedEntries;
-    const adminNavLink = document.getElementById("adminNavLink");
+    const adminNavLink = document.getElementById('adminNavLink');
     if (adminNavLink) {
-      adminNavLink.style.display = role === "admin" ? "inline-flex" : "none";
+      adminNavLink.style.display = role === 'admin' ? 'inline-flex' : 'none';
     }
 
     renderGallery(entryOrder, entries, {
@@ -966,7 +962,7 @@ import {
     });
     const pageConfig = await loadPageConfigWithFallback(setSubtitles, seriesId, {
       pageSlug: requestedPageSlug,
-      draft: role === "admin" && isDraftPageRequested(),
+      draft: role === 'admin' && isDraftPageRequested(),
     });
     if (pageConfig.source === 'builder' && pageConfig.page) {
       applyBuilderPageToDOM(pageConfig.page);
@@ -975,28 +971,25 @@ import {
     init();
   }
 
-  window.addEventListener("bbSessionChanged", (event) => {
+  window.addEventListener('bbSessionChanged', (event) => {
     const user = event?.detail?.user || null;
-    const role = (user?.role || "").toString().toLowerCase();
-    const adminNavLink = document.getElementById("adminNavLink");
+    const role = (user?.role || '').toString().toLowerCase();
+    const adminNavLink = document.getElementById('adminNavLink');
     if (adminNavLink) {
-      adminNavLink.style.display = role === "admin" ? "inline-flex" : "none";
+      adminNavLink.style.display = role === 'admin' ? 'inline-flex' : 'none';
     }
     updatePatronWelcome(user);
     refreshEntriesForSession(user);
   });
 
-  window.addEventListener("entryChanged", () => {
+  window.addEventListener('entryChanged', () => {
     syncEntrySelectDisplay();
   });
 
-  if (
-    document.readyState === "complete" ||
-    document.readyState === "interactive"
-  ) {
+  if (document.readyState === 'complete' || document.readyState === 'interactive') {
     setTimeout(start, 0);
   } else {
-    document.addEventListener("DOMContentLoaded", start);
+    document.addEventListener('DOMContentLoaded', start);
   }
 
   window.BattleBros = {

@@ -1,43 +1,57 @@
 ﻿<!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5" />
+    <title>BWonderComics | Read Battle Bros Comics</title>
+    <meta
+      name="description"
+      content="BWonderComics official website, and Battle Bros comic reader"
+    />
+    <meta
+      name="keywords"
+      content="battle bros, comic reader, online comics, free comics, webcomic, manga reader"
+    />
+    <meta name="author" content="Battle Bros Comics" />
+    <meta name="theme-color" content="#00d9ff" />
 
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5" />
-  <title>BWonderComics | Read Battle Bros Comics</title>
-  <meta name="description" content="BWonderComics official website, and Battle Bros comic reader" />
-  <meta name="keywords" content="battle bros, comic reader, online comics, free comics, webcomic, manga reader" />
-  <meta name="author" content="Battle Bros Comics" />
-  <meta name="theme-color" content="#00d9ff" />
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://bwondercomics.com/" />
+    <meta property="og:title" content="BWonderComics - Free Online Comic Reader" />
+    <meta
+      property="og:description"
+      content="BWonderComics official website, and Battle Bros comic reader"
+    />
+    <!-- SITE_BRANDING_SOCIAL_IMAGE_START -->
+    <meta property="og:image" content="https://bwondercomics.com/assets/banner1.png" />
+    <meta property="twitter:image" content="https://bwondercomics.com/assets/banner1.png" />
+    <!-- SITE_BRANDING_SOCIAL_IMAGE_END -->
 
-  <!-- Open Graph / Facebook -->
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://bwondercomics.com/" />
-  <meta property="og:title" content="BWonderComics - Free Online Comic Reader" />
-  <meta property="og:description" content="BWonderComics official website, and Battle Bros comic reader" />
-  <!-- SITE_BRANDING_SOCIAL_IMAGE_START -->
-  <meta property="og:image" content="https://bwondercomics.com/assets/banner1.png" />
-  <meta property="twitter:image" content="https://bwondercomics.com/assets/banner1.png" />
-  <!-- SITE_BRANDING_SOCIAL_IMAGE_END -->
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://bwondercomics.com/" />
+    <meta property="twitter:title" content="BWonderComics - Free Online Comic Reader" />
+    <meta
+      property="twitter:description"
+      content="BWonderComics official website, and Battle Bros comic reader"
+    />
+    <!-- SITE_BRANDING_ICONS_START -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/boywondericon.png" />
+    <link rel="apple-touch-icon" href="/assets/boywondericon.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <!-- SITE_BRANDING_ICONS_END -->
 
-  <!-- Twitter -->
-  <meta property="twitter:card" content="summary_large_image" />
-  <meta property="twitter:url" content="https://bwondercomics.com/" />
-  <meta property="twitter:title" content="BWonderComics - Free Online Comic Reader" />
-  <meta property="twitter:description" content="BWonderComics official website, and Battle Bros comic reader" />
-  <!-- SITE_BRANDING_ICONS_START -->
-  <link rel="icon" type="image/png" sizes="32x32" href="/assets/boywondericon.png" />
-  <link rel="apple-touch-icon" href="/assets/boywondericon.png" />
-  <link rel="manifest" href="/manifest.json" />
-  <!-- SITE_BRANDING_ICONS_END -->
+    <!-- Performance optimizations -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Righteous&family=Bebas+Neue&display=swap"
+      rel="stylesheet"
+    />
 
-  <!-- Performance optimizations -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Righteous&family=Bebas+Neue&display=swap" rel="stylesheet" />
-
-  <!-- Schema.org structured data for SEO -->
-  <script type="application/ld+json">
+    <!-- Schema.org structured data for SEO -->
+    <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "WebSite",
@@ -51,547 +65,664 @@
       }
     </script>
 
-  <link rel="stylesheet" href="reader/comic-comments.css">
-  <link rel="stylesheet" href="assets/css/variables.css">
+    <link rel="stylesheet" href="reader/comic-comments.css" />
+    <link rel="stylesheet" href="assets/css/variables.css" />
 
-  <link rel="stylesheet" href="assets/css/main.css">
-</head>
+    <link rel="stylesheet" href="assets/css/main.css" />
+  </head>
 
-<body>
-  <!-- Skip to content link for accessibility -->
-  <a href="#viewport" class="skip-to-content">Skip to comic</a>
+  <body>
+    <!-- Skip to content link for accessibility -->
+    <a href="#viewport" class="skip-to-content">Skip to comic</a>
 
-  <!-- ==================== HEADER ==================== -->
-  <header class="topbar" id="topbar">
-    <div class="brand">
-      <div class="logo">BWC</div>
-      <div class="title">
-        <h1>BATTLE BROS</h1>
-        <p class="subtitle" id="subtitle" aria-live="polite"></p>
+    <!-- ==================== HEADER ==================== -->
+    <header class="topbar" id="topbar">
+      <div class="brand">
+        <div class="logo">BWC</div>
+        <div class="title">
+          <h1>BATTLE BROS</h1>
+          <p class="subtitle" id="subtitle" aria-live="polite"></p>
+        </div>
       </div>
-    </div>
-    <div class="patron-welcome" id="patronWelcome" role="status" aria-live="polite"></div>
-    <div class="header-actions">
-      <div class="status-panel" id="statusPanel" aria-label="Status">
-        <span class="status-text" id="statusText"></span><span class="status-cursor" id="statusCursor"
-          aria-hidden="true"></span>
-      </div>
-      <div class="entry-controls">
-        <div class="entry-select" id="entrySelect">
-          <button class="entry-select-trigger" id="entrySelectTrigger" type="button" aria-haspopup="listbox"
-            aria-expanded="false">
-            <span class="entry-select-name" id="entrySelectName">Entry</span>
-            <span class="entry-select-patron" id="entrySelectPatron" style="display: none;">Patron</span>
+      <div class="patron-welcome" id="patronWelcome" role="status" aria-live="polite"></div>
+      <div class="header-actions">
+        <div class="status-panel" id="statusPanel" aria-label="Status">
+          <span class="status-text" id="statusText"></span
+          ><span class="status-cursor" id="statusCursor" aria-hidden="true"></span>
+        </div>
+        <div class="entry-controls">
+          <div class="entry-select" id="entrySelect">
+            <button
+              class="entry-select-trigger"
+              id="entrySelectTrigger"
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+            >
+              <span class="entry-select-name" id="entrySelectName">Entry</span>
+              <span class="entry-select-patron" id="entrySelectPatron" style="display: none"
+                >Patron</span
+              >
+            </button>
+            <div
+              class="entry-select-menu"
+              id="entrySelectMenu"
+              role="listbox"
+              aria-label="Select entry"
+            ></div>
+          </div>
+          <button
+            id="entryCoverGalleryBtn"
+            class="entry-covers-btn"
+            aria-label="Open Cover Gallery"
+            title="Cover Gallery"
+          >
+            COVERS
           </button>
-          <div class="entry-select-menu" id="entrySelectMenu" role="listbox" aria-label="Select entry"></div>
         </div>
-        <button id="entryCoverGalleryBtn" class="entry-covers-btn" aria-label="Open Cover Gallery" title="Cover Gallery">
-          COVERS
-        </button>
+        <select id="entry" class="entry-select-native" aria-label="Select entry"></select>
+        <div class="nav-links">
+          <a class="nav-link" href="comics.html">Comics</a>
+          <a
+            class="nav-link admin-link"
+            id="adminNavLink"
+            href="admin/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style="display: none"
+            >Admin</a
+          >
+        </div>
       </div>
-      <select id="entry" class="entry-select-native" aria-label="Select entry"></select>
-      <div class="nav-links">
-        <a class="nav-link" href="comics.html">Comics</a>
-        <a class="nav-link admin-link" id="adminNavLink" href="admin/" target="_blank" rel="noopener noreferrer"
-          style="display:none;">Admin</a>
-      </div>
-    </div>
-  </header>
+    </header>
 
-  <!-- ==================== MAIN VIEWER ==================== -->
-  <main>
-    <div class="viewerWrap">
-      <!-- Left Preview Panel -->
-      <aside class="side-panel left" id="leftPanel">
-        <div class="left-panel-content">
-          <div class="left-panel-text-top">TO GO EVEN FURTHER BEYOND</div>
-          <div class="preview" id="leftPreview" aria-hidden="false">
-            <picture>
-              <img class="panel-preview-img" src="assets/bookturn.gif"
-                alt="Battle Bros Volume 1 - Get the physical comic!" id="bookTurnPromo" />
-            </picture>
-            <div class="preview-arrow" aria-hidden="true"></div>
-          </div>
-          <div class="left-panel-text-bottom">
-            <span class="bubble-em">WANT TO SUPPORT THE COMIC?</span>
-            <span class="bubble-bold">Buy the physical book</span> at the
-            <a class="bubble-highlight" href="https://bwondercomics.bigcartel.com/product/battle-bros-volume-1"
-              target="_blank" rel="noopener noreferrer" aria-label="bwondercomics store link">bwondercomics store!</a>
-          </div>
-
-          <!-- Email Signup Form -->
-          <div class="email-signup-section">
-            <div class="email-signup-label">JOIN THE EMAIL LIST!</div>
-            <form id="emailSignupForm" action="/api/email/subscribe" method="POST" class="email-signup-form" data-source="homepage">
-              <input type="email" name="email" id="emailInput" placeholder="your.email@example.com" required
-                class="email-input" aria-label="Email address" />
-              <button type="submit" class="email-submit-btn">SUBMIT</button>
-            </form>
-            <div class="email-signup-cta">
-              Occasional dispatches from the Bros: updates, art, that’s it.
+    <!-- ==================== MAIN VIEWER ==================== -->
+    <main>
+      <div class="viewerWrap">
+        <!-- Left Preview Panel -->
+        <aside class="side-panel left" id="leftPanel">
+          <div class="left-panel-content">
+            <div class="left-panel-text-top">TO GO EVEN FURTHER BEYOND</div>
+            <div class="preview" id="leftPreview" aria-hidden="false">
+              <picture>
+                <img
+                  class="panel-preview-img"
+                  src="assets/bookturn.gif"
+                  alt="Battle Bros Volume 1 - Get the physical comic!"
+                  id="bookTurnPromo"
+                />
+              </picture>
+              <div class="preview-arrow" aria-hidden="true"></div>
             </div>
-            <div id="emailFormMessage" class="email-form-message" style="display: none"></div>
-          </div>
-        </div>
-      </aside>
+            <div class="left-panel-text-bottom">
+              <span class="bubble-em">WANT TO SUPPORT THE COMIC?</span>
+              <span class="bubble-bold">Buy the physical book</span> at the
+              <a
+                class="bubble-highlight"
+                href="https://bwondercomics.bigcartel.com/product/battle-bros-volume-1"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="bwondercomics store link"
+                >bwondercomics store!</a
+              >
+            </div>
 
-      <!-- Viewport and Controls Wrapper -->
-      <div class="viewer-content-wrapper" id="mainContent">
-        <!-- Main Viewport -->
-        <section class="viewport" id="viewport" tabindex="0" aria-label="Comic viewport">
-          <div class="stageWrap" id="stageWrap">
-            <div class="stage" id="stage">
-              <!-- Left Page -->
-              <div class="page" id="leftPage" role="img" aria-hidden="false">
-                <div class="spinner" id="leftSpinner" style="display: none"></div>
-                <img id="leftImg" src="" alt="" draggable="false" loading="lazy" />
+            <!-- Email Signup Form -->
+            <div class="email-signup-section">
+              <div class="email-signup-label">JOIN THE EMAIL LIST!</div>
+              <form
+                id="emailSignupForm"
+                action="/api/email/subscribe"
+                method="POST"
+                class="email-signup-form"
+                data-source="homepage"
+              >
+                <input
+                  type="email"
+                  name="email"
+                  id="emailInput"
+                  placeholder="your.email@example.com"
+                  required
+                  class="email-input"
+                  aria-label="Email address"
+                />
+                <button type="submit" class="email-submit-btn">SUBMIT</button>
+              </form>
+              <div class="email-signup-cta">
+                Occasional dispatches from the Bros: updates, art, that’s it.
+              </div>
+              <div id="emailFormMessage" class="email-form-message" style="display: none"></div>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Viewport and Controls Wrapper -->
+        <div class="viewer-content-wrapper" id="mainContent">
+          <!-- Main Viewport -->
+          <section class="viewport" id="viewport" tabindex="0" aria-label="Comic viewport">
+            <div class="stageWrap" id="stageWrap">
+              <div class="stage" id="stage">
+                <!-- Left Page -->
+                <div class="page" id="leftPage" role="img" aria-hidden="false">
+                  <div class="spinner" id="leftSpinner" style="display: none"></div>
+                  <img id="leftImg" src="" alt="" draggable="false" loading="lazy" />
+                </div>
+
+                <!-- Right Page (two-page mode) -->
+                <div class="page" id="rightPage" aria-hidden="true" style="display: none">
+                  <div class="spinner" id="rightSpinner" style="display: none"></div>
+                  <img id="rightImg" src="" alt="" draggable="false" loading="lazy" />
+                </div>
               </div>
 
-              <!-- Right Page (two-page mode) -->
-              <div class="page" id="rightPage" aria-hidden="true" style="display: none">
-                <div class="spinner" id="rightSpinner" style="display: none"></div>
-                <img id="rightImg" src="" alt="" draggable="false" loading="lazy" />
+              <div class="flashOverlay" id="flashOverlay" aria-hidden="true"></div>
+            </div>
+
+            <!-- Edge Navigation Zones -->
+            <div class="edgeZone left" id="edgeLeft" aria-hidden="true">
+              <div
+                class="edgeArrow"
+                id="edgeLeftBtn"
+                title="Previous page"
+                role="button"
+                aria-label="Previous page"
+              >
+                <svg viewBox="0 0 24 24" width="22" height="22">
+                  <path fill="currentColor" d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+                </svg>
               </div>
             </div>
-
-            <div class="flashOverlay" id="flashOverlay" aria-hidden="true"></div>
-          </div>
-
-          <!-- Edge Navigation Zones -->
-          <div class="edgeZone left" id="edgeLeft" aria-hidden="true">
-            <div class="edgeArrow" id="edgeLeftBtn" title="Previous page" role="button" aria-label="Previous page">
-              <svg viewBox="0 0 24 24" width="22" height="22">
-                <path fill="currentColor" d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
-              </svg>
-            </div>
-          </div>
-          <div class="edgeZone right" id="edgeRight" aria-hidden="true">
-            <div class="edgeArrow" id="edgeRightBtn" title="Next page" role="button" aria-label="Next page">
-              <svg viewBox="0 0 24 24" width="22" height="22">
-                <path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z" />
-              </svg>
-            </div>
-          </div>
-        </section>
-
-        <!-- ==================== CONTROLS ==================== -->
-        <div class="controls" id="controls" role="toolbar" aria-label="Reader controls">
-          <div class="left">
-            <button class="btn" id="prevBtn" type="button" aria-label="Previous page">
-              &lt; BACK
-            </button>
-            <button class="btn" id="nextBtn" type="button" aria-label="Next page">
-              NEXT &gt;
-            </button>
-            <span class="status" id="pageIndicator" aria-live="polite">PAGE 0 / 0</span>
-          </div>
-          <div class="right">
-            <button class="btn" id="helpBtn" type="button" aria-label="Show keyboard shortcuts"
-              title="Keyboard shortcuts (?)">
-              HELP ?
-            </button>
-            <button class="btn" id="commentToggleBtn" type="button" aria-label="Show comments">
-              COMMENTS
-            </button>
-            <button class="btn" id="zoomOut" type="button" aria-label="Zoom out">
-              - ZOOM
-            </button>
-            <button class="btn primary" id="fitBtn" type="button" aria-label="Fit">
-              FIT
-            </button>
-            <button class="btn" id="zoomIn" type="button" aria-label="Zoom in">
-              + ZOOM
-            </button>
-            <button class="btn" id="fullscreenBtn" type="button" aria-label="Toggle fullscreen">
-              FULL
-            </button>
-          </div>
-          <div class="progress-bar" aria-hidden="true">
-            <div class="progress-fill" id="progressFill"></div>
-          </div>
-        </div>
-
-        <!-- Comic Entry Comments -->
-        <div class="comic-comments-section collapsed" id="comicCommentsSection">
-          <h3 class="comments-title">Discuss This Entry</h3>
-          <div class="comment-placeholder">Loading comments...</div>
-        </div>
-      </div>
-
-    </div>
-    <!-- End viewer-content-wrapper -->
-
-    <!-- Right Preview Panel -->
-    <aside class="side-panel right" id="rightPanel">
-      <div class="right-panel-feed-bar" id="rightPanelFeedBar" aria-hidden="true">
-        <button class="feed-exit-btn" id="feedExitBtn" type="button" aria-label="Close feed">X</button>
-        <div class="latest-actions">
-          <a class="latest-link latest-link--left" id="rightPanelOpenFeed" href="feed.html">Open feed</a>
-          <a class="latest-link latest-link--right" id="rightPanelOpenMedia" href="media.html">Media</a>
-        </div>
-      </div>
-      <div class="latest-update" id="latestUpdate">
-        <div class="latest-heading-row">
-          <button class="latest-heading" id="latestHeadingBtn" type="button" aria-expanded="false"
-            aria-controls="rightPanelFeed">BWC FEED</button>
-          <div class="latest-author">DOYLE MELVILLE II</div>
-        </div>
-        <div class="latest-body" id="latestBody">
-          <div class="latest-loading">Loading...</div>
-        </div>
-      </div>
-      <div class="latest-update right-panel-feed" id="rightPanelFeed" aria-hidden="true">
-        <div class="latest-body" id="rightPanelFeedBody">
-          <div class="latest-loading">Loading...</div>
-        </div>
-      </div>
-
-      <div class="right-stack">
-        <div class="preview" id="rightPreview" aria-hidden="false">
-          <picture>
-            <source srcset="assets/banner3.png" type="image/webp" />
-            <img class="panel-preview-img" src="assets/banner3.png" alt="Right illustration preview" />
-          </picture>
-        </div>
-        <div class="panel-buttons" id="dynamicButtons">
-          <div class="comicnet-panel" id="comicNetPanel">
-            <h4>Indie Comics</h4>
-            <div class="comicnet-list">
-              <div class="comicnet-item">
-                <a class="comicnet-link" href="https://www.steve-hogan.com/comics" target="_blank"
-                  rel="noopener noreferrer">
-                  <img class="comicnet-avatar" src="com1cshare/steve.jpg" alt="Steve Hogan cover" />
-                  <span>MILKY ZEST by Steve Hogan</span>
-                </a>
-              </div>
-              <div class="comicnet-item">
-                <a class="comicnet-link" href="https://kideastwood.blogspot.com/" target="_blank"
-                  rel="noopener noreferrer">
-                  <img class="comicnet-avatar" src="com1cshare/connor.jpg" alt="Connor Tierney cover" />
-                  <span>KID EASTWOOD by Connor Tierney</span>
-                </a>
+            <div class="edgeZone right" id="edgeRight" aria-hidden="true">
+              <div
+                class="edgeArrow"
+                id="edgeRightBtn"
+                title="Next page"
+                role="button"
+                aria-label="Next page"
+              >
+                <svg viewBox="0 0 24 24" width="22" height="22">
+                  <path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z" />
+                </svg>
               </div>
             </div>
+          </section>
+
+          <!-- ==================== CONTROLS ==================== -->
+          <div class="controls" id="controls" role="toolbar" aria-label="Reader controls">
+            <div class="left">
+              <button class="btn" id="prevBtn" type="button" aria-label="Previous page">
+                &lt; BACK
+              </button>
+              <button class="btn" id="nextBtn" type="button" aria-label="Next page">
+                NEXT &gt;
+              </button>
+              <span class="status" id="pageIndicator" aria-live="polite">PAGE 0 / 0</span>
+            </div>
+            <div class="right">
+              <button
+                class="btn"
+                id="helpBtn"
+                type="button"
+                aria-label="Show keyboard shortcuts"
+                title="Keyboard shortcuts (?)"
+              >
+                HELP ?
+              </button>
+              <button class="btn" id="commentToggleBtn" type="button" aria-label="Show comments">
+                COMMENTS
+              </button>
+              <button class="btn" id="zoomOut" type="button" aria-label="Zoom out">- ZOOM</button>
+              <button class="btn primary" id="fitBtn" type="button" aria-label="Fit">FIT</button>
+              <button class="btn" id="zoomIn" type="button" aria-label="Zoom in">+ ZOOM</button>
+              <button class="btn" id="fullscreenBtn" type="button" aria-label="Toggle fullscreen">
+                FULL
+              </button>
+            </div>
+            <div class="progress-bar" aria-hidden="true">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
           </div>
-        </div>
-      </div>
-      <button class="user-settings-btn" id="userSettingsBtn" type="button" aria-label="Account settings">
-        <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-          <path fill="currentColor"
-            d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.08 7.08 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.75 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.14.24.43.34.69.22l2.39-.96c.5.4 1.05.71 1.63.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.26.12.55.02.69-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z" />
-        </svg>
-      </button>
-      <button class="links-grid-btn" id="linksGridBtn" type="button" aria-label="Show links">
-        <span></span>
-        <span></span>
-        <span></span>
-        <span></span>
-        <span></span>
-        <span></span>
-        <span></span>
-        <span></span>
-        <span></span>
-      </button>
-      </div>
-    </aside>
-    </div>
-  </main>
 
-  <!-- Cover Gallery Overlay -->
-  <div class="entry-cover-gallery" id="entryCoverGallery">
-    <div class="entry-cover-gallery-panel">
-      <h2>Cover Gallery</h2>
-      <div class="entry-cover-gallery-grid" id="entryCoverGalleryGrid">
-        <!-- Entry cards populated by JS -->
-      </div>
-      <button class="entry-cover-gallery-close" id="entryCoverGalleryClose">Close</button>
-    </div>
-  </div>
-
-  <!-- User Settings Overlay -->
-  <div class="user-settings-overlay" id="userSettingsOverlay" aria-hidden="true">
-    <div class="user-settings-panel" role="dialog" aria-modal="true" aria-labelledby="userSettingsTitle">
-      <div class="user-settings-header">
-        <h2 id="userSettingsTitle">Account Settings</h2>
-        <button class="user-settings-close" id="userSettingsClose" type="button">Close</button>
-      </div>
-      <div class="user-settings-status" id="userSettingsStatus" role="status"></div>
-
-      <div id="userSettingsAuth">
-        <p class="user-settings-note">Sign in to manage your account.</p>
-        <form class="user-settings-form" id="userSettingsLoginForm">
-          <input class="user-settings-input" type="email" id="userSettingsLoginEmail" placeholder="Email"
-            autocomplete="email" required />
-          <input class="user-settings-input" type="password" id="userSettingsLoginPassword" placeholder="Password"
-            autocomplete="current-password" required />
-          <button class="btn primary" type="submit">Sign in</button>
-        </form>
-      </div>
-
-      <div id="userSettingsContent" style="display: none;">
-        <div class="user-settings-section" style="margin-top: 0; padding-top: 0; border-top: 0;">
-          <div class="user-settings-label">Signed in as</div>
-          <div class="user-settings-value" id="userSettingsIdentity">-</div>
-          <div class="user-settings-note" id="userSettingsRole">Role: user</div>
-          <div class="user-settings-supporter" id="userSettingsSupporterBadge" style="display: none;">
-            Premium supporter
+          <!-- Comic Entry Comments -->
+          <div class="comic-comments-section collapsed" id="comicCommentsSection">
+            <h3 class="comments-title">Discuss This Entry</h3>
+            <div class="comment-placeholder">Loading comments...</div>
           </div>
         </div>
 
-        <div class="user-settings-section">
-          <div class="user-settings-label">Email list</div>
-          <label class="user-settings-toggle">
-            <input type="checkbox" id="userSettingsEmailOptIn" />
-            <span>Receive email updates</span>
-          </label>
-          <div class="user-settings-note" id="userSettingsEmailStatus">Not subscribed.</div>
-        </div>
+        <!-- End viewer-content-wrapper -->
 
-        <div class="user-settings-section">
-          <div class="user-settings-label">Premium code</div>
-          <input class="user-settings-input" type="text" id="userSettingsPremiumCode"
-            placeholder="Enter Patreon code" autocomplete="off" />
-          <div class="user-settings-actions">
-            <button class="btn" id="userSettingsRedeem" type="button">Redeem code</button>
-          </div>
-          <div class="user-settings-note" id="userSettingsPremiumStatus">Premium access: inactive.</div>
-        </div>
-
-        <div class="user-settings-section">
-          <div class="user-settings-label">Your comments</div>
-          <div class="user-settings-note" id="userSettingsCommentCount">You have 0 comments.</div>
-          <div class="user-settings-comments" id="userSettingsCommentsList"></div>
-          <div class="user-settings-note" id="userSettingsCommentsEmpty">No comments yet.</div>
-          <div class="user-settings-actions">
-            <button class="btn" id="userSettingsLoadMore" type="button">Load more</button>
-            <button class="btn user-settings-danger" id="userSettingsDeleteComments" type="button">
-              Delete all comments
+        <!-- Right Preview Panel -->
+        <aside class="side-panel right" id="rightPanel">
+          <div class="right-panel-feed-bar" id="rightPanelFeedBar" aria-hidden="true">
+            <button class="feed-exit-btn" id="feedExitBtn" type="button" aria-label="Close feed">
+              X
             </button>
+            <div class="latest-actions">
+              <a class="latest-link latest-link--left" id="rightPanelOpenFeed" href="feed.html"
+                >Open feed</a
+              >
+              <a class="latest-link latest-link--right" id="rightPanelOpenMedia" href="media.html"
+                >Media</a
+              >
+            </div>
+          </div>
+          <div class="latest-update" id="latestUpdate">
+            <div class="latest-heading-row">
+              <button
+                class="latest-heading"
+                id="latestHeadingBtn"
+                type="button"
+                aria-expanded="false"
+                aria-controls="rightPanelFeed"
+              >
+                BWC FEED
+              </button>
+              <div class="latest-author">DOYLE MELVILLE II</div>
+            </div>
+            <div class="latest-body" id="latestBody">
+              <div class="latest-loading">Loading...</div>
+            </div>
+          </div>
+          <div class="latest-update right-panel-feed" id="rightPanelFeed" aria-hidden="true">
+            <div class="latest-body" id="rightPanelFeedBody">
+              <div class="latest-loading">Loading...</div>
+            </div>
+          </div>
+
+          <div class="right-stack">
+            <div class="preview" id="rightPreview" aria-hidden="false">
+              <picture>
+                <source srcset="assets/banner3.png" type="image/webp" />
+                <img
+                  class="panel-preview-img"
+                  src="assets/banner3.png"
+                  alt="Right illustration preview"
+                />
+              </picture>
+            </div>
+            <div class="panel-buttons" id="dynamicButtons">
+              <div class="comicnet-panel" id="comicNetPanel">
+                <h4>Indie Comics</h4>
+                <div class="comicnet-list">
+                  <div class="comicnet-item">
+                    <a
+                      class="comicnet-link"
+                      href="https://www.steve-hogan.com/comics"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <img
+                        class="comicnet-avatar"
+                        src="com1cshare/steve.jpg"
+                        alt="Steve Hogan cover"
+                      />
+                      <span>MILKY ZEST by Steve Hogan</span>
+                    </a>
+                  </div>
+                  <div class="comicnet-item">
+                    <a
+                      class="comicnet-link"
+                      href="https://kideastwood.blogspot.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <img
+                        class="comicnet-avatar"
+                        src="com1cshare/connor.jpg"
+                        alt="Connor Tierney cover"
+                      />
+                      <span>KID EASTWOOD by Connor Tierney</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <button
+            class="user-settings-btn"
+            id="userSettingsBtn"
+            type="button"
+            aria-label="Account settings"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path
+                fill="currentColor"
+                d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.08 7.08 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.75 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.14.24.43.34.69.22l2.39-.96c.5.4 1.05.71 1.63.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.26.12.55.02.69-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"
+              />
+            </svg>
+          </button>
+          <button class="links-grid-btn" id="linksGridBtn" type="button" aria-label="Show links">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+        </aside>
+      </div>
+    </main>
+
+    <!-- Cover Gallery Overlay -->
+    <div class="entry-cover-gallery" id="entryCoverGallery">
+      <div class="entry-cover-gallery-panel">
+        <h2>Cover Gallery</h2>
+        <div class="entry-cover-gallery-grid" id="entryCoverGalleryGrid">
+          <!-- Entry cards populated by JS -->
+        </div>
+        <button class="entry-cover-gallery-close" id="entryCoverGalleryClose">Close</button>
+      </div>
+    </div>
+
+    <!-- User Settings Overlay -->
+    <div class="user-settings-overlay" id="userSettingsOverlay" aria-hidden="true">
+      <div
+        class="user-settings-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="userSettingsTitle"
+      >
+        <div class="user-settings-header">
+          <h2 id="userSettingsTitle">Account Settings</h2>
+          <button class="user-settings-close" id="userSettingsClose" type="button">Close</button>
+        </div>
+        <div class="user-settings-status" id="userSettingsStatus" role="status"></div>
+
+        <div id="userSettingsAuth">
+          <p class="user-settings-note">Sign in to manage your account.</p>
+          <form class="user-settings-form" id="userSettingsLoginForm">
+            <input
+              class="user-settings-input"
+              type="email"
+              id="userSettingsLoginEmail"
+              placeholder="Email"
+              autocomplete="email"
+              required
+            />
+            <input
+              class="user-settings-input"
+              type="password"
+              id="userSettingsLoginPassword"
+              placeholder="Password"
+              autocomplete="current-password"
+              required
+            />
+            <button class="btn primary" type="submit">Sign in</button>
+          </form>
+        </div>
+
+        <div id="userSettingsContent" style="display: none">
+          <div class="user-settings-section" style="margin-top: 0; padding-top: 0; border-top: 0">
+            <div class="user-settings-label">Signed in as</div>
+            <div class="user-settings-value" id="userSettingsIdentity">-</div>
+            <div class="user-settings-note" id="userSettingsRole">Role: user</div>
+            <div
+              class="user-settings-supporter"
+              id="userSettingsSupporterBadge"
+              style="display: none"
+            >
+              Premium supporter
+            </div>
+          </div>
+
+          <div class="user-settings-section">
+            <div class="user-settings-label">Email list</div>
+            <label class="user-settings-toggle">
+              <input type="checkbox" id="userSettingsEmailOptIn" />
+              <span>Receive email updates</span>
+            </label>
+            <div class="user-settings-note" id="userSettingsEmailStatus">Not subscribed.</div>
+          </div>
+
+          <div class="user-settings-section">
+            <div class="user-settings-label">Premium code</div>
+            <input
+              class="user-settings-input"
+              type="text"
+              id="userSettingsPremiumCode"
+              placeholder="Enter Patreon code"
+              autocomplete="off"
+            />
+            <div class="user-settings-actions">
+              <button class="btn" id="userSettingsRedeem" type="button">Redeem code</button>
+            </div>
+            <div class="user-settings-note" id="userSettingsPremiumStatus">
+              Premium access: inactive.
+            </div>
+          </div>
+
+          <div class="user-settings-section">
+            <div class="user-settings-label">Your comments</div>
+            <div class="user-settings-note" id="userSettingsCommentCount">You have 0 comments.</div>
+            <div class="user-settings-comments" id="userSettingsCommentsList"></div>
+            <div class="user-settings-note" id="userSettingsCommentsEmpty">No comments yet.</div>
+            <div class="user-settings-actions">
+              <button class="btn" id="userSettingsLoadMore" type="button">Load more</button>
+              <button
+                class="btn user-settings-danger"
+                id="userSettingsDeleteComments"
+                type="button"
+              >
+                Delete all comments
+              </button>
+            </div>
+          </div>
+
+          <div class="user-settings-section">
+            <div class="user-settings-label">Account</div>
+            <div class="user-settings-actions">
+              <button class="btn" id="userSettingsLogout" type="button">Sign out</button>
+              <button class="btn user-settings-danger" id="userSettingsDeleteAccount" type="button">
+                Delete account
+              </button>
+            </div>
+            <div class="user-settings-note">
+              Deleting your account removes your comments and email signup.
+            </div>
           </div>
         </div>
+      </div>
+    </div>
 
-        <div class="user-settings-section">
-          <div class="user-settings-label">Account</div>
-          <div class="user-settings-actions">
-            <button class="btn" id="userSettingsLogout" type="button">Sign out</button>
-            <button class="btn user-settings-danger" id="userSettingsDeleteAccount" type="button">
-              Delete account
-            </button>
+    <!-- Keyboard Shortcuts Overlay -->
+    <div class="shortcuts-overlay" id="shortcutsOverlay">
+      <div class="shortcuts-panel">
+        <h2>Keyboard Shortcuts</h2>
+        <div class="shortcuts-grid">
+          <div class="shortcut-item">
+            <span class="shortcut-key">Left / Right</span>
+            <span class="shortcut-desc">Navigate between pages</span>
           </div>
-          <div class="user-settings-note">Deleting your account removes your comments and email signup.</div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">+ / =</span>
+            <span class="shortcut-desc">Zoom in</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">-</span>
+            <span class="shortcut-desc">Zoom out</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">0</span>
+            <span class="shortcut-desc">Reset zoom to default</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">F</span>
+            <span class="shortcut-desc">Toggle fullscreen mode</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">?</span>
+            <span class="shortcut-desc">Show/hide this help</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">ESC</span>
+            <span class="shortcut-desc">Close overlays or exit fullscreen</span>
+          </div>
+        </div>
+        <button class="shortcuts-close" id="shortcutsClose">Close</button>
+      </div>
+    </div>
+
+    <!-- End of Entry Overlay -->
+    <div class="entry-end-overlay" id="entryEndOverlay">
+      <div class="entry-end-content">
+        <h2>ENTRY COMPLETE</h2>
+        <p>You've reached the end of this entry! Ready for more Battle Bros action?</p>
+        <div class="entry-end-buttons">
+          <button class="entry-end-btn primary" id="nextEntryBtn">Next Entry</button>
+          <button class="entry-end-btn" id="restartEntryBtn">Restart Entry</button>
+          <button class="entry-end-btn" id="closeEndOverlay">Keep Reading</button>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Keyboard Shortcuts Overlay -->
-  <div class="shortcuts-overlay" id="shortcutsOverlay">
-    <div class="shortcuts-panel">
-      <h2>Keyboard Shortcuts</h2>
-      <div class="shortcuts-grid">
-        <div class="shortcut-item">
-          <span class="shortcut-key">Left / Right</span>
-          <span class="shortcut-desc">Navigate between pages</span>
-        </div>
-        <div class="shortcut-item">
-          <span class="shortcut-key">+ / =</span>
-          <span class="shortcut-desc">Zoom in</span>
-        </div>
-        <div class="shortcut-item">
-          <span class="shortcut-key">-</span>
-          <span class="shortcut-desc">Zoom out</span>
-        </div>
-        <div class="shortcut-item">
-          <span class="shortcut-key">0</span>
-          <span class="shortcut-desc">Reset zoom to default</span>
-        </div>
-        <div class="shortcut-item">
-          <span class="shortcut-key">F</span>
-          <span class="shortcut-desc">Toggle fullscreen mode</span>
-        </div>
-        <div class="shortcut-item">
-          <span class="shortcut-key">?</span>
-          <span class="shortcut-desc">Show/hide this help</span>
-        </div>
-        <div class="shortcut-item">
-          <span class="shortcut-key">ESC</span>
-          <span class="shortcut-desc">Close overlays or exit fullscreen</span>
-        </div>
-      </div>
-      <button class="shortcuts-close" id="shortcutsClose">Close</button>
-    </div>
-  </div>
+    <!-- Core reader modules -->
+    <script type="module" src="reader/safe-mode.js"></script>
+    <script type="module" src="reader/live-tracking.js"></script>
+    <script type="module" src="reader/chat-sso.js"></script>
+    <script type="module" src="reader/app.js"></script>
+    <script type="module" src="reader/customization.js"></script>
+    <script type="module" src="reader/comic-comments.js"></script>
+    <script type="module" src="reader/user-settings.js"></script>
+    <!-- comic-comments.js is loaded on page load so the panel can initialize reliably. -->
+    <script>
+      // Wrap button text characters so hover can animate each letter
+      (() => {
+        const wrapLetters = (el) => {
+          if (!el || el.dataset.wrapped === 'true') return;
+          const chars = el.textContent.split('');
+          el.innerHTML = chars.map((ch) => `<span>${ch === ' ' ? '&nbsp;' : ch}</span>`).join('');
+          el.dataset.wrapped = 'true';
+        };
 
-  <!-- End of Entry Overlay -->
-  <div class="entry-end-overlay" id="entryEndOverlay">
-    <div class="entry-end-content">
-      <h2>ENTRY COMPLETE</h2>
-      <p>
-        You've reached the end of this entry! Ready for more Battle Bros
-        action?
-      </p>
-      <div class="entry-end-buttons">
-        <button class="entry-end-btn primary" id="nextEntryBtn">
-          Next Entry
-        </button>
-        <button class="entry-end-btn" id="restartEntryBtn">
-          Restart Entry
-        </button>
-        <button class="entry-end-btn" id="closeEndOverlay">
-          Keep Reading
-        </button>
-      </div>
-    </div>
-  </div>
+        const wrapAll = () => {
+          document.querySelectorAll('.panel-btn-text').forEach(wrapLetters);
+        };
 
-  <!-- Core reader modules -->
-  <script type="module" src="reader/safe-mode.js"></script>
-  <script type="module" src="reader/live-tracking.js"></script>
-  <script type="module" src="reader/chat-sso.js"></script>
-  <script type="module" src="reader/app.js"></script>
-  <script type="module" src="reader/customization.js"></script>
-  <script type="module" src="reader/comic-comments.js"></script>
-  <script type="module" src="reader/user-settings.js"></script>
-  <!-- comic-comments.js is loaded on page load so the panel can initialize reliably. -->
-  <script>
-    // Wrap button text characters so hover can animate each letter
-    (() => {
-      const wrapLetters = (el) => {
-        if (!el || el.dataset.wrapped === "true") return;
-        const chars = el.textContent.split("");
-        el.innerHTML = chars
-          .map((ch) => `<span>${ch === " " ? "&nbsp;" : ch}</span>`)
-          .join("");
-        el.dataset.wrapped = "true";
-      };
+        const observeButtons = () => {
+          const container = document.querySelector('.panel-buttons');
+          if (!container) return;
+          // Keep new buttons animated if the list changes at runtime.
+          const observer = new MutationObserver(() => wrapAll());
+          observer.observe(container, { childList: true, subtree: true });
+        };
 
-      const wrapAll = () => {
-        document.querySelectorAll(".panel-btn-text").forEach(wrapLetters);
-      };
-
-      const observeButtons = () => {
-        const container = document.querySelector(".panel-buttons");
-        if (!container) return;
-        // Keep new buttons animated if the list changes at runtime.
-        const observer = new MutationObserver(() => wrapAll());
-        observer.observe(container, { childList: true, subtree: true });
-      };
-
-      if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", () => {
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', () => {
+            wrapAll();
+            observeButtons();
+            setTimeout(wrapAll, 200);
+          });
+        } else {
           wrapAll();
           observeButtons();
           setTimeout(wrapAll, 200);
-        });
-      } else {
-        wrapAll();
-        observeButtons();
-        setTimeout(wrapAll, 200);
-      }
-    })();
+        }
+      })();
+    </script>
+    <script>
+      // Reader comments toggle button
+      (() => {
+        const bind = () => {
+          const btn = document.getElementById('commentToggleBtn');
+          const panel = document.getElementById('comicCommentsSection');
+          if (!btn || !panel) return;
 
-  </script>
-  <script>
-    // Reader comments toggle button
-    (() => {
-      const bind = () => {
-        const btn = document.getElementById("commentToggleBtn");
-        const panel = document.getElementById("comicCommentsSection");
-        if (!btn || !panel) return;
+          const fallbackToggle = () => {
+            // Minimal toggle to avoid blocking the button if comments script fails.
+            const willShow = panel.classList.contains('collapsed');
+            panel.classList.toggle('collapsed', !willShow);
+            btn.textContent = willShow ? 'HIDE COMMENTS' : 'COMMENTS';
+            btn.setAttribute('aria-pressed', String(willShow));
+            if (willShow) {
+              try {
+                panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              } catch (err) {}
+            }
+          };
 
-        const fallbackToggle = () => {
-          // Minimal toggle to avoid blocking the button if comments script fails.
-          const willShow = panel.classList.contains("collapsed");
-          panel.classList.toggle("collapsed", !willShow);
-          btn.textContent = willShow ? "HIDE COMMENTS" : "COMMENTS";
-          btn.setAttribute("aria-pressed", String(willShow));
-          if (willShow) {
-            try {
-              panel.scrollIntoView({ behavior: "smooth", block: "center" });
-            } catch (err) { }
-          }
-        };
+          btn.addEventListener('click', async (e) => {
+            e.preventDefault();
 
-        btn.addEventListener("click", async (e) => {
-          e.preventDefault();
-
-          // Toggle comments
-          if (typeof window.toggleReaderComments === "function") {
-            try {
-              window.toggleReaderComments();
-            } catch (err) {
+            // Toggle comments
+            if (typeof window.toggleReaderComments === 'function') {
+              try {
+                window.toggleReaderComments();
+              } catch (err) {
+                fallbackToggle();
+              }
+            } else {
               fallbackToggle();
             }
-          } else {
-            fallbackToggle();
-          }
-        });
-      };
+          });
+        };
 
-      if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", bind);
-      } else {
-        bind();
-      }
-    })();
-  </script>
-  <script>
-    // Optional deep-link behavior: open comments when openComments=1|true|yes.
-    (() => {
-      const params = new URLSearchParams(window.location.search || "");
-      const flag = (params.get("openComments") || "").toLowerCase();
-      if (!["1", "true", "yes"].includes(flag)) return;
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', bind);
+        } else {
+          bind();
+        }
+      })();
+    </script>
+    <script>
+      // Optional deep-link behavior: open comments when openComments=1|true|yes.
+      (() => {
+        const params = new URLSearchParams(window.location.search || '');
+        const flag = (params.get('openComments') || '').toLowerCase();
+        if (!['1', 'true', 'yes'].includes(flag)) return;
 
-      const tryOpenComments = () => {
-        const panel = document.getElementById("comicCommentsSection");
-        const btn = document.getElementById("commentToggleBtn");
-        if (!panel || !btn) return false;
+        const tryOpenComments = () => {
+          const panel = document.getElementById('comicCommentsSection');
+          const btn = document.getElementById('commentToggleBtn');
+          if (!panel || !btn) return false;
 
-        if (panel.classList.contains("collapsed")) {
-          if (typeof window.toggleReaderComments === "function") {
-            try {
-              window.toggleReaderComments();
-            } catch (err) {
+          if (panel.classList.contains('collapsed')) {
+            if (typeof window.toggleReaderComments === 'function') {
+              try {
+                window.toggleReaderComments();
+              } catch (err) {
+                btn.click();
+              }
+            } else {
               btn.click();
             }
-          } else {
-            btn.click();
           }
-        }
 
-        try {
-          panel.scrollIntoView({ behavior: "smooth", block: "start" });
-        } catch (err) { }
-        return true;
-      };
-
-      const waitForReady = () => {
-        const deadline = Date.now() + 5000;
-        const tick = () => {
-          if (tryOpenComments()) return;
-          if (Date.now() < deadline) {
-            window.requestAnimationFrame(tick);
-          }
+          try {
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          } catch (err) {}
+          return true;
         };
-        tick();
-      };
 
-      if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", waitForReady, { once: true });
-      } else {
-        waitForReady();
-      }
-    })();
-  </script>
-  <script>
-    // Load the analytics loader without Vite bundling it.
-    (() => {
-      const script = document.createElement("script");
-      script.defer = true;
-      script.src = "/analytics.js";
-      document.head.appendChild(script);
-    })();
-  </script>
-</body>
+        const waitForReady = () => {
+          const deadline = Date.now() + 5000;
+          const tick = () => {
+            if (tryOpenComments()) return;
+            if (Date.now() < deadline) {
+              window.requestAnimationFrame(tick);
+            }
+          };
+          tick();
+        };
 
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', waitForReady, { once: true });
+        } else {
+          waitForReady();
+        }
+      })();
+    </script>
+    <script>
+      // Load the analytics loader without Vite bundling it.
+      (() => {
+        const script = document.createElement('script');
+        script.defer = true;
+        script.src = '/analytics.js';
+        document.head.appendChild(script);
+      })();
+    </script>
+  </body>
 </html>

@@ -582,7 +582,7 @@
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 4px;
   color: #fff;
-  font-family: "Courier New", Courier, monospace;
+  font-family: 'Courier New', Courier, monospace;
   padding: 2px 6px;
 }
 
@@ -607,7 +607,6 @@
   padding-right: 6px;
 }
 
-
 /* Refresh Indicator */
 .refresh-indicator {
   position: fixed;
@@ -625,7 +624,9 @@
   opacity: 0;
   transform: translateY(-6px);
   pointer-events: none;
-  transition: opacity 0.2s ease, transform 0.2s ease;
+  transition:
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .refresh-indicator--visible {
@@ -721,7 +722,6 @@
   font-size: 0.8em;
 }
 
-
 .ops-history-note {
   color: #999;
   font-size: 0.8em;
@@ -733,7 +733,6 @@
   font-size: 0.85em;
   margin-top: 8px;
 }
-
 
 /* Test Results */
 .test-result {
@@ -822,7 +821,8 @@
   font-style: italic;
 }
 
-.error, .warning {
+.error,
+.warning {
   padding: 15px;
   border-radius: 8px;
   margin: 10px 0;

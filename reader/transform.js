@@ -45,13 +45,14 @@ function getVisiblePageUrls() {
     return { leftUrl: '', rightUrl: '', pageCount: 0 };
   }
 
-  const rightVisible = !!el.rightPage
-    && typeof window !== 'undefined'
-    && typeof window.getComputedStyle === 'function'
-    && window.getComputedStyle(el.rightPage).display !== 'none'
-    && state.pageIndex + 1 < state.pages.length;
+  const rightVisible =
+    !!el.rightPage &&
+    typeof window !== 'undefined' &&
+    typeof window.getComputedStyle === 'function' &&
+    window.getComputedStyle(el.rightPage).display !== 'none' &&
+    state.pageIndex + 1 < state.pages.length;
 
-  const rightUrl = rightVisible ? (state.pages[state.pageIndex + 1] || '') : '';
+  const rightUrl = rightVisible ? state.pages[state.pageIndex + 1] || '' : '';
   return { leftUrl, rightUrl, pageCount: rightUrl ? 2 : 1 };
 }
 
@@ -65,10 +66,10 @@ function rememberMetric(url, metric) {
 function getMetricForUrl(url, imgEl) {
   if (!url) return null;
   if (
-    imgEl
-    && imgEl.dataset?.pageUrl === url
-    && imgEl.naturalWidth > 0
-    && imgEl.naturalHeight > 0
+    imgEl &&
+    imgEl.dataset?.pageUrl === url &&
+    imgEl.naturalWidth > 0 &&
+    imgEl.naturalHeight > 0
   ) {
     return rememberMetric(url, { width: imgEl.naturalWidth, height: imgEl.naturalHeight });
   }
@@ -82,7 +83,7 @@ function getPageChrome(pageEl) {
   const style = window.getComputedStyle(pageEl);
   return {
     horizontal: parsePixels(style.borderLeftWidth) + parsePixels(style.borderRightWidth),
-    vertical: parsePixels(style.borderTopWidth) + parsePixels(style.borderBottomWidth)
+    vertical: parsePixels(style.borderTopWidth) + parsePixels(style.borderBottomWidth),
   };
 }
 
@@ -105,7 +106,7 @@ function getAvailableFrameSpace() {
 
   return {
     width: Math.max(0, el.mainContent.clientWidth),
-    height: Math.max(0, el.mainContent.clientHeight - occupiedHeight)
+    height: Math.max(0, el.mainContent.clientHeight - occupiedHeight),
   };
 }
 
@@ -123,11 +124,12 @@ export function calculateOnPageFrameSize({
   gap = 0,
   pageHorizontalChrome = 0,
   pageVerticalChrome = 0,
-  fallbackFrame = null
+  fallbackFrame = null,
 }) {
-  const fallback = fallbackFrame?.width > 0 && fallbackFrame?.height > 0
-    ? { width: fallbackFrame.width, height: fallbackFrame.height }
-    : null;
+  const fallback =
+    fallbackFrame?.width > 0 && fallbackFrame?.height > 0
+      ? { width: fallbackFrame.width, height: fallbackFrame.height }
+      : null;
 
   if (availableWidth <= 0 || availableHeight <= 0) return fallback;
   if (!Array.isArray(pages) || !pages.length) return fallback;
@@ -137,7 +139,7 @@ export function calculateOnPageFrameSize({
 
   const contentWidth = validPages.reduce((sum, page) => sum + page.width, 0);
   const contentHeight = Math.max(...validPages.map((page) => page.height));
-  const fixedWidth = (pageHorizontalChrome * validPages.length) + (validPages.length > 1 ? gap : 0);
+  const fixedWidth = pageHorizontalChrome * validPages.length + (validPages.length > 1 ? gap : 0);
   const fixedHeight = pageVerticalChrome;
   const maxContentWidth = availableWidth - fixedWidth;
   const maxContentHeight = availableHeight - fixedHeight;
@@ -150,8 +152,8 @@ export function calculateOnPageFrameSize({
   if (!Number.isFinite(scale) || scale <= 0) return fallback;
 
   return {
-    width: (contentWidth * scale) + fixedWidth,
-    height: (contentHeight * scale) + fixedHeight
+    width: contentWidth * scale + fixedWidth,
+    height: contentHeight * scale + fixedHeight,
   };
 }
 
@@ -187,7 +189,7 @@ export function fitOnPageFrame() {
     gap: pageCount === 2 ? getStageGap() : 0,
     pageHorizontalChrome: horizontalChrome,
     pageVerticalChrome: verticalChrome,
-    fallbackFrame: state.lastOnPageFrame
+    fallbackFrame: state.lastOnPageFrame,
   });
 
   if (!frame) {
@@ -240,9 +242,7 @@ export function zoomIn() {
  * Clamped to CONFIG.ZOOM_MIN minimum
  */
 export function zoomOut() {
-  const minScale = document.fullscreenElement
-    ? (state.fullscreenBaseScale || 1)
-    : CONFIG.ZOOM_MIN;
+  const minScale = document.fullscreenElement ? state.fullscreenBaseScale || 1 : CONFIG.ZOOM_MIN;
   state.scale = Math.max(minScale, state.scale / CONFIG.ZOOM_STEP);
   applyTransform();
 }

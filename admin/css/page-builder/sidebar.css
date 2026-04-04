@@ -35,16 +35,16 @@
   transform: rotate(180deg);
 }
 
-.page-builder-layout[data-sidebar-mode="collapsed"] .page-builder-sidebar {
+.page-builder-layout[data-sidebar-mode='collapsed'] .page-builder-sidebar {
   padding: 12px 8px;
   align-items: center;
 }
 
-.page-builder-layout[data-sidebar-mode="collapsed"] .pb-sidebar-body {
+.page-builder-layout[data-sidebar-mode='collapsed'] .pb-sidebar-body {
   display: none;
 }
 
-.page-builder-layout[data-sidebar-mode="collapsed"] .pb-sidebar-collapsed-copy {
+.page-builder-layout[data-sidebar-mode='collapsed'] .pb-sidebar-collapsed-copy {
   display: flex;
 }
 

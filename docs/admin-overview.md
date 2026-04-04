@@ -3,6 +3,7 @@
 This document covers the admin panel (content editor) architecture, data flow, and major features. Current code is being modularized; `admin/app.js` remains the primary entry point, with shared constants in `admin/config.js`, DOM references in `admin/dom.js`, and the page-builder workflow coordinated from `admin/page-builder.js`.
 
 ## Entry Point and Shared Modules
+
 - `admin/app.js` — Main script; initializes the UI and wires up entries, posts, media, analytics, designer, and page-builder tools.
 - `admin/config.js` — Constants: storage keys and API endpoints.
 - `admin/dom.js` — Centralized DOM lookups for forms, buttons, lists, modals, and status elements.
@@ -13,6 +14,7 @@ This document covers the admin panel (content editor) architecture, data flow, a
 - `admin/css/page-builder/` — Internal page-builder stylesheet split by ownership (`layout`, `sidebar`, `canvas`, `insertions`, `inspector`, `controls`, `theme`, `responsive`) so layout and inspector work can evolve without one monolithic CSS file.
 
 ## Feature Areas
+
 - Auth/session: Uses the site's account system (`/api/login`, `/api/session`) and requires an `admin` role.
 - Analytics: `admin/analytics.js` is the public analytics facade used by `admin/app.js`; analytics screen logic now lives under `admin/analytics/` with focused modules for traffic, reader analytics, reads-over-time, visitor history, live visitors, and shared formatters. The analytics UI is grouped into `Site Traffic`, `Visitor History`, and `Reader Engagement`.
 - Entry management (issues/etc): Load/save entries; add/edit/delete; reconcile pages with disk via `/api/list-entry-images`; reorder pages (drag/drop and up/down); renumber flow with confirmation; premium/private handling moves pages into `protected/`.
@@ -26,6 +28,7 @@ This document covers the admin panel (content editor) architecture, data flow, a
 - Series settings: Each series can set its own singular/plural label (e.g., `Issue/Issues`, `Chapter/Chapters`) stored in the DB and served at `admin/series.json`.
 
 ## Data Paths and Persistence
+
 - Reads: `/admin/data.json`/`/admin/series/<id>/data.json` (DB-backed JSON views for entries + folders + status), `/media.json` (DB-backed), `/api/admin/pages?series_id=<id>`, `/api/admin/pages/<page_id>`, and `/api/admin/assets`; image paths under `comics/<seriesId>/entries/` or `protected/comics/<seriesId>/entries/`.
 - Writes (server):
   - Entries (DB): `/api/save` for `admin/data.json` and `admin/series/<id>/data.json` writes to Postgres (no disk write).
@@ -38,12 +41,14 @@ This document covers the admin panel (content editor) architecture, data flow, a
 - Local cache: `localStorage` (`STORAGE_KEY`) for draft entries/status, plus page-builder UI preferences such as `pb-editor-mode` and `pb-sidebar-mode`.
 
 ## Runtime Flow (High Level)
-1) `init` attaches handlers, upload handlers, checks session; shows login or dashboard.
-2) Dashboard load: fetch entries → render list; fetch posts → render; fetch media → sync with disk → render; fetch page-builder pages on demand.
-3) User actions: entry CRUD/reorder, posts CRUD, media CRUD/sync, page-builder editing, previews, exports.
-4) Persistence: localStorage draft save on entry updates; server saves (DB + disk) on explicit actions.
+
+1. `init` attaches handlers, upload handlers, checks session; shows login or dashboard.
+2. Dashboard load: fetch entries → render list; fetch posts → render; fetch media → sync with disk → render; fetch page-builder pages on demand.
+3. User actions: entry CRUD/reorder, posts CRUD, media CRUD/sync, page-builder editing, previews, exports.
+4. Persistence: localStorage draft save on entry updates; server saves (DB + disk) on explicit actions.
 
 ## Visual Flow (Admin)
+
 ```mermaid
 flowchart TD
   A[init] --> B{session authenticated?}
@@ -59,6 +64,7 @@ flowchart TD
 ```
 
 ### Entry Edit/Save Flow
+
 ```mermaid
 flowchart LR
   X[Open edit modal] --> Y[reconcile pages with /api/list-entry-images]
@@ -74,6 +80,7 @@ flowchart LR
 ```
 
 ## Page Builder Workflow
+
 - Layout: the builder uses a page rail, central canvas, and right inspector. On wide screens the left rail starts expanded and the inspector starts docked; both user choices persist in `localStorage`.
 - Explicit-save editing: module forms, theme controls, and section settings edit local draft state first. The inspector footer shows `Save`/`Discard`, and the builder blocks tab switches, module switches, and page switches while a draft is dirty.
 - Immediate structure editing: sections and modules can be inserted inline at exact positions; module drag handles support reorder within a column or move across sections/columns; section drag handles reorder sections vertically.
@@ -82,11 +89,13 @@ flowchart LR
 - Styling structure: page-builder CSS now stays behind the existing `admin.page-builder.css` import, but the actual rules live under `admin/css/page-builder/` so shell layout, canvas, inspector, shared controls, theme styling, and responsive behavior are maintained in separate files.
 
 ## Near-Term Modularization Targets
+
 - Split `admin/app.js` by concern: auth/session, chapters/pages, posts/blog, media library, preview/export, utilities.
 - Centralize helpers (escape/tag parsing/sorting) into a small utilities module.
 - Add happy-dom/Vitest coverage for core flows (entry reorder/save, post save, media sync mapping).
 
 ## Analytics Module Layout
+
 - `admin/analytics.js` — Coordinator that preserves the stable `createAnalytics()` API used by the rest of admin.
 - `admin/analytics/traffic.js` — Sitewide traffic summary, page reads, landing-entry panels, referrers, countries, browsers, devices, and top events by visitors.
 - `admin/analytics/reader.js` — Health header, weekly digest, reader summary cards, ranked lists, and series-safe drilldowns using `entryKey`.

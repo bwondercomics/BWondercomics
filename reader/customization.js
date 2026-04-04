@@ -10,7 +10,8 @@ import { logger } from './logger.js';
   const SUPPORT_TEXT_HTML = `<span class="bubble-em">WANT TO SUPPORT THE COMIC?</span>
               <span class="bubble-bold">Buy the physical book</span> at the
               <a class="bubble-highlight" href="https://bwondercomics.bigcartel.com/product/battle-bros-volume-1" target="_blank" rel="noopener noreferrer" aria-label="bwondercomics store link">bwondercomics store!</a>`;
-  const SUPPORT_TEXT_PLAIN = "WANT TO SUPPORT THE COMIC? Buy the physical book at the bwondercomics store!";
+  const SUPPORT_TEXT_PLAIN =
+    'WANT TO SUPPORT THE COMIC? Buy the physical book at the bwondercomics store!';
 
   const defaultConfig = {
     theme: {
@@ -20,34 +21,38 @@ import { logger } from './logger.js';
       bgDark: '#0a0a12',
       bgPanel: '#1a1a2e',
       text: '#ffffff',
-      danger: '#ff3838'
+      danger: '#ff3838',
     },
     layout: {
       leftPanel: { enabled: true, order: 1 },
       viewport: { enabled: true, order: 2 },
-      rightPanel: { enabled: true, order: 3 }
+      rightPanel: { enabled: true, order: 3 },
     },
     content: {
       header: {
-        title: "BATTLE BROS",
-        subtitle: "",
-        subtitles: []
+        title: 'BATTLE BROS',
+        subtitle: '',
+        subtitles: [],
       },
       leftPanel: {
-        topText: "TO GO EVEN FURTHER BEYOND",
+        topText: 'TO GO EVEN FURTHER BEYOND',
         bottomText: SUPPORT_TEXT_HTML,
-        image: "assets/bookturn.gif"
+        image: 'assets/bookturn.gif',
       },
       rightPanel: {
-        image: "assets/banner3.png",
+        image: 'assets/banner3.png',
         buttons: [
-          { icon: "B", text: "Bluesky", url: "https://bsky.app/profile/bwondercomics.com" },
-          { icon: "P", text: "Patreon", url: "https://patreon.com/doylemelville2" },
-          { icon: "A", text: "ArtStation", url: "https://doyle-melvilleii.artstation.com" },
-          { icon: "S", text: "Buy Print", url: "https://bwondercomics.bigcartel.com/product/battle-bros-volume-1" }
-        ]
-      }
-    }
+          { icon: 'B', text: 'Bluesky', url: 'https://bsky.app/profile/bwondercomics.com' },
+          { icon: 'P', text: 'Patreon', url: 'https://patreon.com/doylemelville2' },
+          { icon: 'A', text: 'ArtStation', url: 'https://doyle-melvilleii.artstation.com' },
+          {
+            icon: 'S',
+            text: 'Buy Print',
+            url: 'https://bwondercomics.bigcartel.com/product/battle-bros-volume-1',
+          },
+        ],
+      },
+    },
   };
 
   async function initCustomization() {
@@ -73,7 +78,9 @@ import { logger } from './logger.js';
     const buttonContainer = document.querySelector('.panel-buttons');
     if (!panel || !buttonContainer) return;
 
-    const hide = () => { panel.style.display = 'none'; };
+    const hide = () => {
+      panel.style.display = 'none';
+    };
     hide();
 
     const toggle = (e) => {
@@ -167,13 +174,13 @@ import { logger } from './logger.js';
           const btnContainer = document.querySelector('.panel-buttons');
           if (btnContainer) {
             const buttons = [...config.content.rightPanel.buttons];
-            const hasComnet = buttons.some((b) => (b.id || "").toLowerCase() === "comnet");
+            const hasComnet = buttons.some((b) => (b.id || '').toLowerCase() === 'comnet');
             if (!hasComnet) {
               buttons.push({
-                id: "comnet",
-                icon: "assets/button-icons/comicnet.webp",
-                text: "COM1C_NET",
-                url: "#",
+                id: 'comnet',
+                icon: 'assets/button-icons/comicnet.webp',
+                text: 'COM1C_NET',
+                url: '#',
               });
             }
 
@@ -181,28 +188,29 @@ import { logger } from './logger.js';
             const existingPanel = document.getElementById('comicNetPanel');
             const panelHTML = existingPanel ? existingPanel.outerHTML : '';
 
-            btnContainer.innerHTML = buttons
-              .map((btn) => {
-                const icon = btn.icon || "";
-                const isImage = /\.(png|jpe?g|webp|gif|svg)$/i.test(icon);
-                const iconSrc = isImage ? icon : "";
-                const iconMarkup = iconSrc
-                  ? `<img src="${iconSrc}" alt="${btn.text || "icon"}" />`
-                  : `<span>${icon}</span>`;
-                const targetAttr =
-                  btn.url && btn.url.startsWith("#")
-                    ? ""
-                    : 'target="_blank" rel="noopener noreferrer"';
-                const idAttr = btn.id ? `id="${btn.id}"` : "";
-                const href = btn.url || "#";
-                return `
+            btnContainer.innerHTML =
+              buttons
+                .map((btn) => {
+                  const icon = btn.icon || '';
+                  const isImage = /\.(png|jpe?g|webp|gif|svg)$/i.test(icon);
+                  const iconSrc = isImage ? icon : '';
+                  const iconMarkup = iconSrc
+                    ? `<img src="${iconSrc}" alt="${btn.text || 'icon'}" />`
+                    : `<span>${icon}</span>`;
+                  const targetAttr =
+                    btn.url && btn.url.startsWith('#')
+                      ? ''
+                      : 'target="_blank" rel="noopener noreferrer"';
+                  const idAttr = btn.id ? `id="${btn.id}"` : '';
+                  const href = btn.url || '#';
+                  return `
                     <a href="${href}" ${targetAttr} class="panel-btn" ${idAttr}>
                       <div class="panel-btn-icon">${iconMarkup}</div>
                       <div class="panel-btn-text">${btn.text}</div>
                     </a>
                   `;
-              })
-              .join("") + panelHTML; // Append the panel HTML after buttons
+                })
+                .join('') + panelHTML; // Append the panel HTML after buttons
 
             wireComicNetPopover();
           }
@@ -221,14 +229,14 @@ import { logger } from './logger.js';
         const elements = [
           { el: leftPanel, conf: config.layout.leftPanel },
           { el: mainContent, conf: config.layout.viewport },
-          { el: rightPanel, conf: config.layout.rightPanel }
+          { el: rightPanel, conf: config.layout.rightPanel },
         ];
 
         // Sort by order
         elements.sort((a, b) => (a.conf?.order || 0) - (b.conf?.order || 0));
 
         // Re-append in new order
-        elements.forEach(item => {
+        elements.forEach((item) => {
           if (item.conf && item.conf.enabled === false) {
             item.el.style.display = 'none';
           } else {
@@ -246,6 +254,4 @@ import { logger } from './logger.js';
   } else {
     initCustomization();
   }
-
 })();
-

@@ -3,11 +3,14 @@
 Status: largely implemented in admin as of April 2026, with a final audit/correction pass completed on 2026-04-02.
 
 ## User Goals
+
 - **Primary**: Quick answer to "Is my content performing well?"
 - **Priority**: Visual/aesthetic cleanup first
 
 ## Current State
+
 The analytics dashboard currently shows:
+
 - Summary cards: `Pages Read`, `Entry Starts`, `Start-to-Finish Rate`, `Unique Visitors`
 - Sitewide traffic panels: `Page Reads`, landing pages, referrers, countries, browsers, devices, top events by visitors
 - `Pages Read Over Time`: line chart using raw `reader_page_view` totals
@@ -18,6 +21,7 @@ The analytics dashboard currently shows:
 - Weekly Digest: this week vs last week comparison using page reads, starts, completion rate, visitors
 
 ### Implemented changes
+
 - Health header kept as dot + headline + summary only.
 - Stop/drop-off UI removed from admin.
 - Reader reads were redefined to page views where the UI says `Pages Read`.
@@ -33,6 +37,7 @@ The analytics dashboard currently shows:
 - Reads-over-time keeps space reserved for the per-entry selector so the control row does not jump when switching modes.
 
 ### Still future work
+
 - Retention/cohort analysis
 - Funnel visualization
 - Session summaries with clearer visit-level definitions
@@ -41,21 +46,25 @@ The analytics dashboard currently shows:
 ## Pain Points
 
 ### 1. Information Overload
+
 - Five nearly identical cards showing ranked lists
 - Hard to quickly answer "how is my content doing?"
 - No clear hierarchy - everything feels equally important
 
 ### 2. Missing Context
+
 - Raw numbers without benchmarks ("Is 14 reads good?")
 - No comparison to typical/expected performance
 - Completion rate still lacks deeper retention context
 
 ### 3. Not Actionable
+
 - Data tells you what happened, not what to do
 - No alerts or recommendations
 - No way to track if improvements are working
 
 ### 4. Aesthetic Issues
+
 - Dense, text-heavy layout
 - Charts are functional but not engaging
 - No visual storytelling
@@ -65,10 +74,13 @@ The analytics dashboard currently shows:
 ## Implementation Plan
 
 ### Phase 1: Visual Foundation (Aesthetic Cleanup)
+
 Goal: Make analytics feel polished and easy to scan
 
 #### Add Health Indicator at Top
+
 Colored shape indicators:
+
 - 🟢 Green circle = Doing Great
 - 🟡 Yellow/amber circle = Steady
 - 🔴 Red circle = Needs Attention
@@ -78,6 +90,7 @@ Based on: finish rate + week-over-week trend
 One sentence summary: "Readers are engaging well this week"
 
 #### Color-Code All Metrics
+
 - Green: Above average / trending up
 - Amber: Flat / neutral
 - Red: Below average / trending down
@@ -85,39 +98,47 @@ One sentence summary: "Readers are engaging well this week"
 Apply to: summary cards, list items, chart areas
 
 #### Add Trend Arrows
+
 - ↑ ↓ → next to every number
 - Show % change from last period
 - Example: "14 reads ↑ +23%"
 
 #### Improve Whitespace & Hierarchy
+
 - More padding between cards
 - Larger, bolder hero numbers
 - Dimmer secondary information
 - Group related metrics visually
 
 #### Chart Enhancements
+
 - Fill area under line (more visual weight)
 - Add subtle gradient
 - Better hover tooltips
 - "This week vs last week" overlay option
 
 ### Phase 2: Simplify Information
+
 Goal: Answer "how am I doing?" without scrolling
 
 #### Consolidate Performance Cards
+
 - [x] Entry/series views moved into tabbed `Entry Performance` and `Series Performance`
 - [x] Stop-page panel removed
 - [x] Right-hand cards changed from raw finishes to `Start-to-Finish Rate`
 
 #### Summary Sentence
+
 - [x] Auto-generated summary now uses pages read + start-to-finish rate
 - Highlight outliers (unusually good or bad)
 
 #### Better Empty States
+
 - Encouraging message when no data
 - "Keep creating! Your first readers will show up here"
 
 ### Phase 3: Deeper Insights (Future)
+
 - Reader funnel visualization
 - Best publishing times heatmap
 - Reader cohort analysis
@@ -128,9 +149,11 @@ Goal: Answer "how am I doing?" without scrolling
 ## Improvement Concepts (Reference)
 
 ### A. "At a Glance" Health Score
+
 A single, prominent number (0-100) showing overall content health
 
 Components:
+
 - Finish rate weight: 40%
 - Week-over-week growth: 30%
 - Avg stop page (as % of total): 30%
@@ -138,15 +161,17 @@ Components:
 Visual: Large circular gauge with color (red/yellow/green)
 
 ### B. Smart Insights Cards
+
 Replace static metric lists with dynamic insight cards:
 
-| Instead of... | Show... |
-|--------------|---------|
-| "Entry Reads: 14" | "Entry 5 got 3x more reads than usual this week" |
+| Instead of...      | Show...                                                      |
+| ------------------ | ------------------------------------------------------------ |
+| "Entry Reads: 14"  | "Entry 5 got 3x more reads than usual this week"             |
 | "Finish Rate: 42%" | "Readers are 15% more likely to finish Entry 3 than average" |
-| "Avg Stop: Page 4" | "Most readers leave at the fight scene (page 4) in Entry 7" |
+| "Avg Stop: Page 4" | "Most readers leave at the fight scene (page 4) in Entry 7"  |
 
 ### C. Reader Journey Visualization
+
 ```
 Started Entry  ████████████████████████  100%
 Reached Middle ██████████████            58%
@@ -155,12 +180,14 @@ Started Next   ████████                  35%
 ```
 
 ### D. Entry Performance Matrix
-| Entry | Reads | Finish % | Trend | Rating |
-|-------|-------|----------|-------|--------|
-| Entry 1 | 45 | 78% | ↑ | ★★★★★ |
-| Entry 5 | 14 | 42% | ↓ | ★★★☆☆ |
+
+| Entry   | Reads | Finish % | Trend | Rating |
+| ------- | ----- | -------- | ----- | ------ |
+| Entry 1 | 45    | 78%      | ↑     | ★★★★★  |
+| Entry 5 | 14    | 42%      | ↓     | ★★★☆☆  |
 
 ### E. Reader Cohort Analysis
+
 - New vs Returning readers
 - Engagement Tiers: Casual (1 entry), Regular (2-5), Superfan (5+)
 
@@ -169,6 +196,7 @@ Started Next   ████████                  35%
 ## Visual Specifications
 
 ### Color Palette
+
 ```
 Good:    #22c55e (green-500)
 Neutral: #f59e0b (amber-500)
@@ -176,19 +204,22 @@ Concern: #ef4444 (red-500)
 ```
 
 ### Health Indicator Thresholds
-| Metric | Good | Neutral | Concern |
-|--------|------|---------|---------|
-| Finish Rate | >60% | 40-60% | <40% |
-| Week Change | >+10% | -10% to +10% | <-10% |
+
+| Metric      | Good  | Neutral      | Concern |
+| ----------- | ----- | ------------ | ------- |
+| Finish Rate | >60%  | 40-60%       | <40%    |
+| Week Change | >+10% | -10% to +10% | <-10%   |
 
 ### Card Layout (Before → After)
 
 **Before:** 5 equal cards in grid
+
 ```
 [Entry Reads] [Series Reads] [Entry Finishes] [Series Finishes] [Stop Page]
 ```
 
 **After:** Hero summary + tabbed detail
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  ● Your content is performing well                      │  (green dot)
@@ -210,6 +241,7 @@ Concern: #ef4444 (red-500)
 ---
 
 ## Frontend Architecture (Current)
+
 - `admin/analytics.js` - Thin coordinator/facade exposing `createAnalytics()`
 - `admin/analytics/traffic.js` - Summary, page reads, landing-entry panels, referrers, countries, browsers, devices, top events by visitors
 - `admin/analytics/reader.js` - Health indicator, reader summary, reader cards, filters, drilldowns, weekly digest fetch
@@ -219,12 +251,14 @@ Concern: #ef4444 (red-500)
 - `admin/analytics/shared.js` - Shared pure formatters/helpers
 
 ## Current Contract Notes
+
 - `GET /api/admin/analytics/live` now returns `activeCount` + `visitors` as the primary frontend contract, while still exposing `total` + `sessions` as temporary compatibility aliases.
 - `GET /api/admin/analytics/reader` adds `entryKey` to entry-ranked payloads.
 - `GET /api/admin/analytics/reads-over-time` and `GET /api/admin/analytics/reader-series` accept `entry_key`.
 - `GET /api/admin/analytics/visitors` returns landing pages from Umami `entry`, and top-event counts represent unique visitors rather than raw event hits.
 
 ## Files to Modify for Future Analytics UI Work
+
 - `admin/index.html` - Restructure analytics section HTML when layout changes are needed
 - `admin/analytics/traffic.js` - Sitewide traffic panel behavior
 - `admin/analytics/reader.js` - Reader cards, health, and drilldowns
@@ -234,6 +268,7 @@ Concern: #ef4444 (red-500)
 - `backend API` - Possibly add health score calculation endpoint
 
 ## Verification
+
 1. Open admin panel → Analytics section
 2. Verify health indicator shows and makes sense
 3. Check all metrics have trend arrows and colors

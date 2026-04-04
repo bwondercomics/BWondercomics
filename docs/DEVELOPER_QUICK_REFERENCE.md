@@ -5,6 +5,7 @@
 Before every commit, run through this quick checklist:
 
 ### **Code Quality**
+
 ```bash
 # 1. Check for debugging code
 grep -r "console.log" reader/ admin/
@@ -32,22 +33,26 @@ python -m ruff format backend/app
 ```
 
 ### **Contract Fixtures**
+
 - Treat `tests/fixtures/contract-fixtures.json` and `backend/tests/helpers.py` as the canonical reader/admin/backend contract layer.
 - If a backend payload shape changes, update that shared contract layer and at least one frontend test plus one backend test.
 
 ### **Security**
+
 - [ ] No hardcoded credentials or API keys
 - [ ] All user inputs sanitized
 - [ ] Auth checks in place for protected routes
 - [ ] HTTPS enforced in production
 
 ### **Performance**
+
 - [ ] No N+1 database queries
 - [ ] Images optimized (WebP, responsive sizes)
 - [ ] Lazy loading for off-screen content
 - [ ] No render-blocking resources
 
 ### **Accessibility**
+
 - [ ] All images have alt text
 - [ ] Interactive elements keyboard accessible
 - [ ] Proper heading hierarchy (h1 → h2 → h3)
@@ -60,117 +65,132 @@ python -m ruff format backend/app
 ### **JavaScript**
 
 #### ❌ **Magic Numbers**
+
 ```javascript
 // BAD
 if (distance > 10) {
-    zoom();
+  zoom();
 }
 
 // GOOD
 const ZOOM_THRESHOLD = 10; // pixels
 if (distance > ZOOM_THRESHOLD) {
-    zoom();
+  zoom();
 }
 ```
 
 #### ❌ **Callback Hell**
+
 ```javascript
 // BAD
 getData((data) => {
-    processData(data, (result) => {
-        saveResult(result, (saved) => {
-            showMessage('Done');
-        });
+  processData(data, (result) => {
+    saveResult(result, (saved) => {
+      showMessage('Done');
     });
+  });
 });
 
 // GOOD
 async function handleData() {
-    const data = await getData();
-    const result = await processData(data);
-    await saveResult(result);
-    showMessage('Done');
+  const data = await getData();
+  const result = await processData(data);
+  await saveResult(result);
+  showMessage('Done');
 }
 ```
 
 #### ❌ **God Functions**
+
 ```javascript
 // BAD - function doing too much
 function handlePageChange(direction) {
-    // 200 lines of code doing:
-    // - validation
-    // - state updates
-    // - rendering
-    // - analytics
-    // - local storage
+  // 200 lines of code doing:
+  // - validation
+  // - state updates
+  // - rendering
+  // - analytics
+  // - local storage
 }
 
 // GOOD - split into focused functions
-function validatePageChange(direction) { /* ... */ }
-function updatePageState(newPage) { /* ... */ }
-function renderPage(page) { /* ... */ }
-function trackPageView(page) { /* ... */ }
-function saveProgress(page) { /* ... */ }
+function validatePageChange(direction) {
+  /* ... */
+}
+function updatePageState(newPage) {
+  /* ... */
+}
+function renderPage(page) {
+  /* ... */
+}
+function trackPageView(page) {
+  /* ... */
+}
+function saveProgress(page) {
+  /* ... */
+}
 
 function handlePageChange(direction) {
-    if (!validatePageChange(direction)) return;
-    const newPage = calculateNewPage(direction);
-    updatePageState(newPage);
-    renderPage(newPage);
-    trackPageView(newPage);
-    saveProgress(newPage);
+  if (!validatePageChange(direction)) return;
+  const newPage = calculateNewPage(direction);
+  updatePageState(newPage);
+  renderPage(newPage);
+  trackPageView(newPage);
+  saveProgress(newPage);
 }
 ```
 
 #### ❌ **Duplicate Code**
+
 ```javascript
 // BAD - repeated logic
 function loadSeries1() {
-    showLoading();
-    fetch('/series/battle-bros/data.json')
-        .then(r => r.json())
-        .then(data => {
-            hideLoading();
-            renderSeries(data);
-        })
-        .catch(err => {
-            hideLoading();
-            showError(err);
-        });
+  showLoading();
+  fetch('/series/battle-bros/data.json')
+    .then((r) => r.json())
+    .then((data) => {
+      hideLoading();
+      renderSeries(data);
+    })
+    .catch((err) => {
+      hideLoading();
+      showError(err);
+    });
 }
 
 function loadSeries2() {
-    showLoading();
-    fetch('/series/another-series/data.json')
-        .then(r => r.json())
-        .then(data => {
-            hideLoading();
-            renderSeries(data);
-        })
-        .catch(err => {
-            hideLoading();
-            showError(err);
-        });
+  showLoading();
+  fetch('/series/another-series/data.json')
+    .then((r) => r.json())
+    .then((data) => {
+      hideLoading();
+      renderSeries(data);
+    })
+    .catch((err) => {
+      hideLoading();
+      showError(err);
+    });
 }
 
 // GOOD - extracted common pattern
 async function loadSeries(seriesId) {
-    showLoading();
-    try {
-        const response = await fetch(`/series/${seriesId}/data.json`);
-        const data = await response.json();
-        renderSeries(data);
-    } catch (err) {
-        showError(err);
-    } finally {
-        hideLoading();
-    }
+  showLoading();
+  try {
+    const response = await fetch(`/series/${seriesId}/data.json`);
+    const data = await response.json();
+    renderSeries(data);
+  } catch (err) {
+    showError(err);
+  } finally {
+    hideLoading();
+  }
 }
 ```
 
 ### **Python**
 
 #### ❌ **N+1 Query Problem**
+
 ```python
 # BAD
 comments = db.query(Comment).all()
@@ -187,6 +207,7 @@ for comment in comments:
 ```
 
 #### ❌ **Missing Error Handling**
+
 ```python
 # BAD
 def get_user(user_id):
@@ -209,75 +230,78 @@ def get_user(user_id):
 ## 📊 Performance Optimization Patterns
 
 ### **1. Debouncing**
+
 Use for: resize, scroll, search input
 
 ```javascript
 function debounce(func, wait) {
-    let timeout;
-    return function executedFunction(...args) {
-        const later = () => {
-            clearTimeout(timeout);
-            func(...args);
-        };
-        clearTimeout(timeout);
-        timeout = setTimeout(later, wait);
+  let timeout;
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
     };
+    clearTimeout(timeout);
+    timeout = setTimeout(later, wait);
+  };
 }
 
 // Usage
 const debouncedSearch = debounce((query) => {
-    fetchSearchResults(query);
+  fetchSearchResults(query);
 }, 300);
 
 searchInput.addEventListener('input', (e) => {
-    debouncedSearch(e.target.value);
+  debouncedSearch(e.target.value);
 });
 ```
 
 ### **2. Throttling**
+
 Use for: scroll events, mousemove
 
 ```javascript
 function throttle(func, limit) {
-    let inThrottle;
-    return function executedFunction(...args) {
-        if (!inThrottle) {
-            func(...args);
-            inThrottle = true;
-            setTimeout(() => inThrottle = false, limit);
-        }
-    };
+  let inThrottle;
+  return function executedFunction(...args) {
+    if (!inThrottle) {
+      func(...args);
+      inThrottle = true;
+      setTimeout(() => (inThrottle = false), limit);
+    }
+  };
 }
 
 // Usage
 const throttledScroll = throttle(() => {
-    console.log('Scroll position:', window.scrollY);
+  console.log('Scroll position:', window.scrollY);
 }, 100);
 
 window.addEventListener('scroll', throttledScroll);
 ```
 
 ### **3. Memoization**
+
 Use for: expensive calculations
 
 ```javascript
 function memoize(fn) {
-    const cache = new Map();
-    return function(...args) {
-        const key = JSON.stringify(args);
-        if (cache.has(key)) {
-            return cache.get(key);
-        }
-        const result = fn(...args);
-        cache.set(key, result);
-        return result;
-    };
+  const cache = new Map();
+  return function (...args) {
+    const key = JSON.stringify(args);
+    if (cache.has(key)) {
+      return cache.get(key);
+    }
+    const result = fn(...args);
+    cache.set(key, result);
+    return result;
+  };
 }
 
 // Usage
 const expensiveCalculation = memoize((n) => {
-    // Some expensive operation
-    return fibonacci(n);
+  // Some expensive operation
+  return fibonacci(n);
 });
 ```
 
@@ -286,18 +310,18 @@ const expensiveCalculation = memoize((n) => {
 ```javascript
 // Intersection Observer for images
 const imageObserver = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-        if (entry.isIntersecting) {
-            const img = entry.target;
-            img.src = img.dataset.src;
-            img.classList.remove('lazy');
-            imageObserver.unobserve(img);
-        }
-    });
+  entries.forEach((entry) => {
+    if (entry.isIntersecting) {
+      const img = entry.target;
+      img.src = img.dataset.src;
+      img.classList.remove('lazy');
+      imageObserver.unobserve(img);
+    }
+  });
 });
 
-document.querySelectorAll('img[data-src]').forEach(img => {
-    imageObserver.observe(img);
+document.querySelectorAll('img[data-src]').forEach((img) => {
+  imageObserver.observe(img);
 });
 ```
 
@@ -306,22 +330,22 @@ document.querySelectorAll('img[data-src]').forEach(img => {
 ```javascript
 // For long lists (100+ items)
 class VirtualList {
-    constructor(container, items, itemHeight) {
-        this.container = container;
-        this.items = items;
-        this.itemHeight = itemHeight;
-        this.visibleCount = Math.ceil(container.clientHeight / itemHeight);
-        this.renderItems();
-    }
-    
-    renderItems() {
-        const scrollTop = this.container.scrollTop;
-        const startIndex = Math.floor(scrollTop / this.itemHeight);
-        const endIndex = startIndex + this.visibleCount;
-        
-        const visibleItems = this.items.slice(startIndex, endIndex);
-        // Render only visible items + small buffer
-    }
+  constructor(container, items, itemHeight) {
+    this.container = container;
+    this.items = items;
+    this.itemHeight = itemHeight;
+    this.visibleCount = Math.ceil(container.clientHeight / itemHeight);
+    this.renderItems();
+  }
+
+  renderItems() {
+    const scrollTop = this.container.scrollTop;
+    const startIndex = Math.floor(scrollTop / this.itemHeight);
+    const endIndex = startIndex + this.visibleCount;
+
+    const visibleItems = this.items.slice(startIndex, endIndex);
+    // Render only visible items + small buffer
+  }
 }
 ```
 
@@ -400,22 +424,22 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 ```javascript
 test('should save progress to localStorage', () => {
-    // ARRANGE - set up test data
-    const testState = {
-        currentEntry: 'Issue 1',
-        pageIndex: 5
-    };
-    
-    // ACT - perform the action
-    saveProgress(testState);
-    
-    // ASSERT - verify the result
-    const saved = localStorage.getItem('battleBros_progress');
-    expect(saved).toBeTruthy();
-    
-    const parsed = JSON.parse(saved);
-    expect(parsed.chapter).toBe('Issue 1');
-    expect(parsed.page).toBe(5);
+  // ARRANGE - set up test data
+  const testState = {
+    currentEntry: 'Issue 1',
+    pageIndex: 5,
+  };
+
+  // ACT - perform the action
+  saveProgress(testState);
+
+  // ASSERT - verify the result
+  const saved = localStorage.getItem('battleBros_progress');
+  expect(saved).toBeTruthy();
+
+  const parsed = JSON.parse(saved);
+  expect(parsed.chapter).toBe('Issue 1');
+  expect(parsed.page).toBe(5);
 });
 ```
 
@@ -462,15 +486,15 @@ test('should save progress to localStorage', () => {
 ```javascript
 // Track custom performance metrics
 function trackMetric(name, value) {
-    // Send to analytics
-    if (window.umami) {
-        umami.track(name, { value });
-    }
-    
-    // Log to console in dev
-    if (process.env.NODE_ENV === 'development') {
-        console.log(`[Metric] ${name}: ${value}ms`);
-    }
+  // Send to analytics
+  if (window.umami) {
+    umami.track(name, { value });
+  }
+
+  // Log to console in dev
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`[Metric] ${name}: ${value}ms`);
+  }
 }
 
 // Example usage
@@ -488,15 +512,20 @@ trackMetric('chapter_load_time', duration);
 
 ```css
 /* Block */
-.card {}
+.card {
+}
 
 /* Element */
-.card__title {}
-.card__image {}
+.card__title {
+}
+.card__image {
+}
 
 /* Modifier */
-.card--featured {}
-.card__title--large {}
+.card--featured {
+}
+.card__title--large {
+}
 ```
 
 ### **CSS Custom Properties**
@@ -504,24 +533,24 @@ trackMetric('chapter_load_time', duration);
 ```css
 /* Define in :root */
 :root {
-    --color-primary: #00d9ff;
-    --color-secondary: #ff00ea;
-    --spacing-sm: 8px;
-    --spacing-md: 16px;
-    --spacing-lg: 24px;
+  --color-primary: #00d9ff;
+  --color-secondary: #ff00ea;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
 }
 
 /* Use throughout */
 .button {
-    background: var(--color-primary);
-    padding: var(--spacing-md);
+  background: var(--color-primary);
+  padding: var(--spacing-md);
 }
 
 /* Override in dark mode */
 @media (prefers-color-scheme: dark) {
-    :root {
-        --color-primary: #00b3d9;
-    }
+  :root {
+    --color-primary: #00b3d9;
+  }
 }
 ```
 
@@ -530,23 +559,23 @@ trackMetric('chapter_load_time', duration);
 ```css
 /* Base styles (mobile) */
 .container {
-    padding: 1rem;
+  padding: 1rem;
 }
 
 /* Tablet and up */
 @media (min-width: 768px) {
-    .container {
-        padding: 2rem;
-    }
+  .container {
+    padding: 2rem;
+  }
 }
 
 /* Desktop and up */
 @media (min-width: 1024px) {
-    .container {
-        padding: 3rem;
-        max-width: 1200px;
-        margin: 0 auto;
-    }
+  .container {
+    padding: 3rem;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
 }
 ```
 
@@ -560,30 +589,30 @@ trackMetric('chapter_load_time', duration);
 // BAD - race condition
 let currentRequest;
 async function search(query) {
-    const result = await fetch(`/api/search?q=${query}`);
-    displayResults(result);  // Might display old results!
+  const result = await fetch(`/api/search?q=${query}`);
+  displayResults(result); // Might display old results!
 }
 
 // GOOD - abort previous requests
 let currentController;
 async function search(query) {
-    // Cancel previous request
-    if (currentController) {
-        currentController.abort();
+  // Cancel previous request
+  if (currentController) {
+    currentController.abort();
+  }
+
+  currentController = new AbortController();
+
+  try {
+    const result = await fetch(`/api/search?q=${query}`, {
+      signal: currentController.signal,
+    });
+    displayResults(result);
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      console.error('Search failed:', err);
     }
-    
-    currentController = new AbortController();
-    
-    try {
-        const result = await fetch(`/api/search?q=${query}`, {
-            signal: currentController.signal
-        });
-        displayResults(result);
-    } catch (err) {
-        if (err.name !== 'AbortError') {
-            console.error('Search failed:', err);
-        }
-    }
+  }
 }
 ```
 
@@ -592,18 +621,18 @@ async function search(query) {
 ```javascript
 // BAD - event listener not removed
 function setupPage() {
-    window.addEventListener('resize', handleResize);
+  window.addEventListener('resize', handleResize);
 }
 
 // GOOD - cleanup
 function setupPage() {
-    const cleanup = () => {
-        window.removeEventListener('resize', handleResize);
-    };
-    
-    window.addEventListener('resize', handleResize);
-    
-    return cleanup;
+  const cleanup = () => {
+    window.removeEventListener('resize', handleResize);
+  };
+
+  window.addEventListener('resize', handleResize);
+
+  return cleanup;
 }
 
 // Usage
@@ -617,19 +646,19 @@ cleanup();
 ```javascript
 // BAD - mutating state directly
 function updateUser(state, newName) {
-    state.user.name = newName;  // Direct mutation!
-    return state;
+  state.user.name = newName; // Direct mutation!
+  return state;
 }
 
 // GOOD - immutable update
 function updateUser(state, newName) {
-    return {
-        ...state,
-        user: {
-            ...state.user,
-            name: newName
-        }
-    };
+  return {
+    ...state,
+    user: {
+      ...state.user,
+      name: newName,
+    },
+  };
 }
 ```
 

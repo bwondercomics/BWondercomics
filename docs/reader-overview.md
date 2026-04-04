@@ -3,10 +3,12 @@
 This document summarizes how the reader portion of the site is organized, what each module does, and the runtime flow. It excludes the admin panel.
 
 ## Entry Point and Data
+
 - `reader/app.js` bootstraps config/state, fetches content, wires UI handlers, and kicks off rendering.
 - Data sources: entry page images under `comics/<seriesId>/entries/` (public) or `protected/comics/<seriesId>/entries/` (premium/private), `/data.json` / `/series/<id>/data.json` (entries + status + metadata + per-series labels), `/page-config.json` / `/series/<id>/page-config.json` (DB-backed theme/content overrides), and `/api/posts/latest` for the “latest update” widget. Reader requests `protected/*` paths via `/api/protected/*`.
 
 ## Modules
+
 - `reader/config.js` — Tunables for layout/zoom, keyboard settings, debounce intervals; includes `TWO_PAGE_ASPECT_RATIO` (0.714).
 - `reader/data.js` — Fetches entries/media/posts, normalizes JSON, and provides simple caching helpers.
 - `reader/entries.js` — Entry navigation helpers (next/prev resolution, slug/name mapping, index clamping).
@@ -24,12 +26,14 @@ This document summarizes how the reader portion of the site is organized, what e
 - `assets/css/main.core.11-viewport.css` — Viewport rules for the default/fullscreen layouts and the optional `.viewport.dynamic-frame` mode.
 
 ## Runtime Flow
-1) `app.js` init: load config/state → fetch entries + page config + latest post → render initial page(s).
-2) Controls: UI/keyboard/gesture handlers update `state` → `render` redraws → `gallery`/overlays sync to the new state.
-3) Persistence: `state.saveProgress` writes entry/page to `localStorage`; errors are caught so reading is not blocked.
-4) Layout: `render` chooses single vs two-page mode based on the aspect ratio threshold (`TWO_PAGE_ASPECT_RATIO`), caches visible page dimensions, and in the fixed-height desktop layout resizes the viewport frame to the visible page or spread. Stacked/mobile keeps the existing full-width flow, and fullscreen stays on the height-fit path.
+
+1. `app.js` init: load config/state → fetch entries + page config + latest post → render initial page(s).
+2. Controls: UI/keyboard/gesture handlers update `state` → `render` redraws → `gallery`/overlays sync to the new state.
+3. Persistence: `state.saveProgress` writes entry/page to `localStorage`; errors are caught so reading is not blocked.
+4. Layout: `render` chooses single vs two-page mode based on the aspect ratio threshold (`TWO_PAGE_ASPECT_RATIO`), caches visible page dimensions, and in the fixed-height desktop layout resizes the viewport frame to the visible page or spread. Stacked/mobile keeps the existing full-width flow, and fullscreen stays on the height-fit path.
 
 ## Visual Flow (Reader)
+
 ```mermaid
 flowchart TD
   A[app.js init] --> B[load config/state]
@@ -45,6 +49,7 @@ flowchart TD
 ```
 
 ### Render Decision Flow
+
 ```mermaid
 flowchart LR
   S[state: current page, zoom, layout preference]
@@ -64,5 +69,6 @@ flowchart LR
 ```
 
 ## Testing
+
 - Test suite: Vitest with happy-dom, covering navigation math, state persistence/error handling, render layout selection, on-page frame sizing math, and DOM regressions for page-shape changes.
 - Files include `tests/entries.test.js`, `tests/state.test.js`, `tests/data.test.js`, `tests/render.test.js`, `tests/transform.test.js`, and `tests/on-page-frame.test.js`; config lives in `vitest.config.js` and `tests/setup.js`.

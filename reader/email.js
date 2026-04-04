@@ -24,10 +24,10 @@ export function initEmailSignupForm() {
       const response = await fetch(form.action, {
         method: 'POST',
         headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json'
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ email, source })
+        body: JSON.stringify({ email, source }),
       });
 
       if (response.ok) {

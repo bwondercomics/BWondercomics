@@ -1,15 +1,15 @@
-const DEFAULT_SAFE_URL = "https://safe.bwondercomics.com";
+const DEFAULT_SAFE_URL = 'https://safe.bwondercomics.com';
 
 function normalizeSafeUrl(rawUrl) {
-  const trimmed = String(rawUrl || "").trim();
+  const trimmed = String(rawUrl || '').trim();
   if (!trimmed) return DEFAULT_SAFE_URL;
   if (!/^https?:\/\//i.test(trimmed)) return DEFAULT_SAFE_URL;
-  return trimmed.replace(/\/+$/, "");
+  return trimmed.replace(/\/+$/, '');
 }
 
 function getSafeModeUrl(config) {
-  if (!config || typeof config !== "object") return null;
-  const site = config.site && typeof config.site === "object" ? config.site : {};
+  if (!config || typeof config !== 'object') return null;
+  const site = config.site && typeof config.site === 'object' ? config.site : {};
   const enabled = site.safeModeRedirect === true || site.safeMode === true;
   if (!enabled) return null;
   return normalizeSafeUrl(site.safeModeUrl || DEFAULT_SAFE_URL);
@@ -17,10 +17,10 @@ function getSafeModeUrl(config) {
 
 async function checkSafeMode() {
   const host = window.location.hostname.toLowerCase();
-  if (host === "localhost" || host === "127.0.0.1") return;
+  if (host === 'localhost' || host === '127.0.0.1') return;
 
   try {
-    const response = await fetch("/page-config.json", { cache: "no-store" });
+    const response = await fetch('/page-config.json', { cache: 'no-store' });
     if (!response.ok) return;
     const config = await response.json();
     const safeUrl = getSafeModeUrl(config);
@@ -34,8 +34,8 @@ async function checkSafeMode() {
   }
 }
 
-if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", checkSafeMode);
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', checkSafeMode);
 } else {
   checkSafeMode();
 }

@@ -16,7 +16,18 @@ except ImportError:  # pragma: no cover - non-POSIX fallback
 from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
-from .models import AdminOpsRun, Comment, EmailSubscriber, Entry, EntryPage, MediaItem, Post, PremiumCode, Series, User
+from .models import (
+    AdminOpsRun,
+    Comment,
+    EmailSubscriber,
+    Entry,
+    EntryPage,
+    MediaItem,
+    Post,
+    PremiumCode,
+    Series,
+    User,
+)
 from .routes.admin_utils import iso_z
 from .settings import settings
 
@@ -193,7 +204,9 @@ def collect_backup_summary() -> dict:
     backup_dir = settings.base_dir / "var" / "backups"
     grouped = {"db": [], "files": []}
     if backup_dir.exists():
-        for path in sorted(backup_dir.iterdir(), key=lambda item: item.stat().st_mtime, reverse=True):
+        for path in sorted(
+            backup_dir.iterdir(), key=lambda item: item.stat().st_mtime, reverse=True
+        ):
             if not path.is_file():
                 continue
             bucket = _classify_backup(path)
@@ -212,7 +225,9 @@ def collect_backup_summary() -> dict:
 
     latest_db = grouped["db"][0] if grouped["db"] else None
     latest_files = grouped["files"][0] if grouped["files"] else None
-    status = "ok" if latest_db and latest_files else "warning" if latest_db or latest_files else "error"
+    status = (
+        "ok" if latest_db and latest_files else "warning" if latest_db or latest_files else "error"
+    )
     message = (
         f"DB backups: {len(grouped['db'])}, file backups: {len(grouped['files'])}"
         if status != "error"
@@ -253,11 +268,14 @@ def collect_database_stats(db: Session) -> dict:
         )
         total_comments = db.scalar(select(func.count()).select_from(Comment)) or 0
         comments_approved = (
-            db.scalar(select(func.count()).select_from(Comment).where(Comment.hidden.is_(False))) or 0
+            db.scalar(select(func.count()).select_from(Comment).where(Comment.hidden.is_(False)))
+            or 0
         )
         total_codes = db.scalar(select(func.count()).select_from(PremiumCode)) or 0
         active_codes = (
-            db.scalar(select(func.count()).select_from(PremiumCode).where(PremiumCode.active.is_(True)))
+            db.scalar(
+                select(func.count()).select_from(PremiumCode).where(PremiumCode.active.is_(True))
+            )
             or 0
         )
         total_posts = db.scalar(select(func.count()).select_from(Post)) or 0
@@ -328,8 +346,16 @@ def collect_database_overview(db: Session) -> dict:
         pass
 
     try:
-        active = db.execute(text("SELECT count(*) FROM pg_stat_activity WHERE state = 'active'")).scalar() or 0
-        idle = db.execute(text("SELECT count(*) FROM pg_stat_activity WHERE state = 'idle'")).scalar() or 0
+        active = (
+            db.execute(
+                text("SELECT count(*) FROM pg_stat_activity WHERE state = 'active'")
+            ).scalar()
+            or 0
+        )
+        idle = (
+            db.execute(text("SELECT count(*) FROM pg_stat_activity WHERE state = 'idle'")).scalar()
+            or 0
+        )
         total = db.execute(text("SELECT count(*) FROM pg_stat_activity")).scalar() or 0
         max_conn = db.execute(text("SHOW max_connections")).scalar()
         connections = {
@@ -389,10 +415,14 @@ def collect_database_overview(db: Session) -> dict:
 
 def collect_test_status(db: Session) -> dict:
     tests_dir = settings.base_dir / "tests"
-    files = sorted(
-        [path for path in tests_dir.rglob("*.test.js") if path.is_file()],
-        key=lambda path: str(path),
-    ) if tests_dir.exists() else []
+    files = (
+        sorted(
+            [path for path in tests_dir.rglob("*.test.js") if path.is_file()],
+            key=lambda path: str(path),
+        )
+        if tests_dir.exists()
+        else []
+    )
 
     latest_run = db.scalar(
         select(AdminOpsRun)

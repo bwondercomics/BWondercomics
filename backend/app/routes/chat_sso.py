@@ -39,7 +39,11 @@ _CHAT_ADMIN_BRIDGE_COOKIE_MAX_AGE_SECONDS = 12 * 60 * 60
 
 def _build_login_redirect(request: Request) -> str:
     path = settings.oidc_login_path or "/?openComments=1"
-    if not path.startswith("http://") and not path.startswith("https://") and not path.startswith("/"):
+    if (
+        not path.startswith("http://")
+        and not path.startswith("https://")
+        and not path.startswith("/")
+    ):
         path = "/" + path
     next_target = request.url.path
     if request.url.query:
@@ -262,7 +266,9 @@ def _normalize_legacy_voice_channels(value: Any) -> Any:
     """Map TextChannel+voice payloads to VoiceChannel for legacy web bundles."""
     if isinstance(value, dict):
         normalized = {k: _normalize_legacy_voice_channels(v) for k, v in value.items()}
-        if normalized.get("channel_type") == "TextChannel" and isinstance(normalized.get("voice"), dict):
+        if normalized.get("channel_type") == "TextChannel" and isinstance(
+            normalized.get("voice"), dict
+        ):
             normalized["channel_type"] = "VoiceChannel"
         return normalized
     if isinstance(value, list):
@@ -295,7 +301,10 @@ def _extract_chat_session(payload: dict[str, Any]) -> dict[str, Any] | None:
     session_id = str(payload.get("_id") or "").strip()
     if not token or not user_id or not session_id:
         return None
-    name = str(payload.get("name") or settings.chat_sso_device_name).strip() or settings.chat_sso_device_name
+    name = (
+        str(payload.get("name") or settings.chat_sso_device_name).strip()
+        or settings.chat_sso_device_name
+    )
 
     # Keep the full payload shape from Stoat to remain compatible with
     # client revisions that expect extra session fields.
@@ -503,7 +512,9 @@ def _make_chat_admin_bridge_cookie(user_id: UUID, chat_user_id: str) -> str:
     )
 
 
-def _get_chat_admin_bridge_identity(request: Request, db: Session) -> tuple[User | None, str | None]:
+def _get_chat_admin_bridge_identity(
+    request: Request, db: Session
+) -> tuple[User | None, str | None]:
     token = request.cookies.get(_CHAT_ADMIN_BRIDGE_COOKIE_NAME)
     payload = verify_token(token)
     if not payload or payload.get("kind") != "chat_admin_bridge":

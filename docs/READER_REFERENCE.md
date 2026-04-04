@@ -3,6 +3,7 @@
 This summarizes the reader runtime after modularization: what each file does, key functions, and data sources.
 
 ## Data sources
+
 - `data.json`: entries map, order, statusMessage.
 - `page-config.json`: optional theme/content overrides + subtitles (DB-backed).
 - `/api/posts/latest`: latest update widget (DB-backed; published-only + scheduling support).
@@ -10,6 +11,7 @@ This summarizes the reader runtime after modularization: what each file does, ke
 - Entry page paths may start with `protected/`; those are requested via `/api/protected/<path>`.
 
 ## Module map
+
 - `reader/config.js`: constants (storage key, cache sizes, zoom steps, breakpoints, animation timings).
 - `reader/entries.js`: entry helpers (`extractEntryNumber`, `sortEntryNames`, `sortEntryNamesWithMeta`, `sanitizeEntries`).
 - `reader/state.js`: shared `state` object; `saveProgress`, `loadProgress`, cached natural page metrics, and the last successful desktop on-page frame.
@@ -29,14 +31,15 @@ This summarizes the reader runtime after modularization: what each file does, ke
 - `reader/customization.js`: applies `page-config` theme/content/layout overrides at load (runs as module).
 
 ## Flow (runtime)
-1) `index.html` loads `reader/app.js` + `reader/customization.js` as ES modules.
-2) `app.start()`:
+
+1. `index.html` loads `reader/app.js` + `reader/customization.js` as ES modules.
+2. `app.start()`:
    - `loadEntryData()` → sets entries/order/statusMessage.
    - `loadPageConfig()` → sets subtitles (and other overrides via customization module).
    - `loadLatestPost()` → fetches `/api/posts/latest`, passes to `renderLatestUpdate`.
    - Initializes elements, entry select, status panel, email form, pointer/fullscreen/nav handlers.
    - Restores saved progress if present; renders current pages and applies the desktop on-page frame when eligible.
-3) User interactions:
+3. User interactions:
    - Navigation via buttons/edge zones/keyboard/swipe → `controls.js` updates state and calls `render` + `saveProgress`.
    - Zoom/pan via pointer/pinch/wheel or buttons → `pointer.js` + `transform.js`.
    - Fullscreen toggle → `fullscreen.js` (auto-hide controls, fullscreen height fit, and suspension of on-page frame sizing).
@@ -44,10 +47,12 @@ This summarizes the reader runtime after modularization: what each file does, ke
    - Shortcuts overlay → `overlays.js`; end-of-chapter overlay uses `controls.js` helpers.
 
 ## Key exports (for reference)
+
 - `window.BattleBros` (from `app.js`): `setSubtitle`, `setRandomSubtitleNow`, `setSubtitles`.
 - Functions by module (see map above) are imported within `app.js`; no other globals are exposed.
 
 ## Notes
+
 - Reader logic assumes `data.json` is reachable; on failure, a user-friendly error is shown in the viewport.
 - Image caching uses a FIFO map capped by `CONFIG.IMAGE_CACHE_SIZE`; natural page dimensions are cached in `state.pageMetrics` and the last successful desktop frame in `state.lastOnPageFrame`.
 - Two-page mode: width ≥ `CONFIG.TWO_PAGE_BREAKPOINT` (900) and aspect ratio > 0.714; otherwise single-page.

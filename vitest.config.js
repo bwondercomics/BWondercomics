@@ -18,8 +18,8 @@ export default defineConfig({
         'media/**',
         'tests/**',
         '**/*.html',
-        '**/*.json'
-      ]
-    }
-  }
+        '**/*.json',
+      ],
+    },
+  },
 });

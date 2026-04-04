@@ -3,11 +3,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import {
-  sanitizeSeriesId,
-  getSeriesDataPath,
-  getSeriesPageConfigPath
-} from '../reader/series.js';
+import { sanitizeSeriesId, getSeriesDataPath, getSeriesPageConfigPath } from '../reader/series.js';
 
 describe('sanitizeSeriesId', () => {
   it('should normalize to lowercase and hyphenate', () => {

@@ -31,7 +31,7 @@
 }
 
 @media (max-width: 1099px) {
-  .page-builder-layout[data-viewport-band="stacked"] .page-builder-sidebar {
+  .page-builder-layout[data-viewport-band='stacked'] .page-builder-sidebar {
     max-height: none;
   }
 

@@ -73,7 +73,9 @@ def _resolve_issuer(request: Request) -> str:
         return settings.oidc_issuer
 
     forwarded_proto = (request.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
-    proto = forwarded_proto if forwarded_proto in {"http", "https"} else request.url.scheme or "http"
+    proto = (
+        forwarded_proto if forwarded_proto in {"http", "https"} else request.url.scheme or "http"
+    )
     host = (request.headers.get("X-Forwarded-Host") or request.headers.get("Host") or "").strip()
     host = host.split(",")[0].strip() if host else request.url.netloc
     return f"{proto}://{host}".rstrip("/")
@@ -229,7 +231,11 @@ def _provider_enabled() -> bool:
 
 def _build_login_redirect(request: Request) -> str:
     path = settings.oidc_login_path or "/?openComments=1"
-    if not path.startswith("http://") and not path.startswith("https://") and not path.startswith("/"):
+    if (
+        not path.startswith("http://")
+        and not path.startswith("https://")
+        and not path.startswith("/")
+    ):
         path = "/" + path
     next_target = request.url.path
     if request.url.query:

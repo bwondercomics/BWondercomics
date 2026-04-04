@@ -23,7 +23,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  font-family: "Bebas Neue", system-ui, sans-serif;
+  font-family: 'Bebas Neue', system-ui, sans-serif;
   letter-spacing: 0.02em;
   background:
     radial-gradient(circle at top, rgba(0, 217, 255, 0.16), transparent 32%),
@@ -85,7 +85,7 @@ input {
 .ops-login-card h1,
 .ops-header h1,
 .ops-section-header h2 {
-  font-family: "Righteous", cursive;
+  font-family: 'Righteous', cursive;
   letter-spacing: 0.04em;
   margin: 0;
 }

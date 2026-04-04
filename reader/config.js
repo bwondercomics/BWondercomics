@@ -68,7 +68,7 @@ export const CONFIG = {
   SWIPE_THRESHOLD: 50,
 
   /** Maximum time (ms) for a gesture to be considered a swipe */
-  SWIPE_TIMEOUT: 500
+  SWIPE_TIMEOUT: 500,
 };
 
 export const ENTRY_NUMBER_PATTERN = /(?:entry|issue|chapter)\s*(\d+)/i;

@@ -41,7 +41,7 @@ export function restartEntry(_entries) {
 export function changeEntry(name, entries, entryMeta = {}) {
   // Reset view state when switching entries.
   if (!entries[name]) return;
-  trackEntryExit("change_entry");
+  trackEntryExit('change_entry');
   state.currentEntry = name;
   state.pages = entries[name];
   state.pageIndex = 0;
@@ -51,5 +51,5 @@ export function changeEntry(name, entries, entryMeta = {}) {
   setActiveEntry();
   render();
   saveProgress(state);
-  window.dispatchEvent(new CustomEvent("entryChanged", { detail: { entry: name } }));
+  window.dispatchEvent(new CustomEvent('entryChanged', { detail: { entry: name } }));
 }

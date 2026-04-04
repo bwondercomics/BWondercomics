@@ -3,6 +3,7 @@
 This repo serves a plain HTML/CSS/JS frontend, with a FastAPI backend adding dynamic pieces (auth, comments, admin write APIs, scheduling + RSS, premium gating, analytics proxy).
 
 ## What runs where
+
 - **Static frontend** (served by Caddy in production): `index.html` (reader shell), `feed.html`, `media.html`, `comics.html`, plus JS modules under `reader/` and `admin/`. Public pages come from `dist/`; the admin UI is served from `/admin/*` (repo source) per the current Caddyfile.
 - **Static assets** (site chrome): `assets/` (icons, banners, UI images referenced by HTML and page configs).
 - **Reverse proxy + file server**: Caddy (see `deploy/Caddyfile`) serves static assets/files and proxies `/api/*`, DB-backed JSON endpoints, and exact public page routes used for dynamic branding to the API.
@@ -10,6 +11,7 @@ This repo serves a plain HTML/CSS/JS frontend, with a FastAPI backend adding dyn
 - **Database**: Postgres (Docker Compose recommended) stores users/comments, posts, series, and entries.
 
 ## Core data model
+
 - **Series**: a comic series (title/description, premium flag, and the per-series entry label like `Issue/Issues`).
 - **Entries**: the updates within a series (internally “entries”; a series can call them “issues”, “chapters”, “episodes”, etc).
 - **Entry pages**: ordered image paths for each entry (images live on disk under `comics/<seriesId>/entries/` for public pages or `protected/comics/<seriesId>/entries/` for premium/private; paths are stored in DB).
@@ -21,7 +23,9 @@ This repo serves a plain HTML/CSS/JS frontend, with a FastAPI backend adding dyn
 - **Site branding config**: the default `page_configs` record now also carries optional `site.ogImagePath` and `site.faviconPath` values for global branding. These must point to public assets.
 
 ## Routing + contracts (why the frontend still works)
+
 The backend serves **DB-backed JSON at the existing file paths** (Caddy proxies these to the API) so the reader/admin can keep using the same URLs:
+
 - Public:
   - `GET /series.json` → series list (DB-backed)
   - `GET /data.json` → default series entries (DB-backed)
@@ -34,11 +38,14 @@ The backend serves **DB-backed JSON at the existing file paths** (Caddy proxies 
 DB is the source of truth. Do not reintroduce static HTML/JSON files as a data store.
 
 The admin “save JSON” flow is also kept, but is intercepted and written to Postgres:
+
 - `POST /api/save` with `filename=admin/series.json` → updates series in DB
 - `POST /api/save` with `filename=admin/data.json` or `admin/series/<id>/data.json` → updates entries in DB
 
 ## Key user flows
+
 ### 1) Reading comics
+
 1. Browser loads `index.html`.
 2. `reader/app.js` determines `seriesId` from `?series=<id>` (default is `battle-bros`).
 3. Reader fetches:
@@ -50,6 +57,7 @@ The admin “save JSON” flow is also kept, but is intercepted and written to P
    - If a page path starts with `protected/`, the reader requests it via `/api/protected/<path>`.
 
 ### 2) Managing series + entries (admin)
+
 1. Admin opens `/admin/` and signs in (must be an `admin` role).
 2. Admin edits series settings (including the per-series entry label).
 3. Admin creates/edits entries, uploads pages, reorders pages, and saves.
@@ -57,6 +65,7 @@ The admin “save JSON” flow is also kept, but is intercepted and written to P
 5. File moves/copies (public ↔ protected) go through `/api/move-path` and `/api/copy-path`.
 
 ### 2a) Managing site branding (admin media)
+
 1. Admin opens the Media tab and selects a public media item.
 2. `Set as OG image` writes `site.ogImagePath` on the default page config.
 3. `Set as favicon` writes `site.faviconPath` on the default page config.
@@ -64,6 +73,7 @@ The admin “save JSON” flow is also kept, but is intercepted and written to P
 5. If the configured media is deleted or moved off `public`, the admin clears the affected branding field automatically before the media save finishes.
 
 ### 3) Posts + RSS
+
 - Admin CRUD happens at `/api/admin/posts`.
 - Public feed reads:
   - `/api/posts` (published-only; scheduled become visible when due)
@@ -71,14 +81,17 @@ The admin “save JSON” flow is also kept, but is intercepted and written to P
   - `/rss.xml` (generated from DB; only shareable + publishable posts)
 
 ### 4) Comments + roles
+
 - Auth: `/api/register`, `/api/login`, `/api/session`, `/api/logout` (cookie session).
 - Comments: `/api/comments` (read/write) with moderation routes under `/api/admin/*`.
 - Premium gating is enforced server-side based on request path + the user’s role.
 
 ### 5) Pretty URLs
+
 - `/series/<id>/` redirects to `/index.html?series=<id>` so you can link cleanly.
 
 ## Where to read code (entry points)
+
 - Backend runtime + routing: `backend/app/main.py`
 - Dynamic site-branding helpers/routes: `backend/app/site_branding.py`, `backend/app/routes/site_branding.py`
 - Series/entry JSON views and DB save logic: `backend/app/series_store.py`, `backend/app/routes/series_json.py`, `backend/app/routes/files.py`

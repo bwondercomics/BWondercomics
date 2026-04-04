@@ -15,6 +15,7 @@ Legacy note: This document predates the current DB-first architecture and may re
 **Impact**: Performance, security (information disclosure)
 
 **Files to modify**:
+
 - `reader/app.js` (lines 391, 410)
 - `reader/customization.js` (lines 61, 69)
 - `reader/data.js` (line 64)
@@ -22,9 +23,10 @@ Legacy note: This document predates the current DB-first architecture and may re
 **Solution**: Create a logger utility
 
 **Step 1** - Create `reader/logger.js`:
+
 ```javascript
-const isDevelopment = window.location.hostname === 'localhost' || 
-                      window.location.hostname === '127.0.0.1';
+const isDevelopment =
+  window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
 export const logger = {
   log: (...args) => {
@@ -34,23 +36,25 @@ export const logger = {
   error: (...args) => console.error(...args),
   info: (...args) => {
     if (isDevelopment) console.info(...args);
-  }
+  },
 };
 ```
 
 **Step 2** - Update `reader/app.js`:
+
 ```javascript
 // Add import at top
 import { logger } from './logger.js';
 
 // Replace line 391
-logger.log("🎬 Battle Bros Reader initialized");
+logger.log('🎬 Battle Bros Reader initialized');
 
 // Replace line 410
 logger.log(`Chapter data loaded for series: ${seriesId}`);
 ```
 
 **Step 3** - Update `reader/customization.js`:
+
 ```javascript
 // Add import
 import { logger } from './logger.js';
@@ -63,6 +67,7 @@ logger.log('Loaded config from localStorage draft (file not found)');
 ```
 
 **Step 4** - Update `reader/data.js`:
+
 ```javascript
 // Add import
 import { logger } from './logger.js';
@@ -79,6 +84,7 @@ logger.log(`✓ Page config loaded from ${configPath}`);
 **Impact**: Maintainability, file size
 
 **Step 1** - Create `assets/css/variables.css`:
+
 ```css
 :root {
   /* Colors */
@@ -88,28 +94,28 @@ logger.log(`✓ Page config loaded from ${configPath}`);
   --bg-dark: #0a0a12;
   --bg-panel: #1a1a2e;
   --text: #ffffff;
-  
+
   /* Spacing */
   --spacing-xs: 4px;
   --spacing-sm: 8px;
   --spacing-md: 16px;
   --spacing-lg: 24px;
   --spacing-xl: 32px;
-  
+
   /* Typography */
   --font-primary: 'Righteous', cursive;
   --font-secondary: 'Bebas Neue', cursive;
-  
+
   /* Transitions */
   --transition-fast: 0.15s ease;
   --transition-normal: 0.25s ease;
   --transition-slow: 0.4s ease;
-  
+
   /* Borders */
   --border-radius-sm: 5px;
   --border-radius-md: 8px;
   --border-radius-lg: 12px;
-  
+
   /* Shadows */
   --shadow-neon: 0 0 10px rgba(0, 217, 255, 0.3);
   --shadow-glow: 0 0 20px rgba(255, 0, 234, 0.3);
@@ -117,11 +123,13 @@ logger.log(`✓ Page config loaded from ${configPath}`);
 ```
 
 **Step 2** - Link in HTML files (add to `<head>`):
+
 ```html
-<link rel="stylesheet" href="assets/css/variables.css">
+<link rel="stylesheet" href="assets/css/variables.css" />
 ```
 
 **Step 3** - Remove duplicate `:root` blocks from:
+
 - `index.html`
 - `feed.html`
 - `comics.html`
@@ -135,11 +143,13 @@ logger.log(`✓ Page config loaded from ${configPath}`);
 **Impact**: Code consistency, bug prevention
 
 **Step 1** - Install ESLint:
+
 ```bash
 npm install --save-dev eslint @eslint/js
 ```
 
 **Step 2** - Create `eslint.config.js`:
+
 ```javascript
 import js from '@eslint/js';
 
@@ -155,25 +165,26 @@ export default [
         navigator: 'readonly',
         localStorage: 'readonly',
         fetch: 'readonly',
-        console: 'readonly'
-      }
+        console: 'readonly',
+      },
     },
     rules: {
       'no-console': ['warn', { allow: ['warn', 'error'] }],
       'no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       'prefer-const': 'error',
       'no-var': 'error',
-      'eqeqeq': ['error', 'always'],
-      'curly': ['error', 'all']
-    }
+      eqeqeq: ['error', 'always'],
+      curly: ['error', 'all'],
+    },
   },
   {
-    ignores: ['node_modules/**', 'backend/**', 'tests/**']
-  }
+    ignores: ['node_modules/**', 'backend/**', 'tests/**'],
+  },
 ];
 ```
 
 **Step 3** - Add scripts to `package.json`:
+
 ```json
 {
   "scripts": {
@@ -193,6 +204,7 @@ export default [
 **Step 1** - Already installed ✓
 
 **Step 2** - Create `.prettierrc.json`:
+
 ```json
 {
   "semi": true,
@@ -206,6 +218,7 @@ export default [
 ```
 
 **Step 3** - Create `.prettierignore`:
+
 ```
 node_modules
 backend
@@ -214,6 +227,7 @@ backend
 ```
 
 **Step 4** - Add scripts to `package.json`:
+
 ```json
 {
   "scripts": {
@@ -233,6 +247,7 @@ backend
 **Impact**: Maintainability, consistency
 
 **Step 1** - Create `reader/auth.js`:
+
 ```javascript
 export class AuthManager {
   constructor() {
@@ -259,7 +274,7 @@ export class AuthManager {
     const response = await fetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password }),
     });
 
     if (!response.ok) {
@@ -283,7 +298,7 @@ export class AuthManager {
   }
 
   notify() {
-    this.listeners.forEach(cb => cb(this.user));
+    this.listeners.forEach((cb) => cb(this.user));
   }
 
   isAdmin() {
@@ -299,6 +314,7 @@ export const auth = new AuthManager();
 ```
 
 **Step 2** - Usage in `feed.html` and `index.html`:
+
 ```javascript
 import { auth } from './reader/auth.js';
 
@@ -326,44 +342,50 @@ try {
 **Impact**: Maintainability, readability
 
 **Step 1** - Create `reader/constants.js`:
+
 ```javascript
 export const CONSTANTS = {
   // Touch/Gesture
   DOUBLE_TAP_DELAY: 300,
   PINCH_THRESHOLD: 10,
   SWIPE_THRESHOLD: 50,
-  
+
   // Zoom
   MIN_SCALE: 0.5,
   MAX_SCALE: 4,
   ZOOM_STEP: 0.2,
-  
+
   // Animation
   TRANSITION_DURATION: 300,
   DEBOUNCE_DELAY: 150,
-  
+
   // Cache
   MAX_CACHED_IMAGES: 10,
   PRELOAD_PAGES: 2,
-  
+
   // LocalStorage
   STORAGE_KEY: 'battleBros_progress',
-  
+
   // UI
   MOBILE_BREAKPOINT: 768,
-  HEADER_HEIGHT: 60
+  HEADER_HEIGHT: 60,
 };
 ```
 
 **Step 2** - Use in modules:
+
 ```javascript
 import { CONSTANTS } from './constants.js';
 
 // Instead of:
-if (timeSinceLastTap < 300) { /* ... */ }
+if (timeSinceLastTap < 300) {
+  /* ... */
+}
 
 // Use:
-if (timeSinceLastTap < CONSTANTS.DOUBLE_TAP_DELAY) { /* ... */ }
+if (timeSinceLastTap < CONSTANTS.DOUBLE_TAP_DELAY) {
+  /* ... */
+}
 ```
 
 ---
@@ -376,11 +398,13 @@ if (timeSinceLastTap < CONSTANTS.DOUBLE_TAP_DELAY) { /* ... */ }
 **Impact**: Load time, bundle size
 
 **Step 1** - Install Vite:
+
 ```bash
 npm install --save-dev vite
 ```
 
 **Step 2** - Create `vite.config.js`:
+
 ```javascript
 import { defineConfig } from 'vite';
 
@@ -394,26 +418,27 @@ export default defineConfig({
         feed: 'feed.html',
         comics: 'comics.html',
         media: 'media.html',
-        admin: 'admin/index.html'
-      }
+        admin: 'admin/index.html',
+      },
     },
     minify: 'terser',
     terserOptions: {
       compress: {
-        drop_console: true
-      }
-    }
+        drop_console: true,
+      },
+    },
   },
   server: {
     port: 3000,
     proxy: {
-      '/api': 'http://localhost:8000'
-    }
-  }
+      '/api': 'http://localhost:8000',
+    },
+  },
 });
 ```
 
 **Step 3** - Add build scripts to `package.json`:
+
 ```json
 {
   "scripts": {
@@ -425,6 +450,7 @@ export default defineConfig({
 ```
 
 **Step 4** - Development workflow:
+
 ```bash
 # Development
 npm run dev
@@ -444,6 +470,7 @@ npm run preview
 **Impact**: Initial load time, bandwidth
 
 **Step 1** - Add lazy loading attributes to chapter images:
+
 ```javascript
 // In reader/render.js
 function renderPage(imageSrc, pageNumber) {
@@ -457,22 +484,26 @@ function renderPage(imageSrc, pageNumber) {
 ```
 
 **Step 2** - For cover gallery, implement Intersection Observer:
+
 ```javascript
 // In reader/gallery.js
-const imageObserver = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    if (entry.isIntersecting) {
-      const img = entry.target;
-      if (img.dataset.src) {
-        img.src = img.dataset.src;
-        img.removeAttribute('data-src');
-        imageObserver.unobserve(img);
+const imageObserver = new IntersectionObserver(
+  (entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting) {
+        const img = entry.target;
+        if (img.dataset.src) {
+          img.src = img.dataset.src;
+          img.removeAttribute('data-src');
+          imageObserver.unobserve(img);
+        }
       }
-    }
-  });
-}, {
-  rootMargin: '50px'
-});
+    });
+  },
+  {
+    rootMargin: '50px',
+  }
+);
 
 // Use data-src for images
 const img = document.createElement('img');
@@ -489,6 +520,7 @@ imageObserver.observe(img);
 **Impact**: Initial bundle size
 
 **Step 1** - Use dynamic imports for heavy features:
+
 ```javascript
 // In reader/app.js
 
@@ -518,11 +550,13 @@ async function loadCustomization() {
 **Impact**: Security vulnerability
 
 **Step 1** - Install CSRF library:
+
 ```bash
 pip install fastapi-csrf-protect
 ```
 
 **Step 2** - Update `backend/app/main.py`:
+
 ```python
 from fastapi_csrf_protect import CsrfProtect
 from fastapi_csrf_protect.exceptions import CsrfProtectError
@@ -537,6 +571,7 @@ def csrf_protect_exception_handler(request, exc):
 ```
 
 **Step 3** - Protect routes:
+
 ```python
 from fastapi_csrf_protect import CsrfProtect
 
@@ -557,11 +592,13 @@ async def create_comment(
 **Impact**: Security, availability
 
 **Step 1** - Install slowapi:
+
 ```bash
 pip install slowapi
 ```
 
 **Step 2** - Update `backend/app/main.py`:
+
 ```python
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -573,6 +610,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 ```
 
 **Step 3** - Apply to sensitive routes:
+
 ```python
 from slowapi import Limiter
 
@@ -590,11 +628,13 @@ async def login(request: Request, ...):
 **Impact**: XSS vulnerability
 
 **Step 1** - Install bleach:
+
 ```bash
 pip install bleach
 ```
 
 **Step 2** - Create sanitization utility in `backend/app/security.py`:
+
 ```python
 import bleach
 
@@ -612,6 +652,7 @@ def sanitize_comment(text: str) -> str:
 ```
 
 **Step 3** - Use in comment routes:
+
 ```python
 from .security import sanitize_comment
 
@@ -628,12 +669,14 @@ async def create_comment(data: CommentCreate, ...):
 ### Fix 5.1: Add E2E Tests with Playwright
 
 **Step 1** - Install Playwright:
+
 ```bash
 npm install --save-dev @playwright/test
 npx playwright install
 ```
 
 **Step 2** - Create `playwright.config.js`:
+
 ```javascript
 import { defineConfig } from '@playwright/test';
 
@@ -652,6 +695,7 @@ export default defineConfig({
 ```
 
 **Step 3** - Create `tests/e2e/reader.spec.js`:
+
 ```javascript
 import { test, expect } from '@playwright/test';
 
@@ -678,6 +722,7 @@ test.describe('Comic Reader', () => {
 ```
 
 **Step 4** - Add test script:
+
 ```json
 {
   "scripts": {
@@ -709,16 +754,19 @@ After implementing fixes:
 ## Estimated Impact
 
 **Performance**:
+
 - Initial load time: -40% (from ~3s to ~1.8s)
 - Bundle size: -35% (from ~500KB to ~325KB)
 - Lighthouse score: +15 points (from ~75 to ~90)
 
 **Code Quality**:
+
 - Lines of duplicate code: -60%
 - Maintainability index: +25%
 - Test coverage: +30% (from 50% to 80%)
 
 **Security**:
+
 - OWASP Top 10 issues: -3 (CSRF, Rate Limiting, XSS)
 - Security score: Improved from B to A
 

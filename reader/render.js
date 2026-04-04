@@ -24,12 +24,12 @@ function getEmptyEntryMessage() {
   if (comingSoon) {
     return {
       title: 'COMING SOON',
-      detail: publishAt ? `Scheduled for ${publishAt}` : 'Scheduled for a future release.'
+      detail: publishAt ? `Scheduled for ${publishAt}` : 'Scheduled for a future release.',
     };
   }
   return {
     title: 'NO PAGES YET',
-    detail: 'This entry is not available right now.'
+    detail: 'This entry is not available right now.',
   };
 }
 
@@ -49,7 +49,7 @@ function ensureEmptyStateContainer() {
       'padding: 24px',
       'background: rgba(10, 10, 18, 0.85)',
       'color: var(--text)',
-      'z-index: 5'
+      'z-index: 5',
     ].join('; ');
     el.viewport.appendChild(container);
   }
@@ -80,7 +80,7 @@ function rememberPageMetric(url, imgEl) {
   if (!url || !imgEl?.naturalWidth || !imgEl?.naturalHeight) return null;
   const metric = {
     width: imgEl.naturalWidth,
-    height: imgEl.naturalHeight
+    height: imgEl.naturalHeight,
   };
   state.pageMetrics.set(url, metric);
   return metric;
@@ -193,7 +193,7 @@ export function loadImage(imgEl, spinnerEl, url) {
 
   imgEl.src = url;
 
-  preloadImage(url).catch(() => { });
+  preloadImage(url).catch(() => {});
 }
 
 /**
@@ -205,7 +205,7 @@ export function preloadUpcoming() {
   const endIdx = Math.min(state.pages.length, startIdx + CONFIG.PRELOAD_AHEAD);
 
   for (let i = startIdx; i < endIdx; i++) {
-    preloadImage(state.pages[i]).catch(() => { });
+    preloadImage(state.pages[i]).catch(() => {});
   }
 }
 
@@ -280,7 +280,8 @@ export function updateUI() {
     if (el.indicator) {
       const meta = state.entryMeta || {};
       const status = String(meta.status || '').toLowerCase();
-      el.indicator.textContent = status === 'scheduled' || meta.comingSoon ? 'COMING SOON' : 'NO PAGES';
+      el.indicator.textContent =
+        status === 'scheduled' || meta.comingSoon ? 'COMING SOON' : 'NO PAGES';
     }
     if (el.progressFill) el.progressFill.style.width = '0%';
     if (el.prevBtn) el.prevBtn.disabled = true;
@@ -300,7 +301,7 @@ export function updateUI() {
 
   if (el.progressFill) {
     const displayed = Math.min(total, state.pageIndex + (twoPageMode ? 2 : 1));
-    el.progressFill.style.width = ((displayed / total) * 100) + '%';
+    el.progressFill.style.width = (displayed / total) * 100 + '%';
   }
 
   if (el.prevBtn) {
@@ -314,7 +315,6 @@ export function updateUI() {
   }
 
   const finished =
-    state.pageIndex >= total - 1 ||
-    (twoPageMode && state.pageIndex + 1 >= total - 1);
+    state.pageIndex >= total - 1 || (twoPageMode && state.pageIndex + 1 >= total - 1);
   if (finished) markEntryComplete();
 }
