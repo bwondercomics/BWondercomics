@@ -6,6 +6,7 @@ Recommended starting points:
 - `docs/OPERATIONS.md` (runbook + maintenance shortcuts)
 - `docs/ARCHITECTURE.md` (what runs where)
 - `docs/ROADMAP.md` (phase checklist)
+- `docs/READER_BUILDER_QA.md` (`0.8.0` manual QA worksheet for reader + page-builder lock)
 - `docs/STOAT_SSO_PLAN.md` (Stoat/Revolt subdomain + OIDC SSO implementation plan)
 - `deploy/README.md` (how to run it on a server)
 - `docs/admin-overview.md` (admin panel behavior)

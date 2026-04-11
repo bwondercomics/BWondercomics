@@ -22,7 +22,7 @@ This document covers the admin panel (content editor) architecture, data flow, a
 - Status message: Editable site-wide status stored with entry payload.
 - Blog/updates: CRUD for posts via the DB-backed API (`/api/admin/posts`), with draft/scheduled/published and a “publish date/time” field.
 - Media library: Load/save `/media.json` (DB-backed); search/filter by tags/path; sync with disk via `/api/list-media`; apply media to posts; tag propagation from posts; per-item access (`public`/`premium`/`private`) and premium visibility (`blur`/`hidden`). Premium/private items are stored under `protected/media/`. Post images may be copied to `media/post-assets/` automatically; that folder is derived and excluded from media sync. Blurred previews live at `media/previews/` and are excluded from the admin list; the preview panel shows both the original and public preview.
-- Page builder: Structured page editing for landing/custom pages, with a page list, canvas, module palette, and right-side inspector. Module fields, theme controls, and section settings use explicit local drafts with `Save`/`Discard`, while structural actions such as add, move, reorder, and delete remain immediate.
+- Page builder: Structured page editing for landing/custom pages, with a page list, canvas, module palette, and right-side inspector. Module fields, theme controls, and section settings use explicit local drafts with `Save`/`Discard`, while structural actions such as add, move, reorder, and delete remain immediate. The canvas header shows page status (`Published`/`Draft`/`Homepage`) and makes it explicit when `Open Reader` is opening a draft preview.
 - Preview/export: Entry preview image navigation; JSON export/copy; share data assembly.
 - UI: Modals for entry edit and renumber confirmation; indicators for unsaved changes; smooth scroll to sections.
 - Series settings: Each series can set its own singular/plural label (e.g., `Issue/Issues`, `Chapter/Chapters`) stored in the DB and served at `admin/series.json`.
@@ -83,6 +83,7 @@ flowchart LR
 
 - Layout: the builder uses a page rail, central canvas, and right inspector. On wide screens the left rail starts expanded and the inspector starts docked; both user choices persist in `localStorage`.
 - Explicit-save editing: module forms, theme controls, and section settings edit local draft state first. The inspector footer shows `Save`/`Discard`, and the builder blocks tab switches, module switches, and page switches while a draft is dirty.
+- Draft/publish clarity: the canvas header keeps the page status visible at all times. When a page is unpublished, the header warns that `Open Reader` is loading the draft preview route until the page is published.
 - Immediate structure editing: sections and modules can be inserted inline at exact positions; module drag handles support reorder within a column or move across sections/columns; section drag handles reorder sections vertically.
 - Theme behavior: theme save persists color tokens, panel backgrounds, panel spacing, and empty-state metadata together. `Discard` restores the current page state, and `Reset to Default` rebuilds the full theme draft instead of only resetting colors.
 - Canvas density: section headers stay compact by default, while spacing and secondary section controls live in a `Section Settings` drawer for the active section.

@@ -71,3 +71,10 @@ body::after {
   animation: scanline 6s linear infinite;
   opacity: 0.4;
 }
+
+html.reader-bootstrap-loading body > .skip-to-content,
+html.reader-bootstrap-loading body > header.topbar,
+html.reader-bootstrap-loading body > main {
+  opacity: 0;
+  visibility: hidden;
+}

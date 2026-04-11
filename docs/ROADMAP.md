@@ -37,6 +37,8 @@ Goal: make the current repo honest, green, and stable enough to harden against.
 
 Goal: freeze the existing builder-first architecture as the `1.0` shape.
 
+Worksheet: `docs/READER_BUILDER_QA.md`
+
 - [ ] Treat per-series pages, `isHomepage`, draft/publish, and open-reader workflow as the canonical page-builder model.
 - [ ] Audit daily-use reader flows end to end: saved progress, entry switching, store entries, premium gating, comments, gallery, latest update, and analytics tracking.
 - [ ] Update builder-facing docs to remove stale “future feature” language where the behavior already exists.

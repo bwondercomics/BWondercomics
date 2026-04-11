@@ -4,6 +4,7 @@ import { logger } from './logger.js';
 
 (function () {
   'use strict';
+  const READER_BOOT_STATE_KEY = '__BW_READER_BOOT__';
 
   const seriesId = getActiveSeriesId();
   // Default config matches original HTML
@@ -56,6 +57,12 @@ import { logger } from './logger.js';
   };
 
   async function initCustomization() {
+    const bootState = window[READER_BOOT_STATE_KEY];
+    const pageConfigResult = bootState?.pageConfigReady ? await bootState.pageConfigReady : null;
+    if (pageConfigResult?.source === 'builder' || pageConfigResult?.source === 'error') {
+      return;
+    }
+
     let config = null;
     try {
       const configPath = getSeriesPageConfigPath(seriesId);

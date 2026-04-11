@@ -393,10 +393,14 @@ describe('admin page-builder shell', () => {
     expect(document.getElementById('pbPageTitle')?.textContent).toContain('reader');
     expect(document.getElementById('pbPageTitle')?.textContent).toContain('Published');
     expect(document.getElementById('pbPageTitle')?.textContent).toContain('Homepage');
+    expect(document.getElementById('pbPageTitle')?.textContent).toContain(
+      'Published page. Open Reader matches the public reader.'
+    );
 
     const link = document.querySelector('.pb-open-reader-link');
     expect(link?.getAttribute('href')).toContain('../index.html?series=battle-bros&page=reader');
     expect(link?.getAttribute('href')).not.toContain('draft=1');
+    expect(link?.textContent).toContain('Open Reader');
 
     document
       .getElementById('pbSaveDraft')
@@ -408,8 +412,14 @@ describe('admin page-builder shell', () => {
       expect.objectContaining({ isPublished: false })
     );
     expect(document.getElementById('pbPageTitle')?.textContent).toContain('Draft');
+    expect(document.getElementById('pbPageTitle')?.textContent).toContain(
+      'Draft page. Open Reader loads the draft preview until you publish changes.'
+    );
     expect(document.querySelector('.pb-open-reader-link')?.getAttribute('href')).toContain(
       'draft=1'
+    );
+    expect(document.querySelector('.pb-open-reader-link')?.textContent).toContain(
+      'Open Draft Preview'
     );
 
     document.getElementById('pbPublish')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -420,8 +430,12 @@ describe('admin page-builder shell', () => {
       expect.objectContaining({ isPublished: true })
     );
     expect(document.getElementById('pbPageTitle')?.textContent).toContain('Published');
+    expect(document.getElementById('pbPageTitle')?.textContent).toContain(
+      'Published page. Open Reader matches the public reader.'
+    );
     expect(document.querySelector('.pb-open-reader-link')?.getAttribute('href')).not.toContain(
       'draft=1'
     );
+    expect(document.querySelector('.pb-open-reader-link')?.textContent).toContain('Open Reader');
   });
 });

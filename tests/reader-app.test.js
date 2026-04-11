@@ -36,6 +36,8 @@ async function bootReaderApp({ sessionKey = 'guest', savedProgress = null } = {}
   vi.resetModules();
   mountReaderDom();
   stubReaderGlobals(vi);
+  document.documentElement.classList.add('reader-bootstrap-loading');
+  window.__bwReaderBootRelease = window.setTimeout(() => {}, 5000);
   localStorage.clear();
   if (savedProgress) {
     localStorage.setItem(STORAGE.PROGRESS_KEY, JSON.stringify(savedProgress));
@@ -203,6 +205,8 @@ describe('reader app bootstrap', () => {
     expect(state.pageIndex).toBe(1);
     expect(document.getElementById('entry').value).toBe('Issue 10');
     expect(document.querySelectorAll('#entrySelectMenu .entry-option--locked')).toHaveLength(1);
+    expect(document.documentElement.classList.contains('reader-bootstrap-loading')).toBe(false);
+    expect(document.body.dataset.readerPageSource).toBe('builder');
     expect(events.length).toBeGreaterThan(0);
   });
 

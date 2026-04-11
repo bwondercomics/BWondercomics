@@ -32,7 +32,7 @@ Related docs:
    - [x] Add "Open reader for this page" link.
 2. Published flag off
    - [x] Display publish status in list + header.
-   - [ ] Warn on save if unpublished for active reader page.
+   - [x] Warn on save if unpublished for active reader page.
 3. Module type mismatch
    - Constrain module types per slot.
    - Warn when a module won't render in reader.

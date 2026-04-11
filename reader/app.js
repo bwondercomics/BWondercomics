@@ -81,6 +81,50 @@ import { getActiveSeriesId, getRequestedPageSlug, isDraftPageRequested } from '.
 
 (function () {
   'use strict';
+  const READER_BOOT_CLASS = 'reader-bootstrap-loading';
+  const READER_BOOT_TIMEOUT_KEY = '__bwReaderBootRelease';
+  const READER_BOOT_STATE_KEY = '__BW_READER_BOOT__';
+
+  function getReaderBootState() {
+    const existing = window[READER_BOOT_STATE_KEY];
+    if (existing) return existing;
+
+    let resolvePageConfigReady;
+    const pageConfigReady = new Promise((resolve) => {
+      resolvePageConfigReady = resolve;
+    });
+    const state = {
+      pageConfig: null,
+      pageConfigReady,
+      pageConfigResolved: false,
+      resolvePageConfig(result) {
+        if (state.pageConfigResolved) return;
+        state.pageConfig = result || { source: 'none' };
+        state.pageConfigResolved = true;
+        resolvePageConfigReady(state.pageConfig);
+      },
+    };
+
+    window[READER_BOOT_STATE_KEY] = state;
+    return state;
+  }
+
+  const readerBootState = getReaderBootState();
+
+  function releaseReaderBootstrap(pageSource = 'none') {
+    const root = document.documentElement;
+    root.classList.remove(READER_BOOT_CLASS);
+    if (document.body) {
+      document.body.dataset.readerPageSource = pageSource;
+    }
+
+    const timeoutId = window[READER_BOOT_TIMEOUT_KEY];
+    if (timeoutId) {
+      window.clearTimeout(timeoutId);
+      delete window[READER_BOOT_TIMEOUT_KEY];
+    }
+  }
+
   // ==================== ENTRY HELPERS ====================
 
   // Helpers now live in reader/entries.js
@@ -836,11 +880,13 @@ import { getActiveSeriesId, getRequestedPageSlug, isDraftPageRequested } from '.
           </div>
         `;
     }
+    readerBootState.resolvePageConfig({ source: 'error' });
+    releaseReaderBootstrap('error');
   }
 
   // ==================== INITIALIZATION ====================
 
-  function init() {
+  function init(pageSource = 'none') {
     initElements();
     initEntrySelect();
     initReaderAnalytics();
@@ -870,6 +916,7 @@ import { getActiveSeriesId, getRequestedPageSlug, isDraftPageRequested } from '.
           </div>
         `;
       }
+      releaseReaderBootstrap(pageSource);
       return;
     }
     const saved = loadProgress();
@@ -894,6 +941,7 @@ import { getActiveSeriesId, getRequestedPageSlug, isDraftPageRequested } from '.
 
     attachEventHandlers();
     render();
+    releaseReaderBootstrap(pageSource);
 
     logger.log('🎬 Battle Bros Reader initialized');
   }
@@ -964,11 +1012,12 @@ import { getActiveSeriesId, getRequestedPageSlug, isDraftPageRequested } from '.
       pageSlug: requestedPageSlug,
       draft: role === 'admin' && isDraftPageRequested(),
     });
+    readerBootState.resolvePageConfig(pageConfig);
     if (pageConfig.source === 'builder' && pageConfig.page) {
       applyBuilderPageToDOM(pageConfig.page);
     }
     loadLatestUpdate();
-    init();
+    init(pageConfig.source);
   }
 
   window.addEventListener('bbSessionChanged', (event) => {

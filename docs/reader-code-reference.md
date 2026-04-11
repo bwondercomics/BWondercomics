@@ -4,10 +4,10 @@ This guide maps the reader-side modules, their responsibilities, and how they co
 
 ## Module Inventory
 
-- `reader/app.js` — Composition root; wires modules together, bootstraps data load, kicks off render, and binds global events.
+- `reader/app.js` — Composition root; coordinates the reader bootstrap, keeps the static shell hidden until the initial page source is known, kicks off render, and binds global events.
 - `reader/config.js` — Constants for storage keys, debounce timings, UI thresholds (e.g., two-page breakpoints), and default options.
 - `reader/dom.js` — Centralized DOM lookups; a single source of element references used across modules, including `#mainContent` for on-page frame sizing.
-- `reader/data.js` — Fetches `/data.json` (or `/series/<id>/data.json`), `/page-config.json` (DB-backed), and `/api/posts/latest`; normalizes entry metadata, page-config overrides, and maps `protected/*` asset paths to `/api/protected/*`.
+- `reader/data.js` — Fetches `/data.json` (or `/series/<id>/data.json`), the builder page API with legacy `page-config.json` fallback for the default reader slug, and `/api/posts/latest`; normalizes entry metadata, page-config overrides, and maps `protected/*` asset paths to `/api/protected/*`.
 - `reader/state.js` — Single state container: current entry/page, zoom, fit mode, progress persistence (localStorage), cached natural page metrics, and derived helpers (e.g., `isTwoPageMode`).
 - `reader/render.js` — Renders pages into the stage, caches natural page dimensions as images preload/load, reapplies non-fullscreen frame fitting, and updates UI labels/buttons.
 - `reader/controls.js` — Keyboard and click navigation (prev/next, first/last, toggle two-page, reset zoom, fullscreen), debounce helpers, and guard rails when zoomed.
@@ -19,7 +19,7 @@ This guide maps the reader-side modules, their responsibilities, and how they co
 - `reader/overlays.js` — Shortcuts modal, help overlays, and shared show/hide helpers.
 - `reader/latest.js` — Renders the “Latest update” widget from the post returned by `/api/posts/latest`.
 - `reader/email.js` — Signup form submission to the internal API (`POST /api/email/subscribe`) with inline success/error feedback.
-- `reader/customization.js` — Public `window.BattleBros` API (set subtitle, set subtitle list, random subtitle) and dynamic theme/app bar updates.
+- `reader/customization.js` — Legacy page-config applier for non-builder reader pages; waits for `reader/app.js` to resolve the initial page source, then no-ops when the builder page already owns the DOM.
 - `reader/entries.js` — Entry metadata helpers: sort entries, derive page arrays, next/prev entry lookup.
 - `reader/transform.js` — Math utilities for scale/translate clamping, pointer focal calculations, fullscreen fitting, and desktop on-page frame sizing for the visible page or spread.
 - `assets/css/main.core.11-viewport.css` — Viewport layout rules, including the `.viewport.dynamic-frame` mode used by desktop on-page sizing.
@@ -28,16 +28,17 @@ This guide maps the reader-side modules, their responsibilities, and how they co
 
 ```mermaid
 flowchart TD
-  A[startup] --> B[load data.json + page-config.json + /api/posts/latest]
-  B --> C[populate state (entries, folders, status)]
-  C --> D[render initial entry/page]
-  D --> E[attach controls + pointer + fullscreen listeners]
-  E --> F{user input}
-  F -->|prev/next/entry| G[controls -> state -> render]
-  F -->|zoom/pan| H[pointer -> state -> render]
-  F -->|fullscreen| I[fullscreen -> state -> render]
-  F -->|gallery/help| J[overlays/gallery toggles]
-  D --> K[persist progress (localStorage)]
+  A[startup] --> B[hide static shell + load data.json]
+  B --> C[resolve builder page or legacy page-config + load latest post]
+  C --> D[populate state (entries, folders, status)]
+  D --> E[render initial entry/page]
+  E --> F[release bootstrap state + attach controls/listeners]
+  F --> G{user input}
+  G -->|prev/next/entry| H[controls -> state -> render]
+  G -->|zoom/pan| I[pointer -> state -> render]
+  G -->|fullscreen| J[fullscreen -> state -> render]
+  G -->|gallery/help| K[overlays/gallery toggles]
+  E --> L[persist progress (localStorage)]
 ```
 
 ## Key Responsibilities by Module
@@ -69,20 +70,22 @@ flowchart TD
   - Keeps button state and auto-hide controls synchronized with fullscreen state.
 - **data.js**
   - Fetches JSON with `cache: 'no-store'` to avoid stale content.
-  - Normalizes status message, entry folder mapping, and optional theme/layout overrides from `page-config.json`.
-  - Exposes `loadEntryData()`, `loadPageConfig()`, and `loadLatestPost()` for startup wiring.
+  - Normalizes status message, entry folder mapping, builder-page metadata, and optional legacy `page-config.json` overrides.
+  - Exposes `loadEntryData()`, `loadPageConfigWithFallback()`, and `loadLatestPost()` for startup wiring.
 - **latest.js**
   - Selects the newest post (by date) where `share !== false`.
   - Formats date (`toLocaleString`) and safely injects HTML-escaped content preview.
 - **email.js**
   - Submits to `/api/email/subscribe`, toggles success/error states inline.
 - **customization.js**
-  - Exposes `window.BattleBros` helpers; updates DOM for subtitle/banner/button tweaks at runtime.
+  - Preserves the legacy `page-config.json` contract for default reader pages that do not yet have a builder page.
+  - Waits for the bootstrap state from `app.js` and skips all DOM mutations when the initial page source is `builder` or `error`.
 
 ## Data Sources
 
 - `data.json` — Entries, entryFolders, statusMessage.
 - `/api/posts/latest` — DB-backed latest blog post for the “Latest update” widget.
+- `/api/pages/<seriesId>/<slug>` — Preferred page-builder source for reader chrome and panel content.
 - `/page-config.json` (and `/series/<id>/page-config.json`) — Optional theming, header/panel content, button list, and layout ordering (DB-backed).
 - `localStorage` — Reading progress (`battleBros_progress` via `config`).
 
@@ -95,18 +98,20 @@ flowchart TD
 
 ## Testing
 
-- Vitest suite (`tests/entries.test.js`, `tests/data.test.js`, `tests/render.test.js`, `tests/state.test.js`, `tests/transform.test.js`, `tests/on-page-frame.test.js`) covers:
+- Vitest suite (`tests/entries.test.js`, `tests/data.test.js`, `tests/render.test.js`, `tests/state.test.js`, `tests/transform.test.js`, `tests/on-page-frame.test.js`, `tests/reader-app.test.js`, `tests/reader-data-builder.test.js`, `tests/reader-customization.test.js`) covers:
   - Page resolution and ordering
   - Progress save/load with localStorage error handling
   - Two-page mode logic
   - On-page frame size math for portrait, landscape, and spread layouts
   - DOM/render regressions for navigation-driven frame updates, fullscreen bypass, and stacked/mobile fallback
+  - Reader bootstrap release after builder-page application and the no-flash handoff from the static shell
+  - Legacy `page-config.json` coordination so `customization.js` only runs when the builder path did not claim the page
   - Entry sorting and normalization
 
 ## Common Extension Points
 
-- Add a new header button: edit page config in admin (stored in DB and served at `/page-config.json`); `customization.js` renders them at startup.
-- Change theme/branding: edit page config in admin (theme vars stored in DB); `customization.js` applies to CSS variables.
+- Add a new header button: update the reader builder page first; use legacy page config only if the default reader slug still relies on the fallback path.
+- Change theme/branding: prefer the builder page theme metadata; legacy `page-config.json` remains available for fallback pages and shared branding fields.
 
 ## Gotchas / Notes
 

@@ -166,6 +166,21 @@ function renderPageStatusBadges(page) {
   return badges.join('');
 }
 
+function getReaderLinkLabel(page) {
+  return page?.isPublished === false ? 'Open Draft Preview' : 'Open Reader';
+}
+
+function getReaderPreviewNote(page) {
+  if (page?.isPublished === false) {
+    return 'Draft page. Open Reader loads the draft preview until you publish changes.';
+  }
+  return 'Published page. Open Reader matches the public reader.';
+}
+
+function getReaderPreviewStatus(page) {
+  return page?.isPublished === false ? 'warning' : 'neutral';
+}
+
 function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSections, setActiveNav }) {
   let pages = [];
   let currentPage = null;
@@ -565,6 +580,12 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
       renderPageList();
       renderCanvas();
       renderEditorPanel();
+      setEditorStatus(
+        isPublished
+          ? 'Page published. Open Reader now matches the public page.'
+          : 'Draft saved. Open Reader now uses the draft preview until you publish.',
+        isPublished ? 'success' : 'warning'
+      );
       releaseButtons(activeButton, isPublished ? 'Published' : 'Draft Saved');
     } catch (err) {
       console.error('Page status update error:', err);
@@ -821,9 +842,12 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
             <div class="pb-page-title-actions">
               <span class="pb-page-title-badges">${renderPageStatusBadges(currentPage)}</span>
               <a class="pb-open-reader-link" href="${escapeAttr(getReaderUrl(currentPage))}" target="_blank" rel="noopener noreferrer">
-                Open Reader
+                ${escapeHtml(getReaderLinkLabel(currentPage))}
               </a>
             </div>
+          </div>
+          <div class="pb-page-title-note" data-status="${escapeAttr(getReaderPreviewStatus(currentPage))}">
+            ${escapeHtml(getReaderPreviewNote(currentPage))}
           </div>
         `;
       }

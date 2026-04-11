@@ -72,7 +72,8 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - `tests/reader-controls.test.js`: `reader/controls.js` navigation and end-of-entry behavior
 - `tests/reader-fullscreen.test.js`: `reader/fullscreen.js` enter/exit and controls-bar timing
 - `tests/reader-pointer.test.js`: `reader/pointer.js` swipe, drag, double-tap, and edge zones
-- `tests/reader-app.test.js`: `reader/app.js` boot, session gating, shortcuts, and resize behavior against `index.html`
+- `tests/reader-app.test.js`: `reader/app.js` boot, session gating, shortcuts, resize behavior, and bootstrap-loading release against `index.html`
+- `tests/reader-customization.test.js`: coordination between `reader/app.js` bootstrap state and `reader/customization.js` so legacy page-config mutations do not overwrite builder pages
 - `tests/render.test.js`: two-page mode/render helpers
 - `tests/transform.test.js`: on-page sizing math
 - `tests/on-page-frame.test.js`: DOM/render frame sizing regressions

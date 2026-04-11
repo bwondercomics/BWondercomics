@@ -14,6 +14,16 @@
     />
     <meta name="author" content="Battle Bros Comics" />
     <meta name="theme-color" content="#00d9ff" />
+    <script>
+      (() => {
+        const root = document.documentElement;
+        root.classList.add('reader-bootstrap-loading');
+        window.__bwReaderBootRelease = window.setTimeout(() => {
+          root.classList.remove('reader-bootstrap-loading');
+          delete window.__bwReaderBootRelease;
+        }, 5000);
+      })();
+    </script>
 
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website" />
