@@ -71,6 +71,15 @@ Use this worksheet for the `0.8.0` reader + builder lock pass. The goal is not t
 - [ ] Explicit-save editing
   - Modify a module, theme settings, and section settings.
   - Confirm dirty-state blocking works and `Save`/`Discard` do what they claim.
+- [ ] Page header editing
+  - Open both an existing page and a newly created page.
+  - Click the header surface in the canvas and change the title, subtitle, and at least one navigation button.
+  - Save the header, reload the builder, and confirm the edited values persist in the header editor and the canvas preview.
+  - Open the reader from the builder and confirm the same title/subtitle/buttons render there.
+- [ ] Builder-page links from the header
+  - Add a header button that targets another builder page in the same series.
+  - Open the reader and confirm the button routes to `?page=<slug>` for the selected series.
+  - Repeat with a URL target and an anchor target to confirm all three link modes still behave correctly.
 - [ ] Open-reader verification
   - From a published non-reader page, open the reader and confirm the selected page renders.
   - Repeat for a draft page and confirm the builder warning matches the actual reader route.

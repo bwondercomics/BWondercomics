@@ -1,6 +1,9 @@
 export async function fetchPages(seriesId) {
   try {
-    const res = await fetch(`/api/admin/pages?series_id=${encodeURIComponent(seriesId)}`);
+    const res = await fetch(`/api/admin/pages?series_id=${encodeURIComponent(seriesId)}`, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
     if (!res.ok) throw new Error('Failed to fetch pages');
     const data = await res.json();
     return data.pages || [];
@@ -12,7 +15,10 @@ export async function fetchPages(seriesId) {
 
 export async function fetchPage(pageId) {
   try {
-    const res = await fetch(`/api/admin/pages/${pageId}`);
+    const res = await fetch(`/api/admin/pages/${pageId}`, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
     if (!res.ok) throw new Error('Failed to fetch page');
     const data = await res.json();
     return data.page || null;

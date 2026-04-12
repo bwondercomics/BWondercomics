@@ -7,7 +7,8 @@ This guide maps the reader-side modules, their responsibilities, and how they co
 - `reader/app.js` — Composition root; coordinates the reader bootstrap, keeps the static shell hidden until the initial page source is known, kicks off render, and binds global events.
 - `reader/config.js` — Constants for storage keys, debounce timings, UI thresholds (e.g., two-page breakpoints), and default options.
 - `reader/dom.js` — Centralized DOM lookups; a single source of element references used across modules, including `#mainContent` for on-page frame sizing.
-- `reader/data.js` — Fetches `/data.json` (or `/series/<id>/data.json`), the builder page API with legacy `page-config.json` fallback for the default reader slug, and `/api/posts/latest`; normalizes entry metadata, page-config overrides, and maps `protected/*` asset paths to `/api/protected/*`.
+- `reader/data.js` — Fetches `/data.json` (or `/series/<id>/data.json`), the builder page API with legacy `page-config.json` fallback for the default reader slug, and `/api/posts/latest`; normalizes entry metadata, effective page-header state, page-config overrides, and maps `protected/*` asset paths to `/api/protected/*`.
+- `reader/header-layout.js` — Applies the effective header layout to the existing topbar DOM, repositions stable header blocks into left/center/right regions, and rebuilds configurable nav links while preserving the runtime admin link.
 - `reader/state.js` — Single state container: current entry/page, zoom, fit mode, progress persistence (localStorage), cached natural page metrics, and derived helpers (e.g., `isTwoPageMode`).
 - `reader/render.js` — Renders pages into the stage, caches natural page dimensions as images preload/load, reapplies non-fullscreen frame fitting, and updates UI labels/buttons.
 - `reader/controls.js` — Keyboard and click navigation (prev/next, first/last, toggle two-page, reset zoom, fullscreen), debounce helpers, and guard rails when zoomed.
@@ -31,8 +32,8 @@ flowchart TD
   A[startup] --> B[hide static shell + load data.json]
   B --> C[resolve builder page or legacy page-config + load latest post]
   C --> D[populate state (entries, folders, status)]
-  D --> E[render initial entry/page]
-  E --> F[release bootstrap state + attach controls/listeners]
+  D --> E[render initial entry/page + attach controls/listeners]
+  E --> F[apply builder page DOM as final state when builder source wins]
   F --> G{user input}
   G -->|prev/next/entry| H[controls -> state -> render]
   G -->|zoom/pan| I[pointer -> state -> render]
@@ -71,7 +72,13 @@ flowchart TD
 - **data.js**
   - Fetches JSON with `cache: 'no-store'` to avoid stale content.
   - Normalizes status message, entry folder mapping, builder-page metadata, and optional legacy `page-config.json` overrides.
+  - Resolves an effective page header from `page.meta.header` first, then falls back through legacy `page-config` and legacy `header` module sources when older pages still depend on them.
+  - Applies page header copy, subtitle rotation, panel content, theme, and page-scoped navigation targets.
   - Exposes `loadEntryData()`, `loadPageConfigWithFallback()`, and `loadLatestPost()` for startup wiring.
+- **header-layout.js**
+  - Builds the live topbar layout from the effective header config instead of replacing the whole header.
+  - Reuses existing DOM blocks for brand, patron welcome, status, entry controls, and nav so existing listeners and session-driven behavior stay attached.
+  - Rebuilds configurable nav links from the shared link-target model and keeps `#adminNavLink` runtime-controlled.
 - **latest.js**
   - Selects the newest post (by date) where `share !== false`.
   - Formats date (`toLocaleString`) and safely injects HTML-escaped content preview.
@@ -86,6 +93,7 @@ flowchart TD
 - `data.json` — Entries, entryFolders, statusMessage.
 - `/api/posts/latest` — DB-backed latest blog post for the “Latest update” widget.
 - `/api/pages/<seriesId>/<slug>` — Preferred page-builder source for reader chrome and panel content.
+- Builder page metadata (`page.meta.header`) — Preferred source for page-level header copy, layout, visible blocks, and nav items.
 - `/page-config.json` (and `/series/<id>/page-config.json`) — Optional theming, header/panel content, button list, and layout ordering (DB-backed).
 - `localStorage` — Reading progress (`battleBros_progress` via `config`).
 
@@ -110,7 +118,8 @@ flowchart TD
 
 ## Common Extension Points
 
-- Add a new header button: update the reader builder page first; use legacy page config only if the default reader slug still relies on the fallback path.
+- Add or move a header button: update the builder page header first; use legacy page config only if the default reader slug still relies on the fallback path.
+- Change page title/subtitle/header layout: edit the page header in the builder so it persists to `page.meta.header`; legacy `header` modules are fallback-only.
 - Change theme/branding: prefer the builder page theme metadata; legacy `page-config.json` remains available for fallback pages and shared branding fields.
 
 ## Gotchas / Notes

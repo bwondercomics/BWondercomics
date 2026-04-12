@@ -1013,11 +1013,15 @@ import { getActiveSeriesId, getRequestedPageSlug, isDraftPageRequested } from '.
       draft: role === 'admin' && isDraftPageRequested(),
     });
     readerBootState.resolvePageConfig(pageConfig);
-    if (pageConfig.source === 'builder' && pageConfig.page) {
-      applyBuilderPageToDOM(pageConfig.page);
-    }
     loadLatestUpdate();
     init(pageConfig.source);
+    if (pageConfig.source === 'builder' && pageConfig.page) {
+      // Let reader bootstrap finish first, then reapply builder DOM as the final state.
+      applyBuilderPageToDOM(pageConfig.page, {
+        pageConfig: pageConfig.config,
+        seriesId,
+      });
+    }
   }
 
   window.addEventListener('bbSessionChanged', (event) => {

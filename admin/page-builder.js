@@ -2,8 +2,23 @@ import { el } from './dom.js';
 import { openImagePicker } from './image-picker.js';
 import { DEFAULT_SERIES_ID } from './state.js';
 import { readFileAsBase64 } from './utils.js';
+import { loadSeriesPageConfig } from './page-config.js';
 import { LAYOUT_OPTIONS, MODULE_TYPES, THEME_COLORS } from './page-builder/constants.js';
 import { escapeAttr, escapeHtml, resolveAssetUrl } from './page-builder/helpers.js';
+import {
+  HEADER_BLOCK_DEFS,
+  HEADER_REGION_ORDER,
+  createEffectivePageHeader,
+  createPageHeaderMeta,
+  createDefaultHeaderConfig,
+  normalizeHeaderCopy,
+  normalizeHeaderConfig,
+} from './page-builder/header-config.js';
+import {
+  bindHeaderEditorEvents,
+  renderHeaderEditorContent,
+} from './page-builder/header-editor.js';
+import { normalizeHeaderNavItems } from './page-builder/link-utils.js';
 import { renderThemeEditorContent, bindThemeEditorEvents } from './page-builder/theme-editor.js';
 import { renderModuleEditorContent, bindModuleEditorEvents } from './page-builder/module-editor.js';
 import {
@@ -43,6 +58,8 @@ function getDefaultThemeDraft() {
     panelSpacing: {},
   };
 }
+
+const INSERTABLE_MODULE_TYPES = MODULE_TYPES.filter((module) => module.type !== 'header');
 
 /**
  * Get default config for a module type.
@@ -185,11 +202,14 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
   let pages = [];
   let currentPage = null;
   let selectedModuleId = null;
+  let selectedCanvasSurface = null;
   let activeEditorTab = 'modules';
   let editorResizeBound = false;
   let activeModuleDraftId = null;
   let activeModuleDraft = null;
   let activeThemeDraft = null;
+  let activeHeaderDraft = null;
+  let currentSeriesPageConfig = null;
   let activeSectionId = null;
   let activeSectionDraft = null;
   let dirtyScope = null;
@@ -317,6 +337,8 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     dirtyScope = scope;
     if (scope === 'module') {
       setEditorStatus('Unsaved module changes. Save or discard before switching.', 'warning');
+    } else if (scope === 'header') {
+      setEditorStatus('Unsaved header changes. Save or discard before switching.', 'warning');
     } else if (scope === 'theme') {
       setEditorStatus('Unsaved theme changes. Save or discard before switching.', 'warning');
     } else if (scope === 'section') {
@@ -345,7 +367,9 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
         message =
           footerScope === 'theme'
             ? 'Theme draft has unsaved changes.'
-            : 'Module draft has unsaved changes.';
+            : footerScope === 'header'
+              ? 'Header draft has unsaved changes.'
+              : 'Module draft has unsaved changes.';
         type = 'warning';
       } else if (editorStatus.message) {
         message = editorStatus.message;
@@ -354,6 +378,8 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
         message =
           footerScope === 'theme'
             ? 'Theme changes save explicitly.'
+            : footerScope === 'header'
+              ? 'Header changes save explicitly.'
             : 'Module changes save explicitly.';
       }
       statusEl.textContent = message;
@@ -387,6 +413,22 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     };
   }
 
+  function normalizeHeaderDraft(page = currentPage) {
+    const effectiveHeader = createEffectivePageHeader(
+      page,
+      currentSeriesPageConfig,
+      normalizeHeaderNavItems
+    );
+    return {
+      header: normalizeHeaderConfig(effectiveHeader, normalizeHeaderNavItems),
+      copy: normalizeHeaderCopy(effectiveHeader.copy, {
+        title: page?.title || 'Page Title',
+        subtitle: '',
+        subtitles: [],
+      }),
+    };
+  }
+
   function initializeModuleDraft(moduleId = selectedModuleId) {
     const module = getSelectedModuleRecord(moduleId);
     activeModuleDraftId = module?.id || null;
@@ -395,6 +437,15 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
 
   function initializeThemeDraft() {
     activeThemeDraft = currentPage ? normalizeThemeDraft(currentPage) : getDefaultThemeDraft();
+  }
+
+  function initializeHeaderDraft() {
+    activeHeaderDraft = currentPage
+      ? normalizeHeaderDraft(currentPage)
+      : {
+          header: createDefaultHeaderConfig(),
+          copy: normalizeHeaderCopy(null, { title: 'Page Title', subtitle: '', subtitles: [] }),
+        };
   }
 
   function initializeSectionDraft(sectionId) {
@@ -411,9 +462,11 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
 
   function resetBuilderState() {
     selectedModuleId = null;
+    selectedCanvasSurface = null;
     activeModuleDraftId = null;
     activeModuleDraft = null;
     activeThemeDraft = currentPage ? normalizeThemeDraft(currentPage) : null;
+    activeHeaderDraft = currentPage ? normalizeHeaderDraft(currentPage) : null;
     activeSectionId = null;
     activeSectionDraft = null;
     dirtyScope = null;
@@ -428,7 +481,14 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     if (!page?.id) return;
     pages = pages.map((item) => (item.id === page.id ? { ...item, ...page } : item));
     if (currentPage?.id === page.id) {
-      currentPage = { ...currentPage, ...page };
+      currentPage = {
+        ...currentPage,
+        ...page,
+        meta: cloneValue(page.meta ?? currentPage?.meta ?? {}),
+        sections: Array.isArray(page.sections)
+          ? cloneValue(page.sections)
+          : cloneValue(currentPage?.sections || []),
+      };
     }
   }
 
@@ -564,11 +624,12 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     );
 
     try {
+      const nextMeta = buildNormalizedPageMeta(currentPage);
       const updated = await updatePage(currentPage.id, {
         title: currentPage.title,
         slug: currentPage.slug,
         pageType: currentPage.pageType,
-        meta: currentPage.meta,
+        meta: nextMeta,
         isPublished,
       });
       if (!updated) {
@@ -577,6 +638,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
 
       syncPageSummary(updated);
       activeThemeDraft = normalizeThemeDraft(currentPage);
+      activeHeaderDraft = normalizeHeaderDraft(updated);
       renderPageList();
       renderCanvas();
       renderEditorPanel();
@@ -607,6 +669,17 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
 
   async function createPageForSeries(slug, title) {
     return createPage(getSeriesId(), slug, title);
+  }
+
+  async function loadCurrentSeriesPageConfig() {
+    const config = await loadSeriesPageConfig(getSeriesId(), {
+      force: true,
+      fallback: {},
+    });
+    currentSeriesPageConfig = config && typeof config === 'object' ? cloneValue(config) : {};
+    if (!currentSeriesPageConfig.site || typeof currentSeriesPageConfig.site !== 'object') {
+      currentSeriesPageConfig.site = {};
+    }
   }
 
   async function uploadAssetFile(file) {
@@ -645,6 +718,142 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     });
   }
 
+  function sortCanvasModulesForColumn(section, columnIndex) {
+    return sortModulesForColumn(section, columnIndex).filter((module) => module.moduleType !== 'header');
+  }
+
+  function getHiddenColumnModuleIds(section, columnIndex) {
+    return sortModulesForColumn(section, columnIndex)
+      .filter((module) => module.moduleType === 'header')
+      .map((module) => module.id);
+  }
+
+  function buildColumnOrder(section, columnIndex, visibleModuleIds) {
+    return [...getHiddenColumnModuleIds(section, columnIndex), ...visibleModuleIds];
+  }
+
+  function getVisibleSectionModuleCount(section) {
+    return (section?.modules || []).filter((module) => module.moduleType !== 'header').length;
+  }
+
+  function getHeaderPreviewState() {
+    if (activeHeaderDraft) {
+      return {
+        header: normalizeHeaderConfig(activeHeaderDraft.header, normalizeHeaderNavItems),
+        copy: normalizeHeaderCopy(activeHeaderDraft.copy, {
+          title: currentPage?.title || 'Page Title',
+          subtitle: '',
+          subtitles: [],
+        }),
+      };
+    }
+    return normalizeHeaderDraft(currentPage);
+  }
+
+  function getHeaderBlockPreview(blockId, headerState) {
+    const copy = normalizeHeaderCopy(headerState.copy, {
+      title: currentPage?.title || 'Page Title',
+      subtitle: '',
+      subtitles: [],
+    });
+    const enabledNavItems = normalizeHeaderNavItems(headerState.header?.nav?.items || []).filter(
+      (item) => item.enabled !== false
+    );
+    if (blockId === 'brand') {
+      const supportingCopy =
+        copy.subtitle || copy.subtitles?.[0] || 'Page title and subtitle live here.';
+      return `
+        <span class="pb-page-header-part-primary">${escapeHtml(copy.title || currentPage?.title || 'Page Title')}</span>
+        <span class="pb-page-header-part-secondary">${escapeHtml(supportingCopy)}</span>
+      `;
+    }
+    if (blockId === 'nav') {
+      if (!enabledNavItems.length) {
+        return '<span class="pb-page-header-part-secondary">No navigation buttons yet.</span>';
+      }
+      return `
+        <div class="pb-page-header-chip-row">
+          ${enabledNavItems
+            .slice(0, 4)
+            .map((item) => `<span class="pb-page-header-chip">${escapeHtml(item.label)}</span>`)
+            .join('')}
+          ${enabledNavItems.length > 4 ? '<span class="pb-page-header-chip">…</span>' : ''}
+        </div>
+      `;
+    }
+    const def = HEADER_BLOCK_DEFS.find((item) => item.id === blockId);
+    return `<span class="pb-page-header-part-secondary">${escapeHtml(def?.description || '')}</span>`;
+  }
+
+  function renderPageHeaderSurface() {
+    const headerState = getHeaderPreviewState();
+    const isSelected = selectedCanvasSurface === 'page-header';
+    const isDirty = dirtyScope === 'header';
+    const formatRegionLabel = (region) =>
+      String(region || '').replace(/^\w/, (char) => char.toUpperCase());
+
+    return `
+      <button
+        type="button"
+        class="pb-page-header-surface ${isSelected ? 'selected' : ''}"
+        data-action="select-page-header"
+      >
+        <div class="pb-page-header-surface-head">
+          <div>
+            <span class="pb-page-header-kicker">Page Header</span>
+            <div class="pb-page-header-title">Click to edit title, buttons, visible parts, and placement</div>
+          </div>
+          ${isDirty ? '<span class="pb-page-header-badge">Unsaved</span>' : '<span class="pb-page-header-badge">Click to edit</span>'}
+        </div>
+        <div class="pb-page-header-surface-layout">
+          ${HEADER_REGION_ORDER.map((region) => {
+            const blockIds = headerState.header?.regions?.[region] || [];
+            return `
+              <div class="pb-page-header-region" data-region="${region}">
+                <div class="pb-page-header-region-label">${escapeHtml(formatRegionLabel(region))}</div>
+                <div class="pb-page-header-region-stack">
+                  ${blockIds
+                    .map((blockId) => {
+                      const block = HEADER_BLOCK_DEFS.find((item) => item.id === blockId);
+                      const enabled = headerState.header?.blocks?.[blockId]?.enabled !== false;
+                      return `
+                        <div class="pb-page-header-part ${enabled ? '' : 'is-disabled'}">
+                          <span class="pb-page-header-part-label">${escapeHtml(block?.label || blockId)}</span>
+                          ${getHeaderBlockPreview(blockId, headerState)}
+                        </div>
+                      `;
+                    })
+                    .join('')}
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </button>
+    `;
+  }
+
+  function buildNormalizedPageHeader(page = currentPage, draftState = activeHeaderDraft) {
+    if (draftState?.header || draftState?.copy) {
+      return createPageHeaderMeta(
+        draftState?.header,
+        draftState?.copy,
+        normalizeHeaderNavItems,
+        { page }
+      );
+    }
+    return createEffectivePageHeader(page, currentSeriesPageConfig, normalizeHeaderNavItems);
+  }
+
+  function buildNormalizedPageMeta(page = currentPage, draftState = activeHeaderDraft) {
+    const nextMeta = {
+      ...(page?.meta || {}),
+      header: cloneValue(buildNormalizedPageHeader(page, draftState)),
+    };
+    delete nextMeta.headerOverrides;
+    return nextMeta;
+  }
+
   async function insertModuleAt(sectionId, columnIndex, insertIndex, moduleType) {
     if (!currentPage) return;
     const section = getSectionRecord(sectionId);
@@ -656,10 +865,11 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     section.modules = section.modules || [];
     section.modules.push(newModule);
 
-    const orderedIds = sortModulesForColumn(section, columnIndex)
+    const visibleOrderedIds = sortCanvasModulesForColumn(section, columnIndex)
       .map((module) => module.id)
       .filter((id) => id !== newModule.id);
-    orderedIds.splice(insertIndex, 0, newModule.id);
+    visibleOrderedIds.splice(insertIndex, 0, newModule.id);
+    const orderedIds = buildColumnOrder(section, columnIndex, visibleOrderedIds);
 
     await reorderModules(sectionId, columnIndex, orderedIds);
     applyModuleOrderLocally(sectionId, columnIndex, orderedIds);
@@ -677,10 +887,11 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     const sourceSection = location.section;
     const sourceModule = location.module;
     const sourceColumnIndex = sourceModule.columnIndex ?? 0;
-    const targetOrderedIds = sortModulesForColumn(targetSection, targetColumnIndex)
+    const targetVisibleIds = sortCanvasModulesForColumn(targetSection, targetColumnIndex)
       .map((module) => module.id)
       .filter((id) => id !== moduleId);
-    targetOrderedIds.splice(insertIndex, 0, moduleId);
+    targetVisibleIds.splice(insertIndex, 0, moduleId);
+    const targetOrderedIds = buildColumnOrder(targetSection, targetColumnIndex, targetVisibleIds);
 
     if (sourceSection.id === targetSectionId && sourceColumnIndex === targetColumnIndex) {
       await reorderModules(targetSectionId, targetColumnIndex, targetOrderedIds);
@@ -701,9 +912,10 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
       ...movedModule,
     });
 
-    const sourceOrderedIds = sortModulesForColumn(sourceSection, sourceColumnIndex).map(
+    const sourceVisibleIds = sortCanvasModulesForColumn(sourceSection, sourceColumnIndex).map(
       (module) => module.id
     );
+    const sourceOrderedIds = buildColumnOrder(sourceSection, sourceColumnIndex, sourceVisibleIds);
     if (sourceOrderedIds.length > 0) {
       await reorderModules(sourceSection.id, sourceColumnIndex, sourceOrderedIds);
       applyModuleOrderLocally(sourceSection.id, sourceColumnIndex, sourceOrderedIds);
@@ -745,12 +957,12 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
   }
 
   function renderModulePicker(target) {
-    const groups = Array.from(new Set(MODULE_TYPES.map((module) => module.category)));
+    const groups = Array.from(new Set(INSERTABLE_MODULE_TYPES.map((module) => module.category)));
     return `
       <div class="pb-inline-picker">
         ${groups
           .map((category) => {
-            const items = MODULE_TYPES.filter((module) => module.category === category);
+            const items = INSERTABLE_MODULE_TYPES.filter((module) => module.category === category);
             return `
             <div class="pb-inline-picker-group">
               <div class="pb-inline-picker-title">${escapeHtml(category)}</div>
@@ -869,12 +1081,13 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
 
     const html = `
       ${canvasNotice}
+      ${renderPageHeaderSurface()}
       ${sections
         .map((section, sectionIndex) => {
           const layoutValue = section.layout || '1';
           const columnCount = layoutValue.split('-').length;
           const columnIndices = Array.from({ length: columnCount }, (_, i) => i);
-          const moduleCount = (section.modules || []).length;
+          const moduleCount = getVisibleSectionModuleCount(section);
           const isSettingsOpen = activeSectionId === section.id;
           const sectionDraft =
             isSettingsOpen && activeSectionDraft
@@ -956,7 +1169,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
             <div class="pb-section-columns" data-layout="${layoutValue}">
               ${columnIndices
                 .map((colIdx) => {
-                  const modules = sortModulesForColumn(section, colIdx);
+                  const modules = sortCanvasModulesForColumn(section, colIdx);
                   return `
                   <div class="pb-column" data-column-index="${colIdx}" data-section-id="${section.id}">
                     ${renderModuleInsertBar(section.id, colIdx, 0)}
@@ -1178,6 +1391,25 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
       });
     });
 
+    el.pbCanvas.querySelector('[data-action="select-page-header"]')?.addEventListener('click', () => {
+      if (selectedCanvasSurface === 'page-header') return;
+      if (
+        !ensureCleanWorkspace(
+          'Save or discard your current changes before switching to the page header.'
+        )
+      ) {
+        renderEditorPanel();
+        return;
+      }
+      selectedModuleId = null;
+      selectedCanvasSurface = 'page-header';
+      activeEditorTab = 'modules';
+      initializeHeaderDraft();
+      setEditorStatus('', 'neutral');
+      renderCanvas();
+      renderEditorPanel();
+    });
+
     el.pbCanvas.querySelectorAll('.pb-module').forEach((modEl) => {
       const moduleId = modEl.dataset.moduleId;
 
@@ -1191,7 +1423,12 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
 
       modEl.addEventListener('click', () => {
         if (selectedModuleId === moduleId) return;
-        if (dirtyScope === 'module' || dirtyScope === 'theme' || dirtyScope === 'section') {
+        if (
+          dirtyScope === 'module' ||
+          dirtyScope === 'theme' ||
+          dirtyScope === 'header' ||
+          dirtyScope === 'section'
+        ) {
           const sameModule = dirtyScope === 'module' && selectedModuleId === moduleId;
           if (!sameModule) {
             ensureCleanWorkspace(
@@ -1201,6 +1438,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
           }
         }
         selectedModuleId = moduleId;
+        selectedCanvasSurface = null;
         activeEditorTab = 'modules';
         initializeModuleDraft(moduleId);
         setEditorStatus('', 'neutral');
@@ -1322,11 +1560,45 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     renderEditorPanel();
   }
 
+  async function saveActiveHeaderDraft() {
+    if (!currentPage || !activeHeaderDraft) return;
+
+    try {
+      const nextMeta = buildNormalizedPageMeta(currentPage, activeHeaderDraft);
+      const updatedPage = await updatePage(currentPage.id, { meta: nextMeta });
+
+      if (!updatedPage) {
+        setEditorStatus('Failed to save the page header.', 'danger');
+        renderEditorPanel();
+        return;
+      }
+
+      syncPageSummary(updatedPage);
+      activeHeaderDraft = normalizeHeaderDraft(updatedPage);
+      clearDirty('header');
+      setEditorStatus('Page header saved.', 'success');
+      renderCanvas();
+      renderEditorPanel();
+    } catch (error) {
+      console.error('saveActiveHeaderDraft error:', error);
+      setEditorStatus('Failed to save the page header.', 'danger');
+      renderEditorPanel();
+    }
+  }
+
+  function discardActiveHeaderDraft() {
+    activeHeaderDraft = normalizeHeaderDraft(currentPage);
+    clearDirty('header');
+    setEditorStatus('Page header changes discarded.', 'neutral');
+    renderCanvas();
+    renderEditorPanel();
+  }
+
   function renderEditorPanel() {
     if (!el.pbModuleEditor) return;
 
     const renderTabs = (disableTabs = false) => `
-      <div class="pb-editor-tabs" role="tablist" aria-label="Inspector tabs">
+      <div class="pb-editor-tabs" data-count="2" role="tablist" aria-label="Inspector tabs">
         <button
           class="pb-editor-tab ${activeEditorTab === 'modules' ? 'active' : ''}"
           data-tab="modules"
@@ -1348,7 +1620,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
       </div>
     `;
 
-    const renderFooter = ({ scope, actionsHtml = '' }) => `
+      const renderFooter = ({ scope, actionsHtml = '' }) => `
       <div class="pb-editor-footer" data-scope="${scope}">
         <div class="pb-editor-footer-status" data-editor-status></div>
         <div class="pb-editor-footer-actions">${actionsHtml}</div>
@@ -1383,13 +1655,13 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
       el.pbModuleEditor.innerHTML = renderShell({
         kicker: 'Inspector',
         title: 'Choose a Page',
-        subtitle: 'Select a page on the left to unlock module editing and theme controls.',
+        subtitle: 'Select a page on the left to unlock page-header editing, module editing, and theme controls.',
         contentHtml: `
           <div class="pb-editor-empty">
             <div class="pb-editor-empty-card">
               <span class="pb-editor-empty-kicker">Start Here</span>
               <h4>Pick a page from the left rail</h4>
-              <p>Once a page is active, use Modules for block editing and Theme for page-wide styling.</p>
+              <p>Once a page is active, click the page header or a module in the canvas to edit it. Theme still handles page-wide styling.</p>
             </div>
           </div>
         `,
@@ -1401,6 +1673,9 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     const selectedModule = getSelectedModuleRecord();
     if (!activeThemeDraft) {
       initializeThemeDraft();
+    }
+    if (!activeHeaderDraft) {
+      initializeHeaderDraft();
     }
     if (selectedModule && activeModuleDraftId !== selectedModule.id) {
       initializeModuleDraft(selectedModule.id);
@@ -1425,19 +1700,35 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
           <button class="btn-primary" id="pbSaveTheme" data-action="save-current" type="button">Save Theme</button>
         `,
       });
+    } else if (selectedCanvasSurface === 'page-header') {
+      contentHtml = renderHeaderEditorContent({
+        draftState: activeHeaderDraft,
+        pages,
+      });
+      kicker = 'Page Header';
+      title = 'Header Settings';
+      subtitle = `Edit the visible header parts, placement, copy, and buttons for ${getPageDisplayTitle(currentPage)}.`;
+      footerHtml = renderFooter({
+        scope: 'header',
+        actionsHtml: `
+          <button class="btn-secondary" id="pbDiscardHeader" data-action="discard-current" type="button">Discard</button>
+          <button class="btn-primary" id="pbSaveHeader" data-action="save-current" type="button">Save Header</button>
+        `,
+      });
     } else {
       contentHtml = renderModuleEditorContent({
         currentPage,
         selectedModuleId,
         draftConfig: selectedModule ? activeModuleDraft : null,
+        pages,
       });
       kicker = selectedModule ? 'Selected Module' : 'Module Inspector';
       title = selectedModule
         ? `${getModuleLabel(selectedModule.moduleType)} Module`
-        : 'Choose a Module';
+        : 'Choose Something to Edit';
       subtitle = selectedModule
         ? `Editing ${getModulePreview(selectedModule.moduleType, activeModuleDraft || selectedModule.config || {})}.`
-        : 'Select a module in the canvas to edit content, behavior, appearance, and advanced settings.';
+        : 'Click the page header or a module in the canvas to edit it. Theme still controls page-wide styling.';
       if (selectedModule) {
         footerHtml = renderFooter({
           scope: 'module',
@@ -1473,6 +1764,8 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
         activeEditorTab = nextTab;
         if (nextTab === 'theme') {
           initializeThemeDraft();
+        } else if (selectedCanvasSurface === 'page-header') {
+          initializeHeaderDraft();
         } else if (selectedModuleId) {
           initializeModuleDraft(selectedModuleId);
         }
@@ -1504,6 +1797,24 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
       document.getElementById('pbResetTheme')?.addEventListener('click', () => {
         resetActiveThemeDraft();
       });
+    } else if (selectedCanvasSurface === 'page-header') {
+      bindHeaderEditorEvents({
+        el,
+        draftState: activeHeaderDraft,
+        setDraftState: (nextDraft) => {
+          activeHeaderDraft = cloneValue(nextDraft);
+        },
+        markDirty,
+        renderEditorPanel,
+        renderCanvas,
+      });
+
+      document.getElementById('pbSaveHeader')?.addEventListener('click', async () => {
+        await saveActiveHeaderDraft();
+      });
+      document.getElementById('pbDiscardHeader')?.addEventListener('click', () => {
+        discardActiveHeaderDraft();
+      });
     } else if (selectedModule) {
       bindModuleEditorEvents({
         el,
@@ -1516,6 +1827,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
         },
         markDirty,
         renderEditorPanel,
+        pages,
         openImagePicker,
         fetchAssets,
         uploadAssetFile,
@@ -1583,6 +1895,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     setActiveNav(el.btnDesigner);
 
     await loadPages();
+    await loadCurrentSeriesPageConfig();
     renderPageList();
     renderModulePalette();
     renderCanvas();
@@ -1650,7 +1963,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
   function renderModulePalette() {
     if (!el.pbModulePalette) return;
 
-    el.pbModulePalette.innerHTML = MODULE_TYPES.map(
+    el.pbModulePalette.innerHTML = INSERTABLE_MODULE_TYPES.map(
       (mod) => `
         <div class="pb-module-type" draggable="true" data-module-type="${mod.type}">
           <span class="pb-module-type-icon">${mod.icon}</span>
@@ -1744,6 +2057,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
 
   function onSeriesChange() {
     currentPage = null;
+    currentSeriesPageConfig = null;
     resetBuilderState();
     if (el.pageBuilderSection?.style.display !== 'none') {
       showPageBuilderSection();

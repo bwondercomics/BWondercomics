@@ -1,4 +1,9 @@
 import { escapeHtml, resolveAssetUrl } from './helpers.js';
+import {
+  normalizeButtonItem,
+  resolveLinkTargetHref,
+  shouldOpenLinkInNewTab,
+} from './link-utils.js';
 import { renderPromoModule } from './promo-renderer.js';
 
 export const PREVIEW_RENDERERS = {
@@ -156,18 +161,22 @@ export const PREVIEW_RENDERERS = {
   },
 
   buttons: (config) => {
-    const buttons = config.buttons || [];
+    const buttons = (config.buttons || []).map((button) => normalizeButtonItem(button));
     if (buttons.length === 0) {
       return '<div class="pb-buttons pb-buttons--empty">No buttons configured</div>';
     }
     const buttonsHtml = buttons
       .map((btn) => {
+        if (btn.enabled === false) return '';
         const text = escapeHtml(btn.text || 'Button');
-        const url = escapeHtml(btn.url || '#');
+        const href = escapeHtml(resolveLinkTargetHref(btn.link || btn.url, { seriesId: 'battle-bros' }));
         const style = btn.style || 'primary';
-        const target = url.startsWith('#') ? '' : 'target="_blank" rel="noopener noreferrer"';
-        return `<a href="${url}" class="pb-btn pb-btn--${style}" ${target}>${text}</a>`;
+        const target = shouldOpenLinkInNewTab(btn.link || btn.url)
+          ? 'target="_blank" rel="noopener noreferrer"'
+          : '';
+        return `<a href="${href}" class="pb-btn pb-btn--${style}" ${target}>${text}</a>`;
       })
+      .filter(Boolean)
       .join('');
     return `<div class="pb-buttons">${buttonsHtml}</div>`;
   },

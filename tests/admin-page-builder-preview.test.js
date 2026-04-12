@@ -148,6 +148,79 @@ describe('admin page-builder editor and preview renderers', () => {
     expect(renderEditorPanel).not.toHaveBeenCalled();
   });
 
+  it('renders structured buttons controls and normalizes builder-page link targets', async () => {
+    const buttonsModule = getContractFixture('builderModules').buttons;
+    const pages = [getContractFixture('builderPage'), getContractFixture('builderPageDraft')];
+    const currentPage = {
+      sections: [
+        {
+          id: 'section-1',
+          modules: [buttonsModule],
+        },
+      ],
+    };
+    const draftConfig = {
+      buttons: [
+        {
+          text: 'About',
+          style: 'primary',
+          link: {
+            kind: 'builder-page',
+            pageSlug: 'about',
+          },
+        },
+      ],
+    };
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = renderModuleEditorContent({
+      currentPage,
+      selectedModuleId: buttonsModule.id,
+      draftConfig,
+      pages,
+    });
+    document.body.innerHTML = '';
+    document.body.appendChild(wrapper);
+
+    const setDraftConfig = vi.fn();
+    const markDirty = vi.fn();
+    const renderEditorPanel = vi.fn();
+
+    bindModuleEditorEvents({
+      el: { pbModuleEditor: wrapper },
+      currentPage,
+      selectedModuleId: buttonsModule.id,
+      draftConfig,
+      setDraftConfig,
+      markDirty,
+      renderEditorPanel,
+      pages,
+      openImagePicker: vi.fn(),
+      fetchAssets: vi.fn(async () => []),
+      uploadAssetFile: vi.fn(async () => ({})),
+    });
+
+    expect(wrapper.textContent).toContain('Buttons');
+    expect(wrapper.querySelector('[data-item-key="kind"]')?.getAttribute('value')).toBeNull();
+
+    const pageSelect = wrapper.querySelector('[data-item-key="pageSlug"]');
+    pageSelect.value = 'reader';
+    pageSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(setDraftConfig).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        buttons: [
+          expect.objectContaining({
+            link: expect.objectContaining({
+              kind: 'builder-page',
+              pageSlug: 'reader',
+            }),
+          }),
+        ],
+      })
+    );
+    expect(markDirty).toHaveBeenCalledWith('module');
+  });
+
   it('renders high-value preview modules and preview-only email forms', () => {
     const modules = getContractFixture('builderModules');
     const previewPage = getContractFixture('builderPage');
@@ -164,11 +237,30 @@ describe('admin page-builder editor and preview renderers', () => {
 
     const wrapper = document.createElement('div');
     wrapper.innerHTML = renderPreviewModule(modules['email-signup']);
+    const buttonPreview = document.createElement('div');
+    buttonPreview.innerHTML = renderPreviewModule({
+      ...modules.buttons,
+      config: {
+        buttons: [
+          {
+            text: 'About',
+            style: 'primary',
+            link: {
+              kind: 'builder-page',
+              pageSlug: 'about',
+            },
+          },
+        ],
+      },
+    });
     initPreviewEmailForms(wrapper);
     wrapper
       .querySelector('[data-email-signup]')
       ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
 
     expect(wrapper.querySelector('.pb-email-status')?.textContent).toContain('Preview mode');
+    expect(buttonPreview.querySelector('.pb-btn')?.getAttribute('href')).toContain(
+      'index.html?series=battle-bros&page=about'
+    );
   });
 });

@@ -12,6 +12,32 @@ header.topbar {
   backdrop-filter: blur(8px);
 }
 
+.topbar-layout {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+
+.topbar-region {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 260px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.topbar-region[data-region='center'] {
+  justify-content: center;
+}
+
+.topbar-region[data-region='right'] {
+  justify-content: flex-end;
+}
+
 .header-actions {
   display: flex;
   align-items: center;
@@ -42,9 +68,23 @@ header.topbar {
   z-index: 70;
 }
 
+.topbar-layout .patron-welcome {
+  position: static;
+  left: auto;
+  top: auto;
+  transform: none;
+  display: none;
+  margin: 0;
+}
+
 .patron-welcome.is-visible {
   opacity: 1;
   transform: translate(-50%, -50%);
+}
+
+.topbar-layout .patron-welcome.is-visible {
+  display: inline-flex;
+  transform: none;
 }
 
 .nav-links {

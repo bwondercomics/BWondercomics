@@ -187,7 +187,16 @@ describe('reader app bootstrap', () => {
         pageSlug: 'reader',
       }
     );
-    expect(mocks.applyBuilderPageToDOM).toHaveBeenCalledWith(getContractFixture('builderPage'));
+    expect(mocks.applyBuilderPageToDOM).toHaveBeenCalledWith(
+      getContractFixture('builderPage'),
+      expect.objectContaining({
+        pageConfig: undefined,
+        seriesId: 'battle-bros',
+      })
+    );
+    expect(mocks.renderStatusPanel.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.applyBuilderPageToDOM.mock.invocationCallOrder[0]
+    );
     expect(mocks.renderLatestUpdate).toHaveBeenCalledWith(getContractFixture('latestPost'));
     expect(mocks.renderGallery).toHaveBeenCalledWith(
       ['Issue 2', 'Issue 10', 'Store Release'],

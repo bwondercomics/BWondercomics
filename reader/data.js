@@ -13,6 +13,8 @@ import {
 import { logger } from './logger.js';
 import { renderModule, initEmailForms, initPromoCarousels } from './page-renderer.js';
 import { initFeedModules } from './feed-panel.js';
+import { applySharedHeaderLayout } from './header-layout.js';
+import { createEffectivePageHeader } from '../admin/page-builder/header-config.js';
 
 /**
  * Loads entry data from the public series endpoint
@@ -89,26 +91,31 @@ export async function loadEntryData(seriesId) {
  * @returns {Promise<boolean>} True if config loaded successfully, false otherwise
  */
 export async function loadPageConfig(setSubtitlesFn, seriesId) {
+  const config = await fetchPageConfig(seriesId);
+  if (!config) return false;
+
+  if (config.content && config.content.header && Array.isArray(config.content.header.subtitles)) {
+    setSubtitlesFn(config.content.header.subtitles);
+    logger.log(`✓ Page config loaded from ${getSeriesPageConfigPath(seriesId)}`);
+  } else {
+    console.warn('No subtitles found in page-config.json');
+  }
+
+  return true;
+}
+
+export async function fetchPageConfig(seriesId) {
   try {
     const configPath = getSeriesPageConfigPath(seriesId);
     const response = await fetch(configPath, { cache: 'no-store' });
     if (!response.ok) {
       console.warn(`Failed to load page config: ${response.status} ${response.statusText}`);
-      return false;
+      return null;
     }
-    const config = await response.json();
-
-    if (config.content && config.content.header && Array.isArray(config.content.header.subtitles)) {
-      setSubtitlesFn(config.content.header.subtitles);
-      logger.log(`✓ Page config loaded from ${configPath}`);
-    } else {
-      console.warn('No subtitles found in page-config.json');
-    }
-
-    return true;
+    return await response.json();
   } catch (error) {
     console.error('Failed to load page config:', error);
-    return false;
+    return null;
   }
 }
 
@@ -184,27 +191,21 @@ export async function loadBuilderPage(slug, seriesId = null, options = {}) {
 
 /**
  * Extract subtitles from a page builder page.
- * Looks for header modules and extracts their subtitles array.
+ * Prefers the first-class page header and falls back through legacy sources.
  * @param {Object} page - The page data from the builder API
+ * @param {Object|null} [pageConfig] - Optional legacy page-config fallback
  * @returns {string[]} Array of subtitles
  */
-export function extractSubtitlesFromBuilderPage(page) {
-  if (!page || !page.sections) return [];
-
-  for (const section of page.sections) {
-    for (const mod of section.modules || []) {
-      if (mod.moduleType === 'header' && mod.config) {
-        // Try subtitles array first, then fall back to single subtitle
-        if (Array.isArray(mod.config.subtitles) && mod.config.subtitles.length > 0) {
-          return mod.config.subtitles;
-        }
-        if (mod.config.subtitle) {
-          return [mod.config.subtitle];
-        }
-      }
-    }
+export function extractSubtitlesFromBuilderPage(page, pageConfig = null) {
+  if (!page) return [];
+  const header = createEffectivePageHeader(page, pageConfig);
+  const subtitles = Array.isArray(header?.copy?.subtitles)
+    ? header.copy.subtitles.filter(Boolean)
+    : [];
+  if (subtitles.length > 0) {
+    return subtitles;
   }
-  return [];
+  return header?.copy?.subtitle ? [header.copy.subtitle] : [];
 }
 
 /**
@@ -270,27 +271,19 @@ function applyPanelBackgrounds(page) {
  * Updates header, panels, and other elements based on module config.
  * @param {Object} page - The page data from the builder API
  */
-export function applyBuilderPageToDOM(page) {
+export function applyBuilderPageToDOM(page, options = {}) {
   if (!page || !page.sections) return;
+  const effectiveHeader = createEffectivePageHeader(page, options.pageConfig || null);
+  applySharedHeaderLayout(options.pageConfig || null, {
+    seriesId: options.seriesId || getActiveSeriesId(),
+    page,
+  });
 
   // Apply theme first
   applyPageTheme(page);
   applyPanelBackgrounds(page);
   const panelSpacing = page?.meta?.panelSpacing || {};
   const panelBackgrounds = page?.meta?.panelBackgrounds || {};
-
-  // Find modules by type across all sections
-  const findModulesByType = (type) => {
-    const results = [];
-    for (const section of page.sections) {
-      for (const mod of section.modules || []) {
-        if (mod.moduleType === type) {
-          results.push({ module: mod, section });
-        }
-      }
-    }
-    return results;
-  };
 
   const PANEL_MODULE_TYPES = new Set([
     'text',
@@ -325,18 +318,19 @@ export function applyBuilderPageToDOM(page) {
     return results;
   };
 
-  // Apply header module (title/subtitle)
-  const headers = findModulesByType('header');
-  if (headers.length > 0) {
-    const config = headers[0].module.config || {};
-    const titleEl = document.querySelector('.topbar .title h1');
-    if (titleEl && config.title) {
-      titleEl.textContent = config.title;
-    }
-    const subtitleEl = document.getElementById('subtitle');
-    if (subtitleEl && config.subtitle) {
-      subtitleEl.textContent = config.subtitle;
-    }
+  // Apply effective page header copy.
+  const titleEl = document.querySelector('.topbar .title h1');
+  if (titleEl && effectiveHeader.copy?.title) {
+    titleEl.textContent = effectiveHeader.copy.title;
+  }
+  const subtitleEl = document.getElementById('subtitle');
+  const subtitleText = effectiveHeader.copy?.subtitle || effectiveHeader.copy?.subtitles?.[0] || '';
+  if (subtitleEl) {
+    subtitleEl.textContent = subtitleText;
+  }
+  if (window.BattleBros?.setSubtitles) {
+    const subtitles = extractSubtitlesFromBuilderPage(page, options.pageConfig || null);
+    window.BattleBros.setSubtitles(subtitles);
   }
 
   // Apply left/right panel content based on columns
@@ -445,6 +439,7 @@ export async function loadPageConfigWithFallback(setSubtitlesFn, seriesId = null
   const pageSlug = sanitizePageSlug(options?.pageSlug || '') || 'reader';
   const useDraft = !!options?.draft;
   const allowLegacyFallback = pageSlug === 'reader' && !useDraft;
+  const pageConfig = await fetchPageConfig(sid);
 
   // Check for no-fallback mode via localStorage (set in page builder admin)
   const noFallback = localStorage.getItem('pb-no-fallback') === '1';
@@ -452,29 +447,31 @@ export async function loadPageConfigWithFallback(setSubtitlesFn, seriesId = null
   // Try page builder first
   const builderPage = await loadBuilderPage(pageSlug, sid, { draft: useDraft });
   if (builderPage) {
-    const subtitles = extractSubtitlesFromBuilderPage(builderPage);
+    const subtitles = extractSubtitlesFromBuilderPage(builderPage, pageConfig);
     if (subtitles.length > 0) {
       setSubtitlesFn(subtitles);
     }
     logger.log(`✓ Loaded builder page "${pageSlug}" for series: ${sid}`);
-    return { source: 'builder', page: builderPage };
+    return { source: 'builder', page: builderPage, config: pageConfig };
   }
 
   if (!allowLegacyFallback) {
-    return { source: 'none' };
+    return { source: 'none', config: pageConfig };
   }
 
   // No fallback mode - stop here and show what we got (nothing)
   if (noFallback) {
     console.warn('NO-FALLBACK MODE: Page builder returned nothing. No legacy fallback applied.');
-    return { source: 'none' };
+    return { source: 'none', config: pageConfig };
   }
 
   // Fall back to legacy page-config
-  const legacyLoaded = await loadPageConfig(setSubtitlesFn, sid);
-  if (legacyLoaded) {
-    return { source: 'legacy' };
+  if (pageConfig) {
+    if (pageConfig.content?.header && Array.isArray(pageConfig.content.header.subtitles)) {
+      setSubtitlesFn(pageConfig.content.header.subtitles);
+    }
+    return { source: 'legacy', config: pageConfig };
   }
 
-  return { source: 'none' };
+  return { source: 'none', config: pageConfig };
 }

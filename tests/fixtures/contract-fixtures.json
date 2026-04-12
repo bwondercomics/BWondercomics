@@ -127,6 +127,36 @@
       }
     },
     "site": {
+      "header": {
+        "version": 1,
+        "regions": {
+          "left": ["brand"],
+          "center": ["patron", "status"],
+          "right": ["entryControls", "nav"]
+        },
+        "blocks": {
+          "brand": { "enabled": true },
+          "patron": { "enabled": true },
+          "status": { "enabled": true },
+          "entryControls": { "enabled": true },
+          "nav": { "enabled": true }
+        },
+        "nav": {
+          "enabled": true,
+          "items": [
+            {
+              "id": "nav-comics",
+              "label": "Comics",
+              "enabled": true,
+              "link": {
+                "kind": "url",
+                "url": "comics.html",
+                "openInNewTab": false
+              }
+            }
+          ]
+        }
+      },
       "ogImagePath": "media/site/og.png",
       "faviconPath": "media/site/icon.png"
     }
@@ -607,6 +637,52 @@
           "opacity": 0.6,
           "hideEmptyText": true
         }
+      },
+      "header": {
+        "version": 3,
+        "copy": {
+          "title": "Battle Bros",
+          "subtitle": "Hero Time",
+          "subtitles": [
+            "Hero Time",
+            "Lunch Break Justice"
+          ]
+        },
+        "regions": {
+          "left": ["brand"],
+          "center": ["nav"],
+          "right": ["entryControls", "status", "patron"]
+        },
+        "blocks": {
+          "brand": { "enabled": true },
+          "patron": { "enabled": true },
+          "status": { "enabled": true },
+          "entryControls": { "enabled": true },
+          "nav": { "enabled": true }
+        },
+        "nav": {
+          "items": [
+            {
+              "id": "nav-about",
+              "label": "About",
+              "enabled": true,
+              "link": {
+                "kind": "builder-page",
+                "pageSlug": "about"
+              }
+            },
+            {
+              "id": "nav-comics",
+              "label": "Comics",
+              "enabled": true,
+              "link": {
+                "kind": "url",
+                "url": "comics.html",
+                "openInNewTab": false
+              }
+            }
+          ]
+        }
       }
     }
   },
@@ -643,6 +719,9 @@
     "meta": {
       "theme": {
         "accent": "#00ff88"
+      },
+      "headerOverrides": {
+        "hiddenBlockIds": ["status"]
       }
     }
   },

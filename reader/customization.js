@@ -1,6 +1,7 @@
 // Page customization: applies DB-backed page config.
 import { getActiveSeriesId, getSeriesPageConfigPath } from './series.js';
 import { logger } from './logger.js';
+import { applySharedHeaderLayout } from './header-layout.js';
 
 (function () {
   'use strict';
@@ -116,6 +117,8 @@ import { logger } from './logger.js';
 
   function applyConfig(config) {
     if (!config) return;
+
+    applySharedHeaderLayout(config, { seriesId });
 
     // 1. Apply Theme
     if (config.theme) {

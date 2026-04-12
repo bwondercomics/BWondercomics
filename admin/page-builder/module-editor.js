@@ -9,6 +9,7 @@ import {
   generateSocialButtonId,
   getDefaultSocialButtonStyle,
 } from './social-editor.js';
+import { bindButtonsEditorEvents, renderButtonsEditor } from './button-editor.js';
 
 function cloneConfig(config = {}) {
   return JSON.parse(JSON.stringify(config || {}));
@@ -46,6 +47,8 @@ function getModuleSummary(moduleType, config) {
       return `${config.items?.length || 0} promo item${(config.items?.length || 0) === 1 ? '' : 's'}`;
     case 'social':
       return `${config.buttons?.length || 0} social button${(config.buttons?.length || 0) === 1 ? '' : 's'}`;
+    case 'buttons':
+      return `${config.buttons?.length || 0} button${(config.buttons?.length || 0) === 1 ? '' : 's'}`;
     case 'feed':
       return `Feed module · limit ${config.limit || 0}`;
     case 'email-signup':
@@ -489,14 +492,19 @@ function bindGenericModuleDraftEvents({
   });
 }
 
-export function renderModuleEditorContent({ currentPage, selectedModuleId, draftConfig = null }) {
+export function renderModuleEditorContent({
+  currentPage,
+  selectedModuleId,
+  draftConfig = null,
+  pages = [],
+}) {
   if (!selectedModuleId) {
     return `
       <div class="pb-editor-empty">
         <div class="pb-editor-empty-card">
           <span class="pb-editor-empty-kicker">No Module Selected</span>
-          <h4>Choose a module in the canvas</h4>
-          <p>Use the canvas to select a block, then edit its content and styling here. Switch to Theme for page-wide settings.</p>
+          <h4>Choose the page header or a module</h4>
+          <p>Click the page header to edit title, buttons, and layout, or click a module to edit its content and styling. Theme still handles page-wide settings.</p>
         </div>
       </div>
     `;
@@ -736,6 +744,10 @@ export function renderModuleEditorContent({ currentPage, selectedModuleId, draft
       contentSections.push(renderSocialEditor(config));
       break;
 
+    case 'buttons':
+      contentSections.push(renderButtonsEditor(config, pages));
+      break;
+
     case 'feed': {
       const feedStyle = config.style || {};
       contentSections.push(
@@ -896,6 +908,7 @@ export function bindModuleEditorEvents({
   setDraftConfig,
   markDirty,
   renderEditorPanel,
+  pages = [],
   openImagePicker,
   fetchAssets,
   uploadAssetFile,
@@ -927,6 +940,18 @@ export function bindModuleEditorEvents({
       openImagePicker,
       fetchAssets,
       uploadAssetFile,
+    });
+    return;
+  }
+
+  if (selectedModule.moduleType === 'buttons') {
+    bindButtonsEditorEvents({
+      el,
+      draftConfig,
+      setDraftConfig,
+      renderEditorPanel,
+      markDirty,
+      pages,
     });
     return;
   }

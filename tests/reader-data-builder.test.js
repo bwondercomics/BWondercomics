@@ -35,8 +35,12 @@ describe('reader builder presentation loading', () => {
 
   it('prefers a published builder page and extracts header subtitles', async () => {
     const builderPage = getContractFixture('builderPage');
+    const pageConfig = getContractFixture('pageConfig');
     const setSubtitles = vi.fn();
     const fetchMock = vi.fn(async (url) => {
+      if (url === 'page-config.json') {
+        return jsonResponse(pageConfig);
+      }
       if (url === '/api/pages/battle-bros/reader') {
         return jsonResponse({ page: builderPage });
       }
@@ -46,10 +50,10 @@ describe('reader builder presentation loading', () => {
 
     const result = await loadPageConfigWithFallback(setSubtitles, 'battle-bros');
 
-    expect(result).toEqual({ source: 'builder', page: builderPage });
+    expect(result).toEqual({ source: 'builder', page: builderPage, config: pageConfig });
     expect(setSubtitles).toHaveBeenCalledWith(['Hero Time', 'Lunch Break Justice']);
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(extractSubtitlesFromBuilderPage(builderPage)).toEqual([
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(extractSubtitlesFromBuilderPage(builderPage, pageConfig)).toEqual([
       'Hero Time',
       'Lunch Break Justice',
     ]);
@@ -60,8 +64,12 @@ describe('reader builder presentation loading', () => {
     const aboutPage = buildContractFixture('builderPageDraft', {
       isPublished: true,
     });
+    const pageConfig = getContractFixture('pageConfig');
     const setSubtitles = vi.fn();
     const fetchMock = vi.fn(async (url) => {
+      if (url === 'page-config.json') {
+        return jsonResponse(pageConfig);
+      }
       if (url === '/api/pages/battle-bros/about') {
         return jsonResponse({ page: aboutPage });
       }
@@ -73,15 +81,19 @@ describe('reader builder presentation loading', () => {
       pageSlug: 'about',
     });
 
-    expect(result).toEqual({ source: 'builder', page: aboutPage });
-    expect(setSubtitles).not.toHaveBeenCalled();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ source: 'builder', page: aboutPage, config: pageConfig });
+    expect(setSubtitles).toHaveBeenCalledWith(['Hero Time', 'Lunch Break Justice']);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('loads unpublished draft pages through the admin slug endpoint', async () => {
     const draftPage = getContractFixture('builderPageDraft');
+    const pageConfig = getContractFixture('pageConfig');
     const setSubtitles = vi.fn();
     const fetchMock = vi.fn(async (url) => {
+      if (url === 'page-config.json') {
+        return jsonResponse(pageConfig);
+      }
       if (url === '/api/admin/pages/by-slug/battle-bros/about') {
         return jsonResponse({ page: draftPage });
       }
@@ -94,9 +106,9 @@ describe('reader builder presentation loading', () => {
       draft: true,
     });
 
-    expect(result).toEqual({ source: 'builder', page: draftPage });
-    expect(setSubtitles).not.toHaveBeenCalled();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ source: 'builder', page: draftPage, config: pageConfig });
+    expect(setSubtitles).toHaveBeenCalledWith(['Hero Time', 'Lunch Break Justice']);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('falls back to the legacy page-config contract when no builder page exists', async () => {
@@ -115,17 +127,21 @@ describe('reader builder presentation loading', () => {
 
     const result = await loadPageConfigWithFallback(setSubtitles, 'battle-bros');
 
-    expect(result).toEqual({ source: 'legacy' });
+    expect(result).toEqual({ source: 'legacy', config: pageConfig });
     expect(setSubtitles).toHaveBeenCalledWith(['Hero Time', 'Lunch Break Justice']);
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-      '/api/pages/battle-bros/reader',
       'page-config.json',
+      '/api/pages/battle-bros/reader',
     ]);
   });
 
   it('does not use legacy fallback for non-reader page slugs', async () => {
     const setSubtitles = vi.fn();
+    const pageConfig = getContractFixture('pageConfig');
     const fetchMock = vi.fn(async (url) => {
+      if (url === 'page-config.json') {
+        return jsonResponse(pageConfig);
+      }
       if (url === '/api/pages/battle-bros/about') {
         return jsonResponse({}, { ok: false, status: 404, statusText: 'Not Found' });
       }
@@ -137,15 +153,19 @@ describe('reader builder presentation loading', () => {
       pageSlug: 'about',
     });
 
-    expect(result).toEqual({ source: 'none' });
+    expect(result).toEqual({ source: 'none', config: pageConfig });
     expect(setSubtitles).not.toHaveBeenCalled();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('honors pb-no-fallback when the builder page is missing', async () => {
     localStorage.setItem('pb-no-fallback', '1');
     const setSubtitles = vi.fn();
+    const pageConfig = getContractFixture('pageConfig');
     const fetchMock = vi.fn(async (url) => {
+      if (url === 'page-config.json') {
+        return jsonResponse(pageConfig);
+      }
       if (url === '/api/pages/battle-bros/reader') {
         return jsonResponse({}, { ok: false, status: 404, statusText: 'Not Found' });
       }
@@ -155,9 +175,9 @@ describe('reader builder presentation loading', () => {
 
     const result = await loadPageConfigWithFallback(setSubtitles, 'battle-bros');
 
-    expect(result).toEqual({ source: 'none' });
+    expect(result).toEqual({ source: 'none', config: pageConfig });
     expect(setSubtitles).not.toHaveBeenCalled();
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('returns null when a draft page request is denied', async () => {
@@ -177,6 +197,7 @@ describe('reader builder presentation loading', () => {
 
   it('applies the builder page contract to the live reader DOM', async () => {
     const builderPage = getContractFixture('builderPage');
+    const pageConfig = getContractFixture('pageConfig');
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/posts/latest') {
         return jsonResponse({ post: getContractFixture('latestPost') });
@@ -188,7 +209,7 @@ describe('reader builder presentation loading', () => {
     });
     vi.stubGlobal('fetch', fetchMock);
 
-    applyBuilderPageToDOM(builderPage);
+    applyBuilderPageToDOM(builderPage, { pageConfig, seriesId: 'battle-bros' });
     await flushReaderUi(4);
 
     expect(document.querySelector('.topbar .title h1')?.textContent).toBe('Battle Bros');
@@ -212,6 +233,103 @@ describe('reader builder presentation loading', () => {
     expect(leftBuilder?.querySelector('.pb-module--promo')).not.toBeNull();
     expect(rightBuilder?.querySelector('.pb-module--feed')).not.toBeNull();
     expect(rightBuilder?.querySelector('.latest-name')?.textContent).toBe('Issue 10 Released');
+  });
+
+  it('uses first-class page header copy before legacy header-module fallback', () => {
+    const builderPage = getContractFixture('builderPage');
+    const pageConfig = getContractFixture('pageConfig');
+    builderPage.meta.header.copy.title = 'Meta Header';
+    builderPage.meta.header.copy.subtitle = 'Meta Subtitle';
+    builderPage.meta.header.copy.subtitles = ['Meta One', 'Meta Two'];
+    builderPage.sections[0].modules[0].config.title = 'Legacy Header';
+    builderPage.sections[0].modules[0].config.subtitle = 'Legacy Subtitle';
+    builderPage.sections[0].modules[0].config.subtitles = ['Legacy One'];
+
+    applyBuilderPageToDOM(builderPage, { pageConfig, seriesId: 'battle-bros' });
+
+    expect(document.querySelector('.topbar .title h1')?.textContent).toBe('Meta Header');
+    expect(document.getElementById('subtitle')?.textContent).toBe('Meta Subtitle');
+    expect(extractSubtitlesFromBuilderPage(builderPage, pageConfig)).toEqual([
+      'Meta One',
+      'Meta Two',
+    ]);
+  });
+
+  it('uses legacy header copy fallback when a page only has v2 layout config', () => {
+    const builderPage = getContractFixture('builderPage');
+    const pageConfig = getContractFixture('pageConfig');
+    builderPage.meta.header = {
+      version: 2,
+      regions: {
+        left: ['brand'],
+        center: ['nav'],
+        right: ['entryControls', 'status', 'patron'],
+      },
+      blocks: {
+        brand: { enabled: true },
+        patron: { enabled: true },
+        status: { enabled: true },
+        entryControls: { enabled: true },
+        nav: { enabled: true },
+      },
+      nav: {
+        items: [
+          {
+            id: 'legacy-nav',
+            label: 'Legacy Nav',
+            enabled: true,
+            link: { kind: 'url', url: 'comics.html', openInNewTab: false },
+          },
+        ],
+      },
+    };
+    builderPage.sections[0].modules[0].config.title = 'Legacy Header';
+    builderPage.sections[0].modules[0].config.subtitle = 'Legacy Subtitle';
+    builderPage.sections[0].modules[0].config.subtitles = ['Legacy One', 'Legacy Two'];
+
+    applyBuilderPageToDOM(builderPage, { pageConfig, seriesId: 'battle-bros' });
+
+    expect(document.querySelector('.topbar .title h1')?.textContent).toBe('Legacy Header');
+    expect(document.getElementById('subtitle')?.textContent).toBe('Legacy Subtitle');
+    expect(extractSubtitlesFromBuilderPage(builderPage, pageConfig)).toEqual([
+      'Legacy One',
+      'Legacy Two',
+    ]);
+  });
+
+  it('applies page-level header config before legacy page-config fallback', () => {
+    const builderPage = getContractFixture('builderPage');
+    const pageConfig = getContractFixture('pageConfig');
+
+    applyBuilderPageToDOM(builderPage, { pageConfig, seriesId: 'battle-bros' });
+
+    expect(document.querySelector('.topbar-layout')).not.toBeNull();
+    expect(document.querySelector('.topbar-region[data-region="left"] .brand')).not.toBeNull();
+    expect(document.querySelector('.topbar-region[data-region="center"] .nav-links')).not.toBeNull();
+    expect(document.querySelector('.topbar-region[data-region="right"] #statusPanel')).not.toBeNull();
+    expect(document.querySelector('.nav-links .nav-link')?.textContent).toBe('About');
+    expect(document.querySelector('.nav-links .nav-link')?.getAttribute('href')).toContain(
+      'index.html?series=battle-bros&page=about'
+    );
+  });
+
+  it('falls back to legacy shared header config plus page overrides when page.meta.header is missing', () => {
+    const builderPage = buildContractFixture('builderPageDraft', {
+      meta: {
+        headerOverrides: {
+          hiddenBlockIds: ['status'],
+        },
+      },
+    });
+    const pageConfig = getContractFixture('pageConfig');
+
+    applyBuilderPageToDOM(builderPage, { pageConfig, seriesId: 'battle-bros' });
+
+    expect(document.querySelector('.topbar-layout')).not.toBeNull();
+    expect(document.querySelector('.topbar-region[data-region="left"] .brand')).not.toBeNull();
+    expect(document.querySelector('.topbar-region[data-region="right"] .nav-links')).not.toBeNull();
+    expect(document.querySelector('.nav-links .nav-link')?.textContent).toBe('Comics');
+    expect(document.getElementById('statusPanel')?.style.display).toBe('none');
   });
 
   it('uses the current empty-panel behavior and hideEmptyText contract', () => {

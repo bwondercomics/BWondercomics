@@ -62,7 +62,20 @@ describe('admin page-builder data layer', () => {
     expect(await updatePage(page.id, { isPublished: false })).toEqual(updatedPage);
     expect(await deletePage(page.id)).toBe(true);
 
-    expect(fetchMock).toHaveBeenCalledWith('/api/admin/pages?series_id=battle-bros');
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/admin/pages?series_id=battle-bros',
+      expect.objectContaining({
+        cache: 'no-store',
+        credentials: 'same-origin',
+      })
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/admin/pages/${page.id}`,
+      expect.objectContaining({
+        cache: 'no-store',
+        credentials: 'same-origin',
+      })
+    );
     expect(fetchMock).toHaveBeenCalledWith(
       '/api/admin/pages?series_id=battle-bros',
       expect.objectContaining({

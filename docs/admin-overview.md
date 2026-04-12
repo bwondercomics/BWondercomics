@@ -9,7 +9,7 @@ This document covers the admin panel (content editor) architecture, data flow, a
 - `admin/dom.js` — Centralized DOM lookups for forms, buttons, lists, modals, and status elements.
 - `admin/admin.css` — Extracted styles from `admin/index.html`; this remains the single admin stylesheet entrypoint and imports the section-level CSS files.
 - `admin/page-builder.js` — Page-builder coordinator for the page list, canvas, inspector shell, explicit-save drafts, and structure editing interactions.
-- `admin/page-builder/` — Focused helpers for data access, theme editing, module editing, and module-type-specific editors.
+- `admin/page-builder/` — Focused helpers for data access, theme editing, module editing, header normalization/editing, shared link editing, and module-type-specific editors.
 - `admin/css/admin.page-builder.css` — Stable page-builder stylesheet facade imported by `admin/admin.css`.
 - `admin/css/page-builder/` — Internal page-builder stylesheet split by ownership (`layout`, `sidebar`, `canvas`, `insertions`, `inspector`, `controls`, `theme`, `responsive`) so layout and inspector work can evolve without one monolithic CSS file.
 
@@ -22,7 +22,9 @@ This document covers the admin panel (content editor) architecture, data flow, a
 - Status message: Editable site-wide status stored with entry payload.
 - Blog/updates: CRUD for posts via the DB-backed API (`/api/admin/posts`), with draft/scheduled/published and a “publish date/time” field.
 - Media library: Load/save `/media.json` (DB-backed); search/filter by tags/path; sync with disk via `/api/list-media`; apply media to posts; tag propagation from posts; per-item access (`public`/`premium`/`private`) and premium visibility (`blur`/`hidden`). Premium/private items are stored under `protected/media/`. Post images may be copied to `media/post-assets/` automatically; that folder is derived and excluded from media sync. Blurred previews live at `media/previews/` and are excluded from the admin list; the preview panel shows both the original and public preview.
-- Page builder: Structured page editing for landing/custom pages, with a page list, canvas, module palette, and right-side inspector. Module fields, theme controls, and section settings use explicit local drafts with `Save`/`Discard`, while structural actions such as add, move, reorder, and delete remain immediate. The canvas header shows page status (`Published`/`Draft`/`Homepage`) and makes it explicit when `Open Reader` is opening a draft preview.
+- Page builder: Structured page editing for landing/custom pages, with a page list, canvas, module palette, and right-side inspector. Module fields, theme controls, section settings, and page-header settings use explicit local drafts with `Save`/`Discard`, while structural actions such as add, move, reorder, and delete remain immediate. The canvas header shows page status (`Published`/`Draft`/`Homepage`) and makes it explicit when `Open Reader` is opening a draft preview.
+- Page header editing: the header is edited from the canvas itself. Clicking the header preview opens plain-language sections for `Header Copy`, `Navigation Buttons`, `Header Parts`, and `Placement`; the old shared-header tab model is no longer the primary workflow.
+- Internal builder-page links: header buttons and `buttons` modules can target another builder page in the active series, a URL, or an anchor target.
 - Preview/export: Entry preview image navigation; JSON export/copy; share data assembly.
 - UI: Modals for entry edit and renumber confirmation; indicators for unsaved changes; smooth scroll to sections.
 - Series settings: Each series can set its own singular/plural label (e.g., `Issue/Issues`, `Chapter/Chapters`) stored in the DB and served at `admin/series.json`.
@@ -39,6 +41,7 @@ This document covers the admin panel (content editor) architecture, data flow, a
   - Page-builder assets: `/api/admin/assets`, `/api/admin/assets/upload`
   - Files/folders: `/api/create-entry`, `/api/delete-image`, `/api/list-entry-images`, `/api/list-media`, `/api/move-path`, `/api/copy-path`
 - Local cache: `localStorage` (`STORAGE_KEY`) for draft entries/status, plus page-builder UI preferences such as `pb-editor-mode` and `pb-sidebar-mode`.
+- Header persistence: normal header saves write `page.meta.header` on the page record. Legacy `page-config` header content and legacy `header` modules remain read-only fallback inputs for older pages until they are re-saved.
 
 ## Runtime Flow (High Level)
 
@@ -83,8 +86,10 @@ flowchart LR
 
 - Layout: the builder uses a page rail, central canvas, and right inspector. On wide screens the left rail starts expanded and the inspector starts docked; both user choices persist in `localStorage`.
 - Explicit-save editing: module forms, theme controls, and section settings edit local draft state first. The inspector footer shows `Save`/`Discard`, and the builder blocks tab switches, module switches, and page switches while a draft is dirty.
+- Page-header editing: the canvas renders a dedicated clickable header surface for the selected page. Header settings are page-scoped, save explicitly, and persist normalized header metadata (`version: 3`) with copy, regions, blocks, and nav items.
 - Draft/publish clarity: the canvas header keeps the page status visible at all times. When a page is unpublished, the header warns that `Open Reader` is loading the draft preview route until the page is published.
 - Immediate structure editing: sections and modules can be inserted inline at exact positions; module drag handles support reorder within a column or move across sections/columns; section drag handles reorder sections vertically.
+- Header/link model: header buttons and `buttons` modules share the same normalized link target contract, so builder-page links, anchors, and external URLs behave consistently in admin and reader.
 - Theme behavior: theme save persists color tokens, panel backgrounds, panel spacing, and empty-state metadata together. `Discard` restores the current page state, and `Reset to Default` rebuilds the full theme draft instead of only resetting colors.
 - Canvas density: section headers stay compact by default, while spacing and secondary section controls live in a `Section Settings` drawer for the active section.
 - Styling structure: page-builder CSS now stays behind the existing `admin.page-builder.css` import, but the actual rules live under `admin/css/page-builder/` so shell layout, canvas, inspector, shared controls, theme styling, and responsive behavior are maintained in separate files.

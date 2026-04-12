@@ -1,0 +1,237 @@
+import { escapeAttr, escapeHtml } from './helpers.js';
+import {
+  isBuilderPageTargetMissing,
+  normalizeButtonsConfig,
+  normalizeLinkTarget,
+} from './link-utils.js';
+
+function cloneValue(value) {
+  return JSON.parse(JSON.stringify(value ?? null));
+}
+
+function renderLinkFields(button, index, pages) {
+  const link = normalizeLinkTarget(button.link, '');
+  const isMissingPage = isBuilderPageTargetMissing(link, pages);
+  const options = pages
+    .map((page) => {
+      const slug = String(page?.slug || '').trim();
+      const label = page?.title || slug || 'Untitled page';
+      return `<option value="${escapeAttr(slug)}" ${link.pageSlug === slug ? 'selected' : ''}>${escapeHtml(label)} (${escapeHtml(slug)})</option>`;
+    })
+    .join('');
+
+  return `
+    <div class="pb-editor-field">
+      <label class="pb-editor-label">Target Type</label>
+      <select class="pb-editor-select pb-button-input" data-item-index="${index}" data-item-key="kind">
+        <option value="builder-page" ${link.kind === 'builder-page' ? 'selected' : ''}>Builder Page</option>
+        <option value="url" ${link.kind === 'url' ? 'selected' : ''}>URL</option>
+        <option value="anchor" ${link.kind === 'anchor' ? 'selected' : ''}>Anchor</option>
+      </select>
+    </div>
+    ${
+      link.kind === 'builder-page'
+        ? `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Builder Page</label>
+        <select class="pb-editor-select pb-button-input" data-item-index="${index}" data-item-key="pageSlug">
+          <option value="">Select a page</option>
+          ${options}
+        </select>
+        ${
+          isMissingPage
+            ? '<p class="pb-editor-help" data-status="warning">Saved page slug is not in the current series.</p>'
+            : ''
+        }
+      </div>
+    `
+        : ''
+    }
+    ${
+      link.kind === 'url'
+        ? `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">URL</label>
+        <input type="text" class="pb-editor-input pb-button-input" data-item-index="${index}" data-item-key="url" value="${escapeAttr(link.url || '')}">
+      </div>
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">
+          <input type="checkbox" class="pb-button-input" data-item-index="${index}" data-item-key="openInNewTab" ${link.openInNewTab ? 'checked' : ''}> Open external links in new tab
+        </label>
+      </div>
+    `
+        : ''
+    }
+    ${
+      link.kind === 'anchor'
+        ? `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Anchor</label>
+        <input type="text" class="pb-editor-input pb-button-input" data-item-index="${index}" data-item-key="hash" value="${escapeAttr(link.hash || '')}" placeholder="#section-id">
+      </div>
+    `
+        : ''
+    }
+  `;
+}
+
+export function renderButtonsEditor(config = {}, pages = []) {
+  const normalized = normalizeButtonsConfig(config);
+  const buttonsHtml = normalized.buttons
+    .map(
+      (button, index) => `
+      <div class="pb-social-item pb-button-item" data-item-index="${index}">
+        <div class="pb-promo-item-header">
+          <div>
+            <strong>${escapeHtml(button.text || `Button ${index + 1}`)}</strong>
+            <div class="pb-editor-help">Configure the label, style, and destination.</div>
+          </div>
+          <div class="pb-promo-item-actions">
+            <button type="button" class="pb-promo-action" data-action="move-up" ${index === 0 ? 'disabled' : ''} title="Move up">\u2191</button>
+            <button type="button" class="pb-promo-action" data-action="move-down" ${index === normalized.buttons.length - 1 ? 'disabled' : ''} title="Move down">\u2193</button>
+            <button type="button" class="pb-promo-action danger" data-action="remove" title="Remove">\u00D7</button>
+          </div>
+        </div>
+        <div class="pb-editor-field">
+          <label class="pb-editor-label">Label</label>
+          <input type="text" class="pb-editor-input pb-button-input" data-item-index="${index}" data-item-key="text" value="${escapeAttr(button.text || '')}">
+        </div>
+        <div class="pb-editor-field">
+          <label class="pb-editor-label">Style</label>
+          <select class="pb-editor-select pb-button-input" data-item-index="${index}" data-item-key="style">
+            <option value="primary" ${button.style === 'primary' ? 'selected' : ''}>Primary</option>
+            <option value="secondary" ${button.style === 'secondary' ? 'selected' : ''}>Secondary</option>
+          </select>
+        </div>
+        <div class="pb-editor-field">
+          <label class="pb-editor-label">
+            <input type="checkbox" class="pb-button-input" data-item-index="${index}" data-item-key="enabled" ${button.enabled !== false ? 'checked' : ''}> Enabled
+          </label>
+        </div>
+        ${renderLinkFields(button, index, pages)}
+      </div>
+    `
+    )
+    .join('');
+
+  return `
+    <section class="pb-editor-section-card">
+      <div class="pb-editor-section-head">
+        <div>
+          <span class="pb-editor-section-kicker">Navigation</span>
+          <h4 class="pb-editor-section-title">Buttons</h4>
+        </div>
+        <p class="pb-editor-section-copy">Create reusable buttons with internal page targets, anchors, or URLs.</p>
+      </div>
+      <div class="pb-promo-editor-list">
+        ${buttonsHtml || '<div class="pb-promo-empty">No buttons. Click "+ Add Button" to create one.</div>'}
+      </div>
+      <div class="pb-editor-actions">
+        <button type="button" class="btn-secondary" id="pbButtonsAddButton">+ Add Button</button>
+      </div>
+    </section>
+  `;
+}
+
+function setLinkValue(button, key, input) {
+  const nextLink = normalizeLinkTarget(button.link, '');
+  if (key === 'kind') {
+    nextLink.kind = input.value;
+    nextLink.pageSlug = '';
+    nextLink.url = '';
+    nextLink.hash = '';
+    nextLink.openInNewTab = false;
+  } else if (key === 'openInNewTab') {
+    nextLink.openInNewTab = input.checked;
+  } else {
+    nextLink[key] = input.value;
+  }
+  button.link = normalizeLinkTarget(nextLink, '');
+}
+
+export function bindButtonsEditorEvents({
+  el,
+  draftConfig,
+  setDraftConfig,
+  renderEditorPanel,
+  markDirty,
+}) {
+  let config = normalizeButtonsConfig(draftConfig);
+
+  const commit = (nextConfig, rerender = false) => {
+    config = normalizeButtonsConfig(nextConfig);
+    setDraftConfig(config);
+    markDirty('module');
+    if (rerender) {
+      renderEditorPanel();
+    }
+  };
+
+  document.getElementById('pbButtonsAddButton')?.addEventListener('click', () => {
+    const nextConfig = normalizeButtonsConfig(config);
+    nextConfig.buttons.push({
+      id: `btn-${Date.now()}`,
+      text: 'New Button',
+      enabled: true,
+      style: 'primary',
+      link: normalizeLinkTarget({ kind: 'builder-page' }),
+    });
+    commit(nextConfig, true);
+  });
+
+  el.pbModuleEditor.querySelectorAll('.pb-button-item').forEach((itemEl) => {
+    const index = parseInt(itemEl.dataset.itemIndex, 10);
+
+    itemEl.querySelector('[data-action="remove"]')?.addEventListener('click', () => {
+      const nextConfig = normalizeButtonsConfig(config);
+      nextConfig.buttons.splice(index, 1);
+      commit(nextConfig, true);
+    });
+
+    itemEl.querySelector('[data-action="move-up"]')?.addEventListener('click', () => {
+      if (index <= 0) return;
+      const nextConfig = normalizeButtonsConfig(config);
+      [nextConfig.buttons[index - 1], nextConfig.buttons[index]] = [
+        nextConfig.buttons[index],
+        nextConfig.buttons[index - 1],
+      ];
+      commit(nextConfig, true);
+    });
+
+    itemEl.querySelector('[data-action="move-down"]')?.addEventListener('click', () => {
+      if (index >= config.buttons.length - 1) return;
+      const nextConfig = normalizeButtonsConfig(config);
+      [nextConfig.buttons[index], nextConfig.buttons[index + 1]] = [
+        nextConfig.buttons[index + 1],
+        nextConfig.buttons[index],
+      ];
+      commit(nextConfig, true);
+    });
+  });
+
+  el.pbModuleEditor.querySelectorAll('.pb-button-input').forEach((input) => {
+    const eventName = input.type === 'checkbox' || input.tagName === 'SELECT' ? 'change' : 'input';
+    input.addEventListener(eventName, () => {
+      const index = parseInt(input.dataset.itemIndex, 10);
+      const key = input.dataset.itemKey;
+      const nextConfig = normalizeButtonsConfig(config);
+      const button = nextConfig.buttons[index];
+      if (!button || !key) return;
+      if (['kind', 'pageSlug', 'url', 'hash', 'openInNewTab'].includes(key)) {
+        setLinkValue(button, key, input);
+        commit(nextConfig, key === 'kind');
+        return;
+      }
+      if (input.type === 'checkbox') {
+        button[key] = input.checked;
+      } else {
+        button[key] = input.value;
+      }
+      commit(nextConfig);
+    });
+  });
+}
+
+export function cloneButtonsConfig(config = {}) {
+  return cloneValue(normalizeButtonsConfig(config));
+}

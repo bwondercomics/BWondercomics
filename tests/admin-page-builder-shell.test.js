@@ -58,6 +58,10 @@ async function setupPageBuilder({
     config,
     ...(addModuleResult || {}),
   }));
+  const updateModule = vi.fn(async (moduleId, data) => ({
+    id: moduleId,
+    config: data?.config || {},
+  }));
   const moveModule = vi.fn(async (_moduleId, _sectionId, columnIndex, sortIndex) => ({
     id: 'moved-module-id',
     columnIndex,
@@ -79,7 +83,7 @@ async function setupPageBuilder({
     deleteSection: vi.fn(async () => false),
     reorderSections,
     addModule,
-    updateModule: vi.fn(async () => null),
+    updateModule,
     moveModule,
     reorderModules,
     deleteModule: vi.fn(async () => false),
@@ -130,6 +134,7 @@ async function setupPageBuilder({
       moveModule,
       reorderModules,
       reorderSections,
+      updateModule,
       updatePage,
       hideAllSections,
       setActiveNav,
@@ -437,5 +442,107 @@ describe('admin page-builder shell', () => {
       'draft=1'
     );
     expect(document.querySelector('.pb-open-reader-link')?.textContent).toContain('Open Reader');
+  });
+
+  it('persists a normalized v3 page header on explicit draft saves for legacy pages', async () => {
+    const legacyPage = getContractFixture('builderPage');
+    delete legacyPage.meta.header;
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[legacyPage]],
+      fetchPageResult: legacyPage,
+    });
+
+    await manager.showPageBuilderSection();
+
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.updatePage).not.toHaveBeenCalled();
+
+    document
+      .getElementById('pbSaveDraft')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.updatePage).toHaveBeenCalledWith(
+      legacyPage.id,
+      expect.objectContaining({
+        isPublished: false,
+        meta: expect.objectContaining({
+          header: expect.objectContaining({
+            version: 3,
+            copy: expect.objectContaining({
+              title: 'Battle Bros',
+              subtitle: 'Hero Time',
+              subtitles: ['Hero Time', 'Lunch Break Justice'],
+            }),
+          }),
+        }),
+      })
+    );
+  });
+
+  it('opens page-level header settings when the canvas header is clicked', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(
+      Array.from(document.querySelectorAll('.pb-editor-tab')).some(
+        (tab) => tab.textContent?.trim() === 'Header'
+      )
+    ).toBe(false);
+
+    document
+      .querySelector('[data-action="select-page-header"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Header Settings');
+    expect(document.getElementById('pbSaveHeader')).not.toBeNull();
+    expect(document.querySelector('.pb-header-region--board[data-region="left"]')).not.toBeNull();
+    expect(document.querySelector('[data-copy-key="title"]')).not.toBeNull();
+    expect(document.querySelector('.pb-header-block-input[data-block-id="brand"]')).not.toBeNull();
+    expect(document.body.textContent).not.toContain('Hide on this page');
+
+    const headerTitleInput = document.querySelector('.pb-header-copy-input[data-copy-key="title"]');
+    if (headerTitleInput) {
+      headerTitleInput.value = 'Battle Bros Home';
+      headerTitleInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    document.getElementById('pbSaveHeader')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.updatePage).toHaveBeenCalledWith(
+      selectedPage.id,
+      expect.objectContaining({
+        meta: expect.objectContaining({
+          header: expect.objectContaining({
+            version: 3,
+            copy: expect.objectContaining({
+              title: 'Battle Bros Home',
+            }),
+          }),
+        }),
+      })
+    );
+    expect(
+      document.querySelector('.pb-header-copy-input[data-copy-key="title"]')?.value
+    ).toBe('Battle Bros Home');
+    expect(document.querySelector('.pb-page-header-part-primary')?.textContent).toContain(
+      'Battle Bros Home'
+    );
+    expect(mocks.updateModule).not.toHaveBeenCalled();
+    expect(mocks.addModule).not.toHaveBeenCalled();
   });
 });

@@ -1,5 +1,7 @@
 # Builder Plan (Unified Modules)
 
+Status note (`2026-04`): the implemented header flow now differs from parts of this earlier plan. Current behavior is a page-scoped header editor driven by `page.meta.header` (`version: 3`), with legacy `page-config` header data and legacy `header` modules retained only as fallback inputs for older pages.
+
 Goal: move the reader UI to builder‑controlled modules with **one unified codepath per module** (no layered fallbacks).
 
 ## Global rule
