@@ -808,10 +808,12 @@ describe('admin page-builder shell', () => {
     const editBtn = document.getElementById('pbViewEdit');
     const previewBtn = document.getElementById('pbViewPreview');
     const widthToggles = document.getElementById('pbWidthToggles');
+    const layout = document.querySelector('.page-builder-layout');
 
-    // Starts in edit mode — structural canvas visible, width toggles hidden
+    // Starts in edit mode — structural canvas visible, width toggles hidden, no canvas-mode attr
     expect(canvas?.dataset.mode).toBe('edit');
     expect(widthToggles?.hidden).toBe(true);
+    expect(layout?.dataset.canvasMode).toBeUndefined();
     expect(canvas?.querySelector('div[data-section-id]')).not.toBeNull();
 
     // Switch to preview mode
@@ -819,6 +821,8 @@ describe('admin page-builder shell', () => {
 
     expect(canvas?.dataset.mode).toBe('preview');
     expect(widthToggles?.hidden).toBe(false);
+    // Layout gets data-canvas-mode so CSS can collapse sidebar + editor
+    expect(layout?.dataset.canvasMode).toBe('preview');
     // Preview frame wraps shared-renderer output
     expect(canvas?.querySelector('.pb-preview-frame')).not.toBeNull();
     expect(canvas?.querySelector('.pb-page')).not.toBeNull();
@@ -834,6 +838,8 @@ describe('admin page-builder shell', () => {
 
     expect(canvas?.dataset.mode).toBe('edit');
     expect(widthToggles?.hidden).toBe(true);
+    // Layout attribute is cleared
+    expect(layout?.dataset.canvasMode).toBeUndefined();
     expect(canvas?.querySelector('div[data-section-id]')).not.toBeNull();
     expect(editBtn?.classList.contains('pb-view-toggle--active')).toBe(true);
   });

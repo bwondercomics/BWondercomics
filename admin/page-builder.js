@@ -1458,7 +1458,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
 
         canvasMode = nextMode;
 
-        // Sync active classes
+        // Sync active classes on the toggle buttons
         el.pbViewToggles.querySelectorAll('.pb-view-toggle').forEach((node) => {
           const b = /** @type {HTMLElement} */ (node);
           b.classList.toggle('pb-view-toggle--active', b.dataset.view === canvasMode);
@@ -1467,6 +1467,18 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
         // Show width toggles only in preview mode
         if (el.pbWidthToggles) {
           el.pbWidthToggles.hidden = canvasMode !== 'preview';
+        }
+
+        // Set data-canvas-mode on the layout grid so CSS collapses sidebar + editor
+        const layout = /** @type {HTMLElement|null} */ (document.querySelector('.page-builder-layout'));
+        if (layout) {
+          if (canvasMode === 'preview') {
+            layout.dataset.canvasMode = 'preview';
+          } else {
+            delete layout.dataset.canvasMode;
+            // Restore sidebar/editor to their persisted state
+            applyEditorMode();
+          }
         }
 
         renderCanvas();

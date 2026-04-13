@@ -186,3 +186,21 @@
 .pb-sidebar-rail-toggle:hover {
   filter: brightness(1.03);
 }
+
+/* ==================== PREVIEW MODE: CANVAS FULL-WIDTH ==================== */
+
+/* Collapse sidebar + editor columns; canvas takes everything */
+.page-builder-layout[data-canvas-mode='preview'] {
+  grid-template-columns: 1fr;
+}
+
+.page-builder-layout[data-canvas-mode='preview'] .page-builder-sidebar,
+.page-builder-layout[data-canvas-mode='preview'] .page-builder-editor {
+  display: none;
+}
+
+/* Hide the panel collapse toggles — irrelevant while panels are gone */
+.page-builder-layout[data-canvas-mode='preview'] .pb-sidebar-rail-toggle,
+.page-builder-layout[data-canvas-mode='preview'] .pb-editor-rail-toggle {
+  display: none;
+}
