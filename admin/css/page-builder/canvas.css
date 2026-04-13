@@ -573,3 +573,53 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* ==================== VIEW / WIDTH TOGGLES ==================== */
+
+.pb-view-toggle--active,
+.pb-view-toggle--active:hover,
+.pb-width-toggle--active,
+.pb-width-toggle--active:hover {
+  background: rgba(0, 217, 255, 0.18);
+  border-color: var(--primary, #00d9ff);
+  color: var(--primary, #00d9ff);
+}
+
+.pb-canvas-header-actions-group--view,
+.pb-canvas-header-actions-group--width {
+  gap: 4px;
+}
+
+/* ==================== PREVIEW FRAME ==================== */
+
+.pb-preview-frame {
+  margin: 0 auto;
+  background: var(--bg-dark, #0a0a12);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-y: auto;
+  overflow-x: hidden;
+  transition: max-width 0.25s ease;
+  padding: 20px;
+}
+
+.pb-preview-frame[data-width='desktop'] {
+  max-width: 1280px;
+}
+
+.pb-preview-frame[data-width='tablet'] {
+  max-width: 768px;
+}
+
+.pb-preview-frame[data-width='mobile'] {
+  max-width: 375px;
+}
+
+/* ==================== CANVAS PREVIEW MODE ==================== */
+
+/* Hide structural editing controls when canvas is in preview mode */
+.pb-canvas[data-mode='preview'] .pb-module-insert,
+.pb-canvas[data-mode='preview'] .pb-section-insert {
+  display: none;
+}
+

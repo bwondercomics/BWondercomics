@@ -380,11 +380,19 @@ Deliberately not in this phase:
 - a one-off stored-data backfill script
 - a full schema system for every module
 
-### Phase 2 - Useful preview pass
+### Phase 2 - Useful preview pass ✅
 
 - wire a real preview surface into the builder
 - prefer shared render logic over a third rendering path
 - add mobile/desktop width toggles
+
+**Implemented (2026-04-13):**
+
+- Extracted `admin/page-builder/shared-renderers.js` — the single source of truth for module HTML output, replacing the two previously duplicated renderer implementations (~450-line and ~620-line files each cut by 70-75%)
+- Rewrote `reader/page-renderer.js` and `admin/page-builder/preview-renderers.js` to delegate to the shared factory via a three-option interface (`resolveImageUrl`, `getSeriesId`, `showMountPlaceholders`)
+- Added Edit/Preview canvas mode toggle to the builder toolbar; preview mode renders `renderPreviewPage(currentPage)` wrapped in a centred `.pb-preview-frame` using the shared renderer — the public `main.core.18-page-builder.css` was already in the admin head, so preview output is visually identical to the reader
+- Added Desktop (1280px) / Tablet (768px) / Mobile (375px) width presets sourced from the site's `variables.css` breakpoints; width changes update the frame `data-width` attribute in-place with a CSS `max-width` transition, no re-render
+- Added 7 new tests (5 parity + 2 integration); full suite: 36 files, 207 passing, 0 regressions
 
 ### Phase 3 - Page management pass
 

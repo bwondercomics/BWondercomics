@@ -18,6 +18,12 @@ import {
 import { normalizeHeaderNavItems } from './page-builder/link-utils.js';
 import { createSidebarPanel } from './page-builder/sidebar-panel.js';
 import {
+  renderPreviewPage,
+  initPreviewEmailForms,
+  initPreviewPromoCarousels,
+  setPreviewSeriesId,
+} from './page-builder/preview-renderers.js';
+import {
   fetchPages,
   fetchPage,
   createPage,
@@ -212,6 +218,10 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
   let activeInsertTarget = null;
   let draggedModuleId = null;
   let draggedSectionId = null;
+  /** @type {'edit'|'preview'} */
+  let canvasMode = 'edit';
+  /** @type {'desktop'|'tablet'|'mobile'} */
+  let previewWidth = 'desktop';
 
   const renderEditorPanel = createEditorPanelRenderer({
     el,
@@ -1159,8 +1169,36 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     }
   }
 
+  function renderPreview() {
+    if (!el.pbCanvas) return;
+
+    const html = currentPage
+      ? renderPreviewPage(currentPage)
+      : '<div class="pb-canvas-empty"><p>Select a page to preview it.</p></div>';
+
+    el.pbCanvas.dataset.mode = 'preview';
+    el.pbCanvas.innerHTML = `
+      <div class="pb-preview-frame" data-width="${previewWidth}">
+        ${html}
+      </div>
+    `;
+
+    const frame = el.pbCanvas.querySelector('.pb-preview-frame');
+    if (frame) {
+      initPreviewEmailForms(frame);
+      initPreviewPromoCarousels(frame);
+    }
+  }
+
   function renderCanvas() {
     if (!el.pbCanvas) return;
+
+    if (canvasMode === 'preview') {
+      renderPreview();
+      return;
+    }
+
+    el.pbCanvas.dataset.mode = 'edit';
 
     const { pageTitleHtml, canvasHtml } = renderCanvasSnapshot({
       state: {
@@ -1408,12 +1446,63 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     el.pbPublish?.addEventListener('click', async () => {
       await updatePublishState(true);
     });
+
+    // ── View toggle (Edit / Preview) ──────────────────────────────────────────
+    if (el.pbViewToggles) {
+      el.pbViewToggles.addEventListener('click', (e) => {
+        const btn = /** @type {HTMLElement|null} */ (/** @type {HTMLElement} */ (e.target).closest('[data-view]'));
+        if (!btn) return;
+        const nextMode = btn.dataset.view;
+        if (nextMode !== 'edit' && nextMode !== 'preview') return;
+        if (nextMode === canvasMode) return;
+
+        canvasMode = nextMode;
+
+        // Sync active classes
+        el.pbViewToggles.querySelectorAll('.pb-view-toggle').forEach((node) => {
+          const b = /** @type {HTMLElement} */ (node);
+          b.classList.toggle('pb-view-toggle--active', b.dataset.view === canvasMode);
+        });
+
+        // Show width toggles only in preview mode
+        if (el.pbWidthToggles) {
+          el.pbWidthToggles.hidden = canvasMode !== 'preview';
+        }
+
+        renderCanvas();
+      });
+    }
+
+    // ── Width toggle (Desktop / Tablet / Mobile) ──────────────────────────────
+    if (el.pbWidthToggles) {
+      el.pbWidthToggles.addEventListener('click', (e) => {
+        const btn = /** @type {HTMLElement|null} */ (/** @type {HTMLElement} */ (e.target).closest('[data-width]'));
+        if (!btn) return;
+        const nextWidth = btn.dataset.width;
+        if (nextWidth !== 'desktop' && nextWidth !== 'tablet' && nextWidth !== 'mobile') return;
+        if (nextWidth === previewWidth) return;
+
+        previewWidth = nextWidth;
+
+        el.pbWidthToggles.querySelectorAll('.pb-width-toggle').forEach((node) => {
+          const b = /** @type {HTMLElement} */ (node);
+          b.classList.toggle('pb-width-toggle--active', b.dataset.width === previewWidth);
+        });
+
+        // Update existing preview frame in-place (no full re-render needed)
+        const frame = /** @type {HTMLElement|null} */ (el.pbCanvas?.querySelector('.pb-preview-frame'));
+        if (frame) {
+          frame.dataset.width = previewWidth;
+        }
+      });
+    }
   }
 
   function onSeriesChange() {
     currentPage = null;
     currentSeriesPageConfig = null;
     resetBuilderState();
+    setPreviewSeriesId(getSeriesId());
     if (el.pageBuilderSection?.style.display !== 'none') {
       showPageBuilderSection();
     }

@@ -791,4 +791,98 @@ describe('admin page-builder shell', () => {
     expect(mocks.updateModule).not.toHaveBeenCalled();
     expect(mocks.addModule).not.toHaveBeenCalled();
   });
+  it('toggles between edit and preview canvas modes via the view toggle buttons', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    const canvas = document.getElementById('pbCanvas');
+    const editBtn = document.getElementById('pbViewEdit');
+    const previewBtn = document.getElementById('pbViewPreview');
+    const widthToggles = document.getElementById('pbWidthToggles');
+
+    // Starts in edit mode — structural canvas visible, width toggles hidden
+    expect(canvas?.dataset.mode).toBe('edit');
+    expect(widthToggles?.hidden).toBe(true);
+    expect(canvas?.querySelector('div[data-section-id]')).not.toBeNull();
+
+    // Switch to preview mode
+    previewBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(canvas?.dataset.mode).toBe('preview');
+    expect(widthToggles?.hidden).toBe(false);
+    // Preview frame wraps shared-renderer output
+    expect(canvas?.querySelector('.pb-preview-frame')).not.toBeNull();
+    expect(canvas?.querySelector('.pb-page')).not.toBeNull();
+    // Structural edit UI is gone
+    expect(canvas?.querySelector('div[data-section-id]')).toBeNull();
+
+    // Preview button should be active, edit button inactive
+    expect(previewBtn?.classList.contains('pb-view-toggle--active')).toBe(true);
+    expect(editBtn?.classList.contains('pb-view-toggle--active')).toBe(false);
+
+    // Switch back to edit mode
+    editBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(canvas?.dataset.mode).toBe('edit');
+    expect(widthToggles?.hidden).toBe(true);
+    expect(canvas?.querySelector('div[data-section-id]')).not.toBeNull();
+    expect(editBtn?.classList.contains('pb-view-toggle--active')).toBe(true);
+  });
+
+  it('cycles through desktop/tablet/mobile preview widths without re-rendering', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    // Enter preview mode
+    document
+      .getElementById('pbViewPreview')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const canvas = document.getElementById('pbCanvas');
+    const widthToggles = document.getElementById('pbWidthToggles');
+
+    expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('desktop');
+
+    // Switch to tablet
+    widthToggles
+      ?.querySelector('[data-width="tablet"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('tablet');
+    expect(
+      widthToggles?.querySelector('[data-width="tablet"]')?.classList.contains('pb-width-toggle--active')
+    ).toBe(true);
+    expect(
+      widthToggles?.querySelector('[data-width="desktop"]')?.classList.contains('pb-width-toggle--active')
+    ).toBe(false);
+
+    // Switch to mobile
+    widthToggles
+      ?.querySelector('[data-width="mobile"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('mobile');
+
+    // Back to desktop
+    widthToggles
+      ?.querySelector('[data-width="desktop"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('desktop');
+  });
 });

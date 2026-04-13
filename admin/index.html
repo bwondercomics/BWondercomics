@@ -872,6 +872,60 @@
                         </button>
                       </div>
                       <div
+                        id="pbViewToggles"
+                        class="page-builder-actions pb-canvas-header-actions-group pb-canvas-header-actions-group--view"
+                      >
+                        <button
+                          type="button"
+                          class="btn-small btn-secondary pb-view-toggle pb-view-toggle--active"
+                          data-view="edit"
+                          id="pbViewEdit"
+                          title="Structural editing canvas"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          class="btn-small btn-secondary pb-view-toggle"
+                          data-view="preview"
+                          id="pbViewPreview"
+                          title="Live page preview"
+                        >
+                          Preview
+                        </button>
+                      </div>
+                      <div
+                        id="pbWidthToggles"
+                        class="page-builder-actions pb-canvas-header-actions-group pb-canvas-header-actions-group--width"
+                        hidden
+                        aria-label="Preview width"
+                      >
+                        <button
+                          type="button"
+                          class="btn-small btn-secondary pb-width-toggle pb-width-toggle--active"
+                          data-width="desktop"
+                          title="Desktop (1280px)"
+                        >
+                          🖥
+                        </button>
+                        <button
+                          type="button"
+                          class="btn-small btn-secondary pb-width-toggle"
+                          data-width="tablet"
+                          title="Tablet (768px)"
+                        >
+                          📱
+                        </button>
+                        <button
+                          type="button"
+                          class="btn-small btn-secondary pb-width-toggle"
+                          data-width="mobile"
+                          title="Mobile (375px)"
+                        >
+                          📲
+                        </button>
+                      </div>
+                      <div
                         class="page-builder-actions pb-canvas-header-actions-group pb-canvas-header-actions-group--publish"
                       >
                         <button type="button" class="btn-small btn-secondary" id="pbSaveDraft">

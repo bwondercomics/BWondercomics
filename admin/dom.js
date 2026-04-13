@@ -193,6 +193,8 @@ export const el = {
   pbModuleEditor: document.getElementById('pbModuleEditor'),
   pbSidebarRailLabel: document.getElementById('pbSidebarRailLabel'),
   pbPageTitle: document.getElementById('pbPageTitle'),
+  pbViewToggles: document.getElementById('pbViewToggles'),
+  pbWidthToggles: document.getElementById('pbWidthToggles'),
   btnMedia: document.getElementById('btnMedia'),
   btnDesigner: document.getElementById('btnDesigner'),
   btnUsers: document.getElementById('btnUsers'),
