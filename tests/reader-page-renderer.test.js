@@ -97,6 +97,55 @@ describe('reader page renderer', () => {
     expect(unknown.textContent).toContain('[Unknown module: mystery]');
   });
 
+  it('sanitizes dangerous builder html and urls during rendering', () => {
+    const text = parseModuleHtml(
+      renderModule({
+        moduleType: 'text',
+        config: {
+          content:
+            '<p onclick="evil()">Hello <strong>world</strong><script>alert(1)</script><a href="javascript:alert(2)">bad</a></p>',
+        },
+      })
+    );
+    const html = parseModuleHtml(
+      renderModule({
+        moduleType: 'html',
+        config: {
+          code: '<section onclick="evil()"><script>alert(1)</script><div class="widget" data-note="ok">Safe</div><img src="javascript:alert(2)"></section>',
+        },
+      })
+    );
+    const social = parseModuleHtml(
+      renderModule({
+        moduleType: 'social',
+        config: {
+          buttons: [{ text: 'Unsafe', url: 'javascript:alert(3)' }],
+        },
+      })
+    );
+    const feed = parseModuleHtml(
+      renderModule({
+        moduleType: 'feed',
+        config: {
+          feedHref: 'javascript:alert(4)',
+          mediaHref: '//evil.example/media',
+        },
+      })
+    );
+
+    expect(text.innerHTML).not.toContain('<script');
+    expect(text.innerHTML).not.toContain('onclick');
+    expect(text.innerHTML).not.toContain('javascript:');
+    expect(text.querySelector('.pb-text strong')?.textContent).toBe('world');
+    expect(html.innerHTML).not.toContain('<script');
+    expect(html.innerHTML).not.toContain('onclick');
+    expect(html.innerHTML).not.toContain('javascript:');
+    expect(html.querySelector('.widget')?.getAttribute('data-note')).toBe('ok');
+    expect(social.querySelector('.pb-social-btn')?.getAttribute('href')).toBe('#');
+    expect(feed.querySelector('.pb-feed-link')?.getAttribute('href')).toBe('feed.html');
+    expect(feed.querySelector('.pb-feed-media')?.getAttribute('href')).toBe('media.html');
+  });
+
   it('renders page sections with current layout and spacing styles', () => {
     const page = getContractFixture('builderPage');
     const wrapper = parseModuleHtml(renderPage(page));

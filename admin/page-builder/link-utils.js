@@ -1,3 +1,5 @@
+import { sanitizeAnchor, sanitizeHref } from './sanitize.js';
+
 const DEFAULT_SERIES_ID = 'battle-bros';
 
 function createId(prefix = 'item') {
@@ -17,9 +19,7 @@ function sanitizePageSlug(raw = '') {
 }
 
 function sanitizeHash(raw = '') {
-  const value = String(raw || '').trim();
-  if (!value) return '';
-  return value.startsWith('#') ? value : `#${value.replace(/^#+/, '')}`;
+  return sanitizeAnchor(raw);
 }
 
 function normalizeSeriesId(raw = '') {
@@ -37,12 +37,24 @@ function normalizeLinkTarget(rawTarget = null, legacyUrl = '') {
   const fallbackUrl = String(legacyUrl || target.url || '').trim();
   const rawKind = target.kind || (fallbackUrl.startsWith('#') ? 'anchor' : 'url');
   const kind = ['builder-page', 'url', 'anchor'].includes(rawKind) ? rawKind : 'url';
+  const safeUrl = kind === 'url' ? sanitizeHref(fallbackUrl) : '';
+  const safeHash = kind === 'anchor' ? sanitizeHash(target.hash || fallbackUrl) : '';
+  const pageSlug = kind === 'builder-page' ? sanitizePageSlug(target.pageSlug) : '';
+  if (kind === 'builder-page' && !pageSlug) {
+    return {
+      kind: 'url',
+      pageSlug: '',
+      url: safeUrl || '#',
+      hash: '',
+      openInNewTab: target.openInNewTab === true && isExternalUrl(safeUrl),
+    };
+  }
   return {
     kind,
-    pageSlug: kind === 'builder-page' ? sanitizePageSlug(target.pageSlug) : '',
-    url: kind === 'url' ? fallbackUrl : '',
-    hash: kind === 'anchor' ? sanitizeHash(target.hash || fallbackUrl) : '',
-    openInNewTab: kind === 'url' ? target.openInNewTab === true : false,
+    pageSlug,
+    url: kind === 'url' ? safeUrl || '#' : '',
+    hash: kind === 'anchor' ? safeHash || '#' : '',
+    openInNewTab: kind === 'url' ? target.openInNewTab === true && isExternalUrl(safeUrl) : false,
   };
 }
 

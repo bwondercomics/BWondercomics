@@ -11,6 +11,15 @@ import {
   resolveLinkTargetHref,
   shouldOpenLinkInNewTab,
 } from '../admin/page-builder/link-utils.js';
+import {
+  sanitizeAssetUrl,
+  sanitizeBuilderHtml,
+  sanitizeColor,
+  sanitizeHref,
+  sanitizeKeyword,
+  sanitizeNumber,
+  sanitizeVideoUrl,
+} from '../admin/page-builder/sanitize.js';
 
 /**
  * Escape HTML special characters.
@@ -26,7 +35,7 @@ function escapeHtml(str) {
 }
 
 function resolveImageUrl(path = '') {
-  const raw = String(path || '').trim();
+  const raw = sanitizeAssetUrl(path);
   if (!raw) return '';
   if (/^https?:\/\//i.test(raw)) return raw;
   if (raw.startsWith('/')) return raw;
@@ -49,8 +58,8 @@ export const MODULE_RENDERERS = {
   },
 
   text: (config) => {
-    const content = config.content || '';
-    const alignment = config.alignment || 'left';
+    const content = sanitizeBuilderHtml(config.content || '', 'text');
+    const alignment = sanitizeKeyword(config.alignment, ['left', 'center', 'right'], 'left');
     return `<div class="pb-text" style="text-align: ${alignment};">${content}</div>`;
   },
 
@@ -69,7 +78,7 @@ export const MODULE_RENDERERS = {
 
   gallery: (config) => {
     const images = config.images || [];
-    const columns = config.columns || 3;
+    const columns = sanitizeNumber(config.columns, 3, 1, 6);
     if (images.length === 0) {
       return '<div class="pb-gallery pb-gallery--empty">No images in gallery</div>';
     }
@@ -84,7 +93,7 @@ export const MODULE_RENDERERS = {
   },
 
   video: (config) => {
-    const url = config.url || '';
+    const url = sanitizeVideoUrl(config.url || '');
     if (!url) return '<div class="pb-video pb-video--empty">No video URL set</div>';
 
     let embedUrl = url;
@@ -111,9 +120,10 @@ export const MODULE_RENDERERS = {
     }
     const buttonsHtml = buttons
       .map((btn) => {
-        const icon = escapeHtml(btn.icon || '');
+        const rawIcon = String(btn.icon || '');
+        const icon = escapeHtml(rawIcon);
         const text = escapeHtml(btn.text || '');
-        const url = escapeHtml(btn.url || '#');
+        const url = escapeHtml(sanitizeHref(btn.url || '') || '#');
         const style = btn.style || {};
 
         const hexToRgba = (hex, opacity) => {
@@ -123,22 +133,27 @@ export const MODULE_RENDERERS = {
           const b = parseInt(h.substring(4, 6), 16) || 0;
           return `rgba(${r},${g},${b},${opacity})`;
         };
-        const bgOpacity = typeof style.bgOpacity === 'number' ? style.bgOpacity : 1;
-        const borderOpacity = typeof style.borderOpacity === 'number' ? style.borderOpacity : 1;
+        const bgOpacity = sanitizeNumber(style.bgOpacity, 1, 0, 1);
+        const borderOpacity = sanitizeNumber(style.borderOpacity, 1, 0, 1);
 
         const btnStyles = [];
-        btnStyles.push(`background-color: ${hexToRgba(style.bgColor || '#00d9ff', bgOpacity)}`);
-        if (style.textColor) btnStyles.push(`color: ${style.textColor}`);
-        const bw = style.borderWidth ?? 2;
         btnStyles.push(
-          `border: ${bw}px solid ${hexToRgba(style.borderColor || '#00d9ff', borderOpacity)}`
+          `background-color: ${hexToRgba(sanitizeColor(style.bgColor, '#00d9ff'), bgOpacity)}`
         );
-        if (style.borderRadius != null) btnStyles.push(`border-radius: ${style.borderRadius}px`);
+        const textColor = sanitizeColor(style.textColor);
+        if (textColor) btnStyles.push(`color: ${textColor}`);
+        const bw = sanitizeNumber(style.borderWidth, 2, 0, 10);
+        btnStyles.push(
+          `border: ${bw}px solid ${hexToRgba(sanitizeColor(style.borderColor, '#00d9ff'), borderOpacity)}`
+        );
+        if (style.borderRadius != null) {
+          btnStyles.push(`border-radius: ${sanitizeNumber(style.borderRadius, 8, 0, 80)}px`);
+        }
         const styleAttr = btnStyles.length ? ` style="${btnStyles.join(';')}"` : '';
 
-        const isImage = /\.(png|jpe?g|webp|gif|svg)$/i.test(icon);
+        const isImage = /\.(png|jpe?g|webp|gif|svg)$/i.test(rawIcon);
         const iconHtml = isImage
-          ? `<img src="${icon}" alt="${text}" />`
+          ? `<img src="${escapeHtml(resolveImageUrl(rawIcon))}" alt="${text}" />`
           : `<span class="pb-social-icon-text">${icon}</span>`;
         return `
           <a href="${url}" class="pb-social-btn"${styleAttr} target="_blank" rel="noopener noreferrer">
@@ -159,20 +174,20 @@ export const MODULE_RENDERERS = {
     const style = config.style || {};
 
     const headingStyles = [];
-    headingStyles.push(`color: ${style.headingColor || '#ffffff'}`);
+    headingStyles.push(`color: ${sanitizeColor(style.headingColor, '#ffffff')}`);
     if (style.headingFont === 'display') {
       headingStyles.push('font-family: "Bebas Neue", sans-serif');
     } else if (style.headingFont === 'mono') {
       headingStyles.push('font-family: "JetBrains Mono", monospace');
     }
     if (style.headingGlow) {
-      const glowColor = style.headingColor || '#ffffff';
+      const glowColor = sanitizeColor(style.headingColor, '#ffffff');
       headingStyles.push(`text-shadow: 0 0 10px ${glowColor}, 0 0 20px ${glowColor}`);
     }
 
     const inputClass =
       style.inputStyle === 'flat' ? 'pb-email-input--flat' : 'pb-email-input--bubble';
-    const buttonColor = style.buttonColor || '#00d9ff';
+    const buttonColor = sanitizeColor(style.buttonColor, '#00d9ff');
     const buttonStyles = [`--btn-color: ${buttonColor}`];
     const buttonClass = style.buttonGlow ? 'pb-email-btn--glow' : '';
 
@@ -201,7 +216,7 @@ export const MODULE_RENDERERS = {
         const href = escapeHtml(
           resolveLinkTargetHref(btn.link || btn.url, { seriesId: getActiveSeriesId() })
         );
-        const style = btn.style || 'primary';
+        const style = sanitizeKeyword(btn.style, ['primary', 'secondary'], 'primary');
         const target = shouldOpenLinkInNewTab(btn.link || btn.url)
           ? 'target="_blank" rel="noopener noreferrer"'
           : '';
@@ -213,13 +228,13 @@ export const MODULE_RENDERERS = {
   },
 
   spacer: (config) => {
-    const height = config.height || 40;
+    const height = sanitizeNumber(config.height, 40, 0, 600);
     return `<div class="pb-spacer" style="height: ${height}px;"></div>`;
   },
 
   divider: (config) => {
-    const style = config.style || 'solid';
-    const color = config.color || '';
+    const style = sanitizeKeyword(config.style, ['solid', 'dashed', 'dotted'], 'solid');
+    const color = sanitizeColor(config.color);
     const colorStyle = color ? `border-color: ${escapeHtml(color)};` : '';
     return `<hr class="pb-divider pb-divider--${style}" style="${colorStyle}" />`;
   },
@@ -237,7 +252,7 @@ export const MODULE_RENDERERS = {
   },
 
   'entry-gallery': (config) => {
-    const columns = config.columns || 3;
+    const columns = sanitizeNumber(config.columns, 3, 1, 6);
     const showLabels = config.showLabels !== false;
     return `
       <div class="pb-entry-gallery-mount"
@@ -249,23 +264,38 @@ export const MODULE_RENDERERS = {
   },
 
   feed: (config, mod) => {
-    const limit = Number.isFinite(config.limit) ? config.limit : 5;
+    const limit = sanitizeNumber(config.limit, 5, 1, 25);
     const heading = escapeHtml(config.heading || 'BWC FEED');
     const author = escapeHtml(config.author || 'DOYLE MELVILLE II');
     const showAuthor = config.showAuthor !== false;
     const showDropdown = config.showDropdown !== false;
     const feedLabel = escapeHtml(config.feedLabel || 'Open feed');
-    const feedHref = escapeHtml(config.feedHref || 'feed.html');
+    const feedHref = escapeHtml(sanitizeHref(config.feedHref || 'feed.html') || 'feed.html');
     const showMediaButton = config.showMediaButton !== false;
     const mediaLabel = escapeHtml(config.mediaLabel || 'Media');
-    const mediaHref = escapeHtml(config.mediaHref || 'media.html');
+    const mediaHref = escapeHtml(sanitizeHref(config.mediaHref || 'media.html') || 'media.html');
     const moduleId = escapeHtml(
       mod?.id ? String(mod.id) : `feed-${Math.random().toString(36).slice(2, 9)}`
     );
     const panelId = `pb-feed-panel-${moduleId}`;
     const style = config.style || {};
 
-    const btnStyle = `background:${style.buttonBgColor || '#00d9ff'};color:${style.buttonTextColor || '#0a0a12'};border-color:${style.buttonBgColor || '#00d9ff'}`;
+    const buttonBgColor = sanitizeColor(style.buttonBgColor, '#00d9ff');
+    const buttonTextColor = sanitizeColor(style.buttonTextColor, '#0a0a12');
+    const borderColor = sanitizeColor(style.borderColor, '#ffed00');
+    const headingBgColor = sanitizeColor(style.headingBgColor, '#ffed00');
+    const headingTextColor = sanitizeColor(style.headingTextColor, '#0a0a12');
+    const authorColor = sanitizeColor(style.authorColor, '#7ef5e3');
+    const safeStyle = {
+      ...style,
+      buttonBgColor,
+      buttonTextColor,
+      borderColor,
+      headingBgColor,
+      headingTextColor,
+      authorColor,
+    };
+    const btnStyle = `background:${buttonBgColor};color:${buttonTextColor};border-color:${buttonBgColor}`;
 
     return `
       <div class="pb-feed-module"
@@ -276,7 +306,7 @@ export const MODULE_RENDERERS = {
            data-feed-label="${feedLabel}"
            data-media-href="${mediaHref}"
            data-media-label="${mediaLabel}"
-           data-feed-style="${escapeHtml(JSON.stringify(style))}">
+           data-feed-style="${escapeHtml(JSON.stringify(safeStyle))}">
         <div class="right-panel-feed-bar pb-feed-bar" aria-hidden="true">
           <button class="feed-exit-btn pb-feed-exit" type="button" aria-label="Close feed">\u00D7</button>
           <div class="latest-actions">
@@ -284,19 +314,19 @@ export const MODULE_RENDERERS = {
             ${showMediaButton ? `<a class="latest-link latest-link--right pb-feed-media" href="${mediaHref}" style="${btnStyle}">${mediaLabel}</a>` : ''}
           </div>
         </div>
-        <div class="latest-update pb-feed-latest" style="border-color:${style.borderColor || '#ffed00'}">
+        <div class="latest-update pb-feed-latest" style="border-color:${borderColor}">
           <div class="latest-heading-row">
             <button class="latest-heading pb-feed-toggle" type="button"
               aria-expanded="false" aria-controls="${panelId}"
-              style="background:${style.headingBgColor || '#ffed00'};color:${style.headingTextColor || '#0a0a12'}">${heading}</button>
-            ${showAuthor ? `<div class="latest-author" style="color:${style.authorColor || '#7ef5e3'}">${author}</div>` : ''}
+              style="background:${headingBgColor};color:${headingTextColor}">${heading}</button>
+            ${showAuthor ? `<div class="latest-author" style="color:${authorColor}">${author}</div>` : ''}
           </div>
           <div class="latest-body pb-feed-latest-body">
             <div class="latest-loading">Loading...</div>
           </div>
         </div>
         <div class="latest-update right-panel-feed pb-feed-panel" id="${panelId}" aria-hidden="true"
-             style="border-color:${style.borderColor || '#ffed00'}">
+             style="border-color:${borderColor}">
           <div class="latest-body pb-feed-body">
             <div class="latest-loading">Loading...</div>
           </div>
@@ -306,7 +336,7 @@ export const MODULE_RENDERERS = {
   },
 
   html: (config) => {
-    const code = config.code || '';
+    const code = sanitizeBuilderHtml(config.code || '', 'html');
     return `<div class="pb-html">${code}</div>`;
   },
 
@@ -322,39 +352,43 @@ export const MODULE_RENDERERS = {
  */
 export function renderModule(mod) {
   const type = mod.moduleType || 'text';
+  const safeType = String(type || 'text').replace(/[^a-z0-9_-]/gi, '') || 'unknown';
   const config = mod.config || {};
 
   const renderer = MODULE_RENDERERS[type];
   if (!renderer) {
     logger.warn(`Unknown module type: ${type}`);
-    return `<div class="pb-module pb-module--unknown">[Unknown module: ${type}]</div>`;
+    return `<div class="pb-module pb-module--unknown">[Unknown module: ${escapeHtml(type)}]</div>`;
   }
 
   const content = renderer(config, mod);
-  return `<div class="pb-module pb-module--${type}">${content}</div>`;
+  return `<div class="pb-module pb-module--${safeType}">${content}</div>`;
 }
 
 /**
  * Render a section with its columns and modules.
  */
 function renderSection(section) {
-  const layout = section.layout || '1';
+  const layout = sanitizeKeyword(section.layout, ['1', '1-1', '1-2', '2-1', '1-1-1', '1-3-1'], '1');
   const columnCount = layout.split('-').length;
-  const sectionType = section.sectionType || 'row';
+  const sectionType = sanitizeKeyword(section.sectionType, ['row'], 'row');
   const settings = section.settings || {};
 
   let style = '';
-  if (settings.backgroundColor) style += `background-color: ${settings.backgroundColor};`;
-  if (settings.paddingTop) style += `padding-top: ${settings.paddingTop}px;`;
-  if (settings.paddingBottom) style += `padding-bottom: ${settings.paddingBottom}px;`;
+  const backgroundColor = sanitizeColor(settings.backgroundColor);
+  if (backgroundColor) style += `background-color: ${backgroundColor};`;
+  const paddingTop = sanitizeNumber(settings.paddingTop, 0, 0, 600);
+  const paddingBottom = sanitizeNumber(settings.paddingBottom, 0, 0, 600);
+  if (paddingTop) style += `padding-top: ${paddingTop}px;`;
+  if (paddingBottom) style += `padding-bottom: ${paddingBottom}px;`;
   if (settings.moduleGap !== undefined && settings.moduleGap !== null) {
-    style += `--pb-module-gap: ${Number(settings.moduleGap)}px;`;
+    style += `--pb-module-gap: ${sanitizeNumber(settings.moduleGap, 0, 0, 600)}px;`;
   }
   if (settings.columnGap !== undefined && settings.columnGap !== null) {
-    style += `--pb-column-gap: ${Number(settings.columnGap)}px;`;
+    style += `--pb-column-gap: ${sanitizeNumber(settings.columnGap, 0, 0, 600)}px;`;
   }
   if (settings.sectionGap !== undefined && settings.sectionGap !== null) {
-    style += `--pb-section-gap: ${Number(settings.sectionGap)}px;`;
+    style += `--pb-section-gap: ${sanitizeNumber(settings.sectionGap, 0, 0, 600)}px;`;
   }
 
   const columnModules = {};
@@ -395,7 +429,7 @@ export function renderPage(page) {
 
   const sectionsHtml = page.sections.map((section) => renderSection(section)).join('');
 
-  return `<div class="pb-page" data-page-id="${page.id || ''}">${sectionsHtml}</div>`;
+  return `<div class="pb-page" data-page-id="${escapeHtml(page.id || '')}">${sectionsHtml}</div>`;
 }
 
 /**

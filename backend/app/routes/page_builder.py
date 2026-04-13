@@ -220,11 +220,13 @@ def api_add_section(
     if not _require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    section = add_section(db, page_id, payload.model_dump(by_alias=True, exclude_none=True))
-    if not section:
-        return JSONResponse(status_code=404, content={"error": "Page not found"})
-
-    return {"section": section}
+    try:
+        section = add_section(db, page_id, payload.model_dump(by_alias=True, exclude_none=True))
+        if not section:
+            return JSONResponse(status_code=404, content={"error": "Page not found"})
+        return {"section": section}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
 
 
 @router.put("/api/admin/sections/{section_id}")
@@ -238,11 +240,13 @@ def api_update_section(
     if not _require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    section = update_section(db, section_id, payload.model_dump(by_alias=True, exclude_none=True))
-    if not section:
-        return JSONResponse(status_code=404, content={"error": "Section not found"})
-
-    return {"section": section}
+    try:
+        section = update_section(db, section_id, payload.model_dump(by_alias=True, exclude_none=True))
+        if not section:
+            return JSONResponse(status_code=404, content={"error": "Section not found"})
+        return {"section": section}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
 
 
 @router.delete("/api/admin/sections/{section_id}")
@@ -318,11 +322,13 @@ def api_add_module(
     if not _require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    module = add_module(db, section_id, payload.model_dump(by_alias=True, exclude_none=True))
-    if not module:
-        return JSONResponse(status_code=404, content={"error": "Section not found"})
-
-    return {"module": module}
+    try:
+        module = add_module(db, section_id, payload.model_dump(by_alias=True, exclude_none=True))
+        if not module:
+            return JSONResponse(status_code=404, content={"error": "Section not found"})
+        return {"module": module}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
 
 
 @router.put("/api/admin/modules/{module_id}")
@@ -336,11 +342,13 @@ def api_update_module(
     if not _require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    module = update_module(db, module_id, payload.model_dump(by_alias=True, exclude_none=True))
-    if not module:
-        return JSONResponse(status_code=404, content={"error": "Module not found"})
-
-    return {"module": module}
+    try:
+        module = update_module(db, module_id, payload.model_dump(by_alias=True, exclude_none=True))
+        if not module:
+            return JSONResponse(status_code=404, content={"error": "Module not found"})
+        return {"module": module}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
 
 
 @router.delete("/api/admin/modules/{module_id}")
@@ -365,13 +373,15 @@ def api_move_module(
     if not _require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    module = move_module(
-        db, module_id, payload.target_section_id, payload.column_index, payload.sort_index
-    )
-    if not module:
-        return JSONResponse(status_code=404, content={"error": "Module or section not found"})
-
-    return {"module": module}
+    try:
+        module = move_module(
+            db, module_id, payload.target_section_id, payload.column_index, payload.sort_index
+        )
+        if not module:
+            return JSONResponse(status_code=404, content={"error": "Module or section not found"})
+        return {"module": module}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
 
 
 @router.post("/api/admin/sections/{section_id}/modules/reorder")
@@ -385,8 +395,11 @@ def api_reorder_modules(
     if not _require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    reorder_modules(db, section_id, payload.column_index, payload.module_ids)
-    return {"status": "success"}
+    try:
+        reorder_modules(db, section_id, payload.column_index, payload.module_ids)
+        return {"status": "success"}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
 
 
 # Public endpoint for page rendering

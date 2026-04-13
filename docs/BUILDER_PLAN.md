@@ -1,354 +1,475 @@
-# Builder Plan (Unified Modules)
+# Builder Plan
 
-Status note (`2026-04`): the implemented header flow now differs from parts of this earlier plan. Current behavior is a page-scoped header editor driven by `page.meta.header` (`version: 3`), with legacy `page-config` header data and legacy `header` modules retained only as fallback inputs for older pages.
+Status note (`2026-04`): this document replaces large parts of the older "unified modules" plan. The builder has shipped materially since that draft, and several earlier assumptions are now incorrect.
 
-Goal: move the reader UI to builder‑controlled modules with **one unified codepath per module** (no layered fallbacks).
+## Product direction
 
-## Global rule
+The goal is not to build a Squarespace clone.
 
-- **One source of truth per module.** If a module exists, we modify or replace it in place. No parallel logic.
-- Builder config becomes the canonical description of the UI.
-- **No fallback UI in dev.** The reader should either work or visibly break so changes are obvious. Fallbacks hide failures and slow iteration.
+The goal is to build a lightweight page builder for the comic CMS that is configurable for any comic, series, or site running on it:
 
-Related docs:
+- secure enough to trust on a public site
+- useful enough that common page work does not require code edits
+- simple enough to maintain without turning into a second product
 
-## Dev workflow (expected behavior)
+Benchmark takeaway from stronger builders like Squarespace, WordPress Site Editor, and GrapesJS:
 
-1. Edit in page builder (edit-only canvas).
-2. Save → dev server reflects the saved builder page (root reader).
-3. Verify on dev server (no fallback masking).
-4. Build → deploy live.
+- We do not need their full feature set.
+- We do need a few of the basics they get right:
+  - safe content handling
+  - trustworthy preview
+  - reusable structured controls instead of raw JSON everywhere
+  - some protection against destructive overwrite or silent drift
 
-## Draft vs publish UX
+Non-goals for this builder:
 
-- [x] Publish toggle removed from UI (builder is edit-only).
-- [x] Replaced with explicit actions.
-- [x] `Save Draft` keeps `isPublished=false`.
-- [x] `Publish Changes` sets `isPublished=true`.
-- [x] Builder labels and button text match the explicit actions.
+- freeform drag-anywhere layout editing
+- real-time multi-user collaboration
+- AI generation features
+- ecommerce/platform complexity
+- deep design-system tooling beyond what the site actually needs
 
-## Complications + solutions (least → most complex)
+## Current implementation snapshot
 
-1. Page ID/series mismatch
-   - [x] Show active reader page ID in builder UI.
-   - [x] Add "Open reader for this page" link.
-2. Published flag off
-   - [x] Display publish status in list + header.
-   - [x] Warn on save if unpublished for active reader page.
-3. Module type mismatch
-   - Constrain module types per slot.
-   - Warn when a module won't render in reader.
-4. No‑fallback dev mode (enforced)
-   - Render a clear empty state instead of silent failure.
-5. Panel clearing logic
-   - Clear panel DOM when module list is empty.
-   - Add "Reset panel" action.
-6. Dev server auth limits
-   - Proxy dev server over HTTPS for auth.
-   - Or test via published reader only.
-7. Mixed legacy + builder state
-   - Remove legacy page-config fallback from reader.
-   - Checklist each UI surface moved to builder.
-8. Module schema drift
-   - Version module configs.
-   - Migrate configs on load.
-9. Global refactor risk
-   - Convert one surface at a time.
-   - Add dev-only logs for missing config.
+### Data model
 
-## Module mapping (current UI → builder)
+The current backend model is stable and already useful:
 
-### 1) Header module (single module)
+- `BuilderPage`
+- `BuilderSection`
+- `BuilderModule`
 
-Configurable parts:
+Current page-level fields and behavior:
 
-- Brand: logo + title + subtitle
-- Patron welcome banner
-- Status panel (typewriter/statusMessage)
-- Entry selector + patron badge
-- Cover gallery button
-- No fallback UI (remove native select fallback)
-- Nav links (Comics, Admin)
-- Header buttons[] (shared button model)
+- pages are scoped per series
+- each page has `slug`, `title`, `pageType`, `isPublished`, `isHomepage`, `sortIndex`, `meta`
+- one homepage per series is enforced by the backend
 
-### 2) Reader module (single module)
+Current page-level `meta` ownership:
 
-Controls and overlays included:
+- `meta.header`
+- `meta.theme`
+- `meta.panelBackgrounds`
+- `meta.panelSpacing`
 
-- Viewport + pages
-- Edge zones
-- Controls bar (prev/next, zoom, fit, fullscreen, help)
-- Progress bar
-- Fullscreen behavior & tap‑to‑toggle UI (mobile)
-- Comments panel + toggle
-- Shortcuts overlay (on/off + custom list)
-- Entry‑end overlay (custom text/buttons OR disabled)
+Current section ownership:
 
-### Main page rules
+- `layout`
+- `sortIndex`
+- `settings` for spacing controls
 
-- **Any page can be marked as the main page** for its series (`isHomepage=true`).
-- **Any page can contain the reader module**, not just a fixed `reader` page ID.
-- Root `/` should load the **default series’ main page**.
+Current module ownership:
 
-### Series isolation rule
+- `moduleType`
+- `columnIndex`
+- `sortIndex`
+- `config`
 
-- Pages are **scoped to the selected series**. Editing a page only affects that series.
-- Reader content (entries/pages) must always come from the active series.
-- The only cross‑series interactions allowed:
-  - Copy module configurations as templates.
-  - Choose which series is the landing/default series.
+### Current page header architecture
 
-### Series navigation
+This is the biggest difference from the earlier plan.
 
-- Users switch series via the **Comics** button in the header (opens the comics library).
+The primary header path is now page-scoped and stored in `page.meta.header` (`version: 3`).
 
-### Layout/placement architecture
+That means:
 
-- Modules need a **placement model** (grid/slots) so configurable parts can render in defined regions.
-- Panels already behave like stacks; formalize this as `panelLayout` + `panelSlots`.
-- Header should expose slots (brand, status, entry controls, nav, actions) with a grid layout.
-- Reader controls should expose slots (left controls, center status, right controls) so buttons can be reordered or hidden without custom CSS.
+- the header is not primarily treated as a normal insertable module anymore
+- page-level header editing is already shipped
+- legacy `page-config` header data and legacy `header` modules are still used only as fallback inputs for older pages
 
-#### Slot map (concrete proposal)
+### Current module catalog
 
-**Header slots (CSS grid areas)**
+The builder currently recognizes these module types:
 
-- `brand` (logo + title + subtitle)
-- `status` (status panel)
-- `patron` (patron welcome)
-- `entry` (entry selector + cover button)
-- `nav` (Comics + Admin links)
-- `actions` (header buttons[])
+- `header`
+- `text`
+- `image`
+- `gallery`
+- `video`
+- `social`
+- `email-signup`
+- `promo`
+- `buttons`
+- `spacer`
+- `divider`
+- `reader`
+- `entry-gallery`
+- `feed`
+- `html`
 
-**Header layout (default)**
+`header` is not part of the normal insertable palette because page-level header editing supersedes it.
 
-```
-| brand | status | entry | nav | actions |
-| brand | patron | entry | nav | actions |
-```
+### Current editing UX
 
-**Panels (stack slots)**
+Shipped behavior in the admin builder:
 
-- `panel.left` and `panel.right` are vertical stacks.
-- Each module can declare optional `slot` (top/middle/bottom), otherwise flow order.
+- page list by series
+- module palette
+- section insertion
+- section drag/drop reorder
+- module drag/drop reorder
+- section layout switching
+- section spacing settings
+- page-scoped header editor
+- page theme editor
+- explicit module draft editing
+- explicit `Save Draft` and `Publish Changes`
+- page status badges in the page list and page header
+- "Open Reader" / draft preview link
 
-**Reader controls slots**
+The current canvas is an edit surface, not a true live page preview.
 
-- `controls.left` (prev/next)
-- `controls.center` (page indicator)
-- `controls.right` (help/comments/zoom/fit/fullscreen)
-- `controls.progress` (progress bar)
+What the canvas currently does well:
 
-**Reader overlays**
+- shows page structure
+- shows section layout
+- shows module ordering
+- supports insertion and reordering efficiently
 
-- `comments`, `shortcuts`, `entryEnd` are toggled overlays controlled by reader module config.
+What it does not do yet:
 
-### Visual layout editor (builder)
+- render the actual page as the user will see it on the public reader
 
-- Provide drag‑and‑drop controls to **reorder header parts** (brand/status/patron/entry/nav/actions).
-- Provide drag‑and‑drop controls to **reorder panel modules** (left/right stacks).
-- Provide drag‑and‑drop controls to **reorder reader control groups** (left/center/right/progress).
-- Allow moving parts between slots where valid (e.g., header parts between grid areas).
+### Current editor coverage
 
-### 3) Panel modules (swappable L/R)
+Structured editors exist today for:
 
-Modules can be placed in either panel and ordered:
+- page header
+- theme
+- `text`
+- `image`
+- `email-signup`
+- `promo`
+- `social`
+- `buttons`
+- `spacer`
+- `reader`
+- `feed`
+- `html` via dedicated code textarea
 
-- Feed
-- Social Buttons
-- Email Signup
-- Promo (modify existing promo module; do not add a new one)
-- Gallery (optional future)
+Common modules still missing good first-class editors:
 
-### Recent builder changes (current state)
+- `gallery`
+- `video`
+- `divider`
+- `entry-gallery`
 
-- [x] Preview toggle removed (edit-only canvas).
-- [x] Disable fallback toggle removed (no dev fallbacks in UI).
-- [x] Published toggle removed (publish actions pending).
-- [x] Promo image picker simplified (no crop/focus/zoom editor).
-- [x] Promo per-slide Image Fit added (Fill/cover vs Fit/contain).
+Those still fall back to raw JSON-oriented editing instead of a polished control surface.
 
-## Completed so far (confirmed)
+### Current rendering behavior
 
-- Panel modules render correctly on the reader-facing page (left/right panels show expected content).
-- Feed preview renders formatted text and is truncated to a snippet.
-- Social buttons module renders correctly in panels.
-- Social module editor UI is present in the builder.
+Current runtime behavior:
 
-### Promo module status (current)
+- public reader pages are served from `/api/pages/{series_id}/{slug}`
+- admin draft pages are available through `/api/admin/pages/by-slug/{series_id}/{slug}`
+- the reader can load draft pages when the user is an admin
 
-- **Unstable layout**: border/fit/fill/text spacing still inconsistent across slides.
-- Treat promo as **needs rebuild** once builder foundations are stable.
-- Keep decisions: **no crop editor**, **per-slide Fit/Fill**, **simple picker** only.
+Important current reality:
 
-Panel container config:
+- the reader still contains legacy fallback behavior through `page-config` loading for some flows
+- the earlier "no fallback UI in dev" goal has not actually been fully achieved
 
-- panelEnabled.left/right
-- panelOrder.left/right
+There is also duplicated render logic:
 
-### 4) Shared Button Model (Header + Panels)
+- `reader/page-renderer.js` renders live page output
+- `admin/page-builder/preview-renderers.js` renders admin preview output
 
-```
-{ label, icon, action: "link"|"overlay"|"toggle", href, target, overlayId, toggleId }
-```
+That duplication is manageable right now, but it is a future drift risk.
 
-Supports:
+### Current page and button model
 
-- overlay: user-settings, cover-gallery
-- toggle: right-panel-feed, comments
-- link: any URL/page
+The older plan's shared button model is stale.
 
-## Implementation phases
-
-### Phase A — Schema foundations
-
-1. Builder schema updates (header/reader/panels + shared button model)
-
-#### Draft schema (per-page, no global fallbacks)
-
-**Page (API shape)**
+What is actually implemented today is closer to:
 
 ```json
 {
-  "page": {
-    "id": "uuid",
-    "seriesId": "battle-bros",
-    "pageId": "reader-home",
-    "title": "Battle Bros",
-    "isPublished": true,
-    "isHomepage": true,
-    "meta": {
-      "layout": {
-        "header": {
-          "gridTemplateAreas": ["brand status entry nav actions", "brand patron entry nav actions"],
-          "slotOrder": ["brand", "status", "patron", "entry", "nav", "actions"]
-        },
-        "panels": {
-          "left": { "order": ["moduleIdA", "moduleIdB"] },
-          "right": { "order": ["moduleIdC", "moduleIdD"] }
-        },
-        "readerControls": {
-          "left": ["prev", "next"],
-          "center": ["pageIndicator"],
-          "right": ["help", "comments", "zoomOut", "fit", "zoomIn", "fullscreen"],
-          "progress": ["progressBar"]
-        }
-      }
-    },
-    "sections": [
-      /* BuilderSection[] */
-    ]
+  "id": "btn-123",
+  "text": "About",
+  "enabled": true,
+  "style": "primary",
+  "link": {
+    "kind": "builder-page",
+    "pageSlug": "about",
+    "url": "",
+    "hash": "",
+    "openInNewTab": false
   }
 }
 ```
 
-Notes:
+Current supported link kinds:
 
-- `pageId` is the UI label for the page identifier (internally stored as slug).
-- Layout is **per-page** only.
+- `builder-page`
+- `url`
+- `anchor`
 
-**Header module config**
+Current scope:
 
-```json
-{
-  "moduleType": "header",
-  "config": {
-    "brand": {
-      "show": true,
-      "logoText": "BWC",
-      "logoImage": "",
-      "title": "BATTLE BROS",
-      "subtitleMode": "rotating",
-      "subtitles": []
-    },
-    "patron": { "show": true, "text": "Welcome, Patron!", "durationMs": 20000 },
-    "status": { "show": true, "source": "statusMessage", "typing": true },
-    "entryControls": {
-      "show": true,
-      "showPatronBadge": true,
-      "showCoverButton": true,
-      "coverButtonLabel": "COVERS"
-    },
-    "nav": {
-      "show": true,
-      "links": [
-        { "label": "Comics", "href": "comics.html" },
-        { "label": "Admin", "href": "admin/", "requiresAdmin": true }
-      ]
-    },
-    "buttons": [
-      /* shared button model */
-    ]
-  }
-}
-```
+- used by the button module
+- used by page-header nav editing
 
-**Reader module config**
+Not currently implemented:
 
-```json
-{
-  "moduleType": "reader",
-  "config": {
-    "viewport": { "twoPageMode": "auto", "edgeZones": true, "edgeZoneSize": "default" },
-    "controls": {
-      "show": true,
-      "showPrevNext": true,
-      "showHelp": true,
-      "showComments": true,
-      "showZoom": true,
-      "showFit": true,
-      "showFullscreen": true,
-      "showProgress": true
-    },
-    "behavior": {
-      "keyboardShortcuts": true,
-      "swipeNavigation": true,
-      "tapToToggleUi": true,
-      "mobileUiHideDelayMs": 0
-    },
-    "overlays": {
-      "comments": true,
-      "shortcuts": true,
-      "entryEnd": {
-        "enabled": true,
-        "title": "ENTRY COMPLETE",
-        "body": "You've reached the end...",
-        "buttons": ["next", "restart", "close"]
-      }
-    }
-  }
-}
-```
+- overlay action model
+- toggle action model
 
-**Panel module configs (swappable left/right)**
+If those are needed later, they should be added intentionally and validated carefully instead of being assumed by the schema.
 
-```json
-{ "moduleType": "feed", "config": { "title": "BWC FEED", "limit": 6, "showAuthor": true, "showLinks": true } }
-{ "moduleType": "social", "config": { "buttons": [ /* shared button model */ ], "style": "grid" } }
-{ "moduleType": "email-signup", "config": { "heading": "JOIN THE EMAIL LIST!", "subtext": "Occasional dispatches...", "placeholder": "your@email.com", "buttonText": "SUBMIT" } }
-{ "moduleType": "promo", "config": { "items": [ /* existing promo schema (modified in place) */ ] } }
-```
+## What changed since the older version of this document
 
-**Shared button model**
+The earlier draft is now stale in these important ways:
 
-```json
-{ "label": "Open Feed", "icon": "🔗", "action": "link", "href": "feed.html", "target": "_self" }
-```
+- The page header is now a page-level editor backed by `page.meta.header`, not the "single header module" approach the older doc assumed.
+- Explicit draft/publish actions are shipped.
+- Status badges and reader-preview links are shipped.
+- Theme editing is shipped and page-scoped.
+- Section drag/drop and spacing controls are shipped.
+- Button, social, promo, feed, and email module editors are shipped.
+- The builder still does not have a true live preview in the main editing surface.
+- The reader still has fallback behavior in some paths, so "no fallback in dev" is not currently true.
+- Page creation still uses prompt dialogs.
+- Page reordering exists in the backend API but does not yet exist in the builder UI.
+- The old "shared button model" section no longer matches the current implementation.
+- The old document talked about showing page ID in the UI; the current UI is more focused on slug, page type, publish state, and homepage state.
 
-### Phase B — Reader renderer alignment
+## Audit summary
 
-2. Reader renderer updates (apply builder config cleanly)
+### Strengths
 
-### Phase C — Builder UI controls
+The current builder already has a strong base:
 
-3. Builder UI updates (configure new parts)
+- the page/section/module model is clear
+- page header and theme state are split in a sensible way
+- explicit save points reduce accidental mutation
+- draft vs published behavior is understandable
+- series scoping is clear
+- automated coverage already exists for builder data, shell flows, preview rendering, reader rendering, and backend routes
 
-### Phase D — Validation and cleanup
+This is already beyond a toy admin form.
 
-4. Validation/feedback warnings (missing required pieces, etc.)
-5. Remove any obsolete/legacy paths that conflict with the unified modules
+### High-risk issues
 
-## Non‑goals for this pass
+#### 1. Content safety is not strong enough yet
 
-- Re‑designing visual styles
-- New features outside the mapped UI
+Today the builder can store and the reader can render raw HTML from:
+
+- `text` module content
+- `html` module code
+
+It also preserves arbitrary URL strings for some links.
+
+That means the current builder is flexible, but too trusting.
+
+This is the most important gap from the audit. A lightweight builder can still be secure, but only if it enforces a small, explicit content model.
+
+#### 2. No revision history or conflict protection
+
+Current behavior is explicit save, but still effectively last-write-wins.
+
+Missing today:
+
+- revision history
+- optimistic locking
+- conflict messages when another save has happened since load
+- any recovery path stronger than "save carefully"
+
+This does not need enterprise collaboration, but it does need basic overwrite protection.
+
+#### 3. The builder is still more structural than visual
+
+The current canvas is efficient for arranging modules, but it is not a trustworthy preview of the actual page.
+
+That makes authoring less confident than it should be, especially compared to the useful preview loops in stronger builders.
+
+#### 4. Several common modules still depend on weak editor coverage
+
+The builder is strongest where there are structured controls.
+
+It is weakest where authors have to fall back to raw JSON for common modules. That is not a good steady-state authoring experience.
+
+#### 5. Preview/live renderer drift is possible
+
+Because admin preview rendering and live reader rendering are duplicated, changes can diverge over time.
+
+That is a maintenance problem, not just a polish problem.
+
+## Updated priorities
+
+The priorities below are intentionally biased toward lightweight, secure, and useful.
+
+### P0 - Secure and stabilize what already exists
+
+These are still the highest-value priorities, but the first security pass is now in place.
+
+1. Keep the new sanitization boundary as the canonical save/read path for builder content.
+2. Keep the `html` module admin-usable, but only under the stricter sanitizer now in place.
+3. Expand server-side validation over time where it prevents broken pages, especially for:
+   - allowed `moduleType` values
+   - valid section `layout` values
+   - allowed link shapes
+   - numeric bounds for common config fields
+   - future module-specific config coverage
+4. Add optimistic concurrency protection using `updatedAt` or a revision token.
+5. Keep automated coverage for:
+   - XSS attempts
+   - `javascript:` links
+   - unsafe HTML/event-handler stripping
+   - invalid structural payloads
+6. Add save-conflict handling tests once optimistic concurrency exists.
+
+### P1 - Make the builder more useful without making it heavy
+
+1. Add a real preview mode inside the builder.
+2. Keep the current structural canvas for drag/drop and page assembly.
+3. Use a lightweight preview approach:
+   - page or section preview using real render output
+   - desktop/mobile width toggles
+   - no full freeform WYSIWYG canvas
+4. Replace `prompt()` page creation with a proper modal or form.
+5. Add UI for:
+   - page title editing
+   - slug editing
+   - page type editing
+   - homepage assignment
+6. Add page reorder UI using the endpoint that already exists.
+
+### P2 - Improve editor coverage and reduce maintenance drift
+
+1. Add structured editors for:
+   - `gallery`
+   - `video`
+   - `divider`
+   - `entry-gallery`
+2. Add a better asset picker flow for plain image editing.
+3. Reduce preview/live duplication by sharing renderer logic where practical.
+4. Add targeted validation/warnings only where they prevent broken pages.
+5. Add duplication helpers where cheap and useful:
+   - duplicate page
+   - duplicate section
+   - duplicate module
+
+### P3 - Reduce legacy fallback over time
+
+1. Keep header fallback only until older pages are migrated.
+2. Keep `page-config` fallback only while the reader still depends on unmigrated surfaces.
+3. Track which surfaces are still legacy-backed.
+4. Remove fallback paths only after the builder is complete enough that authors are not forced back into code.
+
+## Concrete near-term plan
+
+### Phase 1 - Security pass
+
+Status: implemented
+
+Implemented in this pass:
+
+- added a backend builder security boundary in `backend/app/builder_security.py`
+- sanitize `text` module HTML on save and on defensive read
+- keep `html` enabled, but under a stricter sanitizer instead of raw passthrough
+- sanitize promo CTA HTML and builder link targets
+- add URL/protocol allowlists for links, media assets, panel backgrounds, and videos
+- add backend validation for `moduleType`, `layout`, `sectionType`, `sortIndex`, and `columnIndex`
+- sanitize page meta used by the builder, including header nav links and panel background paths
+- harden reader and preview renderers so legacy unsafe data is still rendered defensively
+- add security-focused backend and frontend tests for XSS, bad URLs, and invalid structure
+
+Deliberately not in this phase:
+
+- optimistic concurrency / revision tokens
+- a one-off stored-data backfill script
+- a full schema system for every module
+
+### Phase 2 - Useful preview pass
+
+- wire a real preview surface into the builder
+- prefer shared render logic over a third rendering path
+- add mobile/desktop width toggles
+
+### Phase 3 - Page management pass
+
+- replace prompt-based page creation
+- add page metadata editor
+- add page reorder UI
+
+### Phase 4 - Editor coverage pass
+
+- add structured editors for the remaining common modules
+- reduce raw JSON dependence for everyday authoring
+
+### Phase 5 - Fallback cleanup pass
+
+- document what legacy fallback remains
+- migrate remaining surfaces deliberately
+- remove fallback only when replacement coverage is complete
+
+## Keep / change / avoid
+
+### Keep
+
+- explicit save model
+- page-scoped header editor
+- page-scoped theme editor
+- series scoping
+- drag/drop sections and modules
+- lightweight section settings
+
+### Change
+
+- unsafe HTML and URL handling
+- prompt-based page creation
+- missing page reorder UI
+- structural-only preview
+- raw JSON dependence for common modules
+
+### Avoid
+
+- trying to become a generic site builder
+- adding complex features before security and preview are trustworthy
+- introducing more duplicated render logic
+- over-engineering a schema for features the site does not actually need
+
+## Verification coverage
+
+Current automated coverage already exists for:
+
+- builder data API wrappers
+- builder shell interactions
+- builder preview rendering
+- reader page rendering
+- reader builder-page loading
+- backend page/section/module routes
+
+Coverage still missing from the audit perspective:
+
+- optimistic concurrency tests
+- preview/live parity checks
+
+## Implemented security notes
+
+The current builder security model is intentionally lightweight:
+
+- sanitize on save
+- store the cleaned value
+- sanitize again on read as defense in depth
+- reject invalid structural payloads with `400`
+
+The current policies are:
+
+- `text` keeps basic editorial HTML only
+- `html` remains available, but scripts, inline event handlers, forms, embeds, and unsafe URLs are stripped
+- builder links and media URLs allow only safe protocols and safe relative paths
+- invalid section layouts, module types, column indexes, and similar structural violations are rejected instead of silently stored
+
+This is enough to make the builder materially safer without turning it into a heavyweight schema-driven system. The next meaningful security step is conflict protection, not more raw feature complexity.
+
+## Working definition of done
+
+This builder is in a good place when all of the following are true:
+
+- common page work can be done without code edits
+- builder output is safe by default
+- authors can trust what they preview
+- page saves do not silently overwrite each other
+- legacy fallback paths are small, intentional, and temporary
+- the builder remains simpler than the site it serves

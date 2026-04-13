@@ -1,7 +1,13 @@
+import {
+  sanitizeBuilderHtml,
+  sanitizeColor,
+  sanitizeHref,
+  sanitizeKeyword,
+  sanitizeNumber,
+} from './sanitize.js';
+
 function clampOpacity(value, fallback = 1) {
-  const num = typeof value === 'number' ? value : parseFloat(value);
-  if (!Number.isFinite(num)) return fallback;
-  return Math.min(1, Math.max(0, num));
+  return sanitizeNumber(value, fallback, 0, 1);
 }
 
 function hexToRgba(color, opacity) {
@@ -41,12 +47,12 @@ export function renderPromoModule(config = {}, options = {}) {
   const escapeHtml = options.escapeHtml || defaultEscape;
   const resolveImageUrl = options.resolveImageUrl || ((path) => path || '');
 
-  const height = config.height || 400;
+  const height = sanitizeNumber(config.height, 400, 160, 1200);
   const showNav = config.showNavigation !== false;
   const showIndicators = config.showIndicators !== false;
   const autoRotate = config.autoRotate !== false;
-  const interval = config.interval || 5000;
-  const transition = config.transition || 'fade';
+  const interval = sanitizeNumber(config.interval, 5000, 1000, 60000);
+  const transition = sanitizeKeyword(config.transition, ['fade', 'slide'], 'fade');
 
   const hasBlurBackground = items.some((item) => Boolean(item?.style?.backgroundBlur));
 
@@ -57,7 +63,7 @@ export function renderPromoModule(config = {}, options = {}) {
 
       const slideStyles = [];
       const bgOpacity = clampOpacity(style.backgroundOpacity, 0.6);
-      const bgColor = style.backgroundColor || 'transparent';
+      const bgColor = sanitizeColor(style.backgroundColor, 'transparent');
       const blurBackground = Boolean(style.backgroundBlur);
       const bgBaseColor = bgColor === 'transparent' ? '#000000' : bgColor;
       const bgRgba = hexToRgba(bgBaseColor, bgOpacity);
@@ -69,7 +75,7 @@ export function renderPromoModule(config = {}, options = {}) {
       const fit = item.imageFit === 'contain' ? 'contain' : 'cover';
       const objectFit = fit === 'contain' ? 'contain' : 'cover';
       if (style.imageBorder) {
-        const borderColor = style.imageBorderColor || '#00d9ff';
+        const borderColor = sanitizeColor(style.imageBorderColor, '#00d9ff');
         if (fit === 'contain') {
           imageStyles.push(`border: 2px solid ${borderColor}`);
         } else {
@@ -77,8 +83,8 @@ export function renderPromoModule(config = {}, options = {}) {
         }
       }
       if (style.imageGlow) {
-        const glowColor = style.imageGlowColor || '#00d9ff';
-        const intensity = style.imageGlowIntensity || 0.5;
+        const glowColor = sanitizeColor(style.imageGlowColor, '#00d9ff');
+        const intensity = sanitizeNumber(style.imageGlowIntensity, 0.5, 0, 2);
         const glowValue = `0 0 ${20 * intensity}px ${glowColor}, 0 0 ${40 * intensity}px ${glowColor}`;
         if (fit === 'contain') {
           imageStyles.push(`box-shadow: ${glowValue}`);
@@ -90,26 +96,26 @@ export function renderPromoModule(config = {}, options = {}) {
       imageStyles.push(`object-position: center`);
 
       const topTextStyles = [];
-      topTextStyles.push(`color: ${style.topTextColor || '#ffed00'}`);
+      topTextStyles.push(`color: ${sanitizeColor(style.topTextColor, '#ffed00')}`);
       if (style.topTextFont === 'display') {
         topTextStyles.push('font-family: "Bebas Neue", sans-serif');
       } else if (style.topTextFont === 'mono') {
         topTextStyles.push('font-family: "JetBrains Mono", monospace');
       }
       if (style.topTextGlow) {
-        const glowColor = style.topTextGlowColor || '#ffed00';
+        const glowColor = sanitizeColor(style.topTextGlowColor, '#ffed00');
         topTextStyles.push(`text-shadow: 0 0 10px ${glowColor}, 0 0 20px ${glowColor}`);
       }
 
       const bottomTextStyles = [];
-      bottomTextStyles.push(`color: ${style.bottomTextColor || '#ffffff'}`);
+      bottomTextStyles.push(`color: ${sanitizeColor(style.bottomTextColor, '#ffffff')}`);
       if (style.bottomTextFont === 'display') {
         bottomTextStyles.push('font-family: "Bebas Neue", sans-serif');
       } else if (style.bottomTextFont === 'mono') {
         bottomTextStyles.push('font-family: "JetBrains Mono", monospace');
       }
       if (style.bottomTextGlow) {
-        const glowColor = style.bottomTextGlowColor || '#00d9ff';
+        const glowColor = sanitizeColor(style.bottomTextGlowColor, '#00d9ff');
         bottomTextStyles.push(`text-shadow: 0 0 10px ${glowColor}, 0 0 20px ${glowColor}`);
       }
 
@@ -118,11 +124,11 @@ export function renderPromoModule(config = {}, options = {}) {
         ? `<div class="pb-promo-top-text" style="${topTextStyles.join(';')}">${escapeHtml(item.topText)}</div>`
         : '';
       const bottomText = item.bottomText
-        ? `<div class="pb-promo-bottom-text" style="${bottomTextStyles.join(';')}">${item.bottomText}</div>`
+        ? `<div class="pb-promo-bottom-text" style="${bottomTextStyles.join(';')}">${sanitizeBuilderHtml(item.bottomText, 'text')}</div>`
         : '';
 
       const rawLink = item.linkUrl || '';
-      const linkUrl = escapeHtml(rawLink);
+      const linkUrl = escapeHtml(sanitizeHref(rawLink));
       const imageFrame = imageSrc
         ? `<div class="pb-promo-image-frame" data-fit="${fit}"${frameStyles.length ? ` style="${frameStyles.join(';')}"` : ''}>
            <img src="${imageSrc}" alt="" loading="lazy" data-fit="${fit}" style="${imageStyles.join(';')}" class="pb-promo-img" />
@@ -193,7 +199,7 @@ export function renderPromoModule(config = {}, options = {}) {
   const hasOutside = items.some((item) => item.textPosition === 'outside');
 
   return `
-    <div class="pb-promo pb-promo--${transition}" data-bg-blur="${hasBlurBackground}" data-show-indicators="${showIndicators && items.length > 1}"
+      <div class="pb-promo pb-promo--${transition}" data-bg-blur="${hasBlurBackground}" data-show-indicators="${showIndicators && items.length > 1}"
          data-has-outside="${hasOutside}"
          style="--promo-height: ${height}px;"
          data-auto-rotate="${autoRotate}"

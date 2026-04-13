@@ -263,4 +263,38 @@ describe('admin page-builder editor and preview renderers', () => {
       'index.html?series=battle-bros&page=about'
     );
   });
+
+  it('sanitizes dangerous preview html and urls', () => {
+    const text = document.createElement('div');
+    text.innerHTML = renderPreviewModule({
+      moduleType: 'text',
+      config: {
+        content:
+          '<p onclick="evil()">Preview <strong>copy</strong><script>alert(1)</script><a href="javascript:alert(2)">bad</a></p>',
+      },
+    });
+    const html = document.createElement('div');
+    html.innerHTML = renderPreviewModule({
+      moduleType: 'html',
+      config: {
+        code: '<div onclick="evil()"><script>alert(1)</script><section class="safe" data-note="ok">Safe</section></div>',
+      },
+    });
+    const social = document.createElement('div');
+    social.innerHTML = renderPreviewModule({
+      moduleType: 'social',
+      config: {
+        buttons: [{ text: 'Unsafe', url: 'javascript:alert(3)' }],
+      },
+    });
+
+    expect(text.innerHTML).not.toContain('<script');
+    expect(text.innerHTML).not.toContain('onclick');
+    expect(text.innerHTML).not.toContain('javascript:');
+    expect(text.querySelector('.pb-text strong')?.textContent).toBe('copy');
+    expect(html.innerHTML).not.toContain('<script');
+    expect(html.innerHTML).not.toContain('onclick');
+    expect(html.querySelector('.safe')?.getAttribute('data-note')).toBe('ok');
+    expect(social.querySelector('.pb-social-btn')?.getAttribute('href')).toBe('#');
+  });
 });
