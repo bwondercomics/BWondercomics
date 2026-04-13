@@ -3,24 +3,20 @@ import { openImagePicker } from './image-picker.js';
 import { DEFAULT_SERIES_ID } from './state.js';
 import { readFileAsBase64 } from './utils.js';
 import { loadSeriesPageConfig } from './page-config.js';
-import { LAYOUT_OPTIONS, MODULE_TYPES, THEME_COLORS } from './page-builder/constants.js';
-import { escapeAttr, escapeHtml, resolveAssetUrl } from './page-builder/helpers.js';
+import { MODULE_TYPES, THEME_COLORS } from './page-builder/constants.js';
+import { createCanvasEventBinder } from './page-builder/canvas-events.js';
+import { renderCanvasSnapshot } from './page-builder/canvas-renderer.js';
+import { createEditorPanelRenderer } from './page-builder/editor-panel.js';
+import { resolveAssetUrl } from './page-builder/helpers.js';
 import {
-  HEADER_BLOCK_DEFS,
-  HEADER_REGION_ORDER,
   createEffectivePageHeader,
   createPageHeaderMeta,
   createDefaultHeaderConfig,
   normalizeHeaderCopy,
   normalizeHeaderConfig,
 } from './page-builder/header-config.js';
-import {
-  bindHeaderEditorEvents,
-  renderHeaderEditorContent,
-} from './page-builder/header-editor.js';
 import { normalizeHeaderNavItems } from './page-builder/link-utils.js';
-import { renderThemeEditorContent, bindThemeEditorEvents } from './page-builder/theme-editor.js';
-import { renderModuleEditorContent, bindModuleEditorEvents } from './page-builder/module-editor.js';
+import { createSidebarPanel } from './page-builder/sidebar-panel.js';
 import {
   fetchPages,
   fetchPage,
@@ -58,8 +54,6 @@ function getDefaultThemeDraft() {
     panelSpacing: {},
   };
 }
-
-const INSERTABLE_MODULE_TYPES = MODULE_TYPES.filter((module) => module.type !== 'header');
 
 /**
  * Get default config for a module type.
@@ -218,6 +212,129 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
   let activeInsertTarget = null;
   let draggedModuleId = null;
   let draggedSectionId = null;
+
+  const renderEditorPanel = createEditorPanelRenderer({
+    el,
+    getState: () => ({
+      currentPage,
+      pages,
+      activeEditorTab,
+      selectedCanvasSurface,
+      selectedModuleId,
+      activeThemeDraft,
+      activeHeaderDraft,
+      activeModuleDraft,
+      activeModuleDraftId,
+    }),
+    actions: {
+      ensureCleanWorkspace,
+      initializeThemeDraft,
+      initializeHeaderDraft,
+      initializeModuleDraft,
+      setActiveEditorTab: (nextTab) => {
+        activeEditorTab = nextTab;
+      },
+      setActiveThemeDraft: (nextDraft) => {
+        activeThemeDraft = cloneValue(nextDraft);
+      },
+      setActiveHeaderDraft: (nextDraft) => {
+        activeHeaderDraft = cloneValue(nextDraft);
+      },
+      setActiveModuleDraft: (nextDraft) => {
+        activeModuleDraft = cloneValue(nextDraft);
+      },
+      setActiveModuleDraftId: (nextDraftId) => {
+        activeModuleDraftId = nextDraftId ?? null;
+      },
+      setSelectedModuleId: (nextModuleId) => {
+        selectedModuleId = nextModuleId ?? null;
+      },
+      clearSelectedModuleState,
+      removeModuleFromCurrentPage,
+      markDirty,
+      clearDirty,
+      setEditorStatus,
+      saveActiveThemeDraft,
+      discardActiveThemeDraft,
+      resetActiveThemeDraft,
+      saveActiveHeaderDraft,
+      discardActiveHeaderDraft,
+      saveActiveModuleDraft,
+      discardActiveModuleDraft,
+      renderCanvas,
+      updateEditorFooterUi,
+    },
+    helpers: {
+      getSelectedModuleRecord,
+      getPageDisplayTitle,
+      getModuleLabel,
+      getModulePreview,
+    },
+    deps: {
+      openImagePicker,
+      fetchAssets,
+      uploadAssetFile,
+      resolveAssetUrl,
+      deleteModule,
+    },
+  });
+
+  const bindCanvasEvents = createCanvasEventBinder({
+    el,
+    getState: () => ({
+      currentPage,
+      selectedModuleId,
+      selectedCanvasSurface,
+      activeSectionId,
+      activeSectionDraft,
+      dirtyScope,
+      activeInsertTarget,
+      draggedModuleId,
+      draggedSectionId,
+    }),
+    actions: {
+      insertSectionAt,
+      reorderSectionToIndex,
+      setDraggedSectionId: (sectionId) => {
+        draggedSectionId = sectionId;
+      },
+      changeSectionLayout,
+      toggleSectionSettings,
+      updateActiveSectionDraftField,
+      discardSectionSettings,
+      saveSectionSettings,
+      setDraggedModuleId: (moduleId) => {
+        draggedModuleId = moduleId;
+      },
+      moveModuleToTarget,
+      insertModuleAt,
+      toggleModulePicker,
+      selectPageHeaderFromCanvas,
+      selectModule,
+      deleteModuleFromCanvas,
+      deleteSectionFromCanvas,
+    },
+  });
+
+  const { renderPageList, renderModulePalette, bindSidebarTabs } = createSidebarPanel({
+    el,
+    getState: () => ({
+      currentPage,
+      pages,
+    }),
+    actions: {
+      selectPage,
+      deletePage: deletePageFromSidebar,
+      setDraggedModuleId: (moduleId) => {
+        draggedModuleId = moduleId;
+      },
+      syncSidebarRailLabel,
+    },
+    helpers: {
+      getPageDisplayTitle,
+      renderPageStatusBadges,
+    },
+  });
 
   function getSeriesId() {
     return sanitizeSeriesId(getActiveSeriesId()) || DEFAULT_SERIES_ID;
@@ -460,15 +577,34 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     };
   }
 
-  function resetBuilderState() {
+  function clearSelectedModuleState() {
     selectedModuleId = null;
-    selectedCanvasSurface = null;
     activeModuleDraftId = null;
     activeModuleDraft = null;
-    activeThemeDraft = currentPage ? normalizeThemeDraft(currentPage) : null;
-    activeHeaderDraft = currentPage ? normalizeHeaderDraft(currentPage) : null;
+  }
+
+  function clearActiveSectionState() {
     activeSectionId = null;
     activeSectionDraft = null;
+    clearDirty('section');
+  }
+
+  function removeModuleFromCurrentPage(moduleId) {
+    for (const section of currentPage?.sections || []) {
+      section.modules = (section.modules || []).filter((module) => module.id !== moduleId);
+    }
+  }
+
+  function removeSectionFromCurrentPage(sectionId) {
+    currentPage.sections = (currentPage.sections || []).filter((section) => section.id !== sectionId);
+  }
+
+  function resetBuilderState() {
+    clearSelectedModuleState();
+    selectedCanvasSurface = null;
+    activeThemeDraft = currentPage ? normalizeThemeDraft(currentPage) : null;
+    activeHeaderDraft = currentPage ? normalizeHeaderDraft(currentPage) : null;
+    clearActiveSectionState();
     dirtyScope = null;
     editorStatus = { type: 'neutral', message: '' };
     canvasStatus = { type: 'neutral', message: '' };
@@ -736,103 +872,6 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     return (section?.modules || []).filter((module) => module.moduleType !== 'header').length;
   }
 
-  function getHeaderPreviewState() {
-    if (activeHeaderDraft) {
-      return {
-        header: normalizeHeaderConfig(activeHeaderDraft.header, normalizeHeaderNavItems),
-        copy: normalizeHeaderCopy(activeHeaderDraft.copy, {
-          title: currentPage?.title || 'Page Title',
-          subtitle: '',
-          subtitles: [],
-        }),
-      };
-    }
-    return normalizeHeaderDraft(currentPage);
-  }
-
-  function getHeaderBlockPreview(blockId, headerState) {
-    const copy = normalizeHeaderCopy(headerState.copy, {
-      title: currentPage?.title || 'Page Title',
-      subtitle: '',
-      subtitles: [],
-    });
-    const enabledNavItems = normalizeHeaderNavItems(headerState.header?.nav?.items || []).filter(
-      (item) => item.enabled !== false
-    );
-    if (blockId === 'brand') {
-      const supportingCopy =
-        copy.subtitle || copy.subtitles?.[0] || 'Page title and subtitle live here.';
-      return `
-        <span class="pb-page-header-part-primary">${escapeHtml(copy.title || currentPage?.title || 'Page Title')}</span>
-        <span class="pb-page-header-part-secondary">${escapeHtml(supportingCopy)}</span>
-      `;
-    }
-    if (blockId === 'nav') {
-      if (!enabledNavItems.length) {
-        return '<span class="pb-page-header-part-secondary">No navigation buttons yet.</span>';
-      }
-      return `
-        <div class="pb-page-header-chip-row">
-          ${enabledNavItems
-            .slice(0, 4)
-            .map((item) => `<span class="pb-page-header-chip">${escapeHtml(item.label)}</span>`)
-            .join('')}
-          ${enabledNavItems.length > 4 ? '<span class="pb-page-header-chip">…</span>' : ''}
-        </div>
-      `;
-    }
-    const def = HEADER_BLOCK_DEFS.find((item) => item.id === blockId);
-    return `<span class="pb-page-header-part-secondary">${escapeHtml(def?.description || '')}</span>`;
-  }
-
-  function renderPageHeaderSurface() {
-    const headerState = getHeaderPreviewState();
-    const isSelected = selectedCanvasSurface === 'page-header';
-    const isDirty = dirtyScope === 'header';
-    const formatRegionLabel = (region) =>
-      String(region || '').replace(/^\w/, (char) => char.toUpperCase());
-
-    return `
-      <button
-        type="button"
-        class="pb-page-header-surface ${isSelected ? 'selected' : ''}"
-        data-action="select-page-header"
-      >
-        <div class="pb-page-header-surface-head">
-          <div>
-            <span class="pb-page-header-kicker">Page Header</span>
-            <div class="pb-page-header-title">Click to edit title, buttons, visible parts, and placement</div>
-          </div>
-          ${isDirty ? '<span class="pb-page-header-badge">Unsaved</span>' : '<span class="pb-page-header-badge">Click to edit</span>'}
-        </div>
-        <div class="pb-page-header-surface-layout">
-          ${HEADER_REGION_ORDER.map((region) => {
-            const blockIds = headerState.header?.regions?.[region] || [];
-            return `
-              <div class="pb-page-header-region" data-region="${region}">
-                <div class="pb-page-header-region-label">${escapeHtml(formatRegionLabel(region))}</div>
-                <div class="pb-page-header-region-stack">
-                  ${blockIds
-                    .map((blockId) => {
-                      const block = HEADER_BLOCK_DEFS.find((item) => item.id === blockId);
-                      const enabled = headerState.header?.blocks?.[blockId]?.enabled !== false;
-                      return `
-                        <div class="pb-page-header-part ${enabled ? '' : 'is-disabled'}">
-                          <span class="pb-page-header-part-label">${escapeHtml(block?.label || blockId)}</span>
-                          ${getHeaderBlockPreview(blockId, headerState)}
-                        </div>
-                      `;
-                    })
-                    .join('')}
-                </div>
-              </div>
-            `;
-          }).join('')}
-        </div>
-      </button>
-    `;
-  }
-
   function buildNormalizedPageHeader(page = currentPage, draftState = activeHeaderDraft) {
     if (draftState?.header || draftState?.copy) {
       return createPageHeaderMeta(
@@ -956,543 +995,205 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     renderCanvas();
   }
 
-  function renderModulePicker(target) {
-    const groups = Array.from(new Set(INSERTABLE_MODULE_TYPES.map((module) => module.category)));
-    return `
-      <div class="pb-inline-picker">
-        ${groups
-          .map((category) => {
-            const items = INSERTABLE_MODULE_TYPES.filter((module) => module.category === category);
-            return `
-            <div class="pb-inline-picker-group">
-              <div class="pb-inline-picker-title">${escapeHtml(category)}</div>
-              <div class="pb-inline-picker-grid">
-                ${items
-                  .map(
-                    (module) => `
-                  <button
-                    type="button"
-                    class="pb-inline-picker-item"
-                    data-action="insert-module-type"
-                    data-module-type="${module.type}"
-                    data-section-id="${target.sectionId}"
-                    data-column-index="${target.columnIndex}"
-                    data-insert-index="${target.insertIndex}"
-                  >
-                    <span class="pb-inline-picker-icon">${module.icon}</span>
-                    <span class="pb-inline-picker-label">${module.label}</span>
-                  </button>
-                `
-                  )
-                  .join('')}
-              </div>
-            </div>
-          `;
-          })
-          .join('')}
-      </div>
-    `;
+  async function changeSectionLayout(sectionId, layout) {
+    const updated = await updateSection(sectionId, { layout });
+    if (updated) {
+      const section = getSectionRecord(sectionId);
+      if (section) section.layout = updated.layout || layout;
+      renderCanvas();
+    }
   }
 
-  function renderModuleInsertBar(sectionId, columnIndex, insertIndex) {
-    const isActive =
+  function toggleSectionSettings(sectionId) {
+    if (activeSectionId === sectionId && dirtyScope !== 'section') {
+      clearActiveSectionState();
+      setCanvasStatus('', 'neutral');
+      renderCanvas();
+      return;
+    }
+
+    if (dirtyScope === 'section' && activeSectionId !== sectionId) {
+      setCanvasStatus(
+        'Save or discard the current section settings before switching sections.',
+        'warning'
+      );
+      renderCanvas();
+      return;
+    }
+
+    initializeSectionDraft(sectionId);
+    setCanvasStatus('', 'neutral');
+    renderCanvas();
+  }
+
+  function updateActiveSectionDraftField(key, rawValue) {
+    if (!activeSectionDraft || !key) return;
+    const raw = String(rawValue || '').trim();
+    activeSectionDraft[key] = raw ? Math.max(0, Math.round(Number(raw) || 0)) : '';
+    markDirty('section');
+    renderCanvas();
+  }
+
+  function discardSectionSettings() {
+    if (!activeSectionId) return;
+    initializeSectionDraft(activeSectionId);
+    clearDirty('section');
+    setCanvasStatus('Section changes discarded.', 'neutral');
+    renderCanvas();
+  }
+
+  async function saveSectionSettings() {
+    if (!activeSectionId || !activeSectionDraft) return;
+
+    const section = getSectionRecord(activeSectionId);
+    if (!section) return;
+
+    const settings = {};
+    ['moduleGap', 'columnGap', 'sectionGap'].forEach((key) => {
+      const value = activeSectionDraft[key];
+      if (value !== '' && value !== null && value !== undefined) {
+        settings[key] = value;
+      }
+    });
+
+    const updated = await updateSection(activeSectionId, { settings });
+    if (updated) {
+      section.settings = updated.settings || settings;
+      initializeSectionDraft(activeSectionId);
+      clearDirty('section');
+      setCanvasStatus('Section settings saved.', 'success');
+      renderCanvas();
+      return;
+    }
+
+    setCanvasStatus('Failed to save section settings.', 'danger');
+    renderCanvas();
+  }
+
+  function toggleModulePicker(target) {
+    const isSameTarget =
       activeInsertTarget &&
-      activeInsertTarget.sectionId === sectionId &&
-      activeInsertTarget.columnIndex === columnIndex &&
-      activeInsertTarget.insertIndex === insertIndex;
-    return `
-      <div
-        class="pb-module-insert ${isActive ? 'active' : ''}"
-        data-section-id="${sectionId}"
-        data-column-index="${columnIndex}"
-        data-insert-index="${insertIndex}"
-      >
-        <button
-          type="button"
-          class="pb-inline-insert-trigger"
-          data-action="toggle-module-picker"
-          data-section-id="${sectionId}"
-          data-column-index="${columnIndex}"
-          data-insert-index="${insertIndex}"
-        >
-          + Add Module
-        </button>
-        ${isActive ? renderModulePicker({ sectionId, columnIndex, insertIndex }) : ''}
-      </div>
-    `;
+      activeInsertTarget.sectionId === target.sectionId &&
+      activeInsertTarget.columnIndex === target.columnIndex &&
+      activeInsertTarget.insertIndex === target.insertIndex;
+    activeInsertTarget = isSameTarget ? null : target;
+    renderCanvas();
   }
 
-  function renderSectionInsertBar(insertIndex) {
-    return `
-      <div class="pb-section-insert" data-insert-index="${insertIndex}">
-        <button
-          type="button"
-          class="pb-section-insert-trigger"
-          data-action="insert-section"
-          data-insert-index="${insertIndex}"
-        >
-          + Add Section
-        </button>
-      </div>
-    `;
+  function selectPageHeaderFromCanvas() {
+    if (selectedCanvasSurface === 'page-header') return;
+    if (
+      !ensureCleanWorkspace(
+        'Save or discard your current changes before switching to the page header.'
+      )
+    ) {
+      renderEditorPanel();
+      return;
+    }
+
+    clearSelectedModuleState();
+    selectedCanvasSurface = 'page-header';
+    activeEditorTab = 'modules';
+    initializeHeaderDraft();
+    setEditorStatus('', 'neutral');
+    renderCanvas();
+    renderEditorPanel();
+  }
+
+  function selectModule(moduleId) {
+    if (selectedModuleId === moduleId) return;
+    if (
+      dirtyScope === 'module' ||
+      dirtyScope === 'theme' ||
+      dirtyScope === 'header' ||
+      dirtyScope === 'section'
+    ) {
+      const sameModule = dirtyScope === 'module' && selectedModuleId === moduleId;
+      if (!sameModule) {
+        ensureCleanWorkspace('Save or discard your current changes before selecting another module.');
+        return;
+      }
+    }
+
+    selectedModuleId = moduleId;
+    selectedCanvasSurface = null;
+    activeEditorTab = 'modules';
+    initializeModuleDraft(moduleId);
+    setEditorStatus('', 'neutral');
+    renderCanvas();
+    renderEditorPanel();
+  }
+
+  async function deleteModuleFromCanvas(moduleId) {
+    if (!confirm('Delete this module? This cannot be undone.')) return;
+    if (selectedModuleId === moduleId && dirtyScope === 'module') {
+      clearDirty('module');
+    }
+
+    if (await deleteModule(moduleId)) {
+      removeModuleFromCurrentPage(moduleId);
+      if (selectedModuleId === moduleId) {
+        clearSelectedModuleState();
+      }
+      setCanvasStatus('Module deleted.', 'success');
+      renderCanvas();
+      renderEditorPanel();
+    }
+  }
+
+  async function deleteSectionFromCanvas(sectionId) {
+    if (!confirm('Delete this section and all its modules?')) return;
+
+    if (await deleteSection(sectionId)) {
+      removeSectionFromCurrentPage(sectionId);
+      if (activeSectionId === sectionId) {
+        clearActiveSectionState();
+      }
+      if (selectedModuleId && !getSelectedModuleRecord(selectedModuleId)) {
+        clearDirty('module');
+        clearSelectedModuleState();
+      }
+      setCanvasStatus('Section deleted.', 'success');
+      renderCanvas();
+      renderEditorPanel();
+    }
   }
 
   function renderCanvas() {
     if (!el.pbCanvas) return;
 
+    const { pageTitleHtml, canvasHtml } = renderCanvasSnapshot({
+      state: {
+        currentPage,
+        currentSeriesPageConfig,
+        selectedCanvasSurface,
+        selectedModuleId,
+        activeSectionId,
+        activeSectionDraft,
+        activeInsertTarget,
+        dirtyScope,
+        canvasStatus,
+        activeHeaderDraft,
+      },
+      helpers: {
+        sortSections,
+        sortCanvasModulesForColumn,
+        getVisibleSectionModuleCount,
+        getPageDisplayTitle,
+        renderPageStatusBadges,
+        getReaderUrl,
+        getReaderLinkLabel,
+        getReaderPreviewStatus,
+        getReaderPreviewNote,
+        getModulePreview,
+      },
+    });
+
     if (el.pbPageTitle) {
-      if (!currentPage) {
-        el.pbPageTitle.innerHTML = '';
-      } else {
-        el.pbPageTitle.innerHTML = `
-          <div class="pb-page-title-main">
-            <div class="pb-page-title-copy">
-              <span class="pb-page-title-label">Editing Page</span>
-              <span class="pb-page-title-name">${escapeHtml(getPageDisplayTitle(currentPage))}</span>
-              <span class="pb-page-title-meta">${escapeHtml(currentPage.slug || 'reader')} · ${escapeHtml(currentPage.pageType || 'custom')}</span>
-            </div>
-            <div class="pb-page-title-actions">
-              <span class="pb-page-title-badges">${renderPageStatusBadges(currentPage)}</span>
-              <a class="pb-open-reader-link" href="${escapeAttr(getReaderUrl(currentPage))}" target="_blank" rel="noopener noreferrer">
-                ${escapeHtml(getReaderLinkLabel(currentPage))}
-              </a>
-            </div>
-          </div>
-          <div class="pb-page-title-note" data-status="${escapeAttr(getReaderPreviewStatus(currentPage))}">
-            ${escapeHtml(getReaderPreviewNote(currentPage))}
-          </div>
-        `;
-      }
+      el.pbPageTitle.innerHTML = pageTitleHtml;
     }
-
-    if (!currentPage) {
-      el.pbCanvas.innerHTML = `
-        <div class="pb-canvas-empty">
-          <p>Select a page from the sidebar or create a new one to get started.</p>
-        </div>
-      `;
-      return;
-    }
-
-    const sections = sortSections(currentPage.sections || []);
-    const canvasNotice = canvasStatus.message
-      ? `<div class="pb-canvas-notice" data-status="${escapeAttr(canvasStatus.type || 'neutral')}" id="pbCanvasNotice">${escapeHtml(canvasStatus.message)}</div>`
-      : '';
-
-    const html = `
-      ${canvasNotice}
-      ${renderPageHeaderSurface()}
-      ${sections
-        .map((section, sectionIndex) => {
-          const layoutValue = section.layout || '1';
-          const columnCount = layoutValue.split('-').length;
-          const columnIndices = Array.from({ length: columnCount }, (_, i) => i);
-          const moduleCount = getVisibleSectionModuleCount(section);
-          const isSettingsOpen = activeSectionId === section.id;
-          const sectionDraft =
-            isSettingsOpen && activeSectionDraft
-              ? activeSectionDraft
-              : {
-                  moduleGap: section.settings?.moduleGap ?? '',
-                  columnGap: section.settings?.columnGap ?? '',
-                  sectionGap: section.settings?.sectionGap ?? '',
-                };
-
-          return `
-          ${renderSectionInsertBar(sectionIndex)}
-          <div class="pb-section ${isSettingsOpen ? 'pb-section--active' : ''}" data-section-id="${section.id}">
-            <div class="pb-section-header">
-              <div class="pb-section-header-main">
-                <button
-                  type="button"
-                  class="pb-section-drag-handle"
-                  data-action="section-drag"
-                  data-section-id="${section.id}"
-                  draggable="true"
-                  title="Reorder section"
-                >
-                  \u22EE
-                </button>
-                <div class="pb-section-summary">
-                  <span class="pb-section-summary-title">Section ${sectionIndex + 1}</span>
-                  <span class="pb-section-summary-meta">${moduleCount} module${moduleCount === 1 ? '' : 's'}</span>
-                </div>
-              </div>
-              <div class="pb-section-header-actions">
-                <select class="pb-section-layout-select" data-action="change-layout" data-section-id="${section.id}">
-                  ${LAYOUT_OPTIONS.map(
-                    (opt) => `
-                    <option value="${opt.value}" ${layoutValue === opt.value ? 'selected' : ''}>${opt.label}</option>
-                  `
-                  ).join('')}
-                </select>
-                <button
-                  type="button"
-                  class="btn-small btn-secondary pb-section-settings-toggle"
-                  data-action="toggle-section-settings"
-                  data-section-id="${section.id}"
-                >
-                  ${isSettingsOpen ? 'Hide Settings' : 'Section Settings'}
-                </button>
-                <button class="pb-page-action delete" data-action="delete-section" data-section-id="${section.id}" title="Delete section">\u00D7</button>
-              </div>
-            </div>
-            ${
-              isSettingsOpen
-                ? `
-              <div class="pb-section-settings-card">
-                <div class="pb-section-settings-grid">
-                  <label class="pb-section-settings-field">
-                    <span>Module Gap</span>
-                    <input type="number" class="pb-section-settings-input" data-setting="moduleGap" value="${sectionDraft.moduleGap}" min="0" step="1" placeholder="16">
-                  </label>
-                  <label class="pb-section-settings-field">
-                    <span>Column Gap</span>
-                    <input type="number" class="pb-section-settings-input" data-setting="columnGap" value="${sectionDraft.columnGap}" min="0" step="1" placeholder="16">
-                  </label>
-                  <label class="pb-section-settings-field">
-                    <span>Section Gap</span>
-                    <input type="number" class="pb-section-settings-input" data-setting="sectionGap" value="${sectionDraft.sectionGap}" min="0" step="1" placeholder="24">
-                  </label>
-                </div>
-                <div class="pb-section-settings-actions">
-                  <div class="pb-section-settings-status">${dirtyScope === 'section' ? 'Section settings have unsaved changes.' : 'Section spacing saves explicitly.'}</div>
-                  <div class="pb-section-settings-buttons">
-                    <button type="button" class="btn-secondary" data-action="discard-section-settings" ${dirtyScope === 'section' ? '' : 'disabled'}>Discard</button>
-                    <button type="button" class="btn-primary" data-action="save-section-settings" ${dirtyScope === 'section' ? '' : 'disabled'}>Save</button>
-                  </div>
-                </div>
-              </div>
-            `
-                : ''
-            }
-            <div class="pb-section-columns" data-layout="${layoutValue}">
-              ${columnIndices
-                .map((colIdx) => {
-                  const modules = sortCanvasModulesForColumn(section, colIdx);
-                  return `
-                  <div class="pb-column" data-column-index="${colIdx}" data-section-id="${section.id}">
-                    ${renderModuleInsertBar(section.id, colIdx, 0)}
-                    ${modules
-                      .map(
-                        (mod, moduleIndex) => `
-                      <div
-                        class="pb-module ${selectedModuleId === mod.id ? 'selected' : ''}"
-                        data-module-id="${mod.id}"
-                        data-module-type="${mod.moduleType}"
-                        draggable="true"
-                      >
-                        <div class="pb-module-header">
-                          <div class="pb-module-header-main">
-                            <button type="button" class="pb-module-drag-handle" title="Move module">\u22EE</button>
-                            <span class="pb-module-type-badge">${mod.moduleType}</span>
-                            ${dirtyScope === 'module' && selectedModuleId === mod.id ? '<span class="pb-module-draft-badge">Draft</span>' : ''}
-                          </div>
-                          <button class="pb-page-action delete" data-action="delete-module" data-module-id="${mod.id}" title="Delete">\u00D7</button>
-                        </div>
-                        <div class="pb-module-preview">${escapeHtml(getModulePreview(mod.moduleType, mod.config || {}))}</div>
-                      </div>
-                      ${renderModuleInsertBar(section.id, colIdx, moduleIndex + 1)}
-                    `
-                      )
-                      .join('')}
-                  </div>
-                `;
-                })
-                .join('')}
-            </div>
-          </div>
-        `;
-        })
-        .join('')}
-      ${renderSectionInsertBar(sections.length)}
-    `;
-
-    el.pbCanvas.innerHTML = html;
-
-    el.pbCanvas.querySelectorAll('[data-action="insert-section"]').forEach((button) => {
-      button.addEventListener('click', async () => {
-        const index = parseInt(button.dataset.insertIndex, 10) || 0;
-        await insertSectionAt(index);
-      });
-    });
-
-    el.pbCanvas.querySelectorAll('.pb-section-insert').forEach((insertEl) => {
-      insertEl.addEventListener('dragover', (e) => {
-        if (!draggedSectionId) return;
-        e.preventDefault();
-        insertEl.classList.add('drag-over');
-      });
-      insertEl.addEventListener('dragleave', () => {
-        insertEl.classList.remove('drag-over');
-      });
-      insertEl.addEventListener('drop', async (e) => {
-        if (!draggedSectionId) return;
-        e.preventDefault();
-        insertEl.classList.remove('drag-over');
-        const index = parseInt(insertEl.dataset.insertIndex, 10) || 0;
-        const sectionId = draggedSectionId;
-        draggedSectionId = null;
-        await reorderSectionToIndex(sectionId, index);
-      });
-    });
-
-    el.pbCanvas.querySelectorAll('[data-action="section-drag"]').forEach((handle) => {
-      handle.addEventListener('dragstart', (e) => {
-        draggedSectionId = handle.dataset.sectionId;
-        e.dataTransfer.effectAllowed = 'move';
-      });
-      handle.addEventListener('dragend', () => {
-        draggedSectionId = null;
-      });
-    });
-
-    el.pbCanvas.querySelectorAll('[data-action="change-layout"]').forEach((select) => {
-      select.addEventListener('change', async () => {
-        const sectionId = select.dataset.sectionId;
-        const layout = select.value;
-        const updated = await updateSection(sectionId, { layout });
-        if (updated) {
-          const section = getSectionRecord(sectionId);
-          if (section) section.layout = updated.layout || layout;
-          renderCanvas();
-        }
-      });
-    });
-
-    el.pbCanvas.querySelectorAll('[data-action="toggle-section-settings"]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const sectionId = button.dataset.sectionId;
-        if (activeSectionId === sectionId && dirtyScope !== 'section') {
-          activeSectionId = null;
-          activeSectionDraft = null;
-          setCanvasStatus('', 'neutral');
-          renderCanvas();
-          return;
-        }
-        if (dirtyScope === 'section' && activeSectionId !== sectionId) {
-          setCanvasStatus(
-            'Save or discard the current section settings before switching sections.',
-            'warning'
-          );
-          renderCanvas();
-          return;
-        }
-        initializeSectionDraft(sectionId);
-        setCanvasStatus('', 'neutral');
-        renderCanvas();
-      });
-    });
-
-    if (activeSectionId) {
-      el.pbCanvas.querySelectorAll('.pb-section-settings-input').forEach((input) => {
-        input.addEventListener('change', () => {
-          if (!activeSectionDraft) return;
-          const key = input.dataset.setting;
-          const raw = String(input.value || '').trim();
-          activeSectionDraft[key] = raw ? Math.max(0, Math.round(Number(raw) || 0)) : '';
-          markDirty('section');
-          renderCanvas();
-        });
-      });
-
-      el.pbCanvas
-        .querySelector('[data-action="discard-section-settings"]')
-        ?.addEventListener('click', () => {
-          if (!activeSectionId) return;
-          initializeSectionDraft(activeSectionId);
-          clearDirty('section');
-          setCanvasStatus('Section changes discarded.', 'neutral');
-          renderCanvas();
-        });
-
-      el.pbCanvas
-        .querySelector('[data-action="save-section-settings"]')
-        ?.addEventListener('click', async () => {
-          if (!activeSectionId || !activeSectionDraft) return;
-          const section = getSectionRecord(activeSectionId);
-          if (!section) return;
-          const settings = {};
-          ['moduleGap', 'columnGap', 'sectionGap'].forEach((key) => {
-            const value = activeSectionDraft[key];
-            if (value !== '' && value !== null && value !== undefined) {
-              settings[key] = value;
-            }
-          });
-          const updated = await updateSection(activeSectionId, { settings });
-          if (updated) {
-            section.settings = updated.settings || settings;
-            initializeSectionDraft(activeSectionId);
-            clearDirty('section');
-            setCanvasStatus('Section settings saved.', 'success');
-            renderCanvas();
-          } else {
-            setCanvasStatus('Failed to save section settings.', 'danger');
-            renderCanvas();
-          }
-        });
-    }
-
-    el.pbCanvas.querySelectorAll('.pb-module-insert').forEach((insertEl) => {
-      insertEl.addEventListener('dragover', (e) => {
-        const moduleType = e.dataTransfer?.getData('text/plain');
-        if (!draggedModuleId && !moduleType) return;
-        e.preventDefault();
-        insertEl.classList.add('drag-over');
-      });
-      insertEl.addEventListener('dragleave', () => {
-        insertEl.classList.remove('drag-over');
-      });
-      insertEl.addEventListener('drop', async (e) => {
-        const droppedModuleType = e.dataTransfer?.getData('text/plain');
-        if (!draggedModuleId && !droppedModuleType) return;
-        e.preventDefault();
-        insertEl.classList.remove('drag-over');
-        const sectionId = insertEl.dataset.sectionId;
-        const columnIndex = parseInt(insertEl.dataset.columnIndex, 10);
-        const insertIndex = parseInt(insertEl.dataset.insertIndex, 10);
-        if (draggedModuleId) {
-          const moduleId = draggedModuleId;
-          draggedModuleId = null;
-          await moveModuleToTarget(moduleId, sectionId, columnIndex, insertIndex);
-          return;
-        }
-        if (droppedModuleType) {
-          await insertModuleAt(sectionId, columnIndex, insertIndex, droppedModuleType);
-        }
-      });
-    });
-
-    el.pbCanvas.querySelectorAll('[data-action="toggle-module-picker"]').forEach((button) => {
-      button.addEventListener('click', () => {
-        const target = {
-          sectionId: button.dataset.sectionId,
-          columnIndex: parseInt(button.dataset.columnIndex, 10),
-          insertIndex: parseInt(button.dataset.insertIndex, 10),
-        };
-        const isSameTarget =
-          activeInsertTarget &&
-          activeInsertTarget.sectionId === target.sectionId &&
-          activeInsertTarget.columnIndex === target.columnIndex &&
-          activeInsertTarget.insertIndex === target.insertIndex;
-        activeInsertTarget = isSameTarget ? null : target;
-        renderCanvas();
-      });
-    });
-
-    el.pbCanvas.querySelectorAll('[data-action="insert-module-type"]').forEach((button) => {
-      button.addEventListener('click', async () => {
-        await insertModuleAt(
-          button.dataset.sectionId,
-          parseInt(button.dataset.columnIndex, 10),
-          parseInt(button.dataset.insertIndex, 10),
-          button.dataset.moduleType
-        );
-      });
-    });
-
-    el.pbCanvas.querySelector('[data-action="select-page-header"]')?.addEventListener('click', () => {
-      if (selectedCanvasSurface === 'page-header') return;
-      if (
-        !ensureCleanWorkspace(
-          'Save or discard your current changes before switching to the page header.'
-        )
-      ) {
-        renderEditorPanel();
-        return;
-      }
-      selectedModuleId = null;
-      selectedCanvasSurface = 'page-header';
-      activeEditorTab = 'modules';
-      initializeHeaderDraft();
-      setEditorStatus('', 'neutral');
-      renderCanvas();
-      renderEditorPanel();
-    });
-
-    el.pbCanvas.querySelectorAll('.pb-module').forEach((modEl) => {
-      const moduleId = modEl.dataset.moduleId;
-
-      modEl.addEventListener('dragstart', (e) => {
-        draggedModuleId = moduleId;
-        e.dataTransfer.effectAllowed = 'move';
-      });
-      modEl.addEventListener('dragend', () => {
-        draggedModuleId = null;
-      });
-
-      modEl.addEventListener('click', () => {
-        if (selectedModuleId === moduleId) return;
-        if (
-          dirtyScope === 'module' ||
-          dirtyScope === 'theme' ||
-          dirtyScope === 'header' ||
-          dirtyScope === 'section'
-        ) {
-          const sameModule = dirtyScope === 'module' && selectedModuleId === moduleId;
-          if (!sameModule) {
-            ensureCleanWorkspace(
-              'Save or discard your current changes before selecting another module.'
-            );
-            return;
-          }
-        }
-        selectedModuleId = moduleId;
-        selectedCanvasSurface = null;
-        activeEditorTab = 'modules';
-        initializeModuleDraft(moduleId);
-        setEditorStatus('', 'neutral');
-        renderCanvas();
-        renderEditorPanel();
-      });
-
-      modEl.querySelector('[data-action="delete-module"]')?.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        if (!confirm('Delete this module? This cannot be undone.')) return;
-        const deletingSelected = selectedModuleId === moduleId;
-        if (deletingSelected && dirtyScope === 'module') {
-          clearDirty('module');
-        }
-        if (await deleteModule(moduleId)) {
-          for (const section of currentPage.sections || []) {
-            section.modules = (section.modules || []).filter((module) => module.id !== moduleId);
-          }
-          if (selectedModuleId === moduleId) {
-            selectedModuleId = null;
-            activeModuleDraftId = null;
-            activeModuleDraft = null;
-          }
-          setCanvasStatus('Module deleted.', 'success');
-          renderCanvas();
-          renderEditorPanel();
-        }
-      });
-    });
-
-    el.pbCanvas.querySelectorAll('[data-action="delete-section"]').forEach((button) => {
-      button.addEventListener('click', async () => {
-        const sectionId = button.dataset.sectionId;
-        if (!confirm('Delete this section and all its modules?')) return;
-        if (await deleteSection(sectionId)) {
-          currentPage.sections = (currentPage.sections || []).filter(
-            (section) => section.id !== sectionId
-          );
-          if (activeSectionId === sectionId) {
-            activeSectionId = null;
-            activeSectionDraft = null;
-            clearDirty('section');
-          }
-          if (selectedModuleId && !getSelectedModuleRecord(selectedModuleId)) {
-            selectedModuleId = null;
-            activeModuleDraftId = null;
-            activeModuleDraft = null;
-          }
-          setCanvasStatus('Section deleted.', 'success');
-          renderCanvas();
-          renderEditorPanel();
-        }
-      });
-    });
+    el.pbCanvas.innerHTML = canvasHtml;
+    bindCanvasEvents();
   }
 
   async function saveActiveModuleDraft() {
@@ -1594,276 +1295,6 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     renderEditorPanel();
   }
 
-  function renderEditorPanel() {
-    if (!el.pbModuleEditor) return;
-
-    const renderTabs = (disableTabs = false) => `
-      <div class="pb-editor-tabs" data-count="2" role="tablist" aria-label="Inspector tabs">
-        <button
-          class="pb-editor-tab ${activeEditorTab === 'modules' ? 'active' : ''}"
-          data-tab="modules"
-          role="tab"
-          aria-selected="${String(activeEditorTab === 'modules')}"
-          ${disableTabs ? 'disabled' : ''}
-        >
-          Modules
-        </button>
-        <button
-          class="pb-editor-tab ${activeEditorTab === 'theme' ? 'active' : ''}"
-          data-tab="theme"
-          role="tab"
-          aria-selected="${String(activeEditorTab === 'theme')}"
-          ${disableTabs ? 'disabled' : ''}
-        >
-          Theme
-        </button>
-      </div>
-    `;
-
-      const renderFooter = ({ scope, actionsHtml = '' }) => `
-      <div class="pb-editor-footer" data-scope="${scope}">
-        <div class="pb-editor-footer-status" data-editor-status></div>
-        <div class="pb-editor-footer-actions">${actionsHtml}</div>
-      </div>
-    `;
-
-    const renderShell = ({
-      kicker,
-      title,
-      subtitle,
-      contentHtml,
-      footerHtml = '',
-      disableTabs = false,
-    }) => `
-      <div class="pb-editor-shell">
-        <div class="pb-editor-header">
-          <div class="pb-editor-header-copy">
-            <div class="pb-editor-heading-line">
-              <span class="pb-editor-kicker">${escapeHtml(kicker)}</span>
-              <h3 class="pb-editor-title" id="pbEditorTitle">${escapeHtml(title)}</h3>
-            </div>
-            <p class="pb-editor-subtitle">${escapeHtml(subtitle)}</p>
-          </div>
-          ${renderTabs(disableTabs)}
-        </div>
-        <div class="pb-editor-content">${contentHtml}</div>
-        ${footerHtml}
-      </div>
-    `;
-
-    if (!currentPage) {
-      el.pbModuleEditor.innerHTML = renderShell({
-        kicker: 'Inspector',
-        title: 'Choose a Page',
-        subtitle: 'Select a page on the left to unlock page-header editing, module editing, and theme controls.',
-        contentHtml: `
-          <div class="pb-editor-empty">
-            <div class="pb-editor-empty-card">
-              <span class="pb-editor-empty-kicker">Start Here</span>
-              <h4>Pick a page from the left rail</h4>
-              <p>Once a page is active, click the page header or a module in the canvas to edit it. Theme still handles page-wide styling.</p>
-            </div>
-          </div>
-        `,
-        disableTabs: true,
-      });
-      return;
-    }
-
-    const selectedModule = getSelectedModuleRecord();
-    if (!activeThemeDraft) {
-      initializeThemeDraft();
-    }
-    if (!activeHeaderDraft) {
-      initializeHeaderDraft();
-    }
-    if (selectedModule && activeModuleDraftId !== selectedModule.id) {
-      initializeModuleDraft(selectedModule.id);
-    }
-
-    let contentHtml = '';
-    let footerHtml = '';
-    let kicker = 'Inspector';
-    let title = 'Page Inspector';
-    let subtitle = `Adjust structure and visual polish for ${getPageDisplayTitle(currentPage)}.`;
-
-    if (activeEditorTab === 'theme') {
-      contentHtml = renderThemeEditorContent(currentPage, activeThemeDraft);
-      kicker = 'Theme Studio';
-      title = 'Page Theme';
-      subtitle = `Tune presets, palette, panel backgrounds, and spacing for ${getPageDisplayTitle(currentPage)}.`;
-      footerHtml = renderFooter({
-        scope: 'theme',
-        actionsHtml: `
-          <button class="btn-secondary" id="pbDiscardTheme" data-action="discard-current" type="button">Discard</button>
-          <button class="btn-secondary" id="pbResetTheme" data-action="reset-theme" type="button">Reset to Default</button>
-          <button class="btn-primary" id="pbSaveTheme" data-action="save-current" type="button">Save Theme</button>
-        `,
-      });
-    } else if (selectedCanvasSurface === 'page-header') {
-      contentHtml = renderHeaderEditorContent({
-        draftState: activeHeaderDraft,
-        pages,
-      });
-      kicker = 'Page Header';
-      title = 'Header Settings';
-      subtitle = `Edit the visible header parts, placement, copy, and buttons for ${getPageDisplayTitle(currentPage)}.`;
-      footerHtml = renderFooter({
-        scope: 'header',
-        actionsHtml: `
-          <button class="btn-secondary" id="pbDiscardHeader" data-action="discard-current" type="button">Discard</button>
-          <button class="btn-primary" id="pbSaveHeader" data-action="save-current" type="button">Save Header</button>
-        `,
-      });
-    } else {
-      contentHtml = renderModuleEditorContent({
-        currentPage,
-        selectedModuleId,
-        draftConfig: selectedModule ? activeModuleDraft : null,
-        pages,
-      });
-      kicker = selectedModule ? 'Selected Module' : 'Module Inspector';
-      title = selectedModule
-        ? `${getModuleLabel(selectedModule.moduleType)} Module`
-        : 'Choose Something to Edit';
-      subtitle = selectedModule
-        ? `Editing ${getModulePreview(selectedModule.moduleType, activeModuleDraft || selectedModule.config || {})}.`
-        : 'Click the page header or a module in the canvas to edit it. Theme still controls page-wide styling.';
-      if (selectedModule) {
-        footerHtml = renderFooter({
-          scope: 'module',
-          actionsHtml: `
-            <button class="btn-secondary" id="pbDiscardModule" data-action="discard-current" type="button">Discard</button>
-            <button class="btn-secondary" id="pbDeleteModule" data-action="delete-module" type="button">Delete</button>
-            <button class="btn-primary" id="pbSaveModule" data-action="save-current" type="button">Save</button>
-          `,
-        });
-      }
-    }
-
-    el.pbModuleEditor.innerHTML = renderShell({
-      kicker,
-      title,
-      subtitle,
-      contentHtml,
-      footerHtml,
-    });
-
-    el.pbModuleEditor.querySelectorAll('.pb-editor-tab').forEach((tab) => {
-      tab.addEventListener('click', () => {
-        const nextTab = tab.dataset.tab;
-        if (nextTab === activeEditorTab) return;
-        if (
-          !ensureCleanWorkspace(
-            'Save or discard your current changes before switching inspector tabs.'
-          )
-        ) {
-          renderEditorPanel();
-          return;
-        }
-        activeEditorTab = nextTab;
-        if (nextTab === 'theme') {
-          initializeThemeDraft();
-        } else if (selectedCanvasSurface === 'page-header') {
-          initializeHeaderDraft();
-        } else if (selectedModuleId) {
-          initializeModuleDraft(selectedModuleId);
-        }
-        setEditorStatus('', 'neutral');
-        renderEditorPanel();
-      });
-    });
-
-    if (activeEditorTab === 'theme') {
-      bindThemeEditorEvents({
-        el,
-        draftMeta: activeThemeDraft,
-        setDraftMeta: (nextDraft) => {
-          activeThemeDraft = cloneValue(nextDraft);
-        },
-        markDirty,
-        openImagePicker,
-        fetchAssets,
-        uploadAssetFile,
-        resolveAssetUrl,
-      });
-
-      document.getElementById('pbSaveTheme')?.addEventListener('click', async () => {
-        await saveActiveThemeDraft();
-      });
-      document.getElementById('pbDiscardTheme')?.addEventListener('click', () => {
-        discardActiveThemeDraft();
-      });
-      document.getElementById('pbResetTheme')?.addEventListener('click', () => {
-        resetActiveThemeDraft();
-      });
-    } else if (selectedCanvasSurface === 'page-header') {
-      bindHeaderEditorEvents({
-        el,
-        draftState: activeHeaderDraft,
-        setDraftState: (nextDraft) => {
-          activeHeaderDraft = cloneValue(nextDraft);
-        },
-        markDirty,
-        renderEditorPanel,
-        renderCanvas,
-      });
-
-      document.getElementById('pbSaveHeader')?.addEventListener('click', async () => {
-        await saveActiveHeaderDraft();
-      });
-      document.getElementById('pbDiscardHeader')?.addEventListener('click', () => {
-        discardActiveHeaderDraft();
-      });
-    } else if (selectedModule) {
-      bindModuleEditorEvents({
-        el,
-        currentPage,
-        selectedModuleId,
-        draftConfig: activeModuleDraft,
-        setDraftConfig: (nextDraft) => {
-          activeModuleDraftId = selectedModuleId;
-          activeModuleDraft = cloneValue(nextDraft);
-        },
-        markDirty,
-        renderEditorPanel,
-        pages,
-        openImagePicker,
-        fetchAssets,
-        uploadAssetFile,
-      });
-
-      document.getElementById('pbSaveModule')?.addEventListener('click', async () => {
-        await saveActiveModuleDraft();
-      });
-      document.getElementById('pbDiscardModule')?.addEventListener('click', () => {
-        discardActiveModuleDraft();
-      });
-      document.getElementById('pbDeleteModule')?.addEventListener('click', async () => {
-        const moduleId = selectedModuleId;
-        if (!moduleId) return;
-        if (!confirm('Delete this module? This cannot be undone.')) return;
-        if (await deleteModule(moduleId)) {
-          for (const section of currentPage.sections || []) {
-            section.modules = (section.modules || []).filter((module) => module.id !== moduleId);
-          }
-          selectedModuleId = null;
-          activeModuleDraftId = null;
-          activeModuleDraft = null;
-          clearDirty('module');
-          setEditorStatus('Module deleted.', 'success');
-          renderCanvas();
-          renderEditorPanel();
-        } else {
-          setEditorStatus('Failed to delete module.', 'danger');
-          renderEditorPanel();
-        }
-      });
-    }
-
-    updateEditorFooterUi();
-  }
-
   async function selectPage(pageId) {
     if (!ensureCleanWorkspace('Save or discard your current changes before switching pages.')) {
       return;
@@ -1874,6 +1305,24 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
       currentPage = page;
       resetBuilderState();
       activeThemeDraft = normalizeThemeDraft(currentPage);
+      renderPageList();
+      renderCanvas();
+      renderEditorPanel();
+    }
+  }
+
+  async function deletePageFromSidebar(pageId) {
+    if (!ensureCleanWorkspace('Save or discard your current changes before deleting a page.')) {
+      return;
+    }
+    if (!confirm('Delete this page? This cannot be undone.')) return;
+
+    if (await deletePage(pageId)) {
+      await loadPages();
+      if (currentPage?.id === pageId) {
+        currentPage = null;
+        resetBuilderState();
+      }
       renderPageList();
       renderCanvas();
       renderEditorPanel();
@@ -1903,84 +1352,6 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     applyEditorMode();
   }
 
-  function renderPageList() {
-    if (!el.pbPageList) return;
-
-    if (pages.length === 0) {
-      el.pbPageList.innerHTML = `
-        <div class="pb-page-list-empty" style="color: rgba(255,255,255,0.5); font-size: 0.85rem; padding: 10px;">
-          No pages yet. Create one to get started.
-        </div>
-      `;
-      return;
-    }
-
-    el.pbPageList.innerHTML = pages
-      .map(
-        (page) => `
-        <div class="pb-page-item ${currentPage?.id === page.id ? 'active' : ''}" data-page-id="${page.id}">
-          <div class="pb-page-item-main">
-            <span class="pb-page-item-title">${escapeHtml(getPageDisplayTitle(page))}</span>
-            <span class="pb-page-item-meta">${escapeHtml(page.slug || 'reader')} · ${escapeHtml(page.pageType || 'custom')}</span>
-          </div>
-          <span class="pb-page-item-badges">${renderPageStatusBadges(page)}</span>
-          <span class="pb-page-item-actions">
-            <button class="pb-page-action delete" data-action="delete" title="Delete page">\u00D7</button>
-          </span>
-        </div>
-      `
-      )
-      .join('');
-
-    el.pbPageList.querySelectorAll('.pb-page-item').forEach((item) => {
-      item.addEventListener('click', async (e) => {
-        if (e.target.closest('.pb-page-action')) return;
-        await selectPage(item.dataset.pageId);
-      });
-
-      item.querySelector('.pb-page-action.delete')?.addEventListener('click', async (e) => {
-        e.stopPropagation();
-        if (!ensureCleanWorkspace('Save or discard your current changes before deleting a page.')) {
-          return;
-        }
-        const pageId = item.dataset.pageId;
-        if (confirm('Delete this page? This cannot be undone.')) {
-          if (await deletePage(pageId)) {
-            await loadPages();
-            if (currentPage?.id === pageId) {
-              currentPage = null;
-              resetBuilderState();
-            }
-            renderPageList();
-            renderCanvas();
-            renderEditorPanel();
-          }
-        }
-      });
-    });
-  }
-
-  function renderModulePalette() {
-    if (!el.pbModulePalette) return;
-
-    el.pbModulePalette.innerHTML = INSERTABLE_MODULE_TYPES.map(
-      (mod) => `
-        <div class="pb-module-type" draggable="true" data-module-type="${mod.type}">
-          <span class="pb-module-type-icon">${mod.icon}</span>
-          <span class="pb-module-type-label">${mod.label}</span>
-        </div>
-      `
-    ).join('');
-
-    el.pbModulePalette.querySelectorAll('.pb-module-type').forEach((item) => {
-      item.addEventListener('dragstart', (e) => {
-        draggedModuleId = null;
-        e.dataTransfer.setData('text/plain', item.dataset.moduleType);
-        e.dataTransfer.effectAllowed = 'copy';
-      });
-    });
-  }
-
   function initPageBuilder() {
     applyEditorMode();
 
@@ -2002,23 +1373,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
         applyEditorMode();
       });
     });
-
-    const sidebar = document.querySelector('.page-builder-sidebar');
-    if (sidebar) {
-      sidebar.querySelectorAll('.pb-sidebar-tab').forEach((tab) => {
-        tab.addEventListener('click', () => {
-          sidebar
-            .querySelectorAll('.pb-sidebar-tab')
-            .forEach((button) => button.classList.remove('active'));
-          tab.classList.add('active');
-          const target = tab.dataset.tab;
-          sidebar.querySelectorAll('.pb-sidebar-content').forEach((content) => {
-            content.hidden = content.dataset.content !== target;
-          });
-          syncSidebarRailLabel();
-        });
-      });
-    }
+    bindSidebarTabs();
 
     el.pbAddPage?.addEventListener('click', async () => {
       if (

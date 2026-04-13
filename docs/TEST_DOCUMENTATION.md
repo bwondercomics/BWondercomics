@@ -89,7 +89,7 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - `tests/admin-preview.test.js`: `admin/preview.js` preview-data contract consumption
 - `tests/admin-page-config.test.js`: `admin/page-config.js` page-config load/save behavior
 - `tests/admin-page-builder-data.test.js`: `admin/page-builder/data.js` page/section/module request wrappers and failure handling
-- `tests/admin-page-builder-shell.test.js`: `admin/page-builder.js` empty states, selection, delete flow, and default module config wiring
+- `tests/admin-page-builder-shell.test.js`: `admin/page-builder.js` shell/layout behavior, selection and publish flows, section settings save/discard, canvas delete cleanup, page-header editing, and default module config wiring
 - `tests/admin-page-builder-preview.test.js`: `admin/page-builder/module-editor.js` save/delete flows and `admin/page-builder/preview-renderers.js` preview contracts
 - `tests/admin-designer.test.js`: `admin/designer.js` iframe URL generation, section visibility, and resize messaging
 - `tests/media-branding.test.js`: media/admin branding rules

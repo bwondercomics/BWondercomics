@@ -70,7 +70,7 @@ Install backend dev dependencies into the repo virtualenv:
 - `tests/admin-preview.test.js`: preview data contract loading and image rendering
 - `tests/admin-page-config.test.js`: page-config cache/save contract behavior
 - `tests/admin-page-builder-data.test.js`: page-builder data-layer fetch/create/update/delete wrappers
-- `tests/admin-page-builder-shell.test.js`: page-builder empty state, selection, delete flow, and default module config wiring
+- `tests/admin-page-builder-shell.test.js`: page-builder shell behavior including empty state, selection, publish state, section settings save/discard, canvas delete cleanup, page-header editing, and default module config wiring
 - `tests/admin-page-builder-preview.test.js`: module-editor save/delete flows and preview renderer contracts
 - `tests/admin-designer.test.js`: designer iframe URL and resize-message handling
 - `tests/media-branding.test.js`: admin branding rules

@@ -17,6 +17,9 @@ async function setupPageBuilder({
   createPageResult = null,
   deletePageResult = true,
   addModuleResult = null,
+  updateSectionResult = null,
+  deleteSectionResult = false,
+  deleteModuleResult = false,
   updatePageResult = null,
   useRealEditors = false,
   viewportWidth = 1600,
@@ -69,6 +72,9 @@ async function setupPageBuilder({
     config: {},
   }));
   const reorderModules = vi.fn(async () => true);
+  const updateSection = vi.fn(async () => updateSectionResult);
+  const deleteSection = vi.fn(async () => deleteSectionResult);
+  const deleteModule = vi.fn(async () => deleteModuleResult);
 
   vi.doMock('../admin/page-builder/data.js', () => ({
     fetchPages,
@@ -79,14 +85,14 @@ async function setupPageBuilder({
     fetchAssets: vi.fn(async () => []),
     uploadAsset: vi.fn(async () => ({})),
     addSection,
-    updateSection: vi.fn(async () => null),
-    deleteSection: vi.fn(async () => false),
+    updateSection,
+    deleteSection,
     reorderSections,
     addModule,
     updateModule,
     moveModule,
     reorderModules,
-    deleteModule: vi.fn(async () => false),
+    deleteModule,
   }));
   if (useRealEditors) {
     vi.doUnmock('../admin/page-builder/theme-editor.js');
@@ -134,8 +140,11 @@ async function setupPageBuilder({
       moveModule,
       reorderModules,
       reorderSections,
+      updateSection,
       updateModule,
       updatePage,
+      deleteSection,
+      deleteModule,
       hideAllSections,
       setActiveNav,
     },
@@ -380,6 +389,198 @@ describe('admin page-builder shell', () => {
     );
   });
 
+  it('opens section settings and supports discard/save flows', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const editableSection = selectedPage.sections[1];
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      updateSectionResult: {
+        id: editableSection.id,
+        settings: {
+          moduleGap: 28,
+          columnGap: 24,
+          sectionGap: 40,
+        },
+      },
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] [data-action="toggle-section-settings"]`
+      )
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    expect(
+      document.querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-input[data-setting="moduleGap"]`
+      )?.value
+    ).toBe('20');
+    expect(
+      document.querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-input[data-setting="columnGap"]`
+      )?.value
+    ).toBe('24');
+
+    const moduleGapInput = document.querySelector(
+      `.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-input[data-setting="moduleGap"]`
+    );
+    if (moduleGapInput) {
+      moduleGapInput.value = '28';
+      moduleGapInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    await flushAdminUi(1);
+
+    expect(
+      document.querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-status`
+      )?.textContent
+    ).toContain('unsaved changes');
+
+    document
+      .querySelector('[data-action="discard-section-settings"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    expect(
+      document.querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-input[data-setting="moduleGap"]`
+      )?.value
+    ).toBe('20');
+
+    const savedModuleGapInput = document.querySelector(
+      `.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-input[data-setting="moduleGap"]`
+    );
+    const savedSectionGapInput = document.querySelector(
+      `.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-input[data-setting="sectionGap"]`
+    );
+    if (savedModuleGapInput) {
+      savedModuleGapInput.value = '28';
+      savedModuleGapInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    if (savedSectionGapInput) {
+      savedSectionGapInput.value = '40';
+      savedSectionGapInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    await flushAdminUi(1);
+
+    document
+      .querySelector('[data-action="save-section-settings"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.updateSection).toHaveBeenCalledWith(editableSection.id, {
+      settings: {
+        moduleGap: 28,
+        columnGap: 24,
+        sectionGap: 40,
+      },
+    });
+    expect(
+      document.querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-input[data-setting="moduleGap"]`
+      )?.value
+    ).toBe('28');
+    expect(
+      document.querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-input[data-setting="sectionGap"]`
+      )?.value
+    ).toBe('40');
+  });
+
+  it('clears selected module state when a module is deleted from the canvas', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const feedModule = selectedPage.sections[1].modules.find((module) => module.moduleType === 'feed');
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      deleteModuleResult: true,
+      useRealEditors: true,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector(`.pb-module[data-module-id="${feedModule.id}"]`)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Feed Module');
+
+    document
+      .querySelector(`.pb-module[data-module-id="${feedModule.id}"] [data-action="delete-module"]`)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.deleteModule).toHaveBeenCalledWith(feedModule.id);
+    expect(document.querySelector(`.pb-module[data-module-id="${feedModule.id}"]`)).toBeNull();
+    expect(document.querySelector('.pb-module.selected')).toBeNull();
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain(
+      'Choose Something to Edit'
+    );
+    expect(document.getElementById('pbSaveModule')).toBeNull();
+  });
+
+  it('clears open section settings and stale selected module state when deleting a section', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const editableSection = selectedPage.sections[1];
+    const textModule = editableSection.modules.find((module) => module.moduleType === 'text');
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      deleteSectionResult: true,
+      useRealEditors: true,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector(`.pb-module[data-module-id="${textModule.id}"]`)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    document
+      .querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] [data-action="toggle-section-settings"]`
+      )
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    expect(
+      document.querySelector(`.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-card`)
+    ).not.toBeNull();
+
+    document
+      .querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] [data-action="delete-section"]`
+      )
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.deleteSection).toHaveBeenCalledWith(editableSection.id);
+    expect(document.querySelector(`.pb-section[data-section-id="${editableSection.id}"]`)).toBeNull();
+    expect(document.querySelector('.pb-module.selected')).toBeNull();
+    expect(document.querySelector('.pb-section-settings-card')).toBeNull();
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain(
+      'Choose Something to Edit'
+    );
+  });
+
   it('renders page status details and supports explicit draft/publish actions', async () => {
     const selectedPage = getContractFixture('builderPage');
     const { manager, mocks } = await setupPageBuilder({
@@ -442,6 +643,51 @@ describe('admin page-builder shell', () => {
       'draft=1'
     );
     expect(document.querySelector('.pb-open-reader-link')?.textContent).toContain('Open Reader');
+  });
+
+  it('blocks page-header selection while section settings have unsaved changes', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const editableSection = selectedPage.sections[1];
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] [data-action="toggle-section-settings"]`
+      )
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    const moduleGapInput = document.querySelector(
+      `.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-input[data-setting="moduleGap"]`
+    );
+    if (moduleGapInput) {
+      moduleGapInput.value = '28';
+      moduleGapInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    await flushAdminUi(1);
+
+    document
+      .querySelector('[data-action="select-page-header"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(document.getElementById('pbEditorTitle')?.textContent).not.toContain('Header Settings');
+    expect(document.getElementById('pbSaveHeader')).toBeNull();
+    expect(
+      document.querySelector(`.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-card`)
+    ).not.toBeNull();
+    expect(document.querySelector('.pb-canvas-notice')?.textContent).toContain(
+      'Save or discard your current changes before switching to the page header.'
+    );
   });
 
   it('persists a normalized v3 page header on explicit draft saves for legacy pages', async () => {
