@@ -392,6 +392,7 @@ Deliberately not in this phase:
 - Rewrote `reader/page-renderer.js` and `admin/page-builder/preview-renderers.js` to delegate to the shared factory via a three-option interface (`resolveImageUrl`, `getSeriesId`, `showMountPlaceholders`)
 - Added Edit/Preview canvas mode toggle to the builder toolbar; preview mode renders `renderPreviewPage(currentPage)` wrapped in a centred `.pb-preview-frame` using the shared renderer — the public `main.core.18-page-builder.css` was already in the admin head, so preview output is visually identical to the reader
 - Added Desktop (1280px) / Tablet (768px) / Mobile (375px) width presets sourced from the site's `variables.css` breakpoints; width changes update the frame `data-width` attribute in-place with a CSS `max-width` transition, no re-render
+- Enhanced preview to utilize the full viewport width by injecting `data-canvas-mode='preview'` into the CSS grid, automatically collapsing the sidebar and inspector elements globally to prevent the preview frame from being constrained inside the gutter
 - Added 7 new tests (5 parity + 2 integration); full suite: 36 files, 207 passing, 0 regressions
 
 ### Phase 3 - Page management pass
