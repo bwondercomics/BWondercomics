@@ -58,6 +58,20 @@ export async function deletePage(pageId) {
   }
 }
 
+export async function reorderPages(seriesId, pageIds) {
+  try {
+    const res = await fetch(`/api/admin/pages/reorder?series_id=${encodeURIComponent(seriesId)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ page_ids: pageIds }),
+    });
+    return res.ok;
+  } catch (err) {
+    console.error('reorderPages error:', err);
+    return false;
+  }
+}
+
 export async function updatePage(pageId, data) {
   try {
     const res = await fetch(`/api/admin/pages/${pageId}`, {

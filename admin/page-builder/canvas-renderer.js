@@ -220,6 +220,7 @@ function renderPageTitle(state, helpers) {
       </div>
       <div class="pb-page-title-actions">
         <span class="pb-page-title-badges">${helpers.renderPageStatusBadges(state.currentPage)}</span>
+        <button type="button" class="btn-small btn-secondary pb-page-settings-btn" data-action="select-page-settings">Page Settings</button>
         <a class="pb-open-reader-link" href="${escapeAttr(helpers.getReaderUrl(state.currentPage))}" target="_blank" rel="noopener noreferrer">
           ${escapeHtml(helpers.getReaderLinkLabel(state.currentPage))}
         </a>

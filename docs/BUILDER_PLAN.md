@@ -397,9 +397,9 @@ Deliberately not in this phase:
 
 ### Phase 3 - Page management pass
 
-- replace prompt-based page creation
-- add page metadata editor
-- add page reorder UI
+- Replaced legacy `prompt()`-based page creation with a newly integrated `#addPageModal` matching the Builder's internal layout scheme.
+- Added a "Page Settings" editor view to the Builder panel, allowing live metadata edits (title, slug, page type, isHomepage) seamlessly synced via the API.
+- Integrated vanilla HTML5 drag-and-drop mechanics into the sidebar page list, allowing users to drag elements and persist sequences via `/api/admin/pages/reorder`.
 
 ### Phase 4 - Editor coverage pass
 

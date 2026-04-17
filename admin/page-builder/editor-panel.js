@@ -6,6 +6,35 @@ import {
 import { bindModuleEditorEvents, renderModuleEditorContent } from './module-editor.js';
 import { bindThemeEditorEvents, renderThemeEditorContent } from './theme-editor.js';
 
+function renderPageSettingsContent(draft) {
+  if (!draft) return '';
+  return `
+    <div class="form-editor">
+      <div class="form-group">
+        <label class="form-label" for="pbEditPageSlug">Page Slug</label>
+        <input type="text" id="pbEditPageSlug" class="form-input" value="${escapeHtml(draft.slug)}" />
+        <div class="settings-note">Used in the URL (letters, numbers, dashes).</div>
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="pbEditPageTitle">Page Title</label>
+        <input type="text" id="pbEditPageTitle" class="form-input" value="${escapeHtml(draft.title)}" />
+      </div>
+      <div class="form-group">
+        <label class="form-label" for="pbEditPageType">Page Type</label>
+        <input type="text" id="pbEditPageType" class="form-input" value="${escapeHtml(draft.pageType || '')}" />
+        <div class="settings-note">e.g., custom, reader, gallery.</div>
+      </div>
+      <div class="form-group">
+        <label style="display: flex; align-items: center; gap: 10px; font-size: 0.95rem;">
+          <input type="checkbox" id="pbEditIsHomepage" ${draft.isHomepage ? 'checked' : ''} />
+          Is Homepage
+        </label>
+        <div class="settings-note" style="margin-top: 6px;">Check to make this page the default landing page for the series.</div>
+      </div>
+    </div>
+  `;
+}
+
 function renderTabs(activeEditorTab, disableTabs = false) {
   return `
     <div class="pb-editor-tabs" data-count="2" role="tablist" aria-label="Inspector tabs">
@@ -107,6 +136,9 @@ export function createEditorPanelRenderer({
     if (!state.activeHeaderDraft) {
       actions.initializeHeaderDraft();
     }
+    if (!state.activePageSettingsDraft) {
+      actions.initializePageSettingsDraft();
+    }
     if (selectedModule && state.activeModuleDraftId !== selectedModule.id) {
       actions.initializeModuleDraft(selectedModule.id);
     }
@@ -147,6 +179,18 @@ export function createEditorPanelRenderer({
         actionsHtml: `
           <button class="btn-secondary" id="pbDiscardHeader" data-action="discard-current" type="button">Discard</button>
           <button class="btn-primary" id="pbSaveHeader" data-action="save-current" type="button">Save Header</button>
+        `,
+      });
+    } else if (state.selectedCanvasSurface === 'page-settings') {
+      contentHtml = renderPageSettingsContent(state.activePageSettingsDraft);
+      kicker = 'Page Settings';
+      title = 'Metadata Configuration';
+      subtitle = `Adjust URL slug, title, type, and homepage status for ${pageTitle}.`;
+      footerHtml = renderFooter({
+        scope: 'page-settings',
+        actionsHtml: `
+          <button class="btn-secondary" id="pbDiscardPageSettings" data-action="discard-current" type="button">Discard</button>
+          <button class="btn-primary" id="pbSavePageSettings" data-action="save-current" type="button">Save Settings</button>
         `,
       });
     } else {
@@ -203,6 +247,8 @@ export function createEditorPanelRenderer({
           actions.initializeThemeDraft();
         } else if (nextState.selectedCanvasSurface === 'page-header') {
           actions.initializeHeaderDraft();
+        } else if (nextState.selectedCanvasSurface === 'page-settings') {
+          actions.initializePageSettingsDraft();
         } else if (nextState.selectedModuleId) {
           actions.initializeModuleDraft(nextState.selectedModuleId);
         }
@@ -247,6 +293,26 @@ export function createEditorPanelRenderer({
       });
       document.getElementById('pbDiscardHeader')?.addEventListener('click', () => {
         actions.discardActiveHeaderDraft();
+      });
+    } else if (state.selectedCanvasSurface === 'page-settings') {
+      document.getElementById('pbEditPageSlug')?.addEventListener('input', (e) => {
+        actions.updateActivePageSettingsDraftField('slug', /** @type {HTMLInputElement} */ (e.target).value);
+      });
+      document.getElementById('pbEditPageTitle')?.addEventListener('input', (e) => {
+        actions.updateActivePageSettingsDraftField('title', /** @type {HTMLInputElement} */ (e.target).value);
+      });
+      document.getElementById('pbEditPageType')?.addEventListener('input', (e) => {
+        actions.updateActivePageSettingsDraftField('pageType', /** @type {HTMLInputElement} */ (e.target).value);
+      });
+      document.getElementById('pbEditIsHomepage')?.addEventListener('change', (e) => {
+        actions.updateActivePageSettingsDraftField('isHomepage', /** @type {HTMLInputElement} */ (e.target).checked);
+      });
+
+      document.getElementById('pbSavePageSettings')?.addEventListener('click', async () => {
+        await actions.saveActivePageSettingsDraft();
+      });
+      document.getElementById('pbDiscardPageSettings')?.addEventListener('click', () => {
+        actions.discardActivePageSettingsDraft();
       });
     } else if (selectedModuleRecord) {
       bindModuleEditorEvents({

@@ -155,6 +155,14 @@ export function createCanvasEventBinder({ el, getState, actions }) {
       });
   }
 
+  function bindPageSettingsSelectionAction() {
+    el.pbCanvas
+      .querySelector('[data-action="select-page-settings"]')
+      ?.addEventListener('click', () => {
+        actions.selectPageSettingsFromCanvas();
+      });
+  }
+
   function bindModuleActions() {
     el.pbCanvas.querySelectorAll('.pb-module').forEach((moduleEl) => {
       const moduleId = moduleEl.dataset.moduleId;
@@ -194,6 +202,7 @@ export function createCanvasEventBinder({ el, getState, actions }) {
     bindSectionSettingsActions();
     bindModuleInsertActions();
     bindHeaderSelectionAction();
+    bindPageSettingsSelectionAction();
     bindModuleActions();
     bindSectionDeleteActions();
   }
