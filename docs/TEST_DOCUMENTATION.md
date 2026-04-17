@@ -89,8 +89,8 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - `tests/admin-preview.test.js`: `admin/preview.js` preview-data contract consumption
 - `tests/admin-page-config.test.js`: `admin/page-config.js` page-config load/save behavior
 - `tests/admin-page-builder-data.test.js`: `admin/page-builder/data.js` page/section/module request wrappers and failure handling
-- `tests/admin-page-builder-shell.test.js`: `admin/page-builder.js` shell/layout behavior, selection and publish flows, section settings save/discard, canvas delete cleanup, page-header editing, default module config wiring, and the Edit/Preview canvas mode toggle with Desktop/Tablet/Mobile width presets
-- `tests/admin-page-builder-preview.test.js`: `admin/page-builder/module-editor.js` save/delete flows and `admin/page-builder/preview-renderers.js` preview contracts
+- `tests/admin-page-builder-shell.test.js`: `admin/page-builder.js` shell/layout behavior, selection and publish flows, modal page creation, page-settings save flow, sidebar page reorder success/rollback, section settings save/discard, canvas delete cleanup, page-header editing, default module config wiring, and the Edit/Preview canvas mode toggle with Desktop/Tablet/Mobile width presets
+- `tests/admin-page-builder-preview.test.js`: `admin/page-builder/module-editor.js` save/delete flows, structured editor draft updates (including gallery asset-picker regression coverage), and `admin/page-builder/preview-renderers.js` preview contracts
 - `tests/shared-renderers-parity.test.js`: parity tests for `admin/page-builder/shared-renderers.js` — verifies that `createRenderers()` produces equivalent structure for reader and preview option sets, correct mount-placeholder behavior, image URL resolution per resolver, and button link resolution via `getSeriesId`
 - `tests/admin-designer.test.js`: `admin/designer.js` iframe URL generation, section visibility, and resize messaging
 - `tests/media-branding.test.js`: media/admin branding rules

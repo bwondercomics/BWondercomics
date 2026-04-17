@@ -263,6 +263,12 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
       setActiveHeaderDraft: (nextDraft) => {
         activeHeaderDraft = cloneValue(nextDraft);
       },
+      updateActivePageSettingsDraftField: (key, value) => {
+        if (!activePageSettingsDraft) return;
+        activePageSettingsDraft[key] = value;
+        markDirty('page-settings');
+        renderEditorPanel();
+      },
       setActiveModuleDraft: (nextDraft) => {
         activeModuleDraft = cloneValue(nextDraft);
       },
@@ -282,6 +288,8 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
       resetActiveThemeDraft,
       saveActiveHeaderDraft,
       discardActiveHeaderDraft,
+      saveActivePageSettingsDraft,
+      discardActivePageSettingsDraft,
       saveActiveModuleDraft,
       discardActiveModuleDraft,
       renderCanvas,

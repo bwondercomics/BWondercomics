@@ -395,7 +395,9 @@ Deliberately not in this phase:
 - Enhanced preview to utilize the full viewport width by injecting `data-canvas-mode='preview'` into the CSS grid, automatically collapsing the sidebar and inspector elements globally to prevent the preview frame from being constrained inside the gutter
 - Added 7 new tests (5 parity + 2 integration); full suite: 36 files, 207 passing, 0 regressions
 
-### Phase 3 - Page management pass
+### Phase 3 - Page management pass ✅
+
+**Implemented (2026-04-17):**
 
 - Replaced legacy `prompt()`-based page creation with a newly integrated `#addPageModal` matching the Builder's internal layout scheme.
 - Added a "Page Settings" editor view to the Builder panel, allowing live metadata edits (title, slug, page type, isHomepage) seamlessly synced via the API.
@@ -430,9 +432,6 @@ Deliberately not in this phase:
 ### Change
 
 - unsafe HTML and URL handling
-- prompt-based page creation
-- missing page reorder UI
-- structural-only preview
 - raw JSON dependence for common modules
 
 ### Avoid
@@ -456,7 +455,6 @@ Current automated coverage already exists for:
 Coverage still missing from the audit perspective:
 
 - optimistic concurrency tests
-- preview/live parity checks
 
 ## Implemented security notes
 

@@ -11,11 +11,27 @@ function setViewportWidth(width) {
   });
 }
 
+function createDragLikeEvent(type, dataTransfer, init = {}) {
+  const event = new Event(type, { bubbles: true, cancelable: true, ...init });
+  Object.defineProperty(event, 'dataTransfer', {
+    value: dataTransfer,
+    configurable: true,
+  });
+  if (typeof init.clientY === 'number') {
+    Object.defineProperty(event, 'clientY', {
+      value: init.clientY,
+      configurable: true,
+    });
+  }
+  return event;
+}
+
 async function setupPageBuilder({
   fetchPagesResults = [],
   fetchPageResult = null,
   createPageResult = null,
   deletePageResult = true,
+  reorderPagesResult = true,
   addModuleResult = null,
   updateSectionResult = null,
   deleteSectionResult = false,
@@ -39,6 +55,7 @@ async function setupPageBuilder({
   const fetchPage = vi.fn(async () => fetchPageResult);
   const createPage = vi.fn(async () => createPageResult);
   const deletePage = vi.fn(async () => deletePageResult);
+  const reorderPages = vi.fn(async () => reorderPagesResult);
   const updatePage = vi.fn(
     async (_pageId, data) =>
       updatePageResult || {
@@ -81,6 +98,7 @@ async function setupPageBuilder({
     fetchPage,
     createPage,
     deletePage,
+    reorderPages,
     updatePage,
     fetchAssets: vi.fn(async () => []),
     uploadAsset: vi.fn(async () => ({})),
@@ -138,6 +156,7 @@ async function setupPageBuilder({
       fetchPage,
       fetchPages,
       moveModule,
+      reorderPages,
       reorderModules,
       reorderSections,
       updateSection,
@@ -306,7 +325,7 @@ describe('admin page-builder shell', () => {
     expect(document.querySelector('.pb-editor-tab.active[data-tab="modules"]')).not.toBeNull();
   });
 
-  it('renders the empty state and adds a new page through the current prompts flow', async () => {
+  it('renders the empty state and adds a new page through the modal flow', async () => {
     const page = buildContractFixture('builderPage', {
       id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeee99',
       title: 'Reader Builder',
@@ -316,12 +335,19 @@ describe('admin page-builder shell', () => {
       createPageResult: page,
     });
 
-    globalThis.prompt.mockReturnValueOnce('reader').mockReturnValueOnce('Reader Builder');
-
     await manager.showPageBuilderSection();
     expect(document.getElementById('pbPageList')?.textContent).toContain('No pages yet');
 
     document.getElementById('pbAddPage')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    document.getElementById('pbPageSlugInput').value = 'reader';
+    document.getElementById('pbPageTitleInput').value = 'Reader Builder';
+    const form = document.getElementById('pbAddPageForm');
+    const submitBtn = document.createElement('button');
+    submitBtn.type = 'submit';
+    form.appendChild(submitBtn);
+    submitBtn.click();
     await flushAdminUi(3);
 
     expect(mocks.createPage).toHaveBeenCalledWith('battle-bros', 'reader', 'Reader Builder');
@@ -329,6 +355,110 @@ describe('admin page-builder shell', () => {
       'Reader Builder'
     );
     expect(document.getElementById('pbPageTitle')?.textContent).toContain('Reader Builder');
+  });
+
+  
+  it('opens page settings, edits fields, and saves the draft', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document.querySelector('.pb-page-item')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector('.pb-page-settings-btn')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(document.querySelector('.pb-editor-kicker')?.textContent).toContain('Page Settings');
+    expect(document.getElementById('pbSavePageSettings')).not.toBeNull();
+    
+    // Check initial values
+    const slugInput = document.getElementById('pbEditPageSlug');
+    const titleInput = document.getElementById('pbEditPageTitle');
+    const pageTypeInput = document.getElementById('pbEditPageType');
+    const isHomepageCheckbox = document.getElementById('pbEditIsHomepage');
+    
+    expect(slugInput.value).toBe(selectedPage.slug);
+    expect(titleInput.value).toBe(selectedPage.title);
+    expect(pageTypeInput.value).toBe(selectedPage.pageType);
+    expect(isHomepageCheckbox.checked).toBe(selectedPage.isHomepage);
+
+    // Edit fields
+    slugInput.value = 'reader-new';
+    slugInput.dispatchEvent(new Event('input', { bubbles: true }));
+    
+    titleInput.value = 'Reader New Title';
+    titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+    
+    pageTypeInput.value = 'landing';
+    pageTypeInput.dispatchEvent(new Event('input', { bubbles: true }));
+    
+    isHomepageCheckbox.checked = true;
+    isHomepageCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
+    
+    await flushAdminUi(1);
+
+    document.getElementById('pbSavePageSettings')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.updatePage).toHaveBeenCalledWith(
+      selectedPage.id,
+      expect.objectContaining({
+        slug: 'reader-new',
+        title: 'Reader New Title',
+        pageType: 'landing',
+        isHomepage: true,
+      })
+    );
+  });
+
+  
+  it('supports drag and drop page reordering and rolls back on failure', async () => {
+    const page1 = buildContractFixture('builderPage', { id: 'page-1', title: 'Page 1', sortIndex: 0 });
+    const page2 = buildContractFixture('builderPage', { id: 'page-2', title: 'Page 2', sortIndex: 1 });
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[page1, page2]],
+      reorderPagesResult: true,
+    });
+
+    mocks.reorderPages
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+
+    await manager.showPageBuilderSection();
+    await flushAdminUi(3);
+
+    const pageList = document.getElementById('pbPageList');
+    let items = pageList.querySelectorAll('.pb-page-item');
+    expect(items.length).toBe(2);
+    expect(items[0].querySelector('.pb-page-item-title').textContent).toBe('Page 1');
+
+    const dataTransfer = { effectAllowed: 'move' };
+    items[0].getBoundingClientRect = () => ({ top: 0, height: 40 });
+    items[1].dispatchEvent(createDragLikeEvent('dragstart', dataTransfer));
+    items[0].dispatchEvent(createDragLikeEvent('dragover', dataTransfer, { clientY: 10 }));
+    items[0].dispatchEvent(createDragLikeEvent('drop', dataTransfer));
+    await flushAdminUi(3);
+
+    items = document.getElementById('pbPageList').querySelectorAll('.pb-page-item');
+    expect(items[0].querySelector('.pb-page-item-title').textContent).toBe('Page 2');
+    expect(mocks.reorderPages).toHaveBeenNthCalledWith(1, 'battle-bros', ['page-2', 'page-1']);
+
+    items[1].getBoundingClientRect = () => ({ top: 40, height: 40 });
+    items[0].dispatchEvent(createDragLikeEvent('dragstart', dataTransfer));
+    items[1].dispatchEvent(createDragLikeEvent('dragover', dataTransfer, { clientY: 70 }));
+    items[1].dispatchEvent(createDragLikeEvent('drop', dataTransfer));
+    await flushAdminUi(3);
+
+    items = document.getElementById('pbPageList').querySelectorAll('.pb-page-item');
+    expect(items[0].querySelector('.pb-page-item-title').textContent).toBe('Page 2');
+    expect(items[1].querySelector('.pb-page-item-title').textContent).toBe('Page 1');
+    expect(mocks.reorderPages).toHaveBeenNthCalledWith(2, 'battle-bros', ['page-1', 'page-2']);
   });
 
   it('supports page selection, page deletion, and default module config wiring', async () => {

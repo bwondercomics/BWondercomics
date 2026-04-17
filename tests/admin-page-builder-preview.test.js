@@ -415,4 +415,71 @@ describe('admin page-builder editor and preview renderers', () => {
     removeBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(setDraftConfig).toHaveBeenCalled();
   });
+
+  it('updates the gallery draft when the picker applies an asset', async () => {
+    const galleryModule = getContractFixture('builderModules').gallery;
+    const currentPage = {
+      sections: [
+        {
+          id: 'section-1',
+          modules: [galleryModule],
+        },
+      ],
+    };
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = renderModuleEditorContent({
+      currentPage,
+      selectedModuleId: galleryModule.id,
+      draftConfig: galleryModule.config,
+    });
+    document.body.innerHTML = '';
+    document.body.appendChild(wrapper);
+
+    const setDraftConfig = vi.fn();
+    const markDirty = vi.fn();
+    const renderEditorPanel = vi.fn();
+    const openImagePicker = vi.fn();
+    const fetchAssets = vi.fn(async () => []);
+    const uploadAssetFile = vi.fn(async () => ({}));
+
+    const { bindGalleryEditorEvents } = await import('../admin/page-builder/gallery-editor.js');
+    bindGalleryEditorEvents({
+      el: { pbModuleEditor: wrapper },
+      draftConfig: galleryModule.config,
+      setDraftConfig,
+      markDirty,
+      renderEditorPanel,
+      openImagePicker,
+      fetchAssets,
+      uploadAssetFile,
+    });
+
+    wrapper
+      .querySelector('.pb-gallery-item[data-item-index="0"] [data-action="pick-image"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(openImagePicker).toHaveBeenCalledWith(
+      expect.objectContaining({
+        getItems: fetchAssets,
+        allowUpload: true,
+        uploadHandler: uploadAssetFile,
+        showEditor: false,
+        initialSelection: { path: galleryModule.config.images[0].src },
+        onApply: expect.any(Function),
+      })
+    );
+
+    const pickerOptions = openImagePicker.mock.calls[0][0];
+    pickerOptions.onApply({ item: { path: 'assets/uploads/replacement.png' } });
+
+    expect(setDraftConfig).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        images: expect.arrayContaining([
+          expect.objectContaining({ src: 'assets/uploads/replacement.png' }),
+        ]),
+      })
+    );
+    expect(markDirty).toHaveBeenCalledWith('module');
+    expect(renderEditorPanel).toHaveBeenCalled();
+  });
 });

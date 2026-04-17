@@ -991,6 +991,8 @@ export function bindModuleEditorEvents({
       renderEditorPanel,
       markDirty,
       openImagePicker,
+      fetchAssets,
+      uploadAssetFile,
     });
     return;
   }

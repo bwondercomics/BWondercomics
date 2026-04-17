@@ -100,6 +100,8 @@ export function bindGalleryEditorEvents({
   renderEditorPanel,
   markDirty,
   openImagePicker,
+  fetchAssets,
+  uploadAssetFile,
 }) {
   let config = normalizeGalleryConfig(draftConfig);
 
@@ -158,12 +160,22 @@ export function bindGalleryEditorEvents({
       commit(nextConfig, true);
     });
 
-    itemEl.querySelector('[data-action="pick-image"]')?.addEventListener('click', () => {
-       openImagePicker((path) => {
+    itemEl.querySelector('[data-action="pick-image"]')?.addEventListener('click', async () => {
+      const current = config.images[index] || {};
+      await openImagePicker({
+        title: 'Select gallery image',
+        getItems: fetchAssets,
+        allowUpload: true,
+        uploadHandler: uploadAssetFile,
+        showEditor: false,
+        initialSelection: { path: current.src || '' },
+        onApply: ({ item }) => {
           const nextConfig = normalizeGalleryConfig(config);
-          nextConfig.images[index].src = path;
+          if (!nextConfig.images[index]) return;
+          nextConfig.images[index].src = item?.path || '';
           commit(nextConfig, true);
-       });
+        },
+      });
     });
   });
 

@@ -156,7 +156,7 @@ export function createCanvasEventBinder({ el, getState, actions }) {
   }
 
   function bindPageSettingsSelectionAction() {
-    el.pbCanvas
+    (el.pbPageTitle || el.pbCanvas)
       .querySelector('[data-action="select-page-settings"]')
       ?.addEventListener('click', () => {
         actions.selectPageSettingsFromCanvas();
