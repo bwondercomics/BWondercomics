@@ -1,6 +1,6 @@
 # BWonderComics 0.7.9
 
-Static frontend (built with Vite) + FastAPI backend for the dynamic parts: auth, comments, post scheduling, RSS, uploads, page builder, diagnostics, ops, and analytics proxy.
+(built with Vite) + FastAPI backend for the dynamic parts: auth, comments, post scheduling, RSS, uploads, page builder, diagnostics, ops, and analytics proxy.
 
 Current builder shape:
 
@@ -43,7 +43,3 @@ Public pages are served from `dist/`.
 - Admin panel + page builder: `docs/admin-overview.md`
 - Deployment: `deploy/README.md`
 - Release roadmap: `docs/ROADMAP.md`
-
-## Static hosting
-
-The frontend can be served statically, but you only get the full feature set when the backend is running.
