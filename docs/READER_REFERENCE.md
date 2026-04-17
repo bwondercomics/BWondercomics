@@ -6,7 +6,7 @@ This summarizes the reader runtime after modularization: what each file does, ke
 
 - `data.json`: entries map, order, statusMessage.
 - `/api/pages/<seriesId>/<slug>`: preferred builder-page source for reader chrome and panel content.
-- `page-config.json`: optional theme/content overrides + subtitles (DB-backed legacy fallback for the default reader slug).
+- `page-config.json`: optional theme/content overrides + subtitles (DB-backed legacy fallback for the default reader slug; deprecated once each series has a published `reader` builder page and the series-level fallback audit is clean).
 - `/api/posts/latest`: latest update widget (DB-backed; published-only + scheduling support).
 - `localStorage` key `battleBros_progress`: saved entry/page.
 - Entry page paths may start with `protected/`; those are requested via `/api/protected/<path>`.
@@ -16,7 +16,7 @@ This summarizes the reader runtime after modularization: what each file does, ke
 - `reader/config.js`: constants (storage key, cache sizes, zoom steps, breakpoints, animation timings).
 - `reader/entries.js`: entry helpers (`extractEntryNumber`, `sortEntryNames`, `sortEntryNamesWithMeta`, `sanitizeEntries`).
 - `reader/state.js`: shared `state` object; `saveProgress`, `loadProgress`, cached natural page metrics, and the last successful desktop on-page frame.
-- `reader/data.js`: loaders for entry data, builder-page-first page config with legacy fallback, and latest post.
+- `reader/data.js`: loaders for entry data, builder-page-first page config with deprecated legacy fallback for the default reader slug, and latest post.
 - `reader/dom.js`: element lookups (`el` map), including `#mainContent`, and `initElements`.
 - `reader/render.js`: status typing, image preload/cache, natural-size caching, two-page checks, main `render`/`updateUI`, and non-fullscreen frame refits when visible pages change/load.
 - `reader/controls.js`: page navigation, end-of-entry overlay helpers.
@@ -36,7 +36,7 @@ This summarizes the reader runtime after modularization: what each file does, ke
 1. `index.html` applies a temporary bootstrap-loading state, then loads `reader/app.js` + `reader/customization.js` as ES modules.
 2. `app.start()`:
    - `loadEntryData()` → sets entries/order/statusMessage.
-   - `loadPageConfigWithFallback()` → prefers the builder page API, falls back to legacy `page-config.json` only for the default reader slug, and resolves the startup page source for the rest of the reader.
+  - `loadPageConfigWithFallback()` → prefers the builder page API, falls back to legacy `page-config.json` only for the default reader slug, and resolves the startup page source for the rest of the reader. The legacy branch is removable only after `auditPagesFallbacks(fullSeriesPages)` reports `clean: true`, which now includes a published `reader` page gate.
    - `loadLatestPost()` → fetches `/api/posts/latest`, passes to `renderLatestUpdate`.
    - Initializes elements, entry select, status panel, email form, pointer/fullscreen/nav handlers, then releases the bootstrap-loading state once the initial render or error UI is ready.
    - Restores saved progress if present; renders current pages and applies the desktop on-page frame when eligible.

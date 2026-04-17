@@ -326,17 +326,61 @@ describe('admin page-builder editor and preview renderers', () => {
       selectedModuleId: modules['entry-gallery'].id,
     });
 
+    // Structured controls render correctly
     expect(galleryHtml).toContain('Gallery Layout');
     expect(galleryHtml).toContain('Images');
-    expect(galleryHtml).toContain('Advanced');
     expect(videoHtml).toContain('Video Link');
-    expect(videoHtml).toContain('Advanced');
     expect(dividerHtml).toContain('Divider Styling');
-    expect(dividerHtml).toContain('Advanced');
     expect(entryGalleryHtml).toContain('Entry Gallery Settings');
-    expect(entryGalleryHtml).toContain('Advanced');
+
+    // Fully-structured modules no longer expose the generic raw JSON Advanced card
+    expect(galleryHtml).not.toContain('Raw Config (JSON)');
+    expect(videoHtml).not.toContain('Raw Config (JSON)');
+    expect(dividerHtml).not.toContain('Raw Config (JSON)');
+    expect(entryGalleryHtml).not.toContain('Raw Config (JSON)');
   });
 
+  it('html uses its dedicated code editor; feed alone retains the generic raw Advanced card', () => {
+    const modules = getContractFixture('builderModules');
+    const currentPage = {
+      sections: [{ id: 'section-1', modules: [modules.html, modules.feed, modules.promo, modules.social, modules.buttons] }],
+    };
+
+    const htmlHtml = renderModuleEditorContent({
+      currentPage,
+      selectedModuleId: modules.html.id,
+    });
+    const feedHtml = renderModuleEditorContent({
+      currentPage,
+      selectedModuleId: modules.feed.id,
+    });
+    const promoHtml = renderModuleEditorContent({
+      currentPage,
+      selectedModuleId: modules.promo.id,
+    });
+    const socialHtml = renderModuleEditorContent({
+      currentPage,
+      selectedModuleId: modules.social.id,
+    });
+    const buttonsHtml = renderModuleEditorContent({
+      currentPage,
+      selectedModuleId: modules.buttons.id,
+    });
+
+    // html exposes its explicit code textarea, not the generic raw accordion
+    expect(htmlHtml).toContain('Custom HTML');
+    expect(htmlHtml).toContain('data-key="code"');
+    expect(htmlHtml).not.toContain('Raw Config (JSON)');
+
+    // feed still has an Advanced raw card because its editor coverage is partial
+    expect(feedHtml).toContain('Raw Config (JSON)');
+    expect(feedHtml).toContain('Advanced');
+
+    // Dedicated binders must not advertise a generic raw fallback they do not save
+    expect(promoHtml).not.toContain('Raw Config (JSON)');
+    expect(socialHtml).not.toContain('Raw Config (JSON)');
+    expect(buttonsHtml).not.toContain('Raw Config (JSON)');
+  });
   it('binds gallery editor draft flows and supports list modifications', async () => {
     const galleryModule = getContractFixture('builderModules').gallery;
     const currentPage = {

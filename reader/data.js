@@ -429,10 +429,32 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
 /**
  * Loads page configuration with fallback.
  * Tries a builder page first, then falls back to legacy page-config for the default reader page only.
+ *
+ * **Migration contract**
+ * - `source: 'builder'` — normal path; page was found in the builder API.
+ * - `source: 'none'`    — builder returned nothing and either the slug is not
+ *                         'reader', the request was a draft, or no legacy config
+ *                         exists.
+ * - `source: 'legacy'`  — **DEPRECATED**. Returned only when (a) the slug is
+ *                         'reader', (b) no builder page exists, (c) pb-no-fallback
+ *                         is not set, and (d) a page-config.json is available.
+ *                         This path should become unreachable once every series
+ *                         has a published 'reader' builder page and
+ *                         auditPagesFallbacks(fullSeriesPages) reports
+ *                         `clean: true`. That stronger audit gate must include
+ *                         both page-level fallback buckets and series-level
+ *                         reader readiness. Callers should handle only
+ *                         'builder' or 'none' going forward.
+ *
+ * **pb-no-fallback localStorage flag**
+ * Setting `localStorage.pb-no-fallback = '1'` in admin suppresses legacy fallback
+ * for local testing. This is a transitional dev flag; it will be removed together
+ * with the legacy branch once the migration is complete.
+ *
  * @param {Function} setSubtitlesFn - Callback to set subtitles
  * @param {string} [seriesId] - Optional series ID override
  * @param {{pageSlug?: string, draft?: boolean}} [options] - Page selection and draft mode
- * @returns {Promise<{source: string, page?: Object}>} Result with source indicator
+ * @returns {Promise<{source: string, page?: Object, config?: Object}>} Result with source indicator
  */
 export async function loadPageConfigWithFallback(setSubtitlesFn, seriesId = null, options = {}) {
   const sid = seriesId || getActiveSeriesId();
@@ -441,7 +463,8 @@ export async function loadPageConfigWithFallback(setSubtitlesFn, seriesId = null
   const allowLegacyFallback = pageSlug === 'reader' && !useDraft;
   const pageConfig = await fetchPageConfig(sid);
 
-  // Check for no-fallback mode via localStorage (set in page builder admin)
+  // Check for no-fallback mode via localStorage (set in page builder admin).
+  // DEPRECATED: this flag will be removed alongside the legacy branch below.
   const noFallback = localStorage.getItem('pb-no-fallback') === '1';
 
   // Try page builder first
@@ -459,13 +482,18 @@ export async function loadPageConfigWithFallback(setSubtitlesFn, seriesId = null
     return { source: 'none', config: pageConfig };
   }
 
-  // No fallback mode - stop here and show what we got (nothing)
+  // No fallback mode - stop here and show what we got (nothing).
+  // DEPRECATED: remove together with source:'legacy' branch once migration is complete.
   if (noFallback) {
     console.warn('NO-FALLBACK MODE: Page builder returned nothing. No legacy fallback applied.');
     return { source: 'none', config: pageConfig };
   }
 
-  // Fall back to legacy page-config
+  // Fall back to legacy page-config.
+  // DEPRECATED: this branch is only removable once
+  // auditPagesFallbacks(fullSeriesPages) reports clean:true, which now requires
+  // both zero page-level fallback issues and a published builder page with
+  // slug === 'reader' for the series.
   if (pageConfig) {
     if (pageConfig.content?.header && Array.isArray(pageConfig.content.header.subtitles)) {
       setSubtitlesFn(pageConfig.content.header.subtitles);

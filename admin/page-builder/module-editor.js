@@ -920,7 +920,19 @@ export function renderModuleEditorContent({
       return contentSections.join('');
   }
 
-  if (moduleType !== 'html') {
+  // Only modules that still use the generic draft binder can safely keep the
+  // generic raw JSON escape hatch. Dedicated editor flows must not render a
+  // raw card unless they intentionally parse and persist `_raw`.
+  const MODULES_RETAINING_RAW_CARD = new Set([
+    'header',
+    'text',
+    'image',
+    'spacer',
+    'email-signup',
+    'reader',
+    'feed',
+  ]);
+  if (MODULES_RETAINING_RAW_CARD.has(moduleType)) {
     contentSections.push(renderRawConfigCard(config));
   }
 

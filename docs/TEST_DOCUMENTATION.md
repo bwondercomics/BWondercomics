@@ -66,7 +66,7 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - `tests/entries.test.js`: entry parsing, sorting, and normalization helpers in `reader/entries.js`
 - `tests/state.test.js`: `reader/state.js` persistence behavior
 - `tests/data.test.js`: `reader/data.js` loaders
-- `tests/reader-data-builder.test.js`: builder-first page loading, legacy fallback, theme/panel application, and empty-panel handling
+- `tests/reader-data-builder.test.js`: builder-first page loading, deprecated legacy fallback behavior, theme/panel application, and empty-panel handling
 - `tests/reader-page-renderer.test.js`: `reader/page-renderer.js` module rendering contracts and placeholder states
 - `tests/reader-feed-panel.test.js`: `reader/feed-panel.js` and `reader/latest.js` sorting, sanitization, expansion, latest preview, and feed-mode behavior
 - `tests/reader-controls.test.js`: `reader/controls.js` navigation and end-of-entry behavior
@@ -90,7 +90,8 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - `tests/admin-page-config.test.js`: `admin/page-config.js` page-config load/save behavior
 - `tests/admin-page-builder-data.test.js`: `admin/page-builder/data.js` page/section/module request wrappers and failure handling
 - `tests/admin-page-builder-shell.test.js`: `admin/page-builder.js` shell/layout behavior, selection and publish flows, modal page creation, page-settings save flow, sidebar page reorder success/rollback, section settings save/discard, canvas delete cleanup, page-header editing, default module config wiring, and the Edit/Preview canvas mode toggle with Desktop/Tablet/Mobile width presets
-- `tests/admin-page-builder-preview.test.js`: `admin/page-builder/module-editor.js` save/delete flows, structured editor draft updates (including gallery asset-picker regression coverage), and `admin/page-builder/preview-renderers.js` preview contracts
+- `tests/admin-page-builder-preview.test.js`: `admin/page-builder/module-editor.js` save/delete flows, structured editor draft updates (including gallery asset-picker regression coverage), and `admin/page-builder/preview-renderers.js` preview contracts, including assertions that dedicated-binder modules no longer render a misleading generic raw-config fallback card
+- `tests/admin-page-builder-audit.test.js`: `admin/page-builder/header-config.js` fallback-audit helpers, including series-level removal readiness, the `missingPublishedReaderPage` gate, and per-page legacy header dependency buckets
 - `tests/shared-renderers-parity.test.js`: parity tests for `admin/page-builder/shared-renderers.js` — verifies that `createRenderers()` produces equivalent structure for reader and preview option sets, correct mount-placeholder behavior, image URL resolution per resolver, and button link resolution via `getSeriesId`
 - `tests/admin-designer.test.js`: `admin/designer.js` iframe URL generation, section visibility, and resize messaging
 - `tests/media-branding.test.js`: media/admin branding rules

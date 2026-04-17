@@ -412,11 +412,14 @@ Deliberately not in this phase:
 - Extracted isolated component files (`gallery-editor.js`, `video-editor.js`, `divider-editor.js`, `entry-gallery-editor.js`) applying the unified `draftConfig` pattern mapped consistently into `admin/page-builder/module-editor.js`.
 - Expanded semantic module previews for canvas item labels, and grew Vitest specs asserting data-synchronization within bindings.
 
-### Phase 5 - Fallback cleanup pass
+### Phase 5 - Fallback cleanup pass ✅
 
-- document what legacy fallback remains
-- migrate remaining surfaces deliberately
-- remove fallback only when replacement coverage is complete
+**Implemented (2026-04-17):**
+
+- Added `auditPageFallbacks` and `auditPagesFallbacks` to inventory remaining legacy fallback dependencies (`missingHeader`, `staleHeaderVersion`, `headerOverrides`, `legacyHeaderModule`).
+- Removed the generic `Advanced` raw JSON card from modules whose current editor path should not advertise a generic fallback, including the fully-structured modules (gallery, video, divider, entry-gallery) and dedicated-binder modules (promo, social, buttons).
+- Marked `source: 'legacy'` and the `pb-no-fallback` flag as deprecated in `reader/data.js`, documenting that removal requires a clean series-level audit including a published `reader` page.
+- Expanded the test suite with comprehensive audit coverage to act as the source of truth for safe branch removal.
 
 ## Keep / change / avoid
 

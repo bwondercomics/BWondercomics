@@ -7,7 +7,7 @@ This guide maps the reader-side modules, their responsibilities, and how they co
 - `reader/app.js` — Composition root; coordinates the reader bootstrap, keeps the static shell hidden until the initial page source is known, kicks off render, and binds global events.
 - `reader/config.js` — Constants for storage keys, debounce timings, UI thresholds (e.g., two-page breakpoints), and default options.
 - `reader/dom.js` — Centralized DOM lookups; a single source of element references used across modules, including `#mainContent` for on-page frame sizing.
-- `reader/data.js` — Fetches `/data.json` (or `/series/<id>/data.json`), the builder page API with legacy `page-config.json` fallback for the default reader slug, and `/api/posts/latest`; normalizes entry metadata, effective page-header state, page-config overrides, and maps `protected/*` asset paths to `/api/protected/*`.
+- `reader/data.js` — Fetches `/data.json` (or `/series/<id>/data.json`), the builder page API with deprecated legacy `page-config.json` fallback for the default reader slug, and `/api/posts/latest`; normalizes entry metadata, effective page-header state, page-config overrides, and maps `protected/*` asset paths to `/api/protected/*`.
 - `reader/header-layout.js` — Applies the effective header layout to the existing topbar DOM, repositions stable header blocks into left/center/right regions, and rebuilds configurable nav links while preserving the runtime admin link.
 - `reader/state.js` — Single state container: current entry/page, zoom, fit mode, progress persistence (localStorage), cached natural page metrics, and derived helpers (e.g., `isTwoPageMode`).
 - `reader/render.js` — Renders pages into the stage, caches natural page dimensions as images preload/load, reapplies non-fullscreen frame fitting, and updates UI labels/buttons.
@@ -85,7 +85,7 @@ flowchart TD
 - **email.js**
   - Submits to `/api/email/subscribe`, toggles success/error states inline.
 - **customization.js**
-  - Preserves the legacy `page-config.json` contract for default reader pages that do not yet have a builder page.
+  - Preserves the legacy `page-config.json` contract for default reader pages that do not yet have a published `reader` builder page in the active series.
   - Waits for the bootstrap state from `app.js` and skips all DOM mutations when the initial page source is `builder` or `error`.
 
 ## Data Sources
@@ -118,9 +118,9 @@ flowchart TD
 
 ## Common Extension Points
 
-- Add or move a header button: update the builder page header first; use legacy page config only if the default reader slug still relies on the fallback path.
+- Add or move a header button: update the builder page header first; use legacy page config only if the default reader slug still relies on the deprecated fallback path.
 - Change page title/subtitle/header layout: edit the page header in the builder so it persists to `page.meta.header`; legacy `header` modules are fallback-only.
-- Change theme/branding: prefer the builder page theme metadata; legacy `page-config.json` remains available for fallback pages and shared branding fields.
+- Change theme/branding: prefer the builder page theme metadata; legacy `page-config.json` remains available for deprecated fallback pages and shared branding fields until the series-level audit gate is clean.
 
 ## Gotchas / Notes
 

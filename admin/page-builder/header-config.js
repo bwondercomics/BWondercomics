@@ -252,6 +252,135 @@ function createEffectiveHeaderConfig(
   );
 }
 
+/**
+ * Audit a single builder page for remaining legacy fallback dependencies.
+ *
+ * Fallback buckets checked:
+ *   - `missingHeader`      – page.meta.header is absent; reader falls back through
+ *                            legacy page-config + headerOverrides.
+ *                            Gate: bulk backfill writes meta.header.version = 3.
+ *   - `staleHeaderVersion` – meta.header.version < 3; effective header still falls
+ *                            back to getLegacyHeaderCopyFallback for copy.
+ *                            Gate: header editor normalises to v3 on save; backfill
+ *                            ensures all existing pages are normalised.
+ *   - `headerOverrides`    – page.meta.headerOverrides is present; reader applies
+ *                            legacy per-page block overrides on top of shared config.
+ *                            Gate: no pages depend on headerOverrides (audit clean).
+ *   - `legacyHeaderModule` – a module of type 'header' exists in sections; reader
+ *                            falls back to its config for copy when meta.header is
+ *                            absent or stale (< v3).
+ *                            Gate: no pages have legacy header modules (audit clean).
+ *
+ * @param {Object|null} page - A builder page object
+ * @returns {{ pageId: string, slug: string, issues: Array<{bucket: string, gate: string}> }}
+ */
+export function auditPageFallbacks(page) {
+  const pageId = page?.id || '(unknown)';
+  const slug = page?.slug || '(unknown)';
+  const issues = [];
+
+  const rawHeader =
+    page?.meta?.header &&
+    typeof page.meta.header === 'object' &&
+    !Array.isArray(page.meta.header)
+      ? page.meta.header
+      : null;
+
+  if (!rawHeader) {
+    issues.push({
+      bucket: 'missingHeader',
+      gate: 'Bulk backfill writes page.meta.header.version = 3 for all builder pages.',
+    });
+  } else if (Number(rawHeader.version || 0) < 3) {
+    issues.push({
+      bucket: 'staleHeaderVersion',
+      gate:
+        'Header editor normalises to v3 on save; backfill ensures all existing pages are normalised.',
+    });
+  }
+
+  if (page?.meta?.headerOverrides && typeof page.meta.headerOverrides === 'object') {
+    issues.push({
+      bucket: 'headerOverrides',
+      gate:
+        'Remove after audit shows zero builder pages with headerOverrides and v3 header is universal.',
+    });
+  }
+
+  for (const section of page?.sections || []) {
+    for (const mod of section.modules || []) {
+      if (mod?.moduleType === 'header') {
+        issues.push({
+          bucket: 'legacyHeaderModule',
+          gate:
+            'Remove after all builder pages carry first-class meta.header.version = 3 copy and no legacy header modules remain.',
+        });
+        break; // report once per page
+      }
+    }
+    if (issues.some((i) => i.bucket === 'legacyHeaderModule')) break;
+  }
+
+  return { pageId, slug, issues };
+}
+
+/**
+ * Aggregate fallback audit across multiple builder pages.
+ *
+ * To use this as the legacy-reader removal gate, pass the complete admin page
+ * list for exactly one series (for example the full result of fetchPages()).
+ *
+ * @param {Array<Object>} pages - Array of builder page objects for one series
+ * @returns {{
+ *   clean: boolean,
+ *   pageReports: Array,
+ *   bucketSummary: Object,
+ *   removalReadiness: {
+ *     hasPublishedReaderPage: boolean,
+ *     canRemoveLegacyReaderFallback: boolean
+ *   }
+ * }}
+ */
+export function auditPagesFallbacks(pages = []) {
+  const pageReports = pages.map(auditPageFallbacks);
+  const bucketSummary = {};
+  const hasPublishedReaderPage = pages.some(
+    (page) => String(page?.slug || '').trim() === 'reader' && page?.isPublished === true
+  );
+
+  for (const report of pageReports) {
+    for (const issue of report.issues) {
+      if (!bucketSummary[issue.bucket]) {
+        bucketSummary[issue.bucket] = { count: 0, gate: issue.gate, pageIds: [] };
+      }
+      bucketSummary[issue.bucket].count++;
+      bucketSummary[issue.bucket].pageIds.push(report.pageId);
+    }
+  }
+
+  if (!hasPublishedReaderPage) {
+    bucketSummary.missingPublishedReaderPage = {
+      count: 1,
+      gate:
+        "Remove source:'legacy' only after the series has a published builder page with slug 'reader'.",
+      pageIds: [],
+    };
+  }
+
+  const pageIssuesClean = pageReports.every((report) => report.issues.length === 0);
+  const canRemoveLegacyReaderFallback = pageIssuesClean && hasPublishedReaderPage;
+
+  return {
+    clean: canRemoveLegacyReaderFallback,
+    pageReports,
+    bucketSummary,
+    removalReadiness: {
+      hasPublishedReaderPage,
+      canRemoveLegacyReaderFallback,
+    },
+  };
+}
+
 export {
   HEADER_BLOCK_DEFS,
   HEADER_BLOCK_IDS,
@@ -269,3 +398,4 @@ export {
   normalizeHeaderCopy,
   normalizeHeaderOverrides,
 };
+
