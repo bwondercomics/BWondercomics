@@ -297,4 +297,122 @@ describe('admin page-builder editor and preview renderers', () => {
     expect(html.querySelector('.safe')?.getAttribute('data-note')).toBe('ok');
     expect(social.querySelector('.pb-social-btn')?.getAttribute('href')).toBe('#');
   });
+
+  it('renders structured editor controls for gallery, video, divider, and entry-gallery', () => {
+    const modules = getContractFixture('builderModules');
+    const currentPage = {
+      sections: [
+        {
+          id: 'section-1',
+          modules: [modules.gallery, modules.video, modules.divider, modules['entry-gallery']],
+        },
+      ],
+    };
+
+    const galleryHtml = renderModuleEditorContent({
+      currentPage,
+      selectedModuleId: modules.gallery.id,
+    });
+    const videoHtml = renderModuleEditorContent({
+      currentPage,
+      selectedModuleId: modules.video.id,
+    });
+    const dividerHtml = renderModuleEditorContent({
+      currentPage,
+      selectedModuleId: modules.divider.id,
+    });
+    const entryGalleryHtml = renderModuleEditorContent({
+      currentPage,
+      selectedModuleId: modules['entry-gallery'].id,
+    });
+
+    expect(galleryHtml).toContain('Gallery Layout');
+    expect(galleryHtml).toContain('Images');
+    expect(galleryHtml).toContain('Advanced');
+    expect(videoHtml).toContain('Video Link');
+    expect(videoHtml).toContain('Advanced');
+    expect(dividerHtml).toContain('Divider Styling');
+    expect(dividerHtml).toContain('Advanced');
+    expect(entryGalleryHtml).toContain('Entry Gallery Settings');
+    expect(entryGalleryHtml).toContain('Advanced');
+  });
+
+  it('binds gallery editor draft flows and supports list modifications', async () => {
+    const galleryModule = getContractFixture('builderModules').gallery;
+    const currentPage = {
+      sections: [
+        {
+          id: 'section-1',
+          modules: [galleryModule],
+        },
+      ],
+    };
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = renderModuleEditorContent({
+      currentPage,
+      selectedModuleId: galleryModule.id,
+      draftConfig: galleryModule.config,
+    });
+    document.body.innerHTML = '';
+    document.body.appendChild(wrapper);
+    const setDraftConfig = vi.fn();
+    const markDirty = vi.fn();
+    const renderEditorPanel = vi.fn();
+
+    const { bindGalleryEditorEvents } = await import('../admin/page-builder/gallery-editor.js');
+    bindGalleryEditorEvents({
+      el: { pbModuleEditor: wrapper },
+      draftConfig: galleryModule.config,
+      setDraftConfig,
+      markDirty,
+      renderEditorPanel,
+      openImagePicker: vi.fn(),
+    });
+
+    const columnsInput = wrapper.querySelector('.pb-gallery-main-input[data-key="columns"]');
+    columnsInput.value = '4';
+    columnsInput.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(setDraftConfig).toHaveBeenLastCalledWith(
+      expect.objectContaining({ columns: 4 })
+    );
+
+    const firstItemSrc = wrapper.querySelector('.pb-gallery-item[data-item-index="0"] .pb-gallery-input[data-item-key="src"]');
+    firstItemSrc.value = 'updated/path.png';
+    firstItemSrc.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(setDraftConfig).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        images: expect.arrayContaining([
+          expect.objectContaining({ src: 'updated/path.png' })
+        ])
+      })
+    );
+
+    document.getElementById('pbGalleryAddImage').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(setDraftConfig).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        images: expect.arrayContaining([
+          expect.anything(),
+          expect.anything(),
+          expect.objectContaining({ src: '', alt: '' })
+        ])
+      })
+    );
+    expect(renderEditorPanel).toHaveBeenCalled();
+
+    const moveDownBtn = wrapper.querySelector('.pb-gallery-item[data-item-index="0"] [data-action="move-down"]');
+    moveDownBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(setDraftConfig).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        images: [
+           galleryModule.config.images[1],
+           expect.objectContaining({ src: 'updated/path.png', alt: 'Shot one' }),
+           expect.objectContaining({ src: '', alt: '' })
+        ]
+      })
+    );
+
+    const removeBtn = wrapper.querySelector('.pb-gallery-item[data-item-index="0"] [data-action="remove"]');
+    removeBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(setDraftConfig).toHaveBeenCalled();
+  });
 });

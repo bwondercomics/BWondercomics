@@ -164,6 +164,15 @@ function getModulePreview(moduleType, config) {
     }
     case 'feed':
       return `Feed (limit ${config.limit || 0})`;
+    case 'gallery':
+      const galleryCount = config.images?.length || 0;
+      return galleryCount === 0 ? 'No images' : `${galleryCount} image${galleryCount > 1 ? 's' : ''}`;
+    case 'video':
+      return config.url || 'No video URL';
+    case 'divider':
+      return `${config.style === 'dashed' || config.style === 'dotted' ? (config.style.charAt(0).toUpperCase() + config.style.slice(1)) : 'Solid'} line`;
+    case 'entry-gallery':
+      return `Series entries (${config.columns || 3} cols)`;
     default:
       return moduleType;
   }

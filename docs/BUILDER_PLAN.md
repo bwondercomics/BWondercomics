@@ -401,10 +401,14 @@ Deliberately not in this phase:
 - Added a "Page Settings" editor view to the Builder panel, allowing live metadata edits (title, slug, page type, isHomepage) seamlessly synced via the API.
 - Integrated vanilla HTML5 drag-and-drop mechanics into the sidebar page list, allowing users to drag elements and persist sequences via `/api/admin/pages/reorder`.
 
-### Phase 4 - Editor coverage pass
+### Phase 4 - Editor coverage pass ✅
 
-- add structured editors for the remaining common modules
-- reduce raw JSON dependence for everyday authoring
+**Implemented (2026-04-17):**
+
+- Added structured editors for `gallery`, `video`, `divider`, and `entry-gallery` modules.
+- Replaced the generic raw JSON fallback editor with intuitive UI controls (such as list manipulation, native color pickers, and select drop-downs).
+- Extracted isolated component files (`gallery-editor.js`, `video-editor.js`, `divider-editor.js`, `entry-gallery-editor.js`) applying the unified `draftConfig` pattern mapped consistently into `admin/page-builder/module-editor.js`.
+- Expanded semantic module previews for canvas item labels, and grew Vitest specs asserting data-synchronization within bindings.
 
 ### Phase 5 - Fallback cleanup pass
 

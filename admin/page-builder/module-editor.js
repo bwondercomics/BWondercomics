@@ -10,7 +10,10 @@ import {
   getDefaultSocialButtonStyle,
 } from './social-editor.js';
 import { bindButtonsEditorEvents, renderButtonsEditor } from './button-editor.js';
-
+import { bindGalleryEditorEvents, renderGalleryEditor } from './gallery-editor.js';
+import { bindVideoEditorEvents, renderVideoEditor } from './video-editor.js';
+import { bindDividerEditorEvents, renderDividerEditor } from './divider-editor.js';
+import { bindEntryGalleryEditorEvents, renderEntryGalleryEditor } from './entry-gallery-editor.js';
 function cloneConfig(config = {}) {
   return JSON.parse(JSON.stringify(config || {}));
 }
@@ -43,6 +46,14 @@ function getModuleSummary(moduleType, config) {
       );
     case 'image':
       return config.src || config.alt || 'Image block';
+    case 'gallery':
+      return `${config.images?.length || 0} image(s)`;
+    case 'video':
+      return config.url || 'Video module';
+    case 'divider':
+      return `${config.style === 'dashed' || config.style === 'dotted' ? (config.style.charAt(0).toUpperCase() + config.style.slice(1)) : 'Solid'} line`;
+    case 'entry-gallery':
+      return `Series entries (${config.columns || 3} cols)`;
     case 'promo':
       return `${config.items?.length || 0} promo item${(config.items?.length || 0) === 1 ? '' : 's'}`;
     case 'social':
@@ -876,6 +887,22 @@ export function renderModuleEditorContent({
       break;
     }
 
+    case 'gallery':
+      contentSections.push(renderGalleryEditor(config));
+      break;
+
+    case 'video':
+      contentSections.push(renderVideoEditor(config));
+      break;
+
+    case 'divider':
+      contentSections.push(renderDividerEditor(config));
+      break;
+
+    case 'entry-gallery':
+      contentSections.push(renderEntryGalleryEditor(config));
+      break;
+
     default:
       contentSections.push(
         renderSectionCard(
@@ -952,6 +979,48 @@ export function bindModuleEditorEvents({
       renderEditorPanel,
       markDirty,
       pages,
+    });
+    return;
+  }
+
+  if (selectedModule.moduleType === 'gallery') {
+    bindGalleryEditorEvents({
+      el,
+      draftConfig,
+      setDraftConfig,
+      renderEditorPanel,
+      markDirty,
+      openImagePicker,
+    });
+    return;
+  }
+
+  if (selectedModule.moduleType === 'video') {
+    bindVideoEditorEvents({
+      el,
+      draftConfig,
+      setDraftConfig,
+      markDirty,
+    });
+    return;
+  }
+
+  if (selectedModule.moduleType === 'divider') {
+    bindDividerEditorEvents({
+      el,
+      draftConfig,
+      setDraftConfig,
+      markDirty,
+    });
+    return;
+  }
+
+  if (selectedModule.moduleType === 'entry-gallery') {
+    bindEntryGalleryEditorEvents({
+      el,
+      draftConfig,
+      setDraftConfig,
+      markDirty,
     });
     return;
   }
