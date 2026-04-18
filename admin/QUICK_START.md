@@ -48,7 +48,7 @@
 - **Premium Codes**: generate and deactivate supporter codes.
 - **Moderation**: review comments, bans, censored words, rate limits, and live visitors.
 - **Analytics**: view Umami stats.
-- **Page Designer**: edit page-config theme/content.
+- **Page Designer**: open the integrated builder header editor for the active series.
 
 ## Tips and tricks
 

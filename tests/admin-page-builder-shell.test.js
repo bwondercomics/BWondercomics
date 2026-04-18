@@ -39,6 +39,7 @@ async function setupPageBuilder({
   updatePageResult = null,
   useRealEditors = false,
   viewportWidth = 1600,
+  onDesignerRouteChange = vi.fn(),
 } = {}) {
   vi.resetModules();
   mountAdminDom();
@@ -143,6 +144,7 @@ async function setupPageBuilder({
     getActiveSeriesId: () => 'battle-bros',
     hideAllSections,
     setActiveNav,
+    onDesignerRouteChange,
   });
   manager.initPageBuilder();
 
@@ -166,6 +168,7 @@ async function setupPageBuilder({
       deleteModule,
       hideAllSections,
       setActiveNav,
+      onDesignerRouteChange,
     },
   };
 }
@@ -357,7 +360,6 @@ describe('admin page-builder shell', () => {
     expect(document.getElementById('pbPageTitle')?.textContent).toContain('Reader Builder');
   });
 
-  
   it('opens page settings, edits fields, and saves the draft', async () => {
     const selectedPage = getContractFixture('builderPage');
     const { manager, mocks } = await setupPageBuilder({
@@ -366,7 +368,9 @@ describe('admin page-builder shell', () => {
     });
 
     await manager.showPageBuilderSection();
-    document.querySelector('.pb-page-item')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await flushAdminUi(3);
 
     document
@@ -376,13 +380,13 @@ describe('admin page-builder shell', () => {
 
     expect(document.querySelector('.pb-editor-kicker')?.textContent).toContain('Page Settings');
     expect(document.getElementById('pbSavePageSettings')).not.toBeNull();
-    
+
     // Check initial values
     const slugInput = document.getElementById('pbEditPageSlug');
     const titleInput = document.getElementById('pbEditPageTitle');
     const pageTypeInput = document.getElementById('pbEditPageType');
     const isHomepageCheckbox = document.getElementById('pbEditIsHomepage');
-    
+
     expect(slugInput.value).toBe(selectedPage.slug);
     expect(titleInput.value).toBe(selectedPage.title);
     expect(pageTypeInput.value).toBe(selectedPage.pageType);
@@ -391,19 +395,21 @@ describe('admin page-builder shell', () => {
     // Edit fields
     slugInput.value = 'reader-new';
     slugInput.dispatchEvent(new Event('input', { bubbles: true }));
-    
+
     titleInput.value = 'Reader New Title';
     titleInput.dispatchEvent(new Event('input', { bubbles: true }));
-    
+
     pageTypeInput.value = 'landing';
     pageTypeInput.dispatchEvent(new Event('input', { bubbles: true }));
-    
+
     isHomepageCheckbox.checked = true;
     isHomepageCheckbox.dispatchEvent(new Event('change', { bubbles: true }));
-    
+
     await flushAdminUi(1);
 
-    document.getElementById('pbSavePageSettings')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    document
+      .getElementById('pbSavePageSettings')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await flushAdminUi(3);
 
     expect(mocks.updatePage).toHaveBeenCalledWith(
@@ -417,18 +423,23 @@ describe('admin page-builder shell', () => {
     );
   });
 
-  
   it('supports drag and drop page reordering and rolls back on failure', async () => {
-    const page1 = buildContractFixture('builderPage', { id: 'page-1', title: 'Page 1', sortIndex: 0 });
-    const page2 = buildContractFixture('builderPage', { id: 'page-2', title: 'Page 2', sortIndex: 1 });
+    const page1 = buildContractFixture('builderPage', {
+      id: 'page-1',
+      title: 'Page 1',
+      sortIndex: 0,
+    });
+    const page2 = buildContractFixture('builderPage', {
+      id: 'page-2',
+      title: 'Page 2',
+      sortIndex: 1,
+    });
     const { manager, mocks } = await setupPageBuilder({
       fetchPagesResults: [[page1, page2]],
       reorderPagesResult: true,
     });
 
-    mocks.reorderPages
-      .mockResolvedValueOnce(true)
-      .mockResolvedValueOnce(false);
+    mocks.reorderPages.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
 
     await manager.showPageBuilderSection();
     await flushAdminUi(3);
@@ -627,7 +638,9 @@ describe('admin page-builder shell', () => {
 
   it('clears selected module state when a module is deleted from the canvas', async () => {
     const selectedPage = getContractFixture('builderPage');
-    const feedModule = selectedPage.sections[1].modules.find((module) => module.moduleType === 'feed');
+    const feedModule = selectedPage.sections[1].modules.find(
+      (module) => module.moduleType === 'feed'
+    );
     const { manager, mocks } = await setupPageBuilder({
       fetchPagesResults: [[selectedPage]],
       fetchPageResult: selectedPage,
@@ -692,7 +705,9 @@ describe('admin page-builder shell', () => {
     await flushAdminUi(1);
 
     expect(
-      document.querySelector(`.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-card`)
+      document.querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-card`
+      )
     ).not.toBeNull();
 
     document
@@ -703,7 +718,9 @@ describe('admin page-builder shell', () => {
     await flushAdminUi(3);
 
     expect(mocks.deleteSection).toHaveBeenCalledWith(editableSection.id);
-    expect(document.querySelector(`.pb-section[data-section-id="${editableSection.id}"]`)).toBeNull();
+    expect(
+      document.querySelector(`.pb-section[data-section-id="${editableSection.id}"]`)
+    ).toBeNull();
     expect(document.querySelector('.pb-module.selected')).toBeNull();
     expect(document.querySelector('.pb-section-settings-card')).toBeNull();
     expect(document.getElementById('pbEditorTitle')?.textContent).toContain(
@@ -813,7 +830,9 @@ describe('admin page-builder shell', () => {
     expect(document.getElementById('pbEditorTitle')?.textContent).not.toContain('Header Settings');
     expect(document.getElementById('pbSaveHeader')).toBeNull();
     expect(
-      document.querySelector(`.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-card`)
+      document.querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-card`
+      )
     ).not.toBeNull();
     expect(document.querySelector('.pb-canvas-notice')?.textContent).toContain(
       'Save or discard your current changes before switching to the page header.'
@@ -896,7 +915,9 @@ describe('admin page-builder shell', () => {
       headerTitleInput.value = 'Battle Bros Home';
       headerTitleInput.dispatchEvent(new Event('input', { bubbles: true }));
     }
-    document.getElementById('pbSaveHeader')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    document
+      .getElementById('pbSaveHeader')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await flushAdminUi(3);
 
     expect(mocks.updatePage).toHaveBeenCalledWith(
@@ -912,15 +933,120 @@ describe('admin page-builder shell', () => {
         }),
       })
     );
-    expect(
-      document.querySelector('.pb-header-copy-input[data-copy-key="title"]')?.value
-    ).toBe('Battle Bros Home');
+    expect(document.querySelector('.pb-header-copy-input[data-copy-key="title"]')?.value).toBe(
+      'Battle Bros Home'
+    );
     expect(document.querySelector('.pb-page-header-part-primary')?.textContent).toContain(
       'Battle Bros Home'
     );
     expect(mocks.updateModule).not.toHaveBeenCalled();
     expect(mocks.addModule).not.toHaveBeenCalled();
   });
+
+  it('opens the canonical designer surface with a requested page slug and syncs the route state', async () => {
+    const readerPage = getContractFixture('builderPage');
+    const aboutPage = buildContractFixture('builderPageDraft', {
+      id: 'about-page-id',
+      slug: 'about',
+      title: 'About',
+      isHomepage: false,
+      isPublished: true,
+    });
+    const onDesignerRouteChange = vi.fn();
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[readerPage, aboutPage]],
+      fetchPageResult: aboutPage,
+      onDesignerRouteChange,
+    });
+
+    await manager.showPageBuilderSection({
+      entrypoint: 'designer',
+      pageSlug: 'about',
+      surface: 'header',
+      historyMode: 'push',
+    });
+    await flushAdminUi(3);
+
+    expect(mocks.fetchPage).toHaveBeenCalledWith('about-page-id');
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Header Settings');
+    expect(document.querySelector('.pb-page-header-surface.selected')).not.toBeNull();
+    expect(onDesignerRouteChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pageSlug: 'about',
+        surface: 'header',
+      }),
+      'push'
+    );
+  });
+
+  it('falls back to the reader page in designer mode when the requested slug is missing', async () => {
+    const readerPage = getContractFixture('builderPage');
+    const onDesignerRouteChange = vi.fn();
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[readerPage]],
+      fetchPageResult: readerPage,
+      onDesignerRouteChange,
+    });
+
+    await manager.showPageBuilderSection({
+      entrypoint: 'designer',
+      pageSlug: 'missing-page',
+      surface: 'header',
+      historyMode: 'replace',
+    });
+    await flushAdminUi(3);
+
+    expect(mocks.fetchPage).toHaveBeenCalledWith(readerPage.id);
+    expect(document.getElementById('pbPageTitle')?.textContent).toContain('reader');
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Header Settings');
+    expect(onDesignerRouteChange).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pageSlug: 'reader',
+        surface: 'header',
+      }),
+      'replace'
+    );
+  });
+
+  it('keeps the designer route in sync when selecting another page from the builder rail', async () => {
+    const readerPage = getContractFixture('builderPage');
+    const aboutPage = buildContractFixture('builderPageDraft', {
+      id: 'about-page-id',
+      slug: 'about',
+      title: 'About',
+      isHomepage: false,
+      isPublished: true,
+    });
+    const onDesignerRouteChange = vi.fn();
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[readerPage, aboutPage]],
+      fetchPageResult: aboutPage,
+      onDesignerRouteChange,
+    });
+
+    await manager.showPageBuilderSection({
+      entrypoint: 'designer',
+      pageSlug: 'reader',
+      surface: 'header',
+      historyMode: 'replace',
+    });
+    await flushAdminUi(3);
+
+    document
+      .querySelector('.pb-page-item[data-page-id="about-page-id"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Header Settings');
+    expect(onDesignerRouteChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        pageSlug: 'about',
+        surface: 'header',
+      }),
+      'replace'
+    );
+  });
+
   it('toggles between edit and preview canvas modes via the view toggle buttons', async () => {
     const selectedPage = getContractFixture('builderPage');
     const { manager } = await setupPageBuilder({
@@ -1003,10 +1129,14 @@ describe('admin page-builder shell', () => {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('tablet');
     expect(
-      widthToggles?.querySelector('[data-width="tablet"]')?.classList.contains('pb-width-toggle--active')
+      widthToggles
+        ?.querySelector('[data-width="tablet"]')
+        ?.classList.contains('pb-width-toggle--active')
     ).toBe(true);
     expect(
-      widthToggles?.querySelector('[data-width="desktop"]')?.classList.contains('pb-width-toggle--active')
+      widthToggles
+        ?.querySelector('[data-width="desktop"]')
+        ?.classList.contains('pb-width-toggle--active')
     ).toBe(false);
 
     // Switch to mobile

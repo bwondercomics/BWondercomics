@@ -41,4 +41,40 @@ describe('admin series contract handling', () => {
     expect(document.getElementById('btnAddEntry').textContent).toBe('+ Add New Drop');
     expect(document.getElementById('btnOpenSeries').href).toContain('series=stealth-mode');
   });
+
+  it('keeps the builder shell active when switching series while the page builder is open', async () => {
+    const seriesIndex = getContractFixture('seriesIndex');
+    const showChaptersSection = vi.fn();
+    const onPageBuilderSeriesChange = vi.fn();
+    const entriesApi = {
+      loadEntries: vi.fn(async () => {}),
+      renderStatusMessageInput: vi.fn(),
+      renderEntryList: vi.fn(),
+    };
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({
+        ok: true,
+        json: async () => seriesIndex,
+      }))
+    );
+
+    const { createSeriesManager } = await import('../admin/series.js');
+    const manager = createSeriesManager();
+    manager.bindDependencies({
+      entriesApi,
+      onPageBuilderSeriesChange,
+      showChaptersSection,
+    });
+
+    await manager.loadSeriesIndex();
+    manager.renderSeriesSelect();
+    document.getElementById('pageBuilderSection').style.display = 'block';
+
+    await manager.switchSeries('stealth-mode');
+
+    expect(onPageBuilderSeriesChange).toHaveBeenCalled();
+    expect(showChaptersSection).not.toHaveBeenCalled();
+  });
 });

@@ -93,7 +93,7 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - `tests/admin-page-builder-preview.test.js`: `admin/page-builder/module-editor.js` save/delete flows, structured editor draft updates (including gallery asset-picker regression coverage), and `admin/page-builder/preview-renderers.js` preview contracts, including assertions that dedicated-binder modules no longer render a misleading generic raw-config fallback card
 - `tests/admin-page-builder-audit.test.js`: `admin/page-builder/header-config.js` fallback-audit helpers, including series-level removal readiness, the `missingPublishedReaderPage` gate, and per-page legacy header dependency buckets
 - `tests/shared-renderers-parity.test.js`: parity tests for `admin/page-builder/shared-renderers.js` — verifies that `createRenderers()` produces equivalent structure for reader and preview option sets, correct mount-placeholder behavior, image URL resolution per resolver, and button link resolution via `getSeriesId`
-- `tests/admin-designer.test.js`: `admin/designer.js` iframe URL generation, section visibility, and resize messaging
+- `tests/admin-designer.test.js`: admin shell cleanup after removing the legacy designer iframe host
 - `tests/media-branding.test.js`: media/admin branding rules
 - `tests/diagnostics-snapshot.test.js`: diagnostics UI snapshot and legacy fallback behavior
 - `tests/ops-app.test.js`: ops UI rendering states

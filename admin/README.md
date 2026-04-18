@@ -6,7 +6,9 @@ The admin UI is served at `/admin/` (static) and manages:
 - Entries (chapters/issues/etc) and their page ordering
 - Blog/feed posts (draft/scheduled/published) + RSS + optional Bluesky sharing
 - Media library (DB-backed; served at `/media.json`)
-- Page Designer output (DB-backed; served at `/page-config.json` and `/series/<id>/page-config.json`)
+- Page Designer entry now opens the integrated page builder header editor
+- Legacy page-config output (`/page-config.json` and `/series/<id>/page-config.json`) remains as a
+  fallback-backed data surface while older pages are still being migrated
 - Users + roles, premium codes, and email subscribers
 - Moderation (comments, bans, censored words, comment rate limits, live visitor activity)
 - Analytics (Umami stats)

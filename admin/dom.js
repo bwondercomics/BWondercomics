@@ -178,8 +178,6 @@ export const el = {
   previewNext: /** @type {HTMLButtonElement | null} */ (document.getElementById('previewNext')),
   previewFrame: document.getElementById('previewFrame'),
   previewEmpty: document.getElementById('previewEmpty'),
-  designerSection: document.getElementById('designerSection'),
-  designerFrame: /** @type {HTMLIFrameElement | null} */ (document.getElementById('designerFrame')),
   // Page Builder
   pageBuilderSection: document.getElementById('pageBuilderSection'),
   pbAddPage: document.getElementById('pbAddPage'),

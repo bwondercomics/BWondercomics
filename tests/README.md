@@ -66,13 +66,13 @@ Install backend dev dependencies into the repo virtualenv:
 - `tests/admin-posts.test.js`: post save/render flow
 - `tests/admin-entries.test.js`: entry create/render flow
 - `tests/admin-media.test.js`: empty media state
-- `tests/admin-series.test.js`: series index contract loading and label application
+- `tests/admin-series.test.js`: series index contract loading, label application, and builder-visible series switching
 - `tests/admin-preview.test.js`: preview data contract loading and image rendering
 - `tests/admin-page-config.test.js`: page-config cache/save contract behavior
 - `tests/admin-page-builder-data.test.js`: page-builder data-layer fetch/create/update/delete wrappers
-- `tests/admin-page-builder-shell.test.js`: page-builder shell behavior including empty state, selection, publish state, section settings save/discard, canvas delete cleanup, page-header editing, and default module config wiring
+- `tests/admin-page-builder-shell.test.js`: page-builder shell behavior including empty state, selection, canonical designer-route entry, publish state, section settings save/discard, canvas delete cleanup, page-header editing, and default module config wiring
 - `tests/admin-page-builder-preview.test.js`: module-editor save/delete flows and preview renderer contracts
-- `tests/admin-designer.test.js`: designer iframe URL and resize-message handling
+- `tests/admin-designer.test.js`: admin-shell cleanup proving the legacy designer iframe host is gone
 - `tests/media-branding.test.js`: admin branding rules
 - `tests/diagnostics-snapshot.test.js`: diagnostics snapshot rendering and fallbacks
 - `tests/ops-app.test.js`: ops UI rendering states

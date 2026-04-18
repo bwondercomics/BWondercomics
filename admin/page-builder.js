@@ -166,11 +166,13 @@ function getModulePreview(moduleType, config) {
       return `Feed (limit ${config.limit || 0})`;
     case 'gallery':
       const galleryCount = config.images?.length || 0;
-      return galleryCount === 0 ? 'No images' : `${galleryCount} image${galleryCount > 1 ? 's' : ''}`;
+      return galleryCount === 0
+        ? 'No images'
+        : `${galleryCount} image${galleryCount > 1 ? 's' : ''}`;
     case 'video':
       return config.url || 'No video URL';
     case 'divider':
-      return `${config.style === 'dashed' || config.style === 'dotted' ? (config.style.charAt(0).toUpperCase() + config.style.slice(1)) : 'Solid'} line`;
+      return `${config.style === 'dashed' || config.style === 'dotted' ? config.style.charAt(0).toUpperCase() + config.style.slice(1) : 'Solid'} line`;
     case 'entry-gallery':
       return `Series entries (${config.columns || 3} cols)`;
     default:
@@ -208,7 +210,13 @@ function getReaderPreviewStatus(page) {
   return page?.isPublished === false ? 'warning' : 'neutral';
 }
 
-function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSections, setActiveNav }) {
+function createPageBuilder({
+  sanitizeSeriesId,
+  getActiveSeriesId,
+  hideAllSections,
+  setActiveNav,
+  onDesignerRouteChange,
+}) {
   let pages = [];
   let currentPage = null;
   let selectedModuleId = null;
@@ -233,6 +241,10 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
   let canvasMode = 'edit';
   /** @type {'desktop'|'tablet'|'mobile'} */
   let previewWidth = 'desktop';
+  /** @type {'builder'|'designer'} */
+  let activeEntrypoint = 'builder';
+  /** @type {''|'header'} */
+  let activeDesignerSurface = '';
 
   const renderEditorPanel = createEditorPanelRenderer({
     el,
@@ -379,6 +391,21 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
 
   function getSeriesId() {
     return sanitizeSeriesId(getActiveSeriesId()) || DEFAULT_SERIES_ID;
+  }
+
+  function isDesignerMode() {
+    return activeEntrypoint === 'designer';
+  }
+
+  function syncDesignerRoute(mode = 'replace') {
+    if (!isDesignerMode() || typeof onDesignerRouteChange !== 'function') return;
+    onDesignerRouteChange(
+      {
+        pageSlug: currentPage?.slug || '',
+        surface: activeDesignerSurface || 'header',
+      },
+      mode
+    );
   }
 
   function getSelectedModuleRecord(moduleId = selectedModuleId) {
@@ -538,7 +565,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
             ? 'Theme changes save explicitly.'
             : footerScope === 'header'
               ? 'Header changes save explicitly.'
-            : 'Module changes save explicitly.';
+              : 'Module changes save explicitly.';
       }
       statusEl.textContent = message;
       statusEl.dataset.status = type;
@@ -607,12 +634,14 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
   }
 
   function initializePageSettingsDraft() {
-    activePageSettingsDraft = currentPage ? {
-      slug: currentPage.slug || '',
-      title: currentPage.title || '',
-      pageType: currentPage.pageType || '',
-      isHomepage: currentPage.isHomepage || false,
-    } : null;
+    activePageSettingsDraft = currentPage
+      ? {
+          slug: currentPage.slug || '',
+          title: currentPage.title || '',
+          pageType: currentPage.pageType || '',
+          isHomepage: currentPage.isHomepage || false,
+        }
+      : null;
   }
 
   function initializeSectionDraft(sectionId) {
@@ -646,7 +675,9 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
   }
 
   function removeSectionFromCurrentPage(sectionId) {
-    currentPage.sections = (currentPage.sections || []).filter((section) => section.id !== sectionId);
+    currentPage.sections = (currentPage.sections || []).filter(
+      (section) => section.id !== sectionId
+    );
   }
 
   function resetBuilderState() {
@@ -662,6 +693,35 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     activeInsertTarget = null;
     draggedModuleId = null;
     draggedSectionId = null;
+  }
+
+  function getDefaultDesignerPage(pageSlug = '') {
+    const requestedSlug = String(pageSlug || '')
+      .trim()
+      .toLowerCase();
+    const requested = requestedSlug
+      ? pages.find(
+          (page) =>
+            String(page?.slug || '')
+              .trim()
+              .toLowerCase() === requestedSlug
+        )
+      : null;
+    if (requested) return requested;
+    return (
+      pages.find((page) => page?.slug === 'reader') ||
+      pages.find((page) => page?.isHomepage) ||
+      pages[0] ||
+      null
+    );
+  }
+
+  function activateHeaderSurface() {
+    clearSelectedModuleState();
+    selectedCanvasSurface = 'page-header';
+    activeEditorTab = 'modules';
+    initializeHeaderDraft();
+    setEditorStatus('', 'neutral');
   }
 
   function syncPageSummary(page) {
@@ -906,7 +966,9 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
   }
 
   function sortCanvasModulesForColumn(section, columnIndex) {
-    return sortModulesForColumn(section, columnIndex).filter((module) => module.moduleType !== 'header');
+    return sortModulesForColumn(section, columnIndex).filter(
+      (module) => module.moduleType !== 'header'
+    );
   }
 
   function getHiddenColumnModuleIds(section, columnIndex) {
@@ -925,12 +987,9 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
 
   function buildNormalizedPageHeader(page = currentPage, draftState = activeHeaderDraft) {
     if (draftState?.header || draftState?.copy) {
-      return createPageHeaderMeta(
-        draftState?.header,
-        draftState?.copy,
-        normalizeHeaderNavItems,
-        { page }
-      );
+      return createPageHeaderMeta(draftState?.header, draftState?.copy, normalizeHeaderNavItems, {
+        page,
+      });
     }
     return createEffectivePageHeader(page, currentSeriesPageConfig, normalizeHeaderNavItems);
   }
@@ -1143,20 +1202,16 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     }
 
     clearSelectedModuleState();
-    selectedCanvasSurface = 'page-header';
-    activeEditorTab = 'modules';
-    initializeHeaderDraft();
-    setEditorStatus('', 'neutral');
+    activateHeaderSurface();
     renderCanvas();
     renderEditorPanel();
+    syncDesignerRoute('replace');
   }
 
   function selectPageSettingsFromCanvas() {
     if (selectedCanvasSurface === 'page-settings') return;
     if (
-      !ensureCleanWorkspace(
-        'Save or discard your current changes before editing page settings.'
-      )
+      !ensureCleanWorkspace('Save or discard your current changes before editing page settings.')
     ) {
       renderEditorPanel();
       return;
@@ -1181,7 +1236,9 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     ) {
       const sameModule = dirtyScope === 'module' && selectedModuleId === moduleId;
       if (!sameModule) {
-        ensureCleanWorkspace('Save or discard your current changes before selecting another module.');
+        ensureCleanWorkspace(
+          'Save or discard your current changes before selecting another module.'
+        );
         return;
       }
     }
@@ -1401,7 +1458,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
         slug: activePageSettingsDraft.slug,
         title: activePageSettingsDraft.title,
         pageType: activePageSettingsDraft.pageType,
-        isHomepage: activePageSettingsDraft.isHomepage
+        isHomepage: activePageSettingsDraft.isHomepage,
       });
 
       if (!updatedPage) {
@@ -1417,6 +1474,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
       renderPageList();
       renderCanvas();
       renderEditorPanel();
+      syncDesignerRoute('replace');
     } catch (error) {
       console.error('saveActivePageSettingsDraft error:', error);
       setEditorStatus('Failed to save page settings.', 'danger');
@@ -1428,7 +1486,7 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     const originalPages = [...pages];
     pages.sort((a, b) => pageIdArray.indexOf(a.id) - pageIdArray.indexOf(b.id));
     renderPageList();
-    
+
     const success = await reorderPages(getSeriesId(), pageIdArray);
     if (!success) {
       pages = originalPages;
@@ -1445,20 +1503,39 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     renderEditorPanel();
   }
 
+  async function activatePage(
+    pageId,
+    { surface = '', historyMode = 'replace', fallbackPage = null } = {}
+  ) {
+    const page =
+      currentPage?.id === pageId ? currentPage : (await fetchPage(pageId)) || fallbackPage;
+    if (!page) return false;
+
+    currentPage = page;
+    resetBuilderState();
+    activeThemeDraft = normalizeThemeDraft(currentPage);
+    if (surface === 'header') {
+      activateHeaderSurface();
+    }
+    renderPageList();
+    renderCanvas();
+    renderEditorPanel();
+    if (surface === 'header') {
+      syncDesignerRoute(historyMode);
+    } else if (isDesignerMode()) {
+      syncDesignerRoute(historyMode);
+    }
+    return true;
+  }
+
   async function selectPage(pageId) {
     if (!ensureCleanWorkspace('Save or discard your current changes before switching pages.')) {
       return;
     }
-
-    const page = await fetchPage(pageId);
-    if (page) {
-      currentPage = page;
-      resetBuilderState();
-      activeThemeDraft = normalizeThemeDraft(currentPage);
-      renderPageList();
-      renderCanvas();
-      renderEditorPanel();
-    }
+    await activatePage(pageId, {
+      surface: isDesignerMode() ? activeDesignerSurface || 'header' : '',
+      historyMode: 'replace',
+    });
   }
 
   async function deletePageFromSidebar(pageId) {
@@ -1473,6 +1550,17 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
         currentPage = null;
         resetBuilderState();
       }
+      if (isDesignerMode()) {
+        const fallbackPage = getDefaultDesignerPage();
+        if (fallbackPage) {
+          await activatePage(fallbackPage.id, {
+            surface: activeDesignerSurface || 'header',
+            historyMode: 'replace',
+          });
+          return;
+        }
+        syncDesignerRoute('replace');
+      }
       renderPageList();
       renderCanvas();
       renderEditorPanel();
@@ -1481,10 +1569,24 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
 
   // ==================== Public Methods ====================
 
-  async function showPageBuilderSection() {
+  async function showPageBuilderSection(options = {}) {
+    const entrypoint = options.entrypoint === 'designer' ? 'designer' : activeEntrypoint;
+    const historyMode = options.historyMode === 'push' ? 'push' : 'replace';
+    const requestedPageSlug = String(options.pageSlug || '')
+      .trim()
+      .toLowerCase();
+    const requestedSurface =
+      entrypoint === 'designer'
+        ? options.surface === 'header'
+          ? 'header'
+          : activeDesignerSurface || 'header'
+        : '';
+
+    activeEntrypoint = entrypoint;
+    activeDesignerSurface = requestedSurface;
+
     hideAllSections();
     if (el.adminDashboard) {
-      el.adminDashboard.classList.remove('admin-designer-open');
       el.adminDashboard.classList.add('admin-page-builder-open');
     }
     if (el.pageBuilderSection) {
@@ -1495,10 +1597,28 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
 
     await loadPages();
     await loadCurrentSeriesPageConfig();
-    renderPageList();
     renderModulePalette();
-    renderCanvas();
-    renderEditorPanel();
+
+    if (activeEntrypoint === 'designer') {
+      const targetPage = getDefaultDesignerPage(requestedPageSlug);
+      if (targetPage) {
+        await activatePage(targetPage.id, {
+          surface: activeDesignerSurface || 'header',
+          historyMode,
+        });
+      } else {
+        currentPage = null;
+        resetBuilderState();
+        renderPageList();
+        renderCanvas();
+        renderEditorPanel();
+        syncDesignerRoute(historyMode);
+      }
+    } else {
+      renderPageList();
+      renderCanvas();
+      renderEditorPanel();
+    }
     applyEditorMode();
   }
 
@@ -1525,10 +1645,18 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     });
     bindSidebarTabs();
 
-    const addPageModal = /** @type {HTMLElement|null} */ (document.getElementById('pbAddPageModal'));
-    const addPageForm = /** @type {HTMLFormElement|null} */ (document.getElementById('pbAddPageForm'));
-    const addPageSlugInput = /** @type {HTMLInputElement|null} */ (document.getElementById('pbPageSlugInput'));
-    const addPageTitleInput = /** @type {HTMLInputElement|null} */ (document.getElementById('pbPageTitleInput'));
+    const addPageModal = /** @type {HTMLElement|null} */ (
+      document.getElementById('pbAddPageModal')
+    );
+    const addPageForm = /** @type {HTMLFormElement|null} */ (
+      document.getElementById('pbAddPageForm')
+    );
+    const addPageSlugInput = /** @type {HTMLInputElement|null} */ (
+      document.getElementById('pbPageSlugInput')
+    );
+    const addPageTitleInput = /** @type {HTMLInputElement|null} */ (
+      document.getElementById('pbPageTitleInput')
+    );
 
     if (addPageSlugInput && addPageTitleInput) {
       addPageSlugInput.addEventListener('input', () => {
@@ -1553,7 +1681,9 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     document.getElementById('pbAddPageCancel')?.addEventListener('click', closeAddPageModal);
 
     el.pbAddPage?.addEventListener('click', () => {
-      if (!ensureCleanWorkspace('Save or discard your current changes before creating a new page.')) {
+      if (
+        !ensureCleanWorkspace('Save or discard your current changes before creating a new page.')
+      ) {
         return;
       }
       if (addPageForm) {
@@ -1572,23 +1702,30 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
       const title = addPageTitleInput?.value.trim();
       if (!slug || !title) return;
 
-      const submitBtn = /** @type {HTMLButtonElement|null} */ (addPageForm.querySelector('button[type="submit"]'));
-      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Creating...'; }
-      
+      const submitBtn = /** @type {HTMLButtonElement|null} */ (
+        addPageForm.querySelector('button[type="submit"]')
+      );
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Creating...';
+      }
+
       const newPage = await createPageForSeries(slug, title);
       try {
         if (newPage) {
           closeAddPageModal();
           await loadPages();
-          currentPage = newPage;
-          resetBuilderState();
-          activeThemeDraft = normalizeThemeDraft(currentPage);
-          renderPageList();
-          renderCanvas();
-          renderEditorPanel();
+          await activatePage(newPage.id, {
+            surface: isDesignerMode() ? activeDesignerSurface || 'header' : '',
+            historyMode: 'replace',
+            fallbackPage: newPage,
+          });
         }
       } finally {
-        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Create Page'; }
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Create Page';
+        }
       }
     });
 
@@ -1603,7 +1740,9 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     // ── View toggle (Edit / Preview) ──────────────────────────────────────────
     if (el.pbViewToggles) {
       el.pbViewToggles.addEventListener('click', (e) => {
-        const btn = /** @type {HTMLElement|null} */ (/** @type {HTMLElement} */ (e.target).closest('[data-view]'));
+        const btn = /** @type {HTMLElement|null} */ (
+          /** @type {HTMLElement} */ (e.target).closest('[data-view]')
+        );
         if (!btn) return;
         const nextMode = btn.dataset.view;
         if (nextMode !== 'edit' && nextMode !== 'preview') return;
@@ -1623,7 +1762,9 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
         }
 
         // Set data-canvas-mode on the layout grid so CSS collapses sidebar + editor
-        const layout = /** @type {HTMLElement|null} */ (document.querySelector('.page-builder-layout'));
+        const layout = /** @type {HTMLElement|null} */ (
+          document.querySelector('.page-builder-layout')
+        );
         if (layout) {
           if (canvasMode === 'preview') {
             layout.dataset.canvasMode = 'preview';
@@ -1641,7 +1782,9 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
     // ── Width toggle (Desktop / Tablet / Mobile) ──────────────────────────────
     if (el.pbWidthToggles) {
       el.pbWidthToggles.addEventListener('click', (e) => {
-        const btn = /** @type {HTMLElement|null} */ (/** @type {HTMLElement} */ (e.target).closest('[data-width]'));
+        const btn = /** @type {HTMLElement|null} */ (
+          /** @type {HTMLElement} */ (e.target).closest('[data-width]')
+        );
         if (!btn) return;
         const nextWidth = btn.dataset.width;
         if (nextWidth !== 'desktop' && nextWidth !== 'tablet' && nextWidth !== 'mobile') return;
@@ -1655,7 +1798,9 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
         });
 
         // Update existing preview frame in-place (no full re-render needed)
-        const frame = /** @type {HTMLElement|null} */ (el.pbCanvas?.querySelector('.pb-preview-frame'));
+        const frame = /** @type {HTMLElement|null} */ (
+          el.pbCanvas?.querySelector('.pb-preview-frame')
+        );
         if (frame) {
           frame.dataset.width = previewWidth;
         }
@@ -1664,12 +1809,18 @@ function createPageBuilder({ sanitizeSeriesId, getActiveSeriesId, hideAllSection
   }
 
   function onSeriesChange() {
+    const nextPageSlug = isDesignerMode() ? currentPage?.slug || '' : '';
     currentPage = null;
     currentSeriesPageConfig = null;
     resetBuilderState();
     setPreviewSeriesId(getSeriesId());
     if (el.pageBuilderSection?.style.display !== 'none') {
-      showPageBuilderSection();
+      showPageBuilderSection({
+        entrypoint: activeEntrypoint,
+        pageSlug: nextPageSlug,
+        surface: activeDesignerSurface,
+        historyMode: 'replace',
+      });
     }
   }
 

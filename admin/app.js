@@ -3,7 +3,13 @@ import { el } from './dom.js';
 import { checkSession, login, logout } from './auth.js';
 import { createEntriesApi } from './entries.js';
 import { getChapterFolder } from './utils.js';
-import { COUNT_VIEWS_KEY, HEADER_STICKY_KEY, NAV_LAYOUT_KEY, state } from './state.js';
+import {
+  ACTIVE_SERIES_KEY,
+  COUNT_VIEWS_KEY,
+  HEADER_STICKY_KEY,
+  NAV_LAYOUT_KEY,
+  state,
+} from './state.js';
 import { saveToServer, showError, showSuccess } from './core.js';
 import {
   applyNavLayout,
@@ -16,7 +22,6 @@ import {
 } from './nav.js';
 import { createAnalytics } from './analytics.js';
 import { createDashboard } from './dashboard.js';
-import { createDesigner } from './designer.js';
 import { createPageBuilder } from './page-builder.js';
 import { bindEvents as bindBlueskyEvents, loadStatus as loadBlueskyStatus } from './bluesky.js';
 import { createModerationManager } from './moderation.js';
@@ -35,6 +40,7 @@ import {
 } from './page-config.js';
 
 const SAFE_MODE_URL = 'https://safe.bwondercomics.com';
+const DESIGNER_VIEW = 'designer';
 const SUPPORT_TEXT_HTML = `<span class="bubble-em">WANT TO SUPPORT THE COMIC?</span>
   <span class="bubble-bold">Buy the physical book</span> at the
   <a class="bubble-highlight" href="https://bwondercomics.bigcartel.com/product/battle-bros-volume-1" target="_blank" rel="noopener noreferrer" aria-label="bwondercomics store link">bwondercomics store!</a>`;
@@ -92,6 +98,81 @@ function getDefaultPageConfig() {
   return JSON.parse(JSON.stringify(DEFAULT_PAGE_CONFIG));
 }
 
+function sanitizePageSlug(raw = '') {
+  return String(raw)
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+}
+
+function parseAdminRoute(search = window.location.search) {
+  const params = new URLSearchParams(search);
+  if (params.get('view') !== DESIGNER_VIEW) return null;
+  return {
+    view: DESIGNER_VIEW,
+    seriesId: seriesManager.sanitizeSeriesId(params.get('series') || '') || '',
+    pageSlug: sanitizePageSlug(params.get('page') || ''),
+    surface: params.get('surface') === 'header' ? 'header' : 'header',
+  };
+}
+
+function buildDesignerUrl({ seriesId = '', pageSlug = '', surface = 'header' } = {}) {
+  const params = new URLSearchParams();
+  params.set('view', DESIGNER_VIEW);
+  if (seriesId) {
+    params.set('series', seriesId);
+  }
+  if (pageSlug) {
+    params.set('page', pageSlug);
+  }
+  if (surface === 'header') {
+    params.set('surface', 'header');
+  }
+  return `${window.location.pathname}?${params.toString()}`;
+}
+
+function setDesignerRoute(route, mode = 'replace') {
+  const url = buildDesignerUrl(route);
+  const method = mode === 'push' ? 'pushState' : 'replaceState';
+  window.history[method](null, '', url);
+}
+
+function applyRouteSeriesPreference(route) {
+  const requestedSeriesId = route?.seriesId || '';
+  if (!requestedSeriesId) return false;
+  const isKnownSeries = (state.seriesIndex.series || []).some(
+    (series) => series?.id === requestedSeriesId
+  );
+  if (!isKnownSeries) return false;
+  state.activeSeriesId = requestedSeriesId;
+  localStorage.setItem(ACTIVE_SERIES_KEY, requestedSeriesId);
+  return true;
+}
+
+async function openDesignerRoute(route, historyMode = 'replace') {
+  if (!route) return;
+
+  const requestedSeriesId = route.seriesId || '';
+  if (requestedSeriesId && requestedSeriesId !== seriesManager.getActiveSeriesId()) {
+    await seriesManager.switchSeries(requestedSeriesId);
+  }
+
+  await pageBuilderManager.showPageBuilderSection({
+    entrypoint: 'designer',
+    pageSlug: route.pageSlug || '',
+    surface: route.surface || 'header',
+    historyMode,
+  });
+}
+
+async function handleAdminRouteChange(historyMode = 'replace') {
+  const route = parseAdminRoute();
+  if (!route || el.adminDashboard?.style.display === 'none') return;
+  await openDesignerRoute(route, historyMode);
+}
+
 function setActiveNav(active) {
   const navButtons = [
     el.btnDashboard,
@@ -114,7 +195,6 @@ function setActiveNav(active) {
 
 function hideAllSections() {
   if (el.adminDashboard) {
-    el.adminDashboard.classList.remove('admin-designer-open');
     el.adminDashboard.classList.remove('admin-page-builder-open');
   }
   if (el.adminContent) {
@@ -125,7 +205,6 @@ function hideAllSections() {
   if (el.blogSection) el.blogSection.style.display = 'none';
   if (el.socialSection) el.socialSection.style.display = 'none';
   if (el.previewSection) el.previewSection.style.display = 'none';
-  if (el.designerSection) el.designerSection.style.display = 'none';
   if (el.pageBuilderSection) el.pageBuilderSection.style.display = 'none';
   if (el.analyticsSection) el.analyticsSection.style.display = 'none';
   if (el.mediaSection) el.mediaSection.style.display = 'none';
@@ -317,18 +396,22 @@ const moderationManager = createModerationManager({
   setActiveNav,
   liveVisitors: analyticsManager,
 });
-const designerManager = createDesigner({
-  sanitizeSeriesId: seriesManager.sanitizeSeriesId,
-  getActiveSeriesId: seriesManager.getActiveSeriesId,
-  hideAllSections,
-  setActiveNav,
-});
 
 const pageBuilderManager = createPageBuilder({
   sanitizeSeriesId: seriesManager.sanitizeSeriesId,
   getActiveSeriesId: seriesManager.getActiveSeriesId,
   hideAllSections,
   setActiveNav,
+  onDesignerRouteChange: (route, mode = 'replace') => {
+    setDesignerRoute(
+      {
+        seriesId: seriesManager.getActiveSeriesId(),
+        pageSlug: route?.pageSlug || '',
+        surface: route?.surface || 'header',
+      },
+      mode
+    );
+  },
 });
 
 const entriesApi = createEntriesApi({
@@ -347,7 +430,6 @@ const entriesApi = createEntriesApi({
 
 seriesManager.bindDependencies({
   entriesApi,
-  setDesignerFrameSrc: designerManager.setDesignerFrameSrc,
   onPageBuilderSeriesChange: pageBuilderManager.onSeriesChange,
   showChaptersSection,
 });
@@ -410,6 +492,7 @@ async function showDashboard() {
   void loadInnerNetTarget();
   loadBlueskyStatus();
   await seriesManager.loadSeriesIndex();
+  applyRouteSeriesPreference(parseAdminRoute());
   seriesManager.renderSeriesSelect();
   try {
     await entriesApi.loadEntries();
@@ -432,6 +515,7 @@ async function showDashboard() {
   entriesApi.renderEntryList();
   seriesManager.updateSeriesLinks();
   await dashboardManager.refreshDashboard({ skipPosts: true });
+  await handleAdminRouteChange('replace');
 }
 
 function attachEventHandlers() {
@@ -535,12 +619,20 @@ function attachEventHandlers() {
   }
   if (el.btnSeriesDesigner) {
     el.btnSeriesDesigner.addEventListener('click', () => {
-      pageBuilderManager.showPageBuilderSection();
+      pageBuilderManager.showPageBuilderSection({
+        entrypoint: 'designer',
+        surface: 'header',
+        historyMode: 'push',
+      });
     });
   }
   if (el.btnDesigner) {
     el.btnDesigner.addEventListener('click', () => {
-      pageBuilderManager.showPageBuilderSection();
+      pageBuilderManager.showPageBuilderSection({
+        entrypoint: 'designer',
+        surface: 'header',
+        historyMode: 'push',
+      });
     });
   }
   el.btnAddEntry.addEventListener('click', entriesApi.addNewEntry);
@@ -743,7 +835,9 @@ async function init() {
   updateHeaderMetrics();
   window.addEventListener('scroll', handleHeaderScroll, { passive: true });
   window.addEventListener('resize', updateHeaderMetrics);
-  designerManager.initDesignerFrame();
+  window.addEventListener('popstate', () => {
+    void handleAdminRouteChange('replace');
+  });
   pageBuilderManager.initPageBuilder();
   uploadManager.initUploadHandlers();
   const isAuthenticated = await checkSession(showDashboard);

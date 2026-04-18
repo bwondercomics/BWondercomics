@@ -5,7 +5,6 @@ import { saveToServer } from './core.js';
 
 function createSeriesManager() {
   let entriesApi = null;
-  let setDesignerFrameSrc = null;
   let onPageBuilderSeriesChange = null;
   let showChaptersSection = null;
   let seriesModalMode = 'edit';
@@ -15,12 +14,10 @@ function createSeriesManager() {
 
   function bindDependencies({
     entriesApi: nextEntriesApi,
-    setDesignerFrameSrc: nextSetDesignerFrameSrc,
     onPageBuilderSeriesChange: nextOnPageBuilderSeriesChange,
     showChaptersSection: nextShowChaptersSection,
   } = {}) {
     if (nextEntriesApi) entriesApi = nextEntriesApi;
-    if (nextSetDesignerFrameSrc) setDesignerFrameSrc = nextSetDesignerFrameSrc;
     if (nextOnPageBuilderSeriesChange) onPageBuilderSeriesChange = nextOnPageBuilderSeriesChange;
     if (nextShowChaptersSection) showChaptersSection = nextShowChaptersSection;
   }
@@ -365,11 +362,13 @@ function createSeriesManager() {
     entriesApi.renderEntryList();
     applyUnitLabels();
     updateSeriesLinks();
-    if (setDesignerFrameSrc && el.designerSection && el.designerSection.style.display !== 'none') {
-      setDesignerFrameSrc(nextId, true);
-    }
     if (onPageBuilderSeriesChange) {
       onPageBuilderSeriesChange();
+    }
+    const pageBuilderVisible =
+      el.pageBuilderSection && el.pageBuilderSection.style.display !== 'none';
+    if (pageBuilderVisible) {
+      return;
     }
     if (showChaptersSection) showChaptersSection();
   }
