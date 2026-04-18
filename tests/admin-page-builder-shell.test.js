@@ -1151,4 +1151,125 @@ describe('admin page-builder shell', () => {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('desktop');
   });
+
+  it('shows an import banner in the header editor for a legacy page without meta.header', async () => {
+    const legacyPage = getContractFixture('builderPage');
+    delete legacyPage.meta.header;
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[legacyPage]],
+      fetchPageResult: legacyPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector('[data-action="select-page-header"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(document.querySelector('.pb-editor-source-notice')).not.toBeNull();
+    expect(document.querySelector('.pb-editor-source-notice')?.textContent).toContain(
+      'Imported from shared site configuration'
+    );
+  });
+
+  it('shows no import banner for a page that already has a V3 meta.header', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    // builderPage fixture has meta.header.version = 3
+    expect(selectedPage.meta.header.version).toBe(3);
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector('[data-action="select-page-header"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(document.querySelector('.pb-editor-source-notice')).toBeNull();
+  });
+
+  it('clears the import banner after saving a legacy page header', async () => {
+    const legacyPage = getContractFixture('builderPage');
+    delete legacyPage.meta.header;
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[legacyPage]],
+      fetchPageResult: legacyPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector('[data-action="select-page-header"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(document.querySelector('.pb-editor-source-notice')).not.toBeNull();
+
+    // Make a small edit so the header draft is marked dirty (Save button becomes enabled)
+    const titleInput = document.querySelector('.pb-header-copy-input[data-copy-key="title"]');
+    if (titleInput) {
+      titleInput.value = 'Updated Title';
+      titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+    }
+    await flushAdminUi(1);
+
+    // Save — updatePage returns the page with a V3 header written by buildNormalizedPageMeta
+    document
+      .getElementById('pbSaveHeader')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(5);
+
+    expect(mocks.updatePage).toHaveBeenCalledWith(
+      legacyPage.id,
+      expect.objectContaining({
+        meta: expect.objectContaining({
+          header: expect.objectContaining({ version: 3 }),
+        }),
+      })
+    );
+    // After save, the draft is re-initialized from the updated page which now has meta.header v3
+    expect(document.querySelector('.pb-editor-source-notice')).toBeNull();
+  });
+
+
+
+  it('shows the Imported chip on the canvas header surface for a legacy page', async () => {
+    const legacyPage = getContractFixture('builderPage');
+    delete legacyPage.meta.header;
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[legacyPage]],
+      fetchPageResult: legacyPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    const surface = document.querySelector('.pb-page-header-surface');
+    expect(surface?.querySelector('.pb-page-header-badge--import')).not.toBeNull();
+    expect(surface?.querySelector('.pb-page-header-badge--import')?.textContent).toContain(
+      'Imported'
+    );
+    // V3 page should not have the import chip
+    expect(surface?.querySelector('.pb-page-header-badge--stale')).toBeNull();
+  });
 });
+

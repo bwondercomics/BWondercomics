@@ -268,6 +268,20 @@
   font-weight: 600;
 }
 
+.pb-page-header-badge-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pb-page-header-badge--import,
+.pb-page-header-badge--stale {
+  border-color: rgba(255, 237, 0, 0.25);
+  background: rgba(255, 237, 0, 0.08);
+  color: #fff0a3;
+}
+
 .pb-page-header-surface-layout {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

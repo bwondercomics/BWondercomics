@@ -1,263 +1,366 @@
 DO NOT USE AS REFERENCE, THE LOGIC IS FLAWED.
-
 # Admin Page Builder Logic
 
-This document provides a comprehensive map of the internal functions and data structures within the `admin/page-builder/` module.
+This document describes the current builder runtime under `admin/page-builder/` and `admin/page-builder.js`. It replaces the older draft that was marked as flawed.
 
-## Table of Contents
+## Scope
 
-- [💡 Core Concepts](#-core-concepts)
-- [🔌 Module Initialization](#-module-initialization)
-- [🔄 Data Flow](#-data-flow)
-- [⚙️ Configuration & Registries](#️-configuration--registries)
-- [🖼️ DOM Dependencies](#️-dom-dependencies)
-- [📡 data.js](#-datajs)
-- [📁 The Side Navigation (Rail)](#-the-side-navigation-rail)
-- [🎮 module-editor.js](#-module-editorjs)
-- [🗳️ The Inspector (Sidebar)](#️-the-inspector-sidebar)
-- [🔝 The Page Header](#-the-page-header)
-- [🛠️ Shared Utilities](#️-shared-utilities)
-- [🖌️ Rendering Layer](#️-rendering-layer)
-- [🖱️ Interaction Layer](#️-interaction-layer)
-- [🔗 link-utils.js](#-link-utilsjs)
-- [🔘 button-editor.js](#-button-editorjs)
-- [📏 divider-editor.js](#-divider-editorjs)
-- [🖼️ gallery-editor.js](#️-gallery-editorjs)
-- [📼 video-editor.js](#-video-editorjs)
-- [🗂️ entry-gallery-editor.js](#️-entry-gallery-editorjs)
-- [📱 social-editor.js](#-social-editorjs)
-- [✨ promo-editor.js](#-promo-editorjs)
-- [🎨 theme-editor.js](#-theme-editorjs)
-- [📑 sidebar-panel.js](#-sidebar-paneljs)
+The builder is the admin authoring surface for series-scoped pages backed by:
 
-## 💡 Core Concepts
+- `BuilderPage`
+- `BuilderSection`
+- `BuilderModule`
 
-The Page Builder is a high-performance drafting environment built around the following architectural pillars:
+It is not a freeform visual editor. The builder works with explicit page, section, and module records plus page-level metadata in `page.meta`.
 
-### 1. The Living State (`draftConfig`)
+## Canonical Entry
 
-The "Source of Truth" for any active editing session is a plain JSON object managed by `data.js`.
+The canonical builder route is the admin shell route:
 
-- **Ephemeral Storage**: Changes are held in memory until an explicit **Save** action persists them.
-- **Dirty Tracking**: A `markDirty` callback manages the UI's Save/Discard/Dirty indicator lifecycle.
+- `admin/index.html?view=designer&series=<id>&page=<slug>&surface=header`
 
-### 2. Normalization (The Type Guard)
+Current routing behavior:
 
-Every component implements a `normalize...Config` function.
+- `admin/page-builder.js` owns the builder lifecycle inside the main admin shell.
+- `admin/designer.html` remains only as a redirect bridge into the shell route.
+- The builder can deep-link to a specific page slug and initial surface such as `header`.
 
-- **Integrity**: These functions ensure renderers always receive valid types and defaults, preventing crashes on malformed or legacy data.
-- **Just-In-Time Migration**: Normalization acts as a translation layer for evolving data structures without requiring bulk DB migrations.
+## Current Data Model
 
-### 3. Structural Hierarchy
+### Page
 
-Layouts are composed using a strict container-based hierarchy:
+Current page-level fields include:
 
-- **Page**: Holds global metadata (Slug, Type, Theme).
-- **Section**: The layout container (defines grid patterns like `1-2`, `1-1-1`, or `1-3-1`).
-- **Column**: A vertical grouping within a section layout.
-- **Module**: Atomic content units (Text, Image, Promo, etc.).
+- `slug`
+- `title`
+- `pageType`
+- `isPublished`
+- `isHomepage`
+- `sortIndex`
+- `meta`
 
-### 4. Technical Parity (Shared Renderers)
+Current page-level `meta` ownership:
 
-The builder uses the exact same rendering logic (`shared-renderers.js`) as the live frontend reader.
+- `meta.header`
+- `meta.theme`
+- `meta.panelBackgrounds`
+- `meta.panelSpacing`
 
-- **Environment Bridging**: `preview-renderers.js` configures the shared pipeline for Admin (resolving asset roots, stubbing forms).
-- **Canvas Furniture**: `canvas-renderer.js` injects the interactive "Admin Layers" (reorder handles, insert zones) onto the raw module HTML.
+### Section
 
-### 5. Dual Synchronization
+Sections currently own:
 
-The system maintains a real-time feedback loop. When a module is edited:
+- `layout`
+- `sortIndex`
+- `settings`
 
-1. The **Draft** is updated in the store.
-2. The **Inspector (Sidebar)** rerenders to ensure inputs and labels are in sync with the state.
-3. The **Canvas** specifically rerenders the targeted module/section to maintain visual parity.
+### Module
 
-## 🔌 Module Initialization
+Modules currently own:
 
-The builder components are typically initialized within the `module-editor.js` or `page-builder.js` coordinators. Editors are bound to the DOM whenever a specific module is selected for editing.
+- `moduleType`
+- `columnIndex`
+- `sortIndex`
+- `config`
 
-### Canonical Designer Entry
+## Core Runtime
 
-The integrated builder is now the only real Page Designer shell.
+### `admin/page-builder.js`
 
-- The admin shell opens designer mode through the canonical route
-  `admin/index.html?view=designer&series=<id>&page=<slug>&surface=header`.
-- In designer mode, the builder resolves a target page, opens the shell, and immediately selects
-  the page-header editor.
-- Legacy `admin/designer.html` is only a redirect bridge into that builder route.
+This is the main coordinator. It owns mutable builder state and wires together the rail, canvas, and inspector.
 
-## 🔄 Data Flow
+Its responsibilities include:
 
-```mermaid
-graph TD
-    Store[Data Store: data.js] -->|Get Draft| Coordinator[Module Coordinator]
-    Coordinator -->|Render Editor| SpecificEditor[Button/Gallery/Promo Editor]
-    SpecificEditor -->|User Input| Normalizer[Normalization Helper]
-    Normalizer -->|Validated Config| Commit[Commit to Draft]
-    Commit -->|Set Draft| Store
-    Commit -->|Mark Dirty| UI[Dirty Indicator]
-    Commit -->|Trigger Re-render| Canvas[Canvas Renderer]
-```
+- loading page lists and the active page
+- keeping the current series and selected page in sync with the route
+- tracking selected surface, selected module, active section, and insertion targets
+- initializing and saving page settings, header drafts, and theme drafts
+- `normalizeHeaderDraft` also tags a `source` field (`page-meta-v3`, `page-meta-stale`, `legacy-import`) for tracking header provenance in the UI
+- applying module, section, and page mutations through `data.js`
+- rerendering the rail, canvas, and inspector after state changes
+- rendering status badges and reader-preview links
 
-## 🖼️ DOM Dependencies
+This file is the best source for actual builder flow.
 
-The builder relies on specific areas of the Admin Shell:
+### `admin/page-builder/data.js`
 
-- `#pbModuleEditor`: The sidebar panel where editor forms are rendered.
-- `#pbCanvas`: The live preview area.
-- `.pb-[module]-input`: Context-specific classes used for event delegation.
+This is the backend API layer for builder records.
 
-## ⚙️ Configuration & Registries
+Current fetchers and mutators include:
 
-### `constants.js`
+- `fetchPages(seriesId)`
+- `fetchPage(pageId)`
+- `createPage(seriesId, data)`
+- `deletePage(pageId)`
+- `reorderPages(seriesId, pageIds)`
+- `updatePage(pageId, data)`
+- `addSection(pageId, sectionType, layout)`
+- `updateSection(sectionId, data)`
+- `deleteSection(sectionId)`
+- `reorderSections(pageId, sectionIds)`
+- `addModule(sectionId, moduleType, columnIndex, config, sortIndex)`
+- `updateModule(moduleId, data)`
+- `moveModule(moduleId, targetSectionId, columnIndex, sortIndex)`
+- `reorderModules(sectionId, columnIndex, moduleIds)`
+- `deleteModule(moduleId)`
+- `fetchAssets()`
+- `uploadAsset(file, readFileAsBase64)`
 
-The central registry for the builder's capabilities and styling definitions.
+## Current Builder Flow
 
-- **`MODULE_TYPES`**: The master list of all supported modules. It defines the icon and category for each type, which determines their placement in the inline **Module Picker**.
-- **`LAYOUT_OPTIONS`**: A set of valid column configurations for sections. The `value` (e.g., `1-2`) is parsed by `canvas-renderer.js` to set the grid template.
-- **`THEME_COLORS`**: Defines the logical color tokens available for use across the site.
-- **`THEME_PRESETS`**: A collection of predefined color palettes that can be applied to the page through the **Theme Editor**.
+The implemented flow is:
 
-## 📡 data.js
+1. `admin/page-builder.js` loads the page list for the active series with `fetchPages(...)`.
+2. The selected page is resolved from the route or first available page.
+3. The active page detail is loaded with `fetchPage(...)`.
+4. The left rail is rendered by `sidebar-panel.js`.
+5. The canvas is rendered by `canvas-renderer.js`.
+6. The right inspector shell is rendered by `editor-panel.js`.
+7. User actions call `data.js` mutators, update local state, then rerender affected surfaces.
 
-The data layer responsible for all asynchronous communication with the backend.
+There is no separate long-lived client-side draft store in `data.js`. The main mutable state lives in `admin/page-builder.js`, while persistence happens through explicit backend updates.
 
-### Async Fetchers
+## Page-Scoped Header Architecture
 
-- `fetchPages(seriesId)`: Retrieves all pages for a series.
-- `fetchPage(pageId)`: Retrieves full detail for a single page.
-- `fetchAssets()`: Loads the list of available images/media.
+This is the biggest area the older document got wrong.
 
-### Async Mutators
+The primary header authoring source is now:
 
-- **Pages**: `createPage(...)`, `deletePage(...)`, `updatePage(pageId, data)`, and `reorderPages(seriesId, pageIds)`.
-- **Sections**: `addSection(...)`, `updateSection(sectionId, data)`, `deleteSection(sectionId)`, and `reorderSections(pageId, sectionIds)`.
-- **Modules**: `addModule(...)`, `updateModule(moduleId, data)`, `deleteModule(moduleId)`, `moveModule(moduleId, targetSectionId, columnIndex, sortIndex)`, and `reorderModules(sectionId, columnIndex, moduleIds)`.
-- **Assets**: `uploadAsset(file, readFileAsBase64)`: Handles base64-encoded binary transfers to the asset gallery.
+- `page.meta.header`
 
-## 🎮 module-editor.js
+Current rules:
 
-The orchestrator that manages the editor sidebar. It acts as a switchboard that renders the correct sub-editor based on the `moduleType`.
-
-### Logic & View Orchestration
-
-- **`renderModuleEditorContent(...)`**: The main entry point for the sidebar. It renders a summary header and then either delegates to specialized renderers or inlines fields for generic types.
-- **`bindModuleEditorEvents(...)`**: The event switchboard. It delegates the binding lifecycle to specific sub-editors or the shared generic binder.
-
-### The Generic Module System
-
-For modules without an isolated `.js` coordinator (`text`, `image`, `spacer`, `html`, `email-signup`, and `reader`), the system uses a convention-based field binder:
-
-- **`collectGenericModuleDraft(root, baseConfig)`**: Scrapes inputs with `[data-key]` for top-level config and `[data-style-key]` for nested style objects.
-- **`bindGenericModuleDraftEvents(...)`**: A shared utility that standardizes the "change/input" lifecycle for any module using generic fields.
-- **`renderRawConfigCard(config)`**: Renders a toggleable JSON editor for advanced configuration.
-
-### UI Metadata
-
-- **`getModuleSummary(moduleType, config)`**: Generates human-friendly descriptions used in the sidebar and canvas (e.g., "40px spacer").
-- **`formatModuleLabel(moduleType)`**: Converts internal module slugs (e.g., `entry-gallery`) to human-readable titles (`Entry Gallery`).
-
-## 🗳️ The Inspector (Sidebar)
-
-### `editor-panel.js`
-
-The "Shell" of the editor sidebar. It manages the layout of the property inspector and routes between different specialized editors.
-
-- **`createEditorPanelRenderer({ el, getState, actions, ... })`**: Returns the `renderEditorPanel` function. It is responsible for:
-  - Initializing draft states (Theme, Header, Module, or Page Settings) via `actions`.
-  - Selecting the correct view renderer based on `state.activeEditorTab` and `state.selectedCanvasSurface`.
-  - Managing the sidebar lifecycle (Save/Discard/Reset buttons).
-- **`renderShell`**: The common layout wrapper for all sidebar views. It includes the **Kicker** (context label), the **Header**, and the **Tabs**.
-- **`renderTabs`**: The primary switcher between **Modules** and **Theme**.
-- **`renderFooter`**: A context-aware action bar that renders dynamic buttons (Save/Discard/Delete) based on the current editing scope.
-- **Page Settings**: An internal renderer for editing page metadata (URL slug, title, type, and homepage status).
-
-## 📁 The Side Navigation (Rail)
-
-### `sidebar-panel.js`
-
-Manages the global navigation and library rail, distinct from the module inspector.
-
-- **`renderPageList()`**: Renders the stack of active builder pages.
-  - **Management**: Provides triggers for page selection and deletion.
-  - **Reordering**: Implements a native Drag-and-Drop lifecycle that allows authors to visually reorder the series' page hierarchy via `reorderSidebarPages`.
-  - **Designer Route Sync**: When the shell was entered through the canonical designer route,
-    page selection keeps the URL aligned with the active page slug.
-- **`renderModulePalette()`**: Renders the library of available module types.
-  - **External Drag**: Configures native drag-and-drop objects that can be dropped onto the canvas **Insert Zones** to create new module instances.
-- **`bindSidebarTabs()`**: Orchestrates the view-switching logic between the "Pages" and "Library" tabs within the sidebar rail.
-
-## 🔝 The Page Header
+- the header is edited as page-level metadata, not as a normal insertable module
+- `header` still exists in the module catalog for compatibility, but it is excluded from the normal insertable palette
+- legacy `page-config` header values and legacy `header` modules are fallback inputs only
 
 ### `header-config.js`
 
-The source of truth for header structure and metadata overrides. It manages the resolution lifecycle from raw database JSON to an "Effective Header."
+`header-config.js` resolves effective header state from current and legacy sources.
 
-- **Block Registries**: Defines the 5 standard header zones: `brand` (Logo/Title), `patron` (Welcome), `status` (Announcements), `entryControls` (Chapter navigation), and `nav` (Page links).
-- **`createEffectivePageHeader(page, pageConfig, ...)`**: The primary resolution engine. It calculates the final header state by cascading through:
-  1. Per-page `meta.header` (V3).
-  2. Site-wide default header (Global config).
-  3. Legacy overrides (`meta.headerOverrides`).
-  4. Legacy in-section header modules (for title/subtitle fallback).
-- **Normalization**:
-  - `normalizeHeaderConfig`: Deduplicates blocks across regions and ensures they exist in the registry.
-  - `normalizeHeaderCopy`: Merges page-specific titles and subtitles with global fallbacks.
-- **Migration Audits**: `auditPagesFallbacks` generates reports on "stale" or "missing" V3 header metadata to guide cleanup phases.
+Important exports:
+
+- `createEffectivePageHeader(page, pageConfig, normalizeNavItems?)`
+- normalization helpers for header copy and layout
+- fallback-audit helpers for migration cleanup
+
+Resolution order is effectively:
+
+1. `page.meta.header`
+2. site-level or legacy page-config defaults
+3. older override shapes and legacy fallback content
 
 ### `header-editor.js`
 
-The UI component for the header sidebar. It manages complex multi-stage updates and real-time synchronization with the canvas.
+This renders and binds the page-header editor UI used by the inspector.
 
-- **`renderHeaderEditorContent(...)`**: The primary renderer for the header inspector. It aggregates several modular sub-sections:
-  - **Copy Editor**: Title and rotating subtitles (one per line).
-  - **Navigation Editor**: Management list for header buttons.
-  - **Parts Editor**: Visibility toggles for the 5 global block types (`brand`, `patron`, `status`, etc.).
-  - **Placement Editor**: The "Layout Board" for moving blocks between `left`, `center`, and `right` regions.
-- **`bindHeaderEditorEvents(...)`**: Orchestrates event delegation for the entire header inspector. Uniquely, it often triggers a **Dual Rerender**—updating both the sidebar (to refresh placement button states) and the canvas (for visual parity).
-- **Internal Helpers (🔒)**: Includes a suite of `moveBlock...` functions that handle the logic of reordering the `regions` object within the configuration state.
+Current editor responsibilities include:
 
-## 🛠️ Shared Utilities
+- showing an import/upgrade banner if the active header draft is from a non-canonical `source` (e.g., `legacy-import`)
+- title and subtitle copy editing
+- nav item editing
+- block visibility toggles
+- left/center/right region placement
 
-### `helpers.js`
+Saving header changes writes back through `updatePage(..., { meta: nextMeta })` and clears any import/upgrade banners since the header is upgraded to canonical V3.
 
-Stateless utility functions used for data normalization, asset resolution, and DOM safety.
+## Theme And Page Settings
 
-- **`normalizeFit(value)`**: Standardizes "Image Fit" strings to either `contain` or `cover`.
-- **Focal Point Logic**:
-  - `parseFocus(value)`: Converts keywords (`top`, `bottom left`) or percentage strings into an `{ x, y }` coordinate object.
-  - `formatFocus({ x, y })`: Converts a coordinate object into a CSS-ready `background-position` string (e.g., `50% 50%`).
-- **`resolveAssetUrl(path)`**: Ensures image paths are correctly formatted for the file system (prefixing `/assets/` where necessary).
-- **Security**: Provides `escapeHtml` and `escapeAttr` for safe DOM injection of user-provided configurations.
+### `theme-editor.js`
 
-### `sanitize.js`
+This handles page-scoped theme editing for `page.meta.theme` and related page presentation settings.
 
-The centralized security and normalization layer. It provides deep-inspection sanitization for HTML and strict validation for all configuration primitives.
+### `editor-panel.js`
 
-- **HTML Sanitization**:
-  - **`sanitizeBuilderHtml(value, mode)`**: Parses raw strings into a virtual DOM and strips dangerous tags/attributes.
-  - **Modes**: `text` (basic formatting like `strong`, `em`, `a`) or `html` (includes layout tags like `div`, `section`, `figure`).
-- **Media & URL Safety**:
-  - **`sanitizeVideoUrl(value)`**: Restricts URLs specifically to **YouTube** and **Vimeo** domains to ensure compatibility with shared renderers.
-  - **`sanitizeAssetUrl(value)`**: Validates image paths while stripping fragment identifiers and restricted protocols.
-- **Primitive Normalizers**:
-  - **`sanitizeColor(value, fallback)`**: Validates against Hex, RGB/RGBA, HSL, and CSS named colors.
-  - **`sanitizeNumber(value, fallback, min, max)`**: Clamps numeric inputs to safe ranges (e.g., preventing negative dimensions).
-  - **`sanitizeKeyword(value, allowed, fallback)`**: Enforces strict enum-style validation for string constants.
+This is the inspector shell. It chooses which editor to show based on selected surface and active tab.
 
-## 🖌️ Rendering Layer
+Current inspector scopes include:
 
-The builder uses a multi-stage rendering pipeline to maintain high performance while ensuring technical parity with the live site.
+- page settings
+- page header
+- page theme
+- selected module editor
+
+Important behavior:
+
+- it renders the shell layout and footer actions
+- it delegates module-specific content to `module-editor.js`
+- it invokes delete actions for the currently selected module when appropriate
+
+## Rail And Canvas
+
+### `sidebar-panel.js`
+
+This file renders the left rail.
+
+Current responsibilities:
+
+- page list rendering
+- page selection
+- page drag/drop reorder
+- module palette rendering
+- page/library tab switching
+
+The palette intentionally excludes `header`.
+
+### `canvas-renderer.js`
+
+This file renders the builder canvas markup.
+
+Current responsibilities:
+
+- page title area and status badges
+- header surface preview using effective page-header data (including a chip for `Imported` or `Needs upgrade` sources)
+- section stacks and layout controls
+- module wrappers, insert bars, and inline module picker UI
+- section insert controls
+
+The canvas is an editing surface. It is not a full fidelity public reader render.
+
+### `canvas-events.js`
+
+This file binds canvas interactions, including:
+
+- selecting modules and sections
+- insert-bar interactions
+- drag/drop and move operations
+- canvas delete actions for modules and sections
+
+## Module Editing
+
+### `module-editor.js`
+
+This is the shared module inspector renderer and binder.
+
+Important exports:
+
+- `renderModuleEditorContent(...)`
+- `bindModuleEditorEvents(...)`
+
+Current behavior:
+
+- generic field rendering exists for modules that do not have a dedicated editor
+- dedicated editors are used where specialized UX already exists
+- a raw JSON config card still exists for advanced or not-yet-polished cases
+
+### Dedicated module editors
+
+Current dedicated editor modules include:
+
+- `button-editor.js`
+- `divider-editor.js`
+- `gallery-editor.js`
+- `video-editor.js`
+- `entry-gallery-editor.js`
+- `social-editor.js`
+- `promo-editor.js`
+
+Some module types still rely partly on generic or raw-config editing instead of polished structured controls.
+
+## Rendering Contracts
 
 ### `shared-renderers.js`
 
-The single technical source of truth for module HTML output. It ensures the Admin Canvas and the Frontend Reader are always in sync.
+This is the shared rendering core used by both admin preview output and the public reader.
 
-- **`createRenderers(options)`**: A factory that produces environment-aware rendering functions:
-  - **`renderPage(page)`**: The top-level orchestrator for section stacks.
-  - **`renderSection(section)`**: Translates layout keys (e.g., `1-2`, `1-1-1`) into optimized CSS layouts and applies section-level backgrounds and spacing.
-  - **`renderModule(module)`**: Wraps content in standard builder attributes (`data-module-id`) for interaction tracking.
-- **Module Registry**: Supports 15+ types, including:
-  - **Structural**: `spacer`, `divider`, `header`.
+Main export:
+
+- `createRenderers(options)`
+
+Factory output:
+
+- `renderModule(mod)`
+- `renderSection(section)`
+- `renderPage(page)`
+
+This is the main parity boundary between builder rendering and reader rendering.
+
+### `preview-renderers.js`
+
+This adapts `shared-renderers.js` for admin preview usage.
+
+It exports:
+
+- `renderPreviewModule`
+- `renderPreviewSection`
+- `renderPreviewPage`
+
+### Reader parity
+
+`reader/page-renderer.js` also consumes `createRenderers(...)`.
+
+That means:
+
+- module HTML structure is intentionally shared
+- builder canvas chrome is not shared
+- public-reader mounting and admin-canvas interaction layers stay separate
+
+## Registries And Utilities
+
+### `constants.js`
+
+Current registries include:
+
+- `MODULE_TYPES`
+- `LAYOUT_OPTIONS`
+- theme token registries such as `THEME_COLORS`
+
+`MODULE_TYPES` is used by both the rail and the canvas picker, with `header` filtered out from insertable lists.
+
+### `helpers.js`
+
+Shared helper coverage includes:
+
+- asset URL resolution
+- image fit and focal-point helpers
+- HTML and attribute escaping helpers
+
+### `sanitize.js`
+
+This is the builder sanitization and validation layer.
+
+It includes helpers for:
+
+- sanitizing builder HTML
+- sanitizing asset URLs and video URLs
+- normalizing colors, numbers, and constrained keywords
+
+## Current Module Catalog
+
+The builder currently recognizes these module types:
+
+- `header`
+- `text`
+- `image`
+- `gallery`
+- `video`
+- `social`
+- `email-signup`
+- `promo`
+- `buttons`
+- `spacer`
+- `divider`
+- `reader`
+- `entry-gallery`
+- `feed`
+- `html`
+
+Again: `header` is compatibility-only in the catalog and is not part of the normal insertable palette.
+
+## Important Accuracy Notes
+
+- The builder's mutable UI state is primarily coordinated in `admin/page-builder.js`, not in `data.js`.
+- Header editing is page-scoped through `page.meta.header`, not primarily through a normal `header` module.
+- The admin canvas is an editing surface with builder chrome, not a true public-reader preview.
+- Shared renderer parity exists at the module/section/page HTML level through `shared-renderers.js`.
+- Legacy `page-config` and legacy `header` module content still exist as fallback inputs in some flows, especially for reader compatibility.
+
+## Related Docs
+
+- [docs/BUILDER_PLAN.md](/srv/bw-quality/docs/BUILDER_PLAN.md)
+- [docs/functions/admin-core.md](/srv/bw-quality/docs/functions/admin-core.md)
+- [docs/functions/admin-page-builder-styles.md](/srv/bw-quality/docs/functions/admin-page-builder-styles.md)
+- [docs/functions/reader-core.md](/srv/bw-quality/docs/functions/reader-core.md)
   - **Content**: `text` (HTML), `image`, `gallery`, `html` (bespoke).
   - **Media**: `video` (auto-detects YouTube/Vimeo IDs for iframe embedding).
   - **Interactive**: `buttons`, `social`, `email-signup`.

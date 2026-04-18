@@ -84,6 +84,14 @@ function renderPageHeaderSurface(state) {
   const headerState = getHeaderPreviewState(state);
   const isSelected = state.selectedCanvasSurface === 'page-header';
   const isDirty = state.dirtyScope === 'header';
+  const source = state.activeHeaderDraft?.source;
+
+  let sourceBadge = '';
+  if (source === 'legacy-import') {
+    sourceBadge = '<span class="pb-page-header-badge pb-page-header-badge--import">Imported</span>';
+  } else if (source === 'page-meta-stale') {
+    sourceBadge = '<span class="pb-page-header-badge pb-page-header-badge--stale">Needs upgrade</span>';
+  }
 
   return `
     <button
@@ -96,7 +104,10 @@ function renderPageHeaderSurface(state) {
           <span class="pb-page-header-kicker">Page Header</span>
           <div class="pb-page-header-title">Click to edit title, buttons, visible parts, and placement</div>
         </div>
-        ${isDirty ? '<span class="pb-page-header-badge">Unsaved</span>' : '<span class="pb-page-header-badge">Click to edit</span>'}
+        <div class="pb-page-header-badge-group">
+          ${sourceBadge}
+          ${isDirty ? '<span class="pb-page-header-badge">Unsaved</span>' : '<span class="pb-page-header-badge">Click to edit</span>'}
+        </div>
       </div>
       <div class="pb-page-header-surface-layout">
         ${HEADER_REGION_ORDER.map((region) => {
@@ -125,6 +136,7 @@ function renderPageHeaderSurface(state) {
     </button>
   `;
 }
+
 
 function renderModulePicker(target) {
   const groups = Array.from(new Set(INSERTABLE_MODULE_TYPES.map((module) => module.category)));

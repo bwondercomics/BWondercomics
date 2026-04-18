@@ -75,7 +75,8 @@ That means:
 
 - the header is not primarily treated as a normal insertable module anymore
 - page-level header editing is already shipped
-- legacy `page-config` header data and legacy `header` modules are still used only as fallback inputs for older pages
+- `page.meta.header` is the only intended authoring source of truth for header editing
+- legacy `page-config` header data and legacy `header` modules are still used only as temporary fallback inputs for older pages and should not remain part of the steady-state editor UX
 
 ### Current module catalog
 
@@ -351,10 +352,11 @@ These are still the highest-value priorities, but the first security pass is now
 
 ### P3 - Reduce legacy fallback over time
 
-1. Keep header fallback only until older pages are migrated.
-2. Keep `page-config` fallback only while the reader still depends on unmigrated surfaces.
-3. Track which surfaces are still legacy-backed.
-4. Remove fallback paths only after the builder is complete enough that authors are not forced back into code.
+1. Remove UI-level fallback first so the page designer always opens the real page-scoped header editor.
+2. Keep runtime header fallback only until older pages are migrated to `page.meta.header.version = 3`.
+3. Keep `page-config` fallback only while the reader still depends on unmigrated surfaces.
+4. Track which surfaces are still legacy-backed with an explicit audit gate.
+5. Remove runtime fallback paths only after migration is complete and authors are not forced back into code.
 
 ## Concrete near-term plan
 
@@ -421,6 +423,108 @@ Deliberately not in this phase:
 - Marked `source: 'legacy'` and the `pb-no-fallback` flag as deprecated in `reader/data.js`, documenting that removal requires a clean series-level audit including a published `reader` page.
 - Expanded the test suite with comprehensive audit coverage to act as the source of truth for safe branch removal.
 
+### Phase 6 - Header builder canonicalization pass
+
+Status: in progress
+
+**Implemented so far (2026-04-18):**
+
+- Completed Step 1, making the integrated admin page builder the only real Page Designer shell.
+- Added a canonical admin deep-link contract for designer entry:
+  - `admin/index.html?view=designer&series=<id>&page=<slug>&surface=header`
+- Updated the admin shell so Page Designer entry opens the builder directly in page-header editing mode instead of routing through the legacy iframe path.
+- Kept designer-mode routing in sync as authors switch pages in the builder rail or switch series in the admin shell.
+- Replaced legacy `admin/designer.html` with a redirect bridge into the integrated builder.
+- Removed the legacy designer iframe host from the admin shell and updated tests/docs to reflect the new route contract.
+
+Goal: make the page designer show the real page-scoped header builder by default instead of behaving like a migration/fallback layer.
+
+#### Product target
+
+- the integrated admin page builder is the canonical home of header editing
+- the header editor must feel like a first-class UI editor, not a fallback inspector
+- the canvas header preview, inspector, preview mode, and reader must all reflect the same normalized header state
+- legacy `designer.html` must become a bridge into the integrated builder instead of remaining a separate editing surface
+
+#### Scope and desired behavior
+
+1. Make every page-designer entry point land on the integrated builder surface.
+2. Make clicking the header surface open the structured header editor every time.
+3. Seed legacy pages from `createEffectivePageHeader(...)`, but save back only to `page.meta.header.version = 3`.
+4. Keep the header structured around the current built-in block registry:
+   - `brand`
+   - `patron`
+   - `status`
+   - `entryControls`
+   - `nav`
+5. Do not add raw JSON fallback to the header editor.
+6. Do not add arbitrary freeform header blocks in this pass.
+
+#### Step 1 - Canonicalize the designer route ✅
+
+- treat the integrated builder as the only real page-designer shell
+- update the remaining legacy designer path so `designer.html` acts only as a redirect/bridge into the builder
+- support a stable deep-link contract for opening the builder in designer mode with a specific series selected
+- keep the current nav button and series-level designer links aligned with that same route
+
+#### Step 2 - Make `page.meta.header` the visible editing source of truth ✅
+
+**Implemented (2026-04-18):**
+
+- `normalizeHeaderDraft()` now resolves a `source` field (`'page-meta-v3'` | `'page-meta-stale'` | `'legacy-import'` | `'default'`) so the editor and canvas renderer know the provenance of the active draft without changing save behavior.
+- The header editor shows a warning banner when a page's header was hydrated from shared site configuration (`legacy-import`) or from an older stored format (`page-meta-stale`), prompting authors to save and make it permanent.
+- The canvas header surface shows an `Imported` or `Needs upgrade` chip alongside the existing Unsaved/Click-to-edit badge so provenance is visible before opening the editor.
+- The banner disappears after saving — `saveActiveHeaderDraft` writes normalized V3 data and re-initializes the draft from the server response, so the source becomes `'page-meta-v3'` and the banner is suppressed on the next render.
+- Added 4 new shell tests: import banner present for legacy pages, absent for V3 pages, cleared after save, and canvas chip visible for legacy sources. Full suite: 37 files, 231 passing, 0 regressions.
+
+#### Step 3 - Upgrade the header editor UX to feel like an official builder tool
+
+- keep the existing four editor sections, but make them the canonical workflow:
+  - `Header Copy`
+  - `Navigation Buttons`
+  - `Header Parts`
+  - `Placement`
+- strengthen the canvas preview so it shows real block order, button presence, and empty states instead of reading like a placeholder
+- make the placement board support direct reordering between `left`, `center`, and `right`
+- keep keyboard/button-based movement as a fallback accessibility path even if drag/reorder becomes the primary interaction
+- keep explicit `Save Header` / `Discard` behavior and block context switches while the header draft is dirty
+
+#### Step 4 - Bring header buttons onto the shared button model
+
+- extend header nav items so they can use the same style preset concept as the `buttons` module
+- support add, remove, reorder, enable/disable, and target editing for every header button
+- keep the existing link target contract:
+  - `builder-page`
+  - `url`
+  - `anchor`
+- render those button variants consistently in:
+  - the header inspector
+  - the canvas header preview
+  - preview mode
+  - the live reader header
+- do not introduce per-button custom color systems in this pass; reuse shared button variants instead
+
+#### Step 5 - Keep renderer parity and migration explicit
+
+- update admin header preview and reader header rendering together so the same normalized header data produces the same visible result
+- reuse shared normalization helpers instead of creating another header render path
+- add a migration/backfill step for older builder pages so effective legacy header state is written into `meta.header.version = 3`
+- document the removal order clearly:
+  1. remove UI fallback behavior
+  2. backfill older pages
+  3. verify the audit is clean
+  4. remove runtime fallback in a later cleanup pass
+
+#### Acceptance criteria
+
+- opening the page designer always reveals the integrated header builder, never the legacy fallback UI
+- the header editor is clearly first-class and fully structured
+- authors can move header parts between regions and reorder them without touching JSON
+- authors can add, remove, reorder, enable, disable, and restyle header buttons from the UI
+- saving a legacy page writes `page.meta.header.version = 3` and stops the admin editor from depending on fallback state for that page
+- header preview in admin and the live reader header stay in parity for layout, visible blocks, and button variants
+- the series-level fallback audit remains the gate for runtime fallback removal
+
 ## Keep / change / avoid
 
 ### Keep
@@ -482,6 +586,8 @@ This is enough to make the builder materially safer without turning it into a he
 This builder is in a good place when all of the following are true:
 
 - common page work can be done without code edits
+- the page designer always exposes the real page-scoped header builder instead of a fallback header path
+- header layout and header buttons are fully editable from structured controls
 - builder output is safe by default
 - authors can trust what they preview
 - page saves do not silently overwrite each other

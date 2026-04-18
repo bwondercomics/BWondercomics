@@ -276,11 +276,32 @@ function renderAdvancedEditor(header) {
   `;
 }
 
+function renderSourceBanner(source) {
+  if (source === 'legacy-import') {
+    return `
+      <div class="pb-editor-source-notice" data-status="warning">
+        <strong>Imported from shared site configuration.</strong>
+        <span>This header hasn't been saved as this page's own header yet. Save to store it here.</span>
+      </div>
+    `;
+  }
+  if (source === 'page-meta-stale') {
+    return `
+      <div class="pb-editor-source-notice" data-status="warning">
+        <strong>Older header format detected.</strong>
+        <span>Save to upgrade this page to the current header format.</span>
+      </div>
+    `;
+  }
+  return '';
+}
+
 export function renderHeaderEditorContent({ draftState, pages = [] }) {
   const header = normalizeHeaderConfig(draftState?.header, normalizeHeaderNavItems);
   const copy = normalizeHeaderCopy(draftState?.copy);
 
   return [
+    renderSourceBanner(draftState?.source),
     renderCopyEditor(copy),
     renderNavigationEditor(header, pages),
     renderPartsEditor(header),

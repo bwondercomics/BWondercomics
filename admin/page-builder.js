@@ -599,12 +599,24 @@ function createPageBuilder({
   }
 
   function normalizeHeaderDraft(page = currentPage) {
+    const rawHeader =
+      page?.meta?.header &&
+      typeof page.meta.header === 'object' &&
+      !Array.isArray(page.meta.header)
+        ? page.meta.header
+        : null;
+    const source = !rawHeader
+      ? 'legacy-import'
+      : Number(rawHeader.version || 0) >= 3
+        ? 'page-meta-v3'
+        : 'page-meta-stale';
     const effectiveHeader = createEffectivePageHeader(
       page,
       currentSeriesPageConfig,
       normalizeHeaderNavItems
     );
     return {
+      source,
       header: normalizeHeaderConfig(effectiveHeader, normalizeHeaderNavItems),
       copy: normalizeHeaderCopy(effectiveHeader.copy, {
         title: page?.title || 'Page Title',
@@ -628,6 +640,7 @@ function createPageBuilder({
     activeHeaderDraft = currentPage
       ? normalizeHeaderDraft(currentPage)
       : {
+          source: 'default',
           header: createDefaultHeaderConfig(),
           copy: normalizeHeaderCopy(null, { title: 'Page Title', subtitle: '', subtitles: [] }),
         };

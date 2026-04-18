@@ -1,6 +1,14 @@
-# bwondercomics.com - LLM Context Snapshot
-
 This document is a concise handoff for new threads/agents. It captures how the site is run, key services, workflows, and known constraints.
+
+## Assistant Guidelines
+
+To maintain the long-term health of this project, all AI assistants MUST follow these rules:
+
+1.  **Update Function Documentation**: Whenever you modify business logic or add new internal functions, you MUST update the corresponding documentation in `docs/functions/`.
+    - If the modified file is already documented, update its section in the relevant markdown file.
+    - If a new module is added, create a new section for it.
+2.  **Maintain Documentation Integrity**: Do not remove existing documentation unless the code it describes has been deleted.
+3.  **Audit Compliance**: If you are unsure of the current state of a feature, perform a brief audit and update the docs if they have drifted from the implementation.
 
 ## Repo & Structure
 
@@ -21,6 +29,15 @@ This document is a concise handoff for new threads/agents. It captures how the s
   - Public post copies (auto-managed): `media/post-assets/`
   - `protected/` is server-only and ignored by git (tracked only via `protected/.gitkeep`).
 - Deploy config: `deploy/bwondercomics-compose.yml`, `deploy/Caddyfile`, `deploy/bwondercomics.env`
+
+## 📚 Technical Documentation
+
+Core logic and function maps for persistent reference:
+- **Admin Core Suite**: [admin-core.md](file:///srv/bw-quality/docs/functions/admin-core.md) (Auth, State, DOM, App Orchestration)
+- **Admin Page Builder**: [admin-page-builder.md](file:///srv/bw-quality/docs/functions/admin-page-builder.md) (Structural normalization, Drag-and-Drop, Rendering)
+- **Admin Analytics**: [admin-analytics.md](file:///srv/bw-quality/docs/functions/admin-analytics.md) (Seismometer, Historical Reader Metrics, Traffic)
+- **Reader Core Engine**: [reader-core.md](file:///srv/bw-quality/docs/functions/reader-core.md) (Scale & Pan, Dynamic Fitting, Multi-touch Gestures)
+- **Page Builder Styles**: [admin-page-builder-styles.md](file:///srv/bw-quality/docs/functions/admin-page-builder-styles.md) (Visual Framework, Layout Orchestration, Component Architecture)
 
 ## Services (Docker Compose)
 
@@ -125,6 +142,7 @@ Vite proxies these to the API (so data.json/series.json work):
 
 - Page Builder is now **edit-only**: preview toggle removed.
 - Builder header toggles removed: **Disable Fallback** and **Published** are no longer in UI.
+- Header canvas and editor now track provenance (`legacy-import`, `page-meta-stale`, etc) with visual badges, ensuring canonical V3 saves.
 - Promo image picker is **simple select/upload** (no crop/focus/zoom editor).
 - Promo slides support per‑item **Image Fit**:
   - `Fill (cover)` or `Fit (contain)`; defaults to cover.
