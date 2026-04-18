@@ -1,4 +1,4 @@
-DO NOT USE AS REFERENCE, THE LOGIC IS FLAWED.
+
 
 # Admin Core Suite Logic
 
@@ -33,7 +33,11 @@ This document provides a comprehensive map of the internal functions, orchestrat
 - [🎨 Admin Design System (admin.css)](#-admin-design-system-admincss)
 - [🔍 Preview Manager (preview.js)](#-preview-manager-previewjs)
 - [📚 Series Manager (series.js)](#-series-manager-seriesjs)
+- [🦋 Social Manager (social.js)](#-social-manager-socialjs)
 - [🛡️ Moderation Manager (moderation.js)](#️-moderation-manager-moderationjs)
+- [☁️ Upload Manager (uploads.js)](#️-upload-manager-uploadsjs)
+- [👥 User Manager (users.js)](#-user-manager-usersjs)
+- [🧰 Shared Utilities (utils.js)](#-shared-utilities-utilsjs)
 
 ## 💡 Core Concepts
 
@@ -999,36 +1003,58 @@ Uses `splitPhrases` and `normalizePhrase` to ingest large blocklists. It handles
 - **Inputs**: `moderationSearch`, `moderationIpInput`, `moderationWordInput`.
 - **Policy Control**: `moderationLimitMinInterval`, `moderationLimitMaxUser`, `moderationStatus`.
 
-## 🧭 Navigation Manager (nav.js)
+## 🦋 Social Manager (social.js)
 
-The "UI Recall" orchestrator. It manages the physical orientation and visual preferences of the Admin suite, ensuring a consistent user experience across sessions via localStorage.
+The `social.js` module integrates Bluesky notification monitoring and profile statistics into the global dashboard.
 
 ### Public API (🔌)
 
-#### `initNavPreferences()`
+#### `refreshBluesky()`
+Fetches new notifications and updates profile follower deltas via `localStorage`.
 
-The bootstrap coordinator. It retrieves stored preferences (Layout, Collapse state, Scanlines) and applies them immediately to the DOM to prevent layout jumping during initialization.
-
-#### `applyNavLayout(layout)`
-
-The orientation engine. It normalizes layout strings (`left`, `right`, `top`) and applies the corresponding `admin-layout--{type}` class to the `#adminDashboard` shell.
-
-#### `setNavCollapsed(collapsed)`
-
-Manages the sidebar's reduced footprint. It toggles the `.nav-collapsed` class and ensures that ARIA attributes on the toggle buttons reflect the correct interactive state for screen readers.
+#### `showSocialSection()`
+Reveals the social panel and initializes the active tab.
 
 ### Internal Logic (🔒)
+- **`renderBlueskyProfile`**: Normalizes profile data and calculates follower changes since the last cache.
+- **`buildNotificationItem`**: Renders robust DOM elements for rich social notes (avatars, relative timestamps).
 
-#### Defensive Persistence (`readStorage` / `writeStorage`)
+## ☁️ Upload Manager (uploads.js)
 
-Wraps `localStorage` in critical try-catch blocks. This ensures the application remains functional even in "Privacy" modes or restricted environments where third-party storage is blocked.
+The `uploads.js` module orchestrates drag-and-drop mechanics and API file payload handling for Entry image uploads.
 
-#### Aesthetic Filtering
+### Public API (🔌)
 
-The `applyScanlines` logic toggles the master `admin-scanlines-off` class on `document.body`. This provides a global override for the suite's CSS-driven scanline filters and CRT-noise overlays.
+#### `initUploadHandlers()`
+Binds drag-and-drop listeners on `uploadArea` and initializes the file selection callbacks.
 
-### DOM Dependencies
+### Internal Logic (🔒)
+- **`handleFileSelect`**: Enforces strict `image/*` MIME filtering and a 10MB maximum file size limit.
+- **`uploadImagesToServer`**: Packages valid imagery as Base64 strings, automatically ensuring a valid `entryFolder` exists using inference logic before sending the API POST.
 
-- **Core Container**: `adminDashboard`.
-- **Triggers**: `adminNavToggle`, `navLayoutSelect`, `scanlinesToggle`.
-- **Overlays**: `adminSettingsPanel`, `innerNetPanel`.
+## 👥 User Manager (users.js)
+
+The `users.js` module handles user roles, newsletter subscriptions, and premium code generation.
+
+### Public API (🔌)
+
+#### `loadUsers()`
+The master hydrator, orchestrating parallel fetches for Users List, Email Subscribers, and Premium Codes.
+
+#### `generatePremiumCodes()`
+A high-privilege mutator that generates batch access codes for marketing campaigns.
+
+### Internal Logic (🔒)
+- **Role Assignment**: Supports inline mutation between `user`, `premium`, and `admin` roles, secured by same-origin credentials.
+- **Data Densification**: Combines opt-in dates, IP sources, and recent activity into dense table rows for rapid auditing.
+
+## 🧰 Shared Utilities (utils.js)
+
+A centralized set of stateless helpers used across the administrative SPA.
+
+### Public API (🔌)
+
+- **`escapeHtml`**: Security scrubber preventing XSS in dynamically populated fields.
+- **`sortPagesByFilename`**: Numeric sorting for comic pages (e.g. `page10` comes after `page2`).
+- **`inferFolderFromPages`**: Core pathing engine that derives the structural `chapterFolder` from analyzing the prefix of current pages, enabling the "Self-Healing" directory features.
+- **`generateMediaId`**: Uses a deterministic FNV-1a hash to create stable identifiers from file paths.

@@ -1273,3 +1273,124 @@ describe('admin page-builder shell', () => {
   });
 });
 
+
+// ── Step 3 regressions ───────────────────────────────────────────────────────
+describe('Phase 6 Step 3 — header editor UX upgrades', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  it('does not render a raw JSON textarea in the header editor', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector('[data-action="select-page-header"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(document.getElementById('pbSaveHeader')).not.toBeNull();
+    expect(document.getElementById('pbHeaderRawConfig')).toBeNull();
+  });
+
+  it('renders placement board cards with draggable="true"', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector('[data-action="select-page-header"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const cards = document.querySelectorAll('.pb-header-layout-card[draggable="true"]');
+    expect(cards.length).toBeGreaterThan(0);
+  });
+
+  it('canvas preview shows block-specific chip content for patron, status, and entryControls', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    const surface = document.querySelector('.pb-page-header-surface');
+    const chipText = Array.from(surface?.querySelectorAll('.pb-page-header-chip') || [])
+      .map((el) => el.textContent?.trim())
+      .join(' ');
+    expect(chipText).toContain('Welcome, reader');
+    expect(chipText).toContain('Status message');
+    expect(chipText).toContain('Ch. 42');
+  });
+
+  it('canvas preview shows empty-region indicator when a header region has no blocks', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    selectedPage.meta.header.regions = {
+      left: ['brand', 'patron', 'status', 'entryControls', 'nav'],
+      center: [],
+      right: [],
+    };
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    const emptyRegions = document.querySelectorAll('.pb-page-header-empty-region');
+    expect(emptyRegions.length).toBeGreaterThanOrEqual(1);
+    expect(emptyRegions[0]?.textContent?.trim()).toBe('Empty region');
+  });
+
+  it('placement board section description reflects drag-first workflow copy', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector('[data-action="select-page-header"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const sectionCopies = Array.from(document.querySelectorAll('.pb-editor-section-copy')).map(
+      (el) => el.textContent?.trim()
+    );
+    expect(sectionCopies.some((t) => t?.includes('Drag blocks between regions'))).toBe(true);
+  });
+});

@@ -173,7 +173,7 @@ export function createEditorPanelRenderer({
       });
       kicker = 'Page Header';
       title = 'Header Settings';
-      subtitle = `Edit the visible header parts, placement, copy, and buttons for ${pageTitle}.`;
+      subtitle = `Configure what readers see in the header for ${pageTitle}.`;
       footerHtml = renderFooter({
         scope: 'header',
         actionsHtml: `

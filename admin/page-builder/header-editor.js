@@ -216,23 +216,18 @@ function renderPlacementEditor(header) {
         const block = HEADER_BLOCK_DEFS.find((item) => item.id === blockId);
         const enabled = header.blocks?.[blockId]?.enabled !== false;
         return `
-          <div class="pb-header-layout-card ${enabled ? '' : 'is-disabled'}" data-block-id="${blockId}">
+          <div
+            class="pb-header-layout-card ${enabled ? '' : 'is-disabled'}"
+            data-block-id="${blockId}"
+            draggable="true"
+          >
             <div class="pb-header-layout-card-head">
+              <div class="pb-header-layout-card-drag-handle" aria-hidden="true">⠿</div>
               <div>
                 <strong>${escapeHtml(block?.label || blockId)}</strong>
                 <div class="pb-editor-help">${enabled ? 'Visible' : 'Hidden on this page'}</div>
               </div>
               <span class="pb-header-layout-region-chip">${escapeHtml(getRegionLabel(region))}</span>
-            </div>
-            <div class="pb-editor-field">
-              <label class="pb-editor-label">Region</label>
-              <select class="pb-editor-select pb-header-placement-input" data-block-id="${blockId}" data-key="region">
-                ${HEADER_REGION_ORDER.map(
-                  (option) => `
-                    <option value="${option}" ${option === region ? 'selected' : ''}>${getRegionLabel(option)}</option>
-                  `
-                ).join('')}
-              </select>
             </div>
             <div class="pb-header-layout-actions">
               <button type="button" class="btn-secondary pb-header-layout-button" data-action="move-left" data-block-id="${blockId}" ${region === 'left' ? 'disabled' : ''}>Move Left</button>
@@ -248,7 +243,7 @@ function renderPlacementEditor(header) {
     return `
       <div class="pb-header-region pb-header-region--board" data-region="${region}">
         <div class="pb-header-region-title">${escapeHtml(getRegionLabel(region))}</div>
-        ${regionBlocks || '<div class="pb-editor-help">No items in this region.</div>'}
+        ${regionBlocks || '<div class="pb-editor-help pb-header-region-empty">Drop blocks here</div>'}
       </div>
     `;
   }).join('');
@@ -256,25 +251,13 @@ function renderPlacementEditor(header) {
   return renderSectionCard(
     'Placement',
     'Header Layout Board',
-    'Use the region selector and move buttons to place each visible part where readers expect it.',
+    'Drag blocks between regions, or use the buttons below each block.',
     `<div class="pb-header-layout-grid">${board}</div>`
   );
 }
 
-function renderAdvancedEditor(header) {
-  return `
-    <details class="pb-editor-accordion">
-      <summary class="pb-editor-accordion-toggle">Advanced</summary>
-      <div class="pb-editor-accordion-content">
-        <p class="pb-editor-accordion-copy">Raw JSON is still available, but it stays out of the way unless you need it.</p>
-        <div class="pb-editor-field">
-          <label class="pb-editor-label">Header Layout JSON</label>
-          <textarea class="pb-editor-textarea pb-editor-textarea--code" id="pbHeaderRawConfig">${escapeHtml(JSON.stringify(header, null, 2))}</textarea>
-        </div>
-      </div>
-    </details>
-  `;
-}
+
+
 
 function renderSourceBanner(source) {
   if (source === 'legacy-import') {
@@ -306,7 +289,6 @@ export function renderHeaderEditorContent({ draftState, pages = [] }) {
     renderNavigationEditor(header, pages),
     renderPartsEditor(header),
     renderPlacementEditor(header),
-    renderAdvancedEditor(header),
   ].join('');
 }
 
@@ -418,15 +400,59 @@ export function bindHeaderEditorEvents({
     });
   });
 
-  el.pbModuleEditor.querySelectorAll('.pb-header-placement-input').forEach((input) => {
-    input.addEventListener('change', () => {
-      const blockId = input.dataset.blockId;
-      if (!blockId) return;
+  // ── Placement board: drag-and-drop ────────────────────────────────────
+  let draggedBlockId = null;
+
+  el.pbModuleEditor.querySelectorAll('.pb-header-layout-card').forEach((card) => {
+    card.addEventListener('dragstart', (event) => {
+      draggedBlockId = card.dataset.blockId || null;
+      if (!draggedBlockId) { event.preventDefault(); return; }
+      event.dataTransfer.effectAllowed = 'move';
+      // Defer class so the card isn't invisible before the drag image is captured.
+      requestAnimationFrame(() => card.classList.add('is-dragging'));
+    });
+
+    card.addEventListener('dragend', () => {
+      card.classList.remove('is-dragging');
+      el.pbModuleEditor.querySelectorAll('.pb-header-region--board').forEach((zone) => {
+        zone.classList.remove('is-drag-over');
+      });
+      draggedBlockId = null;
+    });
+  });
+
+  el.pbModuleEditor.querySelectorAll('.pb-header-region--board').forEach((zone) => {
+    zone.addEventListener('dragover', (event) => {
+      if (!draggedBlockId) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+    });
+
+    zone.addEventListener('dragenter', (event) => {
+      if (!draggedBlockId) return;
+      event.preventDefault();
+      zone.classList.add('is-drag-over');
+    });
+
+    zone.addEventListener('dragleave', (event) => {
+      // Only remove the class when we leave the zone itself, not a child element.
+      if (!zone.contains(/** @type {Node} */ (event.relatedTarget))) {
+        zone.classList.remove('is-drag-over');
+      }
+    });
+
+    zone.addEventListener('drop', (event) => {
+      event.preventDefault();
+      zone.classList.remove('is-drag-over');
+      const targetRegion = zone.dataset.region;
+      if (!draggedBlockId || !targetRegion) return;
       const nextState = cloneValue(state);
-      nextState.header = moveBlockToRegion(nextState.header, blockId, input.value);
+      nextState.header = moveBlockToRegion(nextState.header, draggedBlockId, targetRegion);
+      draggedBlockId = null;
       commit(nextState, { rerenderEditor: true, rerenderCanvas: true });
     });
   });
+
 
   el.pbModuleEditor.querySelectorAll('.pb-header-layout-button').forEach((button) => {
     button.addEventListener('click', () => {
@@ -511,18 +537,5 @@ export function bindHeaderEditorEvents({
     });
   });
 
-  document.getElementById('pbHeaderRawConfig')?.addEventListener('input', (event) => {
-    try {
-      const parsed = JSON.parse(event.target.value);
-      commit(
-        {
-          ...state,
-          header: parsed,
-        },
-        { rerenderCanvas: true }
-      );
-    } catch {
-      // Ignore invalid JSON until it becomes valid again.
-    }
-  });
+
 }

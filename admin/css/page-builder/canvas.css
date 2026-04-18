@@ -351,6 +351,23 @@
   gap: 6px;
 }
 
+.pb-page-header-empty-region {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.72rem;
+  font-style: italic;
+}
+
+.pb-page-header-part-empty {
+  font-style: italic;
+  color: rgba(255, 255, 255, 0.42);
+}
+
 .pb-page-header-chip {
   display: inline-flex;
   align-items: center;

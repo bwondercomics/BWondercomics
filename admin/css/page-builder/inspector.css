@@ -413,6 +413,53 @@
   min-width: 0;
 }
 
+.pb-header-layout-card-drag-handle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 1rem;
+  cursor: grab;
+  user-select: none;
+  transition: color 0.12s ease;
+}
+
+.pb-header-layout-card-drag-handle:hover {
+  color: rgba(0, 217, 255, 0.8);
+}
+
+.pb-header-layout-card[draggable='true'] {
+  cursor: default;
+}
+
+.pb-header-layout-card.is-dragging {
+  opacity: 0.38;
+  border-style: dashed;
+}
+
+.pb-header-region--board.is-drag-over {
+  border-color: rgba(0, 217, 255, 0.55);
+  background: rgba(0, 217, 255, 0.07);
+}
+
+.pb-header-region-empty {
+  padding: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  text-align: center;
+  transition: border-color 0.12s ease, background 0.12s ease;
+}
+
+.pb-header-region--board.is-drag-over .pb-header-region-empty {
+  border-color: rgba(0, 217, 255, 0.5);
+  background: rgba(0, 217, 255, 0.06);
+  color: #baf9ff;
+}
+
 .pb-editor-summary {
   display: flex;
   align-items: flex-start;

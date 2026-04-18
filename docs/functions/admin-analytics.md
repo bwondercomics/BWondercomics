@@ -1,4 +1,4 @@
-DO NOT USE AS REFERENCE, THE LOGIC IS FLAWED.
+
 # Admin Analytics Logic
 
 This document provides a comprehensive map of the internal functions and data structures within the `admin/analytics/` module.
@@ -8,12 +8,12 @@ This document provides a comprehensive map of the internal functions and data st
 - [🔌 Module Initialization](#-module-initialization)
 - [🔄 Data Flow](#-data-flow)
 - [🖼️ DOM Dependencies](#️-dom-dependencies)
-- [📈 admin_analytics_live.js](#-admin_analytics_livejs)
-- [📖 admin_analytics_reader.js](#-admin_analytics_readerjs)
-- [📊 admin_analytics_reads-over-time.js](#-admin_analytics_reads-over-timejs)
-- [🚦 admin_analytics_traffic.js](#-admin_analytics_trafficjs)
-- [🕰️ admin_analytics_visitor-history.js](#-admin_analytics_visitor-historyjs)
-- [🛠️ admin_analytics_shared.js](#-admin_analytics_sharedjs)
+- [📈 live.js](#-livejs)
+- [📖 reader.js](#-readerjs)
+- [📊 reads-over-time.js](#-reads-over-timejs)
+- [🚦 traffic.js](#-trafficjs)
+- [🕰️ visitor-history.js](#️-visitor-historyjs)
+- [🛠️ shared.js](#️-sharedjs)
 
 ## 💡 Core Concepts
 
@@ -118,7 +118,7 @@ The analytics modules rely on a global `el` object (defined in `admin/dom.js`) w
 - **Controls**: `analyticsVisitorHistorySearch`, `analyticsVisitorHistorySort`
 - **Metadata**: `analyticsVisitorHistoryStatus`, `analyticsVisitorHistoryMeta`
 
-## 📈 admin_analytics_live.js
+## 📈 live.js
 
 The `createLiveAnalytics` factory function manages the real-time "Seismometer" chart and visitor ticker.
 
@@ -169,7 +169,7 @@ Generates individual visitor cards (with country flags and current path) and pus
 #### `animateLiveTicker()`
 Recursively updates the `transform` of the ticker track to create an infinite scroll effect.
 
-## 📖 admin_analytics_reader.js
+## 📖 reader.js
 
 The `createReaderAnalytics` factory function manages long-term engagement metrics, retention rates, and historical trend charts.
 
@@ -220,7 +220,7 @@ Renders the detailed "Drill Down" view, including the bar chart and historical m
 #### `loadReaderSeries(...)`
 Fetches historical time-series data for the detail chart.
 
-## 📊 admin_analytics_reads-over-time.js
+## 📊 reads-over-time.js
 
 The `createReadsOverTimeAnalytics` factory function manages the historical "Pages Read" line chart.
 
@@ -242,7 +242,7 @@ The primary Canvas rendering engine for the historical line graph.
 #### `updateReadsOverTimeEntryOptions(payload)`
 Populates the entry selector. It automatically adds series context (e.g., "Series · Chapter 1") if multiple entries share the same label.
 
-## 🚦 admin_analytics_traffic.js
+## 🚦 traffic.js
 
 Manages site-wide traffic summaries and acquisition demographics.
 
@@ -265,7 +265,7 @@ Standard bar-chart renderers for traffic breakdowns.
 #### `formatBounceRate(item)` / `formatAverageVisitTime(item)`
 Engagement calculation helpers.
 
-## 🕰️ admin_analytics_visitor-history.js
+## 🕰️ visitor-history.js
 
 Manages the granular "Visitor History" explorer.
 
@@ -282,7 +282,7 @@ Generates a searchable string for local filtering.
 #### `renderVisitorHistoryDetail(visitor)`
 Renders the right-hand panel with reading progress and metadata.
 
-## 🛠️ admin_analytics_shared.js
+## 🛠️ shared.js
 
 Stateless utility functions used for consistent formatting.
 

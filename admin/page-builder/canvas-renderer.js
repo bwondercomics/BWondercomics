@@ -54,7 +54,7 @@ function getHeaderBlockPreview(blockId, headerState, currentPage) {
 
   if (blockId === 'brand') {
     const supportingCopy =
-      copy.subtitle || copy.subtitles?.[0] || 'Page title and subtitle live here.';
+      copy.subtitle || copy.subtitles?.[0] || 'Subtitle line';
     return `
       <span class="pb-page-header-part-primary">${escapeHtml(copy.title || currentPage?.title || 'Page Title')}</span>
       <span class="pb-page-header-part-secondary">${escapeHtml(supportingCopy)}</span>
@@ -63,7 +63,7 @@ function getHeaderBlockPreview(blockId, headerState, currentPage) {
 
   if (blockId === 'nav') {
     if (!enabledNavItems.length) {
-      return '<span class="pb-page-header-part-secondary">No navigation buttons yet.</span>';
+      return '<span class="pb-page-header-part-secondary pb-page-header-part-empty">No buttons — add one in Navigation Buttons</span>';
     }
     return `
       <div class="pb-page-header-chip-row">
@@ -72,6 +72,32 @@ function getHeaderBlockPreview(blockId, headerState, currentPage) {
           .map((item) => `<span class="pb-page-header-chip">${escapeHtml(item.label)}</span>`)
           .join('')}
         ${enabledNavItems.length > 4 ? '<span class="pb-page-header-chip">…</span>' : ''}
+      </div>
+    `;
+  }
+
+  if (blockId === 'patron') {
+    return `
+      <div class="pb-page-header-chip-row">
+        <span class="pb-page-header-chip">👋 Welcome, reader</span>
+      </div>
+    `;
+  }
+
+  if (blockId === 'status') {
+    return `
+      <div class="pb-page-header-chip-row">
+        <span class="pb-page-header-chip">📢 Status message</span>
+      </div>
+    `;
+  }
+
+  if (blockId === 'entryControls') {
+    return `
+      <div class="pb-page-header-chip-row">
+        <span class="pb-page-header-chip">◀</span>
+        <span class="pb-page-header-chip">Ch. 42</span>
+        <span class="pb-page-header-chip">▶</span>
       </div>
     `;
   }
@@ -116,18 +142,21 @@ function renderPageHeaderSurface(state) {
             <div class="pb-page-header-region" data-region="${region}">
               <div class="pb-page-header-region-label">${escapeHtml(formatRegionLabel(region))}</div>
               <div class="pb-page-header-region-stack">
-                ${blockIds
-                  .map((blockId) => {
-                    const block = HEADER_BLOCK_DEFS.find((item) => item.id === blockId);
-                    const enabled = headerState.header?.blocks?.[blockId]?.enabled !== false;
-                    return `
-                      <div class="pb-page-header-part ${enabled ? '' : 'is-disabled'}">
-                        <span class="pb-page-header-part-label">${escapeHtml(block?.label || blockId)}</span>
-                        ${getHeaderBlockPreview(blockId, headerState, state.currentPage)}
-                      </div>
-                    `;
-                  })
-                  .join('')}
+                ${blockIds.length
+                  ? blockIds
+                      .map((blockId) => {
+                        const block = HEADER_BLOCK_DEFS.find((item) => item.id === blockId);
+                        const enabled = headerState.header?.blocks?.[blockId]?.enabled !== false;
+                        return `
+                          <div class="pb-page-header-part ${enabled ? '' : 'is-disabled'}">
+                            <span class="pb-page-header-part-label">${escapeHtml(block?.label || blockId)}</span>
+                            ${getHeaderBlockPreview(blockId, headerState, state.currentPage)}
+                          </div>
+                        `;
+                      })
+                      .join('')
+                  : '<div class="pb-page-header-empty-region">Empty region</div>'
+                }
               </div>
             </div>
           `;

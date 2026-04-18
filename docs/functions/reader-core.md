@@ -2,15 +2,62 @@
 
 This document describes the current reader runtime under `reader/`. It replaces older descriptions that mixed live code with legacy or planned behavior.
 
-## Scope
+## Table of Contents
+
+- [💡 Scope & Canonical Data Sources](#-scope--canonical-data-sources)
+- [⚙️ Boot And Runtime Flow](#️-boot-and-runtime-flow)
+- [🔌 Main Entry Point (app.js)](#-main-entry-point-appjs)
+- [💾 Data Hydration (data.js)](#-data-hydration-datajs)
+- [💾 Global State (state.js)](#-global-state-statejs)
+- [🖼️ Page Renderer (render.js)](#️-page-renderer-renderjs)
+- [🎮 Navigation Controls (controls.js)](#-navigation-controls-controlsjs)
+- [🖱️ Pointer Engine (pointer.js)](#️-pointer-engine-pointerjs)
+- [📐 Transform Engine (transform.js)](#-transform-engine-transformjs)
+- [🔲 Fullscreen Manager (fullscreen.js)](#-fullscreen-manager-fullscreenjs)
+- [🪟 Overlays Management (overlays.js)](#-overlays-management-overlaysjs)
+- [🖼️ Gallery Engine (gallery.js)](#️-gallery-engine-galleryjs)
+- [🖼️ DOM Registry (dom.js)](#️-dom-registry-domjs)
+- [⚙️ Config Constants (config.js)](#️-config-constants-configjs)
+- [📚 Entry Management (entries.js)](#-entry-management-entriesjs)
+- [📚 Series Context (series.js)](#-series-context-seriesjs)
+- [🛠️ Utilities (utils.js)](#️-utilities-utilsjs)
+- [📝 Logger (logger.js)](#-logger-loggerjs)
+- [📄 Builder Page Renderer (page-renderer.js)](#-builder-page-renderer-page-rendererjs)
+- [🏗️ Header Layout (header-layout.js)](#-header-layout-header-layoutjs)
+- [🖌️ Legacy Customization (customization.js)](#️-legacy-customization-customizationjs)
+- [📊 Analytics Coordinator (analytics.js)](#-analytics-coordinator-analyticsjs)
+- [📡 Live Tracker (live-tracking.js)](#-live-tracker-live-trackingjs)
+- [🎯 Comment Targets (comment-targets.js)](#-comment-targets-comment-targetsjs)
+- [🗣️ Comments Engine (comic-comments.js)](#️-comments-engine-comic-commentsjs)
+- [🎨 Comments Engine Styles (comic-comments.css)](#-comments-engine-styles-comic-commentscss)
+- [🔐 Authentication (auth.js)](#-authentication-authjs)
+- [📡 API Layer (api.js)](#-api-layer-apijs)
+- [🔢 Constants Registry (constants.js)](#-constants-registry-constantsjs)
+- [👤 User Settings Overlay (user-settings.js)](#-user-settings-overlay-user-settingsjs)
+- [📧 Email Signup form (email.js)](#-email-signup-form-emailjs)
+- [🚀 Latest Posts Widget (latest.js)](#-latest-posts-widget-latestjs)
+- [📰 Feed Panel (feed-panel.js)](#-feed-panel-feed-paneljs)
+- [💬 Chat SSO Integration (chat-sso.js)](#-chat-sso-integration-chat-ssojs)
+- [🛡️ Safe Mode Guard (safe-mode.js)](#️-safe-mode-guard-safe-modejs)
+- [📜 Current Behavioral Contracts](#-current-behavioral-contracts)
+- [⚠️ Deprecated Or Easy-To-Misstate Areas](#️-deprecated-or-easy-to-misstate-areas)
+
+## 💡 Scope & Canonical Data Sources
 
 The reader is split into three layers:
+- **Core reading runtime**: boot, data loading, state, render, controls, transforms, fullscreen, and overlays.
+- **Builder-page runtime**: page fetching/rendering plus shared header/layout integration.
+- **Support surfaces**: analytics, comments, auth/API helpers, feed/latest widgets, safe-mode redirect, and user settings.
 
-- Core reading runtime: boot, data loading, state, render, controls, transforms, fullscreen, and overlays.
-- Builder-page runtime: page fetching/rendering plus shared header/layout integration.
-- Support surfaces: analytics, comments, auth/API helpers, feed/latest widgets, safe-mode redirect, and user settings.
+### Canonical Data Sources
+- `data.json` or `/series/<seriesId>/data.json`: entry pages, entry metadata, status message, premium flags, unit labels, and entry labels.
+- `/api/pages/<seriesId>/<slug>`: published builder pages for reader pages.
+- `/api/admin/pages/by-slug/<seriesId>/<slug>`: draft builder pages when `draft=1` is requested by an admin.
+- `page-config.json` or `/series/<seriesId>/page-config.json`: legacy page config fallback for the default reader slug only.
+- `/api/posts/latest` and `/api/posts`: latest update widget and feed content.
+- `localStorage`: reading progress, reader analytics opt-out, visitor id, and some UI preferences.
 
-## Boot And Runtime Flow
+## ⚙️ Boot And Runtime Flow
 
 1. `index.html` loads `reader/app.js` and `reader/customization.js`.
 2. `reader/app.js` creates a shared boot-state object on `window`, keeps the static shell hidden with `reader-bootstrap-loading`, and loads:
@@ -22,77 +69,114 @@ The reader is split into three layers:
 5. After the first render or error state is ready, `app.js` releases bootstrap hiding and exposes `window.BattleBros` subtitle helpers.
 6. `reader/customization.js` waits for the boot result and exits early when the builder page already owns the initial DOM, preventing the legacy shell from repainting over builder content.
 
-## Canonical Data Sources
+## 🔌 Main Entry Point (app.js)
+The composition root. Loads runtime data, applies premium gating, initializes DOM bindings, coordinates boot-state handoff, lazy-loads `gallery.js` and `fullscreen.js`, and reacts to session changes.
 
-- `data.json` or `/series/<seriesId>/data.json`: entry pages, entry metadata, status message, premium flags, unit labels, and entry labels.
-- `/api/pages/<seriesId>/<slug>`: published builder pages for reader pages.
-- `/api/admin/pages/by-slug/<seriesId>/<slug>`: draft builder pages when `draft=1` is requested by an admin.
-- `page-config.json` or `/series/<seriesId>/page-config.json`: legacy page config fallback for the default reader slug only.
-- `/api/posts/latest` and `/api/posts`: latest update widget and feed content.
-- `localStorage`: reading progress, reader analytics opt-out, visitor id, and some UI preferences.
+## 💾 Data Hydration (data.js)
+Fetches entry data, page config, latest posts, and builder pages. Applies builder-page DOM, theme, panel backgrounds, feed modules, promo carousels, and shared header layout.
 
-## Core Runtime Modules
+## 💾 Global State (state.js)
+The shared runtime state for current entry, page index, zoom/pan, page metrics, image cache, and persisted progress.
 
-- `reader/app.js`: composition root. Loads runtime data, applies premium gating, initializes DOM bindings, coordinates boot-state handoff, lazy-loads `gallery.js` and `fullscreen.js`, and reacts to session changes.
-- `reader/data.js`: fetches entry data, page config, latest posts, and builder pages. Applies builder-page DOM, theme, panel backgrounds, feed modules, promo carousels, and shared header layout.
-- `reader/state.js`: shared runtime state for current entry, page index, zoom/pan, page metrics, image cache, and persisted progress.
-- `reader/render.js`: renders the current page or spread, updates labels and disabled states, preloads upcoming pages, caches natural image sizes, and reapplies desktop frame fitting outside fullscreen.
-- `reader/controls.js`: prev/next/restart navigation and end-of-entry overlay helpers.
-- `reader/pointer.js`: pointer, drag, wheel, pinch, swipe, and edge-zone handling for navigation and zoom/pan.
-- `reader/transform.js`: scale/pan math, reset/zoom helpers, desktop on-page frame sizing, and fullscreen fit-height behavior.
-- `reader/fullscreen.js`: fullscreen entry/exit, controls-bar visibility, and coordination with frame fitting.
-- `reader/overlays.js`: shortcuts modal plus entry-change helpers used by overlays and end-of-entry flows.
-- `reader/gallery.js`: entry cover gallery rendering, selection, and gallery button wiring.
-- `reader/dom.js`: cached element registry and a small `h(...)` helper for DOM construction.
-- `reader/config.js`: reader-specific constants such as cache sizes, zoom limits, breakpoints, timings, and storage keys.
-- `reader/entries.js`: entry sorting, numeric extraction, and sanitized entry/page normalization.
-- `reader/series.js`: series id, page slug, draft-mode parsing, and public file-path helpers.
-- `reader/utils.js`: lightweight helpers such as throttling and cached measurement.
-- `reader/logger.js`: debug logging facade used across reader modules.
+## 🖼️ Page Renderer (render.js)
+Renders the current page or spread, updates labels and disabled states, preloads upcoming pages, caches natural image sizes, and reapplies desktop frame fitting outside fullscreen.
 
-## Builder-Page Runtime
+## 🎮 Navigation Controls (controls.js)
+Prev/next/restart navigation and end-of-entry overlay helpers.
 
-- `reader/page-renderer.js`: reader-side page renderer built on the shared builder renderers. Exports `renderPage`, `renderModule`, `fetchPage`, `mountPage`, `initEmailForms`, and `initPromoCarousels`.
-- `reader/header-layout.js`: applies the effective page-header layout into the existing topbar DOM rather than replacing the whole header.
-- `reader/customization.js`: legacy page-config applier. It now only runs when the builder page did not claim the initial page.
+## 🖱️ Pointer Engine (pointer.js)
+Pointer, drag, wheel, pinch, swipe, and edge-zone handling for navigation and zoom/pan.
+
+## 📐 Transform Engine (transform.js)
+Scale/pan math, reset/zoom helpers, desktop on-page frame sizing, and fullscreen fit-height behavior.
+
+## 🔲 Fullscreen Manager (fullscreen.js)
+Fullscreen entry/exit, controls-bar visibility, and coordination with frame fitting.
+
+## 🪟 Overlays Management (overlays.js)
+Shortcuts modal plus entry-change helpers used by overlays and end-of-entry flows.
+
+## 🖼️ Gallery Engine (gallery.js)
+Entry cover gallery rendering, selection, and gallery button wiring.
+
+## 🖼️ DOM Registry (dom.js)
+Cached element registry and a small `h(...)` helper for DOM construction.
+
+## ⚙️ Config Constants (config.js)
+Reader-specific constants such as cache sizes, zoom limits, breakpoints, timings, and storage keys.
+
+## 📚 Entry Management (entries.js)
+Entry sorting, numeric extraction, and sanitized entry/page normalization.
+
+## 📚 Series Context (series.js)
+Series id, page slug, draft-mode parsing, and public file-path helpers.
+
+## 🛠️ Utilities (utils.js)
+Lightweight helpers such as throttling and cached measurement.
+
+## 📝 Logger (logger.js)
+Debug logging facade used across reader modules.
+
+## 📄 Builder Page Renderer (page-renderer.js)
+Reader-side page renderer built on the shared builder renderers. Exports `renderPage`, `renderModule`, `fetchPage`, `mountPage`, `initEmailForms`, and `initPromoCarousels`.
+
+## 🏗️ Header Layout (header-layout.js)
+Applies the effective page-header layout into the existing topbar DOM rather than replacing the whole header.
 
 Important current rule:
-
 - Builder page metadata in `page.meta.header` is the preferred source for reader header copy, layout, visible blocks, and nav links.
 - Legacy `page-config` and legacy `header` module content are fallback-only compatibility inputs.
 
-## Analytics And Tracking
+## 🖌️ Legacy Customization (customization.js)
+Legacy page-config applier. It now only runs when the builder page did not claim the initial page.
 
-- `reader/analytics.js`: sends `reader_page_view`, `reader_entry_complete`, and `reader_entry_exit` events. It tracks visible pages, completion, and entry exit while respecting the `battlebros_count_views=false` opt-out flag in `localStorage`.
-- `reader/live-tracking.js`: maintains a lightweight visitor heartbeat to `/api/track/visitor` with visitor id, path, series id, entry label, and page number.
+## 📊 Analytics Coordinator (analytics.js)
+Sends `reader_page_view`, `reader_entry_complete`, and `reader_entry_exit` events. It tracks visible pages, completion, and entry exit while respecting the `battlebros_count_views=false` opt-out flag in `localStorage`.
 
-These are separate systems:
+Analytics and live tracking are separate systems. `analytics.js` handles reader engagement analytics.
 
-- `analytics.js` is reader engagement analytics.
-- `live-tracking.js` is active-visitor presence tracking.
+## 📡 Live Tracker (live-tracking.js)
+Maintains a lightweight visitor heartbeat to `/api/track/visitor` with visitor id, path, series id, entry label, and page number. It handles active-visitor presence tracking.
 
-## Comments, Auth, And User APIs
+## 🎯 Comment Targets (comment-targets.js)
+Builds stable target ids such as `battle-bros:entry-5` and post target ids.
 
-- `reader/comment-targets.js`: builds stable target ids such as `battle-bros:entry-5` and post target ids.
-- `reader/comic-comments.js`: self-contained reader comments UI. It handles session checks, sign-in/register/sign-out, comment posting, admin moderation calls, entry-target changes, and comment-panel collapse/expand behavior. It also requests `fitOnPageFrame()` after comment layout changes.
-- `reader/comic-comments.css`: styles the comments surface.
-- `reader/auth.js`: standalone auth manager with session check, login, register, logout, listener subscription, and `bbSessionChanged` event dispatch.
-- `reader/api.js`: generic JSON fetch helpers plus comment/post convenience methods.
-- `reader/constants.js`: shared endpoint and status-code constants used by auth/API/user-settings helpers.
-- `reader/user-settings.js`: overlay-driven account UI for sign-in, email opt-in, premium-code redeem, comment management, logout, and account deletion.
+## 🗣️ Comments Engine (comic-comments.js)
+Self-contained reader comments UI. It handles session checks, sign-in/register/sign-out, comment posting, admin moderation calls, entry-target changes, and comment-panel collapse/expand behavior. It also requests `fitOnPageFrame()` after comment layout changes.
 
-Note:
+Note: `comic-comments.js` currently uses its own local fetch helpers instead of importing `reader/api.js` or `reader/auth.js`.
 
-- `comic-comments.js` currently uses its own local fetch helpers instead of importing `reader/api.js` or `reader/auth.js`.
+## 🎨 Comments Engine Styles (comic-comments.css)
+Styles the comments surface.
 
-## Feed, Latest, Safe Mode, And External Surfaces
+## 🔐 Authentication (auth.js)
+Standalone auth manager with session check, login, register, logout, listener subscription, and `bbSessionChanged` event dispatch.
 
-- `reader/latest.js`: renders the latest-update widget and generates safe preview HTML.
-- `reader/feed-panel.js`: powers the right-panel feed surface and builder feed modules. It loads `/api/posts`, sanitizes post content, renders preview cards, and toggles feed mode.
-- `reader/chat-sso.js`: chat/community handoff support.
-- `reader/safe-mode.js`: optional redirect guard. It reads `/page-config.json` on non-local hosts and redirects to `safeModeUrl` when safe mode is enabled.
+## 📡 API Layer (api.js)
+Generic JSON fetch helpers plus comment/post convenience methods.
 
-## Current Behavioral Contracts
+## 🔢 Constants Registry (constants.js)
+Shared endpoint and status-code constants used by auth/API/user-settings helpers.
+
+## 👤 User Settings Overlay (user-settings.js)
+Overlay-driven account UI for sign-in, email opt-in, premium-code redeem, comment management, logout, and account deletion.
+
+## 📧 Email Signup form (email.js)
+Email signup form handler. Binds submit events, handles API submission, and displays success/error feedback inline.
+
+## 🚀 Latest Posts Widget (latest.js)
+Renders the latest-update widget and generates safe preview HTML.
+
+## 📰 Feed Panel (feed-panel.js)
+Powers the right-panel feed surface and builder feed modules. It loads `/api/posts`, sanitizes post content, renders preview cards, and toggles feed mode.
+
+## 💬 Chat SSO Integration (chat-sso.js)
+Chat/community handoff support.
+
+## 🛡️ Safe Mode Guard (safe-mode.js)
+Optional redirect guard. It reads `/page-config.json` on non-local hosts and redirects to `safeModeUrl` when safe mode is enabled.
+
+## 📜 Current Behavioral Contracts
 
 - Two-page mode is derived at render time; it is not a separate persisted mode toggle in `state`.
 - Protected entry assets starting with `protected/` are mapped to `/api/protected/...`.
@@ -101,7 +185,7 @@ Note:
 - Progress is persisted with `state.saveProgress()` to the `battleBros_progress` key.
 - Premium gating is applied in `app.js` after session state is known; non-premium users can have premium entries removed from the active entry list or the whole reader locked when the series is premium-only.
 
-## Deprecated Or Easy-To-Misstate Areas
+## ⚠️ Deprecated Or Easy-To-Misstate Areas
 
 - `page-config.json` is no longer the primary reader-page source. Builder pages are primary.
 - Legacy fallback is limited to the default `reader` slug and is documented for removal once the series-level fallback audit is clean and a published `reader` page exists.

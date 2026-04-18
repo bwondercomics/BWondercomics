@@ -477,17 +477,18 @@ Goal: make the page designer show the real page-scoped header builder by default
 - The banner disappears after saving — `saveActiveHeaderDraft` writes normalized V3 data and re-initializes the draft from the server response, so the source becomes `'page-meta-v3'` and the banner is suppressed on the next render.
 - Added 4 new shell tests: import banner present for legacy pages, absent for V3 pages, cleared after save, and canvas chip visible for legacy sources. Full suite: 37 files, 231 passing, 0 regressions.
 
-#### Step 3 - Upgrade the header editor UX to feel like an official builder tool
+#### Step 3 - Upgrade the header editor UX to feel like an official builder tool ✅
 
-- keep the existing four editor sections, but make them the canonical workflow:
-  - `Header Copy`
-  - `Navigation Buttons`
-  - `Header Parts`
-  - `Placement`
-- strengthen the canvas preview so it shows real block order, button presence, and empty states instead of reading like a placeholder
-- make the placement board support direct reordering between `left`, `center`, and `right`
-- keep keyboard/button-based movement as a fallback accessibility path even if drag/reorder becomes the primary interaction
-- keep explicit `Save Header` / `Discard` behavior and block context switches while the header draft is dirty
+**Implemented (2026-04-18):**
+
+- Removed the Advanced raw JSON accordion from the header editor — the editor is now fully structured with no JSON fallback path, matching BUILDER_PLAN.md line 460.
+- Upgraded the placement board to support direct drag-and-drop reordering between `left`, `center`, and `right` regions; each block card is `draggable="true"` with a visible grip handle.
+- Kept keyboard/button-based Move Left, Right, Up, Down as the accessible fallback path.
+- Removed the orphaned region `<select>` dropdown (superseded by drag + buttons).
+- Strengthened the canvas header preview: `patron`, `status`, and `entryControls` now render block-specific representative chips instead of generic definition text; `nav` empty state shows an actionable hint; empty regions show an "Empty region" placeholder instead of rendering nothing.
+- Updated the Placement section description to reflect drag-first workflow copy.
+- Updated the editor-panel subtitle for the header editor shell to workflow-oriented language.
+- Added 5 new shell tests: absence of raw JSON textarea, draggable attributes on placement cards, block-specific canvas chips for patron/status/entryControls, empty-region indicator, drag-first section copy. Full suite: 37 files, 236 passing, 0 regressions.
 
 #### Step 4 - Bring header buttons onto the shared button model
 
@@ -592,4 +593,4 @@ This builder is in a good place when all of the following are true:
 - authors can trust what they preview
 - page saves do not silently overwrite each other
 - legacy fallback paths are small, intentional, and temporary
-- the builder remains simpler than the site it serves
+- the builder remains simple and effective
