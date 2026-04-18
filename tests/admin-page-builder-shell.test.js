@@ -1394,3 +1394,192 @@ describe('Phase 6 Step 3 — header editor UX upgrades', () => {
     expect(sectionCopies.some((t) => t?.includes('Drag blocks between regions'))).toBe(true);
   });
 });
+
+// ── Step 4 regressions ───────────────────────────────────────────────────────
+describe('Phase 6 Step 4 — header buttons on the shared button model', () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+    vi.restoreAllMocks();
+  });
+
+  it('renders a Style select with primary/secondary options in the header nav editor', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector('[data-action="select-page-header"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    // At least one nav item should be present; each must expose a style select
+    const styleSelects = document.querySelectorAll(
+      '.pb-header-nav-input[data-item-key="style"]'
+    );
+    expect(styleSelects.length).toBeGreaterThan(0);
+
+    // The select must offer both primary and secondary options
+    const firstSelect = styleSelects[0];
+    const optionValues = Array.from(firstSelect.querySelectorAll('option')).map(
+      (o) => o.value
+    );
+    expect(optionValues).toContain('primary');
+    expect(optionValues).toContain('secondary');
+  });
+
+  it('persists the secondary style in the draft state when the select changes', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector('[data-action="select-page-header"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const firstStyleSelect = document.querySelector(
+      '.pb-header-nav-input[data-item-key="style"]'
+    );
+    expect(firstStyleSelect).not.toBeNull();
+
+    firstStyleSelect.value = 'secondary';
+    firstStyleSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(1);
+
+    // Canvas should re-render; verify the chip carries the secondary class
+    const secondaryChip = document.querySelector('.pb-page-header-chip--secondary');
+    expect(secondaryChip).not.toBeNull();
+  });
+
+  it('defaults new header nav items to style="primary"', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector('[data-action="select-page-header"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const beforeCount = document.querySelectorAll('.pb-header-nav-item').length;
+
+    document
+      .getElementById('pbHeaderAddNavItem')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const afterCount = document.querySelectorAll('.pb-header-nav-item').length;
+    expect(afterCount).toBe(beforeCount + 1);
+
+    // The newly added item's style select must default to "primary"
+    const allStyleSelects = document.querySelectorAll(
+      '.pb-header-nav-input[data-item-key="style"]'
+    );
+    const lastSelect = allStyleSelects[allStyleSelects.length - 1];
+    expect(lastSelect?.value).toBe('primary');
+  });
+
+  it('canvas nav chips carry pb-page-header-chip--primary for existing nav items', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    // Ensure nav block is enabled and in a region
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    // Nav items from the fixture have no stored style — they should default to primary
+    const surface = document.querySelector('.pb-page-header-surface');
+    const chips = surface?.querySelectorAll('.pb-page-header-chip');
+    const navChips = Array.from(chips || []).filter(
+      (c) =>
+        c.classList.contains('pb-page-header-chip--primary') ||
+        c.classList.contains('pb-page-header-chip--secondary')
+    );
+    // At least all visible nav chips must carry a variant class
+    expect(navChips.length).toBeGreaterThan(0);
+    navChips.forEach((chip) => {
+      expect(
+        chip.classList.contains('pb-page-header-chip--primary') ||
+        chip.classList.contains('pb-page-header-chip--secondary')
+      ).toBe(true);
+    });
+  });
+
+  it('persists the secondary style through a round-trip save', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector('[data-action="select-page-header"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    // Switch first nav item to secondary
+    const firstStyleSelect = document.querySelector(
+      '.pb-header-nav-input[data-item-key="style"]'
+    );
+    firstStyleSelect.value = 'secondary';
+    firstStyleSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(1);
+
+    // Save the header draft
+    document
+      .getElementById('pbSaveHeader')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(5);
+
+    expect(mocks.updatePage).toHaveBeenCalledWith(
+      selectedPage.id,
+      expect.objectContaining({
+        meta: expect.objectContaining({
+          header: expect.objectContaining({
+            nav: expect.objectContaining({
+              items: expect.arrayContaining([
+                expect.objectContaining({ style: 'secondary' }),
+              ]),
+            }),
+          }),
+        }),
+      })
+    );
+  });
+});

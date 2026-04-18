@@ -490,20 +490,18 @@ Goal: make the page designer show the real page-scoped header builder by default
 - Updated the editor-panel subtitle for the header editor shell to workflow-oriented language.
 - Added 5 new shell tests: absence of raw JSON textarea, draggable attributes on placement cards, block-specific canvas chips for patron/status/entryControls, empty-region indicator, drag-first section copy. Full suite: 37 files, 236 passing, 0 regressions.
 
-#### Step 4 - Bring header buttons onto the shared button model
+#### Step 4 - Bring header buttons onto the shared button model ✅
 
-- extend header nav items so they can use the same style preset concept as the `buttons` module
-- support add, remove, reorder, enable/disable, and target editing for every header button
-- keep the existing link target contract:
-  - `builder-page`
-  - `url`
-  - `anchor`
-- render those button variants consistently in:
-  - the header inspector
-  - the canvas header preview
-  - preview mode
-  - the live reader header
-- do not introduce per-button custom color systems in this pass; reuse shared button variants instead
+**Implemented (2026-04-18):**
+
+- Added a `style` field (`'primary'` | `'secondary'`) to `normalizeHeaderNavItem()` in `link-utils.js`, giving header nav items the same variant concept as the `buttons` module. Unknown values fall back to `'primary'`, preserving existing visual behaviour for all stored data.
+- Added a **Style** dropdown (Primary / Secondary) to each header nav item card in `header-editor.js`. The existing `.pb-header-nav-input` event handler picks it up automatically — no extra binding code required.
+- Updated `canvas-renderer.js` so nav-block chips carry `pb-page-header-chip--primary` or `pb-page-header-chip--secondary` modifier classes, giving authors an at-a-glance distinction in the placement board.
+- Updated `reader/header-layout.js` to apply `nav-link--primary` or `nav-link--secondary` to each dynamically rendered header link.
+- Added `.nav-link--secondary` (outline/transparent treatment) to `main.core.04-header.css`. The existing `.nav-link` styles remain the primary treatment.
+- Added `.pb-page-header-chip--secondary` (outline chip) to the admin canvas CSS.
+- No per-button custom color system introduced; only the two existing shared button variants are reused.
+- Added 6 new tests (1 unit in link-utils, 5 shell): style select presence, secondary draft persistence, primary default for new items, chip variant classes, and round-trip save. Full suite: 37 files, 242 passing, 0 regressions.
 
 #### Step 5 - Keep renderer parity and migration explicit
 

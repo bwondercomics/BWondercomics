@@ -69,7 +69,10 @@ function getHeaderBlockPreview(blockId, headerState, currentPage) {
       <div class="pb-page-header-chip-row">
         ${enabledNavItems
           .slice(0, 4)
-          .map((item) => `<span class="pb-page-header-chip">${escapeHtml(item.label)}</span>`)
+          .map((item) => {
+            const variant = item.style === 'secondary' ? 'secondary' : 'primary';
+            return `<span class="pb-page-header-chip pb-page-header-chip--${variant}">${escapeHtml(item.label)}</span>`;
+          })
           .join('')}
         ${enabledNavItems.length > 4 ? '<span class="pb-page-header-chip">…</span>' : ''}
       </div>

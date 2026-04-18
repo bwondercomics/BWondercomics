@@ -122,6 +122,7 @@ Reader-side page renderer built on the shared builder renderers. Exports `render
 
 ## 🏗️ Header Layout (header-layout.js)
 Applies the effective page-header layout into the existing topbar DOM rather than replacing the whole header.
+It clears existing public links and re-mounts them based on `page.meta.header.nav.items`, applying the appropriate variants (`.nav-link--primary` or `.nav-link--secondary`).
 
 Important current rule:
 - Builder page metadata in `page.meta.header` is the preferred source for reader header copy, layout, visible blocks, and nav links.

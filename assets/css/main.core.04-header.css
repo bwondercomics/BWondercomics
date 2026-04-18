@@ -159,6 +159,33 @@ header.topbar {
     0 0 20px rgba(0, 217, 255, 0.35);
 }
 
+/* ── Nav button style variants ─────────────────────────────────────────── */
+
+/* Primary variant — identical to the baseline .nav-link treatment.
+   An explicit nav-link--primary class is applied when style="primary" is stored. */
+
+/* Secondary variant — outline-only; no fill, no glow shadow. */
+.nav-link--secondary {
+  background: transparent;
+  border: 2px solid var(--primary);
+  box-shadow: none;
+}
+
+.nav-link--secondary:hover {
+  background: rgba(0, 217, 255, 0.1);
+  border-color: var(--secondary);
+  box-shadow:
+    0 4px 0 rgba(0, 0, 0, 0.25),
+    0 0 12px rgba(0, 217, 255, 0.25);
+  transform: translateY(-2px);
+  color: var(--text);
+}
+
+.nav-link--secondary:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
 .status-panel {
   display: inline-flex;
   align-items: center;

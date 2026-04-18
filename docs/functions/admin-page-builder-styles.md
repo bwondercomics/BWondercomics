@@ -68,6 +68,9 @@ The staging environment where the actual page layout is constructed and previewe
 ### Principal Components
 - **Canvas Header**: `.pb-canvas-header` houses the page title and status indicators (`.pb-page-title-note[data-status='warning']` etc). Also holds "Publish" and view toggles.
 - **Page Meta Surface**: `.pb-page-header-surface` provides a clickable block representing the global page heading/metadata.
+  - Features structural badges (`.pb-page-header-badge--import` / `--stale`)
+  - The `nav` region displays representing chips: standard `.pb-page-header-chip` (`pb-page-header-chip--primary`) or outline-only `.pb-page-header-chip--secondary` for secondary buttons.
+  - Empty regions display a `.pb-page-header-empty-region` indicator.
 - **Section Grid Layout**: `.pb-section-columns` drives horizontal layout via `data-layout` attributes (e.g. `1-1`, `1-2`, `1-3-1`) determining how CSS Grid distributes `.pb-column` children.
 - **Target Selections**: `.pb-section` and `.pb-module` use `.selected` classes to render cyan highlight borders when targeted by the right-hand Inspector.
 - **Preview Scaling**: Provides width restraints (`.pb-preview-frame[data-width='...']`) limiting layout bounds to `desktop`, `tablet`, or `mobile` constraints.

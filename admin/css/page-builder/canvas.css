@@ -379,6 +379,13 @@
   font-weight: 600;
 }
 
+/* Outline-only chip for secondary-style nav buttons in the canvas preview */
+.pb-page-header-chip--secondary {
+  background: transparent;
+  border: 1px solid rgba(0, 217, 255, 0.45);
+  color: var(--primary, #00d9ff);
+}
+
 .pb-section {
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);

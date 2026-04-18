@@ -126,7 +126,8 @@ This renders and binds the page-header editor UI used by the inspector.
 Current editor responsibilities include:
 - showing an import/upgrade banner if the active header draft is from a non-canonical `source` (e.g., `legacy-import`)
 - title and subtitle copy editing
-- nav item editing
+- nav item CRUD: add, remove, reorder, enable/disable, and target editing for every header button
+- **Style preset dropdown** per nav item: `Primary` (filled/neon) or `Secondary` (outline-only) — maps to the same variant model used by the `buttons` module
 - block visibility toggles
 - drag-and-drop left/center/right region placement (with keyboard-accessible buttons as fallback)
 
@@ -245,7 +246,12 @@ The builder validation layer. Includes helpers for sanitizing builder HTML, proc
 
 ## 🔗 Link Utilities (link-utils.js)
 
-A shared utility library for manipulating and normalizing links across the builder. Contains `normalizeLinkTarget`, `resolveLinkTargetHref`, and `buildReaderPageHref` for routing parity.
+A shared utility library for manipulating and normalizing links across the builder. Key exports:
+- `normalizeLinkTarget` — canonicalizes `builder-page`, `url`, and `anchor` link targets; sanitizes unsafe URLs
+- `resolveLinkTargetHref`, `shouldOpenLinkInNewTab`, `buildReaderPageHref` — routing / href resolution
+- `normalizeButtonItem` — normalizes a `buttons` module item, including `style: 'primary' | 'secondary'`
+- `normalizeHeaderNavItem` / `normalizeHeaderNavItems` — normalizes a header nav item; now includes `style: 'primary' | 'secondary'` (defaults to `'primary'`), making header nav items structurally compatible with the button module's variant model
+- `normalizeButtonsConfig` — normalizes a full `buttons` module config
 
 ## 📖 Current Module Catalog
 

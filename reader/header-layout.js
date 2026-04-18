@@ -72,7 +72,8 @@ function renderNavItems(navEl, headerConfig, seriesId) {
   (headerConfig.nav?.items || []).forEach((item) => {
     if (item.enabled === false) return;
     const link = document.createElement('a');
-    link.className = 'nav-link';
+    const variant = item.style === 'secondary' ? 'secondary' : 'primary';
+    link.className = `nav-link nav-link--${variant}`;
     link.textContent = item.label || 'Link';
     link.href = resolveLinkTargetHref(item.link, { seriesId });
     if (shouldOpenLinkInNewTab(item.link)) {

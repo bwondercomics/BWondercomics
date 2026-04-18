@@ -157,6 +157,13 @@ function renderNavigationEditor(header, pages) {
           <input type="text" class="pb-editor-input pb-header-nav-input" data-item-index="${index}" data-item-key="label" value="${escapeAttr(item.label || '')}">
         </div>
         <div class="pb-editor-field">
+          <label class="pb-editor-label">Style</label>
+          <select class="pb-editor-select pb-header-nav-input" data-item-index="${index}" data-item-key="style">
+            <option value="primary" ${item.style !== 'secondary' ? 'selected' : ''}>Primary</option>
+            <option value="secondary" ${item.style === 'secondary' ? 'selected' : ''}>Secondary</option>
+          </select>
+        </div>
+        <div class="pb-editor-field">
           <label class="pb-editor-label">
             <input type="checkbox" class="pb-header-nav-input" data-item-index="${index}" data-item-key="enabled" ${item.enabled !== false ? 'checked' : ''}> Show this button
           </label>

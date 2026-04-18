@@ -63,6 +63,7 @@ function normalizeHeaderNavItem(item = {}) {
     id: item.id || createId('nav'),
     label: String(item.label || item.text || '').trim() || 'Link',
     enabled: item.enabled !== false,
+    style: ['primary', 'secondary'].includes(item.style) ? item.style : 'primary',
     link: normalizeLinkTarget(item.link, item.url),
   };
 }
