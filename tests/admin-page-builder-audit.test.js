@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  auditPageFallbacks,
-  auditPagesFallbacks,
-} from '../admin/page-builder/header-config.js';
+import { auditPageFallbacks, auditPagesFallbacks } from '../admin/page-builder/header-config.js';
 import { buildContractFixture, getContractFixture } from './helpers/contracts.js';
 
 /**
@@ -62,7 +59,11 @@ describe('auditPageFallbacks – per-page fallback inventory', () => {
       meta: {
         header: {
           version: 2,
-          regions: { left: ['brand'], center: ['nav'], right: ['entryControls', 'status', 'patron'] },
+          regions: {
+            left: ['brand'],
+            center: ['nav'],
+            right: ['entryControls', 'status', 'patron'],
+          },
           blocks: {
             brand: { enabled: true },
             patron: { enabled: true },
@@ -123,9 +124,36 @@ describe('auditPageFallbacks – per-page fallback inventory', () => {
 
     const issue = result.issues.find((i) => i.bucket === 'legacyHeaderModule');
     expect(issue).toBeDefined();
-    expect(issue.gate).toMatch(/meta\.header\.version = 3/i);
+    expect(issue.gate).toMatch(/backfill canonical v3/i);
     // Only one legacyHeaderModule issue even if multiple header modules exist
     expect(result.issues.filter((i) => i.bucket === 'legacyHeaderModule')).toHaveLength(1);
+  });
+
+  it('does not flag legacyHeaderModule when canonical v3 meta.header already exists', () => {
+    const page = buildContractFixture('builderPage', {
+      sections: [
+        {
+          id: 'sec-with-header',
+          sectionType: 'row',
+          layout: '1',
+          sortIndex: 0,
+          settings: {},
+          modules: [
+            {
+              id: 'mod-header-legacy',
+              moduleType: 'header',
+              columnIndex: 0,
+              sortIndex: 0,
+              config: { title: 'Stored legacy header', subtitle: 'Unused now' },
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = auditPageFallbacks(page);
+
+    expect(result.issues.find((i) => i.bucket === 'legacyHeaderModule')).toBeUndefined();
   });
 
   it('does not flag legacyHeaderModule when no header module exists in sections', () => {
@@ -157,7 +185,9 @@ describe('auditPageFallbacks – per-page fallback inventory', () => {
 
   it('handles null / undefined page gracefully', () => {
     expect(auditPageFallbacks(null).issues.find((i) => i.bucket === 'missingHeader')).toBeDefined();
-    expect(auditPageFallbacks(undefined).issues.find((i) => i.bucket === 'missingHeader')).toBeDefined();
+    expect(
+      auditPageFallbacks(undefined).issues.find((i) => i.bucket === 'missingHeader')
+    ).toBeDefined();
   });
 });
 
@@ -193,6 +223,35 @@ describe('auditPagesFallbacks – series-level aggregation', () => {
     expect(result.removalReadiness.canRemoveLegacyReaderFallback).toBe(true);
   });
 
+  it('treats inert legacy header modules as cleanup-only once v3 meta.header exists', () => {
+    const page = buildContractFixture('builderPage', {
+      sections: [
+        {
+          id: 'sec-cleanup-only',
+          sectionType: 'row',
+          layout: '1',
+          sortIndex: 0,
+          settings: {},
+          modules: [
+            {
+              id: 'mod-header-cleanup',
+              moduleType: 'header',
+              columnIndex: 0,
+              sortIndex: 0,
+              config: { title: 'Legacy Header', subtitle: 'Old style' },
+            },
+          ],
+        },
+      ],
+    });
+
+    const result = auditPagesFallbacks([page]);
+
+    expect(result.clean).toBe(true);
+    expect(result.pageReports[0].issues).toHaveLength(0);
+    expect(result.removalReadiness.canRemoveLegacyReaderFallback).toBe(true);
+  });
+
   it('aggregates bucket counts across multiple pages', () => {
     const migratedPage = getContractFixture('builderPage');
     const legacyPage = getContractFixture('builderPageDraft'); // has headerOverrides, missing meta.header
@@ -203,7 +262,13 @@ describe('auditPagesFallbacks – series-level aggregation', () => {
         header: {
           version: 2,
           regions: { left: ['brand'], center: ['nav'], right: [] },
-          blocks: { brand: { enabled: true }, nav: { enabled: true }, patron: { enabled: true }, status: { enabled: true }, entryControls: { enabled: true } },
+          blocks: {
+            brand: { enabled: true },
+            nav: { enabled: true },
+            patron: { enabled: true },
+            status: { enabled: true },
+            entryControls: { enabled: true },
+          },
           nav: { items: [] },
         },
       },
@@ -238,8 +303,7 @@ describe('auditPagesFallbacks – series-level aggregation', () => {
     expect(result.pageReports).toHaveLength(0);
     expect(result.bucketSummary.missingPublishedReaderPage).toEqual({
       count: 1,
-      gate:
-        "Remove source:'legacy' only after the series has a published builder page with slug 'reader'.",
+      gate: "Remove source:'legacy' only after the series has a published builder page with slug 'reader'.",
       pageIds: [],
     });
     expect(result.removalReadiness.hasPublishedReaderPage).toBe(false);
@@ -255,7 +319,11 @@ describe('auditPagesFallbacks – series-level aggregation', () => {
         header: {
           version: 3,
           copy: { title: 'About', subtitle: '', subtitles: [] },
-          regions: { left: ['brand'], center: ['patron', 'status'], right: ['entryControls', 'nav'] },
+          regions: {
+            left: ['brand'],
+            center: ['patron', 'status'],
+            right: ['entryControls', 'nav'],
+          },
           blocks: {
             brand: { enabled: true },
             patron: { enabled: true },
@@ -273,7 +341,15 @@ describe('auditPagesFallbacks – series-level aggregation', () => {
           layout: '1',
           sortIndex: 0,
           settings: {},
-          modules: [{ id: 'mod-about', moduleType: 'text', columnIndex: 0, sortIndex: 0, config: { content: '<p>About</p>' } }],
+          modules: [
+            {
+              id: 'mod-about',
+              moduleType: 'text',
+              columnIndex: 0,
+              sortIndex: 0,
+              config: { content: '<p>About</p>' },
+            },
+          ],
         },
       ],
     });
@@ -296,7 +372,15 @@ describe('auditPagesFallbacks – series-level aggregation', () => {
           layout: '1',
           sortIndex: 0,
           settings: {},
-          modules: [{ id: 'mod-reader-draft', moduleType: 'text', columnIndex: 0, sortIndex: 0, config: { content: '<p>Draft reader</p>' } }],
+          modules: [
+            {
+              id: 'mod-reader-draft',
+              moduleType: 'text',
+              columnIndex: 0,
+              sortIndex: 0,
+              config: { content: '<p>Draft reader</p>' },
+            },
+          ],
         },
       ],
     });

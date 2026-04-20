@@ -164,11 +164,18 @@ Current runtime behavior:
 - public reader pages are served from `/api/pages/{series_id}/{slug}`
 - admin draft pages are available through `/api/admin/pages/by-slug/{series_id}/{slug}`
 - the reader can load draft pages when the user is an admin
+- the public reader is served from `dist/`, so source edits do not change live runtime behavior until the frontend bundle is rebuilt
 
 Important current reality:
 
 - the reader still contains legacy fallback behavior through `page-config` loading for some flows
 - the earlier "no fallback UI in dev" goal has not actually been fully achieved
+
+Release-discipline rule for builder work:
+
+- if a change affects public reader behavior, header rendering, shared builder/reader helpers, public HTML, or shared assets, `dist/` must be rebuilt before claiming the fix works
+- this applies even when the edited file lives under `admin/`, because some builder modules are shared by the reader runtime
+- source-level tests are necessary, but they are not proof that the live site changed until the built assets are regenerated
 
 There is also duplicated render logic:
 
@@ -503,16 +510,22 @@ Goal: make the page designer show the real page-scoped header builder by default
 - No per-button custom color system introduced; only the two existing shared button variants are reused.
 - Added 6 new tests (1 unit in link-utils, 5 shell): style select presence, secondary draft persistence, primary default for new items, chip variant classes, and round-trip save. Full suite: 37 files, 242 passing, 0 regressions.
 
-#### Step 5 - Keep renderer parity and migration explicit
+#### Step 5 - Keep renderer parity and migration explicit ✅
 
-- update admin header preview and reader header rendering together so the same normalized header data produces the same visible result
-- reuse shared normalization helpers instead of creating another header render path
-- add a migration/backfill step for older builder pages so effective legacy header state is written into `meta.header.version = 3`
-- document the removal order clearly:
+**Implemented (2026-04-18):**
+
+- Added `resolvePageHeaderState(...)` in `admin/page-builder/header-config.js` as the shared Step 5 header-state helper. The admin canvas header surface and the reader now consume the same normalized header object instead of resolving copy and layout through separate paths.
+- Updated `admin/page-builder/canvas-renderer.js` to render the page-header surface from that shared resolved state.
+- Updated `reader/data.js` to resolve the effective header once, apply copy from that resolved object, and pass the same state into `reader/header-layout.js` for DOM placement and nav rendering.
+- Updated backend header sanitization so `page.meta.header.nav.items[*].style` now persists the same `'primary' | 'secondary'` contract already used by the frontend button model; save, reload, reader render, and backfill now preserve button variants.
+- Added `python -m backend.app.backfill_page_headers --series <series-id> [--write]` as a CLI-first migration path. It dry-runs by default, backfills older builder pages to canonical `meta.header.version = 3`, and clears `meta.headerOverrides` when writing.
+- Tightened the runtime-fallback audit semantics so `legacyHeaderModule` only blocks readiness when a page still depends on legacy copy fallback. Once V3 `meta.header` exists, stored legacy header modules are treated as later cleanup debt rather than a blocker for runtime fallback removal.
+- Documented and aligned the removal order explicitly:
   1. remove UI fallback behavior
   2. backfill older pages
   3. verify the audit is clean
   4. remove runtime fallback in a later cleanup pass
+- Added targeted frontend and backend coverage for shared reader/admin parity, persisted header button styles, audit readiness semantics, and dry-run/write backfill behavior. Full targeted suites passed during implementation.
 
 #### Acceptance criteria
 

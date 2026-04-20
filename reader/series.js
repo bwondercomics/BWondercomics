@@ -30,6 +30,11 @@ export function getRequestedPageSlug() {
   return sanitizePageSlug(params.get('page') || '') || 'reader';
 }
 
+export function getExplicitPageSlug() {
+  const params = new URLSearchParams(window.location.search);
+  return sanitizePageSlug(params.get('page') || '');
+}
+
 export function isDraftPageRequested() {
   const params = new URLSearchParams(window.location.search);
   const raw = String(params.get('draft') || '')

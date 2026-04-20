@@ -12,6 +12,7 @@ import {
   createEffectivePageHeader,
   createPageHeaderMeta,
   createDefaultHeaderConfig,
+  getPageHeaderSource,
   normalizeHeaderCopy,
   normalizeHeaderConfig,
 } from './page-builder/header-config.js';
@@ -599,17 +600,7 @@ function createPageBuilder({
   }
 
   function normalizeHeaderDraft(page = currentPage) {
-    const rawHeader =
-      page?.meta?.header &&
-      typeof page.meta.header === 'object' &&
-      !Array.isArray(page.meta.header)
-        ? page.meta.header
-        : null;
-    const source = !rawHeader
-      ? 'legacy-import'
-      : Number(rawHeader.version || 0) >= 3
-        ? 'page-meta-v3'
-        : 'page-meta-stale';
+    const source = getPageHeaderSource(page);
     const effectiveHeader = createEffectivePageHeader(
       page,
       currentSeriesPageConfig,
@@ -1529,6 +1520,10 @@ function createPageBuilder({
     activeThemeDraft = normalizeThemeDraft(currentPage);
     if (surface === 'header') {
       activateHeaderSurface();
+    } else if (surface === 'page-settings') {
+      selectedCanvasSurface = 'page-settings';
+      activeEditorTab = 'modules';
+      initializePageSettingsDraft();
     }
     renderPageList();
     renderCanvas();
@@ -1546,7 +1541,7 @@ function createPageBuilder({
       return;
     }
     await activatePage(pageId, {
-      surface: isDesignerMode() ? activeDesignerSurface || 'header' : '',
+      surface: isDesignerMode() ? activeDesignerSurface || 'header' : 'page-settings',
       historyMode: 'replace',
     });
   }
@@ -1729,7 +1724,7 @@ function createPageBuilder({
           closeAddPageModal();
           await loadPages();
           await activatePage(newPage.id, {
-            surface: isDesignerMode() ? activeDesignerSurface || 'header' : '',
+            surface: isDesignerMode() ? activeDesignerSurface || 'header' : 'page-settings',
             historyMode: 'replace',
             fallbackPage: newPage,
           });

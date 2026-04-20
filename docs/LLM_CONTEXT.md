@@ -9,6 +9,10 @@ To maintain the long-term health of this project, all AI assistants MUST follow 
     - If a new module is added, create a new section for it.
 2.  **Maintain Documentation Integrity**: Do not remove existing documentation unless the code it describes has been deleted.
 3.  **Audit Compliance**: If you are unsure of the current state of a feature, perform a brief audit and update the docs if they have drifted from the implementation.
+4.  **Rebuild Public Frontend Before Claiming Runtime Behavior Changed**: The public reader/site is served from `dist/`, not directly from source files. If you change anything that can affect the public runtime, you MUST rebuild `dist/` before saying the fix works.
+    - This includes changes in `reader/`, top-level public HTML, `assets/`, and any shared module imported by the public bundle, even if that shared file lives under `admin/` (for example `admin/page-builder/header-config.js`).
+    - For public/frontend work, prefer `./scripts/frontend-build.sh` because it rebuilds `dist/` and snapshots the release bundle. `npm run build` is the minimum acceptable fallback when the snapshot step is not needed.
+    - Do not treat passing source-level tests as proof that the live site changed until the built assets have been regenerated.
 
 ## Repo & Structure
 
@@ -179,6 +183,12 @@ If the site turns into plain text or missing CSS/JS, confirm the `/assets/*` han
 
 This also snapshots the current `dist/` into `var/releases/`.
 Admin is currently served from `admin/` (repo source) via Caddy; rebuilding `dist/` is optional for admin-only changes unless you change Caddy to serve admin from `dist/`.
+
+Critical nuance:
+
+- Files under `admin/` are not automatically "admin-only". Some builder helpers are shared by the reader bundle.
+- If a change affects public reader behavior, rebuild `dist/` even when the edited file path starts with `admin/`.
+- Do not tell the user a public reader/header/builder fix is live until the rebuilt bundle exists.
 
 Avoid editing `dist/` directly. Treat it as build output only.
 

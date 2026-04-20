@@ -145,9 +145,7 @@ def _clamp_int(value: Any, default: int, minimum: int = 0, maximum: int = 10_000
     return max(minimum, min(maximum, number))
 
 
-def _clamp_float(
-    value: Any, default: float, minimum: float = 0.0, maximum: float = 1.0
-) -> float:
+def _clamp_float(value: Any, default: float, minimum: float = 0.0, maximum: float = 1.0) -> float:
     try:
         number = float(value)
     except (TypeError, ValueError):
@@ -192,7 +190,11 @@ def sanitize_color(value: Any, fallback: str = "") -> str:
         return fallback
     if raw.lower() == "transparent":
         return "transparent"
-    if HEX_COLOR_RE.fullmatch(raw) or FUNCTION_COLOR_RE.fullmatch(raw) or NAMED_COLOR_RE.fullmatch(raw):
+    if (
+        HEX_COLOR_RE.fullmatch(raw)
+        or FUNCTION_COLOR_RE.fullmatch(raw)
+        or NAMED_COLOR_RE.fullmatch(raw)
+    ):
         return raw
     return fallback
 
@@ -306,7 +308,11 @@ def sanitize_link_target(raw_target: Any, legacy_url: Any = "") -> dict[str, Any
     page_slug = _sanitize_slug(target.get("pageSlug")) if kind == "builder-page" else ""
     url = sanitize_hyperlink(target.get("url") or fallback_url) if kind == "url" else ""
     anchor = sanitize_anchor(target.get("hash") or fallback_url) if kind == "anchor" else ""
-    open_in_new_tab = bool(kind == "url" and target.get("openInNewTab") is True and url.startswith(("http://", "https://")))
+    open_in_new_tab = bool(
+        kind == "url"
+        and target.get("openInNewTab") is True
+        and url.startswith(("http://", "https://"))
+    )
 
     if kind == "builder-page" and not page_slug:
         kind = "url"
@@ -466,7 +472,13 @@ def _sanitize_header_regions(regions: Any) -> dict[str, list[str]]:
     for block_id in ("brand", "patron", "status", "entryControls", "nav"):
         if block_id not in remaining:
             continue
-        fallback = "left" if block_id == "brand" else "center" if block_id in {"patron", "status"} else "right"
+        fallback = (
+            "left"
+            if block_id == "brand"
+            else "center"
+            if block_id in {"patron", "status"}
+            else "right"
+        )
         normalized[fallback].append(block_id)
         remaining.remove(block_id)
 
@@ -502,11 +514,13 @@ def sanitize_header_nav_items(items: Any) -> list[dict[str, Any]]:
     normalized: list[dict[str, Any]] = []
     for item in items[:20]:
         entry = item if isinstance(item, dict) else {}
+        style = str(entry.get("style") or "primary").strip()
         normalized.append(
             {
                 "id": _sanitize_id_like(entry.get("id")) or "nav",
                 "label": _coerce_string(entry.get("label") or entry.get("text"), "Link", 120),
                 "enabled": _coerce_bool(entry.get("enabled"), True),
+                "style": style if style in {"primary", "secondary"} else "primary",
                 "link": sanitize_link_target(entry.get("link"), entry.get("url")),
             }
         )
@@ -545,7 +559,9 @@ def sanitize_panel_backgrounds(raw_backgrounds: Any) -> dict[str, Any]:
         path = sanitize_asset_url(current.get("path"))
         panel = {
             "opacity": _clamp_float(current.get("opacity"), 0.18),
-            "fit": "contain" if str(current.get("fit") or "").strip().lower() == "contain" else "cover",
+            "fit": "contain"
+            if str(current.get("fit") or "").strip().lower() == "contain"
+            else "cover",
             "focus": sanitize_focus(current.get("focus"), "center"),
             "hideEmptyText": _coerce_bool(current.get("hideEmptyText"), False),
         }
@@ -694,10 +710,7 @@ def sanitize_feed_style(raw_style: Any) -> dict[str, Any]:
         "itemBorderColor": "#00d9ff",
         "borderColor": "#ffed00",
     }
-    return {
-        key: sanitize_color(style.get(key), default)
-        for key, default in defaults.items()
-    }
+    return {key: sanitize_color(style.get(key), default) for key, default in defaults.items()}
 
 
 def sanitize_promo_item_style(raw_style: Any) -> dict[str, Any]:
@@ -811,8 +824,7 @@ def sanitize_module_config(module_type: str, raw_config: Any) -> dict[str, Any]:
                     in {"overlay", "outside"}
                     else "overlay",
                     "imageFit": str(current.get("imageFit") or "cover").strip()
-                    if str(current.get("imageFit") or "cover").strip()
-                    in {"cover", "contain"}
+                    if str(current.get("imageFit") or "cover").strip() in {"cover", "contain"}
                     else "cover",
                     "style": sanitize_promo_item_style(current.get("style")),
                 }

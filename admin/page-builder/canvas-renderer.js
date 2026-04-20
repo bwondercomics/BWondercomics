@@ -3,9 +3,8 @@ import { escapeAttr, escapeHtml } from './helpers.js';
 import {
   HEADER_BLOCK_DEFS,
   HEADER_REGION_ORDER,
-  createEffectivePageHeader,
-  normalizeHeaderConfig,
   normalizeHeaderCopy,
+  resolvePageHeaderState,
 } from './header-config.js';
 import { normalizeHeaderNavItems } from './link-utils.js';
 
@@ -16,30 +15,12 @@ function formatRegionLabel(region) {
 }
 
 function getHeaderPreviewState({ currentPage, currentSeriesPageConfig, activeHeaderDraft }) {
-  if (activeHeaderDraft) {
-    return {
-      header: normalizeHeaderConfig(activeHeaderDraft.header, normalizeHeaderNavItems),
-      copy: normalizeHeaderCopy(activeHeaderDraft.copy, {
-        title: currentPage?.title || 'Page Title',
-        subtitle: '',
-        subtitles: [],
-      }),
-    };
-  }
-
-  const effectiveHeader = createEffectivePageHeader(
-    currentPage,
-    currentSeriesPageConfig,
-    normalizeHeaderNavItems
-  );
-  return {
-    header: normalizeHeaderConfig(effectiveHeader, normalizeHeaderNavItems),
-    copy: normalizeHeaderCopy(effectiveHeader.copy, {
-      title: currentPage?.title || 'Page Title',
-      subtitle: '',
-      subtitles: [],
-    }),
-  };
+  return resolvePageHeaderState({
+    page: currentPage,
+    pageConfig: currentSeriesPageConfig,
+    draftState: activeHeaderDraft,
+    normalizeNavItems: normalizeHeaderNavItems,
+  });
 }
 
 function getHeaderBlockPreview(blockId, headerState, currentPage) {
@@ -53,8 +34,7 @@ function getHeaderBlockPreview(blockId, headerState, currentPage) {
   );
 
   if (blockId === 'brand') {
-    const supportingCopy =
-      copy.subtitle || copy.subtitles?.[0] || 'Subtitle line';
+    const supportingCopy = copy.subtitle || copy.subtitles?.[0] || 'Subtitle line';
     return `
       <span class="pb-page-header-part-primary">${escapeHtml(copy.title || currentPage?.title || 'Page Title')}</span>
       <span class="pb-page-header-part-secondary">${escapeHtml(supportingCopy)}</span>
@@ -119,7 +99,8 @@ function renderPageHeaderSurface(state) {
   if (source === 'legacy-import') {
     sourceBadge = '<span class="pb-page-header-badge pb-page-header-badge--import">Imported</span>';
   } else if (source === 'page-meta-stale') {
-    sourceBadge = '<span class="pb-page-header-badge pb-page-header-badge--stale">Needs upgrade</span>';
+    sourceBadge =
+      '<span class="pb-page-header-badge pb-page-header-badge--stale">Needs upgrade</span>';
   }
 
   return `
@@ -145,20 +126,21 @@ function renderPageHeaderSurface(state) {
             <div class="pb-page-header-region" data-region="${region}">
               <div class="pb-page-header-region-label">${escapeHtml(formatRegionLabel(region))}</div>
               <div class="pb-page-header-region-stack">
-                ${blockIds.length
-                  ? blockIds
-                      .map((blockId) => {
-                        const block = HEADER_BLOCK_DEFS.find((item) => item.id === blockId);
-                        const enabled = headerState.header?.blocks?.[blockId]?.enabled !== false;
-                        return `
+                ${
+                  blockIds.length
+                    ? blockIds
+                        .map((blockId) => {
+                          const block = HEADER_BLOCK_DEFS.find((item) => item.id === blockId);
+                          const enabled = headerState.header?.blocks?.[blockId]?.enabled !== false;
+                          return `
                           <div class="pb-page-header-part ${enabled ? '' : 'is-disabled'}">
                             <span class="pb-page-header-part-label">${escapeHtml(block?.label || blockId)}</span>
                             ${getHeaderBlockPreview(blockId, headerState, state.currentPage)}
                           </div>
                         `;
-                      })
-                      .join('')
-                  : '<div class="pb-page-header-empty-region">Empty region</div>'
+                        })
+                        .join('')
+                    : '<div class="pb-page-header-empty-region">Empty region</div>'
                 }
               </div>
             </div>
@@ -168,7 +150,6 @@ function renderPageHeaderSurface(state) {
     </button>
   `;
 }
-
 
 function renderModulePicker(target) {
   const groups = Array.from(new Set(INSERTABLE_MODULE_TYPES.map((module) => module.category)));

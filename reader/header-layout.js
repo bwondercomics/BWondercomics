@@ -1,6 +1,4 @@
-import {
-  createEffectiveHeaderConfig,
-} from '../admin/page-builder/header-config.js';
+import { resolvePageHeaderState } from '../admin/page-builder/header-config.js';
 import {
   normalizeHeaderNavItems,
   resolveLinkTargetHref,
@@ -56,7 +54,10 @@ function ensureHeaderScaffold() {
 
 function collectHeaderBlocks(topbar) {
   return Object.fromEntries(
-    Object.entries(BLOCK_SELECTORS).map(([blockId, selector]) => [blockId, topbar.querySelector(selector)])
+    Object.entries(BLOCK_SELECTORS).map(([blockId, selector]) => [
+      blockId,
+      topbar.querySelector(selector),
+    ])
   );
 }
 
@@ -90,7 +91,14 @@ export function applySharedHeaderLayout(pageConfig = null, options = {}) {
 
   const seriesId = options.seriesId || 'battle-bros';
   const currentPage = options.page || null;
-  const headerConfig = createEffectiveHeaderConfig(currentPage, pageConfig, normalizeHeaderNavItems);
+  const headerState =
+    options.headerState ||
+    resolvePageHeaderState({
+      page: currentPage,
+      pageConfig,
+      normalizeNavItems: normalizeHeaderNavItems,
+    });
+  const headerConfig = headerState.header;
   const blocks = collectHeaderBlocks(scaffold.topbar);
 
   Object.values(blocks).forEach((node) => {

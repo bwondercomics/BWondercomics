@@ -4,8 +4,10 @@ import {
   applyBuilderPageToDOM,
   loadBuilderPage,
   extractSubtitlesFromBuilderPage,
+  loadHomepageBuilderPage,
   loadPageConfigWithFallback,
 } from '../reader/data.js';
+import { resolvePageHeaderState } from '../admin/page-builder/header-config.js';
 import { buildContractFixture, getContractFixture } from './helpers/contracts.js';
 import { flushReaderUi, mountReaderDom, stubReaderGlobals } from './helpers/reader-fixture.js';
 
@@ -41,7 +43,7 @@ describe('reader builder presentation loading', () => {
       if (url === 'page-config.json') {
         return jsonResponse(pageConfig);
       }
-      if (url === '/api/pages/battle-bros/reader') {
+      if (url === '/api/pages/home/battle-bros') {
         return jsonResponse({ page: builderPage });
       }
       throw new Error(`Unexpected fetch: ${url}`);
@@ -111,11 +113,51 @@ describe('reader builder presentation loading', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('loads the effective homepage page for public series roots', async () => {
+    const builderPage = buildContractFixture('builderPage', {
+      slug: 'landing',
+      title: 'Landing',
+      isHomepage: true,
+    });
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/pages/home/battle-bros') {
+        return jsonResponse({ page: builderPage });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await loadHomepageBuilderPage('battle-bros');
+
+    expect(result).toEqual(builderPage);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads the effective homepage page for admin draft preview roots', async () => {
+    const draftHomepage = buildContractFixture('builderPageDraft', {
+      slug: 'landing',
+      title: 'Landing',
+      isHomepage: true,
+    });
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/admin/pages/home/battle-bros') {
+        return jsonResponse({ page: draftHomepage });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await loadHomepageBuilderPage('battle-bros', { draft: true });
+
+    expect(result).toEqual(draftHomepage);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('falls back to the legacy page-config contract when no builder page exists', async () => {
     const setSubtitles = vi.fn();
     const pageConfig = getContractFixture('pageConfig');
     const fetchMock = vi.fn(async (url) => {
-      if (url === '/api/pages/battle-bros/reader') {
+      if (url === '/api/pages/home/battle-bros') {
         return jsonResponse({}, { ok: false, status: 404, statusText: 'Not Found' });
       }
       if (url === 'page-config.json') {
@@ -131,7 +173,7 @@ describe('reader builder presentation loading', () => {
     expect(setSubtitles).toHaveBeenCalledWith(['Hero Time', 'Lunch Break Justice']);
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
       'page-config.json',
-      '/api/pages/battle-bros/reader',
+      '/api/pages/home/battle-bros',
     ]);
   });
 
@@ -166,7 +208,7 @@ describe('reader builder presentation loading', () => {
       if (url === 'page-config.json') {
         return jsonResponse(pageConfig);
       }
-      if (url === '/api/pages/battle-bros/reader') {
+      if (url === '/api/pages/home/battle-bros') {
         return jsonResponse({}, { ok: false, status: 404, statusText: 'Not Found' });
       }
       throw new Error(`Unexpected fetch: ${url}`);
@@ -305,12 +347,59 @@ describe('reader builder presentation loading', () => {
 
     expect(document.querySelector('.topbar-layout')).not.toBeNull();
     expect(document.querySelector('.topbar-region[data-region="left"] .brand')).not.toBeNull();
-    expect(document.querySelector('.topbar-region[data-region="center"] .nav-links')).not.toBeNull();
-    expect(document.querySelector('.topbar-region[data-region="right"] #statusPanel')).not.toBeNull();
+    expect(
+      document.querySelector('.topbar-region[data-region="center"] .nav-links')
+    ).not.toBeNull();
+    expect(
+      document.querySelector('.topbar-region[data-region="right"] #statusPanel')
+    ).not.toBeNull();
     expect(document.querySelector('.nav-links .nav-link')?.textContent).toBe('About');
     expect(document.querySelector('.nav-links .nav-link')?.getAttribute('href')).toContain(
       'index.html?series=battle-bros&page=about'
     );
+  });
+
+  it('uses the same resolved header state for reader copy and layout application', () => {
+    const builderPage = getContractFixture('builderPage');
+    const pageConfig = getContractFixture('pageConfig');
+    builderPage.meta.header.copy.title = 'Parity Header';
+    builderPage.meta.header.copy.subtitle = 'Parity Subtitle';
+    builderPage.meta.header.regions = {
+      left: ['brand'],
+      center: ['nav'],
+      right: ['status', 'entryControls', 'patron'],
+    };
+    builderPage.meta.header.nav.items = [
+      {
+        id: 'nav-secondary',
+        label: 'About',
+        enabled: true,
+        style: 'secondary',
+        link: {
+          kind: 'builder-page',
+          pageSlug: 'about',
+        },
+      },
+    ];
+
+    const headerState = resolvePageHeaderState({
+      page: builderPage,
+      pageConfig,
+    });
+
+    applyBuilderPageToDOM(builderPage, { pageConfig, seriesId: 'battle-bros' });
+
+    expect(document.querySelector('.topbar .title h1')?.textContent).toBe(headerState.copy.title);
+    expect(document.getElementById('subtitle')?.textContent).toBe(headerState.copy.subtitle);
+    expect(
+      document.querySelector('.topbar-region[data-region="center"] > .nav-links')
+    ).not.toBeNull();
+    expect(
+      document.querySelector('.topbar-region[data-region="right"] > #statusPanel')
+    ).not.toBeNull();
+    expect(
+      document.querySelector('.nav-links .nav-link')?.classList.contains('nav-link--secondary')
+    ).toBe(true);
   });
 
   it('falls back to legacy shared header config plus page overrides when page.meta.header is missing', () => {

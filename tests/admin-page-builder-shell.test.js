@@ -373,11 +373,6 @@ describe('admin page-builder shell', () => {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await flushAdminUi(3);
 
-    document
-      .querySelector('.pb-page-settings-btn')
-      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    await flushAdminUi(2);
-
     expect(document.querySelector('.pb-editor-kicker')?.textContent).toContain('Page Settings');
     expect(document.getElementById('pbSavePageSettings')).not.toBeNull();
 

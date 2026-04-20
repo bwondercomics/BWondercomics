@@ -139,8 +139,7 @@ function normalizeHeaderOverrides(rawOverrides = null) {
 }
 
 function normalizeHeaderCopy(rawCopy = null, fallback = {}) {
-  const copy =
-    rawCopy && typeof rawCopy === 'object' && !Array.isArray(rawCopy) ? rawCopy : {};
+  const copy = rawCopy && typeof rawCopy === 'object' && !Array.isArray(rawCopy) ? rawCopy : {};
   const fallbackTitle = String(fallback.title || '').trim() || 'Page Title';
   const fallbackSubtitle = String(fallback.subtitle || '').trim();
   const fallbackSubtitles = Array.isArray(fallback.subtitles)
@@ -202,6 +201,15 @@ function createPageHeaderMeta(
   };
 }
 
+function getPageHeaderSource(page = null) {
+  const rawHeader =
+    page?.meta?.header && typeof page.meta.header === 'object' && !Array.isArray(page.meta.header)
+      ? page.meta.header
+      : null;
+  if (!rawHeader) return 'legacy-import';
+  return Number(rawHeader.version || 0) >= 3 ? 'page-meta-v3' : 'page-meta-stale';
+}
+
 function createEffectivePageHeader(
   page = null,
   pageConfig = null,
@@ -241,15 +249,35 @@ function createEffectivePageHeader(
   });
 }
 
+function resolvePageHeaderState(options = {}) {
+  const {
+    page = null,
+    pageConfig = null,
+    draftState = null,
+    normalizeNavItems = (items) => items || [],
+  } = options;
+  const hasDraftState = !!(draftState?.header || draftState?.copy);
+  const meta = hasDraftState
+    ? createPageHeaderMeta(draftState?.header, draftState?.copy, normalizeNavItems, { page })
+    : createEffectivePageHeader(page, pageConfig, normalizeNavItems);
+  return {
+    source: draftState?.source || getPageHeaderSource(page),
+    meta,
+    header: normalizeHeaderConfig(meta, normalizeNavItems),
+    copy: normalizeHeaderCopy(meta.copy, createDefaultHeaderCopy(page)),
+  };
+}
+
 function createEffectiveHeaderConfig(
   page = null,
   pageConfig = null,
   normalizeNavItems = (items) => items || []
 ) {
-  return normalizeHeaderConfig(
-    createEffectivePageHeader(page, pageConfig, normalizeNavItems),
-    normalizeNavItems
-  );
+  return resolvePageHeaderState({
+    page,
+    pageConfig,
+    normalizeNavItems,
+  }).header;
 }
 
 /**
@@ -266,10 +294,10 @@ function createEffectiveHeaderConfig(
  *   - `headerOverrides`    – page.meta.headerOverrides is present; reader applies
  *                            legacy per-page block overrides on top of shared config.
  *                            Gate: no pages depend on headerOverrides (audit clean).
- *   - `legacyHeaderModule` – a module of type 'header' exists in sections; reader
- *                            falls back to its config for copy when meta.header is
- *                            absent or stale (< v3).
- *                            Gate: no pages have legacy header modules (audit clean).
+ *   - `legacyHeaderModule` – a module of type 'header' exists in sections on a page
+ *                            that still depends on legacy fallback for header copy.
+ *                            Once canonical v3 meta.header exists, the stored module
+ *                            is inert cleanup debt and does not block runtime removal.
  *
  * @param {Object|null} page - A builder page object
  * @returns {{ pageId: string, slug: string, issues: Array<{bucket: string, gate: string}> }}
@@ -280,9 +308,7 @@ export function auditPageFallbacks(page) {
   const issues = [];
 
   const rawHeader =
-    page?.meta?.header &&
-    typeof page.meta.header === 'object' &&
-    !Array.isArray(page.meta.header)
+    page?.meta?.header && typeof page.meta.header === 'object' && !Array.isArray(page.meta.header)
       ? page.meta.header
       : null;
 
@@ -294,31 +320,31 @@ export function auditPageFallbacks(page) {
   } else if (Number(rawHeader.version || 0) < 3) {
     issues.push({
       bucket: 'staleHeaderVersion',
-      gate:
-        'Header editor normalises to v3 on save; backfill ensures all existing pages are normalised.',
+      gate: 'Header editor normalises to v3 on save; backfill ensures all existing pages are normalised.',
     });
   }
 
   if (page?.meta?.headerOverrides && typeof page.meta.headerOverrides === 'object') {
     issues.push({
       bucket: 'headerOverrides',
-      gate:
-        'Remove after audit shows zero builder pages with headerOverrides and v3 header is universal.',
+      gate: 'Remove after audit shows zero builder pages with headerOverrides and v3 header is universal.',
     });
   }
 
-  for (const section of page?.sections || []) {
-    for (const mod of section.modules || []) {
-      if (mod?.moduleType === 'header') {
-        issues.push({
-          bucket: 'legacyHeaderModule',
-          gate:
-            'Remove after all builder pages carry first-class meta.header.version = 3 copy and no legacy header modules remain.',
-        });
-        break; // report once per page
+  const dependsOnLegacyCopy = !rawHeader || Number(rawHeader.version || 0) < 3;
+  if (dependsOnLegacyCopy) {
+    for (const section of page?.sections || []) {
+      for (const mod of section.modules || []) {
+        if (mod?.moduleType === 'header') {
+          issues.push({
+            bucket: 'legacyHeaderModule',
+            gate: 'Backfill canonical v3 page.meta.header first; remove stored legacy header modules in a later cleanup pass.',
+          });
+          break; // report once per page
+        }
       }
+      if (issues.some((i) => i.bucket === 'legacyHeaderModule')) break;
     }
-    if (issues.some((i) => i.bucket === 'legacyHeaderModule')) break;
   }
 
   return { pageId, slug, issues };
@@ -361,8 +387,7 @@ export function auditPagesFallbacks(pages = []) {
   if (!hasPublishedReaderPage) {
     bucketSummary.missingPublishedReaderPage = {
       count: 1,
-      gate:
-        "Remove source:'legacy' only after the series has a published builder page with slug 'reader'.",
+      gate: "Remove source:'legacy' only after the series has a published builder page with slug 'reader'.",
       pageIds: [],
     };
   }
@@ -394,8 +419,9 @@ export {
   getHeaderBlockDefinition,
   getLegacyHeaderCopyFallback,
   getLegacyHeaderModuleCopy,
+  getPageHeaderSource,
   normalizeHeaderConfig,
   normalizeHeaderCopy,
   normalizeHeaderOverrides,
+  resolvePageHeaderState,
 };
-

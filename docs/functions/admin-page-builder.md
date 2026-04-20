@@ -40,10 +40,13 @@ This document describes the current builder runtime under `admin/page-builder/` 
 The builder is the admin authoring surface for series-scoped pages backed by `BuilderPage`, `BuilderSection`, and `BuilderModule`. It is not a freeform visual editor. The builder works with explicit page, section, and module records plus page-level metadata in `page.meta`.
 
 ### Canonical Entry
+
 The canonical builder route is the admin shell route:
+
 - `admin/index.html?view=designer&series=<id>&page=<slug>&surface=header`
 
 Current routing behavior:
+
 - `admin/page-builder.js` owns the builder lifecycle inside the main admin shell.
 - `admin/designer.html` remains only as a redirect bridge into the shell route.
 - The builder can deep-link to a specific page slug and initial surface such as `header`.
@@ -51,13 +54,16 @@ Current routing behavior:
 ## 💾 Current Data Model
 
 ### Page
+
 Current page-level fields include: `slug`, `title`, `pageType`, `isPublished`, `isHomepage`, `sortIndex`, and `meta`.
 Current page-level `meta` ownership: `meta.header`, `meta.theme`, `meta.panelBackgrounds`, and `meta.panelSpacing`.
 
 ### Section
+
 Sections currently own: `layout`, `sortIndex`, and `settings`.
 
 ### Module
+
 Modules currently own: `moduleType`, `columnIndex`, `sortIndex`, and `config`.
 
 ## ⚙️ Current Builder Flow
@@ -76,23 +82,26 @@ There is no separate long-lived client-side draft store in `data.js`. The main m
 
 This is the main coordinator. It owns mutable builder state and wires together the rail, canvas, and inspector.
 Its responsibilities include:
+
 - loading page lists and the active page
 - keeping the current series and selected page in sync with the route
 - tracking selected surface, selected module, active section, and insertion targets
 - initializing and saving page settings, header drafts, and theme drafts
-- `normalizeHeaderDraft` also tags a `source` field (`page-meta-v3`, `page-meta-stale`, `legacy-import`) for tracking header provenance in the UI
+- `normalizeHeaderDraft` tags a `source` field (`page-meta-v3`, `page-meta-stale`, `legacy-import`) using the shared header-config provenance helper, so the editor and canvas badges describe the same stored-state contract used elsewhere
 - applying module, section, and page mutations through `data.js`
 - rerendering the rail, canvas, and inspector after state changes
 - rendering status badges and reader-preview links
 
 **Designer Mode Integration**:
 The top-level coordinator now owns the canonical designer-entry behavior in addition to the generic builder shell.
+
 - **`showPageBuilderSection(options)`**: Opens the builder in either normal builder mode or designer mode.
   - `entrypoint: 'designer'` activates route-aware header editing.
   - `pageSlug` requests a specific page by slug.
   - `surface: 'header'` opens the structured page-header editor immediately.
   - `historyMode` controls whether route updates use `pushState` or `replaceState`.
 - **Default Page Resolution**: Designer mode resolves pages in this order: requested slug, `reader`, homepage, then first page in sort order.
+- **Normal Builder Landing Surface**: Outside designer mode, opening or creating a page now defaults to the `page-settings` surface so slug, title, page type, publish state, and homepage assignment are immediately editable without an extra click.
 - **`onSeriesChange()`**: Re-opens the visible builder shell after a series switch and preserves designer-mode routing when applicable.
 
 ## 💾 Data API (data.js)
@@ -111,19 +120,41 @@ The primary header authoring source is now `page.meta.header`. The header is edi
 
 `header-config.js` resolves effective header state from current and legacy sources.
 Important exports:
+
 - `createEffectivePageHeader(page, pageConfig, normalizeNavItems?)`
+- `resolvePageHeaderState({ page, pageConfig, draftState?, normalizeNavItems? })`
 - normalization helpers for header copy and layout
 - fallback-audit helpers for migration cleanup
 
 Resolution order is effectively:
+
 1. `page.meta.header`
 2. site-level or legacy page-config defaults
 3. older override shapes and legacy fallback content
+
+`resolvePageHeaderState(...)` is now the shared Step 5 seam for parity work:
+
+- the admin canvas header surface reads `headerState.header` and `headerState.copy`
+- the reader resolves once in `reader/data.js`, applies copy from `headerState.meta`, and passes the same state into `reader/header-layout.js`
+- this avoids copy/layout drift between admin and reader when legacy fallback data is still being normalized into canonical V3 state
+
+Audit behavior:
+
+- `missingHeader`, `staleHeaderVersion`, and `headerOverrides` remain the runtime-fallback blockers
+- `legacyHeaderModule` is only reported when a page still depends on legacy copy fallback; once canonical V3 `meta.header` exists, stored header modules are later-cleanup debt and do not block runtime fallback removal
+- the documented removal order is now: remove UI fallback behavior, backfill older pages, verify the audit is clean, then remove runtime fallback in a later pass
+
+Migration/backfill workflow:
+
+- legacy page saves already write canonical `page.meta.header.version = 3`
+- bulk migration is handled by the CLI `python -m backend.app.backfill_page_headers --series <series-id> [--write]`
+- the command dry-runs by default, computes effective header state from current page data plus legacy `PageConfig`, writes canonical V3 `meta.header`, and clears `meta.headerOverrides`
 
 ## 📝 Header Editor (header-editor.js)
 
 This renders and binds the page-header editor UI used by the inspector.
 Current editor responsibilities include:
+
 - showing an import/upgrade banner if the active header draft is from a non-canonical `source` (e.g., `legacy-import`)
 - title and subtitle copy editing
 - nav item CRUD: add, remove, reorder, enable/disable, and target editing for every header button
@@ -138,12 +169,14 @@ Saving header changes writes back through `updatePage(..., { meta: nextMeta })` 
 The centralized controller for the visual identity of the page. It manages the global metadata used to theme the reader chrome and panel surfaces.
 
 **Core Systems**
+
 - **Palette Management**: Synchronizes the `THEME_COLORS` token set with dual UI inputs (Color Picker + Hex Text).
 - **Preset Engine**: Allows for one-click application of pre-defined color schemes (Presets) from the centralized registry.
 - **Surface Engineering**: Manages per-panel background art. Integrates with the image picker to utilize focal point coordinates and object-fit logic for panel backgrounds. Provides direct control over background asset opacity.
 - **Structural Rhythm**: Manages `panelSpacing` (the vertical gap between modules) and toggles for empty-state placeholder visibility.
 
 **Logic & State**
+
 - **`renderThemeEditorContent(...)`**: Constructs the four-section editor stack (Presets, Palette, Surfaces, Spacing).
 - **`bindThemeEditorEvents(...)`**: Orchestrates a "Soft-Draft" lifecycle, staging changes to a `draftMeta` object to ensure smooth performance during color picking.
 - **`cloneThemeDraft(draft)`**: Ensures a deep copy of the theme state to prevent accidental mutations of the working metadata.
@@ -153,6 +186,7 @@ The centralized controller for the visual identity of the page. It manages the g
 This is the inspector shell. It chooses which editor to show based on selected surface and active tab (theme, page header, page settings, selected module editor).
 
 Important behavior:
+
 - it renders the shell layout and footer actions
 - it delegates module-specific content to `module-editor.js`
 - it invokes delete actions for the currently selected module when appropriate
@@ -160,6 +194,7 @@ Important behavior:
 ## 📂 Sidebar Rail (sidebar-panel.js)
 
 This file renders the left rail. Current responsibilities:
+
 - page list rendering and selection
 - page drag/drop reorder
 - module palette rendering (palette excludes `header`)
@@ -172,6 +207,7 @@ Responsible for the **Structural Wrapper** and the interactive "Admin-only" laye
 - **`renderCanvasSnapshot({ state, helpers })`**: The main orchestration export that returns the full canvas and page title HTML.
 - **Page Title Bar**: Renders the context header showing the current page slug, type, and status badges, along with the "Page Settings" access point.
 - **Page Header Surface**: A specialized structural preview of the site-wide header. Visualizes brand config as a clickable block, displays representative chips for blocks like patron/status/entryControls, and renders visible "Empty region" indicators when columns are unpopulated.
+- **Header-State Parity**: The surface now reads from `resolvePageHeaderState(...)` instead of maintaining its own ad-hoc header summary path, so the same normalized regions, enabled flags, copy, and nav variants drive both the admin preview and the live reader header.
 - **Section Controls**: Renders section reorder handles, layout selectors, and spacing settings (Module, Column, Section Gap).
 - **Insert Zones**: Manages the placement of `renderModuleInsertBar`, `renderSectionInsertBar`, and the module picker grid.
 
@@ -192,6 +228,7 @@ This is the shared module inspector renderer and binder. Generic field rendering
 ## 🔘 Button Editor (button-editor.js)
 
 Provides the UI and logic for managing lists of interactive buttons.
+
 - `renderButtonsEditor(config, pages)`: form generation.
 - `bindButtonsEditorEvents(...)`: Handles add/remove/reorder sync.
 - `renderLinkFields`: Sub-fields for jumping between Builder Page, URL, and Anchor link modes.
@@ -247,6 +284,7 @@ The builder validation layer. Includes helpers for sanitizing builder HTML, proc
 ## 🔗 Link Utilities (link-utils.js)
 
 A shared utility library for manipulating and normalizing links across the builder. Key exports:
+
 - `normalizeLinkTarget` — canonicalizes `builder-page`, `url`, and `anchor` link targets; sanitizes unsafe URLs
 - `resolveLinkTargetHref`, `shouldOpenLinkInNewTab`, `buildReaderPageHref` — routing / href resolution
 - `normalizeButtonItem` — normalizes a `buttons` module item, including `style: 'primary' | 'secondary'`

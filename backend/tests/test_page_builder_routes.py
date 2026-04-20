@@ -5,6 +5,8 @@ from uuid import UUID
 
 os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///tmp/bw-quality-route-tests.db")
 
+from sqlalchemy import select
+
 from backend.app.routes import page_builder
 from backend.app.models import BuilderModule, BuilderPage
 
@@ -84,7 +86,9 @@ class PageBuilderRouteTests(BackendRouteTestCase):
             "battle-bros",
             self.db,
         )
-        self.assertEqual([page["id"] for page in reordered["pages"]], [second["page"]["id"], first["page"]["id"]])
+        self.assertEqual(
+            [page["id"] for page in reordered["pages"]], [second["page"]["id"], first["page"]["id"]]
+        )
 
         deleted = page_builder.api_delete_page(
             second["page"]["id"],
@@ -124,13 +128,17 @@ class PageBuilderRouteTests(BackendRouteTestCase):
 
         text_module = page_builder.api_add_module(
             first_section["id"],
-            page_builder.CreateModuleRequest(moduleType="text", columnIndex=0, config={"content": "<p>A</p>"}),
+            page_builder.CreateModuleRequest(
+                moduleType="text", columnIndex=0, config={"content": "<p>A</p>"}
+            ),
             self.admin_request(f"/api/admin/sections/{first_section['id']}/modules", "POST"),
             self.db,
         )["module"]
         image_module = page_builder.api_add_module(
             first_section["id"],
-            page_builder.CreateModuleRequest(moduleType="image", columnIndex=0, config={"src": "media/a.png"}),
+            page_builder.CreateModuleRequest(
+                moduleType="image", columnIndex=0, config={"src": "media/a.png"}
+            ),
             self.admin_request(f"/api/admin/sections/{first_section['id']}/modules", "POST"),
             self.db,
         )["module"]
@@ -150,8 +158,12 @@ class PageBuilderRouteTests(BackendRouteTestCase):
 
         page_builder.api_reorder_modules(
             first_section["id"],
-            page_builder.ReorderModulesRequest(columnIndex=0, moduleIds=[image_module["id"], text_module["id"]]),
-            self.admin_request(f"/api/admin/sections/{first_section['id']}/modules/reorder", "POST"),
+            page_builder.ReorderModulesRequest(
+                columnIndex=0, moduleIds=[image_module["id"], text_module["id"]]
+            ),
+            self.admin_request(
+                f"/api/admin/sections/{first_section['id']}/modules/reorder", "POST"
+            ),
             self.db,
         )
         moved_module = page_builder.api_move_module(
@@ -166,7 +178,9 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         )["module"]
         page_builder.api_reorder_sections(
             page["id"],
-            page_builder.ReorderSectionsRequest(sectionIds=[second_section["id"], first_section["id"]]),
+            page_builder.ReorderSectionsRequest(
+                sectionIds=[second_section["id"], first_section["id"]]
+            ),
             self.admin_request(f"/api/admin/pages/{page['id']}/sections/reorder", "POST"),
             self.db,
         )
@@ -180,7 +194,10 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.assertEqual(updated_section["settings"]["moduleGap"], 24)
         self.assertEqual(updated_module["config"]["limit"], 5)
         self.assertEqual(moved_module["columnIndex"], 1)
-        self.assertEqual([section["id"] for section in payload["sections"]], [second_section["id"], first_section["id"]])
+        self.assertEqual(
+            [section["id"] for section in payload["sections"]],
+            [second_section["id"], first_section["id"]],
+        )
         self.assertEqual(payload["sections"][0]["modules"][0]["moduleType"], "feed")
         self.assertEqual(payload["sections"][0]["modules"][1]["id"], text_module["id"])
         self.assertEqual(payload["sections"][1]["modules"][0]["id"], image_module["id"])
@@ -228,6 +245,50 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.assertFalse(admin_draft["page"]["isPublished"])
         self.assertEqual(unauthorized_draft.status_code, 403)
 
+    def test_homepage_endpoints_resolve_homepage_then_reader_with_visibility_rules(self):
+        self.seed_builder_page("builderPage")
+        self.seed_builder_page("builderPageDraft")
+
+        public_home = page_builder.api_public_homepage("battle-bros", self.db)
+        admin_home = page_builder.api_get_homepage_page_admin(
+            "battle-bros",
+            self.admin_request("/api/admin/pages/home/battle-bros"),
+            self.db,
+        )
+
+        self.assertEqual(public_home["page"]["slug"], "reader")
+        self.assertTrue(public_home["page"]["isPublished"])
+        self.assertEqual(admin_home["page"]["slug"], "reader")
+
+        published_reader = self.db.scalar(
+            select(BuilderPage).where(
+                BuilderPage.series_id == "battle-bros",
+                BuilderPage.slug == "reader",
+            )
+        )
+        assert published_reader is not None
+        published_reader.is_homepage = False
+
+        draft_homepage = self.db.scalar(
+            select(BuilderPage).where(
+                BuilderPage.series_id == "battle-bros",
+                BuilderPage.slug == "about",
+            )
+        )
+        assert draft_homepage is not None
+        draft_homepage.is_homepage = True
+        self.db.commit()
+
+        public_fallback = page_builder.api_public_homepage("battle-bros", self.db)
+        admin_draft_home = page_builder.api_get_homepage_page_admin(
+            "battle-bros",
+            self.admin_request("/api/admin/pages/home/battle-bros"),
+            self.db,
+        )
+
+        self.assertEqual(public_fallback["page"]["slug"], "reader")
+        self.assertEqual(admin_draft_home["page"]["slug"], "about")
+
     def test_builder_security_sanitizes_saved_builder_payloads(self):
         self.seed_contract_series()
         page = page_builder.api_create_page(
@@ -241,6 +302,7 @@ class PageBuilderRouteTests(BackendRouteTestCase):
                             "items": [
                                 {
                                     "label": "Bad Link",
+                                    "style": "secondary",
                                     "link": {"kind": "url", "url": "javascript:alert(1)"},
                                 }
                             ]
@@ -306,6 +368,7 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         )["module"]
 
         self.assertEqual(page["meta"]["header"]["nav"]["items"][0]["link"]["url"], "#")
+        self.assertEqual(page["meta"]["header"]["nav"]["items"][0]["style"], "secondary")
         self.assertEqual(page["meta"]["panelBackgrounds"], {})
         self.assertIn("<strong>copy</strong>", text_module["config"]["content"])
         self.assertNotIn("<script", text_module["config"]["content"])
@@ -323,6 +386,7 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         stored_page = self.db.get(BuilderPage, UUID(page["id"]))
         stored_text = self.db.get(BuilderModule, UUID(text_module["id"]))
         self.assertEqual(stored_page.meta["header"]["nav"]["items"][0]["link"]["url"], "#")
+        self.assertEqual(stored_page.meta["header"]["nav"]["items"][0]["style"], "secondary")
         self.assertNotIn("<script", stored_text.config["content"])
 
     def test_builder_security_rejects_invalid_structure_and_sanitizes_legacy_reads(self):
@@ -367,15 +431,14 @@ class PageBuilderRouteTests(BackendRouteTestCase):
                     "items": [
                         {
                             "label": "Unsafe",
+                            "style": "secondary",
                             "link": {"kind": "url", "url": "javascript:alert(1)"},
                         }
                     ]
                 }
             }
         }
-        text_module = next(
-            module for module in seeded["modules"] if module.module_type == "text"
-        )
+        text_module = next(module for module in seeded["modules"] if module.module_type == "text")
         text_module.config = {
             "content": '<p><script>alert(1)</script><a href="javascript:alert(2)">Unsafe</a><strong>Safe</strong></p>',
         }
@@ -388,6 +451,7 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         )["page"]
 
         self.assertEqual(payload["meta"]["header"]["nav"]["items"][0]["link"]["url"], "#")
+        self.assertEqual(payload["meta"]["header"]["nav"]["items"][0]["style"], "secondary")
         hydrated_text = next(
             module
             for section_payload in payload["sections"]

@@ -145,6 +145,40 @@ def get_page_by_slug(db: Session, series_id: str | None, slug: str) -> dict[str,
     return payload
 
 
+def get_homepage_page(
+    db: Session,
+    series_id: str | None,
+    *,
+    published_only: bool = False,
+) -> dict[str, Any] | None:
+    """Resolve the homepage page for a series, falling back to the reader page."""
+    sid = sanitize_series_id(series_id) if series_id else DEFAULT_SERIES_ID
+
+    def load_page(*filters: Any) -> BuilderPage | None:
+        return db.scalar(
+            select(BuilderPage)
+            .where(BuilderPage.series_id == sid, *filters)
+            .options(selectinload(BuilderPage.sections).selectinload(BuilderSection.modules))
+        )
+
+    visibility_filters: list[Any] = []
+    if published_only:
+        visibility_filters.append(BuilderPage.is_published == True)  # noqa: E712
+
+    page = load_page(BuilderPage.is_homepage == True, *visibility_filters)  # noqa: E712
+    if not page:
+        page = load_page(BuilderPage.slug == "reader", *visibility_filters)
+    if not page:
+        return None
+
+    payload = _serialize_page(page, include_sort_index=False)
+    payload["sections"] = [
+        _serialize_section(section)
+        for section in sorted(page.sections, key=lambda s: s.sort_index)
+    ]
+    return payload
+
+
 def create_page(db: Session, series_id: str | None, data: dict[str, Any]) -> dict[str, Any]:
     """Create a new page."""
     sid = sanitize_series_id(series_id) if series_id else DEFAULT_SERIES_ID

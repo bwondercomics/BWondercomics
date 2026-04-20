@@ -77,7 +77,7 @@ async function handleMouseLeaveControls() {
 import { renderLatestUpdate } from './latest.js';
 import { initRightPanelFeed } from './feed-panel.js';
 import { initEmailSignupForm } from './email.js';
-import { getActiveSeriesId, getRequestedPageSlug, isDraftPageRequested } from './series.js';
+import { getActiveSeriesId, getExplicitPageSlug, isDraftPageRequested } from './series.js';
 
 (function () {
   'use strict';
@@ -950,7 +950,7 @@ import { getActiveSeriesId, getRequestedPageSlug, isDraftPageRequested } from '.
 
   async function start() {
     const seriesId = getActiveSeriesId();
-    const requestedPageSlug = getRequestedPageSlug();
+    const explicitPageSlug = getExplicitPageSlug();
 
     try {
       const data = await loadEntryData(seriesId);
@@ -1009,7 +1009,7 @@ import { getActiveSeriesId, getRequestedPageSlug, isDraftPageRequested } from '.
       seriesId,
     });
     const pageConfig = await loadPageConfigWithFallback(setSubtitles, seriesId, {
-      pageSlug: requestedPageSlug,
+      pageSlug: explicitPageSlug,
       draft: role === 'admin' && isDraftPageRequested(),
     });
     readerBootState.resolvePageConfig(pageConfig);

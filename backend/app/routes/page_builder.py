@@ -18,6 +18,7 @@ from ..page_store import (
     delete_module,
     delete_page,
     delete_section,
+    get_homepage_page,
     get_page,
     get_page_by_slug,
     list_pages,
@@ -112,6 +113,23 @@ def api_get_page_by_slug_admin(
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     page = get_page_by_slug(db, series_id, slug)
+    if not page:
+        return JSONResponse(status_code=404, content={"error": "Page not found"})
+
+    return {"page": page}
+
+
+@router.get("/api/admin/pages/home/{series_id}")
+def api_get_homepage_page_admin(
+    series_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Get the effective homepage page for admin preview and draft viewing."""
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    page = get_homepage_page(db, series_id, published_only=False)
     if not page:
         return JSONResponse(status_code=404, content={"error": "Page not found"})
 
@@ -403,6 +421,16 @@ def api_reorder_modules(
 
 
 # Public endpoint for page rendering
+
+
+@router.get("/api/pages/home/{series_id}")
+def api_public_homepage(series_id: str, db: Session = Depends(get_db)):
+    """Get the effective published homepage page for public rendering."""
+    page = get_homepage_page(db, series_id, published_only=True)
+    if not page:
+        return JSONResponse(status_code=404, content={"error": "Page not found"})
+
+    return {"page": page}
 
 
 @router.get("/api/pages/{series_id}/{slug}")

@@ -25,6 +25,9 @@ Public pages are served from `dist/`.
 
 - Build + snapshot: `./scripts/frontend-build.sh` (writes `dist/` and saves a tarball in `var/releases/`).
 - Caddy serves `dist/` for the public site, and `/admin/` directly from the repo (admin changes go live without rebuild).
+- If you change anything that affects the public runtime, rebuilding `dist/` is mandatory before you verify the fix in the browser.
+- This includes `reader/`, top-level public HTML, `assets/`, and shared builder modules imported by the reader bundle, even when those files live under `admin/`.
+- Passing tests against source files does not prove the live site changed until the new bundle has been built.
 
 ## Quality gates
 

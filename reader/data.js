@@ -14,7 +14,10 @@ import { logger } from './logger.js';
 import { renderModule, initEmailForms, initPromoCarousels } from './page-renderer.js';
 import { initFeedModules } from './feed-panel.js';
 import { applySharedHeaderLayout } from './header-layout.js';
-import { createEffectivePageHeader } from '../admin/page-builder/header-config.js';
+import {
+  createEffectivePageHeader,
+  resolvePageHeaderState,
+} from '../admin/page-builder/header-config.js';
 
 /**
  * Loads entry data from the public series endpoint
@@ -190,6 +193,43 @@ export async function loadBuilderPage(slug, seriesId = null, options = {}) {
 }
 
 /**
+ * Loads the effective homepage page for a series.
+ * Prefers the page marked homepage and falls back to the reader page.
+ * @param {string} [seriesId] - Optional series ID override
+ * @param {{draft?: boolean}} [options] - Load unpublished pages through the admin API when enabled
+ * @returns {Promise<Object|null>} The page data or null if not found
+ */
+export async function loadHomepageBuilderPage(seriesId = null, options = {}) {
+  const sid = seriesId || getActiveSeriesId();
+  const useDraft = !!options?.draft;
+  const requestUrl = useDraft
+    ? `/api/admin/pages/home/${encodeURIComponent(sid)}`
+    : `/api/pages/home/${encodeURIComponent(sid)}`;
+  try {
+    const res = await fetch(requestUrl, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
+    if (!res.ok) {
+      if (res.status === 404) {
+        logger.log(`Homepage page not found for series: ${sid}`);
+        return null;
+      }
+      if (useDraft && res.status === 403) {
+        logger.warn(`Draft homepage page requires admin access for series: ${sid}`);
+        return null;
+      }
+      throw new Error(`Failed to load homepage page: ${res.status}`);
+    }
+    const data = await res.json();
+    return data.page || null;
+  } catch (error) {
+    logger.error('Failed to load homepage page:', error);
+    return null;
+  }
+}
+
+/**
  * Extract subtitles from a page builder page.
  * Prefers the first-class page header and falls back through legacy sources.
  * @param {Object} page - The page data from the builder API
@@ -273,10 +313,15 @@ function applyPanelBackgrounds(page) {
  */
 export function applyBuilderPageToDOM(page, options = {}) {
   if (!page || !page.sections) return;
-  const effectiveHeader = createEffectivePageHeader(page, options.pageConfig || null);
+  const headerState = resolvePageHeaderState({
+    page,
+    pageConfig: options.pageConfig || null,
+  });
+  const effectiveHeader = headerState.meta;
   applySharedHeaderLayout(options.pageConfig || null, {
     seriesId: options.seriesId || getActiveSeriesId(),
     page,
+    headerState,
   });
 
   // Apply theme first
@@ -458,7 +503,9 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
  */
 export async function loadPageConfigWithFallback(setSubtitlesFn, seriesId = null, options = {}) {
   const sid = seriesId || getActiveSeriesId();
-  const pageSlug = sanitizePageSlug(options?.pageSlug || '') || 'reader';
+  const requestedPageSlug = sanitizePageSlug(options?.pageSlug || '');
+  const pageSlug = requestedPageSlug || 'reader';
+  const useHomepageResolver = !requestedPageSlug;
   const useDraft = !!options?.draft;
   const allowLegacyFallback = pageSlug === 'reader' && !useDraft;
   const pageConfig = await fetchPageConfig(sid);
@@ -468,13 +515,15 @@ export async function loadPageConfigWithFallback(setSubtitlesFn, seriesId = null
   const noFallback = localStorage.getItem('pb-no-fallback') === '1';
 
   // Try page builder first
-  const builderPage = await loadBuilderPage(pageSlug, sid, { draft: useDraft });
+  const builderPage = useHomepageResolver
+    ? await loadHomepageBuilderPage(sid, { draft: useDraft })
+    : await loadBuilderPage(pageSlug, sid, { draft: useDraft });
   if (builderPage) {
     const subtitles = extractSubtitlesFromBuilderPage(builderPage, pageConfig);
     if (subtitles.length > 0) {
       setSubtitlesFn(subtitles);
     }
-    logger.log(`✓ Loaded builder page "${pageSlug}" for series: ${sid}`);
+    logger.log(`✓ Loaded builder page "${builderPage.slug || pageSlug}" for series: ${sid}`);
     return { source: 'builder', page: builderPage, config: pageConfig };
   }
 
