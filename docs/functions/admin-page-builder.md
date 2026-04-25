@@ -132,6 +132,14 @@ Resolution order is effectively:
 2. site-level or legacy page-config defaults
 3. older override shapes and legacy fallback content
 
+Appearance contract update:
+
+- `normalizeHeaderConfig(...)` now carries optional header-shell `appearance` alongside `regions`, `blocks`, and `nav`
+- a local `normalizeHeaderShellAppearance(...)` normalizes the three shared branches: `top`, `scrolled`, and `navItemDefaults`
+- `createPageHeaderMeta(...)` now persists normalized `appearance` into canonical V3 header metadata
+- `resolvePageHeaderState(...)` now preserves that same `appearance` data on both `meta` and normalized `header`
+- this is a data-contract pass only; no header editor UI or reader/admin header renderer consumes the new appearance fields yet
+
 `resolvePageHeaderState(...)` is now the shared Step 5 seam for parity work:
 
 - the admin canvas header surface reads `headerState.header` and `headerState.copy`
@@ -233,6 +241,10 @@ Provides the UI and logic for managing lists of interactive buttons.
 - `bindButtonsEditorEvents(...)`: Handles add/remove/reorder sync.
 - `renderLinkFields`: Sub-fields for jumping between Builder Page, URL, and Anchor link modes.
 
+Current limitation:
+
+- the shared button appearance contract exists in normalized module data (`defaults.appearance` and per-button `appearance`), but Step 1 does not expose those controls in the editor yet
+
 ## ➖ Divider Editor (divider-editor.js)
 
 A minimalist editor for horizontal ruling lines. Includes a style selector (Solid, Dashed, Dotted) and a color picker.
@@ -277,9 +289,29 @@ Registries include `MODULE_TYPES`, `LAYOUT_OPTIONS`, and theme tokens like `THEM
 
 Shared helper coverage includes asset URL resolution, image fit and focal-point helpers, and HTML/attribute escaping logic.
 
+## 🎨 Appearance Utilities (appearance-utils.js)
+
+Shared appearance-contract helper for header shell state, header nav items, and `buttons` module items/defaults.
+
+Key exports:
+
+- `normalizeAppearance` — normalizes sparse `appearance` input into the shared nested shape while preserving omitted leaves as `null`
+- `mergeAppearance` — deep-merges two normalized appearance objects for future theme/preset/default/override resolution
+- `appearanceToInlineStyle` — future-facing helper that converts a resolved appearance object into stable-order inline CSS
+- `isAppearanceEmpty` — recognizes visually empty appearance objects so storage and emission can stay sparse
+
+Important current rule:
+
+- this helper establishes the shared contract and test seam, but Step 1 does not yet wire appearance into shared renderers, button output, or header shell output
+
 ## 🛡️ Sanitization Layer (sanitize.js)
 
 The builder validation layer. Includes helpers for sanitizing builder HTML, processing URLs, and normalizing numbers/keywords cleanly to prevent data rot.
+
+Backend parity note:
+
+- the matching backend sanitizers now live in `backend/app/builder_security.py` as `sanitize_appearance(...)` and `sanitize_header_shell_appearance(...)`
+- stored JSON omits empty `appearance` keys entirely instead of writing explicit `null`
 
 ## 🔗 Link Utilities (link-utils.js)
 
@@ -287,9 +319,9 @@ A shared utility library for manipulating and normalizing links across the build
 
 - `normalizeLinkTarget` — canonicalizes `builder-page`, `url`, and `anchor` link targets; sanitizes unsafe URLs
 - `resolveLinkTargetHref`, `shouldOpenLinkInNewTab`, `buildReaderPageHref` — routing / href resolution
-- `normalizeButtonItem` — normalizes a `buttons` module item, including `style: 'primary' | 'secondary'`
-- `normalizeHeaderNavItem` / `normalizeHeaderNavItems` — normalizes a header nav item; now includes `style: 'primary' | 'secondary'` (defaults to `'primary'`), making header nav items structurally compatible with the button module's variant model
-- `normalizeButtonsConfig` — normalizes a full `buttons` module config
+- `normalizeButtonItem` — normalizes a `buttons` module item, including `style: 'primary' | 'secondary'` plus optional shared `appearance`
+- `normalizeHeaderNavItem` / `normalizeHeaderNavItems` — normalizes a header nav item; includes `style: 'primary' | 'secondary'` plus optional shared `appearance`, making header nav items structurally compatible with the button module's variant + appearance model
+- `normalizeButtonsConfig` — normalizes a full `buttons` module config, including `defaults.appearance` while preserving unrelated config fields
 
 ## 📖 Current Module Catalog
 

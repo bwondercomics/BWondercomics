@@ -1,3 +1,5 @@
+import { normalizeAppearance } from './appearance-utils.js';
+
 const HEADER_REGION_ORDER = ['left', 'center', 'right'];
 const HEADER_BLOCK_IDS = ['brand', 'patron', 'status', 'entryControls', 'nav'];
 
@@ -111,6 +113,19 @@ function normalizeBlocks(rawBlocks = {}, rawNav = {}) {
   return blocks;
 }
 
+function normalizeHeaderShellAppearance(rawAppearance = null) {
+  const source =
+    rawAppearance && typeof rawAppearance === 'object' && !Array.isArray(rawAppearance)
+      ? rawAppearance
+      : {};
+  const normalized = {
+    top: normalizeAppearance(source.top),
+    scrolled: normalizeAppearance(source.scrolled),
+    navItemDefaults: normalizeAppearance(source.navItemDefaults),
+  };
+  return normalized.top || normalized.scrolled || normalized.navItemDefaults ? normalized : null;
+}
+
 function normalizeHeaderConfig(rawConfig = null, normalizeNavItems = (items) => items || []) {
   const defaults = createDefaultHeaderConfig();
   const config =
@@ -123,6 +138,7 @@ function normalizeHeaderConfig(rawConfig = null, normalizeNavItems = (items) => 
     nav: {
       items: normalizeNavItems(config.nav?.items || defaults.nav.items),
     },
+    appearance: normalizeHeaderShellAppearance(config.appearance),
   };
 }
 
@@ -198,6 +214,7 @@ function createPageHeaderMeta(
     regions: layout.regions,
     blocks: layout.blocks,
     nav: layout.nav,
+    appearance: layout.appearance,
   };
 }
 

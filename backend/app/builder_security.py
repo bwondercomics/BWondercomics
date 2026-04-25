@@ -489,7 +489,7 @@ def sanitize_header_meta(raw_header: Any) -> dict[str, Any]:
     header = raw_header if isinstance(raw_header, dict) else {}
     copy_block = header.get("copy") if isinstance(header.get("copy"), dict) else {}
     subtitles = copy_block.get("subtitles")
-    return {
+    sanitized = {
         "version": 3,
         "copy": {
             "title": _coerce_string(copy_block.get("title"), "Page Title", 200),
@@ -506,6 +506,10 @@ def sanitize_header_meta(raw_header: Any) -> dict[str, Any]:
             "items": sanitize_header_nav_items((header.get("nav") or {}).get("items")),
         },
     }
+    appearance = sanitize_header_shell_appearance(header.get("appearance"))
+    if appearance is not None:
+        sanitized["appearance"] = appearance
+    return sanitized
 
 
 def sanitize_header_nav_items(items: Any) -> list[dict[str, Any]]:
@@ -515,15 +519,17 @@ def sanitize_header_nav_items(items: Any) -> list[dict[str, Any]]:
     for item in items[:20]:
         entry = item if isinstance(item, dict) else {}
         style = str(entry.get("style") or "primary").strip()
-        normalized.append(
-            {
-                "id": _sanitize_id_like(entry.get("id")) or "nav",
-                "label": _coerce_string(entry.get("label") or entry.get("text"), "Link", 120),
-                "enabled": _coerce_bool(entry.get("enabled"), True),
-                "style": style if style in {"primary", "secondary"} else "primary",
-                "link": sanitize_link_target(entry.get("link"), entry.get("url")),
-            }
-        )
+        appearance = sanitize_appearance(entry.get("appearance"))
+        item_payload = {
+            "id": _sanitize_id_like(entry.get("id")) or "nav",
+            "label": _coerce_string(entry.get("label") or entry.get("text"), "Link", 120),
+            "enabled": _coerce_bool(entry.get("enabled"), True),
+            "style": style if style in {"primary", "secondary"} else "primary",
+            "link": sanitize_link_target(entry.get("link"), entry.get("url")),
+        }
+        if appearance is not None:
+            item_payload["appearance"] = appearance
+        normalized.append(item_payload)
     return normalized
 
 
@@ -581,6 +587,104 @@ def sanitize_panel_spacing(raw_spacing: Any) -> dict[str, int]:
             continue
         sanitized[side] = _clamp_int(value, 0, 0, 240)
     return sanitized
+
+
+def _sanitize_optional_clamped_int(
+    source: dict[str, Any], key: str, minimum: int, maximum: int
+) -> int | None:
+    if key not in source:
+        return None
+    try:
+        number = int(source.get(key))
+    except (TypeError, ValueError):
+        return None
+    return max(minimum, min(maximum, number))
+
+
+def _sanitize_optional_clamped_float(
+    source: dict[str, Any], key: str, minimum: float, maximum: float
+) -> float | None:
+    if key not in source:
+        return None
+    try:
+        number = float(source.get(key))
+    except (TypeError, ValueError):
+        return None
+    return max(minimum, min(maximum, number))
+
+
+def sanitize_appearance(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+
+    background = raw.get("background") if isinstance(raw.get("background"), dict) else {}
+    text = raw.get("text") if isinstance(raw.get("text"), dict) else {}
+    border = raw.get("border") if isinstance(raw.get("border"), dict) else {}
+
+    background_type = None
+    if "type" in background:
+        current = str(background.get("type") or "").strip().lower()
+        background_type = current if current in {"solid", "gradient"} else None
+
+    border_style = None
+    if "style" in border:
+        current = str(border.get("style") or "").strip().lower()
+        border_style = current if current in {"solid", "dashed", "dotted"} else None
+
+    result = {
+        "background": {
+            "type": background_type,
+            "color": sanitize_color(background.get("color")) or None
+            if "color" in background
+            else None,
+            "secondaryColor": sanitize_color(background.get("secondaryColor")) or None
+            if "secondaryColor" in background
+            else None,
+            "angle": _sanitize_optional_clamped_int(background, "angle", 0, 360),
+            "opacity": _sanitize_optional_clamped_float(background, "opacity", 0.0, 1.0),
+        },
+        "text": {
+            "color": sanitize_color(text.get("color")) or None if "color" in text else None,
+        },
+        "border": {
+            "width": _sanitize_optional_clamped_int(border, "width", 0, 20),
+            "style": border_style,
+            "color": sanitize_color(border.get("color")) or None if "color" in border else None,
+            "opacity": _sanitize_optional_clamped_float(border, "opacity", 0.0, 1.0),
+            "radius": _sanitize_optional_clamped_int(border, "radius", 0, 200),
+        },
+    }
+
+    has_values = any(
+        value is not None
+        for value in (
+            result["background"]["type"],
+            result["background"]["color"],
+            result["background"]["secondaryColor"],
+            result["background"]["angle"],
+            result["background"]["opacity"],
+            result["text"]["color"],
+            result["border"]["width"],
+            result["border"]["style"],
+            result["border"]["color"],
+            result["border"]["opacity"],
+            result["border"]["radius"],
+        )
+    )
+    return result if has_values else None
+
+
+def sanitize_header_shell_appearance(raw: Any) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        return None
+    result = {
+        "top": sanitize_appearance(raw.get("top")),
+        "scrolled": sanitize_appearance(raw.get("scrolled")),
+        "navItemDefaults": sanitize_appearance(raw.get("navItemDefaults")),
+    }
+    if not any(result.values()):
+        return None
+    return result
 
 
 def sanitize_page_meta(raw_meta: Any) -> dict[str, Any]:
@@ -847,16 +951,23 @@ def sanitize_module_config(module_type: str, raw_config: Any) -> dict[str, Any]:
         for item in raw_buttons[:20]:
             current = item if isinstance(item, dict) else {}
             style = str(current.get("style") or "primary").strip()
-            buttons.append(
-                {
-                    "id": _sanitize_id_like(current.get("id")) or "btn",
-                    "text": _coerce_string(current.get("text"), "Button", 120),
-                    "enabled": _coerce_bool(current.get("enabled"), True),
-                    "style": style if style in {"primary", "secondary"} else "primary",
-                    "link": sanitize_link_target(current.get("link"), current.get("url")),
-                }
-            )
-        return {"buttons": buttons}
+            appearance = sanitize_appearance(current.get("appearance"))
+            item_payload = {
+                "id": _sanitize_id_like(current.get("id")) or "btn",
+                "text": _coerce_string(current.get("text"), "Button", 120),
+                "enabled": _coerce_bool(current.get("enabled"), True),
+                "style": style if style in {"primary", "secondary"} else "primary",
+                "link": sanitize_link_target(current.get("link"), current.get("url")),
+            }
+            if appearance is not None:
+                item_payload["appearance"] = appearance
+            buttons.append(item_payload)
+        sanitized = {"buttons": buttons}
+        defaults_source = config.get("defaults") if isinstance(config.get("defaults"), dict) else {}
+        defaults_appearance = sanitize_appearance(defaults_source.get("appearance"))
+        if defaults_appearance is not None:
+            sanitized["defaults"] = {"appearance": defaults_appearance}
+        return sanitized
 
     if module_type == "spacer":
         return {"height": _clamp_int(config.get("height"), 40, 0, 600)}

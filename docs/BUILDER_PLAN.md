@@ -537,6 +537,147 @@ Goal: make the page designer show the real page-scoped header builder by default
 - header preview in admin and the live reader header stay in parity for layout, visible blocks, and button variants
 - the series-level fallback audit remains the gate for runtime fallback removal
 
+### Phase 7 - Header and Button Appearance Customization Pass
+
+Status: Step 1 implemented (`2026-04-25`); Steps 2-5 pending
+
+This phase adds structured styling controls for the page header shell, header nav items, and the standalone `buttons` module. The model should follow the useful parts of stronger builders such as Wix, Squarespace, Webflow, and Shopify: token-driven defaults, structured controls, and optional per-item overrides instead of freeform CSS.
+
+#### Scope and defaults
+
+- scope is limited to header shell + header nav + `buttons` module
+- styling uses inheritance: `page.meta.theme` tokens -> existing `style` preset -> header/module defaults -> per-item overrides
+- new styling fields are optional and backward compatible
+- no per-state hover/focus editor in this pass; preserve current CSS-driven interaction states
+
+#### Important Interface Changes
+
+Keep the existing `style` field on header nav items and button items for backward compatibility.
+
+Add these new optional interfaces:
+
+- `page.meta.header.appearance`
+  - `top`: header container background/text/border appearance when the page is at the top
+  - `scrolled`: header container background/text/border appearance after scroll
+  - `navItemDefaults`: default appearance for header nav buttons
+- `page.meta.header.nav.items[*].appearance`
+- `buttons` module config `defaults.appearance`
+- `buttons` module config `buttons[*].appearance`
+
+Use one shared `appearance` shape for both header nav items and buttons:
+
+- `background`: `type` (`solid` | `gradient`), `color`, `secondaryColor`, `angle`, `opacity`
+- `text`: `color`
+- `border`: `width`, `style` (`solid` | `dashed` | `dotted`), `color`, `opacity`, `radius`
+
+Do not add raw CSS fields, arbitrary class names, or freeform JSON editing for this feature.
+
+#### Step 1 - Define the shared appearance contract
+
+- Shipped in the shared data contract layer. The builder and backend now accept, normalize, sanitize, and round-trip sparse `appearance` data for header shell state, header nav items, button items, and `buttons.defaults.appearance`.
+- The new frontend helper lives in `admin/page-builder/appearance-utils.js` and exports `normalizeAppearance`, `mergeAppearance`, `appearanceToInlineStyle`, and `isAppearanceEmpty`.
+- Resolution approach is locked to JS-side merge, not CSS-variable fallback. Step 1 does not consume the merge helper yet in renderers, but it establishes the contract and the future emission helper.
+- The contract is sparse by design: empty `appearance` values are omitted from stored JSON, and omitted leaves remain `null` in normalized/sanitized data until a later render-time resolution step applies defaults.
+- Old pages keep current behavior because no reader/admin renderer consumes `appearance` yet when it is absent.
+- Backend sanitization now explicitly owns `appearance`; the old `sanitize_page_meta(...)` `_deepcopy` fallthrough is no longer relied on for these fields.
+
+Functions in the normalize/resolve/sanitize chain that must carry `appearance` through:
+
+- `normalizeHeaderConfig` in `admin/page-builder/header-config.js` — now passes header-shell `appearance` through a local `normalizeHeaderShellAppearance(...)`
+- `createPageHeaderMeta` in `admin/page-builder/header-config.js` — now carries normalized `appearance` into returned V3 meta
+- `resolvePageHeaderState` in `admin/page-builder/header-config.js` — now preserves `appearance` on both `meta` and normalized `header`
+- `sanitize_header_meta` in `backend/app/builder_security.py` — now calls `sanitize_header_shell_appearance(...)` and includes the result only when non-empty
+- `normalizeHeaderNavItem` in `admin/page-builder/link-utils.js` — now passes through an optional normalized `appearance` field
+- `normalizeButtonItem` in `admin/page-builder/link-utils.js` — now passes through an optional normalized `appearance` field
+- `normalizeButtonsConfig` in `admin/page-builder/link-utils.js` — now preserves unrelated config while normalizing `defaults.appearance`
+- `sanitize_header_nav_items` in `backend/app/builder_security.py` — now sanitizes per-item `appearance`
+- `sanitize_module_config` for `buttons` in `backend/app/builder_security.py` — now sanitizes per-button `appearance` and module-level `defaults.appearance`
+
+Backend validation bounds for the `appearance` shape:
+
+- `background.angle` must be clamped 0–360 via `_clamp_int`
+- `background.opacity` and `border.opacity` must be clamped 0.0–1.0 via `_clamp_float`
+- `border.width` must be clamped 0–20 via `_clamp_int`
+- `border.radius` must be clamped 0–200 via `_clamp_int`
+- all color fields must pass through `sanitize_color`
+- `background.type` must be validated against `{'solid', 'gradient'}`
+- `border.style` must be validated against `{'solid', 'dashed', 'dotted'}`
+
+Step 1 verification baseline:
+
+- Added frontend unit coverage for appearance normalization, merge semantics, inline-style emission, and empty-state detection.
+- Added builder normalizer coverage for header nav items, button items, button defaults, and header-state parity passthrough.
+- Added backend route coverage for appearance save/read round-trip, clamping/rejection, and omission of empty `appearance` keys.
+- Verification completed with targeted Vitest coverage, backend route tests via the repo's `unittest` runner, and a `dist/` rebuild.
+
+#### Step 2 - Add appearance controls to the `buttons` module
+
+- Extend the `buttons` module editor with a module-level defaults card plus per-button appearance controls.
+- Keep the current link editor and preset selector; appearance overrides are additive, not a replacement for the existing flow.
+- Render customized buttons through the shared renderer path so admin preview and reader output stay aligned.
+- Use the same precedence everywhere: theme tokens, then preset, then module defaults, then button override.
+- The button renderer in `shared-renderers.js` currently emits pure class-based output (`pb-btn--primary`, `pb-btn--secondary`) with no inline styles. This step must transition it to class + inline-style (or CSS-variable) output when `appearance` data is present, while preserving pure-class output when it is absent.
+- Any new CSS for button appearance variants must be added to the appropriate CSS files and included in the `dist/` build.
+
+#### Step 3 - Add header shell and header nav appearance controls
+
+- Extend the page header editor with a header-shell appearance section covering `top` and `scrolled` states.
+- Add header nav default appearance controls plus per-nav-item appearance controls.
+- Keep the existing header layout/placement workflow unchanged; this phase is styling only, not a new header block system.
+- Do not include per-block styling for `brand`, `patron`, `status`, or `entryControls` in this pass.
+- The reader header (`header.topbar`) is `position: sticky` but has no scroll-aware JS today. This step must add a scroll listener (in `reader/header-layout.js` or `reader/app.js`) that toggles between `top` and `scrolled` appearance on the header shell element.
+- Note that `navItemDefaults` lives under `header.appearance` while per-item overrides live under `header.nav.items[*].appearance`. The merge logic must reach across these two branches — call this out explicitly in the normalizer so implementers don't miss the cross-branch resolution.
+- Any new CSS for header-shell scrolled state or nav-item appearance must be added to the appropriate CSS files and included in the `dist/` build.
+
+#### Step 4 - Keep runtime parity explicit
+
+- Update the reader header runtime to resolve header-shell and nav-item appearance from the same shared header-state helper used by the admin surface.
+- Apply customized button/nav appearance through shared CSS-variable or inline-style generation rather than separate one-off render paths.
+- Preserve current reader behavior when no appearance data is present.
+- Require `dist/` rebuild before claiming live reader changes work, because this phase affects shared reader/builder rendering.
+
+#### Step 5 - Verification and acceptance
+
+- Add unit coverage for appearance normalization, sanitization, and merge precedence.
+- Add editor tests for draft persistence, save/reload round-trip, and backward compatibility with old pages that only use `style`.
+- Add renderer parity tests so admin preview/canvas and live reader produce the same customized header/button output.
+- Add reader tests for top-vs-scrolled header shell styling and customized button/nav rendering.
+
+#### Acceptance Criteria
+
+- authors can customize header container background and border for top and scrolled states without touching JSON
+- authors can customize button and header-nav background, text color, border, and radius from structured controls
+- theme changes still cascade unless a more specific header/module/item override is set
+- old pages that only use `primary` / `secondary` keep their current visual behavior
+- admin preview and the live reader stay in parity for customized header and button rendering
+
+#### Implementation notes from audit
+
+Relationship to existing module style objects:
+
+- The `appearance` shape is intentionally a new shared contract for header + buttons. It diverges from the existing per-module `style` objects used by `social` (`sanitize_social_style`), `email-signup` (`sanitize_email_style`), `feed` (`sanitize_feed_style`), and `promo` (`sanitize_promo_item_style`).
+- Those existing per-module style objects are not migrated to the `appearance` contract in this pass.
+- Future unification of module style objects under a single appearance contract is a separate consideration and is not assumed by this phase.
+
+Test baseline expectations:
+
+- Step 5 should assert a specific test count as a regression gate, consistent with the convention established in earlier phases (e.g., Phase 6 Step 4: "37 files, 242 passing, 0 regressions").
+
+#### Assumptions
+
+- No migration or backfill is required because all new fields are optional.
+- This phase does not expand to social, promo, feed, or other modules.
+- This phase does not add per-block header styling.
+- Hover/focus/active state editors are deferred to a later pass if needed.
+
+#### Benchmark References
+
+- Wix header customization: https://support.wix.com/en/article/wix-editor-customizing-your-site-header
+- Wix button design customization: https://support.wix.com/en/article/wix-editor-customizing-the-design-of-your-buttons
+- Squarespace button styling: https://support.squarespace.com/hc/en-us/articles/206544727-Styling-buttons
+- Webflow state model: https://help.webflow.com/hc/en-us/articles/33961301727251-States
+- Shopify theme settings model: https://help.shopify.com/en/manual/online-store/themes/customizing-themes/theme-editor/theme-settings
+
 ## Keep / change / avoid
 
 ### Keep

@@ -369,6 +369,18 @@ describe('reader builder presentation loading', () => {
       center: ['nav'],
       right: ['status', 'entryControls', 'patron'],
     };
+    builderPage.meta.header.appearance = {
+      top: {
+        background: {
+          color: '#123456',
+        },
+      },
+      navItemDefaults: {
+        text: {
+          color: '#ffffff',
+        },
+      },
+    };
     builderPage.meta.header.nav.items = [
       {
         id: 'nav-secondary',
@@ -400,6 +412,48 @@ describe('reader builder presentation loading', () => {
     expect(
       document.querySelector('.nav-links .nav-link')?.classList.contains('nav-link--secondary')
     ).toBe(true);
+    expect(headerState.meta.appearance).toEqual({
+      top: {
+        background: {
+          type: null,
+          color: '#123456',
+          secondaryColor: null,
+          angle: null,
+          opacity: null,
+        },
+        text: {
+          color: null,
+        },
+        border: {
+          width: null,
+          style: null,
+          color: null,
+          opacity: null,
+          radius: null,
+        },
+      },
+      scrolled: null,
+      navItemDefaults: {
+        background: {
+          type: null,
+          color: null,
+          secondaryColor: null,
+          angle: null,
+          opacity: null,
+        },
+        text: {
+          color: '#ffffff',
+        },
+        border: {
+          width: null,
+          style: null,
+          color: null,
+          opacity: null,
+          radius: null,
+        },
+      },
+    });
+    expect(headerState.header.appearance).toEqual(headerState.meta.appearance);
   });
 
   it('falls back to legacy shared header config plus page overrides when page.meta.header is missing', () => {

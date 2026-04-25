@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  normalizeButtonItem,
+  normalizeButtonsConfig,
   normalizeLinkTarget,
   normalizeHeaderNavItem,
   resolveLinkTargetHref,
@@ -64,5 +66,120 @@ describe('admin page-builder link utilities', () => {
     const primaryItem = normalizeHeaderNavItem({ label: 'Home', style: 'primary', link: { kind: 'builder-page', pageSlug: 'reader' } });
     expect(primaryItem.style).toBe('primary');
   });
-});
 
+  it('normalizeHeaderNavItem preserves a valid appearance payload', () => {
+    const item = normalizeHeaderNavItem({
+      label: 'About',
+      appearance: {
+        background: {
+          color: '#123456',
+          opacity: 0.5,
+        },
+        text: {
+          color: '#ffffff',
+        },
+      },
+      link: { kind: 'url', url: 'about.html' },
+    });
+
+    expect(item.appearance).toEqual({
+      background: {
+        type: null,
+        color: '#123456',
+        secondaryColor: null,
+        angle: null,
+        opacity: 0.5,
+      },
+      text: {
+        color: '#ffffff',
+      },
+      border: {
+        width: null,
+        style: null,
+        color: null,
+        opacity: null,
+        radius: null,
+      },
+    });
+  });
+
+  it('normalizeHeaderNavItem returns appearance null when none is provided', () => {
+    const item = normalizeHeaderNavItem({
+      label: 'About',
+      link: { kind: 'url', url: 'about.html' },
+    });
+
+    expect(item.appearance).toBeNull();
+  });
+
+  it('normalizeButtonItem preserves a valid appearance payload', () => {
+    const button = normalizeButtonItem({
+      text: 'Read More',
+      appearance: {
+        border: {
+          width: 2,
+          style: 'dashed',
+          color: '#00d9ff',
+        },
+      },
+      link: { kind: 'builder-page', pageSlug: 'reader' },
+    });
+
+    expect(button.appearance).toEqual({
+      background: {
+        type: null,
+        color: null,
+        secondaryColor: null,
+        angle: null,
+        opacity: null,
+      },
+      text: {
+        color: null,
+      },
+      border: {
+        width: 2,
+        style: 'dashed',
+        color: '#00d9ff',
+        opacity: null,
+        radius: null,
+      },
+    });
+  });
+
+  it('normalizeButtonsConfig normalizes defaults.appearance', () => {
+    const config = normalizeButtonsConfig({
+      defaults: {
+        appearance: {
+          background: {
+            color: '#222222',
+          },
+        },
+      },
+      buttons: [],
+      heading: 'CTA',
+    });
+
+    expect(config.heading).toBe('CTA');
+    expect(config.defaults).toEqual({
+      appearance: {
+        background: {
+          type: null,
+          color: '#222222',
+          secondaryColor: null,
+          angle: null,
+          opacity: null,
+        },
+        text: {
+          color: null,
+        },
+        border: {
+          width: null,
+          style: null,
+          color: null,
+          opacity: null,
+          radius: null,
+        },
+      },
+    });
+  });
+});

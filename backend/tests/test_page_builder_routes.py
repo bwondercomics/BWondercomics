@@ -389,6 +389,195 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.assertEqual(stored_page.meta["header"]["nav"]["items"][0]["style"], "secondary")
         self.assertNotIn("<script", stored_text.config["content"])
 
+    def test_builder_security_round_trips_sparse_appearance_payloads(self):
+        self.seed_contract_series()
+        page = page_builder.api_create_page(
+            page_builder.CreatePageRequest(
+                slug="appearance-contract",
+                title="Appearance Contract",
+                meta={
+                    "header": {
+                        "copy": {"title": "Appearance Contract"},
+                        "appearance": {
+                            "top": {
+                                "background": {
+                                    "type": "gradient",
+                                    "color": "#112233",
+                                    "secondaryColor": "#334455",
+                                    "angle": 999,
+                                    "opacity": 99,
+                                },
+                                "text": {"color": "not-a-color"},
+                            },
+                            "scrolled": {
+                                "border": {
+                                    "width": -5,
+                                    "style": "double",
+                                    "color": "#00d9ff",
+                                    "opacity": 99,
+                                    "radius": 999,
+                                }
+                            },
+                            "navItemDefaults": {
+                                "text": {"color": "#ffffff"},
+                            },
+                        },
+                        "nav": {
+                            "items": [
+                                {
+                                    "label": "About",
+                                    "appearance": {
+                                        "background": {
+                                            "color": "bad-color",
+                                            "secondaryColor": "#abcdef",
+                                            "angle": 12,
+                                        },
+                                        "text": {"color": "#ffee00"},
+                                        "border": {
+                                            "width": 2,
+                                            "style": "dotted",
+                                            "color": "#00ff00",
+                                            "opacity": 0.5,
+                                        },
+                                    },
+                                    "link": {"kind": "url", "url": "https://example.com"},
+                                }
+                            ]
+                        },
+                    }
+                },
+            ),
+            self.admin_request("/api/admin/pages", "POST"),
+            "battle-bros",
+            self.db,
+        )["page"]
+
+        section = page_builder.api_add_section(
+            page["id"],
+            page_builder.CreateSectionRequest(sectionType="row", layout="1"),
+            self.admin_request(f"/api/admin/pages/{page['id']}/sections", "POST"),
+            self.db,
+        )["section"]
+
+        page_builder.api_add_module(
+            section["id"],
+            page_builder.CreateModuleRequest(
+                moduleType="buttons",
+                columnIndex=0,
+                config={
+                    "defaults": {
+                        "appearance": {
+                            "background": {
+                                "color": "#202020",
+                                "opacity": 1.2,
+                            },
+                            "border": {
+                                "radius": 16,
+                            },
+                        }
+                    },
+                    "buttons": [
+                        {
+                            "text": "Read",
+                            "appearance": {
+                                "border": {
+                                    "width": -5,
+                                    "style": "danger",
+                                    "color": "#ff00ff",
+                                    "opacity": 99,
+                                },
+                                "text": {"color": "#ffffff"},
+                            },
+                            "link": {"kind": "builder-page", "pageSlug": "reader"},
+                        }
+                    ],
+                },
+            ),
+            self.admin_request(f"/api/admin/sections/{section['id']}/modules", "POST"),
+            self.db,
+        )
+
+        payload = page_builder.api_get_page(
+            page["id"],
+            self.admin_request(f"/api/admin/pages/{page['id']}"),
+            self.db,
+        )["page"]
+
+        header_appearance = payload["meta"]["header"]["appearance"]
+        self.assertEqual(header_appearance["top"]["background"]["type"], "gradient")
+        self.assertEqual(header_appearance["top"]["background"]["color"], "#112233")
+        self.assertEqual(header_appearance["top"]["background"]["secondaryColor"], "#334455")
+        self.assertEqual(header_appearance["top"]["background"]["angle"], 360)
+        self.assertEqual(header_appearance["top"]["background"]["opacity"], 1.0)
+        self.assertIsNone(header_appearance["top"]["text"]["color"])
+        self.assertEqual(header_appearance["scrolled"]["border"]["width"], 0)
+        self.assertIsNone(header_appearance["scrolled"]["border"]["style"])
+        self.assertEqual(header_appearance["scrolled"]["border"]["color"], "#00d9ff")
+        self.assertEqual(header_appearance["scrolled"]["border"]["opacity"], 1.0)
+        self.assertEqual(header_appearance["scrolled"]["border"]["radius"], 200)
+        self.assertEqual(header_appearance["navItemDefaults"]["text"]["color"], "#ffffff")
+
+        nav_item = payload["meta"]["header"]["nav"]["items"][0]
+        self.assertIn("appearance", nav_item)
+        self.assertIsNone(nav_item["appearance"]["background"]["color"])
+        self.assertEqual(nav_item["appearance"]["background"]["secondaryColor"], "#abcdef")
+        self.assertEqual(nav_item["appearance"]["background"]["angle"], 12)
+        self.assertEqual(nav_item["appearance"]["text"]["color"], "#ffee00")
+        self.assertEqual(nav_item["appearance"]["border"]["width"], 2)
+        self.assertEqual(nav_item["appearance"]["border"]["style"], "dotted")
+        self.assertEqual(nav_item["appearance"]["border"]["color"], "#00ff00")
+        self.assertEqual(nav_item["appearance"]["border"]["opacity"], 0.5)
+
+        buttons_module = next(
+            module
+            for section_payload in payload["sections"]
+            for module in section_payload["modules"]
+            if module["moduleType"] == "buttons"
+        )
+        self.assertEqual(
+            buttons_module["config"]["defaults"]["appearance"]["background"]["color"], "#202020"
+        )
+        self.assertEqual(
+            buttons_module["config"]["defaults"]["appearance"]["background"]["opacity"], 1.0
+        )
+        self.assertEqual(
+            buttons_module["config"]["defaults"]["appearance"]["border"]["radius"], 16
+        )
+        self.assertEqual(
+            buttons_module["config"]["buttons"][0]["appearance"]["border"]["width"], 0
+        )
+        self.assertIsNone(
+            buttons_module["config"]["buttons"][0]["appearance"]["border"]["style"]
+        )
+        self.assertEqual(
+            buttons_module["config"]["buttons"][0]["appearance"]["border"]["color"], "#ff00ff"
+        )
+        self.assertEqual(
+            buttons_module["config"]["buttons"][0]["appearance"]["border"]["opacity"], 1.0
+        )
+        self.assertEqual(
+            buttons_module["config"]["buttons"][0]["appearance"]["text"]["color"], "#ffffff"
+        )
+
+        plain_page = page_builder.api_create_page(
+            page_builder.CreatePageRequest(
+                slug="appearance-plain",
+                title="Appearance Plain",
+                meta={"header": {"copy": {"title": "Appearance Plain"}}},
+            ),
+            self.admin_request("/api/admin/pages", "POST"),
+            "battle-bros",
+            self.db,
+        )["page"]
+        plain_payload = page_builder.api_get_page(
+            plain_page["id"],
+            self.admin_request(f"/api/admin/pages/{plain_page['id']}"),
+            self.db,
+        )["page"]
+
+        self.assertNotIn("appearance", plain_page["meta"]["header"])
+        self.assertNotIn("appearance", plain_payload["meta"]["header"])
+
     def test_builder_security_rejects_invalid_structure_and_sanitizes_legacy_reads(self):
         self.seed_contract_series()
         page = page_builder.api_create_page(

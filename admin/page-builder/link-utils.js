@@ -1,3 +1,4 @@
+import { normalizeAppearance } from './appearance-utils.js';
 import { sanitizeAnchor, sanitizeHref } from './sanitize.js';
 
 const DEFAULT_SERIES_ID = 'battle-bros';
@@ -65,6 +66,7 @@ function normalizeHeaderNavItem(item = {}) {
     enabled: item.enabled !== false,
     style: ['primary', 'secondary'].includes(item.style) ? item.style : 'primary',
     link: normalizeLinkTarget(item.link, item.url),
+    appearance: normalizeAppearance(item.appearance),
   };
 }
 
@@ -79,12 +81,21 @@ function normalizeButtonItem(button = {}) {
     enabled: button.enabled !== false,
     style: String(button.style || 'primary').trim() || 'primary',
     link: normalizeLinkTarget(button.link, button.url),
+    appearance: normalizeAppearance(button.appearance),
   };
 }
 
 function normalizeButtonsConfig(config = {}) {
+  const defaults =
+    config?.defaults && typeof config.defaults === 'object' && !Array.isArray(config.defaults)
+      ? config.defaults
+      : {};
   return {
     ...JSON.parse(JSON.stringify(config || {})),
+    defaults: {
+      ...JSON.parse(JSON.stringify(defaults)),
+      appearance: normalizeAppearance(defaults.appearance),
+    },
     buttons: Array.isArray(config.buttons) ? config.buttons.map(normalizeButtonItem) : [],
   };
 }
