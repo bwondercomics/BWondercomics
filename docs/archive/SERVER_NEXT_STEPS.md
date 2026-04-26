@@ -1,6 +1,7 @@
 # Next Steps: From Fresh Ubuntu Server to Running Remark42 (archived)
 
 ## Your Current Setup ✅
+
 - Ubuntu Server installed (headless, no GUI)
 - OpenSSH enabled
 - SSD with OS (EFI + root partition)
@@ -26,6 +27,7 @@ ssh USERNAME@192.168.1.XXX
 ```
 
 **First login:**
+
 - Type `yes` when asked about fingerprint
 - Enter your password
 - You're in! 🎉
@@ -50,6 +52,7 @@ sudo apt install -y curl wget git nano htop net-tools
 ### Step 3: Set Static IP (Recommended)
 
 **Find your current network config:**
+
 ```bash
 ip addr show
 # Note your interface name (e.g., enp2s0, eth0, ens33)
@@ -59,6 +62,7 @@ ip route | grep default
 ```
 
 **Edit netplan config:**
+
 ```bash
 # Find your netplan file
 ls /etc/netplan/
@@ -68,17 +72,18 @@ sudo nano /etc/netplan/00-installer-config.yaml
 ```
 
 **Replace content with** (adjust IPs for your network):
+
 ```yaml
 network:
   version: 2
   renderer: networkd
   ethernets:
-    enp2s0:  # Replace with YOUR interface name
+    enp2s0: # Replace with YOUR interface name
       addresses:
-        - 192.168.1.100/24  # Choose an unused IP in your range
+        - 192.168.1.100/24 # Choose an unused IP in your range
       routes:
         - to: default
-          via: 192.168.1.1  # Your router/gateway IP
+          via: 192.168.1.1 # Your router/gateway IP
       nameservers:
         addresses:
           - 8.8.8.8
@@ -86,6 +91,7 @@ network:
 ```
 
 **Apply changes:**
+
 ```bash
 sudo netplan apply
 
@@ -152,11 +158,13 @@ sudo nano /etc/fstab
 ```
 
 **Add this line at the end:**
+
 ```
 UUID=your-uuid-here  /mnt/archive  ext4  defaults  0  2
 ```
 
 **Mount it:**
+
 ```bash
 # Mount the drive
 sudo mount -a
@@ -216,6 +224,7 @@ nano .env
 ```
 
 **Fill in these values:**
+
 ```bash
 REMARK_SECRET=<paste-generated-secret-here>
 GOOGLE_CLIENT_ID=<your-google-client-id>.apps.googleusercontent.com
@@ -241,6 +250,7 @@ docker compose logs -f
 ```
 
 You should see:
+
 ```
 NAME      IMAGE                      STATUS
 remark42  umputun/remark42:latest    Up
@@ -266,11 +276,13 @@ remark42  umputun/remark42:latest    Up
 ### Update Google OAuth
 
 **Get your public IP:**
+
 ```bash
 curl ifconfig.me
 ```
 
 **In Google Cloud Console:**
+
 1. Go to your OAuth credentials
 2. Add redirect URI:
    ```
@@ -281,20 +293,22 @@ curl ifconfig.me
 ### Update Your Website
 
 **On Windows, edit `feed.html` (line ~13):**
+
 ```javascript
 var remark_config = {
-  host: 'http://192.168.1.100:8080',  // Your server's IP
+  host: 'http://192.168.1.100:8080', // Your server's IP
   site_id: 'bwondercomics',
   components: ['embed'],
   theme: 'dark',
-  locale: 'en'
+  locale: 'en',
 };
 ```
 
 **Edit `reader/comic-comments.js` (line ~32):**
+
 ```javascript
 window.remark_config = {
-  host: 'http://192.168.1.100:8080',  // Your server's IP
+  host: 'http://192.168.1.100:8080', // Your server's IP
   site_id: 'bwondercomics',
   // ...
 };
@@ -359,6 +373,7 @@ ls -lh /mnt/archive/backups/
 ## Troubleshooting
 
 ### Can't SSH?
+
 ```bash
 # On server console, check SSH is running
 sudo systemctl status ssh
@@ -368,6 +383,7 @@ ip addr show
 ```
 
 ### Docker permission denied?
+
 ```bash
 # Add user to docker group
 sudo usermod -aG docker $USER
@@ -377,6 +393,7 @@ newgrp docker
 ```
 
 ### Can't access Remark42 from Windows?
+
 ```bash
 # Check if running
 docker compose ps
@@ -394,6 +411,7 @@ curl http://localhost:8080/ping
 ## Summary
 
 ✅ **What you've built:**
+
 - Dedicated Ubuntu Server
 - Docker running Remark42
 - Static IP for reliable access
@@ -401,12 +419,14 @@ curl http://localhost:8080/ping
 - SSH access from your main PC
 
 ✅ **What works now:**
+
 - Comments on feed posts
 - Comments on comic chapters
 - Self-hosted, $0/month except electricity
 - Full data ownership
 
 🚀 **Next possibilities:**
+
 - Build admin panel for comic uploads
 - Set up automatic deployments
 - Add reverse proxy (Nginx) with HTTPS

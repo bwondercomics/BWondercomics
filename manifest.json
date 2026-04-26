@@ -1,7 +1,7 @@
 {
-  "name": "Battle Bros Comic Reader",
-  "short_name": "Battle Bros",
-  "description": "Read Battle Bros comics online with smooth navigation and retro cyberpunk design",
+  "name": "BwonderComics Comic Reader",
+  "short_name": "BwonderComics",
+  "description": "Read BwonderComics comics online!",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a12",

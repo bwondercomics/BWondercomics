@@ -1,81 +1,466 @@
-// DOM references for the admin panel
+// DOM references for the admin panel.
+// Centralize lookups so the rest of the code can share and null-check.
 export const el = {
   loginScreen: document.getElementById('loginScreen'),
-  loginForm: document.getElementById('loginForm'),
-  loginEmail: document.getElementById('loginEmail'),
-  loginPassword: document.getElementById('loginPassword'),
+  loginForm: /** @type {HTMLFormElement | null} */ (document.getElementById('loginForm')),
+  loginEmail: /** @type {HTMLInputElement | null} */ (document.getElementById('loginEmail')),
+  loginPassword: /** @type {HTMLInputElement | null} */ (document.getElementById('loginPassword')),
   btnLogoutFromLogin: document.getElementById('btnLogoutFromLogin'),
   loginError: document.getElementById('loginError'),
   adminDashboard: document.getElementById('adminDashboard'),
+  adminHeader: document.getElementById('adminHeader'),
+  adminNavToggle: /** @type {HTMLButtonElement | null} */ (
+    document.getElementById('adminNavToggle')
+  ),
+  adminNav: document.getElementById('adminNav'),
+  btnInnerNet: document.getElementById('btnInnerNet'),
+  innerNetPanel: document.getElementById('innerNetPanel'),
+  innerNetTarget: document.getElementById('innerNetTarget'),
+  btnSettings: document.getElementById('btnSettings'),
+  adminSettingsPanel: document.getElementById('adminSettingsPanel'),
+  navLayoutSelect: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('navLayoutSelect')
+  ),
+  scanlinesToggle: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('scanlinesToggle')
+  ),
+  stickyHeaderToggle: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('stickyHeaderToggle')
+  ),
+  countViewsToggle: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('countViewsToggle')
+  ),
+  safeModeToggle: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('safeModeToggle')
+  ),
+  btnDashboard: document.getElementById('btnDashboard'),
+  dashboardSection: document.getElementById('dashboardSection'),
+  btnDashboardRefresh: document.getElementById('btnDashboardRefresh'),
+  dashboardStatus: document.getElementById('dashboardStatus'),
+  dashScheduledCount: document.getElementById('dashScheduledCount'),
+  dashScheduledNext: document.getElementById('dashScheduledNext'),
+  dashDraftCount: document.getElementById('dashDraftCount'),
+  dashCommentCount: document.getElementById('dashCommentCount'),
+  dashCommentLatest: document.getElementById('dashCommentLatest'),
+  dashUserCount: document.getElementById('dashUserCount'),
+  dashUserLatest: document.getElementById('dashUserLatest'),
+  dashNotificationCount: document.getElementById('dashNotificationCount'),
+  dashNotifications: document.getElementById('dashNotifications'),
+  dashNotificationsEmpty: document.getElementById('dashNotificationsEmpty'),
+  dashScheduleCount: document.getElementById('dashScheduleCount'),
+  dashScheduleList: document.getElementById('dashScheduleList'),
+  dashScheduleEmpty: document.getElementById('dashScheduleEmpty'),
+  dashTodoCount: document.getElementById('dashTodoCount'),
+  dashTodoInput: /** @type {HTMLInputElement | null} */ (document.getElementById('dashTodoInput')),
+  btnDashTodoAdd: document.getElementById('btnDashTodoAdd'),
+  dashTodoStatus: document.getElementById('dashTodoStatus'),
+  dashTodoList: document.getElementById('dashTodoList'),
+  dashTodoEmpty: document.getElementById('dashTodoEmpty'),
+  dashViews24h: document.getElementById('dashViews24h'),
+  dashVisitors24h: document.getElementById('dashVisitors24h'),
+  dashViews7d: document.getElementById('dashViews7d'),
+  dashVisitors7d: document.getElementById('dashVisitors7d'),
+  dashEntryReads: document.getElementById('dashEntryReads'),
+  dashEntryStarts: document.getElementById('dashEntryStarts'),
+  dashFinishRate: document.getElementById('dashFinishRate'),
+  dashUniqueVisitors: document.getElementById('dashUniqueVisitors'),
+  dashAnalyticsStatus: document.getElementById('dashAnalyticsStatus'),
+  dashConnectionsList: document.getElementById('dashConnectionsList'),
+  // Weekly Digest card
+  weeklyDigestCard: document.getElementById('weeklyDigestCard'),
+  weeklyDigestReads: document.getElementById('weeklyDigestReads'),
+  weeklyDigestStarts: document.getElementById('weeklyDigestStarts'),
+  weeklyDigestCompletionRate: document.getElementById('weeklyDigestCompletionRate'),
+  weeklyDigestVisitors: document.getElementById('weeklyDigestVisitors'),
+  weeklyDigestReadsChange: document.getElementById('weeklyDigestReadsChange'),
+  weeklyDigestStartsChange: document.getElementById('weeklyDigestStartsChange'),
+  weeklyDigestCompletionRateChange: document.getElementById('weeklyDigestCompletionRateChange'),
+  weeklyDigestVisitorsChange: document.getElementById('weeklyDigestVisitorsChange'),
   btnChapters: document.getElementById('btnChapters'),
   chaptersSection: document.getElementById('chaptersSection'),
-  seriesSelect: document.getElementById('seriesSelect'),
+  seriesSelect: /** @type {HTMLSelectElement | null} */ (document.getElementById('seriesSelect')),
   btnAddSeries: document.getElementById('btnAddSeries'),
   btnEditSeries: document.getElementById('btnEditSeries'),
   btnSeriesDesigner: document.getElementById('btnSeriesDesigner'),
-  btnOpenSeries: document.getElementById('btnOpenSeries'),
-  chapterList: document.getElementById('chapterList'),
-  btnAddChapter: document.getElementById('btnAddChapter'),
-  statusMessageInput: document.getElementById('statusMessageInput'),
+  btnOpenSeries: /** @type {HTMLAnchorElement | null} */ (document.getElementById('btnOpenSeries')),
+  entryList: document.getElementById('entryList'),
+  btnAddEntry: document.getElementById('btnAddEntry'),
+  entryLabelSelect: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('entryLabelSelect')
+  ),
+  entryShowInDropdown: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('entryShowInDropdown')
+  ),
+  entryShowInGallery: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('entryShowInGallery')
+  ),
+  entryReleaseType: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('entryReleaseType')
+  ),
+  entryStoreUrl: /** @type {HTMLInputElement | null} */ (document.getElementById('entryStoreUrl')),
+  entryCoverImage: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('entryCoverImage')
+  ),
+  entryLabelTabs: document.getElementById('entryLabelTabs'),
+  btnAddEntryLabel: document.getElementById('btnAddEntryLabel'),
+  statusMessageInput: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('statusMessageInput')
+  ),
   btnSaveStatus: document.getElementById('btnSaveStatus'),
   statusMessageStatus: document.getElementById('statusMessageStatus'),
   btnLogout: document.getElementById('btnLogout'),
   btnBlog: document.getElementById('btnBlog'),
+  btnSocial: document.getElementById('btnSocial'),
   blogSection: document.getElementById('blogSection'),
-  postTitle: document.getElementById('postTitle'),
-  postImage: document.getElementById('postImage'),
-  postImageFile: document.getElementById('postImageFile'),
-  postImageTags: document.getElementById('postImageTags'),
-  postImageFocus: document.getElementById('postImageFocus'),
-  postPublishAt: document.getElementById('postPublishAt'),
+  socialSection: document.getElementById('socialSection'),
+  socialTabs: document.getElementById('socialTabs'),
+  btnSocialRefresh: document.getElementById('btnSocialRefresh'),
+  socialStatus: document.getElementById('socialStatus'),
+  socialBlueskyAvatar: document.getElementById('socialBlueskyAvatar'),
+  socialBlueskyName: document.getElementById('socialBlueskyName'),
+  socialBlueskyHandle: document.getElementById('socialBlueskyHandle'),
+  socialBlueskyProfileLink: document.getElementById('socialBlueskyProfileLink'),
+  socialBlueskyNewFollowers: document.getElementById('socialBlueskyNewFollowers'),
+  socialBlueskyNewUnfollowed: document.getElementById('socialBlueskyNewUnfollowed'),
+  socialBlueskyFollowers: document.getElementById('socialBlueskyFollowers'),
+  socialBlueskyFollowing: document.getElementById('socialBlueskyFollowing'),
+  socialBlueskyNotifications: document.getElementById('socialBlueskyNotifications'),
+  socialBlueskyNotificationsEmpty: document.getElementById('socialBlueskyNotificationsEmpty'),
+  socialBlueskyNotificationCount: document.getElementById('socialBlueskyNotificationCount'),
+  socialBlueskyStatusNote: document.getElementById('socialBlueskyStatusNote'),
+  postTitle: /** @type {HTMLInputElement | null} */ (document.getElementById('postTitle')),
+  postImage: /** @type {HTMLInputElement | null} */ (document.getElementById('postImage')),
+  postImageFile: /** @type {HTMLInputElement | null} */ (document.getElementById('postImageFile')),
+  postImageTags: /** @type {HTMLInputElement | null} */ (document.getElementById('postImageTags')),
+  postImageFocus: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('postImageFocus')
+  ),
+  postImageFit: /** @type {HTMLSelectElement | null} */ (document.getElementById('postImageFit')),
+  btnPostImageFocus: document.getElementById('btnPostImageFocus'),
+  btnPostImageFocusReset: document.getElementById('btnPostImageFocusReset'),
+  postPublishAt: /** @type {HTMLInputElement | null} */ (document.getElementById('postPublishAt')),
   btnMediaPicker: document.getElementById('btnMediaPicker'),
   postContent: document.getElementById('postContent'),
-  postShare: document.getElementById('postShare'),
+  postShare: /** @type {HTMLInputElement | null} */ (document.getElementById('postShare')),
+  postShareBluesky: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('postShareBluesky')
+  ),
+  blueskyCharCounter: document.getElementById('blueskyCharCounter'),
+  btnBlueskyConnect: /** @type {HTMLButtonElement | null} */ (
+    document.getElementById('btnBlueskyConnect')
+  ),
+  blueskyStatusNote: document.getElementById('blueskyStatusNote'),
+  blueskyCredentialsForm: document.getElementById('blueskyCredentialsForm'),
+  blueskyHandle: /** @type {HTMLInputElement | null} */ (document.getElementById('blueskyHandle')),
+  blueskyAppPassword: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('blueskyAppPassword')
+  ),
+  btnBlueskySubmit: document.getElementById('btnBlueskySubmit'),
+  btnBlueskyCancel: document.getElementById('btnBlueskyCancel'),
+  blueskyConnectStatus: document.getElementById('blueskyConnectStatus'),
   btnSavePost: document.getElementById('btnSavePost'),
   btnSaveDraft: document.getElementById('btnSaveDraft'),
   postList: document.getElementById('postList'),
   postStatus: document.getElementById('postStatus'),
   btnPreview: document.getElementById('btnPreview'),
+  btnDiagnostics: document.getElementById('btnDiagnostics'),
   previewSection: document.getElementById('previewSection'),
   previewData: document.getElementById('previewData'),
   btnCopy: document.getElementById('btnCopy'),
   btnDownload: document.getElementById('btnDownload'),
   copySuccess: document.getElementById('copySuccess'),
-  previewChapterSelect: document.getElementById('previewChapterSelect'),
-  previewImg: document.getElementById('previewImg'),
+  previewChapterSelect: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('previewChapterSelect')
+  ),
+  previewImg: /** @type {HTMLImageElement | null} */ (document.getElementById('previewImg')),
   previewPageLabel: document.getElementById('previewPageLabel'),
-  previewPrev: document.getElementById('previewPrev'),
-  previewNext: document.getElementById('previewNext'),
+  previewPrev: /** @type {HTMLButtonElement | null} */ (document.getElementById('previewPrev')),
+  previewNext: /** @type {HTMLButtonElement | null} */ (document.getElementById('previewNext')),
   previewFrame: document.getElementById('previewFrame'),
   previewEmpty: document.getElementById('previewEmpty'),
+  // Page Builder
+  pageBuilderSection: document.getElementById('pageBuilderSection'),
+  pbAddPage: document.getElementById('pbAddPage'),
+  pbSaveDraft: document.getElementById('pbSaveDraft'),
+  pbPublish: document.getElementById('pbPublish'),
+  pbToggleSidebar: document.getElementById('pbToggleSidebar'),
+  pbToggleEditor: document.getElementById('pbToggleEditor'),
+  pbPageList: document.getElementById('pbPageList'),
+  pbModulePalette: document.getElementById('pbModulePalette'),
+  pbCanvas: document.getElementById('pbCanvas'),
+  pbModuleEditor: document.getElementById('pbModuleEditor'),
+  pbSidebarRailLabel: document.getElementById('pbSidebarRailLabel'),
+  pbPageTitle: document.getElementById('pbPageTitle'),
+  pbViewToggles: document.getElementById('pbViewToggles'),
+  pbWidthToggles: document.getElementById('pbWidthToggles'),
   btnMedia: document.getElementById('btnMedia'),
   btnDesigner: document.getElementById('btnDesigner'),
   btnUsers: document.getElementById('btnUsers'),
+  btnModeration: document.getElementById('btnModeration'),
   btnAnalytics: document.getElementById('btnAnalytics'),
+  analyticsCountViewsToggle: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('analyticsCountViewsToggle')
+  ),
+  adminContent: document.querySelector('.admin-content'),
   mediaSection: document.getElementById('mediaSection'),
   mediaList: document.getElementById('mediaList'),
-  mediaPath: document.getElementById('mediaPath'),
-  mediaTags: document.getElementById('mediaTags'),
-  mediaSearch: document.getElementById('mediaSearch'),
+  mediaGallery: document.getElementById('mediaGallery'),
+  mediaPreview: document.getElementById('mediaPreview'),
+  mediaPreviewImg: /** @type {HTMLImageElement | null} */ (
+    document.getElementById('mediaPreviewImg')
+  ),
+  mediaPreviewBlurImg: /** @type {HTMLImageElement | null} */ (
+    document.getElementById('mediaPreviewBlurImg')
+  ),
+  mediaPreviewBlurMissing: document.getElementById('mediaPreviewBlurMissing'),
+  mediaPreviewInfo: document.getElementById('mediaPreviewInfo'),
+  mediaPreviewPath: document.getElementById('mediaPreviewPath'),
+  mediaPreviewTags: document.getElementById('mediaPreviewTags'),
+  mediaPreviewUsage: document.getElementById('mediaPreviewUsage'),
+  mediaUploadStatus: document.getElementById('mediaUploadStatus'),
+  mediaUploadStatusText: document.getElementById('mediaUploadStatusText'),
+  mediaUploadStatusFill: document.getElementById('mediaUploadStatusFill'),
+  mediaPreviewUse: document.getElementById('mediaPreviewUse'),
+  mediaPreviewCopy: document.getElementById('mediaPreviewCopy'),
+  mediaPreviewTagsBtn: document.getElementById('mediaPreviewTagsBtn'),
+  mediaPreviewAccess: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('mediaPreviewAccess')
+  ),
+  mediaPreviewPremiumVisibility: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('mediaPreviewPremiumVisibility')
+  ),
+  mediaPreviewPremiumRow: document.getElementById('mediaPreviewPremiumRow'),
+  mediaPreviewDelete: document.getElementById('mediaPreviewDelete'),
+  mediaPreviewClose: document.getElementById('mediaPreviewClose'),
+  mediaPreviewPrev: document.getElementById('mediaPreviewPrev'),
+  mediaPreviewNext: document.getElementById('mediaPreviewNext'),
+  mediaUploadInput: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('mediaUploadInput')
+  ),
+  btnUploadMedia: document.getElementById('btnUploadMedia'),
+  mediaPath: /** @type {HTMLInputElement | null} */ (document.getElementById('mediaPath')),
+  mediaTags: /** @type {HTMLInputElement | null} */ (document.getElementById('mediaTags')),
+  mediaAccess: /** @type {HTMLSelectElement | null} */ (document.getElementById('mediaAccess')),
+  mediaPremiumVisibility: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('mediaPremiumVisibility')
+  ),
+  mediaPremiumVisibilityRow: document.getElementById('mediaPremiumVisibilityRow'),
+  mediaSearch: /** @type {HTMLInputElement | null} */ (document.getElementById('mediaSearch')),
+  mediaSort: /** @type {HTMLSelectElement | null} */ (document.getElementById('mediaSort')),
+  mediaListCount: document.getElementById('mediaListCount'),
+  mediaGalleryCount: document.getElementById('mediaGalleryCount'),
+  mediaBrandingStatus: document.getElementById('mediaBrandingStatus'),
+  mediaBrandingOgPreview: /** @type {HTMLImageElement | null} */ (
+    document.getElementById('mediaBrandingOgPreview')
+  ),
+  mediaBrandingOgPath: document.getElementById('mediaBrandingOgPath'),
+  mediaBrandingOgReset: document.getElementById('mediaBrandingOgReset'),
+  mediaBrandingFaviconPreview: /** @type {HTMLImageElement | null} */ (
+    document.getElementById('mediaBrandingFaviconPreview')
+  ),
+  mediaBrandingFaviconPath: document.getElementById('mediaBrandingFaviconPath'),
+  mediaBrandingFaviconReset: document.getElementById('mediaBrandingFaviconReset'),
   btnAddMedia: document.getElementById('btnAddMedia'),
   btnSyncMedia: document.getElementById('btnSyncMedia'),
   mediaStatus: document.getElementById('mediaStatus'),
+  mediaPreviewSetOg: document.getElementById('mediaPreviewSetOg'),
+  mediaPreviewSetFavicon: document.getElementById('mediaPreviewSetFavicon'),
   usersSection: document.getElementById('usersSection'),
   btnRefreshUsers: document.getElementById('btnRefreshUsers'),
   usersStatus: document.getElementById('usersStatus'),
+  usersCount: document.getElementById('usersCount'),
   usersList: document.getElementById('usersList'),
+  emailListCount: document.getElementById('emailListCount'),
+  emailList: document.getElementById('emailList'),
+  emailListEmpty: document.getElementById('emailListEmpty'),
+  emailListInput: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('emailListInput')
+  ),
+  emailListSource: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('emailListSource')
+  ),
+  btnEmailListAdd: document.getElementById('btnEmailListAdd'),
+  emailListStatus: document.getElementById('emailListStatus'),
+  premiumCodesCount: document.getElementById('premiumCodesCount'),
+  premiumCodesCountInput: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('premiumCodesCountInput')
+  ),
+  premiumCodesNote: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('premiumCodesNote')
+  ),
+  btnGeneratePremiumCodes: document.getElementById('btnGeneratePremiumCodes'),
+  premiumCodesStatus: document.getElementById('premiumCodesStatus'),
+  premiumCodesList: document.getElementById('premiumCodesList'),
+  premiumCodesEmpty: document.getElementById('premiumCodesEmpty'),
+  moderationSection: document.getElementById('moderationSection'),
+  btnModerationRefresh: document.getElementById('btnModerationRefresh'),
+  moderationStatus: document.getElementById('moderationStatus'),
+  moderationSearch: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('moderationSearch')
+  ),
+  moderationTargetType: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('moderationTargetType')
+  ),
+  moderationTargetId: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('moderationTargetId')
+  ),
+  moderationTargetList: document.getElementById('moderationTargetList'),
+  moderationUserFilter: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('moderationUserFilter')
+  ),
+  moderationStatusFilter: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('moderationStatusFilter')
+  ),
+  moderationSort: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('moderationSort')
+  ),
+  btnModerationApply: document.getElementById('btnModerationApply'),
+  btnModerationClear: document.getElementById('btnModerationClear'),
+  moderationResults: document.getElementById('moderationResults'),
+  moderationCommentsList: document.getElementById('moderationCommentsList'),
+  moderationCommentsEmpty: document.getElementById('moderationCommentsEmpty'),
+  moderationBannedUsersList: document.getElementById('moderationBannedUsersList'),
+  moderationBannedUsersEmpty: document.getElementById('moderationBannedUsersEmpty'),
+  moderationBannedIpsList: document.getElementById('moderationBannedIpsList'),
+  moderationBannedIpsEmpty: document.getElementById('moderationBannedIpsEmpty'),
+  moderationIpInput: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('moderationIpInput')
+  ),
+  btnModerationBanIp: document.getElementById('btnModerationBanIp'),
+  moderationWordsList: document.getElementById('moderationWordsList'),
+  moderationWordsEmpty: document.getElementById('moderationWordsEmpty'),
+  moderationWordsToggle: document.getElementById('moderationWordsToggle'),
+  moderationWordsBody: document.getElementById('moderationWordsBody'),
+  moderationWordInput: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('moderationWordInput')
+  ),
+  btnModerationAddWord: document.getElementById('btnModerationAddWord'),
+  moderationLimitMinInterval: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('moderationLimitMinInterval')
+  ),
+  moderationLimitRateWindow: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('moderationLimitRateWindow')
+  ),
+  moderationLimitMaxUser: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('moderationLimitMaxUser')
+  ),
+  moderationLimitMaxIp: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('moderationLimitMaxIp')
+  ),
+  moderationLimitDuplicateWindow: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('moderationLimitDuplicateWindow')
+  ),
+  btnModerationSaveLimits: document.getElementById('btnModerationSaveLimits'),
+  moderationLimitsStatus: document.getElementById('moderationLimitsStatus'),
   analyticsSection: document.getElementById('analyticsSection'),
+  diagnosticsSection: document.getElementById('diagnosticsSection'),
   analyticsStatus: document.getElementById('analyticsStatus'),
   btnAnalyticsRefresh: document.getElementById('btnAnalyticsRefresh'),
+  analyticsPagesRange: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('analyticsPagesRange')
+  ),
+  analyticsPagesStatus: document.getElementById('analyticsPagesStatus'),
+  analyticsPagesList: document.getElementById('analyticsPagesList'),
+  analyticsReaderStatus: document.getElementById('analyticsReaderStatus'),
+  analyticsReaderSeries: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('analyticsReaderSeries')
+  ),
+  analyticsReaderRange: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('analyticsReaderRange')
+  ),
+  analyticsEntryReads: document.getElementById('analyticsEntryReads'),
+  analyticsSeriesReads: document.getElementById('analyticsSeriesReads'),
+  analyticsEntryRates: document.getElementById('analyticsEntryRates'),
+  analyticsSeriesRates: document.getElementById('analyticsSeriesRates'),
+  analyticsLandingPagesList: document.getElementById('analyticsLandingPagesList'),
+  analyticsReferrersList: document.getElementById('analyticsReferrersList'),
+  analyticsCountriesList: document.getElementById('analyticsCountriesList'),
+  analyticsBrowsersList: document.getElementById('analyticsBrowsersList'),
+  analyticsDevicesList: document.getElementById('analyticsDevicesList'),
+  analyticsEventsList: document.getElementById('analyticsEventsList'),
+  analyticsVisitorHistoryStatus: document.getElementById('analyticsVisitorHistoryStatus'),
+  analyticsVisitorHistoryMeta: document.getElementById('analyticsVisitorHistoryMeta'),
+  analyticsVisitorHistorySearch: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('analyticsVisitorHistorySearch')
+  ),
+  analyticsVisitorHistorySort: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('analyticsVisitorHistorySort')
+  ),
+  analyticsVisitorHistoryList: document.getElementById('analyticsVisitorHistoryList'),
+  analyticsVisitorHistoryDetail: document.getElementById('analyticsVisitorHistoryDetail'),
+  // Reads Over Time chart
+  readsOverTimeMode: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('readsOverTimeMode')
+  ),
+  readsOverTimeEntry: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('readsOverTimeEntry')
+  ),
+  readsOverTimeRange: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('readsOverTimeRange')
+  ),
+  readsOverTimeCanvas: /** @type {HTMLCanvasElement | null} */ (
+    document.getElementById('readsOverTimeCanvas')
+  ),
+  readsOverTimeStatus: document.getElementById('readsOverTimeStatus'),
+  readsOverTimeTotals: document.getElementById('readsOverTimeTotals'),
+  liveVisitorsRange: /** @type {HTMLSelectElement | null} */ (
+    document.getElementById('liveVisitorsRange')
+  ),
+  btnLiveVisitorsZoomOut: document.getElementById('btnLiveVisitorsZoomOut'),
+  btnLiveVisitorsZoomIn: document.getElementById('btnLiveVisitorsZoomIn'),
+  btnLiveVisitorsRefresh: document.getElementById('btnLiveVisitorsRefresh'),
+  liveVisitorsStatus: document.getElementById('liveVisitorsStatus'),
+  liveVisitorsCount: document.getElementById('liveVisitorsCount'),
+  liveVisitorsRangeLabel: document.getElementById('liveVisitorsRangeLabel'),
+  liveVisitorsAxisStart: document.getElementById('liveVisitorsAxisStart'),
+  liveVisitorsChart: document.getElementById('liveVisitorsChart'),
+  liveVisitorsTicker: document.getElementById('liveVisitorsTicker'),
+  liveVisitorsTrack: document.getElementById('liveVisitorsTrack'),
   statViews24h: document.getElementById('statViews24h'),
   statVisitors24h: document.getElementById('statVisitors24h'),
   statViews7d: document.getElementById('statViews7d'),
   statVisitors7d: document.getElementById('statVisitors7d'),
+  statEntryReads: document.getElementById('statEntryReads'),
+  statEntryReadsTrend: document.getElementById('statEntryReadsTrend'),
+  statEntryStarts: document.getElementById('statEntryStarts'),
+  statEntryStartsTrend: document.getElementById('statEntryStartsTrend'),
+  statFinishRate: document.getElementById('statFinishRate'),
+  statFinishRateTrend: document.getElementById('statFinishRateTrend'),
+  statUniqueVisitors: document.getElementById('statUniqueVisitors'),
+  // Health indicator elements
+  analyticsHealth: document.getElementById('analyticsHealth'),
+  healthDot: document.getElementById('healthDot'),
+  healthTitle: document.getElementById('healthTitle'),
+  healthSummary: document.getElementById('healthSummary'),
+  // Tab and insight elements
+  analyticsInsight: document.getElementById('analyticsInsight'),
+  tabEntry: document.getElementById('tabEntry'),
+  tabSeries: document.getElementById('tabSeries'),
   editModal: document.getElementById('editModal'),
   modalTitle: document.getElementById('modalTitle'),
   editForm: document.getElementById('editForm'),
-  chapterName: document.getElementById('chapterName'),
-  chapterPremium: document.getElementById('chapterPremium'),
+  entryName: document.getElementById('entryName'),
+  entryDisplayNumber: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('entryDisplayNumber')
+  ),
+  entryPremium: document.getElementById('entryPremium'),
+  entryStatus: /** @type {HTMLSelectElement | null} */ (document.getElementById('entryStatus')),
+  entryPublishAt: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('entryPublishAt')
+  ),
+  entryComingSoon: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('entryComingSoon')
+  ),
+  entryAutoPost: /** @type {HTMLInputElement | null} */ (document.getElementById('entryAutoPost')),
+  entryShareBluesky: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('entryShareBluesky')
+  ),
+  entryPostTitle: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('entryPostTitle')
+  ),
+  entryPostContent: /** @type {HTMLTextAreaElement | null} */ (
+    document.getElementById('entryPostContent')
+  ),
   pageReorderShell: document.getElementById('pageReorderShell'),
   pageList: document.getElementById('pageList'),
   pagePreviewPanel: document.getElementById('pagePreviewPanel'),
@@ -87,10 +472,39 @@ export const el = {
   btnCloseModal: document.getElementById('btnCloseModal'),
   btnCancelEdit: document.getElementById('btnCancelEdit'),
   btnMoveMode: document.getElementById('btnMoveMode'),
-  btnRenumberPages: document.getElementById('btnRenumberPages'),
+  btnRenumberPages: /** @type {HTMLButtonElement | null} */ (
+    document.getElementById('btnRenumberPages')
+  ),
+  seriesModal: document.getElementById('seriesModal'),
+  seriesModalTitle: document.getElementById('seriesModalTitle'),
+  seriesModalStatus: document.getElementById('seriesModalStatus'),
+  seriesForm: /** @type {HTMLFormElement | null} */ (document.getElementById('seriesForm')),
+  seriesIdInput: /** @type {HTMLInputElement | null} */ (document.getElementById('seriesIdInput')),
+  seriesTitleInput: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('seriesTitleInput')
+  ),
+  seriesDescriptionInput: /** @type {HTMLTextAreaElement | null} */ (
+    document.getElementById('seriesDescriptionInput')
+  ),
+  seriesCoverInput: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('seriesCoverInput')
+  ),
+  seriesUnitSingular: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('seriesUnitSingular')
+  ),
+  seriesUnitPlural: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('seriesUnitPlural')
+  ),
+  seriesPremiumOnly: /** @type {HTMLInputElement | null} */ (
+    document.getElementById('seriesPremiumOnly')
+  ),
+  seriesModalClose: document.getElementById('seriesModalClose'),
+  seriesModalCancel: document.getElementById('seriesModalCancel'),
+  seriesModalDelete: document.getElementById('seriesModalDelete'),
+  seriesModalSave: document.getElementById('seriesModalSave'),
   unsavedIndicator: document.getElementById('unsavedIndicator'),
   confirmModal: document.getElementById('confirmModal'),
   changesList: document.getElementById('changesList'),
   btnConfirmRenumber: document.getElementById('btnConfirmRenumber'),
-  btnCancelRenumber: document.getElementById('btnCancelRenumber')
+  btnCancelRenumber: document.getElementById('btnCancelRenumber'),
 };

@@ -5,10 +5,12 @@ This document explains how ComicBot and TechAdvisor work together to build and e
 ## Agent Overview
 
 ### ComicBot
+
 **Role**: Creative UX Designer & Comic Expert  
 **Focus**: User experience, visual design, comic reading flow, reader engagement
 
 **Strengths**:
+
 - Understanding comic reader psychology and behavior
 - Intuitive navigation and panel transitions
 - Visual design that appeals to indie comic fans
@@ -16,10 +18,12 @@ This document explains how ComicBot and TechAdvisor work together to build and e
 - Reader engagement strategies
 
 ### TechAdvisor
+
 **Role**: Technical Architect & Critical Analyst  
 **Focus**: Code quality, performance, security, best practices, technical feasibility
 
 **Strengths**:
+
 - Deep technical implementation expertise
 - Performance optimization and metrics
 - Security and accessibility compliance
@@ -43,6 +47,7 @@ Implementation Plan ← Collaboration → Technical Specs
 ### 2. When to Engage Each Agent
 
 #### Use ComicBot for:
+
 - New feature ideas focused on reader experience
 - UI/UX design and visual improvements
 - Comic-specific functionality (panel navigation, page transitions)
@@ -50,6 +55,7 @@ Implementation Plan ← Collaboration → Technical Specs
 - Responsive design for different screen sizes
 
 #### Use TechAdvisor for:
+
 - Technical implementation reviews
 - Performance optimization
 - Security vulnerability analysis
@@ -58,6 +64,7 @@ Implementation Plan ← Collaboration → Technical Specs
 - Browser compatibility concerns
 
 #### Use Both Together for:
+
 - New major features requiring UX and technical design
 - Redesigns or refactoring
 - Performance improvements that affect UX
@@ -71,12 +78,14 @@ Implementation Plan ← Collaboration → Technical Specs
 **ComicBot**: "Let's add a magnifying glass feature where users can hover over panels to see details without leaving the page flow."
 
 **TechAdvisor**: "Interesting idea! A few technical considerations:
+
 1. Should we use CSS `transform: scale()` or Canvas rendering?
 2. How do we handle touch devices (no hover state)?
 3. What's the memory impact of loading high-res versions?
 4. Performance on older devices?
 
 I suggest:
+
 - Use CSS transforms for better performance
 - On touch: double-tap to zoom into a panel
 - Lazy load high-res images only when needed
@@ -95,12 +104,14 @@ I suggest:
 **User Report**: "Pages take too long to load on mobile"
 
 **TechAdvisor**: "Let me analyze the performance metrics:
+
 - Current LCP: 3.2s (needs improvement)
 - Image sizes averaging 2MB each
 - No preloading strategy
 - Sequential loading causing waterfall
 
 Recommendations:
+
 1. Convert images to WebP/AVIF format
 2. Implement aggressive preloading (next 3-5 pages)
 3. Add loading skeletons
@@ -119,6 +130,7 @@ Recommendations:
 ### Example 3: Accessibility Concerns
 
 **TechAdvisor**: "Our current implementation has accessibility issues:
+
 - No keyboard navigation for panels
 - Missing ARIA labels on controls
 - Insufficient color contrast in some UI elements
@@ -127,6 +139,7 @@ Recommendations:
 We need to address WCAG 2.1 Level AA compliance."
 
 **ComicBot**: "You're absolutely right. Let's redesign the navigation with accessibility first:
+
 - Add keyboard shortcuts (arrow keys, space, etc.)
 - Create a comic panel description system
 - Ensure all interactive elements are focusable
@@ -135,6 +148,7 @@ We need to address WCAG 2.1 Level AA compliance."
 For the visual design, we can maintain the neon aesthetic while ensuring 4.5:1 contrast ratio. Maybe increase the primary color brightness slightly?"
 
 **TechAdvisor**: "Great plan! I'll implement:
+
 - Semantic HTML structure
 - ARIA live regions for page updates
 - Focus management for modal controls
@@ -161,34 +175,41 @@ I'll use the Chrome DevTools accessibility audit to validate everything."
 ### Sample Prompts
 
 **For Collaborative Work**:
+
 - "ComicBot and TechAdvisor: Discuss the best approach for adding bookmark functionality"
 - "I need both UX and technical perspectives on improving page transition speed"
 
 **For ComicBot**:
+
 - "ComicBot: Design a new reading mode for mobile devices"
 - "How can we make the comic reader more engaging for new users?"
 
 **For TechAdvisor**:
+
 - "TechAdvisor: Review the zoom functionality for performance issues"
 - "What's the best way to implement offline reading capability?"
 
 ## Best Practices
 
 ### 1. Leverage Complementary Skills
+
 - ComicBot excels at "what" and "why" (features and user value)
 - TechAdvisor excels at "how" and "what if" (implementation and edge cases)
 
 ### 2. Encourage Healthy Debate
+
 - Let the agents challenge each other
 - Different perspectives lead to better solutions
 - Final decisions should balance UX and technical reality
 
 ### 3. Know When to Choose One
+
 - Small CSS tweaks? → ComicBot
 - Security patches? → TechAdvisor
 - Major new feature? → Both
 
 ### 4. Document Decisions
+
 - Both agents should explain their reasoning
 - Trade-offs should be explicitly discussed
 - Document why alternatives were rejected
@@ -206,6 +227,7 @@ If ComicBot and TechAdvisor disagree:
 ## Continuous Improvement
 
 Both agents learn from:
+
 - User feedback on implemented features
 - Performance metrics and analytics
 - Bug reports and edge cases discovered
@@ -215,11 +237,13 @@ Both agents learn from:
 ## Summary
 
 ComicBot and TechAdvisor form a powerful team:
+
 - **ComicBot** brings creativity, UX expertise, and comic reader insight
 - **TechAdvisor** ensures technical excellence, performance, and security
 - **Together** they create a comic reader that's both delightful and robust
 
 When used effectively, this collaboration results in:
+
 - Better-designed features
 - More robust implementations
 - Fewer bugs and edge cases
@@ -228,4 +252,4 @@ When used effectively, this collaboration results in:
 
 ---
 
-*Last Updated: 2025-10-29*
+_Last Updated: 2025-10-29_

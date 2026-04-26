@@ -1,113 +1,90 @@
-# Battle Bros Reader - Testing Guide
+# Test Guide
 
 ## Overview
 
-This project now includes a comprehensive test suite using [Vitest](https://vitest.dev/), a modern, fast testing framework with native ES modules support.
+This repo uses two test runners:
 
-## Test Structure
+- Frontend/admin tests: `Vitest` with `happy-dom`
+- Backend tests: Python `unittest`
 
+The frontend suite covers reader helpers, interaction flows, builder-driven presentation, DOM/render regressions, and focused admin manager flows. The backend suite covers diagnostics/ops, branding, and the core auth/comment/file/post/series/page-builder/tracking/user route contracts.
+
+## Commands
+
+Run the frontend suite:
+
+```bash
+npm test
 ```
-tests/
-├── setup.js           # Test environment configuration
-├── chapters.test.js   # Tests for chapter utilities
-├── state.test.js      # Tests for state management
-└── render.test.js     # Tests for rendering logic
+
+Run the backend suite:
+
+```bash
+npm run test:backend
 ```
 
-## Prerequisites
+Run both:
 
-You need Node.js installed to run the tests. Download from: https://nodejs.org/
+```bash
+npm run test:all
+```
 
-## Installation
+Run coverage for the frontend suite:
 
-Install test dependencies:
+```bash
+npm run test:coverage
+```
+
+## Setup
+
+Install Node dependencies:
 
 ```bash
 npm install
 ```
 
-This will install:
-- `vitest` - Test runner
-- `happy-dom` - Fast DOM simulation
-- `@vitest/ui` - Optional UI for test visualization
+Install backend dev dependencies into the repo virtualenv:
 
-## Running Tests
-
-### Run all tests once
 ```bash
-npm test
+./.venv/bin/pip install -r backend/requirements-dev.txt
 ```
 
-### Watch mode (re-runs on file changes)
-```bash
-npm run test:watch
-```
+## Current Test Areas
 
-### Interactive UI
-```bash
-npm run test:ui
-```
+- `tests/entries.test.js`: entry parsing, sorting, and normalization
+- `tests/state.test.js`: reader progress persistence
+- `tests/data.test.js`: reader data/page-config loading
+- `tests/reader-data-builder.test.js`: builder-first page loading, legacy fallback, and DOM application
+- `tests/reader-page-renderer.test.js`: reader page-builder module rendering contracts
+- `tests/reader-feed-panel.test.js`: feed/latest rendering, sanitization, and feed-mode behavior
+- `tests/reader-controls.test.js`: reader next/prev/restart behavior
+- `tests/reader-fullscreen.test.js`: fullscreen enter/exit and controls timing
+- `tests/reader-pointer.test.js`: swipe, drag, double-tap, and edge-zone behavior
+- `tests/reader-app.test.js`: reader boot against the live `index.html` contract
+- `tests/admin-smoke.test.js`: admin app boot against the live markup contract
+- `tests/admin-auth.test.js`: admin session/login/logout contract handling
+- `tests/admin-posts.test.js`: post save/render flow
+- `tests/admin-entries.test.js`: entry create/render flow
+- `tests/admin-media.test.js`: empty media state
+- `tests/admin-series.test.js`: series index contract loading, label application, and builder-visible series switching
+- `tests/admin-preview.test.js`: preview data contract loading and image rendering
+- `tests/admin-page-config.test.js`: page-config cache/save contract behavior
+- `tests/admin-page-builder-data.test.js`: page-builder data-layer fetch/create/update/delete wrappers
+- `tests/admin-page-builder-shell.test.js`: page-builder shell behavior including empty state, selection, canonical designer-route entry, publish state, section settings save/discard, canvas delete cleanup, page-header editing, and default module config wiring
+- `tests/admin-page-builder-preview.test.js`: module-editor save/delete flows and preview renderer contracts
+- `tests/admin-designer.test.js`: admin-shell cleanup proving the legacy designer iframe host is gone
+- `tests/media-branding.test.js`: admin branding rules
+- `tests/diagnostics-snapshot.test.js`: diagnostics snapshot rendering and fallbacks
+- `tests/ops-app.test.js`: ops UI rendering states
+- `tests/helpers/contracts.js` + `tests/fixtures/contract-fixtures.json`: shared frontend contract fixtures for series, builder pages/modules, feed/latest payloads, tracking, and user-state contracts
+- `backend/tests/helpers.py`: shared backend route harness and contract seed helpers for series, builder pages, comments, premium codes, and visitor sessions
+- `backend/tests/test_*.py`: backend diagnostics/ops, branding, and core route contract behavior including page-builder, tracking, and user flows
 
-### Coverage report
-```bash
-npm run test:coverage
-```
+## Notes
 
-## Test Coverage
-
-Current test coverage includes:
-
-### ✅ chapters.js (100%)
-- `extractChapterNumber()` - Number extraction from chapter names
-- `sortChapterNames()` - Numerical and alphabetical sorting
-- `sanitizeChapters()` - Data normalization and validation
-
-### ✅ state.js (100%)
-- State object initialization
-- `saveProgress()` - localStorage persistence
-- `loadProgress()` - Progress restoration
-- Error handling for storage failures
-
-### ✅ render.js (Partial)
-- `isTwoPageMode()` - Viewport detection logic
-- `canShowTwoPages()` - Two-page availability check
-
-## Writing New Tests
-
-Tests use Vitest's API, which is compatible with Jest:
-
-```javascript
-import { describe, it, expect } from 'vitest';
-import { myFunction } from '../reader/mymodule.js';
-
-describe('myFunction', () => {
-  it('should do something', () => {
-    expect(myFunction('input')).toBe('expected output');
-  });
-});
-```
-
-## Continuous Integration
-
-These tests can be integrated into CI/CD pipelines:
-
-```yaml
-# Example GitHub Actions workflow
-- name: Run tests
-  run: npm test
-```
-
-## Benefits
-
-✅ **Confidence** - Catch bugs before they reach production  
-✅ **Documentation** - Tests serve as usage examples  
-✅ **Refactoring** - Safely improve code with test coverage  
-✅ **Quality** - Maintain high code standards  
-
-## Next Steps
-
-Consider adding tests for:
-- `pointer.js` - Touch/pan/zoom interactions
-- `transform.js` - Zoom calculations
-- `data.js` - Async data loading (with mocked fetch)
-- `controls.js` - Navigation logic
+- The production code uses `entry` terminology; older references to `chapter` are legacy.
+- `npm run test:coverage` only covers the Vitest suite.
+- Coverage is informational in this repo right now; CI should run it and publish the report, but it is not a percentage gate.
+- The shared contract layer in `tests/fixtures/contract-fixtures.json` and `backend/tests/helpers.py` is authoritative for reader/admin/backend wire-shape assertions.
+- Backend payload changes should update that contract layer and at least one frontend test plus one backend test.
+- CI uses the same local commands via `.github/workflows/tests.yml`: `npm test`, `npm run test:coverage`, and `npm run test:backend`.

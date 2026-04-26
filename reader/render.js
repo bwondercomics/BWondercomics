@@ -6,6 +6,85 @@
 import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { el } from './dom.js';
+import { markEntryComplete, trackVisiblePages } from './analytics.js';
+import { clearOnPageFrame, fitOnPageFrame } from './transform.js';
+
+function formatDateTime(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+function getEmptyEntryMessage() {
+  const meta = state.entryMeta || {};
+  const status = String(meta.status || '').toLowerCase();
+  const comingSoon = !!meta.comingSoon || status === 'scheduled';
+  const publishAt = formatDateTime(meta.publishAt);
+  if (comingSoon) {
+    return {
+      title: 'COMING SOON',
+      detail: publishAt ? `Scheduled for ${publishAt}` : 'Scheduled for a future release.',
+    };
+  }
+  return {
+    title: 'NO PAGES YET',
+    detail: 'This entry is not available right now.',
+  };
+}
+
+function ensureEmptyStateContainer() {
+  if (!el.viewport) return null;
+  let container = document.getElementById('entryEmptyState');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'entryEmptyState';
+    container.style.cssText = [
+      'position: absolute',
+      'inset: 0',
+      'display: none',
+      'align-items: center',
+      'justify-content: center',
+      'text-align: center',
+      'padding: 24px',
+      'background: rgba(10, 10, 18, 0.85)',
+      'color: var(--text)',
+      'z-index: 5',
+    ].join('; ');
+    el.viewport.appendChild(container);
+  }
+  return container;
+}
+
+function showEmptyEntryState() {
+  const container = ensureEmptyStateContainer();
+  if (!container) return;
+  const { title, detail } = getEmptyEntryMessage();
+  container.innerHTML = `
+    <div style="max-width: 520px;">
+      <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--accent);letter-spacing:2px;">${title}</div>
+      <div style="margin-top:8px;line-height:1.6;opacity:0.9;">${detail}</div>
+    </div>
+  `;
+  container.style.display = 'flex';
+  if (el.stageWrap) el.stageWrap.style.display = 'none';
+}
+
+function hideEmptyEntryState() {
+  const container = document.getElementById('entryEmptyState');
+  if (container) container.style.display = 'none';
+  if (el.stageWrap) el.stageWrap.style.display = '';
+}
+
+function rememberPageMetric(url, imgEl) {
+  if (!url || !imgEl?.naturalWidth || !imgEl?.naturalHeight) return null;
+  const metric = {
+    width: imgEl.naturalWidth,
+    height: imgEl.naturalHeight,
+  };
+  state.pageMetrics.set(url, metric);
+  return metric;
+}
 
 /**
  * Renders the status panel with a typewriter animation effect
@@ -24,9 +103,13 @@ export function renderStatusPanel(message, statusTimerRef) {
   const text = statusMessage || 'ready';
   let i = 0;
   const step = () => {
-    if (i < text.length) {
-      el.statusText.textContent += text[i++];
-      statusTimerRef.current = setTimeout(step, 35);
+    if (i <= text.length) {
+      // Use substring instead of += to avoid O(n²) string concatenation
+      el.statusText.textContent = text.substring(0, i);
+      i++;
+      if (i <= text.length) {
+        statusTimerRef.current = setTimeout(step, 35);
+      }
     }
   };
   step();
@@ -44,7 +127,10 @@ export function preloadImage(url) {
 
   const promise = new Promise((resolve, reject) => {
     const img = new Image();
-    img.onload = () => resolve(img);
+    img.onload = () => {
+      rememberPageMetric(url, img);
+      resolve(img);
+    };
     img.onerror = () => {
       state.imageCache.delete(url);
       reject(new Error('Image load failed: ' + url));
@@ -72,6 +158,7 @@ export function loadImage(imgEl, spinnerEl, url) {
   if (!imgEl) return;
 
   if (!url) {
+    if (imgEl.dataset) imgEl.dataset.pageUrl = '';
     imgEl.removeAttribute('src');
     imgEl.alt = '';
     if (spinnerEl) spinnerEl.style.display = 'none';
@@ -80,21 +167,33 @@ export function loadImage(imgEl, spinnerEl, url) {
 
   if (spinnerEl) spinnerEl.style.display = '';
 
-  const hideSpinner = () => {
+  const settleImageLoad = (loaded) => {
     if (spinnerEl) spinnerEl.style.display = 'none';
-    imgEl.removeEventListener('load', hideSpinner);
-    imgEl.removeEventListener('error', hideSpinner);
+    imgEl.removeEventListener('load', handleLoad);
+    imgEl.removeEventListener('error', handleError);
+    if (loaded && imgEl.dataset?.pageUrl === url) {
+      rememberPageMetric(url, imgEl);
+    }
+    if (imgEl.dataset?.pageUrl === url) fitOnPageFrame();
   };
 
-  imgEl.addEventListener('load', hideSpinner);
-  imgEl.addEventListener('error', hideSpinner);
+  const handleLoad = () => settleImageLoad(true);
+  const handleError = () => settleImageLoad(false);
+
+  imgEl.addEventListener('load', handleLoad);
+  imgEl.addEventListener('error', handleError);
 
   const pageNum = state.pages.indexOf(url) + 1;
-  imgEl.alt = `${state.currentChapter} - page ${pageNum}`;
+  imgEl.alt = `${state.currentEntry} - page ${pageNum}`;
+  if (imgEl.dataset) imgEl.dataset.pageUrl = url;
+
+  // Performance: Add lazy loading and async decoding
+  imgEl.loading = 'eager'; // Eager loading for comic pages (user is actively reading)
+  imgEl.decoding = 'async'; // Async decoding prevents blocking the main thread
 
   imgEl.src = url;
 
-  preloadImage(url).catch(() => { });
+  preloadImage(url).catch(() => {});
 }
 
 /**
@@ -106,7 +205,7 @@ export function preloadUpcoming() {
   const endIdx = Math.min(state.pages.length, startIdx + CONFIG.PRELOAD_AHEAD);
 
   for (let i = startIdx; i < endIdx; i++) {
-    preloadImage(state.pages[i]).catch(() => { });
+    preloadImage(state.pages[i]).catch(() => {});
   }
 }
 
@@ -136,6 +235,16 @@ export function canShowTwoPages() {
  * Triggers page transition animation and preloads upcoming pages
  */
 export function render() {
+  if (!state.pages.length) {
+    state.isTransitioning = false;
+    if (el.stage) el.stage.classList.remove('transitioning');
+    clearOnPageFrame();
+    showEmptyEntryState();
+    updateUI();
+    return;
+  }
+
+  hideEmptyEntryState();
   state.isTransitioning = true;
   if (el.stage) el.stage.classList.add('transitioning');
   setTimeout(() => {
@@ -156,8 +265,10 @@ export function render() {
     loadImage(el.rightImg, el.rightSpinner, rightUrl);
   }
 
+  fitOnPageFrame();
   updateUI();
   preloadUpcoming();
+  trackVisiblePages();
 }
 
 /**
@@ -165,6 +276,19 @@ export function render() {
  * Called after rendering to reflect current state
  */
 export function updateUI() {
+  if (!state.pages.length) {
+    if (el.indicator) {
+      const meta = state.entryMeta || {};
+      const status = String(meta.status || '').toLowerCase();
+      el.indicator.textContent =
+        status === 'scheduled' || meta.comingSoon ? 'COMING SOON' : 'NO PAGES';
+    }
+    if (el.progressFill) el.progressFill.style.width = '0%';
+    if (el.prevBtn) el.prevBtn.disabled = true;
+    if (el.nextBtn) el.nextBtn.disabled = true;
+    return;
+  }
+
   const total = state.pages.length || 1;
   const current = state.pageIndex + 1;
   const twoPageMode = canShowTwoPages();
@@ -177,7 +301,7 @@ export function updateUI() {
 
   if (el.progressFill) {
     const displayed = Math.min(total, state.pageIndex + (twoPageMode ? 2 : 1));
-    el.progressFill.style.width = ((displayed / total) * 100) + '%';
+    el.progressFill.style.width = (displayed / total) * 100 + '%';
   }
 
   if (el.prevBtn) {
@@ -189,4 +313,8 @@ export function updateUI() {
     const rightIsLast = twoPageMode && state.pageIndex + 1 === total - 1;
     el.nextBtn.disabled = isAtEnd || rightIsLast;
   }
+
+  const finished =
+    state.pageIndex >= total - 1 || (twoPageMode && state.pageIndex + 1 >= total - 1);
+  if (finished) markEntryComplete();
 }

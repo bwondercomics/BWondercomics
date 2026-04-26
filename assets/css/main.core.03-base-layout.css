@@ -1,0 +1,80 @@
+/* ==================== BASE LAYOUT ==================== */
+html,
+body {
+  height: 100%;
+  font-family: 'Righteous', sans-serif;
+  background: var(--bg-dark);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 217, 255, 0.65) rgba(8, 8, 14, 0.6);
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+html::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+  background: rgba(8, 8, 14, 0.6);
+}
+
+html::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  background: rgba(0, 217, 255, 0.65);
+  border-radius: 999px;
+  border: 2px solid rgba(8, 8, 14, 0.6);
+}
+
+html::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 217, 255, 0.9);
+}
+
+main {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 72px);
+  height: calc(100dvh - 72px); /* dvh accounts for mobile browser chrome */
+  overflow: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      transparent 0px,
+      transparent 2px,
+      rgba(0, 217, 255, 0.02) 2px,
+      rgba(0, 217, 255, 0.02) 4px
+    ),
+    radial-gradient(circle at 20% 80%, rgba(255, 237, 0, 0.05), transparent 40%),
+    radial-gradient(circle at 80% 20%, rgba(255, 0, 234, 0.05), transparent 40%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: linear-gradient(transparent 50%, rgba(0, 0, 0, 0.05) 50%);
+  background-size: 100% 3px;
+  pointer-events: none;
+  z-index: 1;
+  animation: scanline 6s linear infinite;
+  opacity: 0.4;
+}
+
+html.reader-bootstrap-loading body > .skip-to-content,
+html.reader-bootstrap-loading body > header.topbar,
+html.reader-bootstrap-loading body > main {
+  opacity: 0;
+  visibility: hidden;
+}

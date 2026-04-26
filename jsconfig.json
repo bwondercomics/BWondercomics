@@ -1,0 +1,29 @@
+{
+    "compilerOptions": {
+        "target": "ES2022",
+        "module": "ES2022",
+        "moduleResolution": "node",
+        "checkJs": true,
+        "maxNodeModuleJsDepth": 1,
+        "allowSyntheticDefaultImports": true,
+        "noEmit": true,
+        "skipLibCheck": true,
+        "resolveJsonModule": true
+    },
+    "include": [
+        "reader/**/*.js",
+        "admin/**/*.js"
+    ],
+    "exclude": [
+        "node_modules",
+        "backend",
+        "tests",
+        "dist"
+    ],
+    "typeAcquisition": {
+        "enable": true,
+        "include": [
+            "dom"
+        ]
+    }
+}

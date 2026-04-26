@@ -1,557 +1,852 @@
 <!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5" />
+    <title>BWC Media Library</title>
+    <!-- SITE_BRANDING_ICONS_START -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/boywondericon.png" />
+    <link rel="apple-touch-icon" href="/assets/boywondericon.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <!-- SITE_BRANDING_ICONS_END -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Righteous&family=Bebas+Neue&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      html,
+      body {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(0, 217, 255, 0.65) rgba(8, 8, 14, 0.6);
+      }
 
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5" />
-  <title>BWC Media Library</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Righteous&family=Bebas+Neue&display=swap" rel="stylesheet" />
-  <style>
-    :root {
-      --primary: #00d9ff;
-      --secondary: #ff00ea;
-      --accent: #ffed00;
-      --bg-dark: #0a0a12;
-      --bg-panel: #1a1a2e;
-      --text: #ffffff;
-    }
+      html::-webkit-scrollbar,
+      body::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
 
-    * {
-      box-sizing: border-box;
-    }
+      html::-webkit-scrollbar-track,
+      body::-webkit-scrollbar-track {
+        background: rgba(8, 8, 14, 0.6);
+      }
 
-    body {
-      background: radial-gradient(circle at 10% 20%, rgba(0, 217, 255, 0.06), transparent 25%),
-        radial-gradient(circle at 90% 10%, rgba(255, 0, 234, 0.06), transparent 25%),
-        linear-gradient(180deg, rgba(10, 10, 18, 0.95) 0%, #05050a 100%);
-      color: var(--text);
-      font-family: 'Righteous', cursive;
-      margin: 0;
-      min-height: 100vh;
-    }
+      html::-webkit-scrollbar-thumb,
+      body::-webkit-scrollbar-thumb {
+        background: rgba(0, 217, 255, 0.65);
+        border-radius: 999px;
+        border: 2px solid rgba(8, 8, 14, 0.6);
+      }
 
-    header {
-      background: linear-gradient(135deg, rgba(0, 217, 255, 0.16), rgba(255, 0, 234, 0.12));
-      border-bottom: 3px solid var(--primary);
-      padding: 12px 16px;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      backdrop-filter: blur(6px);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
+      html::-webkit-scrollbar-thumb:hover,
+      body::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 217, 255, 0.9);
+      }
 
-    .header-brand {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      min-width: 200px;
-    }
+      :root {
+        --primary: #00d9ff;
+        --secondary: #ff00ea;
+        --accent: #ffed00;
+        --bg-dark: #0a0a12;
+        --bg-panel: #1a1a2e;
+        --text: #ffffff;
+      }
 
-    .header-nav {
-      display: flex;
-      gap: 8px;
-      justify-content: flex-end;
-      flex-wrap: wrap;
-    }
+      * {
+        box-sizing: border-box;
+      }
 
-    .nav-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      color: var(--text);
-      text-decoration: none;
-      border: 2px solid var(--text);
-      padding: 10px 14px;
-      border-radius: 6px;
-      background: rgba(255, 255, 255, 0.08);
-      transition: all 0.2s ease;
-      font-weight: 600;
-    }
+      body {
+        background:
+          radial-gradient(circle at 10% 20%, rgba(0, 217, 255, 0.06), transparent 25%),
+          radial-gradient(circle at 90% 10%, rgba(255, 0, 234, 0.06), transparent 25%),
+          linear-gradient(180deg, rgba(10, 10, 18, 0.95) 0%, #05050a 100%);
+        color: var(--text);
+        font-family: 'Righteous', cursive;
+        margin: 0;
+        min-height: 100vh;
+      }
 
-    .nav-btn:hover {
-      background: var(--text);
-      color: var(--bg-dark);
-    }
+      header {
+        background: linear-gradient(135deg, rgba(0, 217, 255, 0.16), rgba(255, 0, 234, 0.12));
+        border-bottom: 3px solid var(--primary);
+        padding: 12px 16px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        backdrop-filter: blur(6px);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
 
-    h1 {
-      font-family: 'Bebas Neue', cursive;
-      color: var(--primary);
-      margin: 0;
-      font-size: 2.8rem;
-      letter-spacing: 2px;
-      text-shadow: 2px 2px 0 var(--secondary);
-    }
+      .header-brand {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        min-width: 200px;
+      }
 
-    .subhead {
-      color: rgba(255, 255, 255, 0.75);
-      margin-top: 6px;
-      letter-spacing: 1px;
-      font-size: 0.95rem;
-    }
+      .header-nav {
+        display: flex;
+        gap: 8px;
+        justify-content: flex-end;
+        flex-wrap: wrap;
+      }
 
-    .container {
-      max-width: 1100px;
-      margin: 0 auto;
-      padding: 24px 16px 64px;
-    }
+      .nav-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text);
+        text-decoration: none;
+        border: 2px solid var(--text);
+        padding: 10px 14px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.08);
+        transition: all 0.2s ease;
+        font-weight: 600;
+      }
 
-    .nav-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
+      .nav-btn:hover {
+        background: var(--text);
+        color: var(--bg-dark);
+      }
 
-    .back-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      color: var(--text);
-      text-decoration: none;
-      border: 2px solid var(--text);
-      padding: 10px 14px;
-      border-radius: 6px;
-      background: rgba(255, 255, 255, 0.03);
-      transition: all 0.2s ease;
-    }
-
-    .back-btn:hover {
-      background: var(--text);
-      color: var(--bg-dark);
-    }
-
-    .search-row {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      margin-bottom: 18px;
-    }
-
-    .search-input {
-      flex: 1;
-      min-width: 220px;
-      padding: 12px 14px;
-      border-radius: 8px;
-      border: 2px solid var(--primary);
-      background: var(--bg-panel);
-      color: var(--text);
-      font-family: 'Righteous', cursive;
-      font-size: 1rem;
-    }
-
-    .tags-bar {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      margin-bottom: 18px;
-    }
-
-    .tag-pill {
-      padding: 8px 12px;
-      border-radius: 999px;
-      border: 1px solid var(--primary);
-      background: rgba(0, 217, 255, 0.12);
-      color: var(--text);
-      cursor: pointer;
-      transition: all 0.2s ease;
-      font-size: 0.95rem;
-    }
-
-    .tag-pill.active {
-      background: var(--primary);
-      color: var(--bg-dark);
-      box-shadow: 0 0 12px rgba(0, 217, 255, 0.6);
-    }
-
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-      gap: 16px;
-    }
-
-    .card {
-      background: var(--bg-panel);
-      border: 2px solid var(--primary);
-      border-radius: 12px;
-      overflow: hidden;
-      box-shadow: 0 0 20px rgba(0, 217, 255, 0.18);
-      display: flex;
-      flex-direction: column;
-      min-height: 240px;
-    }
-
-    .card img {
-      width: 100%;
-      height: 200px;
-      object-fit: cover;
-      background: #05050a;
-    }
-
-    .card-body {
-      padding: 12px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .card-path {
-      font-size: 0.95rem;
-      color: rgba(255, 255, 255, 0.9);
-      word-break: break-all;
-    }
-
-    .card-tags {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-
-    .card-tag {
-      background: rgba(255, 237, 0, 0.15);
-      color: var(--accent);
-      border: 1px solid rgba(255, 237, 0, 0.4);
-      padding: 4px 8px;
-      border-radius: 999px;
-      font-size: 0.85rem;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 48px 24px;
-      color: rgba(255, 255, 255, 0.8);
-      border: 2px dashed rgba(0, 217, 255, 0.3);
-      border-radius: 12px;
-      background: rgba(26, 26, 46, 0.6);
-      grid-column: 1 / -1;
-    }
-
-    .error {
-      color: var(--secondary);
-      text-align: center;
-      margin-bottom: 12px;
-    }
-
-    /* Lightbox */
-    .lightbox {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.9);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      z-index: 999;
-      padding: 20px;
-    }
-
-    .lightbox.active {
-      display: flex;
-    }
-
-    .lightbox-content {
-      position: relative;
-      max-width: 90vw;
-      max-height: 90vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 12px;
-    }
-
-    .lightbox img {
-      max-width: 80vw;
-      max-height: 80vh;
-      object-fit: contain;
-      border: 2px solid var(--primary);
-      border-radius: 10px;
-      background: #05050a;
-      box-shadow: 0 0 24px rgba(0, 217, 255, 0.35);
-    }
-
-    .lightbox-close {
-      position: absolute;
-      top: -12px;
-      right: -12px;
-      background: var(--secondary);
-      color: var(--text);
-      border: none;
-      width: 32px;
-      height: 32px;
-      border-radius: 50%;
-      cursor: pointer;
-      font-size: 1.1rem;
-    }
-
-    .lightbox-btn {
-      background: rgba(0, 217, 255, 0.3);
-      border: 2px solid var(--primary);
-      color: var(--text);
-      width: 46px;
-      height: 46px;
-      border-radius: 50%;
-      cursor: pointer;
-      font-size: 1.4rem;
-      display: grid;
-      place-items: center;
-      transition: all 0.2s ease;
-    }
-
-    .lightbox-btn:hover {
-      background: var(--primary);
-      color: var(--bg-dark);
-      box-shadow: 0 0 14px rgba(0, 217, 255, 0.6);
-    }
-
-    .lightbox-meta {
-      position: absolute;
-      bottom: -18px;
-      left: 50%;
-      transform: translateX(-50%);
-      color: var(--text);
-      font-size: 0.95rem;
-      text-align: center;
-      opacity: 0.8;
-    }
-
-    @media (max-width: 600px) {
       h1 {
-        font-size: 2.2rem;
+        font-family: 'Bebas Neue', cursive;
+        color: var(--primary);
+        margin: 0;
+        font-size: 2.8rem;
+        letter-spacing: 2px;
+        text-shadow: 2px 2px 0 var(--secondary);
+      }
+
+      .subhead {
+        color: rgba(255, 255, 255, 0.75);
+        margin-top: 6px;
+        letter-spacing: 1px;
+        font-size: 0.95rem;
+      }
+
+      .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 24px 16px 64px;
+      }
+
+      .nav-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text);
+        text-decoration: none;
+        border: 2px solid var(--text);
+        padding: 10px 14px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.03);
+        transition: all 0.2s ease;
+      }
+
+      .back-btn:hover {
+        background: var(--text);
+        color: var(--bg-dark);
+      }
+
+      .search-row {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+      }
+
+      .search-input {
+        flex: 1;
+        min-width: 220px;
+        padding: 12px 14px;
+        border-radius: 8px;
+        border: 2px solid var(--primary);
+        background: var(--bg-panel);
+        color: var(--text);
+        font-family: 'Righteous', cursive;
+        font-size: 1rem;
+      }
+
+      .tags-bar {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+      }
+
+      .tag-pill {
+        padding: 8px 12px;
+        border-radius: 999px;
+        border: 1px solid var(--primary);
+        background: rgba(0, 217, 255, 0.12);
+        color: var(--text);
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-size: 0.95rem;
+      }
+
+      .tag-pill.active {
+        background: var(--primary);
+        color: var(--bg-dark);
+        box-shadow: 0 0 12px rgba(0, 217, 255, 0.6);
+      }
+
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .card {
+        background: transparent;
+        border: none;
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.35);
+        position: relative;
+      }
+
+      .card-media {
+        width: 100%;
+        aspect-ratio: 5 / 7;
+        background: #05050a;
+        position: relative;
       }
 
       .card img {
-        height: 180px;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        display: block;
+        background: #05050a;
       }
-    }
-  </style>
-</head>
 
-<body>
-  <header>
-    <div class="header-brand">
-      <h1>BWC Media</h1>
-      <div class="subhead">Browse artwork attached to feed posts.</div>
-    </div>
-    <div class="header-nav">
-      <a href="index.html" class="nav-btn">&#8592; Back to Comic</a>
-      <a href="feed.html" class="nav-btn">Feed</a>
-    </div>
-  </header>
-
-  <div class="container">
-    <div class="error" id="error" style="display: none;"></div>
-
-    <div class="search-row">
-      <input type="text" id="search" class="search-input" placeholder="Search by tag or filename...">
-    </div>
-
-    <div class="tags-bar" id="tagsBar"></div>
-
-    <div class="grid" id="grid">
-      <div class="empty-state">Loading media...</div>
-    </div>
-  </div>
-
-  <div class="lightbox" id="lightbox" aria-modal="true" role="dialog">
-    <div class="lightbox-content">
-      <button class="lightbox-btn" id="prevBtn" aria-label="Previous">&#8592;</button>
-      <img id="lightboxImg" src="" alt="">
-      <button class="lightbox-btn" id="nextBtn" aria-label="Next">&#8594;</button>
-      <button class="lightbox-close" id="closeBtn" aria-label="Close">&times;</button>
-      <div class="lightbox-meta" id="lightboxMeta"></div>
-    </div>
-  </div>
-
-  <script>
-    const grid = document.getElementById('grid');
-    const tagsBar = document.getElementById('tagsBar');
-    const searchInput = document.getElementById('search');
-    const errorEl = document.getElementById('error');
-    const lightbox = document.getElementById('lightbox');
-    const lightboxImg = document.getElementById('lightboxImg');
-    const lightboxMeta = document.getElementById('lightboxMeta');
-    const prevBtn = document.getElementById('prevBtn');
-    const nextBtn = document.getElementById('nextBtn');
-    const closeBtn = document.getElementById('closeBtn');
-
-    let mediaItems = [];
-    let activeTag = '';
-    let currentIndex = -1;
-
-    function setError(message) {
-      if (!errorEl) return;
-      if (message) {
-        errorEl.textContent = message;
-        errorEl.style.display = 'block';
-      } else {
-        errorEl.style.display = 'none';
+      .media-missing {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(5, 5, 10, 0.7);
+        color: #ffb54a;
+        font-size: 0.85rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
       }
-    }
 
-    function normalizeTags(tags) {
-      return Array.isArray(tags)
-        ? tags.map(t => String(t).trim().toLowerCase()).filter(Boolean)
-        : [];
-    }
+      .premium-badge {
+        position: absolute;
+        inset: auto 12px 12px 12px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.7);
+        border: 1px solid rgba(255, 237, 0, 0.7);
+        color: var(--accent);
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        text-align: center;
+      }
 
-    function renderTags() {
-      tagsBar.innerHTML = '';
-      const allTags = Array.from(new Set(mediaItems.flatMap(m => normalizeTags(m.tags || [])))).sort();
-      if (!allTags.length) return;
+      .card-body {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        background: linear-gradient(180deg, rgba(10, 10, 18, 0) 0%, rgba(10, 10, 18, 0.9) 80%);
+        opacity: 0;
+        transform: translateY(8px);
+        transition:
+          opacity 0.2s ease,
+          transform 0.2s ease;
+        pointer-events: none;
+      }
 
-      const all = document.createElement('button');
-      all.className = `tag-pill ${activeTag === '' ? 'active' : ''}`;
-      all.textContent = 'All';
-      all.addEventListener('click', () => {
-        activeTag = '';
-        renderTags();
-        renderGrid();
-      });
-      tagsBar.appendChild(all);
+      .card:hover .card-body,
+      .card:focus-within .card-body {
+        opacity: 1;
+        transform: translateY(0);
+      }
 
-      allTags.forEach(tag => {
-        const btn = document.createElement('button');
-        btn.className = `tag-pill ${activeTag === tag ? 'active' : ''}`;
-        btn.textContent = tag;
-        btn.addEventListener('click', () => {
-          activeTag = activeTag === tag ? '' : tag;
+      .card-path {
+        font-size: 0.8rem;
+        color: rgba(255, 255, 255, 0.85);
+        word-break: break-all;
+      }
+
+      .card-tags {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+      }
+
+      .card-tag {
+        background: rgba(255, 237, 0, 0.15);
+        color: var(--accent);
+        border: 1px solid rgba(255, 237, 0, 0.4);
+        padding: 3px 8px;
+        border-radius: 999px;
+        font-size: 0.75rem;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        color: rgba(255, 255, 255, 0.8);
+        border: 2px dashed rgba(0, 217, 255, 0.3);
+        border-radius: 12px;
+        background: rgba(26, 26, 46, 0.6);
+        grid-column: 1 / -1;
+      }
+
+      .error {
+        color: var(--secondary);
+        text-align: center;
+        margin-bottom: 12px;
+      }
+
+      /* Lightbox */
+      .lightbox {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.9);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 999;
+        padding: 20px;
+      }
+
+      .lightbox.active {
+        display: flex;
+      }
+
+      .lightbox-content {
+        position: relative;
+        max-width: 90vw;
+        max-height: 90vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+
+      .lightbox img {
+        max-width: 80vw;
+        max-height: 80vh;
+        object-fit: contain;
+        border: 2px solid var(--primary);
+        border-radius: 10px;
+        background: #05050a;
+        box-shadow: 0 0 24px rgba(0, 217, 255, 0.35);
+      }
+
+      .lightbox-missing {
+        position: absolute;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        color: #ffb54a;
+        font-size: 1rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        background: rgba(5, 5, 10, 0.7);
+        border: 2px dashed rgba(255, 181, 74, 0.6);
+        border-radius: 10px;
+        pointer-events: none;
+      }
+      .lightbox-close {
+        position: absolute;
+        top: -12px;
+        right: -12px;
+        background: var(--secondary);
+        color: var(--text);
+        border: none;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 1.1rem;
+      }
+
+      .lightbox-btn {
+        background: rgba(0, 217, 255, 0.3);
+        border: 2px solid var(--primary);
+        color: var(--text);
+        width: 46px;
+        height: 46px;
+        border-radius: 50%;
+        cursor: pointer;
+        font-size: 1.4rem;
+        display: grid;
+        place-items: center;
+        transition: all 0.2s ease;
+      }
+
+      .lightbox-btn:hover {
+        background: var(--primary);
+        color: var(--bg-dark);
+        box-shadow: 0 0 14px rgba(0, 217, 255, 0.6);
+      }
+
+      .lightbox-meta {
+        position: absolute;
+        bottom: -18px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: var(--text);
+        font-size: 0.95rem;
+        text-align: center;
+        opacity: 0.8;
+      }
+
+      @media (max-width: 600px) {
+        h1 {
+          font-size: 2.2rem;
+        }
+      }
+
+      @media (min-width: 1000px) {
+        .grid {
+          grid-template-columns: repeat(5, minmax(0, 1fr));
+          gap: 14px;
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <script type="module" src="reader/safe-mode.js"></script>
+    <script type="module" src="reader/live-tracking.js"></script>
+    <script type="module" src="reader/chat-sso.js"></script>
+    <header>
+      <div class="header-brand">
+        <h1>BWC Media</h1>
+        <div class="subhead">Browse artwork attached to feed posts.</div>
+      </div>
+      <div class="header-nav">
+        <a href="index.html" class="nav-btn" id="backToComicBtn">&#8592; Back to Comic</a>
+        <a href="feed.html" class="nav-btn">Feed</a>
+      </div>
+    </header>
+
+    <div class="container">
+      <div class="error" id="error" style="display: none"></div>
+
+      <div class="search-row">
+        <input
+          type="text"
+          id="search"
+          class="search-input"
+          placeholder="Search by tag or filename..."
+        />
+      </div>
+
+      <div class="tags-bar" id="tagsBar"></div>
+
+      <div class="grid" id="grid">
+        <div class="empty-state">Loading media...</div>
+      </div>
+    </div>
+
+    <div class="lightbox" id="lightbox" aria-modal="true" role="dialog">
+      <div class="lightbox-content">
+        <button class="lightbox-btn" id="prevBtn" aria-label="Previous">&#8592;</button>
+        <img id="lightboxImg" src="" alt="" />
+        <div class="lightbox-missing" id="lightboxMissing">Image missing</div>
+        <button class="lightbox-btn" id="nextBtn" aria-label="Next">&#8594;</button>
+        <button class="lightbox-close" id="closeBtn" aria-label="Close">&times;</button>
+        <div class="lightbox-meta" id="lightboxMeta"></div>
+      </div>
+    </div>
+
+    <script>
+      // Media library: filterable grid with lightbox navigation.
+      const grid = document.getElementById('grid');
+      const tagsBar = document.getElementById('tagsBar');
+      const searchInput = document.getElementById('search');
+      const errorEl = document.getElementById('error');
+      const lightbox = document.getElementById('lightbox');
+      const lightboxImg = document.getElementById('lightboxImg');
+      const lightboxMissing = document.getElementById('lightboxMissing');
+      const lightboxMeta = document.getElementById('lightboxMeta');
+      const prevBtn = document.getElementById('prevBtn');
+      const nextBtn = document.getElementById('nextBtn');
+      const closeBtn = document.getElementById('closeBtn');
+
+      let mediaItems = [];
+      let activeTag = '';
+      let currentIndex = -1;
+      let viewerIsAdmin = false;
+      let viewerIsPremium = false;
+
+      // Show or hide the error banner.
+      function setError(message) {
+        if (!errorEl) return;
+        if (message) {
+          errorEl.textContent = message;
+          errorEl.style.display = 'block';
+        } else {
+          errorEl.style.display = 'none';
+        }
+      }
+
+      // Normalize tags to lowercase strings for filtering.
+      function normalizeTags(tags) {
+        return Array.isArray(tags)
+          ? tags.map((t) => String(t).trim().toLowerCase()).filter(Boolean)
+          : [];
+      }
+
+      function normalizeAccess(raw, fallbackPublic = true) {
+        const value = String(raw || '')
+          .trim()
+          .toLowerCase();
+        if (value === 'public' || value === 'premium' || value === 'private') {
+          return value;
+        }
+        return fallbackPublic ? 'public' : 'private';
+      }
+
+      function normalizePremiumVisibility(raw) {
+        const value = String(raw || '')
+          .trim()
+          .toLowerCase();
+        return value === 'hidden' ? 'hidden' : 'blur';
+      }
+
+      function resolveAssetPath(rawPath = '') {
+        const raw = String(rawPath || '').trim();
+        if (!raw) return '';
+        if (/^https?:\/\//i.test(raw)) return raw;
+        if (raw.startsWith('protected/')) {
+          const rel = raw.replace(/^protected\//, '');
+          return `/api/protected/${rel}`;
+        }
+        if (raw.startsWith('/')) return raw;
+        return `/${raw}`;
+      }
+
+      function resolveMediaPath(item) {
+        return resolveAssetPath(item?.path || '');
+      }
+
+      function resolvePreviewPath(item) {
+        const raw = String(item?.previewPath || item?.preview_path || '').trim();
+        return raw ? resolveAssetPath(raw) : '';
+      }
+
+      function resolveThumbPath(item) {
+        const raw = String(item?.thumbPath || item?.thumb_path || '').trim();
+        return raw ? resolveAssetPath(raw) : '';
+      }
+
+      function resolveMediaSrc(item) {
+        const access = normalizeAccess(item.access ?? item.visibility, item.public !== false);
+        const premiumVisibility = normalizePremiumVisibility(
+          item.premiumVisibility ?? item.premium_visibility
+        );
+        if (access === 'premium' && !viewerIsPremium) {
+          return premiumVisibility === 'blur' ? resolvePreviewPath(item) : '';
+        }
+        if (access === 'private' && !viewerIsAdmin) {
+          return '';
+        }
+        return resolveMediaPath(item);
+      }
+
+      function resolveThumbSrc(item) {
+        const access = normalizeAccess(item.access ?? item.visibility, item.public !== false);
+        const premiumVisibility = normalizePremiumVisibility(
+          item.premiumVisibility ?? item.premium_visibility
+        );
+        if (access === 'premium' && !viewerIsPremium) {
+          return premiumVisibility === 'blur' ? resolvePreviewPath(item) : '';
+        }
+        if (access === 'private' && !viewerIsAdmin) {
+          return '';
+        }
+        const thumb = resolveThumbPath(item);
+        return thumb || resolveMediaPath(item);
+      }
+
+      async function loadSession() {
+        try {
+          const response = await fetch('/api/session', {
+            cache: 'no-store',
+            credentials: 'same-origin',
+          });
+          if (!response.ok) return;
+          const data = await response.json();
+          const user = data?.user || null;
+          const role = String(user?.role || '').toLowerCase();
+          viewerIsAdmin = role === 'admin';
+          viewerIsPremium = viewerIsAdmin || role === 'premium' || !!user?.premiumActive;
+        } catch (error) {
+          viewerIsAdmin = false;
+          viewerIsPremium = false;
+        }
+      }
+
+      function isItemVisible(item) {
+        const access = normalizeAccess(item.access ?? item.visibility, item.public !== false);
+        const premiumVisibility = normalizePremiumVisibility(
+          item.premiumVisibility ?? item.premium_visibility
+        );
+        if (access === 'private') return viewerIsAdmin;
+        if (access === 'premium') {
+          return viewerIsPremium || premiumVisibility === 'blur';
+        }
+        return true;
+      }
+
+      // Render the tag filter pills.
+      function renderTags() {
+        tagsBar.innerHTML = '';
+        const visibleItems = mediaItems.filter(isItemVisible);
+        const allTags = Array.from(
+          new Set(visibleItems.flatMap((m) => normalizeTags(m.tags || [])))
+        ).sort();
+        if (!allTags.length) return;
+
+        const all = document.createElement('button');
+        all.className = `tag-pill ${activeTag === '' ? 'active' : ''}`;
+        all.textContent = 'All';
+        all.addEventListener('click', () => {
+          activeTag = '';
           renderTags();
           renderGrid();
         });
-        tagsBar.appendChild(btn);
-      });
-    }
+        tagsBar.appendChild(all);
 
-    function renderGrid() {
-      grid.innerHTML = '';
-      const term = (searchInput.value || '').trim().toLowerCase();
-
-      const filtered = mediaItems.filter(item => {
-        const path = (item.path || '').toLowerCase();
-        const tags = normalizeTags(item.tags || []);
-        const matchesTag = activeTag ? tags.includes(activeTag) : true;
-        const matchesTerm = term
-          ? path.includes(term) || tags.some(t => t.includes(term))
-          : true;
-        return matchesTag && matchesTerm;
-      });
-
-      if (!filtered.length) {
-        const empty = document.createElement('div');
-        empty.className = 'empty-state';
-        empty.textContent = 'No media found for that search. Try another tag or term.';
-        grid.appendChild(empty);
-        return;
-      }
-
-      filtered.forEach((item, index) => {
-        const card = document.createElement('div');
-        card.className = 'card';
-        const img = document.createElement('img');
-        img.loading = 'lazy';
-        img.alt = item.path || 'Media item';
-        img.src = item.path || '';
-        img.onerror = () => { img.style.opacity = '0.3'; };
-        img.addEventListener('click', () => openLightbox(filtered, index));
-        card.appendChild(img);
-
-        const body = document.createElement('div');
-        body.className = 'card-body';
-        const pathEl = document.createElement('div');
-        pathEl.className = 'card-path';
-        pathEl.textContent = item.path || 'Unknown path';
-        body.appendChild(pathEl);
-
-        const tagsWrap = document.createElement('div');
-        tagsWrap.className = 'card-tags';
-        const tags = normalizeTags(item.tags || []);
-        if (tags.length) {
-          tags.forEach(tag => {
-            const pill = document.createElement('span');
-            pill.className = 'card-tag';
-            pill.textContent = tag;
-            tagsWrap.appendChild(pill);
+        allTags.forEach((tag) => {
+          const btn = document.createElement('button');
+          btn.className = `tag-pill ${activeTag === tag ? 'active' : ''}`;
+          btn.textContent = tag;
+          btn.addEventListener('click', () => {
+            activeTag = activeTag === tag ? '' : tag;
+            renderTags();
+            renderGrid();
           });
-        } else {
-          const none = document.createElement('span');
-          none.className = 'card-tag';
-          none.textContent = 'untagged';
-          tagsWrap.appendChild(none);
-        }
-        body.appendChild(tagsWrap);
-
-        card.appendChild(body);
-        grid.appendChild(card);
-      });
-    }
-
-    function openLightbox(list, index) {
-      if (!list.length) return;
-      mediaItems = list; // scoped to filtered set so nav respects search/tag filter
-      currentIndex = index;
-      updateLightbox();
-      lightbox.classList.add('active');
-    }
-
-    function closeLightbox() {
-      lightbox.classList.remove('active');
-      currentIndex = -1;
-    }
-
-    function updateLightbox() {
-      if (currentIndex < 0 || currentIndex >= mediaItems.length) return closeLightbox();
-      const item = mediaItems[currentIndex];
-      lightboxImg.src = item.path || '';
-      lightboxImg.alt = item.path || 'Media item';
-      const tags = normalizeTags(item.tags || []);
-      lightboxMeta.textContent = `${item.path || ''}${tags.length ? ' • ' + tags.join(', ') : ''}`;
-    }
-
-    function goNext(delta) {
-      if (currentIndex < 0) return;
-      currentIndex = (currentIndex + delta + mediaItems.length) % mediaItems.length;
-      updateLightbox();
-    }
-
-    async function loadMedia() {
-      try {
-        const response = await fetch('media.json', { cache: 'no-cache' });
-        if (!response.ok) throw new Error('Failed to load media.json');
-        const data = await response.json();
-        mediaItems = Array.isArray(data) ? data : [];
-        setError('');
-      } catch (error) {
-        console.error(error);
-        mediaItems = [];
-        setError('Media library could not be loaded. Add items via the admin to generate media.json.');
+          tagsBar.appendChild(btn);
+        });
       }
-      renderTags();
-      renderGrid();
-    }
 
-    searchInput.addEventListener('input', renderGrid);
-    lightbox.addEventListener('click', (e) => {
-      if (e.target === lightbox) closeLightbox();
-    });
-    closeBtn.addEventListener('click', closeLightbox);
-    prevBtn.addEventListener('click', () => goNext(-1));
-    nextBtn.addEventListener('click', () => goNext(1));
-    window.addEventListener('keydown', (e) => {
-      if (!lightbox.classList.contains('active')) return;
-      if (e.key === 'Escape') closeLightbox();
-      if (e.key === 'ArrowLeft') goNext(-1);
-      if (e.key === 'ArrowRight') goNext(1);
-    });
-    loadMedia();
-  </script>
-  <script defer src="/analytics.js"></script>
-</body>
+      // Render the grid based on tag + search filters.
+      function renderGrid() {
+        grid.innerHTML = '';
+        const term = (searchInput.value || '').trim().toLowerCase();
 
+        const filtered = mediaItems.filter((item) => {
+          const path = (item.path || '').toLowerCase();
+          const tags = normalizeTags(item.tags || []);
+          const matchesTag = activeTag ? tags.includes(activeTag) : true;
+          const matchesTerm = term
+            ? path.includes(term) || tags.some((t) => t.includes(term))
+            : true;
+          return matchesTag && matchesTerm && isItemVisible(item);
+        });
+
+        if (!filtered.length) {
+          const empty = document.createElement('div');
+          empty.className = 'empty-state';
+          empty.textContent = 'No media found for that search. Try another tag or term.';
+          grid.appendChild(empty);
+          return;
+        }
+
+        filtered.forEach((item, index) => {
+          const access = normalizeAccess(item.access ?? item.visibility, item.public !== false);
+          const isPremium = access === 'premium';
+          const card = document.createElement('div');
+          card.className = `card${isPremium ? ' is-premium' : ''}`;
+          const media = document.createElement('div');
+          media.className = 'card-media';
+          const img = document.createElement('img');
+          const missing = document.createElement('div');
+          missing.className = 'media-missing';
+          missing.textContent = 'Image missing';
+          img.loading = 'lazy';
+          img.alt = item.path || 'Media item';
+          img.src = resolveThumbSrc(item) || '';
+          img.onerror = () => {
+            img.style.display = 'none';
+            missing.style.display = 'flex';
+          };
+          img.addEventListener('click', () => openLightbox(filtered, index));
+          media.appendChild(img);
+          media.appendChild(missing);
+          if (isPremium) {
+            const badge = document.createElement('div');
+            badge.className = 'premium-badge';
+            badge.textContent = 'Premium';
+            media.appendChild(badge);
+          }
+          card.appendChild(media);
+
+          const body = document.createElement('div');
+          body.className = 'card-body';
+          const pathEl = document.createElement('div');
+          pathEl.className = 'card-path';
+          pathEl.textContent = item.path || 'Unknown path';
+          body.appendChild(pathEl);
+
+          const tagsWrap = document.createElement('div');
+          tagsWrap.className = 'card-tags';
+          const tags = normalizeTags(item.tags || []);
+          if (tags.length) {
+            tags.forEach((tag) => {
+              const pill = document.createElement('span');
+              pill.className = 'card-tag';
+              pill.textContent = tag;
+              tagsWrap.appendChild(pill);
+            });
+          } else {
+            const none = document.createElement('span');
+            none.className = 'card-tag';
+            none.textContent = 'untagged';
+            tagsWrap.appendChild(none);
+          }
+          body.appendChild(tagsWrap);
+
+          card.appendChild(body);
+          grid.appendChild(card);
+        });
+      }
+
+      // Open the lightbox scoped to the current filtered list.
+      function openLightbox(list, index) {
+        if (!list.length) return;
+        mediaItems = list; // scoped to filtered set so nav respects search/tag filter
+        currentIndex = index;
+        updateLightbox();
+        lightbox.classList.add('active');
+      }
+
+      // Close the lightbox and reset navigation state.
+      function closeLightbox() {
+        lightbox.classList.remove('active');
+        currentIndex = -1;
+      }
+
+      // Update the lightbox image and metadata.
+      function updateLightbox() {
+        if (currentIndex < 0 || currentIndex >= mediaItems.length) return closeLightbox();
+        const item = mediaItems[currentIndex];
+        if (lightboxMissing) lightboxMissing.style.display = 'none';
+        lightboxImg.style.display = 'block';
+        lightboxImg.src = resolveMediaSrc(item) || '';
+        lightboxImg.alt = item.path || 'Media item';
+        lightboxImg.onerror = () => {
+          lightboxImg.style.display = 'none';
+          if (lightboxMissing) lightboxMissing.style.display = 'flex';
+          lightboxMeta.textContent = 'Image missing';
+        };
+        const tags = normalizeTags(item.tags || []);
+        const access = normalizeAccess(item.access ?? item.visibility, item.public !== false);
+        const premiumVisibility = normalizePremiumVisibility(
+          item.premiumVisibility ?? item.premium_visibility
+        );
+        const suffix = tags.length ? ' • ' + tags.join(', ') : '';
+        const premiumNote =
+          access === 'premium' && !viewerIsPremium && premiumVisibility === 'blur'
+            ? ' • Premium preview'
+            : '';
+        lightboxMeta.textContent = `${item.path || ''}${suffix}${premiumNote}`;
+      }
+
+      // Move forward or backward through the filtered list.
+      function goNext(delta) {
+        if (currentIndex < 0) return;
+        currentIndex = (currentIndex + delta + mediaItems.length) % mediaItems.length;
+        updateLightbox();
+      }
+
+      // Load media metadata from media.json and render the UI.
+      async function loadMedia() {
+        try {
+          await loadSession();
+          const response = await fetch('media.json', { cache: 'no-cache' });
+          if (!response.ok) throw new Error('Failed to load media library');
+          const data = await response.json();
+          mediaItems = Array.isArray(data)
+            ? data
+                .filter((item) => item && item.path)
+                .filter((item) => !String(item.path).startsWith('media/previews/'))
+                .map((item) => {
+                  const fallbackPublic = item.public !== false;
+                  const access = normalizeAccess(item.access ?? item.visibility, fallbackPublic);
+                  const premiumVisibility = normalizePremiumVisibility(
+                    item.premiumVisibility ?? item.premium_visibility
+                  );
+                  return { ...item, access, premiumVisibility };
+                })
+            : [];
+          setError('');
+        } catch (error) {
+          console.error(error);
+          mediaItems = [];
+          setError('Media library could not be loaded. Add items via the admin to populate it.');
+        }
+        renderTags();
+        renderGrid();
+      }
+
+      // UI event hooks for filters and lightbox controls.
+      searchInput.addEventListener('input', renderGrid);
+      lightbox.addEventListener('click', (e) => {
+        if (e.target === lightbox) closeLightbox();
+      });
+      closeBtn.addEventListener('click', closeLightbox);
+      prevBtn.addEventListener('click', () => goNext(-1));
+      nextBtn.addEventListener('click', () => goNext(1));
+      window.addEventListener('keydown', (e) => {
+        if (!lightbox.classList.contains('active')) return;
+        if (e.key === 'Escape') closeLightbox();
+        if (e.key === 'ArrowLeft') goNext(-1);
+        if (e.key === 'ArrowRight') goNext(1);
+      });
+      loadMedia();
+
+      const backToComicBtn = document.getElementById('backToComicBtn');
+      if (backToComicBtn && window.history.length > 1) {
+        backToComicBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          window.history.back();
+        });
+      }
+    </script>
+    <script>
+      // Load the analytics loader without Vite bundling it.
+      (() => {
+        const script = document.createElement('script');
+        script.defer = true;
+        script.src = '/analytics.js';
+        document.head.appendChild(script);
+      })();
+    </script>
+  </body>
 </html>

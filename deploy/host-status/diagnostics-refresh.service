@@ -1,0 +1,10 @@
+[Unit]
+Description=Refresh BWonderComics diagnostics snapshot
+After=network.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/bw-quality
+Environment=BWC_BASE_DIR=/srv/bw-quality
+EnvironmentFile=/srv/bw-quality/deploy/bwondercomics.env
+ExecStart=/usr/bin/env python3 /srv/bw-quality/deploy/host-status/diagnostics_refresh.py

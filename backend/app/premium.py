@@ -5,11 +5,10 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from urllib.parse import unquote, urlparse
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .models import Entry, Series
-
 
 DEFAULT_SERIES_ID = "battle-bros"
 
@@ -49,7 +48,9 @@ def _compute_premium_prefixes(db: Session, series_id: str) -> set[str]:
     if series and series.active and series.premium_only:
         if series_id == DEFAULT_SERIES_ID:
             prefixes.add("/chapters/")
+            prefixes.add(f"/comics/{series_id}/entries/")
         else:
+            prefixes.add(f"/comics/{series_id}/entries/")
             prefixes.add(f"/comics/{series_id}/chapters/")
 
     # Entry-level premium gating: lock folder path.
@@ -77,4 +78,3 @@ def is_premium_request_path(db: Session, path: str) -> bool:
     prefixes = _compute_premium_prefixes(db, series_id)
     _cache[series_id] = PremiumPrefixes(series_id=series_id, prefixes=prefixes, computed_at=now)
     return any(clean_path.startswith(prefix) for prefix in prefixes)
-

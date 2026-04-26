@@ -1,41 +1,67 @@
 ﻿<!doctype html>
 <html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5" />
+    <title>BWonderComics | Read Battle Bros Comics</title>
+    <meta
+      name="description"
+      content="BWonderComics official website, and Battle Bros comic reader"
+    />
+    <meta
+      name="keywords"
+      content="battle bros, comic reader, online comics, free comics, webcomic, manga reader"
+    />
+    <meta name="author" content="Battle Bros Comics" />
+    <meta name="theme-color" content="#00d9ff" />
+    <script>
+      (() => {
+        const root = document.documentElement;
+        root.classList.add('reader-bootstrap-loading');
+        window.__bwReaderBootRelease = window.setTimeout(() => {
+          root.classList.remove('reader-bootstrap-loading');
+          delete window.__bwReaderBootRelease;
+        }, 5000);
+      })();
+    </script>
 
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5" />
-  <title>BWonderComics | Read Battle Bros Comics</title>
-  <meta name="description" content="BWonderComics official website, and Battle Bros comic reader" />
-  <meta name="keywords" content="battle bros, comic reader, online comics, free comics, webcomic, manga reader" />
-  <meta name="author" content="Battle Bros Comics" />
-  <meta name="theme-color" content="#00d9ff" />
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://bwondercomics.com/" />
+    <meta property="og:title" content="BWonderComics - Free Online Comic Reader" />
+    <meta
+      property="og:description"
+      content="BWonderComics official website, and Battle Bros comic reader"
+    />
+    <!-- SITE_BRANDING_SOCIAL_IMAGE_START -->
+    <meta property="og:image" content="https://bwondercomics.com/assets/banner1.png" />
+    <meta property="twitter:image" content="https://bwondercomics.com/assets/banner1.png" />
+    <!-- SITE_BRANDING_SOCIAL_IMAGE_END -->
 
-  <!-- Open Graph / Facebook -->
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://bwondercomics.com/" />
-  <meta property="og:title" content="BWonderComics - Free Online Comic Reader" />
-  <meta property="og:description" content="BWonderComics official website, and Battle Bros comic reader" />
-  <meta property="og:image" content="https://bwondercomics.com/assets/banner1.png" />
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://bwondercomics.com/" />
+    <meta property="twitter:title" content="BWonderComics - Free Online Comic Reader" />
+    <meta
+      property="twitter:description"
+      content="BWonderComics official website, and Battle Bros comic reader"
+    />
+    <!-- SITE_BRANDING_ICONS_START -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/boywondericon.png" />
+    <link rel="apple-touch-icon" href="/assets/boywondericon.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <!-- SITE_BRANDING_ICONS_END -->
 
-  <!-- Twitter -->
-  <meta property="twitter:card" content="summary_large_image" />
-  <meta property="twitter:url" content="https://bwondercomics.com/" />
-  <meta property="twitter:title" content="BWonderComics - Free Online Comic Reader" />
-  <meta property="twitter:description" content="BWonderComics official website, and Battle Bros comic reader" />
-  <meta property="twitter:image" content="https://bwondercomics.com/assets/banner1.png" />
+    <!-- Performance optimizations -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Righteous&family=Bebas+Neue&display=swap"
+      rel="stylesheet"
+    />
 
-  <!-- Favicons -->
-  <link rel="icon" type="image/png" sizes="32x32" href="assets/panel.png" />
-  <link rel="apple-touch-icon" href="assets/panel.png" />
-  <link rel="manifest" href="manifest.json" />
-
-  <!-- Performance optimizations -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Righteous&family=Bebas+Neue&display=swap" rel="stylesheet" />
-
-  <!-- Schema.org structured data for SEO -->
-  <script type="application/ld+json">
+    <!-- Schema.org structured data for SEO -->
+    <script type="application/ld+json">
       {
         "@context": "https://schema.org",
         "@type": "WebSite",
@@ -49,2700 +75,664 @@
       }
     </script>
 
-  <link rel="stylesheet" href="reader/comic-comments.css">
-
-  <style>
-    /* ==================== CSS VARIABLES ==================== */
-    :root {
-      --primary: #00d9ff;
-      --secondary: #ff00ea;
-      --accent: #ffed00;
-      --bg-dark: #0a0a12;
-      --bg-panel: #1a1a2e;
-      --text: #ffffff;
-      --danger: #ff3838;
-    }
-
-    /* ==================== RESET ==================== */
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
-
-    /* ==================== ANIMATIONS ==================== */
-    @keyframes glitchText {
-
-      0%,
-      100% {
-        text-shadow:
-          2px 2px 0 var(--primary),
-          -2px -2px 0 var(--secondary);
-      }
-
-      25% {
-        text-shadow:
-          -2px 2px 0 var(--secondary),
-          2px -2px 0 var(--primary);
-      }
-
-      50% {
-        text-shadow:
-          2px -2px 0 var(--primary),
-          -2px 2px 0 var(--secondary);
-      }
-
-      75% {
-        text-shadow:
-          -2px -2px 0 var(--secondary),
-          2px 2px 0 var(--primary);
-      }
-    }
-
-    @keyframes scanline {
-      0% {
-        transform: translateY(-100%);
-      }
-
-      100% {
-        transform: translateY(100%);
-      }
-    }
-
-    @keyframes neonPulse {
-
-      0%,
-      100% {
-        box-shadow:
-          0 0 5px var(--primary),
-          0 0 10px var(--primary);
-      }
-
-      50% {
-        box-shadow:
-          0 0 10px var(--primary),
-          0 0 20px var(--primary);
-      }
-    }
-
-    @keyframes pixelShift {
-
-      0%,
-      100% {
-        transform: translate(0, 0);
-      }
-
-      25% {
-        transform: translate(2px, 0);
-      }
-
-      50% {
-        transform: translate(0, 2px);
-      }
-
-      75% {
-        transform: translate(-2px, 0);
-      }
-    }
-
-    @keyframes spin {
-      to {
-        transform: rotate(360deg);
-      }
-    }
-
-    /* ==================== BASE LAYOUT ==================== */
-    html,
-    body {
-      height: 100%;
-      font-family: "Righteous", sans-serif;
-      background: var(--bg-dark);
-      color: var(--text);
-      -webkit-font-smoothing: antialiased;
-      overflow-x: hidden;
-    }
-
-    main {
-      display: flex;
-      flex-direction: column;
-      height: calc(100vh - 72px);
-      overflow: hidden;
-    }
-
-    body::before {
-      content: "";
-      position: fixed;
-      inset: 0;
-      background:
-        repeating-linear-gradient(0deg,
-          transparent 0px,
-          transparent 2px,
-          rgba(0, 217, 255, 0.02) 2px,
-          rgba(0, 217, 255, 0.02) 4px),
-        radial-gradient(circle at 20% 80%,
-          rgba(255, 237, 0, 0.05),
-          transparent 40%),
-        radial-gradient(circle at 80% 20%,
-          rgba(255, 0, 234, 0.05),
-          transparent 40%);
-      pointer-events: none;
-      z-index: 0;
-    }
-
-    body::after {
-      content: "";
-      position: fixed;
-      inset: 0;
-      background: linear-gradient(transparent 50%, rgba(0, 0, 0, 0.05) 50%);
-      background-size: 100% 3px;
-      pointer-events: none;
-      z-index: 1;
-      animation: scanline 6s linear infinite;
-      opacity: 0.4;
-    }
-
-    /* ==================== HEADER ==================== */
-    header.topbar {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 12px 20px;
-      background: linear-gradient(135deg,
-          rgba(10, 10, 18, 0.95),
-          rgba(26, 26, 46, 0.95));
-      border-bottom: 3px solid var(--primary);
-      position: sticky;
-      top: 0;
-      z-index: 60;
-      backdrop-filter: blur(8px);
-    }
-
-    .header-actions {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .nav-links {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-    }
-
-    .nav-link {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      min-height: 44px;
-      padding: 10px 16px;
-      border-radius: 8px;
-      border: 2px solid var(--primary);
-      background: linear-gradient(135deg,
-          rgba(0, 217, 255, 0.22),
-          rgba(255, 0, 234, 0.16));
-      color: var(--text);
-      text-decoration: none;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      font-family: "Bebas Neue", sans-serif;
-      font-size: 0.95rem;
-      box-shadow:
-        0 4px 0 rgba(0, 0, 0, 0.3),
-        0 0 16px rgba(0, 217, 255, 0.35),
-        0 0 14px rgba(255, 0, 234, 0.25);
-      transition:
-        transform 0.2s ease,
-        box-shadow 0.2s ease,
-        border-color 0.2s ease,
-        background 0.2s ease;
-    }
-
-    .nav-link:hover {
-      background: linear-gradient(135deg,
-          rgba(0, 217, 255, 0.32),
-          rgba(255, 0, 234, 0.26));
-      border-color: var(--secondary);
-      box-shadow:
-        0 4px 0 rgba(0, 0, 0, 0.35),
-        0 0 24px rgba(0, 217, 255, 0.45),
-        0 0 20px rgba(255, 0, 234, 0.35);
-      transform: translateY(-2px);
-      color: var(--text);
-    }
-
-    .nav-link:active {
-      transform: translateY(0);
-      box-shadow:
-        0 2px 0 rgba(0, 0, 0, 0.3),
-        0 0 16px rgba(0, 217, 255, 0.35),
-        0 0 12px rgba(255, 0, 234, 0.25);
-    }
-
-    .nav-link.admin-link {
-      border-color: rgba(255, 237, 0, 0.85);
-      background: linear-gradient(135deg,
-          rgba(255, 237, 0, 0.22),
-          rgba(0, 217, 255, 0.18));
-      box-shadow:
-        0 4px 0 rgba(0, 0, 0, 0.3),
-        0 0 16px rgba(255, 237, 0, 0.25),
-        0 0 14px rgba(0, 217, 255, 0.25);
-    }
-
-    .nav-link.admin-link:hover {
-      border-color: var(--accent);
-      background: linear-gradient(135deg,
-          rgba(255, 237, 0, 0.3),
-          rgba(0, 217, 255, 0.24));
-      box-shadow:
-        0 4px 0 rgba(0, 0, 0, 0.35),
-        0 0 24px rgba(255, 237, 0, 0.32),
-        0 0 20px rgba(0, 217, 255, 0.35);
-    }
-
-    .status-panel {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: rgba(10, 10, 18, 0.9);
-      border: 1px solid var(--primary);
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-family:
-        "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
-      color: #7ef5e3;
-      box-shadow: 0 0 10px rgba(0, 217, 255, 0.18);
-      position: relative;
-      overflow: visible;
-      white-space: nowrap;
-      max-width: none;
-      width: auto;
-      flex-shrink: 0;
-    }
-
-    .status-panel::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg,
-          transparent 0%,
-          rgba(255, 255, 255, 0.03) 50%,
-          transparent 100%);
-      opacity: 0.5;
-      pointer-events: none;
-    }
-
-    .status-text {
-      letter-spacing: 0.5px;
-    }
-
-    .status-cursor {
-      display: inline-block;
-      width: 10px;
-      height: 1.05em;
-      margin-left: 6px;
-      background: currentColor;
-      border-radius: 1px;
-      vertical-align: -0.05em;
-      animation: statusBlink 1.1s steps(1) infinite;
-    }
-
-    @keyframes statusBlink {
-      50% {
-        opacity: 0;
-      }
-    }
-
-    .brand {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-    }
-
-    .logo {
-      width: 50px;
-      height: 50px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: linear-gradient(135deg, var(--bg-panel), var(--bg-dark));
-      border: 3px solid var(--accent);
-      color: var(--primary);
-      font-family: "Bebas Neue";
-      font-weight: 900;
-      font-size: 28px;
-      box-shadow: 0 0 10px rgba(0, 217, 255, 0.12);
-      transition: transform 0.25s;
-      animation: neonPulse 6s ease-in-out infinite;
-    }
-
-    .logo:hover {
-      transform: scale(1.06);
-      animation: glitchText 8s infinite;
-    }
-
-    .title h1 {
-      margin: 0;
-      font-size: 28px;
-      letter-spacing: 6px;
-      text-transform: uppercase;
-      background: linear-gradient(90deg,
-          var(--primary),
-          var(--secondary),
-          var(--accent));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      filter: drop-shadow(0 0 8px rgba(0, 217, 255, 0.35));
-      animation:
-        pixelShift 12s linear infinite,
-        glitchText 8s ease-in-out infinite;
-    }
-
-    .title .subtitle {
-      margin: 0;
-      font-size: 10px;
-      color: var(--accent);
-      letter-spacing: 2px;
-      opacity: 1;
-    }
-
-    /* ==================== CHAPTER SELECT ==================== */
-    select#chapter {
-      background: linear-gradient(135deg,
-          rgba(0, 217, 255, 0.15),
-          rgba(255, 0, 234, 0.15));
-      color: var(--text);
-      border: 3px solid var(--primary);
-      border-radius: 8px;
-      padding: 10px 16px;
-      min-width: 180px;
-      min-height: 44px;
-      font-size: 14px;
-      font-weight: 900;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-transform: uppercase;
-      font-family: "Bebas Neue", sans-serif;
-      box-shadow:
-        0 4px 0 rgba(0, 0, 0, 0.3),
-        0 0 16px rgba(0, 217, 255, 0.35),
-        0 0 14px rgba(255, 0, 234, 0.25);
-      position: relative;
-    }
-
-    select#chapter:hover {
-      background: linear-gradient(135deg,
-          rgba(0, 217, 255, 0.25),
-          rgba(255, 0, 234, 0.25));
-      box-shadow:
-        0 4px 0 rgba(0, 0, 0, 0.3),
-        0 0 24px rgba(0, 217, 255, 0.45),
-        0 0 20px rgba(255, 0, 234, 0.35);
-      transform: translateY(-2px);
-    }
-
-    select#chapter:active {
-      transform: translateY(0);
-      box-shadow:
-        0 2px 0 rgba(0, 0, 0, 0.3),
-        0 0 16px rgba(0, 217, 255, 0.35),
-        0 0 12px rgba(255, 0, 234, 0.25);
-    }
-
-    select#chapter option {
-      background: var(--bg-panel);
-      color: var(--text);
-      padding: 8px;
-    }
-
-    /* ==================== GALLERY OVERLAY ==================== */
-    .gallery-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(10, 10, 18, 0.95);
-      backdrop-filter: blur(10px);
-      z-index: 200;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.4s ease;
-    }
-
-    .gallery-overlay.active {
-      opacity: 1;
-      pointer-events: auto;
-    }
-
-    .gallery-panel {
-      background: linear-gradient(135deg,
-          rgba(26, 26, 46, 0.95),
-          rgba(10, 10, 18, 0.95));
-      border: 3px solid var(--primary);
-      border-radius: 12px;
-      padding: 30px;
-      width: 90%;
-      max-width: 1200px;
-      max-height: 90vh;
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-      box-shadow:
-        0 16px 40px rgba(0, 0, 0, 0.35),
-        0 0 40px rgba(0, 217, 255, 0.2);
-      position: relative;
-      transform: translateY(12px) scale(0.97);
-      opacity: 0;
-      transition:
-        transform 0.32s ease,
-        opacity 0.32s ease;
-    }
-
-    .gallery-overlay.active .gallery-panel {
-      transform: translateY(0) scale(1);
-      opacity: 1;
-    }
-
-    .gallery-overlay.active .chapter-card {
-      animation: galleryCard 0.38s ease forwards;
-      animation-delay: calc(var(--card-index, 0) * 60ms + 120ms);
-    }
-
-    .gallery-panel h2 {
-      font-family: "Bebas Neue", sans-serif;
-      font-size: 32px;
-      color: var(--accent);
-      text-align: center;
-      margin: 0;
-      text-shadow: 0 0 10px rgba(255, 237, 0, 0.5);
-      letter-spacing: 2px;
-    }
-
-    .gallery-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-      gap: 20px;
-      overflow-y: auto;
-      padding: 10px;
-      /* Custom scrollbar */
-      scrollbar-width: thin;
-      scrollbar-color: var(--primary) var(--bg-dark);
-    }
-
-    .gallery-grid::-webkit-scrollbar {
-      width: 8px;
-    }
-
-    .gallery-grid::-webkit-scrollbar-track {
-      background: var(--bg-dark);
-    }
-
-    .gallery-grid::-webkit-scrollbar-thumb {
-      background-color: var(--primary);
-      border-radius: 4px;
-    }
-
-    .chapter-card {
-      background: rgba(0, 0, 0, 0.3);
-      border: 2px solid rgba(0, 217, 255, 0.3);
-      border-radius: 8px;
-      overflow: hidden;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      display: flex;
-      flex-direction: column;
-      opacity: 0;
-      transform: translateY(8px) scale(0.98);
-      will-change: transform, opacity;
-    }
-
-    .chapter-card:hover {
-      transform: translateY(-5px);
-      border-color: var(--accent);
-      box-shadow: 0 5px 15px rgba(0, 217, 255, 0.3);
-    }
-
-    .premium-card {
-      border-color: rgba(255, 0, 234, 0.5);
-      box-shadow: 0 0 15px rgba(255, 0, 234, 0.2);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .premium-card:hover {
-      border-color: var(--secondary);
-      box-shadow: 0 5px 18px rgba(255, 0, 234, 0.4);
-    }
-
-    .premium-badge {
-      margin-top: 4px;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 8px;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 0, 234, 0.4);
-      background: rgba(255, 0, 234, 0.1);
-      color: var(--secondary);
-      font-size: 0.85rem;
-      letter-spacing: 0.3px;
-    }
-
-    .premium-card::after {
-      content: "PREMIUM";
-      position: absolute;
-      inset: 12px -32px auto -32px;
-      transform: rotate(-18deg);
-      background: rgba(255, 0, 234, 0.22);
-      border: 1px solid rgba(255, 0, 234, 0.5);
-      color: var(--bg-dark);
-      font-family: "Bebas Neue", sans-serif;
-      font-size: 1rem;
-      letter-spacing: 1px;
-      text-align: center;
-      padding: 6px 0;
-      pointer-events: none;
-      text-shadow: 0 0 6px rgba(0, 0, 0, 0.35);
-    }
-
-    .premium-card.locked .chapter-thumb {
-      filter: blur(2px) grayscale(0.25) brightness(0.75);
-      transform: scale(1.02);
-    }
-
-    .volume-card {
-      border-color: rgba(255, 237, 0, 0.6);
-      box-shadow: 0 0 15px rgba(255, 237, 0, 0.2);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .volume-card:hover {
-      border-color: var(--accent);
-      box-shadow: 0 5px 18px rgba(255, 237, 0, 0.35);
-    }
-
-    .volume-badge {
-      margin-top: 4px;
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 4px 8px;
-      border-radius: 999px;
-      border: 1px solid rgba(255, 237, 0, 0.5);
-      background: rgba(255, 237, 0, 0.12);
-      color: var(--accent);
-      font-size: 0.85rem;
-      letter-spacing: 0.3px;
-    }
-
-    .volume-card::after {
-      content: "PHYSICAL VOLUME";
-      position: absolute;
-      inset: 12px -32px auto -32px;
-      transform: rotate(-18deg);
-      background: rgba(255, 237, 0, 0.2);
-      border: 1px solid rgba(255, 237, 0, 0.6);
-      color: var(--bg-dark);
-      font-family: "Bebas Neue", sans-serif;
-      font-size: 1rem;
-      letter-spacing: 1px;
-      text-align: center;
-      padding: 6px 0;
-      pointer-events: none;
-      text-shadow: 0 0 6px rgba(255, 237, 0, 0.4);
-    }
-
-    @keyframes galleryCard {
-      from {
-        opacity: 0;
-        transform: translateY(16px) scale(0.96);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
-      }
-    }
-
-    .chapter-thumb {
-      width: 100%;
-      aspect-ratio: 2/3;
-      object-fit: cover;
-      background: #000;
-    }
-
-    .chapter-info {
-      padding: 10px;
-      text-align: center;
-      background: rgba(0, 217, 255, 0.1);
-    }
-
-    .chapter-title {
-      font-family: "Bebas Neue", sans-serif;
-      font-size: 18px;
-      color: var(--text);
-      letter-spacing: 1px;
-    }
-
-    .gallery-close {
-      align-self: center;
-      padding: 10px 30px;
-      background: transparent;
-      border: 2px solid var(--danger);
-      color: var(--danger);
-      font-family: "Bebas Neue", sans-serif;
-      font-size: 18px;
-      cursor: pointer;
-      transition: all 0.2s;
-      border-radius: 4px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-
-    .gallery-close:hover {
-      background: var(--danger);
-      color: var(--bg-dark);
-      box-shadow: 0 0 15px rgba(255, 56, 56, 0.4);
-    }
-
-    @keyframes slideUpFade {
-      from {
-        opacity: 0;
-        transform: translateY(20px);
-      }
-
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .chapter-card {
-      animation: slideUpFade 0.4s ease-out backwards;
-    }
-
-    .chapter-card.active {
-      border-color: var(--accent);
-      box-shadow: 0 0 20px rgba(255, 237, 0, 0.4);
-      position: relative;
-    }
-
-    .chapter-card.active::after {
-      content: "PLAYING";
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: var(--accent);
-      color: var(--bg-dark);
-      font-family: "Bebas Neue", sans-serif;
-      font-size: 12px;
-      padding: 2px 6px;
-      border-radius: 4px;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
-      pointer-events: none;
-    }
-
-    /* ==================== VIEWER LAYOUT ==================== */
-    .viewerWrap {
-      display: flex;
-      gap: 12px;
-      align-items: stretch;
-      justify-content: center;
-      width: 100%;
-      max-width: 2000px;
-      margin: 0 auto;
-      padding: 16px 12px 0 12px;
-      flex: 1 1 auto;
-      min-height: 0;
-    }
-
-    .viewer-content-wrapper {
-      display: flex;
-      flex-direction: column;
-      flex: 1 1 auto;
-      min-height: 0;
-      overflow: hidden;
-    }
-
-    /* ==================== SIDE PANELS ==================== */
-    .side-panel {
-      flex: 0 0 auto;
-      width: 20vw;
-      min-width: 250px;
-      max-width: 400px;
-      display: flex;
-      flex-direction: column;
-      background: linear-gradient(180deg,
-          rgba(26, 26, 46, 0.95),
-          rgba(10, 10, 18, 0.95));
-      border: 4px solid var(--primary);
-      box-shadow:
-        0 0 20px rgba(0, 217, 255, 0.4),
-        inset 0 4px 0 rgba(0, 217, 255, 0.1),
-        0 8px 0 rgba(0, 0, 0, 0.3);
-      color: var(--text);
-      overflow: hidden;
-      z-index: 10;
-      position: relative;
-    }
-
-    .side-panel::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 4px;
-      background: linear-gradient(90deg,
-          var(--accent),
-          var(--secondary),
-          var(--primary));
-      z-index: 1;
-    }
-
-    .side-panel.left,
-    .side-panel.right {
-      height: 100%;
-    }
-
-    .side-panel.left {
-      position: relative;
-    }
-
-    /* Let popouts (COM1C_NET) spill outside the right rail */
-    .side-panel.right {
-      overflow: visible;
-      position: relative;
-    }
-
-    .side-panel.left::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      background: url("assets/cityB.png") center/cover no-repeat;
-      opacity: 0.18;
-      filter: saturate(1.1);
-      z-index: 0;
-      pointer-events: none;
-    }
-
-    .side-panel.left>* {
-      position: relative;
-      z-index: 1;
-    }
-
-    .side-panel.left .left-panel-content {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100%;
-      padding: 20px;
-      gap: 16px;
-    }
-
-    .side-panel.left .left-panel-text-top,
-    .side-panel.left .left-panel-text-bottom {
-      font-family: "Bebas Neue", sans-serif;
-      text-align: center;
-      color: var(--text);
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      line-height: 1.3;
-      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
-    }
-
-    .side-panel.left .left-panel-text-top {
-      font-size: 24px;
-      font-weight: 900;
-      color: var(--accent);
-      text-shadow:
-        2px 2px 0 rgba(0, 0, 0, 0.5),
-        0 0 15px rgba(255, 237, 0, 0.6);
-    }
-
-    .side-panel.left .left-panel-text-bottom {
-      font-size: 16px;
-      font-weight: 500;
-      max-width: 100%;
-      word-wrap: break-word;
-      display: grid;
-      gap: 4px;
-      text-transform: none;
-    }
-
-    .bubble-em {
-      font-family: "Bebas Neue", sans-serif;
-      font-size: 18px;
-      letter-spacing: 1.2px;
-      color: var(--accent);
-      text-shadow:
-        2px 2px 0 rgba(0, 0, 0, 0.5),
-        0 0 12px rgba(255, 237, 0, 0.5);
-    }
-
-    .bubble-bold {
-      font-weight: 800;
-      color: var(--text);
-      background: rgba(0, 217, 255, 0.15);
-      padding: 2px 6px;
-      border-radius: 4px;
-      box-shadow: inset 0 0 0 1px rgba(0, 217, 255, 0.5);
-    }
-
-    .bubble-highlight {
-      font-weight: 900;
-      font-size: 18px;
-      color: var(--bg-dark);
-      background: var(--accent);
-      padding: 4px 8px;
-      border-radius: 5px;
-      box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15);
-      letter-spacing: 0.6px;
-      text-shadow: none;
-      text-decoration: none;
-      display: inline-block;
-    }
-
-    .bubble-highlight:link,
-    .bubble-highlight:visited {
-      color: var(--bg-dark);
-    }
-
-    .bubble-highlight:hover {
-      box-shadow:
-        inset 0 0 0 1px rgba(0, 0, 0, 0.25),
-        0 0 12px rgba(255, 237, 0, 0.35);
-      transform: translateY(-1px);
-    }
-
-    .side-panel.left .preview {
-      width: 100%;
-      padding: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: transparent;
-      min-height: 0;
-      flex-direction: column;
-      gap: 6px;
-    }
-
-    .side-panel.left .preview .panel-preview-img {
-      width: 100%;
-      max-height: 420px;
-      height: auto;
-      object-fit: contain;
-      display: block;
-      border: none;
-      box-shadow: 0 6px 14px rgba(0, 0, 0, 0.5);
-      cursor: pointer;
-      transition:
-        transform 0.3s,
-        border-color 0.3s;
-    }
-
-    .preview-arrow {
-      width: 0;
-      height: 0;
-      border-left: 12px solid transparent;
-      border-right: 12px solid transparent;
-      border-bottom: 14px solid var(--accent);
-      filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.35));
-    }
-
-    .side-panel.left .preview .panel-preview-img:hover {
-      transform: scale(1.05);
-      border-color: var(--accent);
-    }
-
-    /* ==================== EMAIL SIGNUP SECTION ==================== */
-    .email-signup-section {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 12px;
-      margin-top: 8px;
-    }
-
-    .email-signup-label {
-      font-family: "Bebas Neue", sans-serif;
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--text);
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      text-align: center;
-      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
-    }
-
-    .email-signup-form {
-      width: 100%;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      align-items: center;
-    }
-
-    .email-input {
-      width: 100%;
-      max-width: 280px;
-      padding: 10px 12px;
-      background: rgba(26, 26, 46, 0.8);
-      border: 3px solid var(--primary);
-      color: var(--text);
-      font-family: "Righteous", sans-serif;
-      font-size: 14px;
-      text-align: center;
-      transition: all 0.2s;
-      box-shadow:
-        0 0 10px rgba(0, 217, 255, 0.3),
-        inset 0 2px 4px rgba(0, 0, 0, 0.4);
-    }
-
-    .email-input::placeholder {
-      color: rgba(255, 255, 255, 0.4);
-      font-size: 13px;
-    }
-
-    .email-input:focus {
-      outline: none;
-      border-color: var(--accent);
-      box-shadow:
-        0 0 20px rgba(255, 237, 0, 0.5),
-        inset 0 2px 4px rgba(0, 0, 0, 0.4);
-      background: rgba(26, 26, 46, 0.95);
-    }
-
-    .email-submit-btn {
-      padding: 10px 32px;
-      background: linear-gradient(135deg, var(--accent), var(--primary));
-      border: 3px solid var(--accent);
-      color: var(--bg-dark);
-      font-family: "Bebas Neue", sans-serif;
-      font-size: 18px;
-      font-weight: 900;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      cursor: pointer;
-      transition: all 0.2s;
-      box-shadow:
-        0 4px 0 rgba(0, 0, 0, 0.5),
-        0 0 20px rgba(255, 237, 0, 0.4);
-      position: relative;
-    }
-
-    .email-submit-btn:hover {
-      background: linear-gradient(135deg, var(--primary), var(--accent));
-      transform: translateY(-2px);
-      box-shadow:
-        0 6px 0 rgba(0, 0, 0, 0.5),
-        0 0 30px rgba(255, 237, 0, 0.7);
-    }
-
-    .email-submit-btn:active {
-      transform: translateY(0);
-      box-shadow:
-        0 2px 0 rgba(0, 0, 0, 0.5),
-        0 0 15px rgba(255, 237, 0, 0.4);
-    }
-
-    .email-submit-btn:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-      transform: none;
-    }
-
-    .email-signup-cta {
-      font-family: "Bebas Neue", sans-serif;
-      font-size: 16px;
-      font-weight: 700;
-      color: var(--accent);
-      text-transform: uppercase;
-      letter-spacing: 1.5px;
-      text-align: center;
-      text-shadow:
-        2px 2px 0 rgba(0, 0, 0, 0.5),
-        0 0 10px rgba(255, 237, 0, 0.4);
-    }
-
-    .email-form-message {
-      font-family: "Righteous", sans-serif;
-      font-size: 14px;
-      text-align: center;
-      padding: 8px 12px;
-      border-radius: 4px;
-      margin-top: 8px;
-      max-width: 280px;
-    }
-
-    .email-form-message.success {
-      background: rgba(0, 217, 255, 0.2);
-      border: 2px solid var(--primary);
-      color: var(--primary);
-    }
-
-    .email-form-message.error {
-      background: rgba(255, 56, 56, 0.2);
-      border: 2px solid var(--danger);
-      color: var(--danger);
-    }
-
-    .side-panel.right {
-      display: flex;
-      flex-direction: column;
-      gap: 12px;
-      padding: 16px;
-      background-image: url("assets/banner3.png");
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      position: relative;
-      isolation: isolate;
-    }
-
-    .right-stack {
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-      flex: 1 1 auto;
-      justify-content: space-between;
-      min-height: 0;
-      position: relative;
-      overflow: visible;
-    }
-
-    .latest-update {
-      border: 2px solid var(--accent);
-      background:
-        linear-gradient(135deg,
-          rgba(255, 237, 0, 0.2),
-          rgba(0, 217, 255, 0.18)),
-        radial-gradient(circle at 20% 20%,
-          rgba(0, 0, 0, 0.25),
-          transparent 40%),
-        rgba(10, 10, 18, 0.95);
-      border-radius: 10px;
-      padding: 12px;
-      box-shadow: 0 8px 18px rgba(0, 0, 0, 0.65);
-    }
-
-    .latest-heading-row {
-      display: flex;
-      align-items: flex-end;
-      gap: 6px;
-      margin-bottom: 10px;
-      flex-wrap: wrap;
-    }
-
-    .latest-heading {
-      font-family: "Bebas Neue", cursive;
-      letter-spacing: 1px;
-      font-size: 1.2rem;
-      color: var(--bg-dark);
-      background: var(--accent);
-      padding: 6px 10px;
-      border-radius: 6px;
-      display: inline-flex;
-    }
-
-    .latest-author {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 2px 8px;
-      border-radius: 6px;
-      border: 1px solid var(--primary);
-      background: transparent;
-      box-shadow: none;
-      font-family: "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
-      color: #7ef5e3;
-      letter-spacing: 0.6px;
-      transform: translateY(2px);
-    }
-
-    .latest-body {
-      display: grid;
-      gap: 10px;
-    }
-
-    .latest-thumb {
-      width: 100%;
-      height: 140px;
-      object-fit: cover;
-      border-radius: 8px;
-      border: 2px solid rgba(0, 217, 255, 0.4);
-      background: #05050a;
-    }
-
-    .latest-thumb.placeholder {
-      display: grid;
-      place-items: center;
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 0.9rem;
-      letter-spacing: 0.5px;
-    }
-
-    .latest-meta {
-      display: grid;
-      gap: 4px;
-    }
-
-    .latest-label {
-      color: rgba(255, 255, 255, 0.7);
-      font-size: 0.85rem;
-    }
-
-    .latest-name {
-      font-family: "Bebas Neue", cursive;
-      font-size: 1.4rem;
-      color: var(--accent);
-      letter-spacing: 1px;
-    }
-
-    .latest-date {
-      color: var(--primary);
-      font-size: 0.9rem;
-    }
-
-    .latest-preview {
-      color: rgba(255, 255, 255, 0.85);
-      font-size: 0.95rem;
-      line-height: 1.3;
-    }
-
-    .latest-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 6px;
-      color: var(--bg-dark);
-      background: var(--primary);
-      border: 2px solid var(--primary);
-      padding: 6px 10px;
-      border-radius: 6px;
-      text-decoration: none;
-      font-weight: bold;
-      letter-spacing: 0.5px;
-    }
-
-    .latest-link:hover {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: var(--bg-dark);
-    }
-
-    .latest-loading,
-    .latest-empty {
-      color: rgba(255, 255, 255, 0.8);
-      font-size: 0.95rem;
-    }
-
-    .side-panel.right .preview {
-      display: none;
-      flex: 0 0 auto;
-      max-height: 0;
-      min-height: 0;
-      height: 0;
-      margin: 0;
-    }
-
-    .panel-buttons {
-      flex: 1 1 auto;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      justify-content: flex-start;
-      padding: 8px 6px 0 6px;
-      margin-top: 0;
-      min-height: 50%;
-      max-height: none;
-      overflow-y: visible;
-      scrollbar-width: thin;
-      align-items: flex-end;
-      background: linear-gradient(180deg,
-          rgba(0, 0, 0, 0) 0%,
-          rgba(0, 0, 0, 0.18) 100%);
-      position: relative;
-    }
-
-    .panel-btn {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 12px;
-      background: rgba(0, 0, 0, 0.18);
-      border: 1px solid rgba(255, 255, 255, 0.35);
-      border-radius: 10px;
-      cursor: pointer;
-      transition: all 0.16s ease;
-      text-decoration: none;
-      color: var(--text);
-      position: relative;
-      box-shadow: none;
-      text-shadow:
-        0 1px 2px rgba(0, 0, 0, 0.65),
-        0 0 0.5px rgba(0, 0, 0, 0.8);
-      backdrop-filter: blur(1px);
-      width: 45%;
-      min-width: 200px;
-      justify-content: flex-start;
-    }
-
-    .panel-btn:hover {
-      background: rgba(0, 0, 0, 0.24);
-      border-color: rgba(255, 255, 255, 0.7);
-      transform: translateY(-1px);
-      box-shadow: 0 0 12px rgba(0, 0, 0, 0.35);
-      backdrop-filter: blur(5px);
-    }
-
-    .panel-btn:active {
-      transform: translateY(0);
-      background: rgba(0, 0, 0, 0.2);
-    }
-
-    .panel-btn-icon {
-      width: 36px;
-      height: 36px;
-      min-width: 36px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0, 0, 0, 0.28);
-      border: 1px solid rgba(255, 255, 255, 0.35);
-      border-radius: 10px;
-      box-shadow: none;
-      overflow: hidden;
-      padding: 4px;
-    }
-
-    .panel-btn-icon img {
-      width: 100%;
-      height: 100%;
-      object-fit: contain;
-      display: block;
-      /* No filter - showing original icon colors */
-    }
-
-    .comicnet-panel {
-      position: absolute;
-      top: 50%;
-      right: calc(100% + 14px);
-      transform: translateY(-50%);
-      width: 240px;
-      max-width: 260px;
-      padding: 12px;
-      background: rgba(10, 10, 18, 0.9);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 10px;
-      box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
-      backdrop-filter: blur(8px);
-      display: none;
-      z-index: 90;
-    }
-
-    .comicnet-panel h4 {
-      margin: 0 0 8px 0;
-      font-family: "Bebas Neue";
-      letter-spacing: 1px;
-      font-size: 16px;
-      color: var(--accent);
-    }
-
-    .comicnet-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .comicnet-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .comicnet-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 10px;
-      color: var(--text);
-      text-decoration: none;
-      font-family: "Righteous", sans-serif;
-      font-size: 14px;
-      line-height: 1.4;
-      flex: 1;
-    }
-
-    .comicnet-link:hover {
-      color: var(--primary);
-    }
-
-    .comicnet-avatar {
-      width: 42px;
-      height: 42px;
-      border-radius: 8px;
-      object-fit: cover;
-      border: 1px solid rgba(255, 255, 255, 0.35);
-      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);
-      flex-shrink: 0;
-    }
-
-    .panel-btn-text {
-      flex: 0 0 auto;
-      font-family: "Bebas Neue";
-      font-size: 18px;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-      color: var(--text);
-      text-shadow: none;
-      font-weight: 800;
-      padding: 4px 8px;
-      background: rgba(0, 0, 0, 0.32);
-      border-radius: 6px;
-      width: auto;
-      display: inline-flex;
-      align-items: center;
-      gap: 1px;
-    }
-
-    .panel-btn-text span {
-      display: inline-block;
-      transition: transform 0.25s ease;
-    }
-
-    .panel-btn:hover .panel-btn-text span {
-      animation: nav-wiggle 0.5s ease both;
-    }
-
-    @keyframes nav-wiggle {
-      0% {
-        transform: translateY(0);
-      }
-
-      30% {
-        transform: translateY(-3px);
-      }
-
-      60% {
-        transform: translateY(1px);
-      }
-
-      100% {
-        transform: translateY(0);
-      }
-    }
-
-    /* ==================== VIEWPORT ==================== */
-    .viewport {
-      flex: 1 1 auto;
-      min-height: 0;
-      min-width: 320px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-      background: linear-gradient(180deg,
-          rgba(26, 26, 46, 0.8),
-          rgba(10, 10, 18, 0.9));
-      border: 4px solid var(--primary);
-      box-shadow:
-        0 0 30px rgba(0, 217, 255, 0.3),
-        inset 0 4px 0 rgba(0, 217, 255, 0.1),
-        0 8px 0 rgba(0, 0, 0, 0.3);
-      overflow: hidden;
-      touch-action: none;
-      z-index: 5;
-      max-height: 100%;
-      position: relative;
-    }
-
-    body.fullscreen-active .viewport {
-      position: fixed !important;
-      inset: 0 !important;
-      width: 100vw !important;
-      height: 100vh !important;
-      clip-path: none !important;
-      border: none !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      box-shadow: none !important;
-      background: #000;
-      z-index: 200;
-    }
-
-    body.fullscreen-active .side-panel {
-      display: none !important;
-    }
-
-    body.fullscreen-active main {
-      height: 100vh;
-    }
-
-    /* ==================== STAGE & PAGES ==================== */
-    .stageWrap {
-      position: relative;
-      width: 100%;
-      height: 100%;
-      overflow: hidden;
-      will-change: transform;
-      z-index: 6;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-
-    .stage {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      justify-content: center;
-      transform-origin: 50% 50%;
-      will-change: transform;
-      cursor: grab;
-      touch-action: none;
-      max-width: 100%;
-      max-height: 100%;
-    }
-
-    .page {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: #000;
-      position: relative;
-      overflow: hidden;
-      border: 3px solid rgba(0, 217, 255, 0.2);
-      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.7);
-      max-width: 100%;
-      max-height: 100%;
-    }
-
-    .page img {
-      display: block;
-      width: auto;
-      height: auto;
-      max-width: 100%;
-      max-height: calc(100vh - 150px);
-      object-fit: contain;
-      -webkit-user-drag: none;
-      pointer-events: none;
-      user-select: none;
-    }
-
-    .spinner {
-      position: absolute;
-      width: 50px;
-      height: 50px;
-      border: 4px solid transparent;
-      border-top: 4px solid var(--primary);
-      border-right: 4px solid var(--secondary);
-      border-bottom: 4px solid var(--accent);
-      animation: spin 0.8s linear infinite;
-      box-shadow: 0 0 20px rgba(0, 217, 255, 0.5);
-    }
-
-    /* ==================== PAGE TRANSITIONS ==================== */
-    .flashOverlay {
-      pointer-events: none;
-      position: absolute;
-      inset: 0;
-      background: #000;
-      opacity: 0;
-      transition: opacity 140ms linear;
-      z-index: 25;
-    }
-
-    .slide-out-left {
-      transition: transform 160ms cubic-bezier(0.2, 0.9, 0.2, 1);
-      transform: translateX(-18px);
-    }
-
-    .slide-out-right {
-      transition: transform 160ms cubic-bezier(0.2, 0.9, 0.2, 1);
-      transform: translateX(18px);
-    }
-
-    .slide-in-left {
-      transition: transform 200ms cubic-bezier(0.2, 0.9, 0.2, 1);
-      transform: translateX(0);
-    }
-
-    .slide-in-right {
-      transition: transform 200ms cubic-bezier(0.2, 0.9, 0.2, 1);
-      transform: translateX(0);
-    }
-
-    /* ==================== EDGE ZONES ==================== */
-    .edgeZone {
-      position: absolute;
-      top: 0;
-      height: 100%;
-      width: 12%;
-      z-index: 30;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 120ms;
-    }
-
-    .edgeZone.active {
-      pointer-events: auto;
-      opacity: 1;
-    }
-
-    .edgeZone.left {
-      left: 0;
-    }
-
-    .edgeZone.right {
-      right: 0;
-    }
-
-    .edgeArrow {
-      width: 64px;
-      height: 64px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0, 0, 0, 0.1);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      border-radius: 50%;
-      color: rgba(255, 255, 255, 0.4);
-      cursor: pointer;
-      user-select: none;
-      backdrop-filter: blur(2px);
-      transition: all 0.2s ease;
-      font-size: 28px;
-    }
-
-    .edgeArrow:hover {
-      background: rgba(0, 0, 0, 0.4);
-      border-color: var(--accent);
-      color: var(--accent);
-      transform: scale(1.1);
-      box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
-    }
-
-    .edgeArrow:active {
-      transform: scale(0.95);
-      background: rgba(0, 0, 0, 0.6);
-    }
-
-    /* ==================== CONTROLS ==================== */
-    .controls {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 14px;
-      margin: 12px auto 16px auto;
-      max-width: 2000px;
-      width: 100%;
-      background: rgba(10, 10, 18, 0.65);
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      box-shadow:
-        0 12px 40px rgba(0, 0, 0, 0.45),
-        inset 0 1px 0 rgba(255, 255, 255, 0.08);
-      backdrop-filter: blur(12px);
-      border-radius: 16px;
-      z-index: 70;
-      flex-shrink: 0;
-      position: relative;
-    }
-
-    .controls .left,
-    .controls .right {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-    }
-
-    .btn {
-      height: 46px;
-      min-width: 46px;
-      padding: 0 14px;
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      background: rgba(255, 255, 255, 0.06);
-      color: var(--text);
-      cursor: pointer;
-      font-family: "Bebas Neue";
-      font-weight: 800;
-      text-transform: uppercase;
-      font-size: 15px;
-      box-shadow: none;
-      transition: all 0.16s ease;
-      border-radius: 10px;
-      letter-spacing: 0.5px;
-      backdrop-filter: blur(4px);
-    }
-
-    .btn:hover {
-      background: rgba(255, 255, 255, 0.12);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-      transform: translateY(-1px);
-      border-color: rgba(255, 255, 255, 0.5);
-    }
-
-    .btn:active {
-      transform: translateY(0);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-    }
-
-    .btn:disabled {
-      opacity: 0.45;
-      cursor: not-allowed;
-      transform: none;
-      box-shadow: none;
-    }
-
-    .btn.primary {
-      font-size: 16px;
-      line-height: 1;
-      padding: 10px 18px;
-      border: 1px solid rgba(255, 255, 255, 0.5);
-      color: var(--bg-dark);
-      background: linear-gradient(135deg, var(--primary), var(--accent));
-      box-shadow: 0 12px 30px rgba(0, 217, 255, 0.3);
-      text-shadow: none;
-      font-weight: 900;
-    }
-
-    .btn.primary:hover {
-      box-shadow: 0 14px 36px rgba(0, 217, 255, 0.35);
-      transform: translateY(-1px);
-    }
-
-    body.fullscreen-active header.topbar {
-      position: fixed;
-      top: 0;
-      left: 0;
-      right: 0;
-      z-index: 210;
-      transition:
-        transform 0.28s ease,
-        opacity 0.28s ease;
-      will-change: transform, opacity;
-      background: linear-gradient(135deg,
-          rgba(10, 10, 18, 0.9),
-          rgba(26, 26, 46, 0.9));
-    }
-
-    body.fullscreen-active .controls {
-      position: fixed;
-      bottom: 20px;
-      left: 50%;
-      transform: translateX(-50%);
-      z-index: 210;
-      transition:
-        transform 0.28s ease,
-        opacity 0.28s ease;
-      will-change: transform, opacity;
-      margin: 0;
-    }
-
-    body.fullscreen-active header.topbar.hidden {
-      transform: translateY(-110%);
-      opacity: 0;
-    }
-
-    body.fullscreen-active .controls.hidden {
-      transform: translateX(-50%) translateY(110%);
-      opacity: 0;
-    }
-
-    /* ==================== STATUS & PROGRESS ==================== */
-    .status {
-      padding: 8px 16px;
-      background: linear-gradient(135deg,
-          rgba(255, 237, 0, 0.15),
-          rgba(255, 237, 0, 0.08));
-      border: 3px solid var(--accent);
-      color: var(--accent);
-      font-family: "Bebas Neue";
-      font-weight: 900;
-      text-transform: uppercase;
-      box-shadow:
-        0 4px 0 rgba(0, 0, 0, 0.3),
-        0 0 15px rgba(255, 237, 0, 0.3);
-      text-shadow: 0 0 8px rgba(255, 237, 0, 0.5);
-      font-size: 16px;
-    }
-
-    .progress-bar {
-      position: absolute;
-      left: 12px;
-      right: 12px;
-      bottom: 0px;
-      height: 6px;
-      background: rgba(255, 255, 255, 0.08);
-      z-index: 50;
-      box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
-      border-radius: 999px;
-      overflow: hidden;
-    }
-
-    .progress-fill {
-      height: 100%;
-      width: 0%;
-      transition: width 0.28s ease-out;
-      background: linear-gradient(90deg, var(--primary), var(--accent));
-      box-shadow: 0 0 12px rgba(0, 0, 0, 0.2);
-      position: relative;
-    }
-
-    .progress-fill::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      right: 0;
-      width: 8px;
-      height: 100%;
-      background: var(--accent);
-      box-shadow: 0 0 10px var(--accent);
-    }
-
-    /* ==================== RESPONSIVE ==================== */
-    /* Respect user's motion preferences */
-    @media (prefers-reduced-motion: reduce) {
-
-      *,
-      *::before,
-      *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-      }
-
-      body::after {
-        animation: none;
-      }
-
-      .logo {
-        animation: none;
-      }
-
-      .title h1 {
-        animation: none;
-      }
-    }
-
-    /* Better keyboard focus indicators */
-    button:focus-visible,
-    select:focus-visible,
-    a:focus-visible,
-    .viewport:focus-visible {
-      outline: 3px solid var(--accent);
-      outline-offset: 2px;
-    }
-
-    /* Skip to content link for accessibility */
-    .skip-to-content {
-      position: absolute;
-      top: -40px;
-      left: 0;
-      background: var(--accent);
-      color: var(--bg-dark);
-      padding: 8px 16px;
-      text-decoration: none;
-      font-weight: bold;
-      z-index: 1000;
-      border-radius: 0 0 4px 0;
-    }
-
-    .skip-to-content:focus {
-      top: 0;
-    }
-
-    /* Keyboard shortcuts help overlay */
-    .shortcuts-overlay {
-      position: fixed;
-      inset: 0;
-      background: rgba(10, 10, 18, 0.97);
-      backdrop-filter: blur(10px);
-      z-index: 300;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-    }
-
-    .shortcuts-overlay.active {
-      display: flex;
-    }
-
-    .shortcuts-panel {
-      background: linear-gradient(180deg,
-          rgba(26, 26, 46, 0.98),
-          rgba(10, 10, 18, 0.98));
-      border: 4px solid var(--primary);
-      padding: 32px;
-      max-width: 600px;
-      width: 100%;
-      max-height: 80vh;
-      overflow-y: auto;
-      box-shadow:
-        0 0 40px rgba(0, 217, 255, 0.5),
-        inset 0 4px 0 rgba(0, 217, 255, 0.1),
-        0 12px 0 rgba(0, 0, 0, 0.5);
-      position: relative;
-    }
-
-    .shortcuts-panel::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 4px;
-      background: linear-gradient(90deg,
-          var(--accent),
-          var(--secondary),
-          var(--primary));
-      z-index: 1;
-    }
-
-    .shortcuts-panel h2 {
-      margin: 0 0 24px 0;
-      font-size: 36px;
-      color: var(--primary);
-      font-family: "Bebas Neue";
-      letter-spacing: 3px;
-      text-shadow:
-        3px 3px 0 rgba(0, 0, 0, 0.5),
-        0 0 20px rgba(0, 217, 255, 0.5);
-      text-transform: uppercase;
-    }
-
-    .shortcuts-grid {
-      display: grid;
-      gap: 16px;
-      margin-bottom: 24px;
-    }
-
-    .shortcut-item {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 14px;
-      background: linear-gradient(135deg,
-          rgba(0, 217, 255, 0.1),
-          rgba(255, 0, 234, 0.08));
-      border: 3px solid rgba(0, 217, 255, 0.3);
-      box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3);
-    }
-
-    .shortcut-key {
-      background: linear-gradient(135deg, var(--bg-dark), var(--bg-panel));
-      border: 3px solid var(--accent);
-      padding: 6px 14px;
-      font-family: "Bebas Neue";
-      color: var(--accent);
-      font-size: 18px;
-      min-width: 90px;
-      text-align: center;
-      box-shadow:
-        0 3px 0 rgba(0, 0, 0, 0.4),
-        0 0 10px rgba(255, 237, 0, 0.3);
-      font-weight: 900;
-    }
-
-    .shortcut-desc {
-      flex: 1;
-      margin-left: 16px;
-      color: var(--text);
-      font-size: 15px;
-      font-weight: 600;
-    }
-
-    .shortcuts-close {
-      width: 100%;
-      padding: 14px;
-      background: linear-gradient(135deg, var(--primary), var(--secondary));
-      color: var(--bg-dark);
-      border: 3px solid var(--accent);
-      font-family: "Bebas Neue";
-      font-size: 20px;
-      cursor: pointer;
-      transition: all 0.2s;
-      box-shadow:
-        0 4px 0 rgba(0, 0, 0, 0.4),
-        0 0 20px rgba(0, 217, 255, 0.5);
-      font-weight: 900;
-      text-transform: uppercase;
-    }
-
-    .shortcuts-close:hover {
-      transform: translateY(-2px);
-      box-shadow:
-        0 6px 0 rgba(0, 0, 0, 0.4),
-        0 0 30px rgba(0, 217, 255, 0.8);
-    }
-
-    .shortcuts-close:active {
-      transform: translateY(0);
-      box-shadow:
-        0 2px 0 rgba(0, 0, 0, 0.4),
-        0 0 20px rgba(0, 217, 255, 0.5);
-    }
-
-    /* End of chapter overlay */
-    .chapter-end-overlay {
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(180deg,
-          rgba(10, 10, 18, 0.98),
-          rgba(26, 26, 46, 0.98));
-      backdrop-filter: blur(8px);
-      z-index: 35;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      padding: 20px;
-      animation: fadeIn 300ms ease-in;
-    }
-
-    .chapter-end-overlay.active {
-      display: flex;
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-      }
-
-      to {
-        opacity: 1;
-      }
-    }
-
-    .chapter-end-content {
-      text-align: center;
-      max-width: 500px;
-      padding: 32px;
-      background: linear-gradient(180deg,
-          rgba(26, 26, 46, 0.9),
-          rgba(10, 10, 18, 0.9));
-      border: 4px solid var(--accent);
-      box-shadow:
-        0 0 40px rgba(255, 237, 0, 0.5),
-        inset 0 4px 0 rgba(255, 237, 0, 0.1),
-        0 12px 0 rgba(0, 0, 0, 0.5);
-      position: relative;
-    }
-
-    .chapter-end-content::before {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 4px;
-      background: linear-gradient(90deg,
-          var(--accent),
-          var(--secondary),
-          var(--primary));
-      z-index: 1;
-    }
-
-    .chapter-end-content h2 {
-      font-family: "Bebas Neue";
-      font-size: 52px;
-      color: var(--accent);
-      margin: 0 0 16px 0;
-      letter-spacing: 4px;
-      text-shadow:
-        4px 4px 0 rgba(0, 0, 0, 0.5),
-        0 0 30px rgba(255, 237, 0, 0.8);
-      text-transform: uppercase;
-      animation: pixelBounce 2s ease-in-out infinite;
-    }
-
-    .chapter-end-content p {
-      font-size: 18px;
-      color: var(--text);
-      margin: 0 0 32px 0;
-      line-height: 1.6;
-      font-weight: 600;
-    }
-
-    .chapter-end-buttons {
-      display: flex;
-      gap: 12px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-
-    .chapter-end-btn {
-      padding: 14px 24px;
-      border: 3px solid var(--primary);
-      background: linear-gradient(135deg,
-          rgba(0, 217, 255, 0.12),
-          rgba(255, 0, 234, 0.08));
-      color: var(--text);
-      font-family: "Bebas Neue";
-      font-size: 18px;
-      cursor: pointer;
-      transition: all 0.2s;
-      text-decoration: none;
-      display: inline-block;
-      box-shadow: 0 4px 0 rgba(0, 0, 0, 0.4);
-      font-weight: 900;
-      text-transform: uppercase;
-    }
-
-    .chapter-end-btn:hover {
-      background: linear-gradient(135deg,
-          rgba(0, 217, 255, 0.2),
-          rgba(255, 0, 234, 0.15));
-      transform: translateY(-2px);
-      box-shadow:
-        0 6px 0 rgba(0, 0, 0, 0.4),
-        0 0 20px rgba(0, 217, 255, 0.5);
-    }
-
-    .chapter-end-btn:active {
-      transform: translateY(0);
-      box-shadow: 0 2px 0 rgba(0, 0, 0, 0.4);
-    }
-
-    .chapter-end-btn.primary {
-      background: linear-gradient(135deg, var(--accent), var(--primary));
-      color: var(--bg-dark);
-      border: 3px solid var(--accent);
-      box-shadow:
-        0 4px 0 rgba(0, 0, 0, 0.5),
-        0 0 25px rgba(255, 237, 0, 0.6);
-    }
-
-    /* Aspect ratio ~7:5 (1.4) or narrower - move panels below viewport */
-    @media (max-aspect-ratio: 7/5) {
-
-      html,
-      body {
-        height: auto;
-        overflow-x: hidden;
-        overflow-y: auto;
-      }
-
-      main {
-        height: auto;
-        overflow: visible;
-      }
-
-      .viewerWrap {
-        flex-direction: row;
-        flex-wrap: wrap;
-        padding: 12px;
-        gap: 12px;
-      }
-
-      /* Wrapper contains viewport + controls, ordered as a unit in mobile layout */
-      .viewer-content-wrapper {
-        order: 1;
-        width: 100%;
-        flex: 0 0 100%;
-      }
-
-      /* Viewport and controls use natural document flow within wrapper */
-      .viewport {
-        width: 100%;
-        height: auto;
-        aspect-ratio: auto;
-        min-height: 50vh;
-      }
-
-      .controls {
-        margin: 12px 0 12px 0;
-        padding: 12px 8px;
-        justify-content: center;
-        flex-wrap: wrap;
-        gap: 8px;
-        max-width: 100%;
-        border-width: 3px;
-      }
-
-      .controls .left,
-      .controls .right {
-        gap: 6px;
-      }
-
-      .side-panel {
-        width: calc(50% - 6px) !important;
-        min-width: 0 !important;
-        max-width: none !important;
-        min-height: auto;
-        flex: 0 0 calc(50% - 6px) !important;
-      }
-
-      .side-panel.left {
-        order: 2;
-        height: auto;
-        min-height: 580px;
-        align-self: stretch;
-      }
-
-      .side-panel.left .left-panel-content {
-        padding: 12px;
-        gap: 8px;
-      }
-
-      .side-panel.left .left-panel-text-top {
-        font-size: 18px;
-      }
-
-      .side-panel.left .left-panel-text-bottom {
-        font-size: 11px;
-      }
-
-      .email-signup-section {
-        gap: 8px;
-        margin-top: 4px;
-      }
-
-      .email-signup-label {
-        font-size: 14px;
-      }
-
-      .email-input {
-        max-width: 100%;
-        font-size: 13px;
-        padding: 8px 10px;
-      }
-
-      .email-submit-btn {
-        font-size: 16px;
-        padding: 8px 24px;
-      }
-
-      .email-signup-cta {
-        font-size: 13px;
-      }
-
-      .side-panel.right {
-        order: 3;
-        flex-direction: column;
-        padding: 12px;
-        height: auto;
-        min-height: 320px;
-        align-self: stretch;
-      }
-
-      .side-panel.right .preview {
-        width: 100%;
-        max-height: 0;
-        height: 0;
-        min-height: 0;
-        margin: 0;
-        display: none;
-      }
-
-      .panel-buttons {
-        flex-direction: column;
-        padding: 0;
-        gap: 8px;
-        min-height: 0;
-        max-height: none;
-        margin-top: 0;
-        flex: 1 1 auto;
-      }
-
-      .panel-btn {
-        flex: 1 1 auto;
-        width: 100%;
-      }
-
-      .edgeZone {
-        width: 18%;
-      }
-    }
-
-    /* Very narrow/portrait - single column layout */
-    @media (max-aspect-ratio: 5/7) {
-      .viewport {
-        min-height: 40vh;
-      }
-
-      .side-panel.left {
-        height: 180px;
-      }
-
-      .side-panel.left .left-panel-content {
-        padding: 8px;
-        gap: 6px;
-      }
-
-      .side-panel.left .left-panel-text-top {
-        font-size: 16px;
-      }
-
-      .side-panel.left .left-panel-text-bottom {
-        font-size: 10px;
-      }
-
-      .email-signup-section {
-        gap: 6px;
-      }
-
-      .email-signup-label {
-        font-size: 12px;
-      }
-
-      .email-input {
-        font-size: 12px;
-        padding: 7px 8px;
-      }
-
-      .email-submit-btn {
-        font-size: 14px;
-        padding: 7px 20px;
-      }
-
-      .email-signup-cta {
-        font-size: 12px;
-      }
-
-      .side-panel.right {
-        flex-direction: column;
-      }
-
-      .side-panel.right .preview {
-        width: 100%;
-        height: 160px;
-      }
-
-      .panel-buttons {
-        flex-direction: column;
-      }
-
-      .panel-btn {
-        flex: 1 1 auto;
-      }
-
-      .controls {
-        padding: 8px 4px;
-        gap: 4px;
-      }
-
-      .controls .left,
-      .controls .right {
-        gap: 3px;
-      }
-
-      .btn {
-        height: 40px;
-        min-width: 40px;
-        padding: 0 8px;
-        font-size: 12px;
-      }
-
-      .btn.primary {
-        padding: 0 10px;
-      }
-
-      .status {
-        font-size: 11px;
-        padding: 6px 6px;
-      }
-    }
-
-    /* Smaller side panels on medium screens */
-    @media (max-width: 1400px) {
-      .side-panel {
-        width: 18vw;
-        min-width: 220px;
-      }
-    }
-
-    @media (max-width: 900px) {
-      .status-panel {
-        padding: 3px 6px;
-        max-width: 170px;
-        font-size: 11px;
-      }
-
-      .status-text {
-        max-width: 120px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
-    }
-
-    @media (max-width: 620px) {
-      .status-panel {
-        max-width: 120px;
-        font-size: 10px;
-      }
-
-      .status-text {
-        max-width: 80px;
-      }
-    }
-  </style>
-</head>
-
-<body>
-  <!-- Skip to content link for accessibility -->
-  <a href="#viewport" class="skip-to-content">Skip to comic</a>
-
-  <!-- ==================== HEADER ==================== -->
-  <header class="topbar" id="topbar">
-    <div class="brand">
-      <div class="logo">BWC</div>
-      <div class="title">
-        <h1>BATTLE BROS</h1>
-        <p class="subtitle" id="subtitle" aria-live="polite"></p>
-      </div>
-    </div>
-    <div class="header-actions">
-      <div class="status-panel" id="statusPanel" aria-label="Status">
-        <span class="status-text" id="statusText"></span><span class="status-cursor" id="statusCursor"
-          aria-hidden="true"></span>
-      </div>
-      <select id="chapter" aria-label="Select chapter"></select>
-		      <div class="nav-links">
-		        <button id="galleryBtn" class="nav-link" aria-label="Open Cover Gallery" title="Cover Gallery">
-		          COVERS
-		        </button>
-		        <a class="nav-link" href="comics.html">Comics</a>
-		        <a class="nav-link" href="media.html">Media</a>
-            <a class="nav-link admin-link" id="adminNavLink" href="admin/" target="_blank" rel="noopener noreferrer"
-              style="display:none;">Admin</a>
-		      </div>
-		    </div>
-		  </header>
-
-  <!-- ==================== MAIN VIEWER ==================== -->
-  <main>
-    <div class="viewerWrap">
-      <!-- Left Preview Panel -->
-      <aside class="side-panel left" id="leftPanel">
-        <div class="left-panel-content">
-          <div class="left-panel-text-top">TO GO EVEN FURTHER BEYOND</div>
-          <div class="preview" id="leftPreview" aria-hidden="false">
-            <picture>
-              <img class="panel-preview-img" src="assets/bookturn.gif" alt="Battle Bros Volume 1 - Get the physical comic!"
-                id="bookTurnPromo" />
-            </picture>
-            <div class="preview-arrow" aria-hidden="true"></div>
-          </div>
-          <div class="left-panel-text-bottom">
-            <span class="bubble-em">WANT TO SUPPORT THE COMIC?</span>
-            <span class="bubble-bold">Buy the physical book</span> at the
-            <a class="bubble-highlight" href="https://bwondercomics.bigcartel.com/product/battle-bros-volume-1"
-              target="_blank" rel="noopener noreferrer" aria-label="bwondercomics store link">bwondercomics store!</a>
-          </div>
-
-          <!-- Email Signup Form -->
-          <div class="email-signup-section">
-            <div class="email-signup-label">JOIN THE EMAIL LIST!</div>
-            <form id="emailSignupForm" action="https://formspree.io/f/xjkjkvla" method="POST" class="email-signup-form">
-              <input type="email" name="email" id="emailInput" placeholder="your.email@example.com" required
-                class="email-input" aria-label="Email address" />
-              <button type="submit" class="email-submit-btn">SUBMIT</button>
-            </form>
-            <div class="email-signup-cta">
-              Occasional dispatches from the Bros: updates, art, that’s it.
-            </div>
-            <div id="emailFormMessage" class="email-form-message" style="display: none"></div>
-          </div>
+    <link rel="stylesheet" href="reader/comic-comments.css" />
+    <link rel="stylesheet" href="assets/css/variables.css" />
+
+    <link rel="stylesheet" href="assets/css/main.css" />
+  </head>
+
+  <body>
+    <!-- Skip to content link for accessibility -->
+    <a href="#viewport" class="skip-to-content">Skip to comic</a>
+
+    <!-- ==================== HEADER ==================== -->
+    <header class="topbar" id="topbar">
+      <div class="brand">
+        <div class="logo">BWC</div>
+        <div class="title">
+          <h1>BATTLE BROS</h1>
+          <p class="subtitle" id="subtitle" aria-live="polite"></p>
         </div>
-      </aside>
+      </div>
+      <div class="patron-welcome" id="patronWelcome" role="status" aria-live="polite"></div>
+      <div class="header-actions">
+        <div class="status-panel" id="statusPanel" aria-label="Status">
+          <span class="status-text" id="statusText"></span
+          ><span class="status-cursor" id="statusCursor" aria-hidden="true"></span>
+        </div>
+        <div class="entry-controls">
+          <div class="entry-select" id="entrySelect">
+            <button
+              class="entry-select-trigger"
+              id="entrySelectTrigger"
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded="false"
+            >
+              <span class="entry-select-name" id="entrySelectName">Entry</span>
+              <span class="entry-select-patron" id="entrySelectPatron" style="display: none"
+                >Patron</span
+              >
+            </button>
+            <div
+              class="entry-select-menu"
+              id="entrySelectMenu"
+              role="listbox"
+              aria-label="Select entry"
+            ></div>
+          </div>
+          <button
+            id="entryCoverGalleryBtn"
+            class="entry-covers-btn"
+            aria-label="Open Cover Gallery"
+            title="Cover Gallery"
+          >
+            COVERS
+          </button>
+        </div>
+        <select id="entry" class="entry-select-native" aria-label="Select entry"></select>
+        <div class="nav-links">
+          <a class="nav-link" href="comics.html">Comics</a>
+          <a
+            class="nav-link admin-link"
+            id="adminNavLink"
+            href="admin/"
+            target="_blank"
+            rel="noopener noreferrer"
+            style="display: none"
+            >Admin</a
+          >
+        </div>
+      </div>
+    </header>
 
-      <!-- Viewport and Controls Wrapper -->
-      <div class="viewer-content-wrapper" id="mainContent">
-        <!-- Main Viewport -->
-        <section class="viewport" id="viewport" tabindex="0" aria-label="Comic viewport">
-          <div class="stageWrap" id="stageWrap">
-            <div class="stage" id="stage">
-              <!-- Left Page -->
-              <div class="page" id="leftPage" role="img" aria-hidden="false">
-                <div class="spinner" id="leftSpinner" style="display: none"></div>
-                <img id="leftImg" src="" alt="" draggable="false" loading="lazy" />
+    <!-- ==================== MAIN VIEWER ==================== -->
+    <main>
+      <div class="viewerWrap">
+        <!-- Left Preview Panel -->
+        <aside class="side-panel left" id="leftPanel">
+          <div class="left-panel-content">
+            <div class="left-panel-text-top">TO GO EVEN FURTHER BEYOND</div>
+            <div class="preview" id="leftPreview" aria-hidden="false">
+              <picture>
+                <img
+                  class="panel-preview-img"
+                  src="assets/bookturn.gif"
+                  alt="Battle Bros Volume 1 - Get the physical comic!"
+                  id="bookTurnPromo"
+                />
+              </picture>
+              <div class="preview-arrow" aria-hidden="true"></div>
+            </div>
+            <div class="left-panel-text-bottom">
+              <span class="bubble-em">WANT TO SUPPORT THE COMIC?</span>
+              <span class="bubble-bold">Buy the physical book</span> at the
+              <a
+                class="bubble-highlight"
+                href="https://bwondercomics.bigcartel.com/product/battle-bros-volume-1"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="bwondercomics store link"
+                >bwondercomics store!</a
+              >
+            </div>
+
+            <!-- Email Signup Form -->
+            <div class="email-signup-section">
+              <div class="email-signup-label">JOIN THE EMAIL LIST!</div>
+              <form
+                id="emailSignupForm"
+                action="/api/email/subscribe"
+                method="POST"
+                class="email-signup-form"
+                data-source="homepage"
+              >
+                <input
+                  type="email"
+                  name="email"
+                  id="emailInput"
+                  placeholder="your.email@example.com"
+                  required
+                  class="email-input"
+                  aria-label="Email address"
+                />
+                <button type="submit" class="email-submit-btn">SUBMIT</button>
+              </form>
+              <div class="email-signup-cta">
+                Occasional dispatches from the Bros: updates, art, that’s it.
               </div>
-
-              <!-- Right Page (two-page mode) -->
-              <div class="page" id="rightPage" aria-hidden="true" style="display: none">
-                <div class="spinner" id="rightSpinner" style="display: none"></div>
-                <img id="rightImg" src="" alt="" draggable="false" loading="lazy" />
-              </div>
-            </div>
-
-            <div class="flashOverlay" id="flashOverlay" aria-hidden="true"></div>
-          </div>
-
-          <!-- Edge Navigation Zones -->
-          <div class="edgeZone left" id="edgeLeft" aria-hidden="true">
-            <div class="edgeArrow" id="edgeLeftBtn" title="Previous page" role="button" aria-label="Previous page">
-              <svg viewBox="0 0 24 24" width="22" height="22">
-                <path fill="currentColor" d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
-              </svg>
+              <div id="emailFormMessage" class="email-form-message" style="display: none"></div>
             </div>
           </div>
-          <div class="edgeZone right" id="edgeRight" aria-hidden="true">
-            <div class="edgeArrow" id="edgeRightBtn" title="Next page" role="button" aria-label="Next page">
-              <svg viewBox="0 0 24 24" width="22" height="22">
-                <path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z" />
-              </svg>
-            </div>
-          </div>
-        </section>
+        </aside>
 
-        <!-- ==================== CONTROLS ==================== -->
-        <div class="controls" id="controls" role="toolbar" aria-label="Reader controls">
-          <div class="left">
-            <button class="btn" id="prevBtn" type="button" aria-label="Previous page">
-              &lt; BACK
-            </button>
-            <button class="btn" id="nextBtn" type="button" aria-label="Next page">
-              NEXT &gt;
-            </button>
-            <span class="status" id="pageIndicator" aria-live="polite">PAGE 0 / 0</span>
-          </div>
-          <div class="right">
-            <button class="btn" id="helpBtn" type="button" aria-label="Show keyboard shortcuts"
-              title="Keyboard shortcuts (?)">
-              HELP ?
-            </button>
-            <button class="btn" id="commentToggleBtn" type="button" aria-label="Show comments">
-              COMMENTS
-            </button>
-            <button class="btn" id="zoomOut" type="button" aria-label="Zoom out">
-              - ZOOM
-            </button>
-            <button class="btn primary" id="fitBtn" type="button" aria-label="Fit">
-              FIT
-            </button>
-            <button class="btn" id="zoomIn" type="button" aria-label="Zoom in">
-              + ZOOM
-            </button>
-            <button class="btn" id="fullscreenBtn" type="button" aria-label="Toggle fullscreen">
-              FULL
-            </button>
-          </div>
-          <div class="progress-bar" aria-hidden="true">
-            <div class="progress-fill" id="progressFill"></div>
-          </div>
-        </div>
-
-        <!-- Comic Chapter Comments -->
-        <div class="comic-comments-section collapsed" id="comicCommentsSection">
-          <h3 class="comments-title">Discuss This Chapter</h3>
-          <div class="comment-placeholder">Loading comments...</div>
-        </div>
-        </div>
-
-      </div>
-      <!-- End viewer-content-wrapper -->
-
-      <!-- Right Preview Panel -->
-      <aside class="side-panel right" id="rightPanel">
-        <div class="latest-update" id="latestUpdate">
-          <div class="latest-heading-row">
-            <div class="latest-heading">BWC FEED</div>
-            <div class="latest-author">DOYLE MELVILLE II</div>
-          </div>
-          <div class="latest-body" id="latestBody">
-            <div class="latest-loading">Loading...</div>
-          </div>
-        </div>
-
-        <div class="right-stack">
-          <div class="preview" id="rightPreview" aria-hidden="false">
-            <picture>
-              <source srcset="assets/banner3.png" type="image/webp" />
-              <img class="panel-preview-img" src="assets/banner3.png" alt="Right illustration preview" />
-            </picture>
-          </div>
-          <div class="panel-buttons" id="dynamicButtons">
-            <div class="comicnet-panel" id="comicNetPanel">
-              <h4>Indie Comics</h4>
-              <div class="comicnet-list">
-                <div class="comicnet-item">
-                  <a class="comicnet-link" href="https://www.steve-hogan.com/comics" target="_blank"
-                    rel="noopener noreferrer">
-                    <img class="comicnet-avatar" src="com1cshare/steve.jpg" alt="Steve Hogan cover" />
-                    <span>MILKY ZEST by Steve Hogan</span>
-                  </a>
+        <!-- Viewport and Controls Wrapper -->
+        <div class="viewer-content-wrapper" id="mainContent">
+          <!-- Main Viewport -->
+          <section class="viewport" id="viewport" tabindex="0" aria-label="Comic viewport">
+            <div class="stageWrap" id="stageWrap">
+              <div class="stage" id="stage">
+                <!-- Left Page -->
+                <div class="page" id="leftPage" role="img" aria-hidden="false">
+                  <div class="spinner" id="leftSpinner" style="display: none"></div>
+                  <img id="leftImg" src="" alt="" draggable="false" loading="lazy" />
                 </div>
-                <div class="comicnet-item">
-                  <a class="comicnet-link" href="https://kideastwood.blogspot.com/" target="_blank"
-                    rel="noopener noreferrer">
-                    <img class="comicnet-avatar" src="com1cshare/connor.jpg" alt="Connor Tierney cover" />
-                    <span>KID EASTWOOD by Connor Tierney</span>
-                  </a>
+
+                <!-- Right Page (two-page mode) -->
+                <div class="page" id="rightPage" aria-hidden="true" style="display: none">
+                  <div class="spinner" id="rightSpinner" style="display: none"></div>
+                  <img id="rightImg" src="" alt="" draggable="false" loading="lazy" />
+                </div>
+              </div>
+
+              <div class="flashOverlay" id="flashOverlay" aria-hidden="true"></div>
+            </div>
+
+            <!-- Edge Navigation Zones -->
+            <div class="edgeZone left" id="edgeLeft" aria-hidden="true">
+              <div
+                class="edgeArrow"
+                id="edgeLeftBtn"
+                title="Previous page"
+                role="button"
+                aria-label="Previous page"
+              >
+                <svg viewBox="0 0 24 24" width="22" height="22">
+                  <path fill="currentColor" d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z" />
+                </svg>
+              </div>
+            </div>
+            <div class="edgeZone right" id="edgeRight" aria-hidden="true">
+              <div
+                class="edgeArrow"
+                id="edgeRightBtn"
+                title="Next page"
+                role="button"
+                aria-label="Next page"
+              >
+                <svg viewBox="0 0 24 24" width="22" height="22">
+                  <path fill="currentColor" d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6z" />
+                </svg>
+              </div>
+            </div>
+          </section>
+
+          <!-- ==================== CONTROLS ==================== -->
+          <div class="controls" id="controls" role="toolbar" aria-label="Reader controls">
+            <div class="left">
+              <button class="btn" id="prevBtn" type="button" aria-label="Previous page">
+                &lt; BACK
+              </button>
+              <button class="btn" id="nextBtn" type="button" aria-label="Next page">
+                NEXT &gt;
+              </button>
+              <span class="status" id="pageIndicator" aria-live="polite">PAGE 0 / 0</span>
+            </div>
+            <div class="right">
+              <button
+                class="btn"
+                id="helpBtn"
+                type="button"
+                aria-label="Show keyboard shortcuts"
+                title="Keyboard shortcuts (?)"
+              >
+                HELP ?
+              </button>
+              <button class="btn" id="commentToggleBtn" type="button" aria-label="Show comments">
+                COMMENTS
+              </button>
+              <button class="btn" id="zoomOut" type="button" aria-label="Zoom out">- ZOOM</button>
+              <button class="btn primary" id="fitBtn" type="button" aria-label="Fit">FIT</button>
+              <button class="btn" id="zoomIn" type="button" aria-label="Zoom in">+ ZOOM</button>
+              <button class="btn" id="fullscreenBtn" type="button" aria-label="Toggle fullscreen">
+                FULL
+              </button>
+            </div>
+            <div class="progress-bar" aria-hidden="true">
+              <div class="progress-fill" id="progressFill"></div>
+            </div>
+          </div>
+
+          <!-- Comic Entry Comments -->
+          <div class="comic-comments-section collapsed" id="comicCommentsSection">
+            <h3 class="comments-title">Discuss This Entry</h3>
+            <div class="comment-placeholder">Loading comments...</div>
+          </div>
+        </div>
+
+        <!-- End viewer-content-wrapper -->
+
+        <!-- Right Preview Panel -->
+        <aside class="side-panel right" id="rightPanel">
+          <div class="right-panel-feed-bar" id="rightPanelFeedBar" aria-hidden="true">
+            <button class="feed-exit-btn" id="feedExitBtn" type="button" aria-label="Close feed">
+              X
+            </button>
+            <div class="latest-actions">
+              <a class="latest-link latest-link--left" id="rightPanelOpenFeed" href="feed.html"
+                >Open feed</a
+              >
+              <a class="latest-link latest-link--right" id="rightPanelOpenMedia" href="media.html"
+                >Media</a
+              >
+            </div>
+          </div>
+          <div class="latest-update" id="latestUpdate">
+            <div class="latest-heading-row">
+              <button
+                class="latest-heading"
+                id="latestHeadingBtn"
+                type="button"
+                aria-expanded="false"
+                aria-controls="rightPanelFeed"
+              >
+                BWC FEED
+              </button>
+              <div class="latest-author">DOYLE MELVILLE II</div>
+            </div>
+            <div class="latest-body" id="latestBody">
+              <div class="latest-loading">Loading...</div>
+            </div>
+          </div>
+          <div class="latest-update right-panel-feed" id="rightPanelFeed" aria-hidden="true">
+            <div class="latest-body" id="rightPanelFeedBody">
+              <div class="latest-loading">Loading...</div>
+            </div>
+          </div>
+
+          <div class="right-stack">
+            <div class="preview" id="rightPreview" aria-hidden="false">
+              <picture>
+                <source srcset="assets/banner3.png" type="image/webp" />
+                <img
+                  class="panel-preview-img"
+                  src="assets/banner3.png"
+                  alt="Right illustration preview"
+                />
+              </picture>
+            </div>
+            <div class="panel-buttons" id="dynamicButtons">
+              <div class="comicnet-panel" id="comicNetPanel">
+                <h4>Indie Comics</h4>
+                <div class="comicnet-list">
+                  <div class="comicnet-item">
+                    <a
+                      class="comicnet-link"
+                      href="https://www.steve-hogan.com/comics"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <img
+                        class="comicnet-avatar"
+                        src="com1cshare/steve.jpg"
+                        alt="Steve Hogan cover"
+                      />
+                      <span>MILKY ZEST by Steve Hogan</span>
+                    </a>
+                  </div>
+                  <div class="comicnet-item">
+                    <a
+                      class="comicnet-link"
+                      href="https://kideastwood.blogspot.com/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <img
+                        class="comicnet-avatar"
+                        src="com1cshare/connor.jpg"
+                        alt="Connor Tierney cover"
+                      />
+                      <span>KID EASTWOOD by Connor Tierney</span>
+                    </a>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-    </div>
-    </aside>
-    </div>
-  </main>
-
-  <!-- Cover Gallery Overlay -->
-  <div class="gallery-overlay" id="galleryOverlay">
-    <div class="gallery-panel">
-      <h2>Cover Gallery</h2>
-      <div class="gallery-grid" id="galleryGrid">
-        <!-- Chapter cards populated by JS -->
+          <button
+            class="user-settings-btn"
+            id="userSettingsBtn"
+            type="button"
+            aria-label="Account settings"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path
+                fill="currentColor"
+                d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.08 7.08 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.75 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.14.24.43.34.69.22l2.39-.96c.5.4 1.05.71 1.63.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.26.12.55.02.69-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"
+              />
+            </svg>
+          </button>
+          <button class="links-grid-btn" id="linksGridBtn" type="button" aria-label="Show links">
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+        </aside>
       </div>
-      <button class="gallery-close" id="galleryClose">Close</button>
-    </div>
-  </div>
+    </main>
 
-  <!-- Keyboard Shortcuts Overlay -->
-  <div class="shortcuts-overlay" id="shortcutsOverlay">
-    <div class="shortcuts-panel">
-      <h2>Keyboard Shortcuts</h2>
-      <div class="shortcuts-grid">
-        <div class="shortcut-item">
-          <span class="shortcut-key">Left / Right</span>
-          <span class="shortcut-desc">Navigate between pages</span>
+    <!-- Cover Gallery Overlay -->
+    <div class="entry-cover-gallery" id="entryCoverGallery">
+      <div class="entry-cover-gallery-panel">
+        <h2>Cover Gallery</h2>
+        <div class="entry-cover-gallery-grid" id="entryCoverGalleryGrid">
+          <!-- Entry cards populated by JS -->
         </div>
-        <div class="shortcut-item">
-          <span class="shortcut-key">+ / =</span>
-          <span class="shortcut-desc">Zoom in</span>
-        </div>
-        <div class="shortcut-item">
-          <span class="shortcut-key">-</span>
-          <span class="shortcut-desc">Zoom out</span>
-        </div>
-        <div class="shortcut-item">
-          <span class="shortcut-key">0</span>
-          <span class="shortcut-desc">Reset zoom to default</span>
-        </div>
-        <div class="shortcut-item">
-          <span class="shortcut-key">F</span>
-          <span class="shortcut-desc">Toggle fullscreen mode</span>
-        </div>
-        <div class="shortcut-item">
-          <span class="shortcut-key">?</span>
-          <span class="shortcut-desc">Show/hide this help</span>
-        </div>
-        <div class="shortcut-item">
-          <span class="shortcut-key">ESC</span>
-          <span class="shortcut-desc">Close overlays or exit fullscreen</span>
-        </div>
-      </div>
-      <button class="shortcuts-close" id="shortcutsClose">Close</button>
-    </div>
-  </div>
-
-  <!-- End of Chapter Overlay -->
-  <div class="chapter-end-overlay" id="chapterEndOverlay">
-    <div class="chapter-end-content">
-      <h2>CHAPTER COMPLETE</h2>
-      <p>
-        You've reached the end of this chapter! Ready for more Battle Bros
-        action?
-      </p>
-      <div class="chapter-end-buttons">
-        <button class="chapter-end-btn primary" id="nextChapterBtn">
-          Next Chapter
-        </button>
-        <button class="chapter-end-btn" id="restartChapterBtn">
-          Restart Chapter
-        </button>
-        <button class="chapter-end-btn" id="closeEndOverlay">
-          Keep Reading
-        </button>
+        <button class="entry-cover-gallery-close" id="entryCoverGalleryClose">Close</button>
       </div>
     </div>
-  </div>
 
-  <script type="module" src="reader/app.js"></script>
-  <script type="module" src="reader/customization.js"></script>
-  <script type="module" src="reader/comic-comments.js"></script>
-  <script>
-    // Wrap button text characters so hover can animate each letter
-    (() => {
-      const wrapLetters = (el) => {
-        if (!el || el.dataset.wrapped === "true") return;
-        const chars = el.textContent.split("");
-        el.innerHTML = chars
-          .map((ch) => `<span>${ch === " " ? "&nbsp;" : ch}</span>`)
-          .join("");
-        el.dataset.wrapped = "true";
-      };
+    <!-- User Settings Overlay -->
+    <div class="user-settings-overlay" id="userSettingsOverlay" aria-hidden="true">
+      <div
+        class="user-settings-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="userSettingsTitle"
+      >
+        <div class="user-settings-header">
+          <h2 id="userSettingsTitle">Account Settings</h2>
+          <button class="user-settings-close" id="userSettingsClose" type="button">Close</button>
+        </div>
+        <div class="user-settings-status" id="userSettingsStatus" role="status"></div>
 
-      const wrapAll = () => {
-        document.querySelectorAll(".panel-btn-text").forEach(wrapLetters);
-      };
+        <div id="userSettingsAuth">
+          <p class="user-settings-note">Sign in to manage your account.</p>
+          <form class="user-settings-form" id="userSettingsLoginForm">
+            <input
+              class="user-settings-input"
+              type="email"
+              id="userSettingsLoginEmail"
+              placeholder="Email"
+              autocomplete="email"
+              required
+            />
+            <input
+              class="user-settings-input"
+              type="password"
+              id="userSettingsLoginPassword"
+              placeholder="Password"
+              autocomplete="current-password"
+              required
+            />
+            <button class="btn primary" type="submit">Sign in</button>
+          </form>
+        </div>
 
-      const observeButtons = () => {
-        const container = document.querySelector(".panel-buttons");
-        if (!container) return;
-        const observer = new MutationObserver(() => wrapAll());
-        observer.observe(container, { childList: true, subtree: true });
-      };
+        <div id="userSettingsContent" style="display: none">
+          <div class="user-settings-section" style="margin-top: 0; padding-top: 0; border-top: 0">
+            <div class="user-settings-label">Signed in as</div>
+            <div class="user-settings-value" id="userSettingsIdentity">-</div>
+            <div class="user-settings-note" id="userSettingsRole">Role: user</div>
+            <div
+              class="user-settings-supporter"
+              id="userSettingsSupporterBadge"
+              style="display: none"
+            >
+              Premium supporter
+            </div>
+          </div>
 
-      if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", () => {
+          <div class="user-settings-section">
+            <div class="user-settings-label">Email list</div>
+            <label class="user-settings-toggle">
+              <input type="checkbox" id="userSettingsEmailOptIn" />
+              <span>Receive email updates</span>
+            </label>
+            <div class="user-settings-note" id="userSettingsEmailStatus">Not subscribed.</div>
+          </div>
+
+          <div class="user-settings-section">
+            <div class="user-settings-label">Premium code</div>
+            <input
+              class="user-settings-input"
+              type="text"
+              id="userSettingsPremiumCode"
+              placeholder="Enter Patreon code"
+              autocomplete="off"
+            />
+            <div class="user-settings-actions">
+              <button class="btn" id="userSettingsRedeem" type="button">Redeem code</button>
+            </div>
+            <div class="user-settings-note" id="userSettingsPremiumStatus">
+              Premium access: inactive.
+            </div>
+          </div>
+
+          <div class="user-settings-section">
+            <div class="user-settings-label">Your comments</div>
+            <div class="user-settings-note" id="userSettingsCommentCount">You have 0 comments.</div>
+            <div class="user-settings-comments" id="userSettingsCommentsList"></div>
+            <div class="user-settings-note" id="userSettingsCommentsEmpty">No comments yet.</div>
+            <div class="user-settings-actions">
+              <button class="btn" id="userSettingsLoadMore" type="button">Load more</button>
+              <button
+                class="btn user-settings-danger"
+                id="userSettingsDeleteComments"
+                type="button"
+              >
+                Delete all comments
+              </button>
+            </div>
+          </div>
+
+          <div class="user-settings-section">
+            <div class="user-settings-label">Account</div>
+            <div class="user-settings-actions">
+              <button class="btn" id="userSettingsLogout" type="button">Sign out</button>
+              <button class="btn user-settings-danger" id="userSettingsDeleteAccount" type="button">
+                Delete account
+              </button>
+            </div>
+            <div class="user-settings-note">
+              Deleting your account removes your comments and email signup.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Overlay -->
+    <div class="shortcuts-overlay" id="shortcutsOverlay">
+      <div class="shortcuts-panel">
+        <h2>Keyboard Shortcuts</h2>
+        <div class="shortcuts-grid">
+          <div class="shortcut-item">
+            <span class="shortcut-key">Left / Right</span>
+            <span class="shortcut-desc">Navigate between pages</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">+ / =</span>
+            <span class="shortcut-desc">Zoom in</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">-</span>
+            <span class="shortcut-desc">Zoom out</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">0</span>
+            <span class="shortcut-desc">Reset zoom to default</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">F</span>
+            <span class="shortcut-desc">Toggle fullscreen mode</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">?</span>
+            <span class="shortcut-desc">Show/hide this help</span>
+          </div>
+          <div class="shortcut-item">
+            <span class="shortcut-key">ESC</span>
+            <span class="shortcut-desc">Close overlays or exit fullscreen</span>
+          </div>
+        </div>
+        <button class="shortcuts-close" id="shortcutsClose">Close</button>
+      </div>
+    </div>
+
+    <!-- End of Entry Overlay -->
+    <div class="entry-end-overlay" id="entryEndOverlay">
+      <div class="entry-end-content">
+        <h2>ENTRY COMPLETE</h2>
+        <p>You've reached the end of this entry! Ready for more Battle Bros action?</p>
+        <div class="entry-end-buttons">
+          <button class="entry-end-btn primary" id="nextEntryBtn">Next Entry</button>
+          <button class="entry-end-btn" id="restartEntryBtn">Restart Entry</button>
+          <button class="entry-end-btn" id="closeEndOverlay">Keep Reading</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Core reader modules -->
+    <script type="module" src="reader/safe-mode.js"></script>
+    <script type="module" src="reader/live-tracking.js"></script>
+    <script type="module" src="reader/chat-sso.js"></script>
+    <script type="module" src="reader/app.js"></script>
+    <script type="module" src="reader/customization.js"></script>
+    <script type="module" src="reader/comic-comments.js"></script>
+    <script type="module" src="reader/user-settings.js"></script>
+    <!-- comic-comments.js is loaded on page load so the panel can initialize reliably. -->
+    <script>
+      // Wrap button text characters so hover can animate each letter
+      (() => {
+        const wrapLetters = (el) => {
+          if (!el || el.dataset.wrapped === 'true') return;
+          const chars = el.textContent.split('');
+          el.innerHTML = chars.map((ch) => `<span>${ch === ' ' ? '&nbsp;' : ch}</span>`).join('');
+          el.dataset.wrapped = 'true';
+        };
+
+        const wrapAll = () => {
+          document.querySelectorAll('.panel-btn-text').forEach(wrapLetters);
+        };
+
+        const observeButtons = () => {
+          const container = document.querySelector('.panel-buttons');
+          if (!container) return;
+          // Keep new buttons animated if the list changes at runtime.
+          const observer = new MutationObserver(() => wrapAll());
+          observer.observe(container, { childList: true, subtree: true });
+        };
+
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', () => {
+            wrapAll();
+            observeButtons();
+            setTimeout(wrapAll, 200);
+          });
+        } else {
           wrapAll();
           observeButtons();
           setTimeout(wrapAll, 200);
-        });
-      } else {
-        wrapAll();
-        observeButtons();
-        setTimeout(wrapAll, 200);
-      }
-    })();
+        }
+      })();
+    </script>
+    <script>
+      // Reader comments toggle button
+      (() => {
+        const bind = () => {
+          const btn = document.getElementById('commentToggleBtn');
+          const panel = document.getElementById('comicCommentsSection');
+          if (!btn || !panel) return;
 
-  </script>
-  <script>
-    // Reader comments toggle button (robust fallback)
-    (() => {
-      const bind = () => {
-        const btn = document.getElementById("commentToggleBtn");
-        const panel = document.getElementById("comicCommentsSection");
-        if (!btn || !panel) return;
+          const fallbackToggle = () => {
+            // Minimal toggle to avoid blocking the button if comments script fails.
+            const willShow = panel.classList.contains('collapsed');
+            panel.classList.toggle('collapsed', !willShow);
+            btn.textContent = willShow ? 'HIDE COMMENTS' : 'COMMENTS';
+            btn.setAttribute('aria-pressed', String(willShow));
+            if (willShow) {
+              try {
+                panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              } catch (err) {}
+            }
+          };
 
-        const fallbackToggle = () => {
-          const willShow = panel.classList.contains("collapsed");
-          panel.classList.toggle("collapsed", !willShow);
-          btn.textContent = willShow ? "HIDE COMMENTS" : "COMMENTS";
-          btn.setAttribute("aria-pressed", String(willShow));
-          if (willShow) {
-            try {
-              panel.scrollIntoView({ behavior: "smooth", block: "center" });
-            } catch (err) { }
-          }
-        };
+          btn.addEventListener('click', async (e) => {
+            e.preventDefault();
 
-        btn.addEventListener("click", (e) => {
-          e.preventDefault();
-          if (typeof window.toggleReaderComments === "function") {
-            try {
-              window.toggleReaderComments();
-            } catch (err) {
+            // Toggle comments
+            if (typeof window.toggleReaderComments === 'function') {
+              try {
+                window.toggleReaderComments();
+              } catch (err) {
+                fallbackToggle();
+              }
+            } else {
               fallbackToggle();
             }
-          } else {
-            fallbackToggle();
+          });
+        };
+
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', bind);
+        } else {
+          bind();
+        }
+      })();
+    </script>
+    <script>
+      // Optional deep-link behavior: open comments when openComments=1|true|yes.
+      (() => {
+        const params = new URLSearchParams(window.location.search || '');
+        const flag = (params.get('openComments') || '').toLowerCase();
+        if (!['1', 'true', 'yes'].includes(flag)) return;
+
+        const tryOpenComments = () => {
+          const panel = document.getElementById('comicCommentsSection');
+          const btn = document.getElementById('commentToggleBtn');
+          if (!panel || !btn) return false;
+
+          if (panel.classList.contains('collapsed')) {
+            if (typeof window.toggleReaderComments === 'function') {
+              try {
+                window.toggleReaderComments();
+              } catch (err) {
+                btn.click();
+              }
+            } else {
+              btn.click();
+            }
           }
-        });
-      };
 
-      if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", bind);
-      } else {
-        bind();
-      }
-    })();
-  </script>
-  <script defer src="/analytics.js"></script>
-</body>
+          try {
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          } catch (err) {}
+          return true;
+        };
 
+        const waitForReady = () => {
+          const deadline = Date.now() + 5000;
+          const tick = () => {
+            if (tryOpenComments()) return;
+            if (Date.now() < deadline) {
+              window.requestAnimationFrame(tick);
+            }
+          };
+          tick();
+        };
+
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', waitForReady, { once: true });
+        } else {
+          waitForReady();
+        }
+      })();
+    </script>
+    <script>
+      // Load the analytics loader without Vite bundling it.
+      (() => {
+        const script = document.createElement('script');
+        script.defer = true;
+        script.src = '/analytics.js';
+        document.head.appendChild(script);
+      })();
+    </script>
+  </body>
 </html>

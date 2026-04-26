@@ -17,18 +17,21 @@ The Manager agent serves as a coordination layer for complex development tasks i
 ## Responsibilities
 
 ### Context Management
+
 - Maintains awareness of ongoing tasks across the repository
 - Tracks relationships between issues, pull requests, and features
 - Preserves important context when tasks span multiple sessions
 - Documents decisions and their rationale for future reference
 
 ### Task Coordination
+
 - Breaks down large features into manageable subtasks
 - Identifies dependencies between different work items
 - Coordinates handoffs between different specialized agents
 - Ensures all agents have access to relevant repository context
 
 ### Progress Tracking
+
 - Monitors completion status of multi-step tasks
 - Identifies blockers or bottlenecks in workflows
 - Provides status updates on complex initiatives
@@ -37,6 +40,7 @@ The Manager agent serves as a coordination layer for complex development tasks i
 ## When to Use
 
 Invoke the Manager agent when:
+
 - Working on features that span multiple components or files
 - Coordinating work that involves multiple team members or agents
 - Breaking down epic-level issues into smaller tasks
@@ -64,6 +68,7 @@ Invoke the Manager agent when:
 ## Integration with Other Agents
 
 The Manager agent works alongside other specialized agents by:
+
 - Delegating specific tasks to domain experts
 - Collecting results and maintaining overall context
 - Ensuring consistency across different workstreams

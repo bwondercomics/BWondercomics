@@ -9,5 +9,5 @@
 - Error/observability: surface fetch/save failures in the UI; add structured logging in `server.py`; optional client error endpoint.
 - Testing: add smoke tests for reader interactions, API endpoint tests, and JSON schema checks for data files.
 - Accessibility: audit focus/ARIA for overlays, edge zones, controls; offer reduced-motion toggle.
-- Code maintainability: split monolithic JS into modules, lint/format; remove legacy patch scripts if unused.
+- Code maintainability: split monolithic JS into modules, lint/format; remove old patch scripts if unused.
 - Deploy hygiene: fix `robots.txt`/`sitemap.xml` domain/paths; keep a pre-deploy checklist (auth/HTTPS/CSP/cache) in docs.

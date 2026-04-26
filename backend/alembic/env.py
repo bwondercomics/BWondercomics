@@ -8,7 +8,6 @@ from pathlib import Path
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
@@ -18,10 +17,9 @@ if config.config_file_name is not None:
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT))
 
+from backend.app import models  # noqa: F401,E402
 from backend.app.db import Base  # noqa: E402
 from backend.app.settings import settings  # noqa: E402
-from backend.app import models  # noqa: F401,E402
-
 
 target_metadata = Base.metadata
 
@@ -68,4 +66,3 @@ if context.is_offline_mode():
     run_migrations_offline()
 else:
     run_migrations_online()
-

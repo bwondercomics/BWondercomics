@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..series_store import series_data_payload, series_index_payload
 
-
 router = APIRouter()
 
 
@@ -25,3 +24,33 @@ def admin_default_series_data(db: Session = Depends(get_db)):
 def admin_series_data(series_id: str, db: Session = Depends(get_db)):
     return JSONResponse(content=series_data_payload(db, series_id))
 
+
+@router.get("/series.json")
+def public_series_index(db: Session = Depends(get_db)):
+    return JSONResponse(content=series_index_payload(db))
+
+
+@router.get("/data.json")
+def public_default_series_data(db: Session = Depends(get_db)):
+    return JSONResponse(content=series_data_payload(db, "battle-bros"))
+
+
+@router.get("/series/{series_id}/data.json")
+def public_series_data(series_id: str, db: Session = Depends(get_db)):
+    return JSONResponse(content=series_data_payload(db, series_id))
+
+
+@router.get("/api/admin/series/{series_id}/data")
+@router.get("/api/admin/series/{series_id}/data.json")
+def admin_series_data_api(series_id: str, db: Session = Depends(get_db)):
+    return JSONResponse(content=series_data_payload(db, series_id))
+
+
+@router.get("/api/admin/series.json")
+def admin_series_index_api(db: Session = Depends(get_db)):
+    return JSONResponse(content=series_index_payload(db))
+
+
+@router.get("/api/admin/data.json")
+def admin_default_series_data_api(db: Session = Depends(get_db)):
+    return JSONResponse(content=series_data_payload(db, "battle-bros"))

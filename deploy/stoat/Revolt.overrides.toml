@@ -1,0 +1,28 @@
+[hosts]
+app = "https://chat.bwondercomics.com"
+api = "https://chat.bwondercomics.com/api"
+events = "wss://chat.bwondercomics.com/ws"
+autumn = "https://chat.bwondercomics.com/autumn"
+january = "https://chat.bwondercomics.com/january"
+
+[hosts.livekit]
+main = "wss://chat.bwondercomics.com/livekit"
+
+[api.livekit]
+call_ring_duration = 30
+
+[api.livekit.nodes.main]
+url = "http://bwondercomics-api:8000/livekit-twirp"
+lat = 37.7749
+lon = -122.4194
+key = "lk_8f208e977e1778c6"
+secret = "c6400a89d0c8cc7c244bcc0d2a4b715534e7be2fcc2862acec4b43421167895e"
+
+[files.s3]
+# MinIO on the compose network uses path-style buckets.
+endpoint = "http://minio:9000"
+path_style_buckets = true
+region = "minio"
+access_key_id = "minioautumn"
+secret_access_key = "minioautumn"
+default_bucket = "revolt-uploads"

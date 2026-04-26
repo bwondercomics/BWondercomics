@@ -23,11 +23,11 @@ Feed System
 			Chapter Management (default view): Manage chapters and pages; edits saved to admin/data.json via /api/save (and also stored in localStorage for draft safety).
 			Blog / Feed: Hidden until you click “Blog / Feed”. Load existing posts from posts.json; add/edit/delete posts. Saving calls /api/save to update posts.json (triggers RSS). Post form fields: Title, Image URL, Content.
 			Preview/Export: Shows chapter JSON, copy/download.
-			Settings (modal): Store GitHub token (for legacy GitHub publish features).
+			Settings (modal): Store GitHub token (for previous GitHub publish features).
 			Buttons:
 			“Blog / Feed” toggles the feed tab and loads posts.
 			“Publish Post” saves/updates post to posts.json.
-			“Publish to GitHub” is legacy; current local server persists directly to disk via /api/save.
+			“Publish to GitHub” is previous; current local server persists directly to disk via /api/save.
 			What to plug in on main site
 
 		Ensure server.py (or equivalent backend) serves static files and accepts POST /api/save to write posts.json and admin/data.json, with RSS regeneration on posts.json save.

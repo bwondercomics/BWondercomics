@@ -1,3 +1,4 @@
+// Email signup form handler (internal API).
 export function initEmailSignupForm() {
   const form = document.getElementById('emailSignupForm');
   const messageDiv = document.getElementById('emailFormMessage');
@@ -10,6 +11,7 @@ export function initEmailSignupForm() {
     const emailInput = document.getElementById('emailInput');
     const submitBtn = form.querySelector('.email-submit-btn');
     const email = emailInput.value.trim();
+    const source = form.dataset.source || 'homepage';
 
     if (!email) return;
 
@@ -18,12 +20,14 @@ export function initEmailSignupForm() {
     messageDiv.style.display = 'none';
 
     try {
+      // Submit to the API endpoint and show a success/fail message.
       const response = await fetch(form.action, {
         method: 'POST',
-        body: new FormData(form),
         headers: {
-          'Accept': 'application/json'
-        }
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, source }),
       });
 
       if (response.ok) {
@@ -36,10 +40,11 @@ export function initEmailSignupForm() {
           messageDiv.style.display = 'none';
         }, 5000);
       } else {
-        throw new Error('Form submission failed');
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Form submission failed');
       }
     } catch (error) {
-      messageDiv.textContent = 'Oops! Something went wrong. Try again?';
+      messageDiv.textContent = error.message || 'Oops! Something went wrong. Try again?';
       messageDiv.className = 'email-form-message error';
       messageDiv.style.display = 'block';
 

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import re
 
-
 TARGET_RE = re.compile(r"^[A-Za-z0-9._:-]+$")
 
 
@@ -23,4 +22,3 @@ def is_admin_role(role: str | None) -> bool:
 
 def is_premium_role(role: str | None) -> bool:
     return normalize_role(role) in {"admin", "premium"}
-

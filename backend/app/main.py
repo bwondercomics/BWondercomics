@@ -1,26 +1,38 @@
 from __future__ import annotations
 
+from uuid import UUID
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
-from starlette.responses import RedirectResponse
-from starlette.responses import Response
-from uuid import UUID
+from starlette.responses import RedirectResponse, Response
 
-from .settings import settings
-from .routes import files as file_routes
+from .premium import is_premium_request_path
 from .routes import admin as admin_routes
+from .routes import admin_analytics as admin_analytics_routes
+from .routes import admin_comments as admin_comments_routes
+from .routes import admin_diagnostics as admin_diagnostics_routes
+from .routes import admin_moderation as admin_moderation_routes
+from .routes import admin_ops as admin_ops_routes
+from .routes import admin_premium as admin_premium_routes
+from .routes import admin_social as admin_social_routes
 from .routes import auth as auth_routes
+from .routes import chat_sso as chat_sso_routes
 from .routes import comments as comments_routes
+from .routes import files as file_routes
+from .routes import oidc as oidc_routes
+from .routes import page_builder as page_builder_routes
 from .routes import posts as posts_routes
 from .routes import series_json as series_json_routes
-from .premium import is_premium_request_path
-from .umami_proxy import proxy_to_umami
+from .routes import site_branding as site_branding_routes
+from .routes import tracking as tracking_routes
+from .routes import user as user_routes
 from .security import verify_token
+from .settings import settings
+from .umami_proxy import proxy_to_umami
 from .validation import is_premium_role
-
 
 app = FastAPI(title="BWonderComics API")
 
@@ -80,11 +92,24 @@ async def premium_gate(request: Request, call_next):
 
 
 app.include_router(auth_routes.router)
+app.include_router(chat_sso_routes.router)
 app.include_router(comments_routes.router)
 app.include_router(admin_routes.router)
+app.include_router(admin_analytics_routes.router)
+app.include_router(admin_comments_routes.router)
+app.include_router(admin_moderation_routes.router)
+app.include_router(admin_premium_routes.router)
+app.include_router(admin_social_routes.router)
+app.include_router(admin_diagnostics_routes.router)
+app.include_router(admin_ops_routes.router)
+app.include_router(page_builder_routes.router)
 app.include_router(posts_routes.router)
 app.include_router(series_json_routes.router)
+app.include_router(site_branding_routes.router)
+app.include_router(tracking_routes.router)
+app.include_router(user_routes.router)
 app.include_router(file_routes.router)
+app.include_router(oidc_routes.router)
 
 
 @app.get("/healthz")
@@ -108,10 +133,16 @@ def analytics_script(request: Request):
     else:
         base_url = (settings.umami_base_url or "").strip().rstrip("/")
         if not base_url:
-            forwarded_proto = (request.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
+            forwarded_proto = (
+                (request.headers.get("X-Forwarded-Proto") or "").split(",")[0].strip().lower()
+            )
             proto = forwarded_proto if forwarded_proto in ("http", "https") else "http"
 
-            host = (request.headers.get("X-Forwarded-Host") or request.headers.get("Host") or "").split(",")[0].strip()
+            host = (
+                (request.headers.get("X-Forwarded-Host") or request.headers.get("Host") or "")
+                .split(",")[0]
+                .strip()
+            )
             hostname = host
             if host.startswith("[") and "]" in host:
                 hostname = host[1 : host.index("]")]
@@ -144,7 +175,11 @@ def analytics_script(request: Request):
 
 
 if settings.umami_proxy_path:
-    @app.api_route(settings.umami_proxy_path, methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"])
+
+    @app.api_route(
+        settings.umami_proxy_path,
+        methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
+    )
     @app.api_route(
         settings.umami_proxy_path + "/{rest:path}",
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"],
@@ -181,6 +216,11 @@ if settings.umami_proxy_path:
         return response
 
 
-# Keep the site static-first: mount the repository root as the web root.
-# API routes take precedence because this mount is registered last.
-app.mount("/", StaticFiles(directory=str(settings.base_dir), html=True), name="static")
+# Serve uploaded media and entry assets even when the main site is built into dist/
+app.mount("/media", StaticFiles(directory=str(settings.base_dir / "media")), name="media")
+app.mount("/comics", StaticFiles(directory=str(settings.base_dir / "comics")), name="comics")
+
+# Serve production-built files from dist/ directory
+# Use 'npm run build' to generate optimized files
+# For development, use 'npm run dev' instead (runs on port 3000)
+app.mount("/", StaticFiles(directory=str(settings.base_dir / "dist"), html=True), name="static")

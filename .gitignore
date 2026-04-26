@@ -14,6 +14,45 @@ comments/
 deploy/battlebros.env
 deploy/umami.env
 deploy/bwondercomics.env
+namecheap-ddns.env.example
 
 # Battle Bros persistent server data (users/comments)
-var/
+var/**
+!var/.gitkeep
+!var/backups/.gitkeep
+!var/diagnostics/.gitkeep
+!var/log/.gitkeep
+!var/bwondercomics/.gitkeep
+!var/releases/.gitkeep
+!var/tmp/.gitkeep
+
+# Protected premium assets (server-only)
+protected/*
+!protected/.gitkeep
+
+# Media library assets (server-only)
+media/**
+!media/.gitkeep
+!media/previews/.gitkeep
+!media/previews/covers/.gitkeep
+!media/previews/thumbs/.gitkeep
+!media/previews/blurred/.gitkeep
+!media/post-assets/.gitkeep
+
+# Uploaded assets (server-only)
+assets/uploads/**
+!assets/uploads/.gitkeep
+
+# Comics content (server-only)
+comics/**
+!comics/.gitkeep
+
+# Vite build output and cache
+dist/
+dist-ssr/
+coverage/
+deploy/stoat/for-web-dist/
+*.local
+.vite/
+node_modules/.vite/
+deploy/*.env.bak*

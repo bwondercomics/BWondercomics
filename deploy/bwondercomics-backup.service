@@ -1,19 +1,13 @@
 [Unit]
-Description=BWonderComics data backup (users/comments)
-After=local-fs.target
+Description=BWonderComics database backup (nightly)
+After=docker.service
 
 [Service]
 Type=oneshot
 User=dbmelville
 Group=dbmelville
-Environment=BACKUP_DEST=/mnt/archive/backups/bwondercomics
-Environment=DATA_PARENT=/srv/bwondercomics/var
-Environment=DATA_DIR_NAME=bwondercomics
-Environment=RETENTION_DAYS=30
-ExecStart=/bin/bash /srv/bwondercomics/deploy/bwondercomics-backup.sh
+WorkingDirectory=/srv/bw-quality
+ExecStart=/usr/bin/make -C /srv/bw-quality backup-db
 
 NoNewPrivileges=true
 PrivateTmp=true
-ProtectSystem=strict
-ProtectHome=true
-ReadWritePaths=/mnt/archive/backups/bwondercomics

@@ -1,0 +1,132 @@
+/* ==================== EMAIL SIGNUP SECTION ==================== */
+.email-signup-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.email-signup-label {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  text-align: center;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+}
+
+.email-signup-form {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.email-input {
+  width: 100%;
+  max-width: 280px;
+  padding: 10px 12px;
+  background: rgba(26, 26, 46, 0.8);
+  border: 3px solid var(--primary);
+  color: var(--text);
+  font-family: 'Righteous', sans-serif;
+  font-size: 14px;
+  text-align: center;
+  transition: all 0.2s;
+  box-shadow:
+    0 0 10px rgba(0, 217, 255, 0.3),
+    inset 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+.email-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+}
+
+.email-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow:
+    0 0 20px rgba(255, 237, 0, 0.5),
+    inset 0 2px 4px rgba(0, 0, 0, 0.4);
+  background: rgba(26, 26, 46, 0.95);
+}
+
+.email-submit-btn {
+  padding: 10px 32px;
+  background: linear-gradient(135deg, var(--accent), var(--primary));
+  border: 3px solid var(--accent);
+  color: var(--bg-dark);
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: all 0.2s;
+  box-shadow:
+    0 4px 0 rgba(0, 0, 0, 0.5),
+    0 0 20px rgba(255, 237, 0, 0.4);
+  position: relative;
+}
+
+.email-submit-btn:hover {
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  transform: translateY(-2px);
+  box-shadow:
+    0 6px 0 rgba(0, 0, 0, 0.5),
+    0 0 30px rgba(255, 237, 0, 0.7);
+}
+
+.email-submit-btn:active {
+  transform: translateY(0);
+  box-shadow:
+    0 2px 0 rgba(0, 0, 0, 0.5),
+    0 0 15px rgba(255, 237, 0, 0.4);
+}
+
+.email-submit-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.email-signup-cta {
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  text-align: center;
+  text-shadow:
+    2px 2px 0 rgba(0, 0, 0, 0.5),
+    0 0 10px rgba(255, 237, 0, 0.4);
+}
+
+.email-form-message {
+  font-family: 'Righteous', sans-serif;
+  font-size: 14px;
+  text-align: center;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-top: 8px;
+  max-width: 280px;
+}
+
+.email-form-message.success {
+  background: rgba(0, 217, 255, 0.2);
+  border: 2px solid var(--primary);
+  color: var(--primary);
+}
+
+.email-form-message.error {
+  background: rgba(255, 56, 56, 0.2);
+  border: 2px solid var(--danger);
+  color: var(--danger);
+}

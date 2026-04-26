@@ -1,19 +1,36 @@
 {
     "name": "battle-bros-reader",
-    "version": "1.0.0",
-    "description": "Battle Bros comic reader",
+    "version": "0.7.9",
+    "description": "BWonderComics comic site baseline",
     "type": "module",
     "scripts": {
-        "test": "vitest run",
-        "test:watch": "vitest",
-        "test:ui": "vitest --ui",
-        "test:coverage": "vitest run --coverage"
+        "dev": "node ./node_modules/vite/bin/vite.js",
+        "build": "node ./node_modules/vite/bin/vite.js build",
+        "preview": "node ./node_modules/vite/bin/vite.js preview",
+        "test": "node ./node_modules/vitest/vitest.mjs run",
+        "test:all": "npm test && npm run test:backend",
+        "test:backend": "./.venv/bin/python -m unittest discover -s backend/tests -v",
+        "test:watch": "node ./node_modules/vitest/vitest.mjs",
+        "test:ui": "node ./node_modules/vitest/vitest.mjs --ui",
+        "test:coverage": "node ./node_modules/vitest/vitest.mjs run --coverage",
+        "lint": "eslint reader/ admin/",
+        "lint:fix": "eslint --fix reader/ admin/",
+        "lint:py": "./.venv/bin/python -m ruff check backend/app backend/alembic",
+        "format": "node ./node_modules/prettier/bin/prettier.cjs --write '**/*.{js,html,css,md}'",
+        "format:check": "node ./node_modules/prettier/bin/prettier.cjs --check '**/*.{js,html,css,md}'",
+        "format:py": "./.venv/bin/python -m ruff format backend/app backend/alembic",
+        "format:py:check": "./.venv/bin/python -m ruff format --check backend/app backend/alembic"
     },
     "devDependencies": {
-        "@vitest/ui": "^1.0.4",
+        "@eslint/js": "^9.39.2",
+        "@vitest/coverage-v8": "^1.6.1",
+        "@vitest/ui": "^1.6.1",
+        "eslint": "^9.39.2",
         "happy-dom": "^12.10.3",
         "prettier": "^3.7.4",
-        "vitest": "^1.0.4"
+        "terser": "^5.44.1",
+        "vite": "^5.4.11",
+        "vitest": "^1.6.1"
     },
     "keywords": [
         "comic",

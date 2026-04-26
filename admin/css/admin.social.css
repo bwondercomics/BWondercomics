@@ -1,0 +1,194 @@
+/* ==================== SOCIAL ==================== */
+.social-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.social-tab.is-active {
+  border-color: var(--accent);
+  color: var(--accent);
+  box-shadow: 0 0 10px rgba(255, 237, 0, 0.18);
+}
+
+.social-panel[hidden] {
+  display: none;
+}
+
+.social-profile-card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 10px;
+  border: 2px solid rgba(0, 217, 255, 0.35);
+  background: rgba(10, 10, 18, 0.65);
+}
+
+.social-profile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.social-avatar {
+  width: 64px;
+  height: 64px;
+  border-radius: 12px;
+  border: 2px solid rgba(0, 217, 255, 0.4);
+  background: #05050a;
+  background-size: cover;
+  background-position: center;
+  display: grid;
+  place-items: center;
+  font-family: 'Bebas Neue', cursive;
+  font-size: 1.4rem;
+  color: var(--accent);
+  letter-spacing: 1px;
+}
+
+.social-avatar.is-empty {
+  background-image: none;
+}
+
+.social-profile-name {
+  font-family: 'Bebas Neue', cursive;
+  font-size: 1.4rem;
+  color: var(--accent);
+  letter-spacing: 1px;
+}
+
+.social-profile-handle {
+  color: var(--primary);
+  font-size: 0.95rem;
+}
+
+.social-profile-link {
+  display: inline-flex;
+  margin-top: 4px;
+  color: var(--accent);
+  text-decoration: none;
+  font-size: 0.85rem;
+}
+
+.social-profile-link:hover {
+  text-decoration: underline;
+}
+
+.social-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.social-stat-card {
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 237, 0, 0.3);
+  background: rgba(10, 10, 18, 0.7);
+}
+
+.social-stat-label {
+  font-size: 0.75rem;
+  letter-spacing: 0.7px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.social-stat-value {
+  font-size: 1.3rem;
+  color: var(--accent);
+  margin-top: 6px;
+}
+
+.social-notifications {
+  margin-top: 16px;
+}
+
+.social-note {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 217, 255, 0.25);
+  background: rgba(10, 10, 18, 0.75);
+}
+
+.social-note.is-unread {
+  border-color: rgba(255, 237, 0, 0.6);
+  box-shadow: 0 0 12px rgba(255, 237, 0, 0.15);
+}
+
+.social-note + .social-note {
+  margin-top: 8px;
+}
+
+.social-note-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 217, 255, 0.35);
+  background: #05050a;
+  background-size: cover;
+  background-position: center;
+  display: grid;
+  place-items: center;
+  color: var(--accent);
+  font-size: 0.9rem;
+}
+
+.social-note-avatar.is-empty {
+  background-image: none;
+}
+
+.social-note-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
+.social-note-author {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.social-note-author:hover {
+  text-decoration: underline;
+}
+
+.social-note-reason {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--primary);
+}
+
+.social-note-text {
+  font-size: 0.85rem;
+  opacity: 0.85;
+  margin-top: 4px;
+  line-height: 1.3;
+}
+
+.social-note-time {
+  font-size: 0.75rem;
+  color: var(--primary);
+  white-space: nowrap;
+}
+
+.social-placeholder {
+  padding: 20px;
+  border-radius: 10px;
+  border: 2px dashed rgba(255, 237, 0, 0.35);
+  color: rgba(255, 255, 255, 0.75);
+  text-align: center;
+  margin-top: 16px;
+}
+
+.pb-social-input--icon {
+  min-width: 180px;
+}

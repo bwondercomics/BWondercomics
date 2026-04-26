@@ -1,823 +1,937 @@
 ﻿<!doctype html>
 <html lang="en">
-
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5" />
-  <title>BWC - Updates Feed</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Righteous&family=Bebas+Neue&display=swap" />
-
-  <style>
-    :root {
-      --primary: #00d9ff;
-      --secondary: #ff00ea;
-      --accent: #ffed00;
-      --bg-dark: #0a0a12;
-      --bg-panel: #1a1a2e;
-      --text: #ffffff;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      background: radial-gradient(circle at 10% 20%, rgba(0, 217, 255, 0.06), transparent 25%),
-        radial-gradient(circle at 90% 10%, rgba(255, 0, 234, 0.06), transparent 25%),
-        linear-gradient(180deg, rgba(10, 10, 18, 0.95) 0%, #05050a 100%);
-      color: var(--text);
-      font-family: 'Righteous', cursive;
-      margin: 0;
-      min-height: 100vh;
-    }
-
-    header {
-      background: linear-gradient(135deg, rgba(0, 217, 255, 0.12), rgba(255, 0, 234, 0.08));
-      border-bottom: 2px solid var(--primary);
-      padding: 8px 12px;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      backdrop-filter: blur(4px);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .header-brand {
-      display: flex;
-      flex-direction: column;
-      gap: 2px;
-      min-width: 200px;
-    }
-
-    .header-nav {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-    }
-
-    .nav-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      color: var(--text);
-      text-decoration: none;
-      border: 1.5px solid var(--text);
-      padding: 6px 10px;
-      border-radius: 5px;
-      background: rgba(255, 255, 255, 0.08);
-      transition: all 0.2s ease;
-      font-weight: 600;
-    }
-
-    .nav-btn:hover {
-      background: var(--text);
-      color: var(--bg-dark);
-    }
-
-    h1 {
-      font-family: 'Bebas Neue', cursive;
-      color: var(--primary);
-      margin: 0;
-      font-size: 2.2rem;
-      letter-spacing: 1px;
-      text-shadow: 1px 1px 0 var(--secondary);
-    }
-
-    .subhead {
-      color: rgba(255, 255, 255, 0.75);
-      margin-top: 2px;
-      letter-spacing: 1px;
-      font-size: 0.9rem;
-    }
-
-    .container {
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 24px 16px 64px;
-    }
-
-    .nav-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 20px;
-      gap: 12px;
-      flex-wrap: wrap;
-    }
-
-    .back-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      color: var(--text);
-      text-decoration: none;
-      border: 2px solid var(--text);
-      padding: 10px 14px;
-      border-radius: 6px;
-      background: rgba(255, 255, 255, 0.03);
-      transition: all 0.2s ease;
-    }
-
-    .back-btn:hover {
-      background: var(--text);
-      color: var(--bg-dark);
-    }
-
-    .rss-link {
-      color: var(--primary);
-      text-decoration: none;
-      font-size: 0.95rem;
-    }
-
-    .rss-link:hover {
-      text-decoration: underline;
-    }
-
-    .post {
-      background: var(--bg-panel);
-      border: 2px solid var(--primary);
-      border-radius: 12px;
-      padding: 20px;
-      margin-bottom: 28px;
-      box-shadow: 0 0 20px rgba(0, 217, 255, 0.18);
-      animation: fadeIn 0.45s ease-out;
-    }
-
-    .post-header {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      margin-bottom: 6px;
-    }
-
-    .post-icon {
-      width: 44px;
-      height: 44px;
-      border-radius: 10px;
-      border: 2px solid var(--primary);
-      background: #05050a;
-      object-fit: cover;
-      box-shadow: 0 0 12px rgba(0, 217, 255, 0.25);
-      margin-top: 2px;
-    }
-
-    .post-title {
-      font-family: 'Bebas Neue', cursive;
-      color: var(--accent);
-      font-size: 2.1rem;
-      margin: 0;
-      letter-spacing: 1px;
-    }
-
-    .post-date {
-      color: var(--primary);
-      font-size: 0.95rem;
-      margin-bottom: 14px;
-      opacity: 0.8;
-    }
-
-    .post-image {
-      width: 100%;
-      max-height: min(85vh, calc(100vh - 140px));
-      border-radius: 8px;
-      border: 2px solid rgba(0, 217, 255, 0.5);
-      margin-bottom: 14px;
-      background: #05050a;
-      object-fit: contain;
-      object-position: center;
-    }
-
-    .post-content {
-      line-height: 1.6;
-      font-size: 1.05rem;
-      white-space: normal;
-      color: rgba(255, 255, 255, 0.92);
-    }
-
-    .tag-list {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-top: 6px;
-    }
-
-    .tag-pill {
-      background: rgba(0, 217, 255, 0.15);
-      border: 1px solid rgba(0, 217, 255, 0.4);
-      color: var(--primary);
-      padding: 4px 8px;
-      border-radius: 999px;
-      font-size: 0.85rem;
-    }
-
-    .empty-state {
-      text-align: center;
-      padding: 48px 24px;
-      color: rgba(255, 255, 255, 0.8);
-      border: 2px dashed rgba(0, 217, 255, 0.3);
-      border-radius: 12px;
-      background: rgba(26, 26, 46, 0.6);
-    }
-
-
-    /* Comments Section Styling */
-    .comments-section {
-      margin-top: 30px;
-      padding: 18px 16px;
-      border: 2px solid var(--primary);
-      border-radius: 12px;
-      background: rgba(26, 26, 46, 0.55);
-      box-shadow: 0 0 18px rgba(0, 217, 255, 0.15);
-    }
-
-    .comments-title-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-bottom: 10px;
-    }
-
-    .comments-header-row {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-bottom: 6px;
-    }
-
-    .comments-title {
-      font-family: 'Bebas Neue', cursive;
-      color: var(--accent);
-      font-size: 1.8rem;
-      margin: 0;
-      letter-spacing: 1.3px;
-      text-shadow: 0 0 10px rgba(255, 237, 0, 0.3);
-    }
-
-    .comments-toggle {
-      background: transparent;
-      color: var(--text);
-      border: 1px solid rgba(255, 255, 255, 0.4);
-      padding: 6px 10px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 700;
-      transition: all 0.2s ease;
-    }
-
-    .comments-toggle:hover {
-      background: var(--text);
-      color: var(--bg-dark);
-    }
-
-    .comments-body {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin-top: 6px;
-    }
-
-    .comments-section.collapsed .comments-body {
-      display: none;
-    }
-
-    .auth-status {
-      color: rgba(255, 255, 255, 0.9);
-      font-size: 0.95rem;
-    }
-
-    .auth-actions {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .signout-btn,
-    .auth-toggle {
-      background: transparent;
-      border: 1px solid rgba(255, 255, 255, 0.4);
-      color: var(--text);
-      padding: 6px 10px;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      font-weight: 600;
-    }
-
-    .signout-btn:hover,
-    .auth-toggle:hover {
-      background: var(--text);
-      color: var(--bg-dark);
-    }
-
-    .auth-form {
-      margin-top: 8px;
-      padding: 10px;
-      border: 1px solid rgba(0, 217, 255, 0.25);
-      border-radius: 10px;
-      background: rgba(0, 217, 255, 0.05);
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .auth-row {
-      display: flex;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .auth-input {
-      flex: 1;
-      min-width: 180px;
-      padding: 10px 12px;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      background: rgba(5, 5, 10, 0.4);
-      color: var(--text);
-      font-size: 0.95rem;
-    }
-
-    .auth-input.hidden {
-      display: none;
-    }
-
-    .auth-actions-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-
-    .auth-submit {
-      background: linear-gradient(135deg, var(--primary), var(--secondary));
-      border: none;
-      color: var(--bg-dark);
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-weight: 700;
-      cursor: pointer;
-      box-shadow: 0 0 12px rgba(0, 217, 255, 0.3);
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .auth-submit:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 0 16px rgba(0, 217, 255, 0.4);
-    }
-
-    .auth-error {
-      color: var(--accent);
-      min-height: 1.1em;
-      font-size: 0.9rem;
-    }
-
-    .comment-form {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      margin-top: 12px;
-    }
-
-    .comment-textarea {
-      width: 100%;
-      min-height: 110px;
-      padding: 12px;
-      border-radius: 10px;
-      border: 1px solid rgba(0, 217, 255, 0.35);
-      background: rgba(5, 5, 10, 0.5);
-      color: var(--text);
-      font-size: 1rem;
-      resize: vertical;
-      transition: border-color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .comment-textarea:focus {
-      outline: none;
-      border-color: var(--primary);
-      box-shadow: 0 0 12px rgba(0, 217, 255, 0.35);
-    }
-
-    .comment-actions {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-    }
-
-    .comment-submit {
-      background: var(--primary);
-      color: var(--bg-dark);
-      border: none;
-      padding: 10px 14px;
-      border-radius: 8px;
-      font-weight: 700;
-      cursor: pointer;
-      box-shadow: 0 0 10px rgba(0, 217, 255, 0.35);
-      transition: transform 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .comment-submit:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 0 14px rgba(0, 217, 255, 0.45);
-    }
-
-    .comment-hint {
-      color: rgba(255, 255, 255, 0.75);
-      font-size: 0.9rem;
-    }
-
-    .comment-error {
-      color: var(--accent);
-      min-height: 1.1em;
-      font-size: 0.9rem;
-    }
-
-    .comment-form.disabled .comment-textarea {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
-
-    .comments-list {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      margin-top: 10px;
-    }
-
-    .comment-card {
-      border: 1px solid rgba(0, 217, 255, 0.3);
-      background: rgba(5, 5, 10, 0.45);
-      border-radius: 10px;
-      padding: 12px;
-      box-shadow: inset 0 0 8px rgba(0, 217, 255, 0.08);
-    }
-
-    .comment-meta {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-      margin-bottom: 6px;
-      color: rgba(255, 255, 255, 0.85);
-      font-size: 0.95rem;
-    }
-
-    .comment-author {
-      color: var(--accent);
-      font-weight: 700;
-    }
-
-    .comment-time {
-      color: var(--primary);
-      font-size: 0.9rem;
-    }
-
-    .comment-body {
-      margin: 0;
-      white-space: pre-wrap;
-      line-height: 1.5;
-      color: rgba(255, 255, 255, 0.92);
-    }
-
-    .comment-empty {
-      text-align: center;
-      padding: 12px;
-      border: 1px dashed rgba(0, 217, 255, 0.3);
-      border-radius: 8px;
-      color: rgba(255, 255, 255, 0.8);
-      background: rgba(26, 26, 46, 0.4);
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(16px);
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5" />
+    <title>BWC - Updates Feed</title>
+    <!-- SITE_BRANDING_ICONS_START -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/boywondericon.png" />
+    <link rel="apple-touch-icon" href="/assets/boywondericon.png" />
+    <link rel="manifest" href="/manifest.json" />
+    <!-- SITE_BRANDING_ICONS_END -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Righteous&family=Bebas+Neue&display=swap"
+    />
+
+    <style>
+      html,
+      body {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(0, 217, 255, 0.65) rgba(8, 8, 14, 0.6);
       }
 
-      to {
-        opacity: 1;
-        transform: translateY(0);
+      html::-webkit-scrollbar,
+      body::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
       }
-    }
-  </style>
-</head>
 
-<body>
-  <header>
-    <div class="header-brand">
-      <h1>BWC Feed</h1>
-      <div class="subhead">Fresh drops from the BWC universe.</div>
-    </div>
-    <div class="header-nav">
-      <a href="index.html" class="nav-btn">&#8592; Back to Comic</a>
-      <a class="nav-btn" href="rss.xml" target="_blank" rel="noopener">RSS Feed</a>
-      <a href="media.html" class="nav-btn">Media</a>
-    </div>
-  </header>
+      html::-webkit-scrollbar-track,
+      body::-webkit-scrollbar-track {
+        background: rgba(8, 8, 14, 0.6);
+      }
 
-  <div class="container">
-    <div id="feedContainer">
-      <div class="empty-state">Loading updates...</div>
-    </div>
+      html::-webkit-scrollbar-thumb,
+      body::-webkit-scrollbar-thumb {
+        background: rgba(0, 217, 255, 0.65);
+        border-radius: 999px;
+        border: 2px solid rgba(8, 8, 14, 0.6);
+      }
 
-  </div>
+      html::-webkit-scrollbar-thumb:hover,
+      body::-webkit-scrollbar-thumb:hover {
+        background: rgba(0, 217, 255, 0.9);
+      }
+
+      :root {
+        --primary: #00d9ff;
+        --secondary: #ff00ea;
+        --accent: #ffed00;
+        --bg-dark: #0a0a12;
+        --bg-panel: #1a1a2e;
+        --text: #ffffff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        background:
+          radial-gradient(circle at 10% 20%, rgba(0, 217, 255, 0.06), transparent 25%),
+          radial-gradient(circle at 90% 10%, rgba(255, 0, 234, 0.06), transparent 25%),
+          linear-gradient(180deg, rgba(10, 10, 18, 0.95) 0%, #05050a 100%);
+        color: var(--text);
+        font-family: 'Righteous', cursive;
+        margin: 0;
+        min-height: 100vh;
+      }
+
+      header {
+        background: linear-gradient(135deg, rgba(0, 217, 255, 0.12), rgba(255, 0, 234, 0.08));
+        border-bottom: 2px solid var(--primary);
+        padding: 8px 12px;
+        position: sticky;
+        top: 0;
+        z-index: 100;
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .header-brand {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 200px;
+      }
+
+      .header-nav {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .nav-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text);
+        text-decoration: none;
+        border: 1.5px solid var(--text);
+        padding: 6px 10px;
+        border-radius: 5px;
+        background: rgba(255, 255, 255, 0.08);
+        transition: all 0.2s ease;
+        font-weight: 600;
+      }
+
+      .nav-btn:hover {
+        background: var(--text);
+        color: var(--bg-dark);
+      }
+
+      h1 {
+        font-family: 'Bebas Neue', cursive;
+        color: var(--primary);
+        margin: 0;
+        font-size: 2.2rem;
+        letter-spacing: 1px;
+        text-shadow: 1px 1px 0 var(--secondary);
+      }
+
+      .subhead {
+        color: rgba(255, 255, 255, 0.75);
+        margin-top: 2px;
+        letter-spacing: 1px;
+        font-size: 0.9rem;
+      }
+
+      .container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 24px 16px 64px;
+      }
+
+      .nav-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+        gap: 12px;
+        flex-wrap: wrap;
+      }
+
+      .back-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--text);
+        text-decoration: none;
+        border: 2px solid var(--text);
+        padding: 10px 14px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.03);
+        transition: all 0.2s ease;
+      }
+
+      .back-btn:hover {
+        background: var(--text);
+        color: var(--bg-dark);
+      }
+
+      .rss-link {
+        color: var(--primary);
+        text-decoration: none;
+        font-size: 0.95rem;
+      }
+
+      .rss-link:hover {
+        text-decoration: underline;
+      }
+
+      .post {
+        background: var(--bg-panel);
+        border: 2px solid var(--primary);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 28px;
+        box-shadow: 0 0 20px rgba(0, 217, 255, 0.18);
+        animation: fadeIn 0.45s ease-out;
+      }
+
+      .post-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 6px;
+      }
+
+      .post-icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 10px;
+        border: 2px solid var(--primary);
+        background: #05050a;
+        object-fit: cover;
+        box-shadow: 0 0 12px rgba(0, 217, 255, 0.25);
+        margin-top: 2px;
+      }
+
+      .post-title {
+        font-family: 'Bebas Neue', cursive;
+        color: var(--accent);
+        font-size: 2.1rem;
+        margin: 0;
+        letter-spacing: 1px;
+      }
+
+      .post-title.is-placeholder {
+        color: rgba(255, 255, 255, 0.85);
+        letter-spacing: 0.6px;
+      }
+
+      .post-date {
+        color: var(--primary);
+        font-size: 0.95rem;
+        margin-bottom: 14px;
+        opacity: 0.8;
+      }
+
+      .post-image {
+        width: 100%;
+        max-height: min(85vh, calc(100vh - 140px));
+        border-radius: 8px;
+        border: 2px solid rgba(0, 217, 255, 0.5);
+        margin-bottom: 14px;
+        background: #05050a;
+        object-fit: contain;
+        object-position: center;
+      }
+
+      .post-content {
+        line-height: 1.6;
+        font-size: 1.05rem;
+        white-space: normal;
+        color: rgba(255, 255, 255, 0.92);
+      }
+
+      .tag-list {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 6px;
+      }
+
+      .tag-pill {
+        background: rgba(0, 217, 255, 0.15);
+        border: 1px solid rgba(0, 217, 255, 0.4);
+        color: var(--primary);
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 0.85rem;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 48px 24px;
+        color: rgba(255, 255, 255, 0.8);
+        border: 2px dashed rgba(0, 217, 255, 0.3);
+        border-radius: 12px;
+        background: rgba(26, 26, 46, 0.6);
+      }
+
+      /* Comments Section Styling */
+      .comments-section {
+        margin-top: 30px;
+        padding: 18px 16px;
+        border: 2px solid var(--primary);
+        border-radius: 12px;
+        background: rgba(26, 26, 46, 0.55);
+        box-shadow: 0 0 18px rgba(0, 217, 255, 0.15);
+      }
+
+      .comments-title-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 10px;
+      }
+
+      .comments-header-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 6px;
+      }
+
+      .comments-title {
+        font-family: 'Bebas Neue', cursive;
+        color: var(--accent);
+        font-size: 1.8rem;
+        margin: 0;
+        letter-spacing: 1.3px;
+        text-shadow: 0 0 10px rgba(255, 237, 0, 0.3);
+      }
+
+      .comments-toggle {
+        background: transparent;
+        color: var(--text);
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        padding: 6px 10px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 700;
+        transition: all 0.2s ease;
+      }
+
+      .comments-toggle:hover {
+        background: var(--text);
+        color: var(--bg-dark);
+      }
+
+      .comments-body {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 6px;
+      }
+
+      .comments-section.collapsed .comments-body {
+        display: none;
+      }
+
+      .auth-status {
+        color: rgba(255, 255, 255, 0.9);
+        font-size: 0.95rem;
+      }
+
+      .auth-actions {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .signout-btn,
+      .auth-toggle {
+        background: transparent;
+        border: 1px solid rgba(255, 255, 255, 0.4);
+        color: var(--text);
+        padding: 6px 10px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        font-weight: 600;
+      }
+
+      .signout-btn:hover,
+      .auth-toggle:hover {
+        background: var(--text);
+        color: var(--bg-dark);
+      }
+
+      .auth-form {
+        margin-top: 8px;
+        padding: 10px;
+        border: 1px solid rgba(0, 217, 255, 0.25);
+        border-radius: 10px;
+        background: rgba(0, 217, 255, 0.05);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .auth-row {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .auth-input {
+        flex: 1;
+        min-width: 180px;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.3);
+        background: rgba(5, 5, 10, 0.4);
+        color: var(--text);
+        font-size: 0.95rem;
+      }
+
+      .auth-input.hidden {
+        display: none;
+      }
+
+      .auth-actions-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .auth-check {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 0.85rem;
+        color: rgba(255, 255, 255, 0.85);
+      }
+
+      .auth-check.hidden {
+        display: none;
+      }
+
+      .auth-submit {
+        background: linear-gradient(135deg, var(--primary), var(--secondary));
+        border: none;
+        color: var(--bg-dark);
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 0 12px rgba(0, 217, 255, 0.3);
+        transition:
+          transform 0.2s ease,
+          box-shadow 0.2s ease;
+      }
+
+      .auth-submit:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 0 16px rgba(0, 217, 255, 0.4);
+      }
+
+      .auth-error {
+        color: var(--accent);
+        min-height: 1.1em;
+        font-size: 0.9rem;
+      }
+
+      .comment-form {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .comment-textarea {
+        width: 100%;
+        min-height: 110px;
+        padding: 12px;
+        border-radius: 10px;
+        border: 1px solid rgba(0, 217, 255, 0.35);
+        background: rgba(5, 5, 10, 0.5);
+        color: var(--text);
+        font-size: 1rem;
+        resize: vertical;
+        transition:
+          border-color 0.2s ease,
+          box-shadow 0.2s ease;
+      }
+
+      .comment-textarea:focus {
+        outline: none;
+        border-color: var(--primary);
+        box-shadow: 0 0 12px rgba(0, 217, 255, 0.35);
+      }
+
+      .comment-actions {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .comment-submit {
+        background: var(--primary);
+        color: var(--bg-dark);
+        border: none;
+        padding: 10px 14px;
+        border-radius: 8px;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 0 10px rgba(0, 217, 255, 0.35);
+        transition:
+          transform 0.2s ease,
+          box-shadow 0.2s ease;
+      }
+
+      .comment-submit:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 0 14px rgba(0, 217, 255, 0.45);
+      }
+
+      .comment-hint {
+        color: rgba(255, 255, 255, 0.75);
+        font-size: 0.9rem;
+      }
+
+      .comment-error {
+        color: var(--accent);
+        min-height: 1.1em;
+        font-size: 0.9rem;
+      }
+
+      .comment-form.disabled .comment-textarea {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      .comments-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        margin-top: 10px;
+      }
+
+      .comment-card {
+        border: 1px solid rgba(0, 217, 255, 0.3);
+        background: rgba(5, 5, 10, 0.45);
+        border-radius: 10px;
+        padding: 12px;
+        box-shadow: inset 0 0 8px rgba(0, 217, 255, 0.08);
+      }
+
+      .comment-meta {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        margin-bottom: 6px;
+        color: rgba(255, 255, 255, 0.85);
+        font-size: 0.95rem;
+      }
+
+      .comment-author {
+        color: var(--accent);
+        font-weight: 700;
+      }
+
+      .comment-time {
+        color: var(--primary);
+        font-size: 0.9rem;
+      }
+
+      .comment-body {
+        margin: 0;
+        white-space: pre-wrap;
+        line-height: 1.5;
+        color: rgba(255, 255, 255, 0.92);
+      }
+
+      .comment-empty {
+        text-align: center;
+        padding: 12px;
+        border: 1px dashed rgba(0, 217, 255, 0.3);
+        border-radius: 8px;
+        color: rgba(255, 255, 255, 0.8);
+        background: rgba(26, 26, 46, 0.4);
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(16px);
+        }
+
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
+  </head>
+
+  <body>
+    <script type="module" src="reader/safe-mode.js"></script>
+    <script type="module" src="reader/live-tracking.js"></script>
+    <script type="module" src="reader/chat-sso.js"></script>
+    <!-- Feed header + navigation -->
+    <header>
+      <div class="header-brand">
+        <h1>BWC Feed</h1>
+        <div class="subhead">Fresh drops from the BWC universe.</div>
+      </div>
+      <div class="header-nav">
+        <a href="index.html" class="nav-btn" id="backToComicBtn">&#8592; Back to Comic</a>
+        <a class="nav-btn" href="rss.xml" target="_blank" rel="noopener">RSS Feed</a>
+        <a href="media.html" class="nav-btn">Media</a>
+      </div>
+    </header>
+
+    <!-- Feed list container -->
+    <div class="container">
+      <div id="feedContainer">
+        <div class="empty-state">Loading updates...</div>
+      </div>
+    </div>
 
     <script>
-    const feedContainer = document.getElementById('feedContainer');
-    const commentContexts = [];
-    const authState = { user: null };
-
-    const api = {
-      async session() {
-        const res = await fetch('/api/session', { cache: 'no-store', credentials: 'same-origin' });
-        if (!res.ok) throw new Error('Session check failed');
-        const data = await res.json();
-        return data.user || null;
-      },
-      async login(email, password) {
-        const res = await fetch('/api/login', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
+      // Feed page: load posts and attach per-post comments.
+      const backToComicBtn = document.getElementById('backToComicBtn');
+      if (backToComicBtn && window.history.length > 1) {
+        backToComicBtn.addEventListener('click', (event) => {
+          event.preventDefault();
+          window.history.back();
         });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Login failed');
-        return data.user;
-      },
-      async register(email, password, displayName, inviteCode) {
-        const res = await fetch('/api/register', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password, displayName, inviteCode })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Registration failed');
-        return data.user;
-      },
-      async logout() {
-        await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
-      },
-      async fetchComments(targetId) {
-        const res = await fetch(`/api/comments?targetId=${encodeURIComponent(targetId)}`, {
-          cache: 'no-store',
-          credentials: 'same-origin'
-        });
-        if (!res.ok) throw new Error('Failed to load comments');
-        const data = await res.json();
-        return Array.isArray(data.comments) ? data.comments : [];
-      },
-      async postComment(targetId, message) {
-        const res = await fetch('/api/comments', {
-          method: 'POST',
-          credentials: 'same-origin',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ targetId, message })
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Failed to post comment');
-        return data.comment;
       }
-    };
+      const feedContainer = document.getElementById('feedContainer');
+      const commentContexts = [];
+      const FALLBACK_IMAGE = '/assets/image-missing.png';
+      const authState = { user: null };
 
-    const slugifyTarget = (raw = '') => {
-      const base = (raw || 'post').toString().trim();
-      const cleaned = base
-        .toLowerCase()
-        .replace(/[^a-z0-9._:-]+/g, '-')
-        .replace(/^-+|-+$/g, '');
-      return (cleaned || 'post').slice(0, 120);
-    };
-
-    function sanitizeContent(html = '') {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      const allowed = new Set(['b', 'strong', 'i', 'em', 'u', 'a', 'p', 'br', 'ul', 'ol', 'li', 'span', 'img', 'h1', 'h2', 'h3', 'blockquote']);
-      const cleanUrl = (url = '') => {
-        const trimmed = url.trim();
-        if (!trimmed) return '';
-        const lower = trimmed.toLowerCase();
-        if (lower.startsWith('javascript:')) return '';
-        return trimmed;
+      // API helpers for auth + comments.
+      const api = {
+        async session() {
+          const res = await fetch('/api/session', {
+            cache: 'no-store',
+            credentials: 'same-origin',
+          });
+          if (!res.ok) throw new Error('Session check failed');
+          const data = await res.json();
+          return data.user || null;
+        },
+        async login(email, password) {
+          const res = await fetch('/api/login', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Login failed');
+          return data.user;
+        },
+        async register(email, password, displayName, inviteCode, emailOptIn) {
+          const res = await fetch('/api/register', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password, displayName, inviteCode, emailOptIn }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Registration failed');
+          return data.user;
+        },
+        async logout() {
+          await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+        },
+        async fetchComments(targetId) {
+          const res = await fetch(`/api/comments?targetId=${encodeURIComponent(targetId)}`, {
+            cache: 'no-store',
+            credentials: 'same-origin',
+          });
+          if (!res.ok) throw new Error('Failed to load comments');
+          const data = await res.json();
+          return Array.isArray(data.comments) ? data.comments : [];
+        },
+        async postComment(targetId, message) {
+          const res = await fetch('/api/comments', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ targetId, message }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Failed to post comment');
+          return data.comment;
+        },
       };
-      const walk = (node) => {
-        [...node.children].forEach(child => {
-          const tag = child.tagName.toLowerCase();
-          if (!allowed.has(tag)) {
-            child.replaceWith(...child.childNodes);
-          } else {
-            [...child.attributes].forEach(attr => {
-              const name = attr.name.toLowerCase();
-              const allowedAttrs = tag === 'a'
-                ? ['href', 'title', 'target', 'rel']
-                : tag === 'img'
-                  ? ['src', 'alt', 'title']
-                  : [];
-              if (!allowedAttrs.includes(name)) child.removeAttribute(attr.name);
-            });
-            if (tag === 'a') {
-              const href = cleanUrl(child.getAttribute('href') || '');
-              if (!href) child.removeAttribute('href');
-              else {
-                child.setAttribute('href', href);
-                child.setAttribute('target', '_blank');
-                child.setAttribute('rel', 'noopener noreferrer');
-              }
-            }
-            if (tag === 'img') {
-              const src = cleanUrl(child.getAttribute('src') || '');
-              if (!src) {
-                child.remove();
-                return;
-              }
-              child.setAttribute('src', src);
-              child.setAttribute('alt', child.getAttribute('alt') || '');
-            }
-            walk(child);
-          }
-        });
+
+      // Turn a post id/title into a stable comment thread id.
+      const slugifyTarget = (raw = '') => {
+        const base = (raw || 'post').toString().trim();
+        const cleaned = base
+          .toLowerCase()
+          .replace(/[^a-z0-9._:-]+/g, '-')
+          .replace(/^-+|-+$/g, '');
+        return (cleaned || 'post').slice(0, 120);
       };
-      walk(doc.body);
-      return doc.body.innerHTML;
-    }
 
-    function setUser(user) {
-      authState.user = user || null;
-      updateAllCommentSections();
-    }
+      // Allowlist sanitizer for post HTML so the feed stays safe.
+      function sanitizeContent(html = '') {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, 'text/html');
+        const allowed = new Set([
+          'b',
+          'strong',
+          'i',
+          'em',
+          'u',
+          'a',
+          'p',
+          'br',
+          'ul',
+          'ol',
+          'li',
+          'span',
+          'img',
+          'h1',
+          'h2',
+          'h3',
+          'blockquote',
+        ]);
+        const cleanUrl = (url = '') => {
+          const trimmed = url.trim();
+          if (!trimmed) return '';
+          const lower = trimmed.toLowerCase();
+          if (lower.startsWith('javascript:')) return '';
+          return trimmed;
+        };
+        const walk = (node) => {
+          [...node.children].forEach((child) => {
+            const tag = child.tagName.toLowerCase();
+            if (!allowed.has(tag)) {
+              child.replaceWith(...child.childNodes);
+            } else {
+              [...child.attributes].forEach((attr) => {
+                const name = attr.name.toLowerCase();
+                const allowedAttrs =
+                  tag === 'a'
+                    ? ['href', 'title', 'target', 'rel']
+                    : tag === 'img'
+                      ? ['src', 'alt', 'title']
+                      : [];
+                if (!allowedAttrs.includes(name)) child.removeAttribute(attr.name);
+              });
+              if (tag === 'a') {
+                const href = cleanUrl(child.getAttribute('href') || '');
+                if (!href) child.removeAttribute('href');
+                else {
+                  child.setAttribute('href', href);
+                  child.setAttribute('target', '_blank');
+                  child.setAttribute('rel', 'noopener noreferrer');
+                }
+              }
+              if (tag === 'img') {
+                const src = cleanUrl(child.getAttribute('src') || '');
+                if (!src) {
+                  child.remove();
+                  return;
+                }
+                child.setAttribute('src', src);
+                child.setAttribute('alt', child.getAttribute('alt') || '');
+              }
+              walk(child);
+            }
+          });
+        };
+        walk(doc.body);
+        return doc.body.innerHTML;
+      }
 
-    function updateAllCommentSections() {
-      commentContexts.forEach(ctx => updateSectionForUser(ctx));
-    }
+      // Update cached auth state and refresh all comment panels.
+      function setUser(user) {
+        authState.user = user || null;
+        updateAllCommentSections();
+      }
 
-    function applyAuthMode(ctx) {
-      const isLogin = ctx.mode === 'login';
-      if (ctx.authSubmit) ctx.authSubmit.textContent = isLogin ? 'Sign in' : 'Create account';
-      if (ctx.authToggle) ctx.authToggle.textContent = isLogin ? 'Need an account? Register' : 'Have an account? Sign in';
-      if (ctx.displayNameInput) ctx.displayNameInput.classList.toggle('hidden', isLogin);
-      if (ctx.inviteInput) ctx.inviteInput.classList.toggle('hidden', isLogin);
-    }
+      function updateAllCommentSections() {
+        commentContexts.forEach((ctx) => updateSectionForUser(ctx));
+      }
 
-    function setCollapsed(ctx, collapsed) {
-      ctx.collapsed = collapsed;
-      ctx.section.classList.toggle('collapsed', collapsed);
-      ctx.toggleBtn.textContent = collapsed ? 'Show comments' : 'Hide comments';
-      ctx.toggleBtn.setAttribute('aria-expanded', String(!collapsed));
-    }
+      // Toggle login/register UI modes.
+      function applyAuthMode(ctx) {
+        const isLogin = ctx.mode === 'login';
+        if (ctx.authSubmit) ctx.authSubmit.textContent = isLogin ? 'Sign in' : 'Create account';
+        if (ctx.authToggle)
+          ctx.authToggle.textContent = isLogin
+            ? 'Need an account? Register'
+            : 'Have an account? Sign in';
+        if (ctx.displayNameInput) ctx.displayNameInput.classList.toggle('hidden', isLogin);
+        if (ctx.inviteInput) ctx.inviteInput.classList.toggle('hidden', isLogin);
+        if (ctx.emailOptInRow) ctx.emailOptInRow.classList.toggle('hidden', isLogin);
+      }
 
-    function updateSectionForUser(ctx) {
-      const user = authState.user;
-      if (user) {
-        ctx.authStatus.textContent = `Signed in as ${user.displayName || user.email}`;
-        ctx.authForm.style.display = 'none';
-        ctx.signoutBtn.style.display = 'inline-flex';
-        ctx.commentForm.classList.remove('disabled');
-        ctx.textarea.disabled = false;
-        ctx.submitBtn.disabled = false;
-        ctx.commentHint.textContent = 'Be kind. No spam or spoilers.';
-      } else {
-        ctx.authStatus.textContent = 'Sign in to join the discussion';
-        ctx.authForm.style.display = 'flex';
-        ctx.signoutBtn.style.display = 'none';
-        ctx.commentForm.classList.add('disabled');
-        ctx.textarea.disabled = true;
+      // Collapse or expand the comments panel for a post.
+      function setCollapsed(ctx, collapsed) {
+        ctx.collapsed = collapsed;
+        ctx.section.classList.toggle('collapsed', collapsed);
+        ctx.toggleBtn.textContent = collapsed ? 'Show comments' : 'Hide comments';
+        ctx.toggleBtn.setAttribute('aria-expanded', String(!collapsed));
+      }
+
+      // Update the section based on current auth status.
+      function updateSectionForUser(ctx) {
+        const user = authState.user;
+        if (user) {
+          ctx.authStatus.textContent = `Signed in as ${user.displayName || user.email}`;
+          ctx.authForm.style.display = 'none';
+          ctx.signoutBtn.style.display = 'inline-flex';
+          ctx.commentForm.classList.remove('disabled');
+          ctx.textarea.disabled = false;
+          ctx.submitBtn.disabled = false;
+          ctx.commentHint.textContent = 'Be kind. No spam or spoilers.';
+        } else {
+          ctx.authStatus.textContent = 'Sign in to join the discussion';
+          ctx.authForm.style.display = 'flex';
+          ctx.signoutBtn.style.display = 'none';
+          ctx.commentForm.classList.add('disabled');
+          ctx.textarea.disabled = true;
+          ctx.submitBtn.disabled = true;
+          ctx.commentHint.textContent = 'Login to post comments.';
+        }
+        ctx.authError.textContent = '';
+        ctx.commentError.textContent = '';
+        applyAuthMode(ctx);
+      }
+
+      // Handle login/register submissions.
+      async function handleAuthSubmit(event, ctx) {
+        event.preventDefault();
+        const email = ctx.emailInput.value.trim();
+        const password = ctx.passwordInput.value;
+        const displayName = ctx.displayNameInput.value.trim();
+        const inviteCode = ctx.inviteInput.value.trim();
+        const emailOptIn = ctx.emailOptInInput ? ctx.emailOptInInput.checked : false;
+        ctx.authError.textContent = '';
+
+        if (!email || !password) {
+          ctx.authError.textContent = 'Email and password are required.';
+          return;
+        }
+
+        ctx.authSubmit.disabled = true;
+
+        try {
+          const user =
+            ctx.mode === 'login'
+              ? await api.login(email, password)
+              : await api.register(email, password, displayName, inviteCode, emailOptIn);
+          setUser(user);
+          ctx.emailInput.value = '';
+          ctx.passwordInput.value = '';
+          ctx.displayNameInput.value = '';
+          ctx.inviteInput.value = '';
+          if (ctx.emailOptInInput) ctx.emailOptInInput.checked = false;
+        } catch (err) {
+          ctx.authError.textContent = err.message || 'Authentication failed.';
+        } finally {
+          ctx.authSubmit.disabled = false;
+        }
+      }
+
+      // Sign out and reset UI state.
+      async function handleLogout() {
+        try {
+          await api.logout();
+        } finally {
+          setUser(null);
+        }
+      }
+
+      // Post a new comment and refresh the thread.
+      async function handleCommentSubmit(event, ctx) {
+        event.preventDefault();
+        ctx.commentError.textContent = '';
+        const user = authState.user;
+        if (!user) {
+          ctx.commentError.textContent = 'Please sign in to post.';
+          return;
+        }
+
+        const message = ctx.textarea.value.trim();
+        if (!message || message.length > 2000) {
+          ctx.commentError.textContent = 'Comment must be 1-2000 characters.';
+          return;
+        }
+
         ctx.submitBtn.disabled = true;
-        ctx.commentHint.textContent = 'Login to post comments.';
-      }
-      ctx.authError.textContent = '';
-      ctx.commentError.textContent = '';
-      applyAuthMode(ctx);
-    }
-
-    async function handleAuthSubmit(event, ctx) {
-      event.preventDefault();
-      const email = ctx.emailInput.value.trim();
-      const password = ctx.passwordInput.value;
-      const displayName = ctx.displayNameInput.value.trim();
-      const inviteCode = ctx.inviteInput.value.trim();
-      ctx.authError.textContent = '';
-
-      if (!email || !password) {
-        ctx.authError.textContent = 'Email and password are required.';
-        return;
+        try {
+          await api.postComment(ctx.targetId, message);
+          ctx.textarea.value = '';
+          await loadComments(ctx);
+        } catch (err) {
+          ctx.commentError.textContent = err.message || 'Failed to post comment.';
+        } finally {
+          ctx.submitBtn.disabled = !authState.user;
+        }
       }
 
-      ctx.authSubmit.disabled = true;
+      // Render a list of comments into the thread list.
+      function renderComments(listEl, comments) {
+        listEl.innerHTML = '';
+        if (!comments || comments.length === 0) {
+          listEl.innerHTML = '<div class="comment-empty">Be the first to comment.</div>';
+          return;
+        }
 
-      try {
-        const user = ctx.mode === 'login'
-          ? await api.login(email, password)
-          : await api.register(email, password, displayName, inviteCode);
-        setUser(user);
-        ctx.emailInput.value = '';
-        ctx.passwordInput.value = '';
-        ctx.displayNameInput.value = '';
-        ctx.inviteInput.value = '';
-      } catch (err) {
-        ctx.authError.textContent = err.message || 'Authentication failed.';
-      } finally {
-        ctx.authSubmit.disabled = false;
-      }
-    }
+        comments.forEach((comment) => {
+          const card = document.createElement('div');
+          card.className = 'comment-card';
 
-    async function handleLogout() {
-      try {
-        await api.logout();
-      } finally {
-        setUser(null);
-      }
-    }
+          const meta = document.createElement('div');
+          meta.className = 'comment-meta';
 
-    async function handleCommentSubmit(event, ctx) {
-      event.preventDefault();
-      ctx.commentError.textContent = '';
-      const user = authState.user;
-      if (!user) {
-        ctx.commentError.textContent = 'Please sign in to post.';
-        return;
-      }
+          const author = document.createElement('span');
+          author.className = 'comment-author';
+          author.textContent = comment.displayName || 'Reader';
 
-      const message = ctx.textarea.value.trim();
-      if (!message || message.length > 2000) {
-        ctx.commentError.textContent = 'Comment must be 1-2000 characters.';
-        return;
+          const timeEl = document.createElement('span');
+          timeEl.className = 'comment-time';
+          const date = comment.createdAt ? new Date(comment.createdAt) : null;
+          timeEl.textContent = date && !Number.isNaN(date) ? date.toLocaleString() : '';
+
+          meta.appendChild(author);
+          meta.appendChild(timeEl);
+
+          const body = document.createElement('p');
+          body.className = 'comment-body';
+          body.textContent = comment.message || '';
+
+          card.appendChild(meta);
+          card.appendChild(body);
+          listEl.appendChild(card);
+        });
       }
 
-      ctx.submitBtn.disabled = true;
-      try {
-        await api.postComment(ctx.targetId, message);
-        ctx.textarea.value = '';
-        await loadComments(ctx);
-      } catch (err) {
-        ctx.commentError.textContent = err.message || 'Failed to post comment.';
-      } finally {
-        ctx.submitBtn.disabled = !authState.user;
-      }
-    }
-
-    function renderComments(listEl, comments) {
-      listEl.innerHTML = '';
-      if (!comments || comments.length === 0) {
-        listEl.innerHTML = '<div class="comment-empty">Be the first to comment.</div>';
-        return;
+      // Fetch comments for a specific thread.
+      async function loadComments(ctx) {
+        try {
+          const comments = await api.fetchComments(ctx.targetId);
+          renderComments(ctx.listEl, comments);
+        } catch (err) {
+          ctx.listEl.innerHTML = `<div class="comment-empty">${err.message}</div>`;
+        }
       }
 
-      comments.forEach(comment => {
-        const card = document.createElement('div');
-        card.className = 'comment-card';
-
-        const meta = document.createElement('div');
-        meta.className = 'comment-meta';
-
-        const author = document.createElement('span');
-        author.className = 'comment-author';
-        author.textContent = comment.displayName || 'Reader';
-
-        const timeEl = document.createElement('span');
-        timeEl.className = 'comment-time';
-        const date = comment.createdAt ? new Date(comment.createdAt) : null;
-        timeEl.textContent = date && !Number.isNaN(date) ? date.toLocaleString() : '';
-
-        meta.appendChild(author);
-        meta.appendChild(timeEl);
-
-        const body = document.createElement('p');
-        body.className = 'comment-body';
-        body.textContent = comment.message || '';
-
-        card.appendChild(meta);
-        card.appendChild(body);
-        listEl.appendChild(card);
-      });
-    }
-
-    async function loadComments(ctx) {
-      try {
-        const comments = await api.fetchComments(ctx.targetId);
-        renderComments(ctx.listEl, comments);
-      } catch (err) {
-        ctx.listEl.innerHTML = `<div class="comment-empty">${err.message}</div>`;
-      }
-    }
-
-    function createCommentSection(targetId) {
-      const section = document.createElement('div');
-      section.className = 'comments-section collapsed';
-      section.dataset.targetId = targetId;
-      section.innerHTML = `
+      // Build the comments panel UI for a single post.
+      function createCommentSection(targetId) {
+        const section = document.createElement('div');
+        section.className = 'comments-section collapsed';
+        section.dataset.targetId = targetId;
+        section.innerHTML = `
         <div class="comments-title-row">
           <h3 class="comments-title">Comments</h3>
           <button type="button" class="comments-toggle" aria-expanded="false">Show comments</button>
@@ -836,6 +950,10 @@
             <input class="auth-input auth-display hidden" type="text" name="displayName" placeholder="Display name (optional)" autocomplete="name" />
             <input class="auth-input auth-invite hidden" type="text" name="inviteCode" placeholder="Invite code (if required)" autocomplete="off" />
             </div>
+            <label class="auth-check auth-email hidden">
+              <input type="checkbox" class="auth-email-optin" name="emailOptIn" />
+              <span>Join the email list.</span>
+            </label>
             <div class="auth-actions-row">
               <button type="submit" class="auth-submit">Sign in</button>
               <button type="button" class="auth-toggle">Need an account? Register</button>
@@ -854,158 +972,186 @@
         </div>
       `;
 
-      const ctx = {
-        section,
-        body: section.querySelector('.comments-body'),
-        toggleBtn: section.querySelector('.comments-toggle'),
-        targetId,
-        authStatus: section.querySelector('.auth-status'),
-        authForm: section.querySelector('.auth-form'),
-        authSubmit: section.querySelector('.auth-submit'),
-        authToggle: section.querySelector('.auth-toggle'),
-        authError: section.querySelector('.auth-error'),
-        emailInput: section.querySelector('input[type="email"]'),
-        passwordInput: section.querySelector('input[type="password"]'),
-        displayNameInput: section.querySelector('.auth-display'),
-        inviteInput: section.querySelector('.auth-invite'),
-        signoutBtn: section.querySelector('.signout-btn'),
-        commentForm: section.querySelector('.comment-form'),
-        textarea: section.querySelector('.comment-textarea'),
-        submitBtn: section.querySelector('.comment-submit'),
-        commentHint: section.querySelector('.comment-hint'),
-        commentError: section.querySelector('.comment-error'),
-        listEl: section.querySelector('.comments-list'),
-        mode: 'login',
-        collapsed: true
-      };
+        const ctx = {
+          section,
+          body: section.querySelector('.comments-body'),
+          toggleBtn: section.querySelector('.comments-toggle'),
+          targetId,
+          authStatus: section.querySelector('.auth-status'),
+          authForm: section.querySelector('.auth-form'),
+          authSubmit: section.querySelector('.auth-submit'),
+          authToggle: section.querySelector('.auth-toggle'),
+          authError: section.querySelector('.auth-error'),
+          emailInput: section.querySelector('input[type="email"]'),
+          passwordInput: section.querySelector('input[type="password"]'),
+          displayNameInput: section.querySelector('.auth-display'),
+          inviteInput: section.querySelector('.auth-invite'),
+          emailOptInRow: section.querySelector('.auth-email'),
+          emailOptInInput: section.querySelector('.auth-email-optin'),
+          signoutBtn: section.querySelector('.signout-btn'),
+          commentForm: section.querySelector('.comment-form'),
+          textarea: section.querySelector('.comment-textarea'),
+          submitBtn: section.querySelector('.comment-submit'),
+          commentHint: section.querySelector('.comment-hint'),
+          commentError: section.querySelector('.comment-error'),
+          listEl: section.querySelector('.comments-list'),
+          mode: 'login',
+          collapsed: true,
+        };
 
-      ctx.toggleBtn.addEventListener('click', () => {
-        setCollapsed(ctx, !ctx.collapsed);
-      });
-      ctx.authForm.addEventListener('submit', (e) => handleAuthSubmit(e, ctx));
-      ctx.authToggle.addEventListener('click', () => {
-        ctx.mode = ctx.mode === 'login' ? 'register' : 'login';
-        applyAuthMode(ctx);
-      });
-      ctx.signoutBtn.addEventListener('click', () => handleLogout());
-      ctx.commentForm.addEventListener('submit', (e) => handleCommentSubmit(e, ctx));
-
-      applyAuthMode(ctx);
-      updateSectionForUser(ctx);
-      setCollapsed(ctx, true);
-      loadComments(ctx);
-      commentContexts.push(ctx);
-      return section;
-    }
-
-    function renderPost(post) {
-      const article = document.createElement('article');
-      article.className = 'post';
-      const targetId = slugifyTarget(post.id || post.title || 'post');
-      article.id = targetId;
-
-      const header = document.createElement('div');
-      header.className = 'post-header';
-
-      const icon = document.createElement('img');
-      icon.className = 'post-icon';
-      icon.src = 'assets/boywondericon.png';
-      icon.alt = 'Boy Wonder icon';
-      icon.loading = 'lazy';
-
-      const title = document.createElement('h2');
-      title.className = 'post-title';
-      title.textContent = post.title || 'Untitled';
-
-      const date = document.createElement('div');
-      date.className = 'post-date';
-      const parsedDate = post.date ? new Date(post.date) : null;
-      date.textContent = parsedDate && !Number.isNaN(parsedDate) ? parsedDate.toLocaleString() : 'Date not set';
-
-      const titleWrap = document.createElement('div');
-      titleWrap.appendChild(title);
-      titleWrap.appendChild(date);
-
-      header.appendChild(icon);
-      header.appendChild(titleWrap);
-      article.appendChild(header);
-
-      if (post.image) {
-        const img = document.createElement('img');
-        img.className = 'post-image';
-        if (post.imageFocus) {
-          img.style.objectPosition = post.imageFocus;
-        }
-        img.src = post.image;
-        img.alt = post.title || 'Update image';
-        img.loading = 'lazy';
-        article.appendChild(img);
-      }
-
-      if (post.imageTags && post.imageTags.length) {
-        const tagsWrap = document.createElement('div');
-        tagsWrap.className = 'tag-list';
-        post.imageTags.forEach(tag => {
-          const pill = document.createElement('span');
-          pill.className = 'tag-pill';
-          pill.textContent = tag;
-          tagsWrap.appendChild(pill);
+        ctx.toggleBtn.addEventListener('click', () => {
+          setCollapsed(ctx, !ctx.collapsed);
         });
-        article.appendChild(tagsWrap);
+        ctx.authForm.addEventListener('submit', (e) => handleAuthSubmit(e, ctx));
+        ctx.authToggle.addEventListener('click', () => {
+          ctx.mode = ctx.mode === 'login' ? 'register' : 'login';
+          applyAuthMode(ctx);
+        });
+        ctx.signoutBtn.addEventListener('click', () => handleLogout());
+        ctx.commentForm.addEventListener('submit', (e) => handleCommentSubmit(e, ctx));
+
+        applyAuthMode(ctx);
+        updateSectionForUser(ctx);
+        setCollapsed(ctx, true);
+        loadComments(ctx);
+        commentContexts.push(ctx);
+        return section;
       }
 
-      const content = document.createElement('div');
-      content.className = 'post-content';
-      content.innerHTML = sanitizeContent(post.content || '');
-      article.appendChild(content);
+      // Render a feed post card and append its comment section.
+      function renderPost(post) {
+        const article = document.createElement('article');
+        article.className = 'post';
+        const targetId = slugifyTarget(`post:${post.id || post.title || 'post'}`);
+        article.id = targetId.replace(/:/g, '-');
 
-      article.appendChild(createCommentSection(targetId));
-      feedContainer.appendChild(article);
-    }
+        const header = document.createElement('div');
+        header.className = 'post-header';
 
-    async function loadFeed() {
-      try {
-        const response = await fetch('/api/posts', { cache: 'no-store' });
-        if (!response.ok) throw new Error('Failed to load posts');
-        const data = await response.json().catch(() => ({}));
-        let posts = Array.isArray(data.posts)
-          ? data.posts.map(p => ({
-            ...p,
-            imageTags: Array.isArray(p.imageTags)
-              ? p.imageTags
-              : (p.imageTags ? String(p.imageTags).split(',').map(t => t.trim()).filter(Boolean) : [])
-          }))
-          : [];
+        const icon = document.createElement('img');
+        icon.className = 'post-icon';
+        icon.src = '/boywondericon.png';
+        icon.alt = 'Boy Wonder icon';
+        icon.loading = 'lazy';
 
-        feedContainer.innerHTML = '';
+        const title = document.createElement('h2');
+        title.className = 'post-title';
+        const titleText = (post.title || '').trim();
+        title.textContent = titleText || 'Update';
+        if (!titleText) title.classList.add('is-placeholder');
 
-        if (!Array.isArray(posts) || posts.length === 0) {
-          feedContainer.innerHTML = '<div class="empty-state">No updates yet. Check back soon!</div>';
-          return;
+        const date = document.createElement('div');
+        date.className = 'post-date';
+        const parsedDate = post.date ? new Date(post.date) : null;
+        date.textContent =
+          parsedDate && !Number.isNaN(parsedDate) ? parsedDate.toLocaleString() : 'Date not set';
+
+        const titleWrap = document.createElement('div');
+        titleWrap.appendChild(title);
+        titleWrap.appendChild(date);
+
+        header.appendChild(icon);
+        header.appendChild(titleWrap);
+        article.appendChild(header);
+
+        const imageSrc = (post.image || post.thumbPath || '').trim();
+        if (imageSrc) {
+          const img = document.createElement('img');
+          img.className = 'post-image';
+          if (post.imageFocus) {
+            img.style.objectPosition = post.imageFocus;
+          }
+          img.src = imageSrc;
+          img.alt = titleText || 'Update image';
+          img.loading = 'lazy';
+          img.onerror = () => {
+            if (img.src.endsWith(FALLBACK_IMAGE)) return;
+            img.src = FALLBACK_IMAGE;
+            img.classList.add('is-missing');
+          };
+          article.appendChild(img);
         }
 
-        posts.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-        posts.forEach(renderPost);
-      } catch (error) {
-        console.error(error);
-        feedContainer.innerHTML = '<div class="empty-state" style="border-color: rgba(255,0,234,0.4); color: var(--secondary);">Failed to load updates.</div>';
+        if (post.imageTags && post.imageTags.length) {
+          const tagsWrap = document.createElement('div');
+          tagsWrap.className = 'tag-list';
+          post.imageTags.forEach((tag) => {
+            const pill = document.createElement('span');
+            pill.className = 'tag-pill';
+            pill.textContent = tag;
+            tagsWrap.appendChild(pill);
+          });
+          article.appendChild(tagsWrap);
+        }
+
+        const content = document.createElement('div');
+        content.className = 'post-content';
+        content.innerHTML = sanitizeContent(post.content || '');
+        article.appendChild(content);
+
+        article.appendChild(createCommentSection(targetId));
+        feedContainer.appendChild(article);
       }
-    }
 
-    async function bootstrap() {
-      try {
-        const user = await api.session();
-        setUser(user);
-      } catch (err) {
-        console.warn('Session check failed', err);
-        setUser(null);
+      // Load posts from the API and render the feed.
+      async function loadFeed() {
+        try {
+          const response = await fetch('/api/posts', { cache: 'no-store' });
+          if (!response.ok) throw new Error('Failed to load posts');
+          const data = await response.json().catch(() => ({}));
+          let posts = Array.isArray(data.posts)
+            ? data.posts.map((p) => ({
+                ...p,
+                imageTags: Array.isArray(p.imageTags)
+                  ? p.imageTags
+                  : p.imageTags
+                    ? String(p.imageTags)
+                        .split(',')
+                        .map((t) => t.trim())
+                        .filter(Boolean)
+                    : [],
+              }))
+            : [];
+
+          feedContainer.innerHTML = '';
+
+          if (!Array.isArray(posts) || posts.length === 0) {
+            feedContainer.innerHTML =
+              '<div class="empty-state">No updates yet. Check back soon!</div>';
+            return;
+          }
+
+          posts.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+          posts.forEach(renderPost);
+        } catch (error) {
+          console.error(error);
+          feedContainer.innerHTML =
+            '<div class="empty-state" style="border-color: rgba(255,0,234,0.4); color: var(--secondary);">Failed to load updates.</div>';
+        }
       }
-      await loadFeed();
-    }
 
-    bootstrap();
-  </script>
-  <script defer src="/analytics.js"></script>
-</body>
+      // Bootstrap auth and feed data on load.
+      async function bootstrap() {
+        try {
+          const user = await api.session();
+          setUser(user);
+        } catch (err) {
+          console.warn('Session check failed', err);
+          setUser(null);
+        }
+        await loadFeed();
+      }
 
+      bootstrap();
+    </script>
+    <script>
+      // Load the analytics loader without Vite bundling it.
+      (() => {
+        const script = document.createElement('script');
+        script.defer = true;
+        script.src = '/analytics.js';
+        document.head.appendChild(script);
+      })();
+    </script>
+  </body>
 </html>

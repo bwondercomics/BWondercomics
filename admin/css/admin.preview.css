@@ -1,0 +1,28 @@
+/* ==================== PREVIEW SECTION ==================== */
+.preview-container {
+  background: var(--bg-dark);
+  border: 2px solid var(--accent);
+  border-radius: 5px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.preview-title {
+  font-family: 'Bebas Neue', cursive;
+  font-size: 1.3rem;
+  color: var(--accent);
+  margin-bottom: 15px;
+}
+
+.preview-data {
+  background: var(--bg-panel);
+  border: 1px solid var(--primary);
+  border-radius: 3px;
+  padding: 15px;
+  font-family: monospace;
+  font-size: 0.85rem;
+  color: var(--primary);
+  overflow-x: auto;
+  max-height: 400px;
+  overflow-y: auto;
+}

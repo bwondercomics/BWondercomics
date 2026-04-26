@@ -1,4 +1,4 @@
-.PHONY: help env check-env up down restart ps logs api-logs db-logs migrate api-sh psql backup backup-db backup-files restore-db restore-files up-analytics analytics-up analytics-stop analytics-logs
+.PHONY: help env check-env up down restart ps logs api-logs db-logs migrate api-sh psql backup backup-db backup-files restore-db restore-files up-analytics analytics-up analytics-stop analytics-logs chat-up chat-stop chat-logs
 
 ENV_FILE ?= deploy/bwondercomics.env
 COMPOSE_FILE ?= deploy/bwondercomics-compose.yml
@@ -11,10 +11,12 @@ help:
 	@echo ""
 	@echo "  make up              Start/rebuild stack"
 	@echo "  make up-analytics     Start stack + Umami"
+	@echo "  make chat-up          Start Stoat chat profile services"
 	@echo "  make migrate         Run DB migrations"
 	@echo "  make logs            Tail all logs"
 	@echo "  make api-logs         Tail API logs"
 	@echo "  make analytics-logs   Tail Umami logs"
+	@echo "  make chat-logs        Tail Stoat chat logs"
 	@echo "  make ps              Show container status"
 	@echo ""
 	@echo "  make backup           Backup DB + files to $(BACKUP_DIR)/"
@@ -44,6 +46,15 @@ analytics-up: check-env
 
 analytics-stop: check-env
 	$(COMPOSE) stop umami umami-db
+
+chat-up: check-env
+	$(COMPOSE) --profile chat up -d stoat-mongodb stoat-redis stoat-rabbitmq stoat-api stoat-events stoat-web
+
+chat-stop: check-env
+	$(COMPOSE) stop stoat-web stoat-events stoat-delta stoat-api stoat-rabbitmq stoat-redis stoat-mongodb
+
+chat-logs: check-env
+	$(COMPOSE) logs -f --tail=200 stoat-web stoat-events stoat-delta stoat-api stoat-rabbitmq
 
 down: check-env
 	$(COMPOSE) down

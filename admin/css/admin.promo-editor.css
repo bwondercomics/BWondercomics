@@ -1,0 +1,77 @@
+/* ==================== PROMO MODULE EDITOR ==================== */
+
+.pb-promo-items-section {
+  margin-bottom: 0;
+}
+
+.pb-promo-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.pb-promo-item {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.pb-promo-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-wrap: wrap;
+}
+
+.pb-promo-item-num {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.pb-promo-item-actions {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.pb-promo-action {
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 6px;
+  color: var(--text);
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: background 0.15s ease;
+}
+
+.pb-promo-action:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.pb-promo-action--delete:hover {
+  background: rgba(255, 56, 56, 0.3);
+  color: var(--danger);
+}
+
+.pb-promo-action:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+.pb-promo-empty {
+  padding: 20px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.9rem;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}

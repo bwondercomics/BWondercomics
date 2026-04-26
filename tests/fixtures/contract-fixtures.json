@@ -1,0 +1,914 @@
+{
+  "seriesIndex": {
+    "version": 1,
+    "defaultSeriesId": "battle-bros",
+    "series": [
+      {
+        "id": "battle-bros",
+        "title": "Battle Bros",
+        "description": "Mainline adventures.",
+        "premiumOnly": false,
+        "unitLabelSingular": "Issue",
+        "unitLabelPlural": "Issues",
+        "coverImage": "media/covers/battle-bros.png"
+      },
+      {
+        "id": "stealth-mode",
+        "title": "Stealth Mode",
+        "description": "Premium side stories.",
+        "premiumOnly": true,
+        "unitLabelSingular": "Drop",
+        "unitLabelPlural": "Drops"
+      }
+    ]
+  },
+  "seriesData": {
+    "entries": {
+      "Issue 2": [
+        "protected/comics/battle-bros/issue-2/01.png",
+        "protected/comics/battle-bros/issue-2/02.png"
+      ],
+      "Issue 10": [
+        "protected/comics/battle-bros/issue-10/01.png",
+        "/media/public/issue-10-bonus.png"
+      ],
+      "Store Release": [],
+      "Patron Early Access": [
+        "protected/comics/battle-bros/issue-11/01.png"
+      ]
+    },
+    "entryFolders": {
+      "Issue 2": "comics/battle-bros/entries/issue-2",
+      "Issue 10": "comics/battle-bros/entries/issue-10",
+      "Patron Early Access": "comics/battle-bros/entries/issue-11"
+    },
+    "entryMeta": {
+      "Issue 2": {
+        "entryId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb02",
+        "displayNumber": 2,
+        "premium": false,
+        "showInDropdown": true,
+        "showInGallery": true,
+        "releaseType": "digital",
+        "storeUrl": "",
+        "coverImage": "protected/media/covers/issue-2.png",
+        "coverThumbPath": "media/previews/covers/entry-issue-2.jpg",
+        "entryLabelId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+        "entryLabelSingular": "Issue",
+        "entryLabelPlural": "Issues"
+      },
+      "Issue 10": {
+        "entryId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb0a",
+        "displayNumber": 10,
+        "premium": false,
+        "showInDropdown": true,
+        "showInGallery": true,
+        "releaseType": "digital",
+        "storeUrl": "",
+        "coverImage": "protected/media/covers/issue-10.png",
+        "coverThumbPath": "media/previews/covers/entry-issue-10.jpg",
+        "entryLabelId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+        "entryLabelSingular": "Issue",
+        "entryLabelPlural": "Issues"
+      },
+      "Store Release": {
+        "entryId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb14",
+        "premium": false,
+        "showInDropdown": true,
+        "showInGallery": true,
+        "releaseType": "store",
+        "storeUrl": "https://store.example.com/battle-bros-volume-1",
+        "coverImage": "",
+        "coverThumbPath": "",
+        "entryLabelId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+        "entryLabelSingular": "Issue",
+        "entryLabelPlural": "Issues"
+      },
+      "Patron Early Access": {
+        "entryId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbb0b",
+        "displayNumber": 11,
+        "premium": true,
+        "showInDropdown": true,
+        "showInGallery": true,
+        "releaseType": "digital",
+        "storeUrl": "",
+        "coverImage": "protected/media/covers/issue-11.png",
+        "coverThumbPath": "media/previews/covers/entry-issue-11.jpg",
+        "entryLabelId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+        "entryLabelSingular": "Issue",
+        "entryLabelPlural": "Issues"
+      }
+    },
+    "statusMessage": "Ready",
+    "premiumOnly": false,
+    "unitLabelSingular": "Issue",
+    "unitLabelPlural": "Issues",
+    "entryLabels": [
+      {
+        "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaa1",
+        "slug": "issues",
+        "singular": "Issue",
+        "plural": "Issues",
+        "sortIndex": 0,
+        "isDefault": true
+      }
+    ],
+    "lastUpdated": "2026-03-28T00:00:00Z",
+    "publishedBy": "Database",
+    "payloadVersion": 2
+  },
+  "pageConfig": {
+    "content": {
+      "header": {
+        "subtitles": [
+          "Hero Time",
+          "Lunch Break Justice"
+        ]
+      }
+    },
+    "site": {
+      "header": {
+        "version": 1,
+        "regions": {
+          "left": ["brand"],
+          "center": ["patron", "status"],
+          "right": ["entryControls", "nav"]
+        },
+        "blocks": {
+          "brand": { "enabled": true },
+          "patron": { "enabled": true },
+          "status": { "enabled": true },
+          "entryControls": { "enabled": true },
+          "nav": { "enabled": true }
+        },
+        "nav": {
+          "enabled": true,
+          "items": [
+            {
+              "id": "nav-comics",
+              "label": "Comics",
+              "enabled": true,
+              "link": {
+                "kind": "url",
+                "url": "comics.html",
+                "openInNewTab": false
+              }
+            }
+          ]
+        }
+      },
+      "ogImagePath": "media/site/og.png",
+      "faviconPath": "media/site/icon.png"
+    }
+  },
+  "builderModules": {
+    "header": {
+      "id": "fffffff1-ffff-4fff-8fff-ffffffffff01",
+      "moduleType": "header",
+      "columnIndex": 0,
+      "sortIndex": 0,
+      "config": {
+        "title": "Battle Bros",
+        "subtitle": "Hero Time",
+        "subtitles": [
+          "Hero Time",
+          "Lunch Break Justice"
+        ]
+      }
+    },
+    "text": {
+      "id": "fffffff1-ffff-4fff-8fff-ffffffffff02",
+      "moduleType": "text",
+      "columnIndex": 0,
+      "sortIndex": 0,
+      "config": {
+        "content": "<p><strong>Heroes</strong> are back.</p>",
+        "alignment": "center"
+      }
+    },
+    "image": {
+      "id": "fffffff1-ffff-4fff-8fff-ffffffffff03",
+      "moduleType": "image",
+      "columnIndex": 0,
+      "sortIndex": 1,
+      "config": {
+        "src": "media/promo/hero-pose.png",
+        "alt": "Hero pose",
+        "caption": "Issue 10 cover stance"
+      }
+    },
+    "gallery": {
+      "id": "fffffff1-ffff-4fff-8fff-ffffffffff04",
+      "moduleType": "gallery",
+      "columnIndex": 0,
+      "sortIndex": 2,
+      "config": {
+        "columns": 2,
+        "images": [
+          {
+            "src": "media/gallery/shot-1.png",
+            "alt": "Shot one"
+          },
+          {
+            "src": "media/gallery/shot-2.png",
+            "alt": "Shot two"
+          }
+        ]
+      }
+    },
+    "video": {
+      "id": "fffffff1-ffff-4fff-8fff-ffffffffff05",
+      "moduleType": "video",
+      "columnIndex": 1,
+      "sortIndex": 0,
+      "config": {
+        "url": "https://youtu.be/demo123"
+      }
+    },
+    "social": {
+      "id": "fffffff1-ffff-4fff-8fff-ffffffffff06",
+      "moduleType": "social",
+      "columnIndex": 1,
+      "sortIndex": 1,
+      "config": {
+        "buttons": [
+          {
+            "icon": "B",
+            "text": "Bluesky",
+            "url": "https://bsky.app/profile/example",
+            "style": {
+              "bgColor": "#00d9ff",
+              "bgOpacity": 0.8,
+              "textColor": "#101010",
+              "borderColor": "#ffed00",
+              "borderOpacity": 0.9,
+              "borderWidth": 2,
+              "borderRadius": 6
+            }
+          }
+        ]
+      }
+    },
+    "email-signup": {
+      "id": "fffffff1-ffff-4fff-8fff-ffffffffff07",
+      "moduleType": "email-signup",
+      "columnIndex": 0,
+      "sortIndex": 3,
+      "config": {
+        "heading": "Join the List",
+        "subtext": "Get launch notes and bonus drops.",
+        "placeholder": "hero@example.com",
+        "buttonText": "Subscribe",
+        "style": {
+          "headingFont": "display",
+          "headingColor": "#ffffff",
+          "headingGlow": true,
+          "inputStyle": "bubble",
+          "buttonColor": "#00d9ff",
+          "buttonGlow": true
+        }
+      }
+    },
+    "promo": {
+      "id": "fffffff1-ffff-4fff-8fff-ffffffffff08",
+      "moduleType": "promo",
+      "columnIndex": 0,
+      "sortIndex": 4,
+      "config": {
+        "items": [
+          {
+            "image": "media/promo/drop-1.png",
+            "topText": "Issue 10",
+            "bottomText": "<p>Out now</p>",
+            "textPosition": "overlay",
+            "imageFit": "cover",
+            "linkUrl": "https://store.example.com/drop-1",
+            "style": {
+              "backgroundColor": "#101820",
+              "backgroundOpacity": 0.65,
+              "backgroundBlur": true,
+              "topTextColor": "#ffed00",
+              "bottomTextColor": "#ffffff",
+              "imageBorder": true,
+              "imageBorderColor": "#00d9ff"
+            }
+          },
+          {
+            "image": "media/promo/drop-2.png",
+            "topText": "Patron Preview",
+            "bottomText": "<p>Early pages</p>",
+            "textPosition": "outside",
+            "imageFit": "contain",
+            "style": {
+              "backgroundColor": "#0a0a12",
+              "backgroundOpacity": 0.6
+            }
+          }
+        ],
+        "autoRotate": true,
+        "interval": 3000,
+        "showNavigation": true,
+        "showIndicators": true,
+        "height": 320,
+        "transition": "fade"
+      }
+    },
+    "buttons": {
+      "id": "fffffff1-ffff-4fff-8fff-ffffffffff09",
+      "moduleType": "buttons",
+      "columnIndex": 1,
+      "sortIndex": 2,
+      "config": {
+        "buttons": [
+          {
+            "text": "Read Feed",
+            "url": "feed.html",
+            "style": "primary"
+          },
+          {
+            "text": "Store",
+            "url": "https://store.example.com",
+            "style": "secondary"
+          }
+        ]
+      }
+    },
+    "divider": {
+      "id": "fffffff1-ffff-4fff-8fff-ffffffffff0a",
+      "moduleType": "divider",
+      "columnIndex": 0,
+      "sortIndex": 5,
+      "config": {
+        "style": "dashed",
+        "color": "#ffed00"
+      }
+    },
+    "spacer": {
+      "id": "fffffff1-ffff-4fff-8fff-ffffffffff0b",
+      "moduleType": "spacer",
+      "columnIndex": 1,
+      "sortIndex": 3,
+      "config": {
+        "height": 64
+      }
+    },
+    "reader": {
+      "id": "fffffff1-ffff-4fff-8fff-ffffffffff0c",
+      "moduleType": "reader",
+      "columnIndex": 0,
+      "sortIndex": 6,
+      "config": {
+        "showPanels": true,
+        "showComments": false
+      }
+    },
+    "entry-gallery": {
+      "id": "fffffff1-ffff-4fff-8fff-ffffffffff0d",
+      "moduleType": "entry-gallery",
+      "columnIndex": 0,
+      "sortIndex": 7,
+      "config": {
+        "columns": 4,
+        "showLabels": false
+      }
+    },
+    "feed": {
+      "id": "fffffff1-ffff-4fff-8fff-ffffffffff0e",
+      "moduleType": "feed",
+      "columnIndex": 1,
+      "sortIndex": 4,
+      "config": {
+        "limit": 3,
+        "heading": "BWC FEED",
+        "author": "DOYLE MELVILLE II",
+        "showAuthor": true,
+        "showDropdown": true,
+        "feedLabel": "Open feed",
+        "feedHref": "feed.html",
+        "showMediaButton": true,
+        "mediaLabel": "Media",
+        "mediaHref": "media.html",
+        "style": {
+          "headingBgColor": "#ffed00",
+          "headingTextColor": "#0a0a12",
+          "authorColor": "#7ef5e3",
+          "buttonBgColor": "#00d9ff",
+          "buttonTextColor": "#0a0a12",
+          "itemTitleColor": "#ffed00",
+          "itemDateColor": "#00d9ff",
+          "itemBorderColor": "#00d9ff",
+          "borderColor": "#ffed00"
+        }
+      }
+    },
+    "html": {
+      "id": "fffffff1-ffff-4fff-8fff-ffffffffff0f",
+      "moduleType": "html",
+      "columnIndex": 0,
+      "sortIndex": 8,
+      "config": {
+        "code": "<div class=\"custom-widget\">Builder HTML</div>"
+      }
+    }
+  },
+  "builderPage": {
+    "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeee01",
+    "seriesId": "battle-bros",
+    "slug": "reader",
+    "title": "Reader",
+    "pageType": "reader",
+    "isPublished": true,
+    "isHomepage": true,
+    "sortIndex": 0,
+    "sections": [
+      {
+        "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeee11",
+        "sectionType": "row",
+        "layout": "1",
+        "sortIndex": 0,
+        "settings": {
+          "paddingTop": 12,
+          "paddingBottom": 18
+        },
+        "modules": [
+          {
+            "id": "fffffff1-ffff-4fff-8fff-ffffffffff01",
+            "moduleType": "header",
+            "columnIndex": 0,
+            "sortIndex": 0,
+            "config": {
+              "title": "Battle Bros",
+              "subtitle": "Hero Time",
+              "subtitles": [
+                "Hero Time",
+                "Lunch Break Justice"
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeee12",
+        "sectionType": "row",
+        "layout": "1-1",
+        "sortIndex": 1,
+        "settings": {
+          "moduleGap": 20,
+          "columnGap": 24,
+          "panelEnabled": {
+            "left": true,
+            "right": true
+          }
+        },
+        "modules": [
+          {
+            "id": "fffffff1-ffff-4fff-8fff-ffffffffff02",
+            "moduleType": "text",
+            "columnIndex": 0,
+            "sortIndex": 0,
+            "config": {
+              "content": "<p><strong>Heroes</strong> are back.</p>",
+              "alignment": "center"
+            }
+          },
+          {
+            "id": "fffffff1-ffff-4fff-8fff-ffffffffff03",
+            "moduleType": "image",
+            "columnIndex": 0,
+            "sortIndex": 1,
+            "config": {
+              "src": "media/promo/hero-pose.png",
+              "alt": "Hero pose",
+              "caption": "Issue 10 cover stance"
+            }
+          },
+          {
+            "id": "fffffff1-ffff-4fff-8fff-ffffffffff08",
+            "moduleType": "promo",
+            "columnIndex": 0,
+            "sortIndex": 2,
+            "config": {
+              "items": [
+                {
+                  "image": "media/promo/drop-1.png",
+                  "topText": "Issue 10",
+                  "bottomText": "<p>Out now</p>",
+                  "textPosition": "overlay",
+                  "imageFit": "cover",
+                  "linkUrl": "https://store.example.com/drop-1",
+                  "style": {
+                    "backgroundColor": "#101820",
+                    "backgroundOpacity": 0.65,
+                    "backgroundBlur": true,
+                    "topTextColor": "#ffed00",
+                    "bottomTextColor": "#ffffff",
+                    "imageBorder": true,
+                    "imageBorderColor": "#00d9ff"
+                  }
+                },
+                {
+                  "image": "media/promo/drop-2.png",
+                  "topText": "Patron Preview",
+                  "bottomText": "<p>Early pages</p>",
+                  "textPosition": "outside",
+                  "imageFit": "contain",
+                  "style": {
+                    "backgroundColor": "#0a0a12",
+                    "backgroundOpacity": 0.6
+                  }
+                }
+              ],
+              "autoRotate": true,
+              "interval": 3000,
+              "showNavigation": true,
+              "showIndicators": true,
+              "height": 320,
+              "transition": "fade"
+            }
+          },
+          {
+            "id": "fffffff1-ffff-4fff-8fff-ffffffffff0e",
+            "moduleType": "feed",
+            "columnIndex": 1,
+            "sortIndex": 0,
+            "config": {
+              "limit": 3,
+              "heading": "BWC FEED",
+              "author": "DOYLE MELVILLE II",
+              "showAuthor": true,
+              "showDropdown": true,
+              "feedLabel": "Open feed",
+              "feedHref": "feed.html",
+              "showMediaButton": true,
+              "mediaLabel": "Media",
+              "mediaHref": "media.html",
+              "style": {
+                "headingBgColor": "#ffed00",
+                "headingTextColor": "#0a0a12",
+                "authorColor": "#7ef5e3",
+                "buttonBgColor": "#00d9ff",
+                "buttonTextColor": "#0a0a12",
+                "itemTitleColor": "#ffed00",
+                "itemDateColor": "#00d9ff",
+                "itemBorderColor": "#00d9ff",
+                "borderColor": "#ffed00"
+              }
+            }
+          },
+          {
+            "id": "fffffff1-ffff-4fff-8fff-ffffffffff06",
+            "moduleType": "social",
+            "columnIndex": 1,
+            "sortIndex": 1,
+            "config": {
+              "buttons": [
+                {
+                  "icon": "B",
+                  "text": "Bluesky",
+                  "url": "https://bsky.app/profile/example",
+                  "style": {
+                    "bgColor": "#00d9ff",
+                    "bgOpacity": 0.8,
+                    "textColor": "#101010",
+                    "borderColor": "#ffed00",
+                    "borderOpacity": 0.9,
+                    "borderWidth": 2,
+                    "borderRadius": 6
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "id": "fffffff1-ffff-4fff-8fff-ffffffffff09",
+            "moduleType": "buttons",
+            "columnIndex": 1,
+            "sortIndex": 2,
+            "config": {
+              "buttons": [
+                {
+                  "text": "Read Feed",
+                  "url": "feed.html",
+                  "style": "primary"
+                },
+                {
+                  "text": "Store",
+                  "url": "https://store.example.com",
+                  "style": "secondary"
+                }
+              ]
+            }
+          },
+          {
+            "id": "fffffff1-ffff-4fff-8fff-ffffffffff0b",
+            "moduleType": "spacer",
+            "columnIndex": 1,
+            "sortIndex": 3,
+            "config": {
+              "height": 64
+            }
+          }
+        ]
+      }
+    ],
+    "meta": {
+      "theme": {
+        "accent": "#ffcc00",
+        "bgDark": "#090d1f",
+        "bgPanel": "#151a33",
+        "primary": "#00d9ff",
+        "text": "#ffffff"
+      },
+      "panelSpacing": {
+        "left": 18,
+        "right": 26
+      },
+      "panelBackgrounds": {
+        "left": {
+          "path": "media/panels/left-grid.png",
+          "fit": "contain",
+          "focus": "top",
+          "opacity": 0.42
+        },
+        "right": {
+          "path": "media/panels/right-burst.png",
+          "fit": "cover",
+          "focus": "center",
+          "opacity": 0.6,
+          "hideEmptyText": true
+        }
+      },
+      "header": {
+        "version": 3,
+        "copy": {
+          "title": "Battle Bros",
+          "subtitle": "Hero Time",
+          "subtitles": [
+            "Hero Time",
+            "Lunch Break Justice"
+          ]
+        },
+        "regions": {
+          "left": ["brand"],
+          "center": ["nav"],
+          "right": ["entryControls", "status", "patron"]
+        },
+        "blocks": {
+          "brand": { "enabled": true },
+          "patron": { "enabled": true },
+          "status": { "enabled": true },
+          "entryControls": { "enabled": true },
+          "nav": { "enabled": true }
+        },
+        "nav": {
+          "items": [
+            {
+              "id": "nav-about",
+              "label": "About",
+              "enabled": true,
+              "link": {
+                "kind": "builder-page",
+                "pageSlug": "about"
+              }
+            },
+            {
+              "id": "nav-comics",
+              "label": "Comics",
+              "enabled": true,
+              "link": {
+                "kind": "url",
+                "url": "comics.html",
+                "openInNewTab": false
+              }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "builderPageDraft": {
+    "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeee02",
+    "seriesId": "battle-bros",
+    "slug": "about",
+    "title": "About",
+    "pageType": "custom",
+    "isPublished": false,
+    "isHomepage": false,
+    "sortIndex": 1,
+    "sections": [
+      {
+        "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeee13",
+        "sectionType": "row",
+        "layout": "1",
+        "sortIndex": 0,
+        "settings": {},
+        "modules": [
+          {
+            "id": "fffffff1-ffff-4fff-8fff-ffffffffff10",
+            "moduleType": "text",
+            "columnIndex": 0,
+            "sortIndex": 0,
+            "config": {
+              "content": "<p>About Battle Bros</p>",
+              "alignment": "left"
+            }
+          }
+        ]
+      }
+    ],
+    "meta": {
+      "theme": {
+        "accent": "#00ff88"
+      },
+      "headerOverrides": {
+        "hiddenBlockIds": ["status"]
+      }
+    }
+  },
+  "session": {
+    "guest": {
+      "user": null
+    },
+    "admin": {
+      "user": {
+        "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc01",
+        "email": "admin@example.com",
+        "displayName": "Admin",
+        "role": "admin",
+        "createdAt": "2026-03-28T00:00:00Z"
+      }
+    },
+    "premium": {
+      "user": {
+        "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc02",
+        "email": "premium@example.com",
+        "displayName": "Premium",
+        "role": "premium",
+        "createdAt": "2026-03-28T00:00:00Z"
+      }
+    },
+    "user": {
+      "user": {
+        "id": "cccccccc-cccc-4ccc-8ccc-cccccccccc03",
+        "email": "reader@example.com",
+        "displayName": "Reader",
+        "role": "user",
+        "createdAt": "2026-03-28T00:00:00Z"
+      }
+    }
+  },
+  "latestPost": {
+    "id": "dddddddd-dddd-4ddd-8ddd-dddddddddd01",
+    "title": "Issue 10 Released",
+    "content": "<p>Battle Bros returns with a bigger drop.</p>",
+    "image": "media/posts/issue-10.png",
+    "thumbPath": "media/previews/thumbs/post-issue-10.jpg",
+    "imageFit": "cover",
+    "imageFocus": "center",
+    "date": "2026-03-28T00:00:00Z",
+    "share": true,
+    "shareBluesky": false,
+    "status": "published"
+  },
+  "feedPosts": [
+    {
+      "id": "feed-post-2",
+      "title": "Newest Briefing",
+      "content": "<p>Fresh intel with <strong>markup</strong>.</p><object data=\"/ignored\"></object>",
+      "image": "media/posts/newest.png",
+      "thumbPath": "media/previews/thumbs/newest.jpg",
+      "imageFit": "cover",
+      "imageFocus": "center",
+      "date": "2026-04-03T18:00:00Z"
+    },
+    {
+      "id": "feed-post-1",
+      "title": "Sanitized Update",
+      "content": "<p>Safe <em>copy</em> plus <a href=\"https://example.com/story\">good link</a> and <custom-embed>blocked</custom-embed><img alt=\"bad\"></p>",
+      "image": "",
+      "thumbPath": "",
+      "imageFit": "contain",
+      "imageFocus": "top",
+      "date": "2026-03-29T12:00:00Z"
+    },
+    {
+      "id": "feed-post-0",
+      "title": "Missing Thumb",
+      "content": "<p>Older news item.</p>",
+      "image": "media/posts/missing.png",
+      "thumbPath": "media/previews/thumbs/missing.jpg",
+      "imageFit": "cover",
+      "imageFocus": "bottom",
+      "date": "2026-03-20T09:00:00Z"
+    }
+  ],
+  "mediaItems": [
+    {
+      "id": "media-public",
+      "path": "media/gallery/poster.png",
+      "tags": [
+        "poster"
+      ],
+      "public": true,
+      "access": "public",
+      "premiumVisibility": "blur",
+      "thumbPath": "media/previews/thumbs/media-public.jpg",
+      "previewPath": ""
+    },
+    {
+      "id": "media-premium",
+      "path": "protected/media/gallery/teaser.png",
+      "tags": [
+        "premium"
+      ],
+      "public": false,
+      "access": "premium",
+      "premiumVisibility": "blur",
+      "thumbPath": "media/previews/thumbs/media-premium.jpg",
+      "previewPath": "media/previews/blurred/media-premium.jpg"
+    }
+  ],
+  "posts": {
+    "published": {
+      "id": "dddddddd-dddd-4ddd-8ddd-dddddddddd01",
+      "title": "Issue 10 Released",
+      "content": "<p>Battle Bros returns with a bigger drop.</p>",
+      "image": "media/posts/issue-10.png",
+      "imageTags": [
+        "launch",
+        "issue-10"
+      ],
+      "imageFit": "cover",
+      "imageFocus": "center",
+      "date": "2026-03-28T00:00:00Z",
+      "share": true,
+      "shareBluesky": false,
+      "status": "published"
+    },
+    "scheduled": {
+      "id": "dddddddd-dddd-4ddd-8ddd-dddddddddd02",
+      "title": "Patron Early Access",
+      "content": "<p>Patrons get the next issue early.</p>",
+      "image": "protected/media/posts/patron-early-access.png",
+      "imageTags": [
+        "patron"
+      ],
+      "imageFit": "contain",
+      "imageFocus": "top",
+      "date": "2026-04-05T12:00:00Z",
+      "share": true,
+      "shareBluesky": true,
+      "status": "scheduled"
+    }
+  },
+  "tracking": {
+    "firstVisit": {
+      "visitorId": "visitor-001",
+      "path": "/index.html?series=battle-bros",
+      "title": "Battle Bros Reader",
+      "origin": "https://battlebros.example.com",
+      "referrer": "https://search.example.com/result",
+      "seriesId": "battle-bros",
+      "entryTitle": "Issue 10",
+      "entryLabel": "battle-bros | Issue 10",
+      "pageNumber": 3
+    },
+    "repeatVisit": {
+      "visitorId": "visitor-001",
+      "path": "/index.html?series=battle-bros&page=4",
+      "title": "Battle Bros Reader",
+      "origin": "https://battlebros.example.com",
+      "referrer": "https://battlebros.example.com/feed.html",
+      "seriesId": "battle-bros",
+      "entryTitle": "Issue 10",
+      "entryLabel": "battle-bros | Issue 10",
+      "pageNumber": 4
+    }
+  },
+  "userFixtures": {
+    "emailSubscribe": {
+      "email": "reader@example.com",
+      "source": "feed-module"
+    },
+    "premiumCode": {
+      "code": "gold-pass",
+      "note": "Launch promo code"
+    },
+    "comments": [
+      {
+        "id": "99999999-9999-4999-8999-999999999901",
+        "targetId": "battle-bros--issue-10",
+        "message": "Need that next drop.",
+        "createdAt": "2026-03-28T01:00:00Z",
+        "hidden": false
+      },
+      {
+        "id": "99999999-9999-4999-8999-999999999902",
+        "targetId": "battle-bros--issue-10-page-2",
+        "message": "Panel composition is wild.",
+        "createdAt": "2026-03-28T02:00:00Z",
+        "hidden": true
+      }
+    ]
+  }
+}

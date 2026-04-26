@@ -3,15 +3,16 @@
  * Handles reading progress persistence and runtime state
  */
 
-import { CONFIG } from './config.js';
+import { STORAGE } from './constants.js';
 
 /**
  * Global application state object
  * Contains all runtime state for the comic reader
  * @type {Object}
- * @property {string} currentChapter - Name of the currently displayed chapter
+ * @property {string} currentEntry - Name of the currently displayed chapter
  * @property {string[]} pages - Array of image URLs for the current chapter
  * @property {number} pageIndex - Current page index (0-based)
+ * @property {Object|null} entryMeta - Metadata for the current entry (status, comingSoon, etc)
  * @property {number} scale - Current zoom scale factor
  * @property {{x: number, y: number}} pan - Current pan offset in pixels
  * @property {Map} pointers - Active pointer/touch events
@@ -23,15 +24,19 @@ import { CONFIG } from './config.js';
  * @property {Object|null} pinchCenter - Center point of pinch gesture
  * @property {number} pinchScale - Scale factor from pinch gesture
  * @property {Map} imageCache - FIFO cache of preloaded images
+ * @property {Map<string, { width: number, height: number }>} pageMetrics - Cached natural page dimensions by URL
  * @property {number} lastTap - Timestamp of last tap (for double-tap detection)
  * @property {boolean} isTransitioning - Whether page transition animation is active
  * @property {number|null} rafId - RequestAnimationFrame ID for animations
  * @property {Object|null} prevTransformOrigin - Previous transform origin for animations
+ * @property {number} fullscreenBaseScale - Baseline scale when entering fullscreen (used to clamp zoom-out)
+ * @property {{ width: number, height: number }|null} lastOnPageFrame - Last successful on-page frame size
  */
 export const state = {
-  currentChapter: '',
+  currentEntry: '',
   pages: [],
   pageIndex: 0,
+  entryMeta: null,
   scale: 1,
   pan: { x: 0, y: 0 },
   pointers: new Map(),
@@ -43,10 +48,13 @@ export const state = {
   pinchCenter: null,
   pinchScale: 1,
   imageCache: new Map(),
+  pageMetrics: new Map(),
   lastTap: 0,
   isTransitioning: false,
   rafId: null,
-  prevTransformOrigin: null
+  prevTransformOrigin: null,
+  fullscreenBaseScale: 1,
+  lastOnPageFrame: null,
 };
 
 /**
@@ -57,11 +65,11 @@ export const state = {
 export function saveProgress(stateObj = state) {
   try {
     const data = {
-      chapter: stateObj.currentChapter,
+      chapter: stateObj.currentEntry,
       page: stateObj.pageIndex,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     };
-    localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(data));
+    localStorage.setItem(STORAGE.PROGRESS_KEY, JSON.stringify(data));
   } catch (e) {
     console.warn('Failed to save progress:', e);
   }
@@ -73,9 +81,9 @@ export function saveProgress(stateObj = state) {
  */
 export function loadProgress() {
   try {
-    const json = localStorage.getItem(CONFIG.STORAGE_KEY);
+    const json = localStorage.getItem(STORAGE.PROGRESS_KEY);
     return json ? JSON.parse(json) : null;
-  } catch (e) {
+  } catch {
     return null;
   }
 }

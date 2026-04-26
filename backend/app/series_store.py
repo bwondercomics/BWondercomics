@@ -1,22 +1,26 @@
 from __future__ import annotations
 
-import json
+import logging
 import re
-from dataclasses import dataclass
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .models import Entry, EntryPage, Series
-from .settings import settings
-
+from .file_ops import safe_path
+from .models import Entry, EntryLabel, EntryPage, Series
+from .preview_pipeline import (
+    delete_preview_file,
+    entry_cover_thumb_rel_path,
+    generate_thumbnail,
+    resolve_source_path,
+)
 
 DEFAULT_SERIES_ID = "battle-bros"
 SERIES_ID_RE = re.compile(r"^[a-z0-9_-]{1,64}$")
+logger = logging.getLogger(__name__)
 
 
 def sanitize_series_id(raw: str | None) -> str:
@@ -29,13 +33,45 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def _load_json(path: Path, default):
-    try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except FileNotFoundError:
-        return default
-    except Exception:
-        return default
+def _normalize_label_text(raw: Any, fallback: str) -> str:
+    text = str(raw or "").strip()
+    return text[:30] if text else fallback
+
+
+def _slugify_label(raw: Any, fallback: str) -> str:
+    base = str(raw or "").strip().lower()
+    base = re.sub(r"[^a-z0-9_-]+", "-", base).strip("-")
+    return base[:64] or fallback
+
+
+def _ensure_entry_labels(db: Session, series: Series) -> list[EntryLabel]:
+    labels = db.scalars(
+        select(EntryLabel)
+        .where(EntryLabel.series_id == series.id)
+        .order_by(EntryLabel.sort_index.asc(), EntryLabel.created_at.asc())
+    ).all()
+    if labels:
+        if not any(label.is_default for label in labels):
+            labels[0].is_default = True
+            labels[0].updated_at = _now()
+            db.add(labels[0])
+            db.commit()
+        return labels
+
+    label = EntryLabel(
+        id=uuid4(),
+        series_id=series.id,
+        slug=_slugify_label(series.unit_label_plural or series.unit_label_singular, "entries"),
+        singular=_normalize_label_text(series.unit_label_singular, "Entry"),
+        plural=_normalize_label_text(series.unit_label_plural, "Entries"),
+        sort_index=0,
+        is_default=True,
+        created_at=_now(),
+        updated_at=_now(),
+    )
+    db.add(label)
+    db.commit()
+    return [label]
 
 
 def _extract_sort_index(title: str, folder_path: str, fallback: int) -> int:
@@ -60,113 +96,29 @@ def ensure_seeded(db: Session) -> None:
     if have_series and have_entries:
         return
 
-    base = settings.base_dir
-    series_index_path = base / "admin" / "series.json"
-    series_index = _load_json(series_index_path, {})
-    raw_series = series_index.get("series") if isinstance(series_index, dict) else None
-    if not isinstance(raw_series, list):
-        raw_series = []
-
-    default_id = sanitize_series_id(series_index.get("defaultSeriesId") if isinstance(series_index, dict) else None)
-    if not any(isinstance(s, dict) and sanitize_series_id(s.get("id")) == default_id for s in raw_series):
-        raw_series.insert(0, {"id": DEFAULT_SERIES_ID, "title": "Battle Bros", "description": "", "premiumOnly": False})
-
     if not have_series:
-        seen: set[str] = set()
-        for item in raw_series:
-            if not isinstance(item, dict):
-                continue
-            sid = sanitize_series_id(item.get("id"))
-            if sid in seen or not SERIES_ID_RE.match(sid):
-                continue
-            seen.add(sid)
-            series = Series(
-                id=sid,
-                title=str(item.get("title") or sid)[:200],
-                description=str(item.get("description") or ""),
-                cover_image=str(item.get("coverImage") or "").strip() or None,
-                premium_only=bool(item.get("premiumOnly")),
-                status_message="",
-                unit_label_singular="Issue" if sid == DEFAULT_SERIES_ID else "Chapter",
-                unit_label_plural="Issues" if sid == DEFAULT_SERIES_ID else "Chapters",
-                active=True,
-                created_at=_now(),
-                updated_at=_now(),
-            )
-            db.add(series)
-
-        db.commit()
-
-    if have_entries:
-        return
-
-    # Import entries/pages from existing admin data.json files.
-    for series in db.scalars(select(Series).where(Series.active.is_(True))).all():
-        if series.id == DEFAULT_SERIES_ID:
-            data_path = base / "admin" / "data.json"
-        else:
-            data_path = base / "admin" / "series" / series.id / "data.json"
-        raw = _load_json(data_path, {})
-        if not isinstance(raw, dict):
-            continue
-
-        series.status_message = str(raw.get("statusMessage") or "")[:200]
-        series.premium_only = bool(raw.get("premiumOnly")) if "premiumOnly" in raw else series.premium_only
+        series = Series(
+            id=DEFAULT_SERIES_ID,
+            title="Battle Bros",
+            description="",
+            cover_image=None,
+            premium_only=False,
+            status_message="",
+            unit_label_singular="Issue",
+            unit_label_plural="Issues",
+            active=True,
+            created_at=_now(),
+            updated_at=_now(),
+        )
         db.add(series)
-
-        chapters = raw.get("chapters") if isinstance(raw.get("chapters"), dict) else {}
-        chapter_folders = raw.get("chapterFolders") if isinstance(raw.get("chapterFolders"), dict) else {}
-        chapter_meta = raw.get("chapterMeta") if isinstance(raw.get("chapterMeta"), dict) else {}
-
-        fallback_index = 0
-        for title, pages in chapters.items():
-            if not isinstance(title, str) or not title.strip():
-                continue
-            page_list = [p for p in (pages or []) if isinstance(p, str) and p.strip()]
-            folder_path = str(chapter_folders.get(title) or "").strip().strip("/")
-            premium_only = False
-            meta = chapter_meta.get(title)
-            if isinstance(meta, dict):
-                premium_only = bool(meta.get("premium"))
-
-            sort_index = _extract_sort_index(title, folder_path, fallback_index)
-            fallback_index += 1
-
-            entry = Entry(
-                id=uuid4(),
-                series_id=series.id,
-                title=title.strip()[:200],
-                display_number=None,
-                folder_path=folder_path,
-                premium_only=premium_only,
-                status="published",
-                publish_at=_now(),
-                sort_index=sort_index,
-                created_at=_now(),
-                updated_at=_now(),
-            )
-            db.add(entry)
-            db.flush()
-
-            for idx, path in enumerate(page_list):
-                db.add(
-                    EntryPage(
-                        id=uuid4(),
-                        entry_id=entry.id,
-                        sort_index=idx,
-                        path=path.strip(),
-                        alt_text=None,
-                        created_at=_now(),
-                        updated_at=_now(),
-                    )
-                )
-
-    db.commit()
+        db.commit()
 
 
 def series_index_payload(db: Session) -> dict[str, Any]:
     ensure_seeded(db)
-    items = db.scalars(select(Series).where(Series.active.is_(True)).order_by(Series.created_at.asc())).all()
+    items = db.scalars(
+        select(Series).where(Series.active.is_(True)).order_by(Series.created_at.asc())
+    ).all()
     return {
         "version": 1,
         "defaultSeriesId": DEFAULT_SERIES_ID,
@@ -192,40 +144,91 @@ def series_data_payload(db: Session, series_id: str) -> dict[str, Any]:
     if not series or not series.active:
         # Keep reader resilient: return a valid empty structure.
         return {
-            "chapters": {},
-            "chapterFolders": {},
-            "chapterMeta": {},
+            "entries": {},
+            "entryFolders": {},
+            "entryMeta": {},
             "statusMessage": "",
             "premiumOnly": False,
             "unitLabelSingular": "Chapter",
             "unitLabelPlural": "Chapters",
             "lastUpdated": _now().isoformat().replace("+00:00", "Z"),
             "publishedBy": "Database",
+            "payloadVersion": 2,
         }
 
-    entries = db.scalars(select(Entry).where(Entry.series_id == sid).order_by(Entry.sort_index.asc(), Entry.publish_at.asc())).all()
+    entry_labels = _ensure_entry_labels(db, series)
+    entry_labels = sorted(entry_labels, key=lambda label: (label.sort_index, label.created_at))
+    default_label = next(
+        (label for label in entry_labels if label.is_default),
+        entry_labels[0] if entry_labels else None,
+    )
+    label_by_id = {label.id: label for label in entry_labels}
+
+    entries = db.scalars(
+        select(Entry)
+        .where(Entry.series_id == sid)
+        .order_by(Entry.sort_index.asc(), Entry.publish_at.asc())
+    ).all()
 
     chapters: dict[str, list[str]] = {}
     chapter_folders: dict[str, str] = {}
     chapter_meta: dict[str, dict[str, Any]] = {}
 
     for entry in entries:
-        pages = db.scalars(select(EntryPage).where(EntryPage.entry_id == entry.id).order_by(EntryPage.sort_index.asc())).all()
+        pages = db.scalars(
+            select(EntryPage)
+            .where(EntryPage.entry_id == entry.id)
+            .order_by(EntryPage.sort_index.asc())
+        ).all()
         chapters[entry.title] = [p.path for p in pages]
         if entry.folder_path:
             chapter_folders[entry.title] = entry.folder_path
-        chapter_meta[entry.title] = {"premium": bool(entry.premium_only)}
+        label = label_by_id.get(entry.entry_label_id) or default_label
+        meta = {
+            "entryId": str(entry.id),
+            "premium": bool(entry.premium_only),
+            "showInDropdown": bool(entry.show_in_dropdown),
+            "showInGallery": bool(entry.show_in_gallery),
+            "releaseType": entry.release_type or "digital",
+            "storeUrl": entry.store_url or "",
+            "coverImage": entry.cover_image or "",
+            "coverThumbPath": entry.cover_thumb_path or "",
+        }
+        if label:
+            meta["entryLabelId"] = str(label.id)
+            meta["entryLabelSingular"] = label.singular
+            meta["entryLabelPlural"] = label.plural
+        if entry.display_number is not None:
+            meta["displayNumber"] = int(entry.display_number)
+        chapter_meta[entry.title] = meta
 
     return {
-        "chapters": chapters,
-        "chapterFolders": chapter_folders,
-        "chapterMeta": chapter_meta,
+        "entries": chapters,
+        "entryFolders": chapter_folders,
+        "entryMeta": chapter_meta,
         "statusMessage": series.status_message or "",
         "premiumOnly": bool(series.premium_only),
-        "unitLabelSingular": series.unit_label_singular,
-        "unitLabelPlural": series.unit_label_plural,
-        "lastUpdated": (series.updated_at or _now()).astimezone(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "unitLabelSingular": default_label.singular
+        if default_label
+        else series.unit_label_singular,
+        "unitLabelPlural": default_label.plural if default_label else series.unit_label_plural,
+        "entryLabels": [
+            {
+                "id": str(label.id),
+                "slug": label.slug,
+                "singular": label.singular,
+                "plural": label.plural,
+                "sortIndex": int(label.sort_index),
+                "isDefault": bool(label.is_default),
+            }
+            for label in entry_labels
+        ],
+        "lastUpdated": (series.updated_at or _now())
+        .astimezone(timezone.utc)
+        .isoformat()
+        .replace("+00:00", "Z"),
         "publishedBy": "Database",
+        "payloadVersion": 2,
     }
 
 
@@ -254,12 +257,14 @@ def apply_series_index_save(db: Session, payload: Any) -> None:
                 cover_image=str(item.get("coverImage") or "").strip() or None,
                 premium_only=bool(item.get("premiumOnly")),
                 status_message="",
-                unit_label_singular=str(item.get("unitLabelSingular") or ("Issue" if sid == DEFAULT_SERIES_ID else "Chapter"))[
-                    :30
-                ],
-                unit_label_plural=str(item.get("unitLabelPlural") or ("Issues" if sid == DEFAULT_SERIES_ID else "Chapters"))[
-                    :30
-                ],
+                unit_label_singular=str(
+                    item.get("unitLabelSingular")
+                    or ("Issue" if sid == DEFAULT_SERIES_ID else "Chapter")
+                )[:30],
+                unit_label_plural=str(
+                    item.get("unitLabelPlural")
+                    or ("Issues" if sid == DEFAULT_SERIES_ID else "Chapters")
+                )[:30],
                 active=True,
                 created_at=_now(),
                 updated_at=_now(),
@@ -270,13 +275,49 @@ def apply_series_index_save(db: Session, payload: Any) -> None:
             series.cover_image = str(item.get("coverImage") or "").strip() or None
             series.premium_only = bool(item.get("premiumOnly"))
             if "unitLabelSingular" in item:
-                series.unit_label_singular = str(item.get("unitLabelSingular") or "").strip()[:30] or series.unit_label_singular
+                series.unit_label_singular = (
+                    str(item.get("unitLabelSingular") or "").strip()[:30]
+                    or series.unit_label_singular
+                )
             if "unitLabelPlural" in item:
-                series.unit_label_plural = str(item.get("unitLabelPlural") or "").strip()[:30] or series.unit_label_plural
+                series.unit_label_plural = (
+                    str(item.get("unitLabelPlural") or "").strip()[:30] or series.unit_label_plural
+                )
             series.active = True
             series.updated_at = _now()
 
         db.add(series)
+
+        labels = db.scalars(
+            select(EntryLabel)
+            .where(EntryLabel.series_id == sid)
+            .order_by(EntryLabel.sort_index.asc(), EntryLabel.created_at.asc())
+        ).all()
+        if not labels:
+            labels = [
+                EntryLabel(
+                    id=uuid4(),
+                    series_id=sid,
+                    slug=_slugify_label(
+                        series.unit_label_plural or series.unit_label_singular, "entries"
+                    ),
+                    singular=_normalize_label_text(series.unit_label_singular, "Entry"),
+                    plural=_normalize_label_text(series.unit_label_plural, "Entries"),
+                    sort_index=0,
+                    is_default=True,
+                    created_at=_now(),
+                    updated_at=_now(),
+                )
+            ]
+            db.add(labels[0])
+        default_label = next((label for label in labels if label.is_default), labels[0])
+        default_label.singular = _normalize_label_text(series.unit_label_singular, "Entry")
+        default_label.plural = _normalize_label_text(series.unit_label_plural, "Entries")
+        default_label.slug = _slugify_label(
+            default_label.plural or default_label.singular, "entries"
+        )
+        default_label.updated_at = _now()
+        db.add(default_label)
 
     # Soft-hide any series that were removed from the index.
     for s in db.scalars(select(Series).where(Series.active.is_(True))).all():
@@ -292,6 +333,7 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
     if not isinstance(payload, dict):
         raise ValueError("Invalid series data payload")
     sid = sanitize_series_id(series_id)
+    allow_deletions = bool(payload.get("allowDeletions"))
 
     series = db.get(Series, sid)
     if not series:
@@ -319,11 +361,88 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
     series.updated_at = _now()
     db.add(series)
 
-    chapters = payload.get("chapters") if isinstance(payload.get("chapters"), dict) else {}
-    chapter_folders = payload.get("chapterFolders") if isinstance(payload.get("chapterFolders"), dict) else {}
-    chapter_meta = payload.get("chapterMeta") if isinstance(payload.get("chapterMeta"), dict) else {}
+    chapters = payload.get("entries") if isinstance(payload.get("entries"), dict) else {}
+    chapter_folders = (
+        payload.get("entryFolders") if isinstance(payload.get("entryFolders"), dict) else {}
+    )
+    chapter_meta = payload.get("entryMeta") if isinstance(payload.get("entryMeta"), dict) else {}
+    entry_labels_payload = (
+        payload.get("entryLabels") if isinstance(payload.get("entryLabels"), list) else None
+    )
+
+    existing_labels = db.scalars(
+        select(EntryLabel)
+        .where(EntryLabel.series_id == sid)
+        .order_by(EntryLabel.sort_index.asc(), EntryLabel.created_at.asc())
+    ).all()
+    existing_by_id = {str(label.id): label for label in existing_labels}
+
+    requested_label_ids: list[UUID] = []
+    labels: list[EntryLabel] = []
+    if entry_labels_payload is not None:
+        for idx, raw in enumerate(entry_labels_payload):
+            if not isinstance(raw, dict):
+                continue
+            raw_id = str(raw.get("id") or "").strip()
+            label = existing_by_id.get(raw_id)
+            if not label:
+                label = EntryLabel(
+                    id=uuid4(),
+                    series_id=sid,
+                    created_at=_now(),
+                    updated_at=_now(),
+                    sort_index=idx,
+                    is_default=False,
+                    singular="Entry",
+                    plural="Entries",
+                )
+            label.singular = _normalize_label_text(raw.get("singular"), "Entry")
+            label.plural = _normalize_label_text(raw.get("plural"), "Entries")
+            label.slug = _slugify_label(
+                raw.get("slug") or label.plural or label.singular, "entries"
+            )
+            label.sort_index = int(
+                raw.get("sortIndex") if raw.get("sortIndex") is not None else idx
+            )
+            label.is_default = bool(raw.get("isDefault"))
+            label.updated_at = _now()
+            labels.append(label)
+            requested_label_ids.append(label.id)
+            db.add(label)
+
+        if labels and not any(label.is_default for label in labels):
+            labels[0].is_default = True
+            labels[0].updated_at = _now()
+            db.add(labels[0])
+
+        for label in existing_labels:
+            if label.id not in requested_label_ids:
+                db.delete(label)
+    else:
+        labels = existing_labels
+
+    if not labels:
+        label = EntryLabel(
+            id=uuid4(),
+            series_id=sid,
+            slug=_slugify_label(series.unit_label_plural or series.unit_label_singular, "entries"),
+            singular=_normalize_label_text(series.unit_label_singular, "Entry"),
+            plural=_normalize_label_text(series.unit_label_plural, "Entries"),
+            sort_index=0,
+            is_default=True,
+            created_at=_now(),
+            updated_at=_now(),
+        )
+        labels = [label]
+        db.add(label)
+
+    default_label = next((label for label in labels if label.is_default), labels[0])
+    series.unit_label_singular = default_label.singular
+    series.unit_label_plural = default_label.plural
+    db.add(series)
 
     requested_titles: set[str] = set()
+    requested_entry_ids: set[UUID] = set()
     fallback_index = 0
 
     for raw_title, raw_pages in chapters.items():
@@ -335,33 +454,159 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
 
         requested_titles.add(title)
         pages = [p.strip() for p in (raw_pages or []) if isinstance(p, str) and p.strip()]
-        folder_path = str(chapter_folders.get(raw_title) or chapter_folders.get(title) or "").strip().strip("/")
+        folder_path = (
+            str(chapter_folders.get(raw_title) or chapter_folders.get(title) or "")
+            .strip()
+            .strip("/")
+        )
 
         meta = chapter_meta.get(raw_title) or chapter_meta.get(title) or {}
         premium_only = bool(meta.get("premium")) if isinstance(meta, dict) else False
+        display_number = None
+        if isinstance(meta, dict):
+            raw_display = meta.get("displayNumber")
+            if raw_display is None:
+                raw_display = meta.get("display_number")
+            if raw_display is not None and raw_display != "":
+                try:
+                    parsed = int(raw_display)
+                except (TypeError, ValueError):
+                    parsed = None
+                if parsed is not None and parsed >= 0:
+                    display_number = parsed
 
-        entry = db.scalar(select(Entry).where(Entry.series_id == sid, Entry.title == title))
+        entry_label_id = None
+        if isinstance(meta, dict):
+            raw_label_id = meta.get("entryLabelId") or meta.get("entry_label_id")
+            if raw_label_id:
+                try:
+                    entry_label_id = UUID(str(raw_label_id))
+                except Exception:
+                    entry_label_id = None
+        if entry_label_id is None:
+            entry_label_id = default_label.id if default_label else None
+
+        show_in_dropdown = True
+        show_in_gallery = True
+        release_type = "digital"
+        store_url = ""
+        cover_image = ""
+        if isinstance(meta, dict):
+            show_in_dropdown = bool(meta.get("showInDropdown", True))
+            show_in_gallery = bool(meta.get("showInGallery", True))
+            release_type = str(meta.get("releaseType") or "digital").strip().lower() or "digital"
+            if release_type not in ("digital", "store"):
+                release_type = "digital"
+            store_url = str(meta.get("storeUrl") or meta.get("store_url") or "").strip()
+            cover_image = str(meta.get("coverImage") or meta.get("cover") or "").strip()
+
+        entry_id: UUID | None = None
+        if isinstance(meta, dict):
+            raw_entry_id = meta.get("entryId") or meta.get("entry_id")
+            if raw_entry_id:
+                try:
+                    entry_id = UUID(str(raw_entry_id))
+                except Exception:
+                    entry_id = None
+
+        entry = None
+        if entry_id is not None:
+            entry = db.get(Entry, entry_id)
+            if entry and entry.series_id != sid:
+                entry = None
+        if entry is None:
+            entry = db.scalar(select(Entry).where(Entry.series_id == sid, Entry.title == title))
+        existing_cover = entry.cover_image if entry else ""
+        existing_thumb = entry.cover_thumb_path if entry else ""
         if not entry:
             entry = Entry(
                 id=uuid4(),
                 series_id=sid,
                 title=title[:200],
-                display_number=None,
+                display_number=display_number,
+                entry_label_id=entry_label_id,
                 folder_path=folder_path,
                 premium_only=premium_only,
+                show_in_dropdown=show_in_dropdown,
+                show_in_gallery=show_in_gallery,
+                release_type=release_type,
+                store_url=store_url or None,
+                cover_image=cover_image or None,
+                cover_thumb_path=None,
                 status="published",
                 publish_at=_now(),
-                sort_index=_extract_sort_index(title, folder_path, fallback_index),
+                sort_index=display_number
+                if display_number is not None
+                else _extract_sort_index(
+                    title,
+                    folder_path,
+                    fallback_index,
+                ),
                 created_at=_now(),
                 updated_at=_now(),
             )
         else:
+            entry.title = title[:200]
             entry.folder_path = folder_path
             entry.premium_only = premium_only
-            entry.sort_index = _extract_sort_index(title, folder_path, entry.sort_index or fallback_index)
+            entry.entry_label_id = entry_label_id
+            entry.show_in_dropdown = show_in_dropdown
+            entry.show_in_gallery = show_in_gallery
+            entry.release_type = release_type
+            entry.store_url = store_url or None
+            entry.cover_image = cover_image or None
+            if display_number is not None:
+                entry.display_number = display_number
+            effective_display = (
+                display_number if display_number is not None else entry.display_number
+            )
+            entry.sort_index = (
+                effective_display
+                if effective_display is not None
+                else _extract_sort_index(title, folder_path, entry.sort_index or fallback_index)
+            )
             entry.updated_at = _now()
 
         fallback_index += 1
+        db.add(entry)
+        db.flush()
+        requested_entry_ids.add(entry.id)
+
+        expected_thumb = entry_cover_thumb_rel_path(str(entry.id)) if cover_image else ""
+        thumb_ok = False
+        if cover_image:
+            should_regen = (
+                str(existing_cover or "") != cover_image
+                or str(existing_thumb or "") != expected_thumb
+                or not str(existing_thumb or "")
+            )
+            try:
+                abs_thumb = safe_path(expected_thumb)
+            except ValueError:
+                abs_thumb = None
+            if should_regen and abs_thumb:
+                source = resolve_source_path(cover_image)
+                if source:
+                    try:
+                        generate_thumbnail(source, abs_thumb)
+                    except Exception as exc:
+                        logger.warning(
+                            "Failed to generate entry cover thumbnail for %s: %s", cover_image, exc
+                        )
+                else:
+                    logger.warning("Cover source missing for %s", cover_image)
+            if abs_thumb:
+                thumb_ok = abs_thumb.exists()
+            if thumb_ok:
+                entry.cover_thumb_path = expected_thumb
+            else:
+                delete_preview_file(expected_thumb)
+                entry.cover_thumb_path = None
+        else:
+            if existing_thumb:
+                delete_preview_file(existing_thumb)
+            entry.cover_thumb_path = None
+
         db.add(entry)
         db.flush()
 
@@ -382,8 +627,17 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
             )
 
     # Delete entries that were removed from the payload (hard cut).
+    removed_entries = []
     for entry in db.scalars(select(Entry).where(Entry.series_id == sid)).all():
-        if entry.title not in requested_titles:
-            db.delete(entry)
+        keep_by_id = entry.id in requested_entry_ids if requested_entry_ids else False
+        keep_by_title = entry.title in requested_titles
+        if not keep_by_id and not keep_by_title:
+            removed_entries.append(entry)
+    if removed_entries and not allow_deletions:
+        raise ValueError(
+            f"Refusing to delete {len(removed_entries)} entries without allowDeletions=true"
+        )
+    for entry in removed_entries:
+        db.delete(entry)
 
     db.commit()

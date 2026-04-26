@@ -1,0 +1,74 @@
+/* ==================== UNSAVED CHANGES INDICATOR ==================== */
+.unsaved-indicator {
+  background: var(--accent);
+  color: var(--bg-dark);
+  padding: 8px 16px;
+  border-radius: 5px;
+  font-size: 0.9rem;
+  font-weight: bold;
+  animation: neonPulse 2s ease-in-out infinite;
+}
+
+.page-list-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.page-list-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.btn-renumber {
+  background: var(--secondary);
+  color: var(--text);
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  border: none;
+  cursor: pointer;
+  border-radius: 5px;
+  font-family: 'Righteous', cursive;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+}
+
+.btn-renumber:hover {
+  box-shadow: 0 0 15px var(--secondary);
+}
+
+.btn-renumber:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-move-mode {
+  background: transparent;
+  border: 2px solid var(--accent);
+  color: var(--accent);
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  border-radius: 5px;
+  font-family: 'Righteous', cursive;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.btn-move-mode:hover {
+  box-shadow: 0 0 15px rgba(255, 237, 0, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-move-mode.is-active {
+  background: var(--accent);
+  color: var(--bg-dark);
+  box-shadow: 0 0 18px rgba(255, 237, 0, 0.45);
+}

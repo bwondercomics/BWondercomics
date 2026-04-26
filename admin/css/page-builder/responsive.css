@@ -1,0 +1,101 @@
+/* ==================== PAGE BUILDER RESPONSIVE ==================== */
+
+@media (max-width: 1439px) {
+  .pb-page-title-main {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .pb-page-title-actions {
+    justify-content: flex-start;
+  }
+
+  .pb-canvas-header-actions {
+    width: 100%;
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+}
+
+@media (max-width: 1199px) {
+  .pb-editor-subgrid,
+  .pb-theme-preset-grid,
+  .pb-section-settings-grid,
+  .pb-inline-picker-grid,
+  .pb-header-layout-grid,
+  .pb-page-header-surface-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .pb-theme-color-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1099px) {
+  .page-builder-layout[data-viewport-band='stacked'] .page-builder-sidebar {
+    max-height: none;
+  }
+
+  .pb-module-palette {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-shell.admin-page-builder-open .admin-content,
+  .admin-shell.admin-page-builder-open #pageBuilderSection {
+    padding: 8px;
+  }
+
+  .page-builder-layout {
+    gap: 12px;
+  }
+
+  .pb-canvas-header,
+  .pb-editor-header,
+  .pb-editor-content,
+  .pb-editor-footer {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .pb-editor-rail-toggle {
+    top: -18px;
+    left: 14px;
+    right: auto;
+    transform: none;
+  }
+
+  .pb-module-palette {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .pb-editor-field--row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .pb-section-header-actions,
+  .pb-section-settings-actions,
+  .pb-editor-footer {
+    align-items: stretch;
+  }
+
+  .pb-editor-footer-actions,
+  .pb-section-settings-buttons {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .pb-editor-footer-actions .btn-primary,
+  .pb-editor-footer-actions .btn-secondary,
+  .pb-section-settings-buttons .btn-primary,
+  .pb-section-settings-buttons .btn-secondary {
+    flex: 1 1 100%;
+  }
+
+  .pb-promo-style-range {
+    min-width: 100%;
+  }
+}

@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5" />
+    <title>BWonderComics Ops</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Righteous&family=Bebas+Neue&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="ops.css" />
+  </head>
+
+  <body>
+    <div id="opsLoginScreen" class="ops-login-screen">
+      <div class="ops-login-card">
+        <h1>OPS ACCESS</h1>
+        <p>Restricted tooling for maintenance commands, run output, and backups.</p>
+        <form id="opsLoginForm" class="ops-login-form">
+          <label for="opsLoginEmail">Email</label>
+          <input type="email" id="opsLoginEmail" required autocomplete="username" />
+          <label for="opsLoginPassword">Password</label>
+          <input type="password" id="opsLoginPassword" required autocomplete="current-password" />
+          <div class="ops-login-actions">
+            <button type="submit" class="btn-primary">Sign in</button>
+            <a class="btn-secondary" href="/admin/">Open Admin</a>
+          </div>
+        </form>
+        <div id="opsLoginError" class="ops-inline-error" hidden></div>
+      </div>
+    </div>
+
+    <div id="opsApp" class="ops-shell" hidden>
+      <header class="ops-header">
+        <div>
+          <div class="ops-kicker">BWonderComics</div>
+          <h1>Ops Console</h1>
+          <p>Protected maintenance surface for queued commands, run output, and backup status.</p>
+        </div>
+        <div class="ops-header-actions">
+          <div id="opsMeta" class="ops-meta">Checking access…</div>
+          <button id="opsRefresh" class="btn-secondary" type="button">Refresh</button>
+          <a class="btn-secondary" href="/admin/">Admin</a>
+          <button id="opsLogout" class="btn-primary" type="button">Log out</button>
+        </div>
+      </header>
+
+      <div id="opsNotice" class="ops-notice" hidden></div>
+
+      <section class="ops-section">
+        <div class="ops-section-header">
+          <h2>Snapshot</h2>
+        </div>
+        <div id="opsSnapshot"></div>
+      </section>
+
+      <section class="ops-section">
+        <div class="ops-section-header">
+          <h2>Commands</h2>
+        </div>
+        <div id="opsCommands"></div>
+      </section>
+
+      <section class="ops-section">
+        <div class="ops-section-header">
+          <h2>Run Console</h2>
+        </div>
+        <div id="opsRunMeta" class="ops-run-meta">Select a run to inspect output.</div>
+        <pre id="opsRunOutput" class="ops-run-output"></pre>
+      </section>
+
+      <section class="ops-section">
+        <div class="ops-section-header">
+          <h2>Recent Runs</h2>
+        </div>
+        <div id="opsRuns"></div>
+      </section>
+
+      <section class="ops-section">
+        <div class="ops-section-header">
+          <h2>Backups</h2>
+        </div>
+        <div id="opsBackups"></div>
+      </section>
+    </div>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

@@ -23,7 +23,7 @@ Follow these steps to get comments working on your feed!
    - Go to "APIs & Services" → "OAuth consent screen"
    - User Type: **External**
    - Click "Create"
-   
+
    Fill in:
    - App name: `Battle Bros Comments`
    - User support email: (your email)
@@ -37,11 +37,10 @@ Follow these steps to get comments working on your feed!
    - Click "Create Credentials" → "OAuth client ID"
    - Application type: **Web application**
    - Name: `Remark42`
-   
+
    **Authorized redirect URIs:**
    - Add: `http://localhost:8080/auth/google/callback`
    - (Later add your production URL: `https://bwondercomics.com/auth/google/callback`)
-   
    - Click "Create"
 
 5. **Copy Your Credentials**
@@ -53,16 +52,19 @@ Follow these steps to get comments working on your feed!
 ## Step 2: Install Docker on Your Server Computer (5 minutes)
 
 ### Windows:
+
 1. Download Docker Desktop: https://www.docker.com/products/docker-desktop
 2. Run installer
 3. Restart computer
 4. Launch Docker Desktop
 
 ### Mac:
+
 1. Download Docker Desktop for Mac
 2. Install and launch it
 
 ### Linux:
+
 ```bash
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
@@ -71,6 +73,7 @@ sudo usermod -aG docker $USER
 ```
 
 **Verify installation:**
+
 ```bash
 docker --version
 docker compose version
@@ -81,35 +84,40 @@ docker compose version
 ## Step 3: Configure Remark42 (5 minutes)
 
 1. **Navigate to your project** folder:
+
    ```bash
    cd C:\Users\dbmel\battle-bros-reader-dev
    ```
 
 2. **Generate a secret key:**
-   
+
    **Windows PowerShell:**
+
    ```powershell
    -join ((33..126) | Get-Random -Count 64 | ForEach-Object {[char]$_})
    ```
-   
+
    **Mac/Linux:**
+
    ```bash
    openssl rand -hex 32
    ```
-   
+
    Copy the output!
 
 3. **Create `.env` file:**
-   
+
    Copy `.env.example` to `.env`:
+
    ```bash
    copy .env.example .env     # Windows
    cp .env.example .env       # Mac/Linux
    ```
 
 4. **Edit `.env` file** (use Notepad, VS Code, etc.):
-   
+
    Replace the placeholder values:
+
    ```
    REMARK_SECRET=<paste-your-generated-secret-here>
    GOOGLE_CLIENT_ID=<paste-client-id-from-google>.apps.googleusercontent.com
@@ -129,20 +137,24 @@ docker compose up -d
 ```
 
 **Check if it's running:**
+
 ```bash
 docker compose ps
 ```
 
 You should see:
+
 ```
 NAME      IMAGE                      STATUS
 remark42  umputun/remark42:latest    Up
 ```
 
 **View logs (optional):**
+
 ```bash
 docker compose logs -f
 ```
+
 Press `Ctrl+C` to stop viewing logs.
 
 ---
@@ -150,10 +162,13 @@ Press `Ctrl+C` to stop viewing logs.
 ## Step 5: Test Comments! (5 minutes)
 
 1. **Open your feed:**
+
    ```
    file:///C:/Users/dbmel/battle-bros-reader-dev/feed.html
    ```
+
    OR if your server is running:
+
    ```
    http://localhost:5000/feed.html
    ```
@@ -175,17 +190,20 @@ Press `Ctrl+C` to stop viewing logs.
 ## Troubleshooting
 
 ### "Can't connect to Remark42 server"
+
 - Check Docker is running: `docker compose ps`
 - Restart: `docker compose restart`
 - Check URL in feed.html matches: `http://localhost:8080`
 
 ### "Google sign-in fails"
+
 - Double-check redirect URI in Google Console:
   `http://localhost:8080/auth/google/callback`
 - Verify Client ID/Secret in `.env` file
 - Restart Docker: `docker compose restart`
 
 ### "No comments showing"
+
 - Open browser console (F12) and check for errors
 - Verify Remark42 script loaded (look in Network tab)
 
@@ -196,6 +214,7 @@ Press `Ctrl+C` to stop viewing logs.
 ### 1. Set Up Domain
 
 Point a subdomain to your server computer:
+
 ```
 comments.bwondercomics.com → Your server's IP
 ```
@@ -203,14 +222,17 @@ comments.bwondercomics.com → Your server's IP
 ### 2. Update Configuration
 
 **In `.env`:**
+
 ```
 REMARK_URL=https://comments.bwondercomics.com
 ```
 
 **In Google Cloud Console:**
+
 - Add redirect URI: `https://comments.bwondercomics.com/auth/google/callback`
 
 **In `feed.html`** (line 13):
+
 ```javascript
 host: 'https://comments.bwondercomics.com',
 ```
@@ -229,6 +251,7 @@ http://localhost:8080/web/admin.html
 Sign in with your admin Google account (from `ADMIN_EMAIL` in `.env`)
 
 **You can:**
+
 - Delete comments
 - Block users
 - Pin comments
@@ -265,6 +288,7 @@ docker compose up -d
 ## Next Steps
 
 After you have comments working:
+
 1. Add more posts to `posts.json`
 2. Each post will automatically get its own comment section
 3. Share your feed with readers!

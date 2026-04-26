@@ -139,6 +139,18 @@
   flex-wrap: wrap;
 }
 
+.auth-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.auth-check.hidden {
+  display: none;
+}
+
 .auth-submit {
   background: linear-gradient(135deg, var(--primary), var(--secondary));
   border: none;
@@ -148,7 +160,9 @@
   font-weight: 800;
   cursor: pointer;
   box-shadow: 0 0 12px rgba(0, 217, 255, 0.35);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .auth-submit:hover {
@@ -184,7 +198,9 @@
   color: var(--text);
   font-size: 1rem;
   resize: vertical;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .comment-textarea:focus {
@@ -209,7 +225,9 @@
   font-weight: 800;
   cursor: pointer;
   box-shadow: 0 0 10px rgba(0, 217, 255, 0.35);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .comment-submit:hover {

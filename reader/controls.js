@@ -2,6 +2,7 @@ import { CONFIG } from './config.js';
 import { state, saveProgress } from './state.js';
 import { el } from './dom.js';
 import { render, isTwoPageMode } from './render.js';
+import { markEntryComplete, resetEntryCompletion } from './analytics.js';
 
 /**
  * Navigate to the previous page(s)
@@ -9,6 +10,7 @@ import { render, isTwoPageMode } from './render.js';
  */
 export function prevPage() {
   if (state.isTransitioning) return;
+  if (!state.pages.length) return;
 
   const step = isTwoPageMode() ? 2 : 1;
   const newIndex = Math.max(0, state.pageIndex - step);
@@ -25,10 +27,11 @@ export function prevPage() {
 /**
  * Navigate to the next page(s)
  * In two-page mode, moves forward by 2 pages; otherwise by 1 page
- * Shows end-of-chapter overlay when reaching the last page
+ * Shows end-of-entry overlay when reaching the last page
  */
 export function nextPage() {
   if (state.isTransitioning) return;
+  if (!state.pages.length) return;
 
   const twoPageMode = isTwoPageMode();
   const total = state.pages.length;
@@ -37,15 +40,13 @@ export function nextPage() {
   const isAtEnd = state.pageIndex >= total - 1;
 
   if (rightIsLast || isAtEnd) {
-    showEndOfChapter();
+    showEndOfEntry();
     return;
   }
 
   let newIndex;
   if (twoPageMode) {
-    newIndex = state.pageIndex + 2 >= total
-      ? total - 1
-      : state.pageIndex + 2;
+    newIndex = state.pageIndex + 2 >= total ? total - 1 : state.pageIndex + 2;
   } else {
     newIndex = Math.min(total - 1, state.pageIndex + 1);
   }
@@ -57,22 +58,24 @@ export function nextPage() {
   });
 }
 
-export function restartChapter() {
+export function restartEntry() {
   state.pageIndex = 0;
   render();
   saveProgress(state);
-  hideEndOfChapter();
+  resetEntryCompletion();
+  hideEndOfEntry();
 }
 
-export function showEndOfChapter() {
-  const overlay = document.getElementById('chapterEndOverlay');
+export function showEndOfEntry() {
+  const overlay = document.getElementById('entryEndOverlay');
   if (overlay) {
+    markEntryComplete();
     overlay.classList.add('active');
   }
 }
 
-export function hideEndOfChapter() {
-  const overlay = document.getElementById('chapterEndOverlay');
+export function hideEndOfEntry() {
+  const overlay = document.getElementById('entryEndOverlay');
   if (overlay) {
     overlay.classList.remove('active');
   }
@@ -93,7 +96,12 @@ function animatePageChange(direction, onMid) {
   state.isTransitioning = true;
   const duration = CONFIG.ANIMATION_DURATION;
 
-  el.stageWrap.classList.remove('slide-in-left', 'slide-in-right', 'slide-out-left', 'slide-out-right');
+  el.stageWrap.classList.remove(
+    'slide-in-left',
+    'slide-in-right',
+    'slide-out-left',
+    'slide-out-right'
+  );
   void el.stageWrap.offsetWidth;
 
   const slideOut = direction === 'next' ? 'slide-out-left' : 'slide-out-right';

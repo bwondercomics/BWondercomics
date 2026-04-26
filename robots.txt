@@ -1,10 +1,12 @@
-# Battle Bros Comic Reader - Robots.txt
+# BWonderComics - Robots.txt
 User-agent: *
 Allow: /
-Disallow: /chapters/
+Disallow: /admin/
+Disallow: /api/
+Disallow: /protected/
 
 # Sitemap location
-Sitemap: https://battlebros.com/sitemap.xml
+Sitemap: https://bwondercomics.com/sitemap.xml
 
 # Crawl delay to be respectful
 Crawl-delay: 1
