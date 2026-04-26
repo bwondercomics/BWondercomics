@@ -1,4 +1,4 @@
-# BWonderComics 0.7.9
+# BWonderComics 0.8.0 - Reader + Builder Appearance Lock
 
 (built with Vite) + FastAPI backend for the dynamic parts: auth, comments, post scheduling, RSS, uploads, page builder, diagnostics, ops, and analytics proxy.
 
@@ -7,6 +7,7 @@ Current builder shape:
 - Builder pages can own the reader header on a per-page basis, including title/subtitle copy, visible header parts, placement, and navigation buttons.
 - Header state now saves in page metadata (`page.meta.header`); legacy `page-config.json` and legacy `header` modules remain fallback-only for older pages.
 - Header buttons and panel button modules share the same link model, including internal links to other builder pages in the same series.
+- Header shell, header navigation, and panel buttons now share structured appearance controls that render consistently in the admin canvas/preview and public reader.
 
 ## Quick start (Docker)
 
