@@ -98,6 +98,11 @@ The atomic input form fields embedded across the inspector panels.
 - **Modifiers**: Distinct inputs like `.pb-editor-textarea--code` which switch layout context to a monospaced font over a 220px block.
 - **Layout Flow**: Combines labels and inputs in horizontal `.pb-editor-field--row` groups with `.pb-editor-hint` text descriptions below complex elements.
 - **Promo Pickers**: Dedicated slider (`.pb-promo-style-range`) and color picker bounds (`.pb-promo-style-color`) adjusting visual presentation constraints.
+- **Buttons Appearance Controls**: `controls.css` now includes a small button-appearance layer for the buttons module editor:
+  - `.pb-button-appearance-card` for nested default/override cards inside the inspector
+  - `.pb-button-appearance-row` and `.pb-button-appearance-toggle` for checkbox-gated sparse appearance leaves
+  - `.pb-button-appearance-input:disabled` to dim inherited fields instead of inventing fake null values for color/range controls
+  - `.pb-editor-section-head--compact` to keep nested appearance card headings visually consistent without duplicating full section spacing
 
 ---
 

@@ -18,10 +18,11 @@
 import { escapeHtml } from './helpers.js';
 import { renderPromoModule } from './promo-renderer.js';
 import {
-  normalizeButtonItem,
+  normalizeButtonsConfig,
   resolveLinkTargetHref,
   shouldOpenLinkInNewTab,
 } from './link-utils.js';
+import { appearanceToInlineStyle, mergeAppearance } from './appearance-utils.js';
 import {
   sanitizeAssetUrl,
   sanitizeBuilderHtml,
@@ -203,23 +204,30 @@ export function createRenderers({
     },
 
     buttons: (config) => {
-      const buttons = (config.buttons || []).map((button) => normalizeButtonItem(button));
-      if (buttons.length === 0) {
+      const normalized = normalizeButtonsConfig(config);
+      if (normalized.buttons.length === 0) {
         return '<div class="pb-buttons pb-buttons--empty">No buttons configured</div>';
       }
       const seriesId = getSeriesId();
-      const buttonsHtml = buttons
+      const defaultsAppearance = normalized.defaults?.appearance || null;
+      const buttonsHtml = normalized.buttons
         .map((btn) => {
           if (btn.enabled === false) return '';
           const text = escapeHtml(btn.text || 'Button');
-          const href = escapeHtml(
-            resolveLinkTargetHref(btn.link || btn.url, { seriesId })
-          );
+          const href = escapeHtml(resolveLinkTargetHref(btn.link || btn.url, { seriesId }));
           const style = sanitizeKeyword(btn.style, ['primary', 'secondary'], 'primary');
           const target = shouldOpenLinkInNewTab(btn.link || btn.url)
             ? 'target="_blank" rel="noopener noreferrer"'
             : '';
-          return `<a href="${href}" class="pb-btn pb-btn--${style}" ${target}>${text}</a>`;
+          const inlineStyle = appearanceToInlineStyle(
+            mergeAppearance(defaultsAppearance, btn.appearance)
+          );
+
+          if (!inlineStyle) {
+            return `<a href="${href}" class="pb-btn pb-btn--${style}" ${target}>${text}</a>`;
+          }
+
+          return `<a href="${href}" class="pb-btn pb-btn--${style}" style="${inlineStyle}" ${target}>${text}</a>`;
         })
         .filter(Boolean)
         .join('');
@@ -278,9 +286,7 @@ export function createRenderers({
       const feedHref = escapeHtml(sanitizeHref(config.feedHref || 'feed.html') || 'feed.html');
       const showMediaButton = config.showMediaButton !== false;
       const mediaLabel = escapeHtml(config.mediaLabel || 'Media');
-      const mediaHref = escapeHtml(
-        sanitizeHref(config.mediaHref || 'media.html') || 'media.html'
-      );
+      const mediaHref = escapeHtml(sanitizeHref(config.mediaHref || 'media.html') || 'media.html');
       const moduleId = escapeHtml(
         mod?.id ? String(mod.id) : `feed-${Math.random().toString(36).slice(2, 9)}`
       );

@@ -53,8 +53,24 @@ const DROP_TAGS = new Set([
 const HEX_COLOR_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const FUNCTION_COLOR_RE = /^(?:rgb|rgba|hsl|hsla)\(\s*[-\d.%\s,]+\s*\)$/i;
 const NAMED_COLOR_RE = /^[a-z]+$/i;
-const URL_UNSAFE_RE = /[\u0000-\u001f\u007f\s"'<>`\\]/;
 const ANCHOR_RE = /^[A-Za-z][A-Za-z0-9_:\-.]*$/;
+const URL_UNSAFE_PUNCTUATION = new Set(['"', "'", '<', '>', '`', '\\']);
+const URL_UNSAFE_WHITESPACE_RE = /\s/u;
+
+function hasUnsafeUrlChars(value = '') {
+  for (const char of String(value || '')) {
+    const code = char.charCodeAt(0);
+    if (
+      code <= 0x20 ||
+      code === 0x7f ||
+      URL_UNSAFE_WHITESPACE_RE.test(char) ||
+      URL_UNSAFE_PUNCTUATION.has(char)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
 
 function sanitizeClassValue(value) {
   return String(value || '')
@@ -82,10 +98,15 @@ export function sanitizeAnchor(value = '') {
 
 function sanitizeSimpleUrl(
   value,
-  { allowedSchemes = ['http', 'https'], allowRootRelative = true, allowRelative = true, allowAnchor = false } = {}
+  {
+    allowedSchemes = ['http', 'https'],
+    allowRootRelative = true,
+    allowRelative = true,
+    allowAnchor = false,
+  } = {}
 ) {
   const raw = String(value || '').trim();
-  if (!raw || URL_UNSAFE_RE.test(raw) || raw.startsWith('//')) return '';
+  if (!raw || hasUnsafeUrlChars(raw) || raw.startsWith('//')) return '';
   if (allowAnchor && raw.startsWith('#')) return sanitizeAnchor(raw);
   if (raw.startsWith('/')) return allowRootRelative ? raw : '';
 
@@ -162,7 +183,9 @@ export function sanitizeColor(value = '', fallback = '') {
 }
 
 export function sanitizeKeyword(value = '', allowed = [], fallback = '') {
-  const raw = String(value || '').trim().toLowerCase();
+  const raw = String(value || '')
+    .trim()
+    .toLowerCase();
   return allowed.includes(raw) ? raw : fallback;
 }
 
@@ -187,8 +210,15 @@ function sanitizeElementAttributes(source, target, tagName) {
       sanitized = sanitizeClassValue(value);
     } else if (name === 'id' || name === 'role') {
       sanitized = sanitizeIdLike(value);
-    } else if (name === 'title' || name === 'alt' || name.startsWith('data-') || name.startsWith('aria-')) {
-      sanitized = String(value || '').trim().slice(0, 300);
+    } else if (
+      name === 'title' ||
+      name === 'alt' ||
+      name.startsWith('data-') ||
+      name.startsWith('aria-')
+    ) {
+      sanitized = String(value || '')
+        .trim()
+        .slice(0, 300);
     } else {
       continue;
     }

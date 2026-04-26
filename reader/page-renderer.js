@@ -10,7 +10,6 @@
 import { getActiveSeriesId } from './series.js';
 import { logger } from './logger.js';
 import { createRenderers } from '../admin/page-builder/shared-renderers.js';
-import { sanitizeAssetUrl } from '../admin/page-builder/sanitize.js';
 import { escapeHtml } from '../admin/page-builder/helpers.js';
 
 function resolveReaderImageUrl(raw) {
@@ -38,9 +37,7 @@ export function renderPage(page) {
     return '<div class="pb-page-empty">Page not configured.</div>';
   }
 
-  const sectionsHtml = page.sections
-    .map((section) => _renderers.renderSection(section))
-    .join('');
+  const sectionsHtml = page.sections.map((section) => _renderers.renderSection(section)).join('');
 
   return `<div class="pb-page" data-page-id="${escapeHtml(page.id || '')}">${sectionsHtml}</div>`;
 }

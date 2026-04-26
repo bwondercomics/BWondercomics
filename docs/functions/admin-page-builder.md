@@ -240,10 +240,15 @@ Provides the UI and logic for managing lists of interactive buttons.
 - `renderButtonsEditor(config, pages)`: form generation.
 - `bindButtonsEditorEvents(...)`: Handles add/remove/reorder sync.
 - `renderLinkFields`: Sub-fields for jumping between Builder Page, URL, and Anchor link modes.
+- `toSparseAppearance(...)` / `toSparseButtonsConfig(...)`: local helpers that convert normalized appearance state back into sparse storage so disabled controls do not write placeholder null branches.
 
-Current limitation:
+Current behavior:
 
-- the shared button appearance contract exists in normalized module data (`defaults.appearance` and per-button `appearance`), but Step 1 does not expose those controls in the editor yet
+- the editor renders a module-level **Button Defaults** card before the button list and writes sparse values into `config.defaults.appearance`
+- each button renders an **Appearance Overrides** card below preset/link/enabled controls and writes sparse values into `buttons[*].appearance`
+- every appearance leaf is checkbox-gated because native color inputs cannot represent `null`; unchecked fields remove the stored leaf and fall back to inherited defaults
+- appearance controls are keyed with explicit scopes and paths such as `data-appearance-scope="defaults"` plus `background.color`, `text.color`, `border.width`, and `border.radius`
+- enabling or disabling a control rerenders the editor so the correct inputs become active/inactive, while value-only edits continue through the normal draft `commit(...)` path without a full panel refresh
 
 ## ➖ Divider Editor (divider-editor.js)
 
@@ -273,6 +278,13 @@ The most complex module, handling carousels, focal points, and rich CTA text. Ma
 
 This is the shared rendering core used by both admin preview output and the public reader. Factory outputs `renderModule`, `renderSection`, and `renderPage`. This establishes true structural parity between the admin canvas and live website.
 
+Buttons renderer behavior now uses the shared appearance contract directly:
+
+- the whole buttons module config is normalized through `normalizeButtonsConfig(...)`, not just individual items, so `defaults.appearance` is available at render time
+- each button resolves in this order: theme CSS variables from `.pb-btn`, preset class (`pb-btn--primary` / `pb-btn--secondary`), module defaults appearance, then per-button appearance
+- `mergeAppearance(...)` produces the resolved appearance object and `appearanceToInlineStyle(...)` serializes it into stable-order inline CSS when any explicit appearance survives normalization
+- when the merged appearance is empty, renderer output remains byte-for-byte compatible with the legacy class-only anchor pattern and does not emit a `style` attribute
+
 ## 👁️ Preview Renderers (preview-renderers.js)
 
 A bridge that configures the shared rendering pipeline for the Admin environment and implements "Preview-only" interactive hooks. Includes `initPreviewPromoCarousels` and `initPreviewEmailForms` to mock reader functionality safely inside the dashboard.
@@ -297,12 +309,14 @@ Key exports:
 
 - `normalizeAppearance` — normalizes sparse `appearance` input into the shared nested shape while preserving omitted leaves as `null`
 - `mergeAppearance` — deep-merges two normalized appearance objects for future theme/preset/default/override resolution
-- `appearanceToInlineStyle` — future-facing helper that converts a resolved appearance object into stable-order inline CSS
+- `appearanceToInlineStyle` — converts a resolved appearance object into stable-order inline CSS for shared button rendering
 - `isAppearanceEmpty` — recognizes visually empty appearance objects so storage and emission can stay sparse
 
-Important current rule:
+Current semantics:
 
-- this helper establishes the shared contract and test seam, but Step 1 does not yet wire appearance into shared renderers, button output, or header shell output
+- `border.radius` emits whenever it is explicitly set, even when no background or visible border is present
+- `border.width === 0` is treated as a meaningful override, survives merge/emptiness checks, and emits `border: none`
+- buttons now consume this helper end to end in both admin preview and reader rendering paths, while header-shell appearance remains a stored contract for later UI/rendering work
 
 ## 🛡️ Sanitization Layer (sanitize.js)
 

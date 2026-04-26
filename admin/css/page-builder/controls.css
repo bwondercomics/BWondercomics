@@ -126,3 +126,57 @@
   border-radius: 50%;
   cursor: pointer;
 }
+
+.pb-editor-section-head--compact {
+  margin-bottom: 12px;
+}
+
+.pb-button-appearance-card {
+  padding: 14px 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.pb-button-appearance-groups {
+  display: grid;
+  gap: 12px;
+}
+
+.pb-button-appearance-row {
+  justify-content: space-between;
+}
+
+.pb-button-appearance-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 180px;
+  min-width: 180px;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.pb-button-appearance-row > .pb-button-appearance-input {
+  flex: 1 1 150px;
+  min-width: 0;
+}
+
+.pb-button-appearance-row > .pb-editor-input.pb-button-appearance-input,
+.pb-button-appearance-row > .pb-editor-select.pb-button-appearance-input {
+  max-width: 180px;
+}
+
+.pb-button-appearance-row > .pb-promo-style-color.pb-button-appearance-input {
+  width: 42px;
+  min-width: 42px;
+}
+
+.pb-button-appearance-row > .pb-promo-style-range.pb-button-appearance-input {
+  flex: 1 1 180px;
+}
+
+.pb-button-appearance-input:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

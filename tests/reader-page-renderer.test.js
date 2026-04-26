@@ -97,6 +97,64 @@ describe('reader page renderer', () => {
     expect(unknown.textContent).toContain('[Unknown module: mystery]');
   });
 
+  it('renders customized buttons with merged inline appearance styles', () => {
+    const wrapper = parseModuleHtml(
+      renderModule({
+        moduleType: 'buttons',
+        config: {
+          defaults: {
+            appearance: {
+              background: {
+                color: '#112233',
+              },
+              border: {
+                radius: 14,
+              },
+            },
+          },
+          buttons: [
+            {
+              text: 'Read',
+              style: 'secondary',
+              link: { kind: 'builder-page', pageSlug: 'reader' },
+              appearance: {
+                text: {
+                  color: '#ffffff',
+                },
+                border: {
+                  width: 0,
+                },
+              },
+            },
+          ],
+        },
+      })
+    );
+
+    expect(wrapper.querySelector('.pb-btn')?.getAttribute('style')).toBe(
+      'background: #112233; color: #ffffff; border: none; border-radius: 14px'
+    );
+  });
+
+  it('keeps legacy buttons class-only when no appearance is configured', () => {
+    const wrapper = parseModuleHtml(
+      renderModule({
+        moduleType: 'buttons',
+        config: {
+          buttons: [
+            {
+              text: 'Read',
+              style: 'secondary',
+              link: { kind: 'builder-page', pageSlug: 'reader' },
+            },
+          ],
+        },
+      })
+    );
+
+    expect(wrapper.querySelector('.pb-btn')?.hasAttribute('style')).toBe(false);
+  });
+
   it('sanitizes dangerous builder html and urls during rendering', () => {
     const text = parseModuleHtml(
       renderModule({

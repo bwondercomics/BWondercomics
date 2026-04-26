@@ -165,11 +165,12 @@ function getModulePreview(moduleType, config) {
     }
     case 'feed':
       return `Feed (limit ${config.limit || 0})`;
-    case 'gallery':
+    case 'gallery': {
       const galleryCount = config.images?.length || 0;
       return galleryCount === 0
         ? 'No images'
         : `${galleryCount} image${galleryCount > 1 ? 's' : ''}`;
+    }
     case 'video':
       return config.url || 'No video URL';
     case 'divider':

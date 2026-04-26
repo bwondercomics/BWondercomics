@@ -202,6 +202,49 @@ describe('appearance utilities', () => {
     expect(appearanceToInlineStyle(appearance)).toBe('background: rgba(10, 20, 30, 0.4)');
   });
 
+  it('appearanceToInlineStyle emits border radius even without background or visible border', () => {
+    const appearance = normalizeAppearance({
+      border: {
+        radius: 12,
+      },
+    });
+
+    expect(appearanceToInlineStyle(appearance)).toBe('border-radius: 12px');
+  });
+
+  it('appearanceToInlineStyle emits border none for explicit zero-width borders', () => {
+    const appearance = normalizeAppearance({
+      border: {
+        width: 0,
+      },
+    });
+
+    expect(appearanceToInlineStyle(appearance)).toBe('border: none');
+    expect(isAppearanceEmpty(appearance)).toBe(false);
+  });
+
+  it('mergeAppearance preserves explicit zero-width border overrides over a base border', () => {
+    const base = normalizeAppearance({
+      border: {
+        width: 2,
+        color: '#00d9ff',
+        radius: 8,
+      },
+    });
+    const override = normalizeAppearance({
+      border: {
+        width: 0,
+      },
+    });
+
+    const merged = mergeAppearance(base, override);
+
+    expect(merged).not.toBeNull();
+    expect(merged?.border.width).toBe(0);
+    expect(isAppearanceEmpty(merged)).toBe(false);
+    expect(appearanceToInlineStyle(merged)).toBe('border: none; border-radius: 8px');
+  });
+
   it('isAppearanceEmpty returns true for null and all-default objects', () => {
     expect(isAppearanceEmpty(null)).toBe(true);
     expect(
@@ -211,10 +254,8 @@ describe('appearance utilities', () => {
           opacity: 1,
         },
         border: {
-          width: 0,
           style: 'solid',
           opacity: 1,
-          radius: 0,
         },
       })
     ).toBe(true);

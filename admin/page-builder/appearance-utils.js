@@ -94,7 +94,7 @@ function applyOpacity(color, opacity) {
 }
 
 function mergeLeaf(baseValue, overrideValue) {
-  return overrideValue != null ? overrideValue : baseValue ?? null;
+  return overrideValue != null ? overrideValue : (baseValue ?? null);
 }
 
 function normalizeResolvedAppearance(raw) {
@@ -118,7 +118,7 @@ function isAppearanceEmpty(appearance) {
   const border = normalized.border || {};
   const hasBackground = !!(background.color || background.secondaryColor);
   const hasText = !!text.color;
-  const hasBorder = !!border.color || (border.width != null && border.width > 0);
+  const hasBorder = border.width != null || !!border.color || border.radius != null;
   return !hasBackground && !hasText && !hasBorder;
 }
 
@@ -172,9 +172,7 @@ function appearanceToInlineStyle(appearance) {
       const angle = background.angle ?? 135;
       const primaryColor = applyOpacity(background.color, backgroundOpacity);
       const secondaryColor = applyOpacity(background.secondaryColor, backgroundOpacity);
-      tokens.push(
-        `background: linear-gradient(${angle}deg, ${primaryColor}, ${secondaryColor})`
-      );
+      tokens.push(`background: linear-gradient(${angle}deg, ${primaryColor}, ${secondaryColor})`);
     } else {
       tokens.push(`background: ${applyOpacity(background.color, backgroundOpacity)}`);
     }
@@ -184,26 +182,31 @@ function appearanceToInlineStyle(appearance) {
     tokens.push(`color: ${text.color}`);
   }
 
-  const hasVisibleBorder = !!border.color && border.width != null && border.width > 0;
-  const hasRadius = border.radius != null && (hasBackground || hasVisibleBorder);
-  if (hasVisibleBorder) {
-    const borderStyle = border.style || 'solid';
-    const borderOpacity = border.opacity ?? 1;
-    tokens.push(
-      `border: ${border.width}px ${borderStyle} ${applyOpacity(border.color, borderOpacity)}`
-    );
+  const hasBorderWidth = border.width != null;
+  const hasBorderColor = !!border.color;
+  const borderColor = hasBorderColor ? applyOpacity(border.color, border.opacity ?? 1) : '';
+
+  if (hasBorderWidth && border.width === 0) {
+    tokens.push('border: none');
+  } else if (hasBorderWidth && border.width > 0 && hasBorderColor) {
+    tokens.push(`border: ${border.width}px ${border.style || 'solid'} ${borderColor}`);
+  } else {
+    if (hasBorderWidth) {
+      tokens.push(`border-width: ${border.width}px`);
+    }
+    if (border.style) {
+      tokens.push(`border-style: ${border.style}`);
+    }
+    if (hasBorderColor) {
+      tokens.push(`border-color: ${borderColor}`);
+    }
   }
 
-  if (hasRadius) {
+  if (border.radius != null) {
     tokens.push(`border-radius: ${border.radius}px`);
   }
 
   return tokens.join('; ');
 }
 
-export {
-  appearanceToInlineStyle,
-  isAppearanceEmpty,
-  mergeAppearance,
-  normalizeAppearance,
-};
+export { appearanceToInlineStyle, isAppearanceEmpty, mergeAppearance, normalizeAppearance };

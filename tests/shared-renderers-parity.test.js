@@ -33,7 +33,21 @@ describe('shared renderer parity', () => {
     const reader = makeReaderRenderers();
     const preview = makePreviewRenderers();
 
-    const moduleTypes = ['feed', 'promo', 'text', 'image', 'video', 'social', 'buttons', 'spacer', 'divider', 'html', 'header', 'gallery', 'email-signup'];
+    const moduleTypes = [
+      'feed',
+      'promo',
+      'text',
+      'image',
+      'video',
+      'social',
+      'buttons',
+      'spacer',
+      'divider',
+      'html',
+      'header',
+      'gallery',
+      'email-signup',
+    ];
 
     moduleTypes.forEach((type) => {
       const mod = modules[type];
@@ -136,7 +150,96 @@ describe('shared renderer parity', () => {
 
     expect(readerEl.querySelector('.pb-btn')?.getAttribute('href')).toContain('series=battle-bros');
     expect(readerEl.querySelector('.pb-btn')?.getAttribute('href')).toContain('page=about');
-    expect(previewEl.querySelector('.pb-btn')?.getAttribute('href')).toContain('series=battle-bros');
+    expect(previewEl.querySelector('.pb-btn')?.getAttribute('href')).toContain(
+      'series=battle-bros'
+    );
     expect(previewEl.querySelector('.pb-btn')?.getAttribute('href')).toContain('page=about');
+  });
+
+  it('applies button defaults and per-button appearance overrides with reader/preview parity', () => {
+    const mod = {
+      moduleType: 'buttons',
+      config: {
+        defaults: {
+          appearance: {
+            background: {
+              color: '#112233',
+            },
+            text: {
+              color: '#eeeeee',
+            },
+            border: {
+              radius: 12,
+            },
+          },
+        },
+        buttons: [
+          {
+            text: 'Default',
+            style: 'secondary',
+            link: { kind: 'builder-page', pageSlug: 'about' },
+          },
+          {
+            text: 'Override',
+            style: 'secondary',
+            link: { kind: 'builder-page', pageSlug: 'about' },
+            appearance: {
+              text: {
+                color: '#ffffff',
+              },
+              border: {
+                width: 0,
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    const readerEl = document.createElement('div');
+    readerEl.innerHTML = makeReaderRenderers().renderModule(mod);
+    const previewEl = document.createElement('div');
+    previewEl.innerHTML = makePreviewRenderers().renderModule(mod);
+
+    const readerButtons = readerEl.querySelectorAll('.pb-btn');
+    const previewButtons = previewEl.querySelectorAll('.pb-btn');
+
+    expect(readerButtons[0]?.getAttribute('style')).toBe(
+      'background: #112233; color: #eeeeee; border-radius: 12px'
+    );
+    expect(previewButtons[0]?.getAttribute('style')).toBe(
+      'background: #112233; color: #eeeeee; border-radius: 12px'
+    );
+    expect(readerButtons[1]?.getAttribute('style')).toBe(
+      'background: #112233; color: #ffffff; border: none; border-radius: 12px'
+    );
+    expect(previewButtons[1]?.getAttribute('style')).toBe(
+      'background: #112233; color: #ffffff; border: none; border-radius: 12px'
+    );
+  });
+
+  it('keeps legacy class-only button output when no appearance is configured', () => {
+    const mod = {
+      moduleType: 'buttons',
+      config: {
+        buttons: [
+          {
+            text: 'Plain',
+            style: 'primary',
+            link: { kind: 'builder-page', pageSlug: 'about' },
+          },
+        ],
+      },
+    };
+
+    const readerEl = document.createElement('div');
+    readerEl.innerHTML = makeReaderRenderers().renderModule(mod);
+    const previewEl = document.createElement('div');
+    previewEl.innerHTML = makePreviewRenderers().renderModule(mod);
+
+    expect(readerEl.querySelector('.pb-btn')?.hasAttribute('style')).toBe(false);
+    expect(previewEl.querySelector('.pb-btn')?.hasAttribute('style')).toBe(false);
+    expect(readerEl.querySelector('.pb-btn')?.className).toBe('pb-btn pb-btn--primary');
+    expect(previewEl.querySelector('.pb-btn')?.className).toBe('pb-btn pb-btn--primary');
   });
 });
