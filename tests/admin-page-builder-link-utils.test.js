@@ -26,7 +26,11 @@ describe('admin page-builder link utilities', () => {
     });
     expect(resolveLinkTargetHref({ kind: 'url', url: '//evil.example' })).toBe('#');
     expect(resolveLinkTargetHref({ kind: 'url', url: 'javascript:alert(2)' })).toBe('#');
-    expect(shouldOpenLinkInNewTab({ kind: 'url', url: 'javascript:alert(3)', openInNewTab: true })).toBe(false);
+    expect(resolveLinkTargetHref({ kind: 'url', url: 'https://evil.example/a\u00a0b' })).toBe('#');
+    expect(resolveLinkTargetHref({ kind: 'url', url: 'https://evil.example/a\u2028b' })).toBe('#');
+    expect(
+      shouldOpenLinkInNewTab({ kind: 'url', url: 'javascript:alert(3)', openInNewTab: true })
+    ).toBe(false);
   });
 
   it('keeps valid builder-page and anchor targets in safe canonical form', () => {
@@ -51,19 +55,34 @@ describe('admin page-builder link utilities', () => {
 
   it('normalizeHeaderNavItem carries a style field defaulting to primary', () => {
     // No stored style → defaults to primary
-    const defaultItem = normalizeHeaderNavItem({ label: 'About', link: { kind: 'url', url: 'about.html' } });
+    const defaultItem = normalizeHeaderNavItem({
+      label: 'About',
+      link: { kind: 'url', url: 'about.html' },
+    });
     expect(defaultItem.style).toBe('primary');
 
     // Explicit secondary is preserved
-    const secondaryItem = normalizeHeaderNavItem({ label: 'Comics', style: 'secondary', link: { kind: 'url', url: 'comics.html' } });
+    const secondaryItem = normalizeHeaderNavItem({
+      label: 'Comics',
+      style: 'secondary',
+      link: { kind: 'url', url: 'comics.html' },
+    });
     expect(secondaryItem.style).toBe('secondary');
 
     // Unknown/invalid style falls back to primary
-    const badStyleItem = normalizeHeaderNavItem({ label: 'Shop', style: 'danger', link: { kind: 'url', url: 'shop.html' } });
+    const badStyleItem = normalizeHeaderNavItem({
+      label: 'Shop',
+      style: 'danger',
+      link: { kind: 'url', url: 'shop.html' },
+    });
     expect(badStyleItem.style).toBe('primary');
 
     // Explicit primary is preserved
-    const primaryItem = normalizeHeaderNavItem({ label: 'Home', style: 'primary', link: { kind: 'builder-page', pageSlug: 'reader' } });
+    const primaryItem = normalizeHeaderNavItem({
+      label: 'Home',
+      style: 'primary',
+      link: { kind: 'builder-page', pageSlug: 'reader' },
+    });
     expect(primaryItem.style).toBe('primary');
   });
 

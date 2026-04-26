@@ -184,7 +184,7 @@ describe('reader app bootstrap', () => {
       'battle-bros',
       {
         draft: false,
-        pageSlug: 'reader',
+        pageSlug: '',
       }
     );
     expect(mocks.applyBuilderPageToDOM).toHaveBeenCalledWith(

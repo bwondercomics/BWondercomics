@@ -36,6 +36,12 @@ class PostsRouteTests(BackendRouteTestCase):
             )
         )
         self.seed_posts()
+        scheduled = self.db.get(Post, UUID(self.contracts["posts"]["scheduled"]["id"]))
+        assert scheduled is not None
+        scheduled.publish_at = datetime.now(timezone.utc) + timedelta(days=30)
+        scheduled.status = "scheduled"
+        self.db.add(scheduled)
+        self.db.commit()
 
         public_payload = posts.list_public_posts(limit=50, offset=0, db=self.db)
         admin_request = build_request(
@@ -69,6 +75,7 @@ class PostsRouteTests(BackendRouteTestCase):
         source_path = self.base_dir / "protected" / "media" / "posts" / "patron-early-access.png"
         source_path.parent.mkdir(parents=True, exist_ok=True)
         source_path.write_bytes(b"protected-post-image")
+        publish_at = datetime.now(timezone.utc) + timedelta(days=30)
         request = build_request(
             "/api/admin/posts",
             method="POST",
@@ -84,7 +91,7 @@ class PostsRouteTests(BackendRouteTestCase):
             share=True,
             shareBluesky=True,
             status="published",
-            date=self.contracts["posts"]["scheduled"]["date"],
+            date=publish_at.isoformat().replace("+00:00", "Z"),
         )
 
         with patch("backend.app.routes.posts.ensure_media_previews", lambda *_args, **_kwargs: None):
