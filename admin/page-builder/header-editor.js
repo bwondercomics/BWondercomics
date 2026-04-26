@@ -1,3 +1,11 @@
+import {
+  cloneValue as cloneAppearanceValue,
+  isObject,
+  removeAppearanceLeaf,
+  renderAppearanceControls,
+  setAppearanceLeaf,
+  toSparseAppearance,
+} from './appearance-editor.js';
 import { escapeAttr, escapeHtml } from './helpers.js';
 import {
   HEADER_BLOCK_DEFS,
@@ -29,12 +37,14 @@ function renderSectionCard(kicker, title, copy, body) {
 }
 
 function getRegionLabel(region) {
-  return String(region || '')
-    .replace(/^\w/, (char) => char.toUpperCase());
+  return String(region || '').replace(/^\w/, (char) => char.toUpperCase());
 }
 
 function findBlockRegion(header, blockId) {
-  return HEADER_REGION_ORDER.find((region) => (header.regions?.[region] || []).includes(blockId)) || 'left';
+  return (
+    HEADER_REGION_ORDER.find((region) => (header.regions?.[region] || []).includes(blockId)) ||
+    'left'
+  );
 }
 
 function renderCopyEditor(copy) {
@@ -169,6 +179,13 @@ function renderNavigationEditor(header, pages) {
           </label>
         </div>
         ${renderLinkFields(item, index, pages)}
+        ${renderAppearanceControls(
+          item.appearance,
+          'nav-item',
+          index,
+          'Appearance Overrides',
+          'Enable only the leaves you want to override for this header button.'
+        )}
       </div>
     `
     )
@@ -179,6 +196,13 @@ function renderNavigationEditor(header, pages) {
     'Buttons in the Header',
     'Choose which buttons appear in this page header and where each one goes.',
     `
+      ${renderAppearanceControls(
+        header.appearance?.navItemDefaults,
+        'nav-defaults',
+        null,
+        'Header Nav Defaults',
+        'Set sparse defaults that author-created header buttons inherit unless an item override is enabled.'
+      )}
       <div class="pb-promo-editor-list">
         ${navHtml || '<div class="pb-promo-empty">No header buttons yet. Click "+ Add Button" to create one.</div>'}
       </div>
@@ -263,8 +287,31 @@ function renderPlacementEditor(header) {
   );
 }
 
-
-
+function renderShellAppearanceEditor(header) {
+  return renderSectionCard(
+    'Appearance',
+    'Header Shell',
+    'Control the top header shell style and the sparse appearance overlay applied after the page scrolls.',
+    `
+      <div class="pb-appearance-stack">
+        ${renderAppearanceControls(
+          header.appearance?.top,
+          'shell-top',
+          null,
+          'Top',
+          'These sparse values apply while the page is at the top.'
+        )}
+        ${renderAppearanceControls(
+          header.appearance?.scrolled,
+          'shell-scrolled',
+          null,
+          'Scrolled',
+          'These sparse values merge on top of Top after the reader scrolls.'
+        )}
+      </div>
+    `
+  );
+}
 
 function renderSourceBanner(source) {
   if (source === 'legacy-import') {
@@ -293,6 +340,7 @@ export function renderHeaderEditorContent({ draftState, pages = [] }) {
   return [
     renderSourceBanner(draftState?.source),
     renderCopyEditor(copy),
+    renderShellAppearanceEditor(header),
     renderNavigationEditor(header, pages),
     renderPartsEditor(header),
     renderPlacementEditor(header),
@@ -324,7 +372,9 @@ function moveBlockWithinRegion(header, blockId, direction) {
 function moveBlockAcrossRegions(header, blockId, direction) {
   const currentRegion = findBlockRegion(header, blockId);
   const currentIndex = HEADER_REGION_ORDER.indexOf(currentRegion);
-  if (currentIndex === -1) return normalizeHeaderConfig(cloneValue(header), normalizeHeaderNavItems);
+  if (currentIndex === -1) {
+    return normalizeHeaderConfig(cloneValue(header), normalizeHeaderNavItems);
+  }
   const nextRegion = HEADER_REGION_ORDER[currentIndex + direction];
   if (!nextRegion) return normalizeHeaderConfig(cloneValue(header), normalizeHeaderNavItems);
   return moveBlockToRegion(header, blockId, nextRegion);
@@ -359,6 +409,12 @@ function updateNavItemLink(item, key, input) {
   item.link = normalizeLinkTarget(nextLink, '');
 }
 
+const SHELL_APPEARANCE_SCOPE_TO_KEY = {
+  'shell-top': 'top',
+  'shell-scrolled': 'scrolled',
+  'nav-defaults': 'navItemDefaults',
+};
+
 export function bindHeaderEditorEvents({
   el,
   draftState,
@@ -368,6 +424,7 @@ export function bindHeaderEditorEvents({
   renderCanvas,
 }) {
   let state = {
+    source: draftState?.source || null,
     header: normalizeHeaderConfig(draftState?.header, normalizeHeaderNavItems),
     copy: normalizeHeaderCopy(draftState?.copy),
   };
@@ -375,6 +432,7 @@ export function bindHeaderEditorEvents({
   const commit = (nextState, options = {}) => {
     const { rerenderEditor = false, rerenderCanvas = true } = options;
     state = {
+      source: nextState?.source || state.source || null,
       header: normalizeHeaderConfig(nextState.header, normalizeHeaderNavItems),
       copy: normalizeHeaderCopy(nextState.copy),
     };
@@ -407,13 +465,94 @@ export function bindHeaderEditorEvents({
     });
   });
 
+  const ensureHeaderAppearanceRoot = (nextState) => {
+    if (!isObject(nextState.header.appearance)) {
+      nextState.header.appearance = {};
+    }
+    return nextState.header.appearance;
+  };
+
+  const cleanupHeaderAppearanceRoot = (nextState) => {
+    const appearance = nextState.header.appearance;
+    if (!appearance || (!appearance.top && !appearance.scrolled && !appearance.navItemDefaults)) {
+      delete nextState.header.appearance;
+    }
+  };
+
+  const resolveAppearanceTarget = (nextState, scope, index) => {
+    if (scope === 'nav-item') {
+      return Number.isInteger(index) ? nextState.header.nav.items[index] : null;
+    }
+    const key = SHELL_APPEARANCE_SCOPE_TO_KEY[scope];
+    if (!key) return null;
+    const root = ensureHeaderAppearanceRoot(nextState);
+    return {
+      appearance: root[key],
+      setAppearance(appearance) {
+        if (appearance) {
+          root[key] = appearance;
+        } else {
+          delete root[key];
+          cleanupHeaderAppearanceRoot(nextState);
+        }
+      },
+    };
+  };
+
+  const updateAppearanceTarget = (nextState, scope, index, key, value) => {
+    const target = resolveAppearanceTarget(nextState, scope, index);
+    if (!target || !key) return;
+    const appearance = cloneAppearanceValue(target.appearance) || {};
+    setAppearanceLeaf(appearance, key, value);
+    const sparse = toSparseAppearance(appearance);
+    if (target.setAppearance) {
+      target.setAppearance(sparse);
+      return;
+    }
+    if (sparse) {
+      target.appearance = sparse;
+    } else {
+      delete target.appearance;
+    }
+  };
+
+  const removeAppearanceFromTarget = (nextState, scope, index, key) => {
+    const target = resolveAppearanceTarget(nextState, scope, index);
+    if (!target?.appearance || !key) return;
+    const appearance = cloneAppearanceValue(target.appearance);
+    removeAppearanceLeaf(appearance, key);
+    const sparse = toSparseAppearance(appearance);
+    if (target.setAppearance) {
+      target.setAppearance(sparse);
+      return;
+    }
+    if (sparse) {
+      target.appearance = sparse;
+    } else {
+      delete target.appearance;
+    }
+  };
+
+  const getAppearanceInput = ({ scope, index, key }) =>
+    el.pbModuleEditor.querySelector(
+      [
+        '[data-appearance-input="true"]',
+        `[data-appearance-scope="${scope}"]`,
+        `[data-appearance-key="${key}"]`,
+        Number.isInteger(index) ? `[data-item-index="${index}"]` : '',
+      ].join('')
+    );
+
   // ── Placement board: drag-and-drop ────────────────────────────────────
   let draggedBlockId = null;
 
   el.pbModuleEditor.querySelectorAll('.pb-header-layout-card').forEach((card) => {
     card.addEventListener('dragstart', (event) => {
       draggedBlockId = card.dataset.blockId || null;
-      if (!draggedBlockId) { event.preventDefault(); return; }
+      if (!draggedBlockId) {
+        event.preventDefault();
+        return;
+      }
       event.dataTransfer.effectAllowed = 'move';
       // Defer class so the card isn't invisible before the drag image is captured.
       requestAnimationFrame(() => card.classList.add('is-dragging'));
@@ -459,7 +598,6 @@ export function bindHeaderEditorEvents({
       commit(nextState, { rerenderEditor: true, rerenderCanvas: true });
     });
   });
-
 
   el.pbModuleEditor.querySelectorAll('.pb-header-layout-button').forEach((button) => {
     button.addEventListener('click', () => {
@@ -532,7 +670,10 @@ export function bindHeaderEditorEvents({
       if (!item || !key) return;
       if (['kind', 'pageSlug', 'url', 'hash', 'openInNewTab'].includes(key)) {
         updateNavItemLink(item, key, input);
-        commit(nextState, { rerenderEditor: key === 'kind' || key === 'url', rerenderCanvas: true });
+        commit(nextState, {
+          rerenderEditor: key === 'kind' || key === 'url',
+          rerenderCanvas: true,
+        });
         return;
       }
       if (input.type === 'checkbox') {
@@ -544,5 +685,35 @@ export function bindHeaderEditorEvents({
     });
   });
 
+  el.pbModuleEditor.querySelectorAll('[data-appearance-toggle="true"]').forEach((toggle) => {
+    toggle.addEventListener('change', () => {
+      const scope = toggle.dataset.appearanceScope;
+      const key = toggle.dataset.appearanceKey;
+      const index = toggle.dataset.itemIndex ? parseInt(toggle.dataset.itemIndex, 10) : null;
+      if (!scope || !key) return;
+      const nextState = cloneValue(state);
+      if (toggle.checked) {
+        const pairedInput = getAppearanceInput({ scope, index, key });
+        if (!pairedInput) return;
+        updateAppearanceTarget(nextState, scope, index, key, pairedInput.value);
+      } else {
+        removeAppearanceFromTarget(nextState, scope, index, key);
+      }
+      commit(nextState, { rerenderEditor: true, rerenderCanvas: true });
+    });
+  });
 
+  el.pbModuleEditor.querySelectorAll('[data-appearance-input="true"]').forEach((input) => {
+    const eventName = input.tagName === 'SELECT' ? 'change' : 'input';
+    input.addEventListener(eventName, () => {
+      if (input.disabled) return;
+      const scope = input.dataset.appearanceScope;
+      const key = input.dataset.appearanceKey;
+      const index = input.dataset.itemIndex ? parseInt(input.dataset.itemIndex, 10) : null;
+      if (!scope || !key) return;
+      const nextState = cloneValue(state);
+      updateAppearanceTarget(nextState, scope, index, key, input.value);
+      commit(nextState, { rerenderCanvas: true });
+    });
+  });
 }

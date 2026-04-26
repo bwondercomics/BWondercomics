@@ -539,7 +539,7 @@ Goal: make the page designer show the real page-scoped header builder by default
 
 ### Phase 7 - Header and Button Appearance Customization Pass
 
-Status: Step 1 implemented (`2026-04-25`); Steps 2-5 pending
+Status: Steps 1-3 implemented (`2026-04-25` - `2026-04-26`); runtime parity and verification baseline completed for the current header/button appearance pass. Later hover/focus state editing and broader module style unification remain out of scope.
 
 This phase adds structured styling controls for the page header shell, header nav items, and the standalone `buttons` module. The model should follow the useful parts of stronger builders such as Wix, Squarespace, Webflow, and Shopify: token-driven defaults, structured controls, and optional per-item overrides instead of freeform CSS.
 
@@ -619,6 +619,14 @@ Step 1 verification baseline:
 - The button renderer in `shared-renderers.js` currently emits pure class-based output (`pb-btn--primary`, `pb-btn--secondary`) with no inline styles. This step must transition it to class + inline-style (or CSS-variable) output when `appearance` data is present, while preserving pure-class output when it is absent.
 - Any new CSS for button appearance variants must be added to the appropriate CSS files and included in the `dist/` build.
 
+**Implemented (`2026-04-25`):**
+
+- Added structured sparse appearance controls to the `buttons` module editor for module defaults and per-button overrides.
+- Kept the existing `style` preset and link editor model intact; appearance values are additive and only emit inline styles when configured.
+- Updated the shared renderer path so admin preview and reader output merge `defaults.appearance` with `buttons[*].appearance` using the same precedence.
+- Preserved class-only rendering for legacy buttons with no `appearance` data.
+- Added targeted editor and renderer coverage for default overrides, per-button overrides, merge behavior, and backward-compatible output.
+
 #### Step 3 - Add header shell and header nav appearance controls
 
 - Extend the page header editor with a header-shell appearance section covering `top` and `scrolled` states.
@@ -629,6 +637,16 @@ Step 1 verification baseline:
 - Note that `navItemDefaults` lives under `header.appearance` while per-item overrides live under `header.nav.items[*].appearance`. The merge logic must reach across these two branches — call this out explicitly in the normalizer so implementers don't miss the cross-branch resolution.
 - Any new CSS for header-shell scrolled state or nav-item appearance must be added to the appropriate CSS files and included in the `dist/` build.
 
+**Implemented (`2026-04-26`):**
+
+- Extracted shared structured appearance editor helpers into `admin/page-builder/appearance-editor.js`, leaving button-specific and header-specific event binding local to their editors.
+- Added page-header shell controls for `appearance.top` and `appearance.scrolled`, plus header nav defaults and per-item override controls.
+- Added exported header appearance resolvers in `header-config.js`, including the cross-branch merge from `header.appearance.navItemDefaults` to `header.nav.items[*].appearance`.
+- Updated the admin canvas header surface to preview top-state shell appearance and merged nav chip appearance through the shared resolvers.
+- Updated the reader header runtime to apply top/scrolled shell appearance, install one passive scroll listener, clear controlled inline styles when appearance is absent, and keep the runtime-only `#adminNavLink` outside author nav styling.
+- Added reader header CSS transitions and scrolled-state styling in `assets/css/main.core.04-header.css`.
+- Added dedicated `tests/header-appearance.test.js` coverage for shell merge semantics, nav default/item merge precedence, header editor draft persistence, reader scroll behavior, cleanup on pages without appearance, `#adminNavLink` exclusion, and canvas preview output.
+
 #### Step 4 - Keep runtime parity explicit
 
 - Update the reader header runtime to resolve header-shell and nav-item appearance from the same shared header-state helper used by the admin surface.
@@ -636,12 +654,27 @@ Step 1 verification baseline:
 - Preserve current reader behavior when no appearance data is present.
 - Require `dist/` rebuild before claiming live reader changes work, because this phase affects shared reader/builder rendering.
 
+**Implemented for the current pass (`2026-04-26`):**
+
+- Header appearance resolution is centralized through `resolveHeaderShellTopAppearance(...)`, `resolveHeaderShellScrolledAppearance(...)`, and `resolveHeaderNavItemAppearance(...)`.
+- The reader DOM application and admin canvas preview both consume the same normalized header state and inline-style emission helper.
+- Customized buttons continue to use the shared renderer path, so reader and admin preview output stay aligned without a separate button render branch.
+- Pages without appearance data keep the previous class-based visuals, and generated author nav links only receive inline styles when appearance data resolves.
+
 #### Step 5 - Verification and acceptance
 
 - Add unit coverage for appearance normalization, sanitization, and merge precedence.
 - Add editor tests for draft persistence, save/reload round-trip, and backward compatibility with old pages that only use `style`.
 - Add renderer parity tests so admin preview/canvas and live reader produce the same customized header/button output.
 - Add reader tests for top-vs-scrolled header shell styling and customized button/nav rendering.
+
+**Verification baseline (`2026-04-26`):**
+
+- `npm run lint` passed with no warnings.
+- `npm test` passed: 40 frontend test files, 282 passing, 1 skipped.
+- `npm run test:backend` passed: 58 backend tests.
+- Touched-file Prettier check passed for all files in this change set.
+- `node ./node_modules/vite/bin/vite.js build` completed successfully; `dist/` is ignored by git, so rebuilt assets are not committed.
 
 #### Acceptance Criteria
 

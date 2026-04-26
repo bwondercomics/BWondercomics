@@ -219,7 +219,13 @@
   color: inherit;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    border-radius 0.2s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .pb-page-header-surface:hover {
@@ -377,6 +383,10 @@
   color: #fff;
   font-size: 0.72rem;
   font-weight: 600;
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
 }
 
 /* Outline-only chip for secondary-style nav buttons in the canvas preview */
@@ -658,4 +668,3 @@
 .pb-canvas[data-mode='preview'] .pb-section-insert {
   display: none;
 }
-

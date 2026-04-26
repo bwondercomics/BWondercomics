@@ -1,9 +1,12 @@
 import { LAYOUT_OPTIONS, MODULE_TYPES } from './constants.js';
+import { appearanceToInlineStyle } from './appearance-utils.js';
 import { escapeAttr, escapeHtml } from './helpers.js';
 import {
   HEADER_BLOCK_DEFS,
   HEADER_REGION_ORDER,
   normalizeHeaderCopy,
+  resolveHeaderNavItemAppearance,
+  resolveHeaderShellTopAppearance,
   resolvePageHeaderState,
 } from './header-config.js';
 import { normalizeHeaderNavItems } from './link-utils.js';
@@ -51,7 +54,11 @@ function getHeaderBlockPreview(blockId, headerState, currentPage) {
           .slice(0, 4)
           .map((item) => {
             const variant = item.style === 'secondary' ? 'secondary' : 'primary';
-            return `<span class="pb-page-header-chip pb-page-header-chip--${variant}">${escapeHtml(item.label)}</span>`;
+            const inlineStyle = appearanceToInlineStyle(
+              resolveHeaderNavItemAppearance(headerState.header, item)
+            );
+            const styleAttr = inlineStyle ? ` style="${escapeAttr(inlineStyle)}"` : '';
+            return `<span class="pb-page-header-chip pb-page-header-chip--${variant}"${styleAttr}>${escapeHtml(item.label)}</span>`;
           })
           .join('')}
         ${enabledNavItems.length > 4 ? '<span class="pb-page-header-chip">…</span>' : ''}
@@ -94,6 +101,8 @@ function renderPageHeaderSurface(state) {
   const isSelected = state.selectedCanvasSurface === 'page-header';
   const isDirty = state.dirtyScope === 'header';
   const source = state.activeHeaderDraft?.source;
+  const shellStyle = appearanceToInlineStyle(resolveHeaderShellTopAppearance(headerState.header));
+  const shellStyleAttr = shellStyle ? ` style="${escapeAttr(shellStyle)}"` : '';
 
   let sourceBadge = '';
   if (source === 'legacy-import') {
@@ -108,6 +117,7 @@ function renderPageHeaderSurface(state) {
       type="button"
       class="pb-page-header-surface ${isSelected ? 'selected' : ''}"
       data-action="select-page-header"
+      ${shellStyleAttr}
     >
       <div class="pb-page-header-surface-head">
         <div>

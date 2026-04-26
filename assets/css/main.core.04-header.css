@@ -10,6 +10,20 @@ header.topbar {
   top: 0;
   z-index: 60;
   backdrop-filter: blur(8px);
+  transition:
+    background 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    border-radius 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+header.topbar[data-header-appearance-state] {
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+}
+
+header.topbar.topbar--scrolled {
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.2);
 }
 
 .topbar-layout {

@@ -1,4 +1,4 @@
-import { normalizeAppearance } from './appearance-utils.js';
+import { mergeAppearance, normalizeAppearance } from './appearance-utils.js';
 
 const HEADER_REGION_ORDER = ['left', 'center', 'right'];
 const HEADER_BLOCK_IDS = ['brand', 'patron', 'status', 'entryControls', 'nav'];
@@ -124,6 +124,20 @@ function normalizeHeaderShellAppearance(rawAppearance = null) {
     navItemDefaults: normalizeAppearance(source.navItemDefaults),
   };
   return normalized.top || normalized.scrolled || normalized.navItemDefaults ? normalized : null;
+}
+
+function resolveHeaderShellTopAppearance(header = null) {
+  return normalizeAppearance(header?.appearance?.top);
+}
+
+function resolveHeaderShellScrolledAppearance(header = null) {
+  return mergeAppearance(resolveHeaderShellTopAppearance(header), header?.appearance?.scrolled);
+}
+
+function resolveHeaderNavItemAppearance(header = null, item = null) {
+  // This merge intentionally crosses branches: defaults live on header.appearance,
+  // while per-item overrides live on header.nav.items[*].appearance.
+  return mergeAppearance(header?.appearance?.navItemDefaults, item?.appearance);
 }
 
 function normalizeHeaderConfig(rawConfig = null, normalizeNavItems = (items) => items || []) {
@@ -440,5 +454,8 @@ export {
   normalizeHeaderConfig,
   normalizeHeaderCopy,
   normalizeHeaderOverrides,
+  resolveHeaderNavItemAppearance,
   resolvePageHeaderState,
+  resolveHeaderShellScrolledAppearance,
+  resolveHeaderShellTopAppearance,
 };

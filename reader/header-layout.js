@@ -1,4 +1,10 @@
-import { resolvePageHeaderState } from '../admin/page-builder/header-config.js';
+import { appearanceToInlineStyle } from '../admin/page-builder/appearance-utils.js';
+import {
+  resolveHeaderNavItemAppearance,
+  resolveHeaderShellScrolledAppearance,
+  resolveHeaderShellTopAppearance,
+  resolvePageHeaderState,
+} from '../admin/page-builder/header-config.js';
 import {
   normalizeHeaderNavItems,
   resolveLinkTargetHref,
@@ -12,6 +18,81 @@ const BLOCK_SELECTORS = {
   entryControls: '.entry-controls',
   nav: '.nav-links',
 };
+
+const CONTROLLED_TOPBAR_STYLE_PROPS = [
+  'background',
+  'color',
+  'border',
+  'border-width',
+  'border-style',
+  'border-color',
+  'border-radius',
+];
+
+let activeAppearanceTopbar = null;
+let activeTopAppearance = null;
+let activeScrolledAppearance = null;
+let headerAppearanceScrollListenerInstalled = false;
+
+function clearControlledTopbarStyles(topbar) {
+  if (!topbar) return;
+  CONTROLLED_TOPBAR_STYLE_PROPS.forEach((prop) => {
+    topbar.style.removeProperty(prop);
+  });
+  if (!topbar.getAttribute('style')?.trim()) {
+    topbar.removeAttribute('style');
+  }
+}
+
+function applyControlledTopbarStyle(topbar, inlineStyle) {
+  clearControlledTopbarStyles(topbar);
+  if (!topbar || !inlineStyle) return;
+  inlineStyle
+    .split(';')
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .forEach((token) => {
+      const separatorIndex = token.indexOf(':');
+      if (separatorIndex === -1) return;
+      const property = token.slice(0, separatorIndex).trim();
+      const value = token.slice(separatorIndex + 1).trim();
+      if (!property || !value) return;
+      topbar.style.setProperty(property, value);
+    });
+}
+
+function getCurrentScrollOffset() {
+  return Math.max(
+    window.scrollY || 0,
+    window.pageYOffset || 0,
+    document.documentElement?.scrollTop || 0,
+    document.body?.scrollTop || 0
+  );
+}
+
+function syncTopbarAppearanceState() {
+  if (!activeAppearanceTopbar) return;
+
+  const hasAppearance = !!(activeTopAppearance || activeScrolledAppearance);
+  if (!hasAppearance) {
+    activeAppearanceTopbar.classList.remove('topbar--scrolled');
+    activeAppearanceTopbar.removeAttribute('data-header-appearance-state');
+    clearControlledTopbarStyles(activeAppearanceTopbar);
+    return;
+  }
+
+  const isScrolled = getCurrentScrollOffset() > 0;
+  const resolvedAppearance = isScrolled ? activeScrolledAppearance : activeTopAppearance;
+  applyControlledTopbarStyle(activeAppearanceTopbar, appearanceToInlineStyle(resolvedAppearance));
+  activeAppearanceTopbar.dataset.headerAppearanceState = isScrolled ? 'scrolled' : 'top';
+  activeAppearanceTopbar.classList.toggle('topbar--scrolled', isScrolled);
+}
+
+function ensureHeaderAppearanceScrollListener() {
+  if (headerAppearanceScrollListenerInstalled) return;
+  window.addEventListener('scroll', syncTopbarAppearanceState, { passive: true });
+  headerAppearanceScrollListenerInstalled = true;
+}
 
 function ensureHeaderScaffold() {
   const topbar = document.getElementById('topbar');
@@ -81,6 +162,10 @@ function renderNavItems(navEl, headerConfig, seriesId) {
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
     }
+    const inlineStyle = appearanceToInlineStyle(resolveHeaderNavItemAppearance(headerConfig, item));
+    if (inlineStyle) {
+      link.setAttribute('style', inlineStyle);
+    }
     navEl.insertBefore(link, adminLink || null);
   });
 }
@@ -100,6 +185,11 @@ export function applySharedHeaderLayout(pageConfig = null, options = {}) {
     });
   const headerConfig = headerState.header;
   const blocks = collectHeaderBlocks(scaffold.topbar);
+  activeAppearanceTopbar = scaffold.topbar;
+  activeTopAppearance = resolveHeaderShellTopAppearance(headerConfig);
+  activeScrolledAppearance = resolveHeaderShellScrolledAppearance(headerConfig);
+  ensureHeaderAppearanceScrollListener();
+  syncTopbarAppearanceState();
 
   Object.values(blocks).forEach((node) => {
     if (!node) return;
