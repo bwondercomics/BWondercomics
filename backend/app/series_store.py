@@ -90,6 +90,42 @@ def _extract_sort_index(title: str, folder_path: str, fallback: int) -> int:
     return fallback
 
 
+def _is_remote_or_absolute_path(path: str) -> bool:
+    value = str(path or "").strip()
+    return not value or value.startswith(("http://", "https://", "/"))
+
+
+def _is_protected_path(path: str) -> bool:
+    return str(path or "").strip().strip("/").startswith("protected/")
+
+
+def _validate_entry_access_paths(
+    *,
+    title: str,
+    folder_path: str,
+    pages: list[str],
+    effective_premium: bool,
+) -> None:
+    local_pages = [path for path in pages if not _is_remote_or_absolute_path(path)]
+    if not local_pages:
+        return
+
+    paths_to_check = list(local_pages)
+    if folder_path:
+        paths_to_check.append(folder_path)
+
+    has_public_path = any(not _is_protected_path(path) for path in paths_to_check)
+    has_protected_path = any(_is_protected_path(path) for path in paths_to_check)
+    if effective_premium and has_public_path:
+        raise ValueError(
+            f"Premium entry '{title}' must use protected/ folder and page paths before saving"
+        )
+    if not effective_premium and has_protected_path:
+        raise ValueError(
+            f"Public entry '{title}' cannot use protected/ folder or page paths before saving"
+        )
+
+
 def ensure_seeded(db: Session) -> None:
     have_series = bool(db.scalar(select(Series.id).limit(1)))
     have_entries = bool(db.scalar(select(Entry.id).limit(1)))
@@ -499,6 +535,13 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
                 release_type = "digital"
             store_url = str(meta.get("storeUrl") or meta.get("store_url") or "").strip()
             cover_image = str(meta.get("coverImage") or meta.get("cover") or "").strip()
+
+        _validate_entry_access_paths(
+            title=title,
+            folder_path=folder_path,
+            pages=pages,
+            effective_premium=bool(series.premium_only) or premium_only,
+        )
 
         entry_id: UUID | None = None
         if isinstance(meta, dict):

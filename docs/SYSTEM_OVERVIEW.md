@@ -14,7 +14,7 @@ This repo serves a plain HTML/CSS/JS frontend, with a FastAPI backend adding dyn
 
 - **Series**: a comic series (title/description, premium flag, and the per-series entry label like `Issue/Issues`).
 - **Entries**: the updates within a series (internally “entries”; a series can call them “issues”, “chapters”, “episodes”, etc).
-- **Entry pages**: ordered image paths for each entry (images live on disk under `comics/<seriesId>/entries/` for public pages or `protected/comics/<seriesId>/entries/` for premium/private; paths are stored in DB).
+- **Entry pages**: ordered image paths for each entry (local images live on disk under the canonical `comics/<seriesId>/entries/<label-slug>/...` tree for public pages or `protected/comics/<seriesId>/entries/<label-slug>/...` for premium/private; paths are stored in DB).
 - **Posts**: feed/blog updates (draft/scheduled/published + optional share flag for RSS/social).
 - **Users + comments**: accounts + comment threads (with roles for admin/premium).
 - **Media library**: Postgres table for the media index + files under `media/` (public) or `protected/media/` (premium/private). Access is tracked via `media_items.access` (`public`/`premium`/`private`) and `media_items.premium_visibility` (`blur`/`hidden`).
@@ -59,10 +59,10 @@ The admin “save JSON” flow is also kept, but is intercepted and written to P
 ### 2) Managing series + entries (admin)
 
 1. Admin opens `/admin/` and signs in (must be an `admin` role).
-2. Admin edits series settings (including the per-series entry label).
-3. Admin creates/edits entries, uploads pages, reorders pages, and saves.
+2. Admin edits series settings (including the per-series entry label). Series `premiumOnly` changes first synchronize every entry's folder/page paths with the effective access level.
+3. Admin creates/edits entries, uploads pages, reorders pages, and saves. Entry saves use the same access-path sync as the series toggle flow.
 4. Admin writes go through `/api/save` (DB-backed for series, entries, media index, and page configs).
-5. File moves/copies (public ↔ protected) go through `/api/move-path` and `/api/copy-path`.
+5. File moves/copies (public ↔ protected) go through `/api/move-path` and `/api/copy-path`, and `apply_series_data_save(...)` rejects mismatched local public/protected entry paths before the DB write completes.
 
 ### 2a) Managing site branding (admin media)
 

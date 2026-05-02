@@ -229,31 +229,7 @@ function createSeriesManager() {
 
   function getChaptersRoot() {
     const id = getActiveSeriesId();
-    const preferredRoot = `comics/${id}/entries`;
-    const legacyRoots = [`comics/${id}/chapters`, 'chapters'];
-    const rootsToCheck = [preferredRoot, ...legacyRoots];
-
-    const normalizePath = (value) =>
-      String(value || '')
-        .trim()
-        .replace(/^\/+/, '');
-    const hasRootMatch = (path, root) => {
-      const normalized = normalizePath(path);
-      const normalizedRoot = normalizePath(root).replace(/\/+$/, '');
-      return normalized && normalizedRoot && normalized.startsWith(`${normalizedRoot}/`);
-    };
-
-    const folderPaths = Object.values(state.entryFolders || {});
-    const chapterPages = Object.values(state.entries || {}).flatMap((pages) =>
-      Array.isArray(pages) ? pages : []
-    );
-
-    for (const root of rootsToCheck) {
-      if (folderPaths.some((path) => hasRootMatch(path, root))) return root;
-      if (chapterPages.some((path) => hasRootMatch(path, root))) return root;
-    }
-
-    return preferredRoot;
+    return `comics/${id}/entries`;
   }
 
   function getChaptersDataFileUrl() {
@@ -521,17 +497,17 @@ function createSeriesManager() {
       ),
     };
 
-    state.seriesIndex = nextIndex;
-    await saveToServer('admin/series.json', nextIndex);
-
-    // Keep the series' data.json flag in sync so the reader can enforce it.
-    state.premiumOnly = premiumOnly;
     try {
-      await entriesApi.saveEntries(false);
+      await entriesApi.syncEntryAccessPaths(premiumOnly);
+      await entriesApi.saveEntries(false, { throwOnError: true });
+      await saveToServer('admin/series.json', nextIndex);
     } catch (e) {
-      console.warn('Failed to persist premiumOnly to data file:', e);
+      console.warn('Failed to save series premium paths:', e);
+      alert(`Series update failed: ${e.message || e}`);
+      return;
     }
 
+    state.seriesIndex = nextIndex;
     renderSeriesSelect();
     updateSeriesLinks();
     applyUnitLabels();
@@ -675,16 +651,16 @@ function createSeriesManager() {
           ),
         };
 
-        state.seriesIndex = nextIndex;
-        await saveToServer('admin/series.json', nextIndex);
-
-        state.premiumOnly = premiumOnlyValue;
         try {
-          await entriesApi.saveEntries(false);
+          await entriesApi.syncEntryAccessPaths(premiumOnlyValue);
+          await entriesApi.saveEntries(false, { throwOnError: true });
+          await saveToServer('admin/series.json', nextIndex);
         } catch (e) {
-          console.warn('Failed to persist premiumOnly to data file:', e);
+          console.warn('Failed to save series premium paths:', e);
+          throw e;
         }
 
+        state.seriesIndex = nextIndex;
         renderSeriesSelect();
         updateSeriesLinks();
         applyUnitLabels();

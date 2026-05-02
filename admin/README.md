@@ -20,7 +20,8 @@ Uses the site account system (`/api/login`, `/api/session`) and requires `role=a
 ## Persistence
 
 - **Postgres (DB-backed)**: series, entries, posts, media items, page configs, users, comments, moderation, premium codes.
-- **On disk**: uploaded images under `comics/<seriesId>/entries/` (primary), plus media files under `media/`.
+- **On disk**: uploaded entry images under `comics/<seriesId>/entries/<label-slug>/...` for public access or `protected/comics/<seriesId>/entries/<label-slug>/...` for premium access, plus media files under `media/`.
+- **Premium sync behavior**: saving an entry or toggling a series `premiumOnly` flag now runs the same folder/path sync first, so file moves happen before the DB-backed save is accepted.
 
 ## Run / deploy
 

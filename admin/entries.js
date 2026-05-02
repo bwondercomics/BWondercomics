@@ -40,6 +40,15 @@ export function createEntriesApi({
       .replace(/^\/+/, '')
       .replace(/\/+$/, '');
   const stripProtectedPrefix = (value = '') => normalizeRoot(value).replace(/^protected\//, '');
+  const isRemoteOrAbsolutePath = (value = '') => {
+    const raw = String(value || '').trim();
+    return !raw || raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('/');
+  };
+  const pathBasename = (value = '') => {
+    const clean = stripProtectedPrefix(value);
+    const parts = clean.split('/').filter(Boolean);
+    return parts[parts.length - 1] || '';
+  };
   const isEntryPremium = (entryName, override) => {
     if (typeof override === 'boolean') return override || !!state.premiumOnly;
     const meta = entryName ? state.entryMeta?.[entryName] : null;
@@ -61,16 +70,16 @@ export function createEntriesApi({
       null;
     return getEntryRootForLabel(effectiveLabel, isEntryPremium(entryName, premiumOverride));
   };
-  const replaceRootPrefix = (path, fromRoot, toRoot) => {
-    const cleanFrom = normalizeRoot(fromRoot);
-    const cleanTo = normalizeRoot(toRoot);
-    if (!cleanFrom || !path.startsWith(`${cleanFrom}/`)) return path;
-    return `${cleanTo}${path.slice(cleanFrom.length)}`;
-  };
-  const mapPagePaths = (paths, fromRoot, toRoot) => {
-    const cleanFrom = normalizeRoot(fromRoot);
-    if (!cleanFrom) return paths;
-    return paths.map((path) => replaceRootPrefix(path, cleanFrom, toRoot));
+  const mapPageFolder = (paths, fromFolder, toFolder) => {
+    const cleanFrom = normalizeRoot(fromFolder);
+    const cleanTo = normalizeRoot(toFolder);
+    if (!cleanFrom || !cleanTo || cleanFrom === cleanTo) return paths;
+    return paths.map((path) => {
+      const rawPath = String(path || '').trim();
+      const cleanPath = normalizeRoot(rawPath);
+      if (isRemoteOrAbsolutePath(rawPath) || !cleanPath.startsWith(`${cleanFrom}/`)) return path;
+      return `${cleanTo}${cleanPath.slice(cleanFrom.length)}`;
+    });
   };
   const getDataUrl = () => (typeof getDataFileUrl === 'function' ? getDataFileUrl() : 'data.json');
   const getSaveFile = () =>
@@ -800,6 +809,7 @@ export function createEntriesApi({
 
     let allowDeletions = options && options.allowDeletions === true;
     const skipDeletionConfirm = options && options.skipDeletionConfirm === true;
+    const throwOnError = options && options.throwOnError === true;
     if (!allowDeletions && !skipDeletionConfirm) {
       const previousIds = Array.isArray(state.loadedEntryIds) ? state.loadedEntryIds : [];
       const currentIds = getEntryIds();
@@ -854,6 +864,132 @@ export function createEntriesApi({
       if (showError) {
         showError(`Failed to save ${labels().plural}. A draft is stored in your browser.`);
       }
+      if (throwOnError) throw error;
+    }
+  }
+
+  async function listEntryFolderImages(entryFolder) {
+    const cleanFolder = normalizeRoot(entryFolder);
+    if (!cleanFolder) return [];
+    const response = await fetch('/api/list-entry-images', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entryFolder: cleanFolder }),
+    });
+    if (!response.ok) return [];
+    const data = await response.json().catch(() => ({}));
+    return sortPagesByFilename(data.paths || []);
+  }
+
+  async function moveEntryFolder({ entryName, fromFolder, toFolder, pages }) {
+    const cleanFrom = normalizeRoot(fromFolder);
+    const cleanTo = normalizeRoot(toFolder);
+    if (!cleanFrom || !cleanTo || cleanFrom === cleanTo) {
+      return { moved: false, pages };
+    }
+
+    const response = await fetch('/api/move-path', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: cleanFrom, to: cleanTo }),
+    });
+    if (response.ok) {
+      return { moved: true, pages: mapPageFolder(pages, cleanFrom, cleanTo) };
+    }
+
+    const result = await response.json().catch(() => ({}));
+    if (response.status === 404) {
+      const targetPages = await listEntryFolderImages(cleanTo);
+      if (targetPages.length || !pages.length) {
+        return {
+          moved: false,
+          pages: targetPages.length ? targetPages : mapPageFolder(pages, cleanFrom, cleanTo),
+        };
+      }
+    }
+
+    throw new Error(result.error || `Unable to move folder for ${entryName}`);
+  }
+
+  async function createEntryFolder(entryFolder) {
+    const cleanFolder = normalizeRoot(entryFolder);
+    if (!cleanFolder) return;
+    const response = await fetch('/api/create-entry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ entryFolder: cleanFolder }),
+    });
+    if (!response.ok) {
+      const result = await response.json().catch(() => ({}));
+      throw new Error(result.error || 'Unable to create entry folder');
+    }
+  }
+
+  async function canonicalizeEntryPaths({
+    entryName,
+    originalName = entryName,
+    pages = [],
+    labelId = null,
+    entryPremium = false,
+    seriesPremiumOnly = state.premiumOnly,
+    releaseType = 'digital',
+  } = {}) {
+    const effectivePremium = !!seriesPremiumOnly || !!entryPremium;
+    const desiredRoot = normalizeRoot(getEntryRootForLabel(labelId, effectivePremium));
+    const existingFolder = normalizeRoot(
+      state.entryFolders[originalName] || state.entryFolders[entryName] || ''
+    );
+    const sourceFolder = normalizeRoot(
+      existingFolder ||
+        ensureChapterFolder(entryName, state.entryFolders, state.entries, pages, desiredRoot)
+    );
+    let entryFolder = sourceFolder;
+
+    if (entryFolder && desiredRoot && !entryFolder.startsWith(`${desiredRoot}/`)) {
+      const suffix = pathBasename(entryFolder);
+      entryFolder = suffix ? `${desiredRoot}/${suffix}` : desiredRoot;
+    }
+
+    let nextPages = [...pages];
+    let movedFolder = false;
+    const needsFolder = releaseType !== 'store' || nextPages.length > 0;
+    if (sourceFolder && entryFolder && sourceFolder !== entryFolder) {
+      const moved = await moveEntryFolder({
+        entryName,
+        fromFolder: sourceFolder,
+        toFolder: entryFolder,
+        pages: nextPages,
+      });
+      movedFolder = moved.moved;
+      nextPages = moved.pages;
+    }
+
+    if (needsFolder && !movedFolder) {
+      await createEntryFolder(entryFolder);
+    }
+
+    return { entryFolder, pages: nextPages };
+  }
+
+  async function syncEntryAccessPaths(seriesPremiumOnly = state.premiumOnly) {
+    state.premiumOnly = !!seriesPremiumOnly;
+    const entryNames = Object.keys(state.entries || {}).filter(Boolean);
+    for (const entryName of entryNames) {
+      const meta = state.entryMeta?.[entryName] || {};
+      const labelId =
+        meta.entryLabelId || meta.entry_label_id || getDefaultEntryLabel()?.id || null;
+      const releaseType = String(meta.releaseType || 'digital').toLowerCase();
+      const result = await canonicalizeEntryPaths({
+        entryName,
+        originalName: entryName,
+        pages: normalizePages(state.entries[entryName] || []),
+        labelId,
+        entryPremium: !!meta.premium,
+        seriesPremiumOnly: !!seriesPremiumOnly,
+        releaseType,
+      });
+      state.entryFolders[entryName] = result.entryFolder;
+      state.entries[entryName] = result.pages;
     }
   }
 
@@ -1294,21 +1430,23 @@ export function createEntriesApi({
     const premiumFlag = !!el.entryPremium?.checked;
     const releaseType = String(el.entryReleaseType?.value || 'digital').toLowerCase();
     const originalName = state.currentEditingEntry || newName;
-    const entryRoot = getEntryRootForLabel(
-      selectedLabelId,
-      isEntryPremium(originalName, premiumFlag)
-    );
-    const publicRoot = getEntryRootForLabel(selectedLabelId, false);
-    const protectedRoot = getEntryRootForLabel(selectedLabelId, true);
-    let entryFolder = state.entryFolders[originalName] || state.entryFolders[newName] || '';
-    if (entryFolder) {
-      const desiredRoot = entryRoot;
-      const altRoot = desiredRoot.startsWith('protected/') ? publicRoot : protectedRoot;
-      if (entryFolder.startsWith(`${altRoot}/`) && !entryFolder.startsWith(`${desiredRoot}/`)) {
-        const updatedFolder = replaceRootPrefix(entryFolder, altRoot, desiredRoot);
-        pages = mapPagePaths(pages, altRoot, desiredRoot);
-        entryFolder = updatedFolder;
-      }
+    let entryFolder = '';
+    try {
+      const result = await canonicalizeEntryPaths({
+        entryName: newName,
+        originalName,
+        pages,
+        labelId: selectedLabelId,
+        entryPremium: premiumFlag,
+        seriesPremiumOnly: state.premiumOnly,
+        releaseType,
+      });
+      entryFolder = result.entryFolder;
+      pages = result.pages;
+    } catch (e) {
+      console.warn('Move entry folder failed:', e);
+      if (showError) showError(`Could not move folder for ${newName}: ${e.message}`);
+      return;
     }
     if (!entryFolder) {
       entryFolder = ensureChapterFolder(
@@ -1316,52 +1454,8 @@ export function createEntriesApi({
         state.entryFolders,
         state.entries,
         state.currentPages,
-        entryRoot
+        getEntryRootForLabel(selectedLabelId, isEntryPremium(originalName, premiumFlag))
       );
-    }
-    const needsFolder = releaseType !== 'store' || pages.length > 0;
-    let movedFolder = false;
-    if (
-      entryFolder &&
-      state.entryFolders[originalName] &&
-      entryFolder !== state.entryFolders[originalName]
-    ) {
-      try {
-        const resp = await fetch('/api/move-path', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ from: state.entryFolders[originalName], to: entryFolder }),
-        });
-        if (!resp.ok) {
-          const result = await resp.json().catch(() => ({}));
-          if (!(resp.status === 404 && pages.length === 0)) {
-            throw new Error(result.error || 'Unable to move entry folder');
-          }
-        } else {
-          movedFolder = true;
-        }
-      } catch (e) {
-        console.warn('Move entry folder failed:', e);
-        if (showError) showError(`Could not move folder for ${newName}: ${e.message}`);
-        return;
-      }
-    }
-    if (needsFolder && !movedFolder) {
-      try {
-        const resp = await fetch('/api/create-entry', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ entryFolder: entryFolder }),
-        });
-        if (!resp.ok) {
-          const result = await resp.json().catch(() => ({}));
-          throw new Error(result.error || 'Unable to create entry folder');
-        }
-      } catch (e) {
-        console.warn('Create entry folder failed:', e);
-        if (showError) showError(`Could not create folder for ${newName}: ${e.message}`);
-        return;
-      }
     }
 
     if (state.currentEditingEntry && state.currentEditingEntry !== newName) {
@@ -1650,6 +1744,7 @@ export function createEntriesApi({
     addNewEntry,
     deleteEntry,
     saveEntryEdit,
+    syncEntryAccessPaths,
     addPage,
     removePage,
     renderEntryList,

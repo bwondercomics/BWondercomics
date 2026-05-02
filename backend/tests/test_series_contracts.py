@@ -5,8 +5,11 @@ from datetime import datetime, timedelta, timezone
 
 os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///tmp/bw-quality-route-tests.db")
 
-from backend.app.models import Series
+from sqlalchemy import select
+
+from backend.app.models import Entry, EntryPage, Series
 from backend.app.routes import series_json
+from backend.app.series_store import apply_series_data_save
 
 from backend.tests.helpers import BackendRouteTestCase, json_body, parse_iso_z
 
@@ -50,6 +53,53 @@ class SeriesContractTests(BackendRouteTestCase):
 
         self.assertEqual(json_body(public_response), self.contracts["seriesData"])
         self.assertEqual(json_body(admin_response), self.contracts["seriesData"])
+
+    def test_series_data_save_rejects_premium_entries_with_public_paths(self):
+        payload = {
+            "premiumOnly": True,
+            "entries": {
+                "Chapter 1": ["comics/02/entries/chapters/01/01.png"],
+            },
+            "entryFolders": {"Chapter 1": "comics/02/entries/chapters/01"},
+            "entryMeta": {"Chapter 1": {"premium": False}},
+        }
+
+        with self.assertRaisesRegex(ValueError, "Premium entry 'Chapter 1'"):
+            apply_series_data_save(self.db, "02", payload)
+
+    def test_series_data_save_allows_premium_entry_in_public_series(self):
+        payload = {
+            "premiumOnly": False,
+            "entries": {
+                "Chapter 1": ["protected/comics/02/entries/chapters/01/01.png"],
+            },
+            "entryFolders": {"Chapter 1": "protected/comics/02/entries/chapters/01"},
+            "entryMeta": {"Chapter 1": {"premium": True}},
+        }
+
+        apply_series_data_save(self.db, "02", payload)
+
+        series = self.db.get(Series, "02")
+        entry = self.db.scalar(select(Entry).where(Entry.series_id == "02"))
+        page = self.db.scalar(select(EntryPage).where(EntryPage.entry_id == entry.id))
+
+        self.assertFalse(series.premium_only)
+        self.assertTrue(entry.premium_only)
+        self.assertEqual(entry.folder_path, "protected/comics/02/entries/chapters/01")
+        self.assertEqual(page.path, "protected/comics/02/entries/chapters/01/01.png")
+
+    def test_series_data_save_rejects_public_entries_with_protected_paths(self):
+        payload = {
+            "premiumOnly": False,
+            "entries": {
+                "Chapter 1": ["protected/comics/02/entries/chapters/01/01.png"],
+            },
+            "entryFolders": {"Chapter 1": "protected/comics/02/entries/chapters/01"},
+            "entryMeta": {"Chapter 1": {"premium": False}},
+        }
+
+        with self.assertRaisesRegex(ValueError, "Public entry 'Chapter 1'"):
+            apply_series_data_save(self.db, "02", payload)
 
 
 if __name__ == "__main__":

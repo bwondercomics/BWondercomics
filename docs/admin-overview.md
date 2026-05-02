@@ -17,7 +17,7 @@ This document covers the admin panel (content editor) architecture, data flow, a
 
 - Auth/session: Uses the site's account system (`/api/login`, `/api/session`) and requires an `admin` role.
 - Analytics: `admin/analytics.js` is the public analytics facade used by `admin/app.js`; analytics screen logic now lives under `admin/analytics/` with focused modules for traffic, reader analytics, reads-over-time, visitor history, live visitors, and shared formatters. The analytics UI is grouped into `Site Traffic`, `Visitor History`, and `Reader Engagement`.
-- Entry management (issues/etc): Load/save entries; add/edit/delete; reconcile pages with disk via `/api/list-entry-images`; reorder pages (drag/drop and up/down); renumber flow with confirmation; premium/private handling moves pages into `protected/`.
+- Entry management (issues/etc): Load/save entries; add/edit/delete; reconcile pages with disk via `/api/list-entry-images`; reorder pages (drag/drop and up/down); renumber flow with confirmation; keep local entry folders under the canonical `comics/<seriesId>/entries/<label-slug>/...` root; and move local pages into or out of `protected/` when effective premium access changes.
 - Page ops: Add/remove pages; ensure entry folder creation via `/api/create-entry`; delete images via `/api/delete-image`; move/copy files with `/api/move-path` + `/api/copy-path`.
 - Status message: Editable site-wide status stored with entry payload.
 - Blog/updates: CRUD for posts via the DB-backed API (`/api/admin/posts`), with draft/scheduled/published and a “publish date/time” field.
@@ -29,7 +29,7 @@ This document covers the admin panel (content editor) architecture, data flow, a
 - Internal builder-page links: header buttons and `buttons` modules can target another builder page in the active series, a URL, or an anchor target.
 - Preview/export: Entry preview image navigation; JSON export/copy; share data assembly.
 - UI: Modals for entry edit and renumber confirmation; indicators for unsaved changes; smooth scroll to sections.
-- Series settings: Each series can set its own singular/plural label (e.g., `Issue/Issues`, `Chapter/Chapters`) stored in the DB and served at `admin/series.json`.
+- Series settings: Each series can set its own singular/plural label (e.g., `Issue/Issues`, `Chapter/Chapters`) stored in the DB and served at `admin/series.json`. Series-level `premiumOnly` saves now run the same entry access-path sync as entry saves before `admin/series.json` is persisted, so folder moves happen before the metadata write.
 
 ## Data Paths and Persistence
 
@@ -43,6 +43,7 @@ This document covers the admin panel (content editor) architecture, data flow, a
   - Page-builder assets: `/api/admin/assets`, `/api/admin/assets/upload`
   - Files/folders: `/api/create-entry`, `/api/delete-image`, `/api/list-entry-images`, `/api/list-media`, `/api/move-path`, `/api/copy-path`
 - Local cache: `localStorage` (`STORAGE_KEY`) for draft entries/status, plus page-builder UI preferences such as `pb-editor-mode` and `pb-sidebar-mode`.
+- Access-path validation: local entry image paths are expected to stay under `comics/<seriesId>/entries/...` for public content or `protected/comics/<seriesId>/entries/...` for premium content. `apply_series_data_save(...)` now rejects mismatched local folder/page paths before writing to the DB, while remote URLs and absolute paths are ignored by that validator.
 - Header persistence: normal header saves write canonical `page.meta.header.version = 3` on the page record and clear `meta.headerOverrides`. Bulk migration is available through `python -m backend.app.backfill_page_headers --series <series-id> [--write]`, which dry-runs by default and writes effective legacy header state into page meta when enabled. `auditPagesFallbacks(fullSeriesPages)` remains the documented removal gate for the reader’s deprecated legacy path, and it now tracks runtime-fallback blockers (`missingHeader`, `staleHeaderVersion`, `headerOverrides`) plus the published `reader` page requirement; inert legacy `header` modules are later cleanup, not a runtime-removal blocker once V3 header meta exists.
 - Reader-homepage resolution: the public reader root now has a dedicated effective-homepage endpoint at `/api/pages/home/<seriesId>`, while admin draft preview uses `/api/admin/pages/home/<seriesId>`. Both currently resolve the page marked homepage first and fall back to the series `reader` page when no homepage record matches the visibility rules.
 
@@ -75,9 +76,9 @@ flowchart TD
 flowchart LR
   X[Open edit modal] --> Y[reconcile pages with /api/list-entry-images]
   Y --> Z[render page list (drag/drop + up/down)]
-  Z --> W{rename entry?}
-  W -- yes --> M[remap folder mapping; delete old name]
-  W -- no --> N[keep folder mapping]
+  Z --> W{rename, relabel, or change premium access?}
+  W -- yes --> M[canonicalize folder target and move via /api/move-path when needed]
+  W -- no --> N[keep current folder target]
   M --> O
   N --> O[ensure entry folder via /api/create-entry]
   O --> P[save entries draft to localStorage]

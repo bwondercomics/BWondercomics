@@ -580,6 +580,10 @@ The heaviest orchestrator in the Admin suite. It manages the entire lifecycle of
 
 The dual-pass persistence engine. It attempts to load from `data.json` (DB) before falling back to `localStorage` (Drafts). Saving always performs an atomic update to both the persistent store and the local cache.
 
+#### `syncEntryAccessPaths(seriesPremiumOnly)`
+
+The shared access-path synchronizer. It recalculates each entry's effective premium state, canonicalizes its folder target under `comics/<seriesId>/entries/<label-slug>/...` or `protected/comics/<seriesId>/entries/<label-slug>/...`, and moves local folders/pages before the calling save flow persists metadata.
+
 #### `editEntry(entryName)`
 
 The form controller. It populates the entry editor with current metadata—handling complex transformations for date-local inputs and visibility toggles—and reveals the edit workspace.
@@ -599,7 +603,7 @@ A custom-built drag/scroll workspace for reordering pages:
 
 #### Path Internalization
 
-The module uses `inferFolderFromPages` and `replaceRootPrefix` to bridge the gap between static path strings and the application's dynamic `protected/` logic for premium content.
+The module uses `inferFolderFromPages`, `canonicalizeEntryPaths`, `mapPageFolder`, and `syncEntryAccessPaths` to keep entry folders and page arrays aligned with the canonical series root and the effective `protected/` access model for premium content.
 
 ### DOM Dependencies
 

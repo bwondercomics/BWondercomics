@@ -2,7 +2,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getContractFixture } from './helpers/contracts.js';
-import { mountAdminDom, stubAdminGlobals } from './helpers/admin-fixture.js';
+import {
+  flushAdminUi,
+  jsonResponse,
+  mountAdminDom,
+  stubAdminGlobals,
+} from './helpers/admin-fixture.js';
 
 describe('admin series contract handling', () => {
   beforeEach(() => {
@@ -76,5 +81,59 @@ describe('admin series contract handling', () => {
 
     expect(onPageBuilderSeriesChange).toHaveBeenCalled();
     expect(showChaptersSection).not.toHaveBeenCalled();
+  });
+
+  it('syncs entry access paths before saving a series premium toggle', async () => {
+    const calls = [];
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (url === '/api/save') {
+        const body = JSON.parse(options.body);
+        calls.push(`save:${body.filename}`);
+        return jsonResponse({ status: 'success' });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const [{ createSeriesManager }, { state }] = await Promise.all([
+      import('../admin/series.js'),
+      import('../admin/state.js'),
+    ]);
+
+    state.activeSeriesId = '02';
+    state.seriesIndex = {
+      version: 1,
+      defaultSeriesId: 'battle-bros',
+      series: [
+        {
+          id: '02',
+          title: 'PYRE',
+          description: '',
+          premiumOnly: false,
+          unitLabelSingular: 'Chapter',
+          unitLabelPlural: 'Chapters',
+        },
+      ],
+    };
+
+    const entriesApi = {
+      syncEntryAccessPaths: vi.fn(async (premiumOnly) => {
+        calls.push(`sync:${premiumOnly}`);
+      }),
+      saveEntries: vi.fn(async (_showMessage, options) => {
+        calls.push(`saveEntries:${options?.throwOnError === true}`);
+      }),
+    };
+    const manager = createSeriesManager();
+    manager.bindDependencies({ entriesApi });
+
+    await manager.editActiveSeries();
+    document.getElementById('seriesPremiumOnly').checked = true;
+    document
+      .getElementById('seriesForm')
+      .dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await flushAdminUi(3);
+
+    expect(calls).toEqual(['sync:true', 'saveEntries:true', 'save:admin/series.json']);
   });
 });
