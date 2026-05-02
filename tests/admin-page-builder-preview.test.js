@@ -343,7 +343,12 @@ describe('admin page-builder editor and preview renderers', () => {
   it('html uses its dedicated code editor; feed alone retains the generic raw Advanced card', () => {
     const modules = getContractFixture('builderModules');
     const currentPage = {
-      sections: [{ id: 'section-1', modules: [modules.html, modules.feed, modules.promo, modules.social, modules.buttons] }],
+      sections: [
+        {
+          id: 'section-1',
+          modules: [modules.html, modules.feed, modules.promo, modules.social, modules.buttons],
+        },
+      ],
     };
 
     const htmlHtml = renderModuleEditorContent({
@@ -416,46 +421,50 @@ describe('admin page-builder editor and preview renderers', () => {
     const columnsInput = wrapper.querySelector('.pb-gallery-main-input[data-key="columns"]');
     columnsInput.value = '4';
     columnsInput.dispatchEvent(new Event('input', { bubbles: true }));
-    expect(setDraftConfig).toHaveBeenLastCalledWith(
-      expect.objectContaining({ columns: 4 })
-    );
+    expect(setDraftConfig).toHaveBeenLastCalledWith(expect.objectContaining({ columns: 4 }));
 
-    const firstItemSrc = wrapper.querySelector('.pb-gallery-item[data-item-index="0"] .pb-gallery-input[data-item-key="src"]');
+    const firstItemSrc = wrapper.querySelector(
+      '.pb-gallery-item[data-item-index="0"] .pb-gallery-input[data-item-key="src"]'
+    );
     firstItemSrc.value = 'updated/path.png';
     firstItemSrc.dispatchEvent(new Event('input', { bubbles: true }));
     expect(setDraftConfig).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        images: expect.arrayContaining([
-          expect.objectContaining({ src: 'updated/path.png' })
-        ])
+        images: expect.arrayContaining([expect.objectContaining({ src: 'updated/path.png' })]),
       })
     );
 
-    document.getElementById('pbGalleryAddImage').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    document
+      .getElementById('pbGalleryAddImage')
+      .dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(setDraftConfig).toHaveBeenLastCalledWith(
       expect.objectContaining({
         images: expect.arrayContaining([
           expect.anything(),
           expect.anything(),
-          expect.objectContaining({ src: '', alt: '' })
-        ])
+          expect.objectContaining({ src: '', alt: '' }),
+        ]),
       })
     );
     expect(renderEditorPanel).toHaveBeenCalled();
 
-    const moveDownBtn = wrapper.querySelector('.pb-gallery-item[data-item-index="0"] [data-action="move-down"]');
+    const moveDownBtn = wrapper.querySelector(
+      '.pb-gallery-item[data-item-index="0"] [data-action="move-down"]'
+    );
     moveDownBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(setDraftConfig).toHaveBeenLastCalledWith(
       expect.objectContaining({
         images: [
-           galleryModule.config.images[1],
-           expect.objectContaining({ src: 'updated/path.png', alt: 'Shot one' }),
-           expect.objectContaining({ src: '', alt: '' })
-        ]
+          galleryModule.config.images[1],
+          expect.objectContaining({ src: 'updated/path.png', alt: 'Shot one' }),
+          expect.objectContaining({ src: '', alt: '' }),
+        ],
       })
     );
 
-    const removeBtn = wrapper.querySelector('.pb-gallery-item[data-item-index="0"] [data-action="remove"]');
+    const removeBtn = wrapper.querySelector(
+      '.pb-gallery-item[data-item-index="0"] [data-action="remove"]'
+    );
     removeBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(setDraftConfig).toHaveBeenCalled();
   });

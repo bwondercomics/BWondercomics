@@ -40,7 +40,12 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
 
     el.pbPageList.querySelectorAll('.pb-page-item').forEach((item) => {
       item.addEventListener('click', async (event) => {
-        if (event.target.closest('.pb-page-action') || event.target.closest('.pb-page-drag-handle')) return;
+        if (
+          event.target.closest('.pb-page-action') ||
+          event.target.closest('.pb-page-drag-handle')
+        ) {
+          return;
+        }
         await actions.selectPage(item.dataset.pageId);
       });
 
@@ -58,7 +63,7 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
       item.addEventListener('dragend', () => {
         draggedSidebarPageId = null;
         item.style.opacity = '';
-        el.pbPageList.querySelectorAll('.pb-page-item').forEach(el => {
+        el.pbPageList.querySelectorAll('.pb-page-item').forEach((el) => {
           el.style.borderTop = '';
           el.style.borderBottom = '';
         });
@@ -89,24 +94,24 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
       item.addEventListener('drop', async (event) => {
         if (!draggedSidebarPageId || draggedSidebarPageId === item.dataset.pageId) return;
         event.preventDefault();
-        
+
         const isTop = item.dataset.dragOver === 'top';
         item.style.borderTop = '';
         item.style.borderBottom = '';
         delete item.dataset.dragOver;
-        
+
         const currentPages = getState().pages;
-        const pageIds = currentPages.map(p => p.id);
+        const pageIds = currentPages.map((p) => p.id);
         const draggedIdx = pageIds.indexOf(draggedSidebarPageId);
-        
+
         if (draggedIdx === -1) return;
-        
+
         pageIds.splice(draggedIdx, 1);
         const newTargetIdx = pageIds.indexOf(item.dataset.pageId);
         const insertIdx = isTop ? newTargetIdx : newTargetIdx + 1;
-        
+
         pageIds.splice(insertIdx, 0, draggedSidebarPageId);
-        
+
         draggedSidebarPageId = null;
         await actions.reorderSidebarPages(pageIds);
       });

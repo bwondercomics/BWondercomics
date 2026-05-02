@@ -110,12 +110,7 @@ export function createCanvasEventBinder({ el, getState, actions }) {
 
         if (draggedModuleId) {
           actions.setDraggedModuleId(null);
-          await actions.moveModuleToTarget(
-            draggedModuleId,
-            sectionId,
-            columnIndex,
-            insertIndex
-          );
+          await actions.moveModuleToTarget(draggedModuleId, sectionId, columnIndex, insertIndex);
           return;
         }
 
@@ -180,10 +175,12 @@ export function createCanvasEventBinder({ el, getState, actions }) {
         actions.selectModule(moduleId);
       });
 
-      moduleEl.querySelector('[data-action="delete-module"]')?.addEventListener('click', async (event) => {
-        event.stopPropagation();
-        await actions.deleteModuleFromCanvas(moduleId);
-      });
+      moduleEl
+        .querySelector('[data-action="delete-module"]')
+        ?.addEventListener('click', async (event) => {
+          event.stopPropagation();
+          await actions.deleteModuleFromCanvas(moduleId);
+        });
     });
   }
 

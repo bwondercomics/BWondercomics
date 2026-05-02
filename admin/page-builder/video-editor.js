@@ -26,12 +26,7 @@ export function renderVideoEditor(config = {}) {
   `;
 }
 
-export function bindVideoEditorEvents({
-  el,
-  draftConfig,
-  setDraftConfig,
-  markDirty,
-}) {
+export function bindVideoEditorEvents({ el, draftConfig, setDraftConfig, markDirty }) {
   let config = normalizeVideoConfig(draftConfig);
 
   const commit = (nextConfig) => {

@@ -37,6 +37,7 @@ To maintain the long-term health of this project, all AI assistants MUST follow 
 ## 📚 Technical Documentation
 
 Core logic and function maps for persistent reference:
+
 - **Admin Core Suite**: [admin-core.md](file:///srv/bw-quality/docs/functions/admin-core.md) (Auth, State, DOM, App Orchestration)
 - **Admin Page Builder**: [admin-page-builder.md](file:///srv/bw-quality/docs/functions/admin-page-builder.md) (Structural normalization, Drag-and-Drop, Rendering)
 - **Admin Analytics**: [admin-analytics.md](file:///srv/bw-quality/docs/functions/admin-analytics.md) (Seismometer, Historical Reader Metrics, Traffic)

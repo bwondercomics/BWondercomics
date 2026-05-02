@@ -35,12 +35,7 @@ export function renderDividerEditor(config = {}) {
   `;
 }
 
-export function bindDividerEditorEvents({
-  el,
-  draftConfig,
-  setDraftConfig,
-  markDirty,
-}) {
+export function bindDividerEditorEvents({ el, draftConfig, setDraftConfig, markDirty }) {
   let config = normalizeDividerConfig(draftConfig);
 
   const commit = (nextConfig) => {

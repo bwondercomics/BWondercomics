@@ -36,10 +36,12 @@ This summarizes the reader runtime after modularization: what each file does, ke
 1. `index.html` applies a temporary bootstrap-loading state, then loads `reader/app.js` + `reader/customization.js` as ES modules.
 2. `app.start()`:
    - `loadEntryData()` → sets entries/order/statusMessage.
-  - `loadPageConfigWithFallback()` → prefers the builder page API, falls back to legacy `page-config.json` only for the default reader slug, and resolves the startup page source for the rest of the reader. The legacy branch is removable only after `auditPagesFallbacks(fullSeriesPages)` reports `clean: true`, which now includes a published `reader` page gate.
-   - `loadLatestPost()` → fetches `/api/posts/latest`, passes to `renderLatestUpdate`.
-   - Initializes elements, entry select, status panel, email form, pointer/fullscreen/nav handlers, then releases the bootstrap-loading state once the initial render or error UI is ready.
-   - Restores saved progress if present; renders current pages and applies the desktop on-page frame when eligible.
+
+- `loadPageConfigWithFallback()` → prefers the builder page API, falls back to legacy `page-config.json` only for the default reader slug, and resolves the startup page source for the rest of the reader. The legacy branch is removable only after `auditPagesFallbacks(fullSeriesPages)` reports `clean: true`, which now includes a published `reader` page gate.
+- `loadLatestPost()` → fetches `/api/posts/latest`, passes to `renderLatestUpdate`.
+- Initializes elements, entry select, status panel, email form, pointer/fullscreen/nav handlers, then releases the bootstrap-loading state once the initial render or error UI is ready.
+- Restores saved progress if present; renders current pages and applies the desktop on-page frame when eligible.
+
 3. `customization.js` waits for the bootstrap result and exits early when the reader is already using the builder page, preventing the old shell from repainting over the custom one.
 4. User interactions:
    - Navigation via buttons/edge zones/keyboard/swipe → `controls.js` updates state and calls `render` + `saveProgress`.

@@ -1,5 +1,3 @@
-
-
 # Admin Core Suite Logic
 
 This document provides a comprehensive map of the internal functions, orchestration logic, and global infrastructure within the `admin/` root directory.
@@ -1014,12 +1012,15 @@ The `social.js` module integrates Bluesky notification monitoring and profile st
 ### Public API (🔌)
 
 #### `refreshBluesky()`
+
 Fetches new notifications and updates profile follower deltas via `localStorage`.
 
 #### `showSocialSection()`
+
 Reveals the social panel and initializes the active tab.
 
 ### Internal Logic (🔒)
+
 - **`renderBlueskyProfile`**: Normalizes profile data and calculates follower changes since the last cache.
 - **`buildNotificationItem`**: Renders robust DOM elements for rich social notes (avatars, relative timestamps).
 
@@ -1030,9 +1031,11 @@ The `uploads.js` module orchestrates drag-and-drop mechanics and API file payloa
 ### Public API (🔌)
 
 #### `initUploadHandlers()`
+
 Binds drag-and-drop listeners on `uploadArea` and initializes the file selection callbacks.
 
 ### Internal Logic (🔒)
+
 - **`handleFileSelect`**: Enforces strict `image/*` MIME filtering and a 10MB maximum file size limit.
 - **`uploadImagesToServer`**: Packages valid imagery as Base64 strings, automatically ensuring a valid `entryFolder` exists using inference logic before sending the API POST.
 
@@ -1043,12 +1046,15 @@ The `users.js` module handles user roles, newsletter subscriptions, and premium 
 ### Public API (🔌)
 
 #### `loadUsers()`
+
 The master hydrator, orchestrating parallel fetches for Users List, Email Subscribers, and Premium Codes.
 
 #### `generatePremiumCodes()`
+
 A high-privilege mutator that generates batch access codes for marketing campaigns.
 
 ### Internal Logic (🔒)
+
 - **Role Assignment**: Supports inline mutation between `user`, `premium`, and `admin` roles, secured by same-origin credentials.
 - **Data Densification**: Combines opt-in dates, IP sources, and recent activity into dense table rows for rapid auditing.
 

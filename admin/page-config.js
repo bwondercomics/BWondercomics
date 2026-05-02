@@ -22,12 +22,16 @@ function normalizeSeriesId(seriesId = '') {
 
 function getAdminPageConfigPath(seriesId = DEFAULT_SERIES_ID) {
   const sid = normalizeSeriesId(seriesId);
-  return sid === DEFAULT_SERIES_ID ? '/api/admin/page-config.json' : `/api/admin/series/${sid}/page-config.json`;
+  return sid === DEFAULT_SERIES_ID
+    ? '/api/admin/page-config.json'
+    : `/api/admin/series/${sid}/page-config.json`;
 }
 
 function getPageConfigSaveFilename(seriesId = DEFAULT_SERIES_ID) {
   const sid = normalizeSeriesId(seriesId);
-  return sid === DEFAULT_SERIES_ID ? 'admin/page-config.json' : `admin/series/${sid}/page-config.json`;
+  return sid === DEFAULT_SERIES_ID
+    ? 'admin/page-config.json'
+    : `admin/series/${sid}/page-config.json`;
 }
 
 export function getCachedPageConfig() {

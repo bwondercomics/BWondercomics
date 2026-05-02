@@ -119,8 +119,7 @@ def get_page(db: Session, page_id: str) -> dict[str, Any] | None:
 
     payload = _serialize_page(page)
     payload["sections"] = [
-        _serialize_section(section)
-        for section in sorted(page.sections, key=lambda s: s.sort_index)
+        _serialize_section(section) for section in sorted(page.sections, key=lambda s: s.sort_index)
     ]
     return payload
 
@@ -139,8 +138,7 @@ def get_page_by_slug(db: Session, series_id: str | None, slug: str) -> dict[str,
 
     payload = _serialize_page(page, include_sort_index=False)
     payload["sections"] = [
-        _serialize_section(section)
-        for section in sorted(page.sections, key=lambda s: s.sort_index)
+        _serialize_section(section) for section in sorted(page.sections, key=lambda s: s.sort_index)
     ]
     return payload
 
@@ -173,8 +171,7 @@ def get_homepage_page(
 
     payload = _serialize_page(page, include_sort_index=False)
     payload["sections"] = [
-        _serialize_section(section)
-        for section in sorted(page.sections, key=lambda s: s.sort_index)
+        _serialize_section(section) for section in sorted(page.sections, key=lambda s: s.sort_index)
     ]
     return payload
 
@@ -342,9 +339,7 @@ def add_section(db: Session, page_id: str, data: dict[str, Any]) -> dict[str, An
 
     section_type = validate_section_type(data.get("sectionType") or "row")
     layout = validate_layout(data.get("layout") or "1")
-    sort_index = (
-        validate_sort_index(data["sortIndex"]) if "sortIndex" in data else max_sort + 1
-    )
+    sort_index = validate_sort_index(data["sortIndex"]) if "sortIndex" in data else max_sort + 1
 
     section = BuilderSection(
         page_id=pid,
@@ -473,9 +468,7 @@ def add_module(db: Session, section_id: str, data: dict[str, Any]) -> dict[str, 
         or 0
     )
 
-    sort_index = (
-        validate_sort_index(data["sortIndex"]) if "sortIndex" in data else max_sort + 1
-    )
+    sort_index = validate_sort_index(data["sortIndex"]) if "sortIndex" in data else max_sort + 1
     module = BuilderModule(
         section_id=sid,
         module_type=module_type,
@@ -511,7 +504,11 @@ def update_module(db: Session, module_id: str, data: dict[str, Any]) -> dict[str
 
     section = db.get(BuilderSection, module.section_id)
     layout = validate_layout(section.layout) if section else "1"
-    next_type = validate_module_type(data["moduleType"]) if "moduleType" in data else validate_module_type(module.module_type)
+    next_type = (
+        validate_module_type(data["moduleType"])
+        if "moduleType" in data
+        else validate_module_type(module.module_type)
+    )
     if "moduleType" in data:
         module.module_type = next_type
     if "columnIndex" in data:

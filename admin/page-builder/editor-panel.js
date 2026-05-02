@@ -1,8 +1,5 @@
 import { escapeHtml } from './helpers.js';
-import {
-  bindHeaderEditorEvents,
-  renderHeaderEditorContent,
-} from './header-editor.js';
+import { bindHeaderEditorEvents, renderHeaderEditorContent } from './header-editor.js';
 import { bindModuleEditorEvents, renderModuleEditorContent } from './module-editor.js';
 import { bindThemeEditorEvents, renderThemeEditorContent } from './theme-editor.js';
 
@@ -96,13 +93,7 @@ function renderShell({
   `;
 }
 
-export function createEditorPanelRenderer({
-  el,
-  getState,
-  actions,
-  helpers,
-  deps,
-}) {
+export function createEditorPanelRenderer({ el, getState, actions, helpers, deps }) {
   function renderEditorPanel() {
     if (!el.pbModuleEditor) return;
 
@@ -296,16 +287,28 @@ export function createEditorPanelRenderer({
       });
     } else if (state.selectedCanvasSurface === 'page-settings') {
       document.getElementById('pbEditPageSlug')?.addEventListener('input', (e) => {
-        actions.updateActivePageSettingsDraftField('slug', /** @type {HTMLInputElement} */ (e.target).value);
+        actions.updateActivePageSettingsDraftField(
+          'slug',
+          /** @type {HTMLInputElement} */ (e.target).value
+        );
       });
       document.getElementById('pbEditPageTitle')?.addEventListener('input', (e) => {
-        actions.updateActivePageSettingsDraftField('title', /** @type {HTMLInputElement} */ (e.target).value);
+        actions.updateActivePageSettingsDraftField(
+          'title',
+          /** @type {HTMLInputElement} */ (e.target).value
+        );
       });
       document.getElementById('pbEditPageType')?.addEventListener('input', (e) => {
-        actions.updateActivePageSettingsDraftField('pageType', /** @type {HTMLInputElement} */ (e.target).value);
+        actions.updateActivePageSettingsDraftField(
+          'pageType',
+          /** @type {HTMLInputElement} */ (e.target).value
+        );
       });
       document.getElementById('pbEditIsHomepage')?.addEventListener('change', (e) => {
-        actions.updateActivePageSettingsDraftField('isHomepage', /** @type {HTMLInputElement} */ (e.target).checked);
+        actions.updateActivePageSettingsDraftField(
+          'isHomepage',
+          /** @type {HTMLInputElement} */ (e.target).checked
+        );
       });
 
       document.getElementById('pbSavePageSettings')?.addEventListener('click', async () => {

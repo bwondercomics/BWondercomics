@@ -1242,8 +1242,6 @@ describe('admin page-builder shell', () => {
     expect(document.querySelector('.pb-editor-source-notice')).toBeNull();
   });
 
-
-
   it('shows the Imported chip on the canvas header surface for a legacy page', async () => {
     const legacyPage = getContractFixture('builderPage');
     delete legacyPage.meta.header;
@@ -1267,7 +1265,6 @@ describe('admin page-builder shell', () => {
     expect(surface?.querySelector('.pb-page-header-badge--stale')).toBeNull();
   });
 });
-
 
 // ── Step 3 regressions ───────────────────────────────────────────────────────
 describe('Phase 6 Step 3 — header editor UX upgrades', () => {
@@ -1416,16 +1413,12 @@ describe('Phase 6 Step 4 — header buttons on the shared button model', () => {
     await flushAdminUi(2);
 
     // At least one nav item should be present; each must expose a style select
-    const styleSelects = document.querySelectorAll(
-      '.pb-header-nav-input[data-item-key="style"]'
-    );
+    const styleSelects = document.querySelectorAll('.pb-header-nav-input[data-item-key="style"]');
     expect(styleSelects.length).toBeGreaterThan(0);
 
     // The select must offer both primary and secondary options
     const firstSelect = styleSelects[0];
-    const optionValues = Array.from(firstSelect.querySelectorAll('option')).map(
-      (o) => o.value
-    );
+    const optionValues = Array.from(firstSelect.querySelectorAll('option')).map((o) => o.value);
     expect(optionValues).toContain('primary');
     expect(optionValues).toContain('secondary');
   });
@@ -1448,9 +1441,7 @@ describe('Phase 6 Step 4 — header buttons on the shared button model', () => {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await flushAdminUi(2);
 
-    const firstStyleSelect = document.querySelector(
-      '.pb-header-nav-input[data-item-key="style"]'
-    );
+    const firstStyleSelect = document.querySelector('.pb-header-nav-input[data-item-key="style"]');
     expect(firstStyleSelect).not.toBeNull();
 
     firstStyleSelect.value = 'secondary';
@@ -1525,7 +1516,7 @@ describe('Phase 6 Step 4 — header buttons on the shared button model', () => {
     navChips.forEach((chip) => {
       expect(
         chip.classList.contains('pb-page-header-chip--primary') ||
-        chip.classList.contains('pb-page-header-chip--secondary')
+          chip.classList.contains('pb-page-header-chip--secondary')
       ).toBe(true);
     });
   });
@@ -1549,9 +1540,7 @@ describe('Phase 6 Step 4 — header buttons on the shared button model', () => {
     await flushAdminUi(2);
 
     // Switch first nav item to secondary
-    const firstStyleSelect = document.querySelector(
-      '.pb-header-nav-input[data-item-key="style"]'
-    );
+    const firstStyleSelect = document.querySelector('.pb-header-nav-input[data-item-key="style"]');
     firstStyleSelect.value = 'secondary';
     firstStyleSelect.dispatchEvent(new Event('change', { bubbles: true }));
     await flushAdminUi(1);
@@ -1568,9 +1557,7 @@ describe('Phase 6 Step 4 — header buttons on the shared button model', () => {
         meta: expect.objectContaining({
           header: expect.objectContaining({
             nav: expect.objectContaining({
-              items: expect.arrayContaining([
-                expect.objectContaining({ style: 'secondary' }),
-              ]),
+              items: expect.arrayContaining([expect.objectContaining({ style: 'secondary' })]),
             }),
           }),
         }),

@@ -430,11 +430,11 @@ Deliberately not in this phase:
 - Marked `source: 'legacy'` and the `pb-no-fallback` flag as deprecated in `reader/data.js`, documenting that removal requires a clean series-level audit including a published `reader` page.
 - Expanded the test suite with comprehensive audit coverage to act as the source of truth for safe branch removal.
 
-### Phase 6 - Header builder canonicalization pass
+### Phase 6 - Header builder canonicalization pass ✅
 
-Status: in progress
+Status: Complete for the current header-builder canonicalization scope (`2026-04-18`); runtime fallback removal remains gated by the series-level fallback audit and is deferred to a later cleanup pass.
 
-**Implemented so far (2026-04-18):**
+**Implemented (`2026-04-18`):**
 
 - Completed Step 1, making the integrated admin page builder the only real Page Designer shell.
 - Added a canonical admin deep-link contract for designer entry:
@@ -537,9 +537,11 @@ Goal: make the page designer show the real page-scoped header builder by default
 - header preview in admin and the live reader header stay in parity for layout, visible blocks, and button variants
 - the series-level fallback audit remains the gate for runtime fallback removal
 
-### Phase 7 - Header and Button Appearance Customization Pass
+**Completion note (`2026-05-02`):** Phase 6 acceptance is satisfied for its current scope. Runtime fallback removal remains future cleanup after the series-level fallback audit is clean.
 
-Status: Steps 1-3 implemented (`2026-04-25` - `2026-04-26`); runtime parity and verification baseline completed for the current header/button appearance pass. Later hover/focus state editing and broader module style unification remain out of scope.
+### Phase 7 - Header and Button Appearance Customization Pass ✅
+
+Status: Complete for the current header/button appearance scope (`2026-04-25` - `2026-05-02`). Steps 1-5 are implemented and verified; later hover/focus/active state editing, per-block header styling, and broader module style unification remain out of scope.
 
 This phase adds structured styling controls for the page header shell, header nav items, and the standalone `buttons` module. The model should follow the useful parts of stronger builders such as Wix, Squarespace, Webflow, and Shopify: token-driven defaults, structured controls, and optional per-item overrides instead of freeform CSS.
 
@@ -676,6 +678,17 @@ Step 1 verification baseline:
 - Touched-file Prettier check passed for all files in this change set.
 - `node ./node_modules/vite/bin/vite.js build` completed successfully; `dist/` is ignored by git, so rebuilt assets are not committed.
 
+**Closeout verification (`2026-05-02`):**
+
+- `npm run format:check` passed: all JS/HTML/CSS/MD files use Prettier code style.
+- `npm run format:py:check` passed: 45 Python files already formatted.
+- `npm run lint` passed with no warnings.
+- `npm run lint:py` passed: Ruff reported all checks passed.
+- `npm test` passed: 40 frontend test files, 285 passing, 1 skipped.
+- `npm run test:backend` passed: 63 backend tests.
+- `npm run build` completed successfully; `dist/` is ignored by git, so rebuilt assets are not committed.
+- `git diff --check` passed with no whitespace errors.
+
 #### Acceptance Criteria
 
 - authors can customize header container background and border for top and scrolled states without touching JSON
@@ -683,6 +696,8 @@ Step 1 verification baseline:
 - theme changes still cascade unless a more specific header/module/item override is set
 - old pages that only use `primary` / `secondary` keep their current visual behavior
 - admin preview and the live reader stay in parity for customized header and button rendering
+
+**Acceptance completion (`2026-05-02`):** Criteria are satisfied for the current header shell, header nav, and `buttons` appearance scope. Hover/focus/active state editors, per-block header styling, and broader style unification for social, promo, feed, and email module style objects remain deferred.
 
 #### Implementation notes from audit
 

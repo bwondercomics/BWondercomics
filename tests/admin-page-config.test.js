@@ -75,6 +75,9 @@ describe('admin page-config contract handling', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/admin/series/side-story/page-config.json', {
       cache: 'no-store',
     });
-    expect(saveToServer).toHaveBeenCalledWith('admin/series/side-story/page-config.json', pageConfig);
+    expect(saveToServer).toHaveBeenCalledWith(
+      'admin/series/side-story/page-config.json',
+      pageConfig
+    );
   });
 });

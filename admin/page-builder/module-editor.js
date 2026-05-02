@@ -51,7 +51,7 @@ function getModuleSummary(moduleType, config) {
     case 'video':
       return config.url || 'Video module';
     case 'divider':
-      return `${config.style === 'dashed' || config.style === 'dotted' ? (config.style.charAt(0).toUpperCase() + config.style.slice(1)) : 'Solid'} line`;
+      return `${config.style === 'dashed' || config.style === 'dotted' ? config.style.charAt(0).toUpperCase() + config.style.slice(1) : 'Solid'} line`;
     case 'entry-gallery':
       return `Series entries (${config.columns || 3} cols)`;
     case 'promo':

@@ -15,9 +15,7 @@ export function normalizeGalleryImage(image) {
 }
 
 export function normalizeGalleryConfig(config = {}) {
-  const images = Array.isArray(config.images)
-    ? config.images.map(normalizeGalleryImage)
-    : [];
+  const images = Array.isArray(config.images) ? config.images.map(normalizeGalleryImage) : [];
   return {
     images,
     columns: typeof config.columns === 'number' ? config.columns : 3,
@@ -186,7 +184,7 @@ export function bindGalleryEditorEvents({
       const nextConfig = normalizeGalleryConfig(config);
       const image = nextConfig.images[index];
       if (!image || !key) return;
-      
+
       image[key] = input.value;
       commit(nextConfig);
     });

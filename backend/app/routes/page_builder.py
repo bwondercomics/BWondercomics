@@ -259,7 +259,9 @@ def api_update_section(
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     try:
-        section = update_section(db, section_id, payload.model_dump(by_alias=True, exclude_none=True))
+        section = update_section(
+            db, section_id, payload.model_dump(by_alias=True, exclude_none=True)
+        )
         if not section:
             return JSONResponse(status_code=404, content={"error": "Section not found"})
         return {"section": section}

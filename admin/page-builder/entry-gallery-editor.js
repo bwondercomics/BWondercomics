@@ -30,12 +30,7 @@ export function renderEntryGalleryEditor(config = {}) {
   `;
 }
 
-export function bindEntryGalleryEditorEvents({
-  el,
-  draftConfig,
-  setDraftConfig,
-  markDirty,
-}) {
+export function bindEntryGalleryEditorEvents({ el, draftConfig, setDraftConfig, markDirty }) {
   let config = normalizeEntryGalleryConfig(draftConfig);
 
   const commit = (nextConfig) => {
@@ -50,9 +45,9 @@ export function bindEntryGalleryEditorEvents({
       const nextConfig = normalizeEntryGalleryConfig(config);
       const key = input.dataset.key;
       if (key === 'columns') {
-         nextConfig[key] = parseInt(input.value, 10) || 3;
+        nextConfig[key] = parseInt(input.value, 10) || 3;
       } else if (key === 'showLabels') {
-         nextConfig[key] = input.checked;
+        nextConfig[key] = input.checked;
       }
       commit(nextConfig);
     });
