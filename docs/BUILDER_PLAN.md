@@ -726,6 +726,102 @@ Test baseline expectations:
 - Webflow state model: https://help.webflow.com/hc/en-us/articles/33961301727251-States
 - Shopify theme settings model: https://help.shopify.com/en/manual/online-store/themes/customizing-themes/theme-editor/theme-settings
 
+### Phase 8 - Runtime Fallback Retirement Pass
+
+Status: proposed next pass.
+
+Goal: retire the remaining legacy runtime fallback paths now that the integrated builder, page-scoped header model, and appearance contract are stable. This phase is cleanup and migration hardening, not a new styling or editor-feature pass.
+
+#### Scope and defaults
+
+- remove runtime dependence on legacy header/page-config fallback only after audit gates are clean
+- keep stored legacy data readable during migration, but stop using it as normal reader/admin runtime behavior once canonical builder data exists
+- include both reader startup paths: `reader/data.js` and the separate legacy customization IIFE in `reader/customization.js`
+- treat `reader/safe-mode.js` as a separate legacy page-config consumer, not the main reader fallback path; review it during this phase but do not block runtime fallback retirement on it unless it affects normal startup
+- do not remove the structured header editor, `page.meta.header.version = 3`, or the appearance contract added in Phase 7
+- do not expand hover/focus/active editing, per-block header styling, or broader module appearance unification in this pass
+- do not make authors hand-edit JSON to complete migration
+
+#### Step 1 - Establish the fallback inventory gate
+
+- Treat `auditPagesFallbacks(pages)` in `admin/page-builder/header-config.js` as the source of truth for retirement readiness.
+- Confirm the audit is run against the complete admin page list for each series, not only the active page.
+- The audit must be clean before runtime fallback removal is claimed:
+  - no `missingHeader`
+  - no `staleHeaderVersion`
+  - no `headerOverrides`
+  - no blocking `legacyHeaderModule`
+  - a published builder page with slug `reader`
+- Keep the current nuance that stored legacy `header` modules are inert cleanup debt once canonical V3 `meta.header` exists; they should not block runtime removal unless the page still depends on legacy copy fallback.
+- Confirm existing tests still exercise the series-level `missingPublishedReaderPage` gate and mixed-page aggregation; add coverage only for any gate behavior not already protected.
+
+**Completion note (`2026-05-08`):** Added `loadFallbackRetirementGate(seriesId, deps)` as a developer-facing gate that loads full page details before calling `auditPagesFallbacks(...)`, because page-summary lists do not include sections/modules and cannot prove the `legacyHeaderModule` bucket is clean.
+
+#### Step 2 - Backfill and verify canonical page headers
+
+- Use `python -m backend.app.backfill_page_headers --series <series-id>` as the dry-run migration report for each series.
+- Run the same command with `--write` only after reviewing the dry-run output and confirming it will write `page.meta.header.version = 3` and clear obsolete `page.meta.headerOverrides`.
+- Backfill should preserve the effective author-visible header state generated from `createEffectivePageHeader(...)`; it must not silently discard nav items, hidden block choices, placement, or button styles.
+- After write mode, reload admin pages and rerun `auditPagesFallbacks(...)` to confirm the relevant series is clean.
+- Add backend coverage where needed for any missing backfill edge case discovered during dry-run review.
+
+#### Step 3 - Remove legacy reader fallback branches
+
+- In `reader/data.js`, remove the normal `source: 'legacy'` path from `loadPageConfigWithFallback(...)` once every supported series has a clean audit and published builder `reader` page.
+- Remove the transitional `localStorage.pb-no-fallback` branch at the same time as the legacy branch, because it exists only to test fallback-free behavior.
+- Keep `source: 'builder'` for successful builder pages and `source: 'none'` for missing unpublished/draft/non-reader pages.
+- In `reader/customization.js`, remove or hard-disable the legacy `page-config.json` customization fetch so `source: 'none'` cannot re-enter the old reader shell after `source: 'legacy'` is removed.
+- Update `reader-customization.test.js` so the current `source: 'legacy'` behavior is replaced with the post-retirement expectation.
+- Decide whether the unconditional `fetchPageConfig(sid)` call in `loadPageConfigWithFallback(...)` is still needed after customization retirement; keep it only if builder-page subtitle/header layout behavior still depends on it, otherwise make it lazy or remove it from normal startup.
+- Update reader tests so missing builder pages no longer load legacy `page-config.json` as reader content; they should produce the intended empty/error-safe state instead.
+- Preserve defensive sanitization and URL safety for legacy data that may still exist on disk, but do not keep legacy fallback as the primary reader startup path.
+
+#### Step 4 - Remove admin/header runtime compatibility hooks that are no longer needed
+
+- Remove or downgrade admin UI/runtime behavior whose only purpose is to route authors through legacy header fallback after canonical V3 page headers are universal.
+- Keep migration/audit affordances that help inspect old data until a separate stored-data cleanup pass removes inert legacy modules.
+- Revisit `createEffectivePageHeader(...)` and `resolvePageHeaderState(...)` only after the reader branch is gone; keep them as active helpers if admin preview, backfill, or tests still need them, and document the reason instead of forcing deletion.
+- Review `reader/safe-mode.js` and document whether its direct `/page-config.json` fetch remains an intentional recovery-only path or should move to builder page data in a later pass.
+- Update any user-facing copy that still implies fallback is an active authoring mode instead of historical migration debt.
+
+#### Step 5 - Verification and acceptance
+
+- Add focused frontend coverage for:
+  - clean audit readiness with a published `reader` page
+  - blocked audit readiness when any fallback bucket remains
+  - reader startup without legacy `source: 'legacy'`
+  - `reader/customization.js` no longer fetching legacy `page-config.json` for `source: 'none'`
+  - admin/header parity after backfilled V3 headers
+- Add backend coverage for any new backfill behavior or migration edge case found during dry-run/write review.
+- Run the full gate before marking Phase 8 complete:
+  - `npm run format:check`
+  - `npm run format:py:check`
+  - `npm run lint`
+  - `npm run lint:py`
+  - `npm test`
+  - `npm run test:backend`
+  - `npm run build`
+  - `git diff --check`
+
+#### Acceptance Criteria
+
+- every supported series has a published builder `reader` page or is explicitly documented as not ready for fallback retirement
+- `auditPagesFallbacks(fullSeriesPages)` reports `clean: true` for every retired series
+- the reader no longer returns `source: 'legacy'` during normal startup
+- `reader/customization.js` no longer reintroduces legacy `page-config.json` customization after fallback retirement
+- `pb-no-fallback` is removed with the legacy reader branch
+- `fetchPageConfig(sid)` is removed, made lazy, or explicitly documented as still required for builder-page subtitle/header layout compatibility
+- backfilled pages preserve author-visible header layout, nav items, button styles, and Phase 7 appearance data
+- admin preview and live reader remain in parity for backfilled V3 headers
+- remaining legacy header modules, if any, are documented as inert stored-data cleanup debt rather than active runtime dependencies
+- `reader/safe-mode.js` is documented as intentionally separate recovery behavior or queued for a later builder-backed recovery pass
+
+#### Assumptions
+
+- Phase 8 should retire runtime fallback before adding more appearance-editor surface area.
+- Runtime fallback removal may be staged by series if any series cannot pass the published-`reader` and clean-audit gates immediately.
+- A separate cleanup pass can physically delete inert stored legacy header modules after runtime fallback is gone and verified.
+
 ## Keep / change / avoid
 
 ### Keep

@@ -78,6 +78,8 @@ Modules currently own: `moduleType`, `columnIndex`, `sortIndex`, and `config`.
 
 There is no separate long-lived client-side draft store in `data.js`. The main mutable state lives in `admin/page-builder.js`, while persistence happens through explicit backend updates.
 
+Fallback-retirement readiness is a separate developer workflow, not part of the normal editor boot path: the page list from `fetchPages(...)` is intentionally summary-only, so any runtime-fallback audit must hydrate each page with `fetchPage(...)` or use `loadFallbackRetirementGate(...)` before calling `auditPagesFallbacks(...)`.
+
 ## 🔌 Builder Orchestrator (admin/page-builder.js)
 
 This is the main coordinator. It owns mutable builder state and wires together the rail, canvas, and inspector.
@@ -113,6 +115,23 @@ This is the backend API layer for builder records. Current fetchers and mutators
 - `addSection`, `updateSection`, `deleteSection`, `reorderSections`
 - `addModule`, `updateModule`, `moveModule`, `reorderModules`, `deleteModule`
 - `fetchAssets`, `uploadAsset`
+
+Because `fetchPages(seriesId)` returns page summaries without hydrated `sections`/`modules`, it is not sufficient input for `auditPagesFallbacks(...)` when validating runtime-fallback retirement.
+
+## 🚦 Fallback Retirement Gate (fallback-retirement-gate.js)
+
+This helper exists for the Phase 8 runtime-fallback retirement workflow. It loads the summary page list for a series, fetches every page as full detail, then runs `auditPagesFallbacks(...)` on the hydrated records.
+
+Important export:
+
+- `loadFallbackRetirementGate(seriesId, deps?)`
+
+Current contract:
+
+- fails closed when the page list cannot be loaded
+- fails closed when any page detail is missing, invalid, or lacks `sections`
+- reports `completePageDetails` separately from the audit result so callers can distinguish fetch failures from real fallback debt
+- only returns `retirementReady: true` when full detail loading succeeded and the aggregate audit is clean
 
 ## 🏗️ Header Configuration (header-config.js)
 

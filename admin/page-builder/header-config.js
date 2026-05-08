@@ -384,8 +384,10 @@ export function auditPageFallbacks(page) {
 /**
  * Aggregate fallback audit across multiple builder pages.
  *
- * To use this as the legacy-reader removal gate, pass the complete admin page
- * list for exactly one series (for example the full result of fetchPages()).
+ * To use this as the legacy-reader removal gate, pass fully hydrated page
+ * records for exactly one series. The page objects must include sections and
+ * modules so legacy header modules can be detected; page-summary results from
+ * fetchPages() are not sufficient for this audit.
  *
  * @param {Array<Object>} pages - Array of builder page objects for one series
  * @returns {{
