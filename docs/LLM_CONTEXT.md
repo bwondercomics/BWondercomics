@@ -147,7 +147,7 @@ Vite proxies these to the API (so data.json/series.json work):
 
 - Page Builder is now **edit-only**: preview toggle removed.
 - Builder header toggles removed: **Disable Fallback** and **Published** are no longer in UI.
-- Header canvas and editor now track provenance (`legacy-import`, `page-meta-stale`, etc) with visual badges, ensuring canonical V3 saves.
+- Header canvas and editor only show provenance badges for migration states (`legacy-import`, `page-meta-stale`, etc); normal V3 header editing resolves with `pageConfig: null`.
 - Promo image picker is **simple select/upload** (no crop/focus/zoom editor).
 - Promo slides support per‑item **Image Fit**:
   - `Fill (cover)` or `Fit (contain)`; defaults to cover.

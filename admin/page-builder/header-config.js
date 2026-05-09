@@ -241,6 +241,11 @@ function getPageHeaderSource(page = null) {
   return Number(rawHeader.version || 0) >= 3 ? 'page-meta-v3' : 'page-meta-stale';
 }
 
+/**
+ * Resolve the effective page header. Normal admin/reader runtime should pass
+ * `pageConfig: null`; the optional legacy config exists for migration,
+ * backfill, and direct safety tests that still inspect pre-V3 records.
+ */
 function createEffectivePageHeader(
   page = null,
   pageConfig = null,
@@ -280,6 +285,11 @@ function createEffectivePageHeader(
   });
 }
 
+/**
+ * Shared normalized header state for admin preview and reader layout.
+ * `pageConfig` is migration-only input; canonical V3 pages are resolved with
+ * `pageConfig: null` during normal runtime.
+ */
 function resolvePageHeaderState(options = {}) {
   const {
     page = null,

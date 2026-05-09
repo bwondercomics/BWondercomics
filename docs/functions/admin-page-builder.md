@@ -89,7 +89,7 @@ Its responsibilities include:
 - keeping the current series and selected page in sync with the route
 - tracking selected surface, selected module, active section, and insertion targets
 - initializing and saving page settings, header drafts, and theme drafts
-- `normalizeHeaderDraft` tags a `source` field (`page-meta-v3`, `page-meta-stale`, `legacy-import`) using the shared header-config provenance helper, so the editor and canvas badges describe the same stored-state contract used elsewhere
+- `normalizeHeaderDraft` resolves normal headers with `pageConfig: null` and tags a `source` field (`page-meta-v3`, `page-meta-stale`, `legacy-import`) so migration-only badges can flag non-canonical header records
 - applying module, section, and page mutations through `data.js`
 - rerendering the rail, canvas, and inspector after state changes
 - rendering status badges and reader-preview links
@@ -137,7 +137,7 @@ Current contract:
 
 The primary header authoring source is now `page.meta.header`. The header is edited as page-level metadata, not as a normal insertable module. `header` still exists in the module catalog for compatibility, but it is excluded from the normal insertable palette.
 
-`header-config.js` resolves effective header state from current and legacy sources.
+`header-config.js` resolves effective header state from canonical page metadata and keeps legacy inputs available for migration/backfill checks.
 Important exports:
 
 - `createEffectivePageHeader(page, pageConfig, normalizeNavItems?)`
@@ -148,8 +148,10 @@ Important exports:
 Resolution order is effectively:
 
 1. `page.meta.header`
-2. site-level or legacy page-config defaults
-3. older override shapes and legacy fallback content
+2. migration-only site-level or legacy page-config defaults
+3. older override shapes and legacy fallback content for pre-V3 records
+
+Normal admin and reader runtime pass `pageConfig: null`. Non-null `pageConfig` is retained for migration, backfill, and direct safety tests that inspect older records.
 
 Appearance contract update:
 
@@ -163,7 +165,7 @@ Appearance contract update:
 
 - the admin canvas header surface reads `headerState.header` and `headerState.copy`
 - the reader resolves once in `reader/data.js`, applies copy from `headerState.meta`, and passes the same state into `reader/header-layout.js`
-- this avoids copy/layout drift between admin and reader when legacy fallback data is still being normalized into canonical V3 state
+- this avoids copy/layout drift between admin and reader while canonical V3 header state is normalized through one helper
 
 Audit behavior:
 
@@ -182,7 +184,7 @@ Migration/backfill workflow:
 This renders and binds the page-header editor UI used by the inspector.
 Current editor responsibilities include:
 
-- showing an import/upgrade banner if the active header draft is from a non-canonical `source` (e.g., `legacy-import`)
+- showing a migration/upgrade banner if the active header draft is from a non-canonical `source` (e.g., `legacy-import`)
 - title and subtitle copy editing
 - nav item CRUD: add, remove, reorder, enable/disable, and target editing for every header button
 - **Style preset dropdown** per nav item: `Primary` (filled/neon) or `Secondary` (outline-only) — maps to the same variant model used by the `buttons` module
@@ -369,7 +371,7 @@ Again: `header` is compatibility-only in the catalog and is not part of the norm
 - Header editing is page-scoped through `page.meta.header`, not primarily through a normal `header` module.
 - The admin canvas is an editing surface with builder chrome, not a true public-reader preview.
 - Shared renderer parity exists at the module/section/page HTML level through `shared-renderers.js`.
-- Legacy `page-config` and legacy `header` module content still exist as fallback inputs in some flows, especially for reader compatibility.
+- Legacy `page-config` and legacy `header` module content still exist as migration/backfill inputs. Normal reader startup and page-builder header editing resolve V3 page headers with `pageConfig: null`; stored legacy `header` modules are later cleanup debt once V3 metadata exists.
 
 ## 📚 Related Docs
 

@@ -2,7 +2,6 @@ import { el } from './dom.js';
 import { openImagePicker } from './image-picker.js';
 import { DEFAULT_SERIES_ID } from './state.js';
 import { readFileAsBase64 } from './utils.js';
-import { loadSeriesPageConfig } from './page-config.js';
 import { MODULE_TYPES, THEME_COLORS } from './page-builder/constants.js';
 import { createCanvasEventBinder } from './page-builder/canvas-events.js';
 import { renderCanvasSnapshot } from './page-builder/canvas-renderer.js';
@@ -230,7 +229,6 @@ function createPageBuilder({
   let activeThemeDraft = null;
   let activeHeaderDraft = null;
   let activePageSettingsDraft = null;
-  let currentSeriesPageConfig = null;
   let activeSectionId = null;
   let activeSectionDraft = null;
   let dirtyScope = null;
@@ -602,11 +600,7 @@ function createPageBuilder({
 
   function normalizeHeaderDraft(page = currentPage) {
     const source = getPageHeaderSource(page);
-    const effectiveHeader = createEffectivePageHeader(
-      page,
-      currentSeriesPageConfig,
-      normalizeHeaderNavItems
-    );
+    const effectiveHeader = createEffectivePageHeader(page, null, normalizeHeaderNavItems);
     return {
       source,
       header: normalizeHeaderConfig(effectiveHeader, normalizeHeaderNavItems),
@@ -923,17 +917,6 @@ function createPageBuilder({
     return createPage(getSeriesId(), slug, title);
   }
 
-  async function loadCurrentSeriesPageConfig() {
-    const config = await loadSeriesPageConfig(getSeriesId(), {
-      force: true,
-      fallback: {},
-    });
-    currentSeriesPageConfig = config && typeof config === 'object' ? cloneValue(config) : {};
-    if (!currentSeriesPageConfig.site || typeof currentSeriesPageConfig.site !== 'object') {
-      currentSeriesPageConfig.site = {};
-    }
-  }
-
   async function uploadAssetFile(file) {
     return uploadAsset(file, readFileAsBase64);
   }
@@ -996,7 +979,7 @@ function createPageBuilder({
         page,
       });
     }
-    return createEffectivePageHeader(page, currentSeriesPageConfig, normalizeHeaderNavItems);
+    return createEffectivePageHeader(page, null, normalizeHeaderNavItems);
   }
 
   function buildNormalizedPageMeta(page = currentPage, draftState = activeHeaderDraft) {
@@ -1326,7 +1309,6 @@ function createPageBuilder({
     const { pageTitleHtml, canvasHtml } = renderCanvasSnapshot({
       state: {
         currentPage,
-        currentSeriesPageConfig,
         selectedCanvasSurface,
         selectedModuleId,
         activeSectionId,
@@ -1605,7 +1587,6 @@ function createPageBuilder({
     setActiveNav(el.btnDesigner);
 
     await loadPages();
-    await loadCurrentSeriesPageConfig();
     renderModulePalette();
 
     if (activeEntrypoint === 'designer') {
@@ -1820,7 +1801,6 @@ function createPageBuilder({
   function onSeriesChange() {
     const nextPageSlug = isDesignerMode() ? currentPage?.slug || '' : '';
     currentPage = null;
-    currentSeriesPageConfig = null;
     resetBuilderState();
     setPreviewSeriesId(getSeriesId());
     if (el.pageBuilderSection?.style.display !== 'none') {

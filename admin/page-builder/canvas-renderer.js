@@ -17,10 +17,10 @@ function formatRegionLabel(region) {
   return String(region || '').replace(/^\w/, (char) => char.toUpperCase());
 }
 
-function getHeaderPreviewState({ currentPage, currentSeriesPageConfig, activeHeaderDraft }) {
+function getHeaderPreviewState({ currentPage, activeHeaderDraft }) {
   return resolvePageHeaderState({
     page: currentPage,
-    pageConfig: currentSeriesPageConfig,
+    pageConfig: null,
     draftState: activeHeaderDraft,
     normalizeNavItems: normalizeHeaderNavItems,
   });
@@ -106,10 +106,11 @@ function renderPageHeaderSurface(state) {
 
   let sourceBadge = '';
   if (source === 'legacy-import') {
-    sourceBadge = '<span class="pb-page-header-badge pb-page-header-badge--import">Imported</span>';
+    sourceBadge =
+      '<span class="pb-page-header-badge pb-page-header-badge--import">Migration needed</span>';
   } else if (source === 'page-meta-stale') {
     sourceBadge =
-      '<span class="pb-page-header-badge pb-page-header-badge--stale">Needs upgrade</span>';
+      '<span class="pb-page-header-badge pb-page-header-badge--stale">Upgrade header</span>';
   }
 
   return `

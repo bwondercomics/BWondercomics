@@ -479,10 +479,10 @@ Goal: make the page designer show the real page-scoped header builder by default
 **Implemented (2026-04-18):**
 
 - `normalizeHeaderDraft()` now resolves a `source` field (`'page-meta-v3'` | `'page-meta-stale'` | `'legacy-import'` | `'default'`) so the editor and canvas renderer know the provenance of the active draft without changing save behavior.
-- The header editor shows a warning banner when a page's header was hydrated from shared site configuration (`legacy-import`) or from an older stored format (`page-meta-stale`), prompting authors to save and make it permanent.
-- The canvas header surface shows an `Imported` or `Needs upgrade` chip alongside the existing Unsaved/Click-to-edit badge so provenance is visible before opening the editor.
+- The header editor shows a migration warning banner when a page is missing canonical V3 header metadata (`legacy-import`) or uses an older stored format (`page-meta-stale`), prompting authors to save V3 page metadata.
+- The canvas header surface shows migration/upgrade status chips alongside the existing Unsaved/Click-to-edit badge so rare non-canonical records are visible before opening the editor.
 - The banner disappears after saving — `saveActiveHeaderDraft` writes normalized V3 data and re-initializes the draft from the server response, so the source becomes `'page-meta-v3'` and the banner is suppressed on the next render.
-- Added 4 new shell tests: import banner present for legacy pages, absent for V3 pages, cleared after save, and canvas chip visible for legacy sources. Full suite: 37 files, 231 passing, 0 regressions.
+- Added 4 new shell tests: migration banner present for legacy pages, absent for V3 pages, cleared after save, and canvas chip visible for legacy sources. Full suite: 37 files, 231 passing, 0 regressions.
 
 #### Step 3 - Upgrade the header editor UX to feel like an official builder tool ✅
 
@@ -787,6 +787,8 @@ Goal: retire the remaining legacy runtime fallback paths now that the integrated
 - Revisit `createEffectivePageHeader(...)` and `resolvePageHeaderState(...)` only after the reader branch is gone; keep them as active helpers if admin preview, backfill, or tests still need them, and document the reason instead of forcing deletion.
 - Review `reader/safe-mode.js` and document whether its direct `/page-config.json` fetch remains an intentional recovery-only path or should move to builder page data in a later pass.
 - Update any user-facing copy that still implies fallback is an active authoring mode instead of historical migration debt.
+
+**Completion note (`2026-05-09`):** The page builder no longer loads series `page-config.json` as a normal header-editing dependency. Admin header draft/save and canvas preview resolution now use `createEffectivePageHeader(page, null, ...)` / `resolvePageHeaderState(... pageConfig: null ...)` for the steady-state V3 path, while the optional legacy `pageConfig` helper input remains for migration, backfill, and direct safety tests. Provenance UI copy now describes missing/stale header metadata as rare migration state, not an active fallback authoring mode. `reader/safe-mode.js` remains unchanged as the intentional recovery-only `/page-config.json` consumer; stored legacy `header` modules remain later cleanup debt.
 
 #### Step 5 - Verification and acceptance
 

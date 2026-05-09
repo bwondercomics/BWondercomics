@@ -317,16 +317,16 @@ function renderSourceBanner(source) {
   if (source === 'legacy-import') {
     return `
       <div class="pb-editor-source-notice" data-status="warning">
-        <strong>Imported from shared site configuration.</strong>
-        <span>This header hasn't been saved as this page's own header yet. Save to store it here.</span>
+        <strong>Header migration needed.</strong>
+        <span>This page is missing canonical V3 header metadata. Save to write page.meta.header.version = 3.</span>
       </div>
     `;
   }
   if (source === 'page-meta-stale') {
     return `
       <div class="pb-editor-source-notice" data-status="warning">
-        <strong>Older header format detected.</strong>
-        <span>Save to upgrade this page to the current header format.</span>
+        <strong>Older header metadata detected.</strong>
+        <span>Save to upgrade this page to canonical V3 header metadata.</span>
       </div>
     `;
   }

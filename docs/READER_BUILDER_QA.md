@@ -74,6 +74,8 @@ Use this worksheet for the `0.8.0` reader + builder lock pass. The goal is not t
 - [ ] Page header editing
   - Open both an existing page and a newly created page.
   - Click the header surface in the canvas and change the title, subtitle, and at least one navigation button.
+  - For a canonical V3 page, confirm no migration banner/chip appears in the editor or canvas.
+  - For a known legacy/stale header record, confirm the builder shows the migration warning state, save once, and confirm the warning clears after reload.
   - Save the header, reload the builder, and confirm the edited values persist in the header editor and the canvas preview.
   - Open the reader from the builder and confirm the same title/subtitle/buttons render there.
 - [ ] Builder-page links from the header

@@ -205,6 +205,27 @@ describe('admin page-builder shell', () => {
     expect(window.localStorage.getItem('pb-editor-mode')).toBe('docked');
   });
 
+  it('does not fetch series page-config during normal V3 page-builder startup', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+    const fetchMock = vi.fn(async (url) => {
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      await manager.showPageBuilderSection();
+
+      expect(fetchMock).not.toHaveBeenCalled();
+      expect(document.querySelector('.pb-page-item')).not.toBeNull();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('routes nav-collapsed free space into the editor panel instead of the canvas', async () => {
     const { manager } = await setupPageBuilder({
       fetchPagesResults: [[]],
@@ -1147,7 +1168,7 @@ describe('admin page-builder shell', () => {
     expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('desktop');
   });
 
-  it('shows an import banner in the header editor for a legacy page without meta.header', async () => {
+  it('shows a migration banner in the header editor for a legacy page without meta.header', async () => {
     const legacyPage = getContractFixture('builderPage');
     delete legacyPage.meta.header;
     const { manager } = await setupPageBuilder({
@@ -1168,11 +1189,14 @@ describe('admin page-builder shell', () => {
 
     expect(document.querySelector('.pb-editor-source-notice')).not.toBeNull();
     expect(document.querySelector('.pb-editor-source-notice')?.textContent).toContain(
-      'Imported from shared site configuration'
+      'Header migration needed'
+    );
+    expect(document.querySelector('.pb-editor-source-notice')?.textContent).toContain(
+      'page.meta.header.version = 3'
     );
   });
 
-  it('shows no import banner for a page that already has a V3 meta.header', async () => {
+  it('shows no migration banner for a page that already has a V3 meta.header', async () => {
     const selectedPage = getContractFixture('builderPage');
     // builderPage fixture has meta.header.version = 3
     expect(selectedPage.meta.header.version).toBe(3);
@@ -1195,7 +1219,7 @@ describe('admin page-builder shell', () => {
     expect(document.querySelector('.pb-editor-source-notice')).toBeNull();
   });
 
-  it('clears the import banner after saving a legacy page header', async () => {
+  it('clears the migration banner after saving a legacy page header', async () => {
     const legacyPage = getContractFixture('builderPage');
     delete legacyPage.meta.header;
     const { manager, mocks } = await setupPageBuilder({
@@ -1238,11 +1262,11 @@ describe('admin page-builder shell', () => {
         }),
       })
     );
-    // After save, the draft is re-initialized from the updated page which now has meta.header v3
+    // After save, the draft is re-initialized from the updated page which now has meta.header v3.
     expect(document.querySelector('.pb-editor-source-notice')).toBeNull();
   });
 
-  it('shows the Imported chip on the canvas header surface for a legacy page', async () => {
+  it('shows the migration chip on the canvas header surface for a legacy page', async () => {
     const legacyPage = getContractFixture('builderPage');
     delete legacyPage.meta.header;
     const { manager } = await setupPageBuilder({
@@ -1259,7 +1283,7 @@ describe('admin page-builder shell', () => {
     const surface = document.querySelector('.pb-page-header-surface');
     expect(surface?.querySelector('.pb-page-header-badge--import')).not.toBeNull();
     expect(surface?.querySelector('.pb-page-header-badge--import')?.textContent).toContain(
-      'Imported'
+      'Migration needed'
     );
     // V3 page should not have the import chip
     expect(surface?.querySelector('.pb-page-header-badge--stale')).toBeNull();
