@@ -6,8 +6,8 @@ const HEADER_BLOCK_IDS = ['brand', 'patron', 'status', 'entryControls', 'nav'];
 const HEADER_BLOCK_DEFS = [
   {
     id: 'brand',
-    label: 'Logo / Title',
-    description: 'Shows the site branding, page title, and subtitle.',
+    label: 'Logo / Title / Subtitle',
+    description: 'Shows the site branding, page title, subtitle, and rotating subtitle lines.',
   },
   {
     id: 'patron',

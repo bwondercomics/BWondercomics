@@ -472,34 +472,22 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
 }
 
 /**
- * Loads page configuration with fallback.
- * Tries a builder page first, then falls back to legacy page-config for the default reader page only.
+ * Loads the builder page that owns reader startup.
+ * Normal startup no longer reads legacy page-config.json; missing builder pages
+ * resolve to a safe empty state instead of repainting the old reader shell.
  *
- * **Migration contract**
+ * **Retired fallback contract**
  * - `source: 'builder'` — normal path; page was found in the builder API.
- * - `source: 'none'`    — builder returned nothing and either the slug is not
- *                         'reader', the request was a draft, or no legacy config
- *                         exists.
- * - `source: 'legacy'`  — **DEPRECATED**. Returned only when (a) the slug is
- *                         'reader', (b) no builder page exists, (c) pb-no-fallback
- *                         is not set, and (d) a page-config.json is available.
- *                         This path should become unreachable once every series
- *                         has a published 'reader' builder page and
- *                         auditPagesFallbacks(fullSeriesPages) reports
- *                         `clean: true`. That stronger audit gate must include
- *                         both page-level fallback buckets and series-level
- *                         reader readiness. Callers should handle only
- *                         'builder' or 'none' going forward.
+ * - `source: 'none'`    — builder returned nothing for the requested page.
  *
- * **pb-no-fallback localStorage flag**
- * Setting `localStorage.pb-no-fallback = '1'` in admin suppresses legacy fallback
- * for local testing. This is a transitional dev flag; it will be removed together
- * with the legacy branch once the migration is complete.
+ * `createEffectivePageHeader(page, null)` is the steady-state header contract
+ * for migrated V3 pages. Legacy page-config data is still accepted by lower
+ * level helpers for migration/safety tests, but not fetched here.
  *
  * @param {Function} setSubtitlesFn - Callback to set subtitles
  * @param {string} [seriesId] - Optional series ID override
  * @param {{pageSlug?: string, draft?: boolean}} [options] - Page selection and draft mode
- * @returns {Promise<{source: string, page?: Object, config?: Object}>} Result with source indicator
+ * @returns {Promise<{source: 'builder' | 'none', page?: Object}>} Result with source indicator
  */
 export async function loadPageConfigWithFallback(setSubtitlesFn, seriesId = null, options = {}) {
   const sid = seriesId || getActiveSeriesId();
@@ -507,48 +495,19 @@ export async function loadPageConfigWithFallback(setSubtitlesFn, seriesId = null
   const pageSlug = requestedPageSlug || 'reader';
   const useHomepageResolver = !requestedPageSlug;
   const useDraft = !!options?.draft;
-  const allowLegacyFallback = pageSlug === 'reader' && !useDraft;
-  const pageConfig = await fetchPageConfig(sid);
-
-  // Check for no-fallback mode via localStorage (set in page builder admin).
-  // DEPRECATED: this flag will be removed alongside the legacy branch below.
-  const noFallback = localStorage.getItem('pb-no-fallback') === '1';
 
   // Try page builder first
   const builderPage = useHomepageResolver
     ? await loadHomepageBuilderPage(sid, { draft: useDraft })
     : await loadBuilderPage(pageSlug, sid, { draft: useDraft });
   if (builderPage) {
-    const subtitles = extractSubtitlesFromBuilderPage(builderPage, pageConfig);
+    const subtitles = extractSubtitlesFromBuilderPage(builderPage, null);
     if (subtitles.length > 0) {
       setSubtitlesFn(subtitles);
     }
     logger.log(`✓ Loaded builder page "${builderPage.slug || pageSlug}" for series: ${sid}`);
-    return { source: 'builder', page: builderPage, config: pageConfig };
+    return { source: 'builder', page: builderPage };
   }
 
-  if (!allowLegacyFallback) {
-    return { source: 'none', config: pageConfig };
-  }
-
-  // No fallback mode - stop here and show what we got (nothing).
-  // DEPRECATED: remove together with source:'legacy' branch once migration is complete.
-  if (noFallback) {
-    console.warn('NO-FALLBACK MODE: Page builder returned nothing. No legacy fallback applied.');
-    return { source: 'none', config: pageConfig };
-  }
-
-  // Fall back to legacy page-config.
-  // DEPRECATED: this branch is only removable once
-  // auditPagesFallbacks(fullSeriesPages) reports clean:true, which now requires
-  // both zero page-level fallback issues and a published builder page with
-  // slug === 'reader' for the series.
-  if (pageConfig) {
-    if (pageConfig.content?.header && Array.isArray(pageConfig.content.header.subtitles)) {
-      setSubtitlesFn(pageConfig.content.header.subtitles);
-    }
-    return { source: 'legacy', config: pageConfig };
-  }
-
-  return { source: 'none', config: pageConfig };
+  return { source: 'none' };
 }

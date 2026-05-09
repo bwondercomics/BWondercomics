@@ -1008,17 +1008,16 @@ import { getActiveSeriesId, getExplicitPageSlug, isDraftPageRequested } from './
       unitLabelSingular,
       seriesId,
     });
-    const pageConfig = await loadPageConfigWithFallback(setSubtitles, seriesId, {
+    const pageResult = await loadPageConfigWithFallback(setSubtitles, seriesId, {
       pageSlug: explicitPageSlug,
       draft: role === 'admin' && isDraftPageRequested(),
     });
-    readerBootState.resolvePageConfig(pageConfig);
+    readerBootState.resolvePageConfig(pageResult);
     loadLatestUpdate();
-    init(pageConfig.source);
-    if (pageConfig.source === 'builder' && pageConfig.page) {
+    init(pageResult.source);
+    if (pageResult.source === 'builder' && pageResult.page) {
       // Let reader bootstrap finish first, then reapply builder DOM as the final state.
-      applyBuilderPageToDOM(pageConfig.page, {
-        pageConfig: pageConfig.config,
+      applyBuilderPageToDOM(pageResult.page, {
         seriesId,
       });
     }
