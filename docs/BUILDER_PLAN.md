@@ -778,6 +778,8 @@ Goal: retire the remaining legacy runtime fallback paths now that the integrated
 - Update reader tests so missing builder pages no longer load legacy `page-config.json` as reader content; they should produce the intended empty/error-safe state instead.
 - Preserve defensive sanitization and URL safety for legacy data that may still exist on disk, but do not keep legacy fallback as the primary reader startup path.
 
+**Completion note (`2026-05-09`):** Normal reader startup no longer fetches legacy `page-config.json` or returns `source: 'legacy'`. `loadPageConfigWithFallback(...)` now returns only `source: 'builder'` with a builder page or `source: 'none'` for missing builder pages, and the transitional `pb-no-fallback` runtime branch is gone. `reader/customization.js` is retained only as a no-op compatibility module, so `source: 'none'` cannot re-enter the old reader shell. Builder header/subtitle resolution now uses `createEffectivePageHeader(page, null)` during startup; lower-level helpers still accept optional legacy config for direct migration/safety tests. `reader/safe-mode.js` remains the intentional separate `/page-config.json` runtime consumer.
+
 #### Step 4 - Remove admin/header runtime compatibility hooks that are no longer needed
 
 - Remove or downgrade admin UI/runtime behavior whose only purpose is to route authors through legacy header fallback after canonical V3 page headers are universal.

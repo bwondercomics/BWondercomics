@@ -5,7 +5,7 @@ This document summarizes how the reader portion of the site is organized, what e
 ## Entry Point and Data
 
 - `reader/app.js` coordinates the reader bootstrap, keeps the static shell hidden until the initial page source is resolved, fetches content, wires UI handlers, and kicks off rendering.
-- Data sources: entry page images under `comics/<seriesId>/entries/` (public) or `protected/comics/<seriesId>/entries/` (premium/private), `/data.json` / `/series/<id>/data.json` (entries + status + metadata + per-series labels), `/api/pages/home/<seriesId>` as the effective builder-page source for the series root when no explicit `?page=` slug is present, `/api/pages/<seriesId>/<slug>` for explicit builder-page requests, `/api/admin/pages/home/<seriesId>` and `/api/admin/pages/by-slug/<seriesId>/<slug>` for admin draft preview flows, `/page-config.json` / `/series/<id>/page-config.json` as the deprecated legacy fallback for the default reader slug, and `/api/posts/latest` for the “latest update” widget. The homepage resolver currently prefers the page marked homepage and falls back to the published `reader` page if needed. Reader requests `protected/*` paths via `/api/protected/*`.
+- Data sources: entry page images under `comics/<seriesId>/entries/` (public) or `protected/comics/<seriesId>/entries/` (premium/private), `/data.json` / `/series/<id>/data.json` (entries + status + metadata + per-series labels), `/api/pages/home/<seriesId>` as the effective builder-page source for the series root when no explicit `?page=` slug is present, `/api/pages/<seriesId>/<slug>` for explicit builder-page requests, `/api/admin/pages/home/<seriesId>` and `/api/admin/pages/by-slug/<seriesId>/<slug>` for admin draft preview flows, and `/api/posts/latest` for the “latest update” widget. The homepage resolver currently prefers the page marked homepage and falls back to the published `reader` page if needed. Reader requests `protected/*` paths via `/api/protected/*`. Legacy `/page-config.json` is no longer a normal startup source; `reader/safe-mode.js` remains its intentional runtime recovery consumer.
 
 ## Modules
 
@@ -23,13 +23,13 @@ This document summarizes how the reader portion of the site is organized, what e
 - `reader/gallery.js` — Thumbnail gallery rendering and selection; stays in sync with the current page.
 - `reader/latest.js` — “Latest update” banner logic using posts/media to surface the newest item.
 - `reader/email.js` — Builds share/email link data from the current page/entry.
-- `reader/customization.js` — Legacy page-config applier; waits for the bootstrap result and only mutates the DOM when the builder page did not claim the reader shell. This remains transitional until the series-level fallback audit confirms a published `reader` page and zero legacy header dependencies.
+- `reader/customization.js` — No-op compatibility module retained for the old script entry; waits for bootstrap state but does not fetch page-config or mutate the reader shell.
 - `reader/header-layout.js` — Applies the effective page header layout to the live topbar by reusing the existing DOM blocks.
 - `assets/css/main.core.11-viewport.css` — Viewport rules for the default/fullscreen layouts and the optional `.viewport.dynamic-frame` mode.
 
 ## Runtime Flow
 
-1. `app.js` init: set bootstrap-loading state → fetch entries + resolve either the effective homepage page or an explicitly requested builder page, otherwise the deprecated legacy page-config, plus latest post → render initial page(s) and attach controls → reapply the builder page as the final DOM state when the builder source wins → release bootstrap state.
+1. `app.js` init: set bootstrap-loading state → fetch entries + resolve either the effective homepage page or an explicitly requested builder page, plus latest post → render initial page(s) and attach controls → reapply the builder page as the final DOM state when the builder source wins → release bootstrap state.
 2. Controls: UI/keyboard/gesture handlers update `state` → `render` redraws → `gallery`/overlays sync to the new state.
 3. Persistence: `state.saveProgress` writes entry/page to `localStorage`; errors are caught so reading is not blocked.
 4. Layout: `render` chooses single vs two-page mode based on the aspect ratio threshold (`TWO_PAGE_ASPECT_RATIO`), caches visible page dimensions, and in the fixed-height desktop layout resizes the viewport frame to the visible page or spread. Stacked/mobile keeps the existing full-width flow, and fullscreen stays on the height-fit path.
@@ -40,7 +40,7 @@ This document summarizes how the reader portion of the site is organized, what e
 flowchart TD
   A[app.js init] --> B[apply bootstrap-loading state]
   B --> C[load config/state]
-  C --> D[fetch entries + builder page or legacy page-config + latest post]
+  C --> D[fetch entries + builder page + latest post]
   D --> E[render initial page(s)]
   E --> F[release bootstrap state]
   F --> G[attach controls/pointer/overlays/fullscreen/gallery]

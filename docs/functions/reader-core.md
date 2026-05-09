@@ -24,7 +24,7 @@ This document describes the current reader runtime under `reader/`. It replaces 
 - [📝 Logger (logger.js)](#-logger-loggerjs)
 - [📄 Builder Page Renderer (page-renderer.js)](#-builder-page-renderer-page-rendererjs)
 - [🏗️ Header Layout (header-layout.js)](#-header-layout-header-layoutjs)
-- [🖌️ Legacy Customization (customization.js)](#️-legacy-customization-customizationjs)
+- [🖌️ Customization Compatibility (customization.js)](#️-customization-compatibility-customizationjs)
 - [📊 Analytics Coordinator (analytics.js)](#-analytics-coordinator-analyticsjs)
 - [📡 Live Tracker (live-tracking.js)](#-live-tracker-live-trackingjs)
 - [🎯 Comment Targets (comment-targets.js)](#-comment-targets-comment-targetsjs)
@@ -57,7 +57,7 @@ The reader is split into three layers:
 - `/api/admin/pages/home/<seriesId>`: admin-only draft/homepage resolver used when `draft=1` is requested without an explicit page slug.
 - `/api/pages/<seriesId>/<slug>`: published builder pages for reader pages.
 - `/api/admin/pages/by-slug/<seriesId>/<slug>`: draft builder pages when `draft=1` is requested by an admin.
-- `page-config.json` or `/series/<seriesId>/page-config.json`: legacy page config fallback for the default reader slug only.
+- `page-config.json` or `/series/<seriesId>/page-config.json`: legacy config data retained for standalone helpers/admin surfaces; normal reader startup no longer uses it. `reader/safe-mode.js` intentionally still reads `/page-config.json` for recovery redirects.
 - `/api/posts/latest` and `/api/posts`: latest update widget and feed content.
 - `localStorage`: reading progress, reader analytics opt-out, visitor id, and some UI preferences.
 
@@ -71,9 +71,9 @@ The reader is split into three layers:
 3. `loadPageConfigWithFallback()` resolves builder content from two paths:
    - when the URL has an explicit `?page=<slug>`, it loads `/api/pages/<seriesId>/<slug>` or the admin by-slug draft endpoint
    - when no explicit page slug is present, it loads `/api/pages/home/<seriesId>` or the admin homepage draft endpoint so the series root follows homepage assignment instead of hard-coding `reader`
-4. Legacy `page-config.json` fallback only applies for the default `reader` slug and only when a builder page was not active. This path is deprecated.
+4. Missing builder pages resolve to `source: 'none'`; normal startup does not fetch legacy `page-config.json`.
 5. After the first render or error state is ready, `app.js` releases bootstrap hiding and exposes `window.BattleBros` subtitle helpers.
-6. `reader/customization.js` waits for the boot result and exits early when the builder page already owns the initial DOM, preventing the legacy shell from repainting over builder content.
+6. `reader/customization.js` waits for the boot result and remains a no-op so `source: 'none'` cannot repaint the legacy shell.
 
 ## 🔌 Main Entry Point (app.js)
 
@@ -81,13 +81,14 @@ The composition root. Loads runtime data, applies premium gating, initializes DO
 
 ## 💾 Data Hydration (data.js)
 
-Fetches entry data, page config, latest posts, and builder pages. Applies builder-page DOM, theme, panel backgrounds, feed modules, promo carousels, and shared header layout.
+Fetches entry data, builder pages, latest posts, and standalone legacy page config when explicitly requested by helper callers. Applies builder-page DOM, theme, panel backgrounds, feed modules, promo carousels, and shared header layout.
 
 Important current behavior:
 
 - `loadHomepageBuilderPage()` is the root-path loader used when no explicit page slug is requested
 - root-path builder loading now follows the effective homepage resolver instead of always requesting the `reader` slug directly
 - `applyBuilderPageToDOM()` resolves header state once and reuses that same state for both visible copy and shared topbar layout
+- normal startup resolves V3 page headers with `pageConfig: null`; optional legacy config remains accepted only for migration/safety helper calls
 
 ## 💾 Global State (state.js)
 
@@ -170,9 +171,9 @@ Important current rule:
 - Builder page metadata in `page.meta.header` is the preferred source for reader header copy, layout, visible blocks, and nav links.
 - Legacy `page-config` and legacy `header` module content are fallback-only compatibility inputs.
 
-## 🖌️ Legacy Customization (customization.js)
+## 🖌️ Customization Compatibility (customization.js)
 
-Legacy page-config applier. It now only runs when the builder page did not claim the initial page.
+No-op compatibility module retained for the old script entry. It waits for reader boot state and performs no page-config fetches or DOM mutations.
 
 ## 📊 Analytics Coordinator (analytics.js)
 
@@ -245,9 +246,9 @@ Optional redirect guard. It reads `/page-config.json` on non-local hosts and red
 
 ## ⚠️ Deprecated Or Easy-To-Misstate Areas
 
-- `page-config.json` is no longer the primary reader-page source. Builder pages are primary.
-- Legacy fallback is limited to the default `reader` slug and is documented for removal once the series-level fallback audit is clean and a published `reader` page exists.
-- `reader/customization.js` does not blindly repaint the page anymore; it coordinates with the boot-state result from `app.js`.
+- `page-config.json` is not a normal reader-page source. Builder pages are primary, and safe mode is the intentional remaining runtime reader consumer.
+- Legacy reader fallback for the default `reader` slug has been retired after the series-level fallback audit gate.
+- `reader/customization.js` is intentionally a no-op compatibility module.
 - Comments, auth, and API helpers exist as separate modules, but not every reader surface is consolidated onto those abstractions yet.
 
 ## Related Docs

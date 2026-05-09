@@ -169,7 +169,7 @@ Audit behavior:
 
 - `missingHeader`, `staleHeaderVersion`, and `headerOverrides` remain the runtime-fallback blockers
 - `legacyHeaderModule` is only reported when a page still depends on legacy copy fallback; once canonical V3 `meta.header` exists, stored header modules are later-cleanup debt and do not block runtime fallback removal
-- the documented removal order is now: remove UI fallback behavior, backfill older pages, verify the audit is clean, then remove runtime fallback in a later pass
+- runtime fallback has now been retired from normal reader startup; the audit remains the proof that a series was ready, while stored legacy modules and page-config compatibility are separate cleanup debt
 
 Migration/backfill workflow:
 

@@ -51,10 +51,11 @@ The admin “save JSON” flow is also kept, but is intercepted and written to P
 3. Reader fetches:
    - `series.json` (series list + labels)
    - `data.json` or `series/<id>/data.json` (entries + page paths + status + labels)
-   - `page-config.json` or `series/<id>/page-config.json` (theme/panel content; DB-backed)
+   - `GET /api/pages/home/<seriesId>` or `GET /api/pages/<seriesId>/<slug>` (builder-page reader shell/content)
    - `GET /api/posts/latest` (latest update widget)
 4. Reader renders pages from the paths in the data JSON.
    - If a page path starts with `protected/`, the reader requests it via `/api/protected/<path>`.
+   - Legacy `page-config.json` is no longer part of normal reader startup; it remains available for branding/admin helpers and `reader/safe-mode.js` recovery behavior.
 
 ### 2) Managing series + entries (admin)
 

@@ -6,7 +6,7 @@ This summarizes the reader runtime after modularization: what each file does, ke
 
 - `data.json`: entries map, order, statusMessage.
 - `/api/pages/<seriesId>/<slug>`: preferred builder-page source for reader chrome and panel content.
-- `page-config.json`: optional theme/content overrides + subtitles (DB-backed legacy fallback for the default reader slug; deprecated once each series has a published `reader` builder page and the series-level fallback audit is clean).
+- `page-config.json`: no longer part of normal reader startup; still used by standalone legacy helpers and `reader/safe-mode.js` recovery redirect behavior.
 - `/api/posts/latest`: latest update widget (DB-backed; published-only + scheduling support).
 - `localStorage` key `battleBros_progress`: saved entry/page.
 - Entry page paths may start with `protected/`; those are requested via `/api/protected/<path>`.
@@ -16,7 +16,7 @@ This summarizes the reader runtime after modularization: what each file does, ke
 - `reader/config.js`: constants (storage key, cache sizes, zoom steps, breakpoints, animation timings).
 - `reader/entries.js`: entry helpers (`extractEntryNumber`, `sortEntryNames`, `sortEntryNamesWithMeta`, `sanitizeEntries`).
 - `reader/state.js`: shared `state` object; `saveProgress`, `loadProgress`, cached natural page metrics, and the last successful desktop on-page frame.
-- `reader/data.js`: loaders for entry data, builder-page-first page config with deprecated legacy fallback for the default reader slug, and latest post.
+- `reader/data.js`: loaders for entry data, builder-page startup resolution, optional legacy page-config helper access, and latest post.
 - `reader/dom.js`: element lookups (`el` map), including `#mainContent`, and `initElements`.
 - `reader/render.js`: status typing, image preload/cache, natural-size caching, two-page checks, main `render`/`updateUI`, and non-fullscreen frame refits when visible pages change/load.
 - `reader/controls.js`: page navigation, end-of-entry overlay helpers.
@@ -29,7 +29,7 @@ This summarizes the reader runtime after modularization: what each file does, ke
 - `reader/latest.js`: render the latest update widget.
 - `reader/email.js`: Email signup submission to the internal API (`/api/email/subscribe`) + messaging.
 - `reader/app.js`: entry wiring—imports modules, coordinates bootstrap-loading release, loads data, initializes UI, binds events, exposes `window.BattleBros`.
-- `reader/customization.js`: applies legacy `page-config` theme/content/layout overrides only when the builder page was not the active startup source.
+- `reader/customization.js`: no-op compatibility module retained for the old script entry; it waits for boot state but does not fetch page-config or mutate the shell.
 
 ## Flow (runtime)
 
@@ -37,12 +37,12 @@ This summarizes the reader runtime after modularization: what each file does, ke
 2. `app.start()`:
    - `loadEntryData()` → sets entries/order/statusMessage.
 
-- `loadPageConfigWithFallback()` → prefers the builder page API, falls back to legacy `page-config.json` only for the default reader slug, and resolves the startup page source for the rest of the reader. The legacy branch is removable only after `auditPagesFallbacks(fullSeriesPages)` reports `clean: true`, which now includes a published `reader` page gate. In practice that means running the audit on hydrated builder pages with `sections` and `modules`, not just the summary rows returned by `fetchPages(...)`.
+- `loadPageConfigWithFallback()` → resolves the startup builder page through the effective-homepage or explicit-slug API and returns `source: 'builder'` or `source: 'none'`. It no longer fetches legacy `page-config.json` during normal startup; `createEffectivePageHeader(page, null)` is the V3 reader header contract after a clean fallback-retirement audit.
 - `loadLatestPost()` → fetches `/api/posts/latest`, passes to `renderLatestUpdate`.
 - Initializes elements, entry select, status panel, email form, pointer/fullscreen/nav handlers, then releases the bootstrap-loading state once the initial render or error UI is ready.
 - Restores saved progress if present; renders current pages and applies the desktop on-page frame when eligible.
 
-3. `customization.js` waits for the bootstrap result and exits early when the reader is already using the builder page, preventing the old shell from repainting over the custom one.
+3. `customization.js` waits for the bootstrap result and remains a no-op so missing builder pages cannot re-enter the old page-config shell.
 4. User interactions:
    - Navigation via buttons/edge zones/keyboard/swipe → `controls.js` updates state and calls `render` + `saveProgress`.
    - Zoom/pan via pointer/pinch/wheel or buttons → `pointer.js` + `transform.js`.

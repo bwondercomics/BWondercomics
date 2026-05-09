@@ -54,7 +54,7 @@ Install backend dev dependencies into the repo virtualenv:
 - `tests/entries.test.js`: entry parsing, sorting, and normalization
 - `tests/state.test.js`: reader progress persistence
 - `tests/data.test.js`: reader data/page-config loading
-- `tests/reader-data-builder.test.js`: builder-first page loading, legacy fallback, and DOM application
+- `tests/reader-data-builder.test.js`: builder-first page loading, fallback retirement (`source: 'builder'` / `source: 'none'` only), and DOM application
 - `tests/reader-page-renderer.test.js`: reader page-builder module rendering contracts
 - `tests/reader-feed-panel.test.js`: feed/latest rendering, sanitization, and feed-mode behavior
 - `tests/reader-controls.test.js`: reader next/prev/restart behavior

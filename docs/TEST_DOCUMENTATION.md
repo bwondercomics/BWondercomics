@@ -66,14 +66,14 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - `tests/entries.test.js`: entry parsing, sorting, and normalization helpers in `reader/entries.js`
 - `tests/state.test.js`: `reader/state.js` persistence behavior
 - `tests/data.test.js`: `reader/data.js` loaders
-- `tests/reader-data-builder.test.js`: builder-first page loading, effective-homepage resolution for public and admin draft roots, deprecated legacy fallback behavior, header-state parity between reader copy and topbar layout, theme/panel application, and empty-panel handling
+- `tests/reader-data-builder.test.js`: builder-first page loading, effective-homepage resolution for public and admin draft roots, retired legacy fallback behavior, header-state parity between reader copy and topbar layout, theme/panel application, and empty-panel handling
 - `tests/reader-page-renderer.test.js`: `reader/page-renderer.js` module rendering contracts and placeholder states
 - `tests/reader-feed-panel.test.js`: `reader/feed-panel.js` and `reader/latest.js` sorting, sanitization, expansion, latest preview, and feed-mode behavior
 - `tests/reader-controls.test.js`: `reader/controls.js` navigation and end-of-entry behavior
 - `tests/reader-fullscreen.test.js`: `reader/fullscreen.js` enter/exit and controls-bar timing
 - `tests/reader-pointer.test.js`: `reader/pointer.js` swipe, drag, double-tap, and edge zones
 - `tests/reader-app.test.js`: `reader/app.js` boot, session gating, shortcuts, resize behavior, and bootstrap-loading release against `index.html`
-- `tests/reader-customization.test.js`: coordination between `reader/app.js` bootstrap state and `reader/customization.js` so legacy page-config mutations do not overwrite builder pages
+- `tests/reader-customization.test.js`: coordination between `reader/app.js` bootstrap state and no-op `reader/customization.js` so legacy page-config mutations cannot re-enter the reader shell
 - `tests/render.test.js`: two-page mode/render helpers
 - `tests/transform.test.js`: on-page sizing math
 - `tests/on-page-frame.test.js`: DOM/render frame sizing regressions
