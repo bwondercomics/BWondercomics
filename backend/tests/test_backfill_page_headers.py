@@ -23,6 +23,43 @@ class BackfillPageHeadersTests(BackendRouteTestCase):
         self.assertEqual(summary["changedPageIds"], [str(seeded["page"].id)])
         self.assertEqual(summary["blockingBucketSummary"], {})
         self.assertTrue(summary["removalReadiness"]["canRemoveLegacyReaderFallback"])
+        self.assertEqual(len(summary["pageReports"]), 1)
+
+        report = summary["pageReports"][0]
+        self.assertEqual(
+            set(report.keys()),
+            {
+                "pageId",
+                "slug",
+                "beforeHeaderVersion",
+                "afterHeaderVersion",
+                "overridesCleared",
+                "navItemCount",
+                "navStyles",
+                "disabledBlocks",
+                "regions",
+                "hasAppearance",
+                "hasNavItemAppearance",
+            },
+        )
+        self.assertEqual(report["pageId"], str(seeded["page"].id))
+        self.assertEqual(report["slug"], "about")
+        self.assertIsNone(report["beforeHeaderVersion"])
+        self.assertEqual(report["afterHeaderVersion"], 3)
+        self.assertTrue(report["overridesCleared"])
+        self.assertEqual(report["navItemCount"], 1)
+        self.assertEqual(report["navStyles"], ["primary"])
+        self.assertEqual(report["disabledBlocks"], ["status"])
+        self.assertEqual(
+            report["regions"],
+            {
+                "left": ["brand"],
+                "center": ["patron", "status"],
+                "right": ["entryControls", "nav"],
+            },
+        )
+        self.assertFalse(report["hasAppearance"])
+        self.assertFalse(report["hasNavItemAppearance"])
 
         unchanged = self.db.get(BuilderPage, seeded["page"].id)
         self.assertNotIn("header", unchanged.meta)
@@ -46,6 +83,7 @@ class BackfillPageHeadersTests(BackendRouteTestCase):
         self.assertEqual(updated.meta["header"]["version"], 3)
         self.assertEqual(updated.meta["header"]["copy"]["title"], "About")
         self.assertEqual(updated.meta["header"]["nav"]["items"][0]["style"], "primary")
+        self.assertFalse(updated.meta["header"]["blocks"]["status"]["enabled"])
         self.assertNotIn("headerOverrides", updated.meta)
 
     def test_write_mode_backfills_stale_v2_pages_from_legacy_copy(self):
@@ -98,6 +136,113 @@ class BackfillPageHeadersTests(BackendRouteTestCase):
             ["Hero Time", "Lunch Break Justice"],
         )
         self.assertEqual(updated.meta["header"]["nav"]["items"][0]["style"], "secondary")
+
+    def test_write_mode_preserves_stale_header_appearance_payloads(self):
+        self.seed_page_config()
+        seeded = self.seed_builder_page("builderPage")
+        page = seeded["page"]
+        page.meta = {
+            "header": {
+                "version": 2,
+                "copy": {
+                    "title": "Styled Legacy Header",
+                    "subtitle": "Styled Subtitle",
+                },
+                "regions": {
+                    "left": ["brand"],
+                    "center": ["nav"],
+                    "right": ["entryControls", "status", "patron"],
+                },
+                "blocks": {
+                    "brand": {"enabled": True},
+                    "patron": {"enabled": True},
+                    "status": {"enabled": True},
+                    "entryControls": {"enabled": True},
+                    "nav": {"enabled": True},
+                },
+                "appearance": {
+                    "top": {
+                        "background": {
+                            "type": "gradient",
+                            "color": "#112233",
+                            "secondaryColor": "#334455",
+                            "angle": 400,
+                            "opacity": 1.5,
+                        },
+                        "border": {
+                            "radius": 14,
+                        },
+                    },
+                    "scrolled": {
+                        "border": {
+                            "width": 0,
+                            "color": "#00d9ff",
+                        },
+                    },
+                    "navItemDefaults": {
+                        "text": {
+                            "color": "#ffffff",
+                        },
+                    },
+                },
+                "nav": {
+                    "items": [
+                        {
+                            "id": "styled-nav",
+                            "label": "Styled Nav",
+                            "enabled": True,
+                            "style": "secondary",
+                            "appearance": {
+                                "background": {
+                                    "type": "solid",
+                                    "color": "#445566",
+                                },
+                                "border": {
+                                    "width": 2,
+                                    "style": "dotted",
+                                    "color": "#abcdef",
+                                    "radius": 12,
+                                },
+                            },
+                            "link": {
+                                "kind": "url",
+                                "url": "comics.html",
+                                "openInNewTab": False,
+                            },
+                        }
+                    ]
+                },
+            }
+        }
+        self.db.commit()
+
+        summary = backfill_series_page_headers(self.db, "battle-bros", write=True)
+
+        self.assertEqual(summary["updatedPages"], 1)
+        self.assertEqual(summary["pageReports"][0]["hasAppearance"], True)
+        self.assertEqual(summary["pageReports"][0]["hasNavItemAppearance"], True)
+        updated = self.db.get(BuilderPage, page.id)
+        header = updated.meta["header"]
+        self.assertEqual(header["version"], 3)
+        self.assertEqual(header["copy"]["title"], "Styled Legacy Header")
+        self.assertEqual(header["appearance"]["top"]["background"]["type"], "gradient")
+        self.assertEqual(header["appearance"]["top"]["background"]["color"], "#112233")
+        self.assertEqual(header["appearance"]["top"]["background"]["secondaryColor"], "#334455")
+        self.assertEqual(header["appearance"]["top"]["background"]["angle"], 360)
+        self.assertEqual(header["appearance"]["top"]["background"]["opacity"], 1.0)
+        self.assertEqual(header["appearance"]["top"]["border"]["radius"], 14)
+        self.assertEqual(header["appearance"]["scrolled"]["border"]["width"], 0)
+        self.assertEqual(header["appearance"]["scrolled"]["border"]["color"], "#00d9ff")
+        self.assertEqual(header["appearance"]["navItemDefaults"]["text"]["color"], "#ffffff")
+
+        nav_item = header["nav"]["items"][0]
+        self.assertEqual(nav_item["style"], "secondary")
+        self.assertEqual(nav_item["appearance"]["background"]["type"], "solid")
+        self.assertEqual(nav_item["appearance"]["background"]["color"], "#445566")
+        self.assertEqual(nav_item["appearance"]["border"]["width"], 2)
+        self.assertEqual(nav_item["appearance"]["border"]["style"], "dotted")
+        self.assertEqual(nav_item["appearance"]["border"]["color"], "#abcdef")
+        self.assertEqual(nav_item["appearance"]["border"]["radius"], 12)
 
 
 if __name__ == "__main__":

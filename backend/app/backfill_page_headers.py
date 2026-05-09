@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from .builder_security import sanitize_appearance, sanitize_header_shell_appearance
 from .db import SessionLocal
 from .models import BuilderPage, BuilderSection, PageConfig
 from .page_store import update_page
@@ -124,15 +125,17 @@ def normalize_header_nav_items(items: Any) -> list[dict[str, Any]]:
     for index, item in enumerate(items):
         current = item if isinstance(item, dict) else {}
         style = str(current.get("style") or "primary").strip()
-        normalized.append(
-            {
-                "id": str(current.get("id") or f"nav-{index + 1}").strip() or f"nav-{index + 1}",
-                "label": str(current.get("label") or current.get("text") or "").strip() or "Link",
-                "enabled": current.get("enabled") is not False,
-                "style": style if style in {"primary", "secondary"} else "primary",
-                "link": _clone(current.get("link") or {}),
-            }
-        )
+        nav_item = {
+            "id": str(current.get("id") or f"nav-{index + 1}").strip() or f"nav-{index + 1}",
+            "label": str(current.get("label") or current.get("text") or "").strip() or "Link",
+            "enabled": current.get("enabled") is not False,
+            "style": style if style in {"primary", "secondary"} else "primary",
+            "link": _clone(current.get("link") or {}),
+        }
+        appearance = sanitize_appearance(current.get("appearance"))
+        if appearance is not None:
+            nav_item["appearance"] = appearance
+        normalized.append(nav_item)
     return normalized
 
 
@@ -189,7 +192,7 @@ def normalize_blocks(raw_blocks: Any, raw_nav: Any) -> dict[str, dict[str, bool]
 def normalize_header_config(raw_config: Any) -> dict[str, Any]:
     source = raw_config if isinstance(raw_config, dict) else {}
     defaults = create_default_header_config()
-    return {
+    normalized = {
         "version": 2,
         "regions": normalize_regions(source.get("regions")),
         "blocks": normalize_blocks(source.get("blocks"), source.get("nav")),
@@ -201,6 +204,10 @@ def normalize_header_config(raw_config: Any) -> dict[str, Any]:
             )
         },
     }
+    appearance = sanitize_header_shell_appearance(source.get("appearance"))
+    if appearance is not None:
+        normalized["appearance"] = appearance
+    return normalized
 
 
 def normalize_header_overrides(raw_overrides: Any) -> dict[str, list[str]]:
@@ -254,13 +261,16 @@ def create_page_header_meta(
 ) -> dict[str, Any]:
     layout = normalize_header_config(raw_header)
     copy = normalize_header_copy(raw_copy, copy_fallback or create_default_header_copy(page))
-    return {
+    header = {
         "version": 3,
         "copy": copy,
         "regions": layout["regions"],
         "blocks": layout["blocks"],
         "nav": layout["nav"],
     }
+    if layout.get("appearance") is not None:
+        header["appearance"] = layout["appearance"]
+    return header
 
 
 def create_effective_page_header(
@@ -328,6 +338,56 @@ def build_backfilled_page_meta(
     return next_meta
 
 
+def get_header_version(meta: dict[str, Any] | None) -> int | None:
+    raw_header = (meta or {}).get("header") if isinstance(meta, dict) else None
+    if not isinstance(raw_header, dict):
+        return None
+    try:
+        return int(raw_header.get("version") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def get_disabled_blocks(header: dict[str, Any] | None) -> list[str]:
+    blocks = header.get("blocks") if isinstance(header, dict) else {}
+    if not isinstance(blocks, dict):
+        return []
+    return [
+        block_id
+        for block_id in HEADER_BLOCK_IDS
+        if isinstance(blocks.get(block_id), dict) and blocks[block_id].get("enabled") is False
+    ]
+
+
+def summarize_page_report(page: dict[str, Any], next_meta: dict[str, Any] | None) -> dict[str, Any]:
+    before_meta = (page or {}).get("meta") if isinstance((page or {}).get("meta"), dict) else {}
+    after_meta = next_meta if isinstance(next_meta, dict) else before_meta
+    header = after_meta.get("header") if isinstance(after_meta.get("header"), dict) else {}
+    nav_items = (
+        (header.get("nav") or {}).get("items") if isinstance(header.get("nav"), dict) else []
+    )
+    nav_items = nav_items if isinstance(nav_items, list) else []
+    return {
+        "pageId": page.get("id"),
+        "slug": page.get("slug"),
+        "beforeHeaderVersion": get_header_version(before_meta),
+        "afterHeaderVersion": get_header_version(after_meta),
+        "overridesCleared": isinstance(before_meta.get("headerOverrides"), dict)
+        and "headerOverrides" not in after_meta,
+        "navItemCount": len(nav_items),
+        "navStyles": [
+            str(item.get("style") or "primary") for item in nav_items if isinstance(item, dict)
+        ],
+        "disabledBlocks": get_disabled_blocks(header),
+        "regions": _clone(header.get("regions") if isinstance(header, dict) else {}),
+        "hasAppearance": isinstance(header.get("appearance"), dict),
+        "hasNavItemAppearance": any(
+            isinstance(item, dict) and isinstance(item.get("appearance"), dict)
+            for item in nav_items
+        ),
+    }
+
+
 def summarize_runtime_readiness(pages: list[dict[str, Any]]) -> dict[str, Any]:
     bucket_summary: dict[str, dict[str, Any]] = {}
     has_published_reader_page = any(
@@ -393,6 +453,7 @@ def backfill_series_page_headers(db, series_id: str, *, write: bool = False) -> 
     ).all()
     changed_page_ids: list[str] = []
     updated_page_ids: list[str] = []
+    page_reports: list[dict[str, Any]] = []
     projected_pages: list[dict[str, Any]] = []
 
     for page_record in pages:
@@ -400,6 +461,7 @@ def backfill_series_page_headers(db, series_id: str, *, write: bool = False) -> 
         next_meta = build_backfilled_page_meta(page, page_config)
         if next_meta is not None:
             changed_page_ids.append(page["id"])
+            page_reports.append(summarize_page_report(page, next_meta))
         projected_page = _clone(page)
         if next_meta is not None:
             projected_page["meta"] = _clone(next_meta)
@@ -420,6 +482,7 @@ def backfill_series_page_headers(db, series_id: str, *, write: bool = False) -> 
         "skippedPages": len(pages) - len(changed_page_ids),
         "changedPageIds": changed_page_ids,
         "updatedPageIds": updated_page_ids,
+        "pageReports": page_reports,
         "blockingBucketSummary": readiness["bucketSummary"],
         "removalReadiness": readiness["removalReadiness"],
     }

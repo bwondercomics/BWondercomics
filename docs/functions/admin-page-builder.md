@@ -175,7 +175,7 @@ Migration/backfill workflow:
 
 - legacy page saves already write canonical `page.meta.header.version = 3`
 - bulk migration is handled by the CLI `python -m backend.app.backfill_page_headers --series <series-id> [--write]`
-- the command dry-runs by default, computes effective header state from current page data plus legacy `PageConfig`, writes canonical V3 `meta.header`, and clears `meta.headerOverrides`
+- the command dry-runs by default, computes effective header state from current page data plus legacy `PageConfig`, writes canonical V3 `meta.header`, clears `meta.headerOverrides`, preserves sanitized header/nav appearance data, and returns additive `pageReports` details for each changed page
 
 ## 📝 Header Editor (header-editor.js)
 

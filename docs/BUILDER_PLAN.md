@@ -765,6 +765,8 @@ Goal: retire the remaining legacy runtime fallback paths now that the integrated
 - After write mode, reload admin pages and rerun `auditPagesFallbacks(...)` to confirm the relevant series is clean.
 - Add backend coverage where needed for any missing backfill edge case discovered during dry-run review.
 
+**Completion note (`2026-05-09`):** The backend backfill now preserves Phase 7 header appearance data while upgrading stale headers to canonical V3 meta. `backend/app/backfill_page_headers.py` sanitizes and carries forward shell-level `appearance` (`top`, `scrolled`, `navItemDefaults`) plus per-nav-item `appearance`, writes that data into `page.meta.header`, and exposes additive `pageReports` details in dry-run/write summaries so migration review can inspect versions, override cleanup, disabled blocks, regions, nav styles, and appearance presence per changed page. Backend coverage now explicitly asserts hidden-block persistence (`status.enabled == false` after override cleanup) and sanitized legacy appearance retention during `--write`.
+
 #### Step 3 - Remove legacy reader fallback branches
 
 - In `reader/data.js`, remove the normal `source: 'legacy'` path from `loadPageConfigWithFallback(...)` once every supported series has a clean audit and published builder `reader` page.

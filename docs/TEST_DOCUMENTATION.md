@@ -108,7 +108,7 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - `backend/tests/test_comments_routes.py`: comment auth, moderation, duplicate/rate-limit, and censored-phrase handling
 - `backend/tests/test_files_routes.py`: page-config/media index contracts, protected asset access, and virtual save behavior
 - `backend/tests/test_page_builder_routes.py`: page-builder admin CRUD, slug uniqueness, homepage exclusivity, effective-homepage public/admin endpoint resolution, header-nav style sanitization, section/module move-reorder, and public published-page access
-- `backend/tests/test_backfill_page_headers.py`: dry-run and write-mode coverage for canonical V3 header backfill, legacy copy import, nav-style preservation, and `meta.headerOverrides` cleanup
+- `backend/tests/test_backfill_page_headers.py`: dry-run and write-mode coverage for canonical V3 header backfill, legacy copy import, nav-style preservation, hidden-block persistence after override cleanup, additive `pageReports`, and sanitized header/nav appearance preservation
 - `backend/tests/test_posts_routes.py`: public/admin post visibility, scheduled promotion, protected-image copy, and asset cleanup
 - `backend/tests/test_series_contracts.py`: `series.json` and `data.json` payload contracts
 - `backend/tests/test_tracking_routes.py`: visitor-session create/update behavior, dedupe, and validation
