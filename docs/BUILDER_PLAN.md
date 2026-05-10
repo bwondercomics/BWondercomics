@@ -177,12 +177,13 @@ Release-discipline rule for builder work:
 - this applies even when the edited file lives under `admin/`, because some builder modules are shared by the reader runtime
 - source-level tests are necessary, but they are not proof that the live site changed until the built assets are regenerated
 
-There is also duplicated render logic:
+The shared module/page HTML path now removes most renderer duplication:
 
-- `reader/page-renderer.js` renders live page output
-- `admin/page-builder/preview-renderers.js` renders admin preview output
+- `reader/page-renderer.js` renders live page output through `admin/page-builder/shared-renderers.js`
+- `admin/page-builder/preview-renderers.js` configures that shared factory for the admin preview surface
 
-That duplication is manageable right now, but it is a future drift risk.
+That establishes structural module parity, but the admin preview still does not run inside the full
+reader shell or a real iframe viewport.
 
 ### Current page and button model
 
@@ -296,11 +297,14 @@ The builder is strongest where there are structured controls.
 
 It is weakest where authors have to fall back to raw JSON for common modules. That is not a good steady-state authoring experience.
 
-#### 5. Preview/live renderer drift is possible
+#### 5. Preview/live parity is still incomplete
 
-Because admin preview rendering and live reader rendering are duplicated, changes can diverge over time.
+Admin preview and live reader rendering now share the module/page HTML factory, so the earlier
+duplicate-renderer drift has been reduced.
 
-That is a maintenance problem, not just a polish problem.
+The remaining gap is shell and viewport fidelity: the current preview frame does not execute the
+full reader route, topbar/panel shell, or CSS media queries inside a real 375/768/1280px viewport.
+`docs/BUILDER_PREVIEW_PARITY_PLAN.md` is the dedicated plan for closing that gap.
 
 ## Updated priorities
 
@@ -399,10 +403,17 @@ Deliberately not in this phase:
 
 - Extracted `admin/page-builder/shared-renderers.js` — the single source of truth for module HTML output, replacing the two previously duplicated renderer implementations (~450-line and ~620-line files each cut by 70-75%)
 - Rewrote `reader/page-renderer.js` and `admin/page-builder/preview-renderers.js` to delegate to the shared factory via a three-option interface (`resolveImageUrl`, `getSeriesId`, `showMountPlaceholders`)
-- Added Edit/Preview canvas mode toggle to the builder toolbar; preview mode renders `renderPreviewPage(currentPage)` wrapped in a centred `.pb-preview-frame` using the shared renderer — the public `main.core.18-page-builder.css` was already in the admin head, so preview output is visually identical to the reader
+- Added Edit/Preview canvas mode toggle to the builder toolbar; preview mode renders `renderPreviewPage(currentPage)` wrapped in a centred `.pb-preview-frame` using the shared renderer. This gives structural module/page HTML parity with the reader renderer, but it is not full reader-shell or real-viewport parity.
 - Added Desktop (1280px) / Tablet (768px) / Mobile (375px) width presets sourced from the site's `variables.css` breakpoints; width changes update the frame `data-width` attribute in-place with a CSS `max-width` transition, no re-render
 - Enhanced preview to utilize the full viewport width by injecting `data-canvas-mode='preview'` into the CSS grid, automatically collapsing the sidebar and inspector elements globally to prevent the preview frame from being constrained inside the gutter
 - Added 7 new tests (5 parity + 2 integration); full suite: 36 files, 207 passing, 0 regressions
+
+**Contract addendum (2026-05-10):**
+
+- Added `admin/page-builder/preview-contract.js` with the versioned preview snapshot contract, source labels, side-effect policy, and iframe-ready viewport dimensions: Desktop `1280x900`, Tablet `768x1024`, and Mobile `375x812`.
+- Preview mode now labels whether it is rendering the saved hydrated page or an unsaved working snapshot.
+- When the active dirty scope is `module`, `theme`, `header`, `page-settings`, or `section`, preview merges that local draft into a cloned page snapshot without mutating `currentPage`.
+- The current preview still uses `.pb-preview-frame`; exact full reader-shell parity remains a later iframe/preview-bridge phase tracked in `docs/BUILDER_PREVIEW_PARITY_PLAN.md`.
 
 ### Phase 3 - Page management pass ✅
 

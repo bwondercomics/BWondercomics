@@ -310,6 +310,23 @@ Buttons renderer behavior now uses the shared appearance contract directly:
 
 A bridge that configures the shared rendering pipeline for the Admin environment and implements "Preview-only" interactive hooks. Includes `initPreviewPromoCarousels` and `initPreviewEmailForms` to mock reader functionality safely inside the dashboard.
 
+## 🧾 Preview Contract (preview-contract.js)
+
+Defines the shared contract for the current preview frame and the planned iframe reader preview bridge.
+
+Key exports:
+
+- `PREVIEW_VIEWPORTS` and `PREVIEW_VIEWPORT_ORDER` — canonical Desktop, Tablet, and Mobile presets with iframe-ready dimensions (`1280x900`, `768x1024`, `375x812`)
+- `BUILDER_PREVIEW_SNAPSHOT_VERSION` — version marker for builder preview payloads
+- `BUILDER_PREVIEW_SOURCES` — `saved` for hydrated API pages and `working` for cloned snapshots that include an active local draft
+- `DEFAULT_BUILDER_PREVIEW_SIDE_EFFECTS` — default preview policy for disabling or stubbing mutating reader behavior
+- `getPreviewViewport(...)`, `isPreviewViewportId(...)`, `isPreviewSource(...)`, and `getPreviewStatusCopy(...)` — small validation/copy helpers consumed by `admin/page-builder.js`
+
+`admin/page-builder.js` currently uses this contract before rendering the existing `.pb-preview-frame`.
+The snapshot merge path handles the one active `dirtyScope` at a time and covers module config,
+theme metadata, normalized header metadata, page settings, and section spacing settings without
+mutating `currentPage`.
+
 ## 🎡 Promo Renderer (promo-renderer.js)
 
 The specialized renderer for the Promo module. Converts complex slide drafts into high-performance, CSS-driven HTML. Features a neon styling engine (hex to rgba), dynamic slide layouts, and defensive clamps on transition timing constraints.
@@ -370,7 +387,8 @@ Again: `header` is compatibility-only in the catalog and is not part of the norm
 - The builder's mutable UI state is primarily coordinated in `admin/page-builder.js`, not in `data.js`.
 - Header editing is page-scoped through `page.meta.header`, not primarily through a normal `header` module.
 - The admin canvas is an editing surface with builder chrome, not a true public-reader preview.
-- Shared renderer parity exists at the module/section/page HTML level through `shared-renderers.js`.
+- Shared renderer parity exists at the module/section/page HTML level through `shared-renderers.js`; full reader-shell and real-viewport parity is tracked separately in `docs/BUILDER_PREVIEW_PARITY_PLAN.md`.
+- The preview contract can represent saved API-backed snapshots and active unsaved working snapshots, but the iframe transport/reader bridge is not implemented yet.
 - Legacy `page-config` and legacy `header` module content still exist as migration/backfill inputs. Normal reader startup and page-builder header editing resolve V3 page headers with `pageConfig: null`; stored legacy `header` modules are later cleanup debt once V3 metadata exists.
 
 ## 📚 Related Docs

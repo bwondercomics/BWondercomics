@@ -71,8 +71,9 @@ Install backend dev dependencies into the repo virtualenv:
 - `tests/admin-preview.test.js`: preview data contract loading and image rendering
 - `tests/admin-page-config.test.js`: page-config cache/save contract behavior
 - `tests/admin-page-builder-data.test.js`: page-builder data-layer fetch/create/update/delete wrappers
-- `tests/admin-page-builder-shell.test.js`: page-builder shell behavior including empty state, selection, canonical designer-route entry, publish state, section settings save/discard, canvas delete cleanup, page-header editing, and default module config wiring
+- `tests/admin-page-builder-shell.test.js`: page-builder shell behavior including empty state, selection, canonical designer-route entry, publish state, section settings save/discard, canvas delete cleanup, page-header editing, default module config wiring, preview snapshot metadata, and saved-vs-working dirty draft labels
 - `tests/admin-page-builder-preview.test.js`: module-editor save/delete flows and preview renderer contracts
+- `tests/admin-page-builder-preview-contract.test.js`: builder preview viewport/source contract and status-copy helpers
 - `tests/admin-page-builder-audit.test.js`: fallback-retirement audit coverage, including published-`reader` readiness and blocking bucket aggregation
 - `tests/admin-designer.test.js`: admin-shell cleanup proving the legacy designer iframe host is gone
 - `tests/media-branding.test.js`: admin branding rules

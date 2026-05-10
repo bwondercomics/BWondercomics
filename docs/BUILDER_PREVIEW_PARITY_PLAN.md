@@ -1,0 +1,579 @@
+# Builder Preview Parity Plan
+
+Status: draft plan (`2026-05-10`)
+
+Goal: make the page builder preview a trustworthy representation of the page as it will render in
+the public reader at desktop, tablet, and mobile sizes.
+
+This plan is intentionally focused on preview fidelity. It does not expand the builder into a
+freeform visual editor, and it does not change the existing explicit save/publish model unless a
+preview snapshot needs to include local unsaved draft state.
+
+## Audit Follow-Up
+
+The current code audit verified the core diagnosis in this plan:
+
+- the builder preview still uses a `max-width` div frame, so viewport media queries are not exact
+- the builder preview renders module/page HTML, not the full reader shell
+- the live reader applies page data through `applyBuilderPageToDOM(...)`, which also controls
+  header, theme, panels, and runtime module initialization
+
+Known stale documentation to correct during implementation:
+
+- `docs/BUILDER_PLAN.md` currently claims the shared-renderer preview is visually identical to the
+  reader; that is only true at the shared module HTML level, not at full responsive reader-shell
+  fidelity.
+- `docs/admin-overview.md` describes the current `max-width` preview frame and no-rerender width
+  switching as the intended behavior; that will become false once iframe preview lands.
+
+## Problem Statement
+
+The builder currently has two useful but incomplete preview surfaces:
+
+- Edit mode: `admin/page-builder/canvas-renderer.js` renders an authoring canvas with structural
+  controls, insert zones, and a representative page-header surface.
+- Preview mode: `admin/page-builder.js` calls `renderPreviewPage(currentPage)` from
+  `admin/page-builder/preview-renderers.js`, which delegates module HTML output to
+  `admin/page-builder/shared-renderers.js`.
+
+That shared renderer work is valuable, but the current preview is still not exact enough:
+
+- The desktop/tablet/mobile toggle changes `.pb-preview-frame[data-width]` with `max-width`.
+  CSS media queries still evaluate against the browser viewport, not that inner frame. A 375px
+  preview inside a wide admin window can therefore fail to trigger the same mobile CSS that the
+  reader uses on a real 375px viewport.
+- The preview renders only a `.pb-page` body. The live reader applies the page through
+  `reader/data.js` via `applyBuilderPageToDOM(...)`, which also updates `header.topbar`,
+  `#leftPanel`, `#rightPanel`, theme CSS variables, panel backgrounds, panel visibility, reader
+  controls, and mounted modules.
+- The current preview uses preview-only placeholders for some live mounts. That is fine for a
+  structural preview, but it is not the same as the final page.
+- Current tests prove shared renderer structure and shell toggle behavior. They do not prove
+  viewport media-query behavior, full reader shell parity, scroll/header state, or visual parity
+  between builder preview and the reader route.
+
+## Product Target
+
+The author should be able to open the builder, switch to Preview, choose Desktop, Tablet, or
+Mobile, and see the same layout they would see by opening the reader page at that viewport.
+
+The preview must include:
+
+- the same reader shell CSS and markup context
+- the same page-scoped header state from `page.meta.header`
+- the same page theme variables and panel backgrounds
+- the same left/right panel module placement and panel visibility rules
+- the same responsive breakpoints and viewport-dependent JavaScript behavior
+- the same asset URL resolution
+- the same published/draft page data, and a clearly defined behavior for unsaved local edits
+
+Primary data strategy:
+
+- The iframe loads the real root reader entry point, `index.html`, in a same-origin preview mode so
+  it gets the real reader shell, CSS, session cookies, and read-only runtime context.
+- The page being previewed is supplied by the builder through a validated `postMessage` page
+  snapshot. The iframe must not rely on its own builder-page API fetch as the source of truth for
+  preview content, because the builder must be able to preview unsaved working drafts.
+- Same-origin API requests may still be used for session checks, entry data, latest/feed data, and
+  protected asset access, but the page snapshot from the admin builder is authoritative.
+
+## Definition Of Exact
+
+"Exact" means the builder preview and the reader route render from the same page snapshot through
+the same reader layout path at the same CSS viewport dimensions.
+
+Acceptable differences:
+
+- Browser font rasterization and sub-pixel anti-aliasing may differ slightly between machines.
+- Mutating actions such as email signup submission, analytics, tracking, comments posting, and
+  external navigation can be stubbed or disabled in preview mode.
+- Dynamic remote content may use a stable test fixture in automated visual tests.
+
+Not acceptable:
+
+- A preview architecture where the iframe independently fetches a different saved page while the
+  admin builder is showing unsaved working changes.
+- A mobile preview that does not trigger the mobile reader CSS.
+- A preview that shows module order but omits the reader header, panels, controls, or theme.
+- A preview that uses admin-only CSS to approximate public reader behavior.
+- A preview that silently displays published data when the builder says it is showing draft data.
+- A preview that ignores active local drafts when the UI claims it is showing the working page.
+
+## Recommended Architecture
+
+Use an iframe-based reader preview host instead of a constrained `div`.
+
+Reasoning:
+
+- An iframe has a real viewport width and height, so media queries and viewport-dependent reader
+  JavaScript evaluate the same way they do in the browser.
+- It isolates admin CSS from public reader CSS.
+- It allows the preview to run the same reader shell and layout code rather than maintaining a
+  second full-page renderer in the admin bundle.
+- It gives us a clean boundary for disabling side effects in preview mode.
+
+Rejected primary approaches:
+
+- Keep the current `max-width` frame and add more CSS. This cannot make viewport media queries
+  exact.
+- Duplicate the reader shell inside the admin preview. This would reintroduce the renderer drift
+  problem the shared renderer work was meant to reduce.
+- Convert all reader CSS to container queries as the first step. Container queries may be useful
+  later for modules, but the reader shell currently includes viewport-based CSS and JS behavior.
+
+## Preview Viewports
+
+Define viewport presets in one shared registry, not scattered literals:
+
+- Desktop: `1280 x 900`
+- Tablet: `768 x 1024`
+- Mobile: `375 x 812`
+
+The current labels can remain Desktop, Tablet, and Mobile, but the implementation must resize the
+iframe viewport, not only the visible wrapper.
+
+Later additions can include tablet landscape, mobile landscape, and custom width. Those should not
+block the first parity pass.
+
+## Multi-Step Implementation Plan
+
+### Phase 0 - Baseline Audit
+
+1. Document the current preview path:
+   - `admin/page-builder.js::renderPreview()`
+   - `admin/page-builder/preview-renderers.js`
+   - `admin/page-builder/shared-renderers.js`
+   - `reader/page-renderer.js`
+   - `reader/data.js::applyBuilderPageToDOM(...)`
+2. Capture the current parity gaps with a fixture page that includes:
+   - page-scoped V3 header metadata
+   - custom header/nav/button appearance
+   - page theme overrides
+   - panel backgrounds and panel spacing
+   - one-column, two-column, and three-column sections
+   - `text`, `image`, `gallery`, `video`, `social`, `email-signup`, `promo`, `buttons`,
+     `spacer`, `divider`, `reader`, `entry-gallery`, `feed`, and `html` modules
+3. Verify and record the current responsive mismatch:
+   - open the admin builder on a desktop viewport
+   - switch preview to Mobile
+   - confirm public mobile media queries do not necessarily activate because the browser viewport
+     is still desktop-sized
+4. Add this audit note to the implementation PR before changing code so future reviewers know why
+   an iframe is required.
+
+Deliverable: short audit section in the PR or a docs addendum with screenshots or DOM notes.
+
+### Phase 1 - Preview Contract
+
+1. Add a shared `PREVIEW_VIEWPORTS` contract, likely under `admin/page-builder/constants.js` or a
+   small new helper such as `admin/page-builder/preview-constants.js`.
+2. Store width and height for every preset.
+3. Define the preview data contract:
+   - `seriesId`
+   - `pageId`
+   - `pageSlug`
+   - `draftMode`
+   - `snapshotVersion`
+   - normalized page snapshot
+   - preview options, including side-effect stubs and active scroll state
+4. Define when the preview uses saved data versus working draft data:
+   - Saved preview: render the current persisted draft/published page from the API.
+   - Working preview: merge active local drafts into `currentPage` and send that snapshot to the
+     preview iframe.
+5. Make the dirty-state policy explicit before implementation:
+   - if any builder `dirtyScope` is active and the user switches to Preview, the default behavior
+     should be a working preview that includes the dirty state
+   - saved-only preview can exist later as an explicit secondary mode, but it must not be the silent
+     default while there are unsaved changes
+   - the preview status must say whether it is showing persisted API data or an unsaved merged
+     snapshot
+6. Make the UI copy explicit:
+   - "Previewing saved draft" when it is API-backed.
+   - "Previewing unsaved working changes" when a local draft snapshot is merged in.
+
+Deliverable: constants plus documented data contract before the iframe is wired in.
+
+Phase 1 contract addendum:
+
+- The implementation contract lives in `admin/page-builder/preview-contract.js`.
+- `PREVIEW_VIEWPORTS` defines the first iframe-ready presets:
+  - Desktop: `1280 x 900`
+  - Tablet: `768 x 1024`
+  - Mobile: `375 x 812`
+- `PREVIEW_VIEWPORT_ORDER` is `desktop`, `tablet`, `mobile`; the current div preview still writes
+  that id to `.pb-preview-frame[data-width]` until the iframe phase replaces the frame.
+- Preview snapshot payloads use `snapshotVersion: 1` and include `seriesId`, `pageId`, `pageSlug`,
+  `draftMode`, `source`, `page`, and `options`.
+- `draftMode` is `draft` when `currentPage.isPublished === false`, otherwise `published`.
+- `source` is `saved` when no builder draft is dirty and `working` when `dirtyScope` is set.
+- `dirtyScope` is a scalar, so a working snapshot merges only the one active local draft:
+  - `module`: selected module config
+  - `theme`: theme tokens, panel backgrounds, and panel spacing
+  - `header`: normalized `page.meta.header` with `headerOverrides` removed
+  - `page-settings`: slug, title, page type, and homepage flag
+  - `section`: section spacing settings using the existing section-save semantics
+- Preview UI status copy is:
+  - `Previewing saved draft`
+  - `Previewing unsaved working changes`
+- Phase 1 only defines and consumes the contract in the existing preview surface. It does not add the
+  iframe, reader preview bridge, or `postMessage` transport.
+
+### Phase 2 - Reader Preview Host
+
+Recommended path: use the real root reader entry point in an iframe with a preview mode query
+parameter.
+
+1. Add a reader preview mode gate, for example:
+   - `/index.html?series=<id>&page=<slug>&draft=1&builderPreview=1`
+2. Treat root `index.html` as the canonical iframe entry point. The reader currently boots from the
+   root page on `DOMContentLoaded`; the preview implementation should make that relationship
+   explicit rather than assuming a separate reader HTML file exists.
+3. Add a small reader-side preview bridge, for example `reader/preview-bridge.js`, loaded only when
+   the query parameter is present.
+   - The bridge should be dynamically imported or otherwise conditionally loaded from preview mode.
+   - It must not add normal-reader startup weight or behavior when `builderPreview=1` is absent.
+   - If the build still ships the bridge file, normal runtime must not execute it outside preview
+     mode.
+4. In builder preview mode, the reader startup should wait for or request a page snapshot from the
+   parent admin window instead of treating `loadPageConfigWithFallback(...)` as the preview content
+   source. That avoids the ambiguity between iframe session/API draft loading and the builder's
+   local unsaved working state.
+5. The bridge should:
+   - verify `event.origin` against the current same-origin admin page
+   - validate the message type, shape, `snapshotVersion`, series id, page id/slug, and expected
+     preview session token
+   - ignore messages from unknown origins, unknown message types, or stale snapshot versions
+   - accept the normalized page snapshot as the authoritative preview page
+   - send acknowledgement/error messages back to the admin builder with the same validation discipline
+   - let the admin builder validate response message origin and shape before updating UI state
+6. After accepting a snapshot, call the same reader layout application path used at runtime:
+   - `applyBuilderPageToDOM(page, { seriesId, previewMode: true })`
+7. Disable or stub side effects that should not fire in builder preview.
+8. Side effects to disable or stub:
+   - email POSTs
+   - analytics/tracking writes
+   - comments submission
+   - external link navigation from accidental clicks
+   - fullscreen requests
+9. Side effects that may remain read-only:
+   - loading entry data needed by reader/entry-gallery modules
+   - loading latest post/feed data if the live page would load it
+   - loading protected assets only when the current admin session is allowed
+10. The iframe document must load the same public CSS as the reader:
+    - `assets/css/variables.css`
+    - `assets/css/main.css`
+    - `reader/comic-comments.css`
+
+11. Avoid creating a second static copy of the reader shell. If a dedicated preview HTML file
+    becomes necessary, first extract shared reader shell markup or explain why duplication is
+    temporary.
+
+Deliverable: an iframe-loadable reader preview host that can render a posted builder page snapshot.
+
+### Phase 3 - Builder Preview Manager
+
+1. Replace the current preview `innerHTML` path in `admin/page-builder.js::renderPreview()` with an
+   iframe manager.
+2. The iframe manager owns:
+   - iframe creation and teardown
+   - viewport preset changes
+   - loading state
+   - error state
+   - `postMessage` synchronization
+   - debounce timing for high-frequency draft edits
+3. Build a `createPreviewPageSnapshot()` helper that merges active local draft state into
+   `currentPage`:
+   - active module draft
+   - active section settings draft
+   - active theme draft
+   - active header draft
+   - active page settings draft
+4. The snapshot helper must not mutate `currentPage`.
+5. If no local draft is dirty, the snapshot should be byte-stable against the current hydrated page
+   as much as practical.
+6. Width buttons should update:
+   - iframe CSS width
+   - iframe CSS height
+   - active button state
+   - accessible label/title text
+   - preview status text
+7. The preview should survive normal builder operations:
+   - switching pages
+   - switching series
+   - saving a module
+   - publishing/unpublishing
+   - discarding a draft
+   - changing the active viewport preset
+8. Keep the old shared-renderer preview available behind a short-lived fallback flag only during
+   rollout. Prefer a project-consistent localStorage/debug flag name such as `pb-preview-legacy`.
+   Remove it once iframe preview parity is verified.
+
+Deliverable: admin preview mode renders a real reader iframe and keeps it synchronized with the
+current page snapshot.
+
+### Phase 4 - Full Reader Shell Parity
+
+1. Ensure preview output includes:
+   - `header.topbar`
+   - `.viewerWrap`
+   - `#leftPanel`
+   - `#mainContent`
+   - `#viewport`
+   - `#controls`
+   - `#rightPanel`
+2. Confirm `applyBuilderPageToDOM(...)` is the only path that applies page-level data to that shell
+   in preview and runtime.
+3. Confirm `loadPageConfigWithFallback(...)` remains constrained to `source: 'builder'` and
+   `source: 'none'` for normal reader startup. The preview bridge should not reintroduce retired
+   legacy `page-config.json` fallback behavior.
+4. Confirm page header parity:
+   - same `resolvePageHeaderState(...)` input
+   - same nav item rendering
+   - same shell top/scrolled appearance rules
+   - same admin-link exclusion behavior
+5. Confirm theme parity:
+   - page theme CSS variables apply to the iframe document root
+   - default theme values remain untouched when no page override is set
+   - theme reset/discard in the builder updates preview state correctly
+6. Confirm panel parity:
+   - left and right panel module selection follows the same column mapping as runtime
+   - panel backgrounds use the same URL normalization
+   - panel spacing uses the same CSS variable
+   - empty-panel behavior matches runtime
+7. Confirm module parity:
+   - modules use `shared-renderers.js` through the reader path
+   - dynamic modules initialize through the same reader initializers where possible
+   - preview-only stubs are limited to mutating behavior, not layout behavior
+
+Deliverable: preview iframe and live reader route are applying the same page snapshot through the
+same shell-level functions.
+
+### Phase 5 - Responsive Parity
+
+1. Treat the iframe dimensions as the source of truth for responsive testing.
+2. At Desktop, verify:
+   - side panels sit beside the viewport as they do in the reader
+   - header regions have the same placement and wrapping
+   - two-page reader mode behavior matches the public route when the reader module is present
+3. At Tablet, verify:
+   - the same reader breakpoints and aspect-ratio rules activate
+   - side panels, controls, and header wrapping match the public route
+   - overlay/collapsed admin panels do not affect iframe layout
+4. At Mobile, verify:
+   - mobile media queries activate inside the iframe
+   - multi-column builder sections collapse exactly as they do in the reader
+   - controls remain reachable
+   - no horizontal overflow is introduced by modules, header nav, buttons, or custom HTML
+5. Add a debug-only overlay or dev console output that reports:
+   - preset name
+   - iframe CSS width and height
+   - iframe `window.innerWidth` and `window.innerHeight`
+   - page slug and snapshot version
+6. Do not use browser zoom to simulate mobile. Use iframe CSS pixels.
+
+Deliverable: desktop/tablet/mobile modes trigger the same CSS and JavaScript branches as the live
+reader at those viewport sizes.
+
+### Phase 6 - Visual Verification
+
+Decision gate: either adopt browser-level visual verification for this pass or explicitly mark
+manual screenshot QA as the temporary substitute. If Playwright or an equivalent tool is deferred,
+the plan must record that automated visual regression coverage is intentionally absent and that the
+manual QA checklist is the release gate for visual parity.
+
+1. Keep existing Vitest coverage for:
+   - shared renderer module contracts
+   - admin shell preview toggle behavior
+   - reader DOM application
+   - header appearance parity
+2. Add unit coverage for:
+   - preview viewport constants
+   - preview snapshot merging
+   - postMessage payload validation
+   - preview side-effect stubs
+3. Add browser-level visual checks. The recommended tool is Playwright, added as a dev dependency
+   only if the project accepts that dependency.
+4. Visual checks should compare:
+   - builder preview iframe at Desktop vs reader route at Desktop
+   - builder preview iframe at Tablet vs reader route at Tablet
+   - builder preview iframe at Mobile vs reader route at Mobile
+5. Stabilize visual tests by:
+   - using seeded builder fixtures
+   - disabling animations/transitions in test mode
+   - freezing timers where needed
+   - using stable latest/feed fixtures or mocking those API responses
+   - waiting for fonts/images before screenshots
+6. Add non-screenshot browser assertions:
+   - iframe `innerWidth` equals selected preset width
+   - no horizontal overflow at Mobile
+   - expected mobile/desktop CSS branches are active
+   - same key elements exist in preview and reader
+7. If Playwright is not adopted in the first pass, create a manual screenshot checklist and keep
+   the automated work limited to Vitest until the dependency decision is made.
+
+Deliverable: repeatable evidence that preview and reader match at all three required viewport
+classes.
+
+### Phase 7 - Manual QA
+
+Run the manual pass with at least:
+
+- one published builder page
+- one unpublished draft page
+- one page with unsaved local module edits
+- one page with unsaved local header/theme edits
+- one page with all common module types
+- one canonical V3 page header
+- one page with customized button/header-nav appearance
+
+Checklist:
+
+- Desktop preview matches the reader route.
+- Tablet preview matches the reader route.
+- Mobile preview matches the reader route.
+- Mobile mode actually reports `window.innerWidth === 375` inside the iframe.
+- Header title, subtitle, visible blocks, nav links, and nav appearance match.
+- Left/right panels match, including backgrounds and empty states.
+- Builder page links route to the same series/page targets.
+- Draft preview matches the admin draft reader route.
+- Unsaved working preview updates without saving, and the UI labels it as unsaved.
+- Email/comment/analytics side effects do not fire from preview mode.
+- External links are either disabled or clearly require an intentional open action.
+
+Deliverable: completed QA notes, with every mismatch classified as blocker, major, or minor.
+
+### Phase 8 - Documentation And Cleanup
+
+1. Update `docs/BUILDER_PLAN.md` to replace the older preview-pass note with the new source of
+   truth once implemented.
+2. Update `docs/admin-overview.md` with the new iframe preview behavior.
+3. Update `docs/functions/admin-page-builder.md` for:
+   - preview manager
+   - viewport constants
+   - snapshot merge helper
+4. Update `docs/functions/reader-core.md` for:
+   - reader preview bridge
+   - preview side-effect stubs
+   - exact-preview query parameter
+5. Remove stale statements that say either:
+   - preview is only a structural canvas
+   - preview is exact when it still uses max-width framing
+   - preview toggle is removed, if that is no longer true
+   - `.pb-preview-frame` width switching is the intended long-term preview mechanism
+6. Specifically audit:
+   - the "visually identical to the reader" preview claim in `docs/BUILDER_PLAN.md`
+   - the `.pb-preview-frame` / no-rerender width-toggle description in `docs/admin-overview.md`
+   - any compact context notes that still say the preview toggle was removed
+7. Remove the old div-based preview path after the iframe path is stable.
+
+Deliverable: docs describe the actual preview architecture without contradictory notes.
+
+### Phase 9 - Release Gate
+
+Before claiming the preview parity work is complete, run:
+
+```bash
+npm run format:check
+npm run format:py:check
+npm run lint
+npm run lint:py
+npm test
+npm run test:backend
+npm run build
+git diff --check
+```
+
+If browser visual tests are added, include that command in the gate.
+
+Because this work affects the public reader runtime, shared builder modules, public CSS, and public
+HTML behavior, `dist/` must be rebuilt before browser verification or release claims.
+
+## Acceptance Criteria
+
+The plan is complete when all of these are true:
+
+- Preview mode renders through an iframe or equivalent real viewport, not a `max-width` div.
+- Desktop, Tablet, and Mobile presets set real iframe viewport dimensions.
+- Mobile preview triggers the same mobile CSS and reader JavaScript branches as the live reader.
+- Preview uses the same reader shell context as the public page.
+- The authoritative preview page data comes from a validated admin-sent page snapshot, so unsaved
+  working changes can be represented without relying on iframe API fetch timing or auth state.
+- Preview and reader apply page data through the same `applyBuilderPageToDOM(...)` path or a
+  directly shared equivalent.
+- Header, theme, panel backgrounds, panel spacing, panel visibility, modules, and button/nav
+  appearance match between preview and reader.
+- Unsaved local changes are either included in preview through a clearly labeled working snapshot
+  or explicitly excluded with clear UI copy.
+- Preview mode does not submit forms, write analytics/tracking events, post comments, or accidentally
+  navigate the admin away.
+- Automated tests cover snapshot merging, viewport selection, postMessage validation, and reader
+  shell application.
+- Manual or automated browser verification covers Desktop, Tablet, and Mobile.
+- Documentation no longer contradicts the implemented preview behavior.
+
+## Risks And Mitigations
+
+- Risk: iframe preview is slower than direct HTML injection.
+  Mitigation: reuse a single iframe per page, debounce snapshot updates, and reload only when series,
+  page, or route-level context changes.
+- Risk: preview mode accidentally fires reader side effects.
+  Mitigation: centralize a `previewMode` flag in reader startup and test every side-effect boundary.
+- Risk: admin draft auth behaves differently inside the iframe.
+  Mitigation: make the admin-sent snapshot authoritative for preview page content, use same-origin
+  cookies only for session/read-only runtime context, and keep explicit error states for 403/404
+  responses from supporting API calls.
+- Risk: `postMessage` preview sync creates a loose security boundary.
+  Mitigation: validate message origin, type, shape, series/page identity, preview session token, and
+  `snapshotVersion` on both sides; ignore unknown or stale messages; never execute code from
+  messages.
+- Risk: full shell preview exposes existing reader responsive bugs.
+  Mitigation: treat those as real bugs. The preview should reveal them, not mask them.
+- Risk: custom HTML can create overflow that is hard to constrain.
+  Mitigation: add mobile overflow checks and keep sanitizer restrictions in place.
+- Risk: screenshot tests become flaky.
+  Mitigation: freeze animations, seed data, wait for assets, and use DOM assertions for critical
+  layout facts before relying on image diffs.
+- Risk: browser-level visual tooling is deferred.
+  Mitigation: explicitly mark the gap, require the manual screenshot matrix as the temporary release
+  gate, and keep DOM-level viewport assertions in Vitest/browser smoke coverage where possible.
+
+## File Impact Map
+
+Likely implementation files:
+
+- `admin/page-builder.js`
+- `admin/index.html`
+- `admin/page-builder/constants.js`
+- `admin/page-builder/preview-renderers.js`
+- `admin/page-builder/shared-renderers.js`
+- `admin/page-builder/canvas-events.js`
+- `admin/page-builder/header-config.js`
+- `admin/css/page-builder/canvas.css`
+- `admin/css/page-builder/layout.css`
+- `index.html`
+- `reader/app.js`
+- `reader/data.js`
+- `reader/page-renderer.js`
+- `reader/header-layout.js`
+- `reader/preview-bridge.js` if added
+- `assets/css/main.core.18-page-builder.css`
+- `assets/css/main.core.17-responsive.css`
+- `assets/css/main.responsive.css`
+
+Likely test files:
+
+- `tests/admin-page-builder-shell.test.js`
+- `tests/admin-page-builder-preview.test.js`
+- `tests/reader-data-builder.test.js`
+- `tests/reader-page-renderer.test.js`
+- `tests/header-appearance.test.js`
+- new preview bridge or visual parity tests
+
+Likely docs:
+
+- `docs/BUILDER_PLAN.md`
+- `docs/admin-overview.md`
+- `docs/functions/admin-page-builder.md`
+- `docs/functions/reader-core.md`
+- `docs/READER_BUILDER_QA.md`
+- `docs/TEST_DOCUMENTATION.md`

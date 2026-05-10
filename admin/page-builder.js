@@ -6,7 +6,7 @@ import { MODULE_TYPES, THEME_COLORS } from './page-builder/constants.js';
 import { createCanvasEventBinder } from './page-builder/canvas-events.js';
 import { renderCanvasSnapshot } from './page-builder/canvas-renderer.js';
 import { createEditorPanelRenderer } from './page-builder/editor-panel.js';
-import { resolveAssetUrl } from './page-builder/helpers.js';
+import { escapeAttr, resolveAssetUrl } from './page-builder/helpers.js';
 import {
   createEffectivePageHeader,
   createPageHeaderMeta,
@@ -23,6 +23,15 @@ import {
   initPreviewPromoCarousels,
   setPreviewSeriesId,
 } from './page-builder/preview-renderers.js';
+import {
+  BUILDER_PREVIEW_SNAPSHOT_VERSION,
+  BUILDER_PREVIEW_SOURCES,
+  DEFAULT_BUILDER_PREVIEW_SIDE_EFFECTS,
+  PREVIEW_VIEWPORT_ORDER,
+  getPreviewStatusCopy,
+  getPreviewViewport,
+  isPreviewViewportId,
+} from './page-builder/preview-contract.js';
 import {
   fetchPages,
   fetchPage,
@@ -240,7 +249,7 @@ function createPageBuilder({
   /** @type {'edit'|'preview'} */
   let canvasMode = 'edit';
   /** @type {'desktop'|'tablet'|'mobile'} */
-  let previewWidth = 'desktop';
+  let previewWidth = PREVIEW_VIEWPORT_ORDER[0];
   /** @type {'builder'|'designer'} */
   let activeEntrypoint = 'builder';
   /** @type {''|'header'} */
@@ -526,6 +535,8 @@ function createPageBuilder({
       setEditorStatus('Unsaved header changes. Save or discard before switching.', 'warning');
     } else if (scope === 'theme') {
       setEditorStatus('Unsaved theme changes. Save or discard before switching.', 'warning');
+    } else if (scope === 'page-settings') {
+      setEditorStatus('Unsaved page settings. Save or discard before switching.', 'warning');
     } else if (scope === 'section') {
       setCanvasStatus('Unsaved section settings. Save or discard before switching.', 'warning');
     }
@@ -991,6 +1002,88 @@ function createPageBuilder({
     return nextMeta;
   }
 
+  function buildSectionSettingsFromDraft(draft = activeSectionDraft) {
+    const settings = {};
+    ['moduleGap', 'columnGap', 'sectionGap'].forEach((key) => {
+      const value = draft?.[key];
+      if (value !== '' && value !== null && value !== undefined) {
+        settings[key] = value;
+      }
+    });
+    return settings;
+  }
+
+  function applyPreviewWorkingDraft(pageSnapshot) {
+    if (!pageSnapshot || !dirtyScope) return;
+
+    if (dirtyScope === 'module') {
+      const targetModuleId = activeModuleDraftId || selectedModuleId;
+      if (!targetModuleId || !activeModuleDraft) return;
+      for (const section of pageSnapshot.sections || []) {
+        const module = (section.modules || []).find((item) => item.id === targetModuleId);
+        if (module) {
+          module.config = cloneValue(activeModuleDraft);
+          return;
+        }
+      }
+      return;
+    }
+
+    if (dirtyScope === 'theme' && activeThemeDraft) {
+      pageSnapshot.meta = {
+        ...(pageSnapshot.meta || {}),
+        theme: cloneValue(activeThemeDraft.theme),
+        panelBackgrounds: cloneValue(activeThemeDraft.panelBackgrounds),
+        panelSpacing: cloneValue(activeThemeDraft.panelSpacing),
+      };
+      return;
+    }
+
+    if (dirtyScope === 'header' && activeHeaderDraft) {
+      pageSnapshot.meta = buildNormalizedPageMeta(pageSnapshot, activeHeaderDraft);
+      return;
+    }
+
+    if (dirtyScope === 'page-settings' && activePageSettingsDraft) {
+      pageSnapshot.slug = activePageSettingsDraft.slug;
+      pageSnapshot.title = activePageSettingsDraft.title;
+      pageSnapshot.pageType = activePageSettingsDraft.pageType;
+      pageSnapshot.isHomepage = activePageSettingsDraft.isHomepage;
+      return;
+    }
+
+    if (dirtyScope === 'section' && activeSectionId && activeSectionDraft) {
+      const section = (pageSnapshot.sections || []).find((item) => item.id === activeSectionId);
+      if (section) {
+        section.settings = buildSectionSettingsFromDraft(activeSectionDraft);
+      }
+    }
+  }
+
+  function createPreviewPageSnapshot() {
+    if (!currentPage) return null;
+
+    const pageSnapshot = cloneValue(currentPage);
+    const source = dirtyScope ? BUILDER_PREVIEW_SOURCES.WORKING : BUILDER_PREVIEW_SOURCES.SAVED;
+    applyPreviewWorkingDraft(pageSnapshot);
+
+    const viewport = getPreviewViewport(previewWidth);
+    return {
+      seriesId: getSeriesId(),
+      pageId: pageSnapshot.id || currentPage.id || '',
+      pageSlug: pageSnapshot.slug || currentPage.slug || '',
+      draftMode: currentPage.isPublished === false ? 'draft' : 'published',
+      snapshotVersion: BUILDER_PREVIEW_SNAPSHOT_VERSION,
+      source,
+      page: pageSnapshot,
+      options: {
+        viewport: { ...viewport },
+        sideEffects: { ...DEFAULT_BUILDER_PREVIEW_SIDE_EFFECTS },
+        scrollState: { top: 0, left: 0 },
+      },
+    };
+  }
+
   async function insertModuleAt(sectionId, columnIndex, insertIndex, moduleType) {
     if (!currentPage) return;
     const section = getSectionRecord(sectionId);
@@ -1146,13 +1239,7 @@ function createPageBuilder({
     const section = getSectionRecord(activeSectionId);
     if (!section) return;
 
-    const settings = {};
-    ['moduleGap', 'columnGap', 'sectionGap'].forEach((key) => {
-      const value = activeSectionDraft[key];
-      if (value !== '' && value !== null && value !== undefined) {
-        settings[key] = value;
-      }
-    });
+    const settings = buildSectionSettingsFromDraft(activeSectionDraft);
 
     const updated = await updateSection(activeSectionId, { settings });
     if (updated) {
@@ -1278,13 +1365,27 @@ function createPageBuilder({
   function renderPreview() {
     if (!el.pbCanvas) return;
 
-    const html = currentPage
-      ? renderPreviewPage(currentPage)
+    const snapshot = createPreviewPageSnapshot();
+    const html = snapshot
+      ? renderPreviewPage(snapshot.page)
       : '<div class="pb-canvas-empty"><p>Select a page to preview it.</p></div>';
+    const statusHtml = snapshot
+      ? `<div class="pb-canvas-notice pb-preview-status" data-status="${snapshot.source === BUILDER_PREVIEW_SOURCES.WORKING ? 'warning' : 'neutral'}" data-preview-source="${escapeAttr(snapshot.source)}">${getPreviewStatusCopy(snapshot.source)}</div>`
+      : '';
+    const viewport = snapshot?.options?.viewport || getPreviewViewport(previewWidth);
 
     el.pbCanvas.dataset.mode = 'preview';
     el.pbCanvas.innerHTML = `
-      <div class="pb-preview-frame" data-width="${previewWidth}">
+      ${statusHtml}
+      <div class="pb-preview-frame"
+           data-width="${escapeAttr(viewport.id)}"
+           data-preview-source="${escapeAttr(snapshot?.source || '')}"
+           data-page-id="${escapeAttr(snapshot?.pageId || '')}"
+           data-page-slug="${escapeAttr(snapshot?.pageSlug || '')}"
+           data-draft-mode="${escapeAttr(snapshot?.draftMode || '')}"
+           data-snapshot-version="${escapeAttr(String(snapshot?.snapshotVersion || ''))}"
+           data-viewport-width="${escapeAttr(String(viewport.width))}"
+           data-viewport-height="${escapeAttr(String(viewport.height))}">
         ${html}
       </div>
     `;
@@ -1777,7 +1878,7 @@ function createPageBuilder({
         );
         if (!btn) return;
         const nextWidth = btn.dataset.width;
-        if (nextWidth !== 'desktop' && nextWidth !== 'tablet' && nextWidth !== 'mobile') return;
+        if (!isPreviewViewportId(nextWidth)) return;
         if (nextWidth === previewWidth) return;
 
         previewWidth = nextWidth;

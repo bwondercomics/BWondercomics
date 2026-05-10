@@ -173,6 +173,32 @@ async function setupPageBuilder({
   };
 }
 
+async function openBuilderPage(manager) {
+  await manager.showPageBuilderSection();
+  document
+    .querySelector('.pb-page-item')
+    ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  await flushAdminUi(3);
+}
+
+function enterPreviewMode() {
+  document
+    .getElementById('pbViewPreview')
+    ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+}
+
+function enterEditMode() {
+  document.getElementById('pbViewEdit')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+}
+
+function getPreviewFrame() {
+  return document.getElementById('pbCanvas')?.querySelector('.pb-preview-frame');
+}
+
+function getPreviewStatus() {
+  return document.getElementById('pbCanvas')?.querySelector('.pb-preview-status');
+}
+
 describe('admin page-builder shell', () => {
   afterEach(() => {
     vi.clearAllMocks();
@@ -1166,6 +1192,168 @@ describe('admin page-builder shell', () => {
       ?.querySelector('[data-width="desktop"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('desktop');
+
+    const invalidWidth = document.createElement('button');
+    invalidWidth.dataset.width = 'wide';
+    widthToggles?.appendChild(invalidWidth);
+    invalidWidth.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('desktop');
+  });
+
+  it('shows saved preview contract status and frame metadata with no dirty scope', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    expect(getPreviewStatus()?.textContent).toBe('Previewing saved draft');
+    expect(getPreviewStatus()?.dataset.previewSource).toBe('saved');
+    expect(getPreviewFrame()?.dataset.previewSource).toBe('saved');
+    expect(getPreviewFrame()?.dataset.pageId).toBe(selectedPage.id);
+    expect(getPreviewFrame()?.dataset.pageSlug).toBe(selectedPage.slug);
+    expect(getPreviewFrame()?.dataset.draftMode).toBe('published');
+    expect(getPreviewFrame()?.dataset.snapshotVersion).toBe('1');
+    expect(getPreviewFrame()?.dataset.viewportWidth).toBe('1280');
+    expect(getPreviewFrame()?.dataset.viewportHeight).toBe('900');
+  });
+
+  it('previews dirty module drafts without mutating the saved page snapshot', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector(`.pb-module[data-module-id="${textModule.id}"]`)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi();
+
+    const contentInput = document.querySelector('[data-key="content"]');
+    contentInput.value = '<p>Draft preview text</p>';
+    contentInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    enterPreviewMode();
+
+    expect(getPreviewStatus()?.textContent).toBe('Previewing unsaved working changes');
+    expect(getPreviewFrame()?.dataset.previewSource).toBe('working');
+    expect(document.getElementById('pbCanvas')?.textContent).toContain('Draft preview text');
+
+    enterEditMode();
+
+    expect(
+      document
+        .querySelector(`.pb-module[data-module-id="${textModule.id}"] .pb-module-preview`)
+        ?.textContent?.trim()
+    ).toBe('Heroes are back.');
+  });
+
+  it('shows working preview status for dirty theme drafts', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector('.pb-editor-tab[data-tab="theme"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const primaryInput = document.querySelector('.pb-theme-color-text[data-key="primary"]');
+    primaryInput.value = '#112233';
+    primaryInput.dispatchEvent(new Event('input', { bubbles: true }));
+    enterPreviewMode();
+
+    expect(getPreviewStatus()?.textContent).toBe('Previewing unsaved working changes');
+    expect(getPreviewFrame()?.dataset.previewSource).toBe('working');
+  });
+
+  it('shows working preview status for dirty header drafts', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector('[data-action="select-page-header"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const titleInput = document.querySelector('[data-copy-key="title"]');
+    titleInput.value = 'Draft Header Title';
+    titleInput.dispatchEvent(new Event('input', { bubbles: true }));
+    enterPreviewMode();
+
+    expect(getPreviewStatus()?.textContent).toBe('Previewing unsaved working changes');
+    expect(getPreviewFrame()?.dataset.previewSource).toBe('working');
+  });
+
+  it('shows working preview status and slug metadata for dirty page settings drafts', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector('[data-action="select-page-settings"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const slugInput = document.getElementById('pbEditPageSlug');
+    slugInput.value = 'draft-reader';
+    slugInput.dispatchEvent(new Event('input', { bubbles: true }));
+    enterPreviewMode();
+
+    expect(getPreviewStatus()?.textContent).toBe('Previewing unsaved working changes');
+    expect(getPreviewFrame()?.dataset.previewSource).toBe('working');
+    expect(getPreviewFrame()?.dataset.pageSlug).toBe('draft-reader');
+  });
+
+  it('previews dirty section settings drafts', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const targetSection = selectedPage.sections.find((section) => section.layout === '1-1');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector(
+        `[data-action="toggle-section-settings"][data-section-id="${targetSection.id}"]`
+      )
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    const columnGapInput = document.querySelector(
+      `.pb-section[data-section-id="${targetSection.id}"] [data-setting="columnGap"]`
+    );
+    columnGapInput.value = '77';
+    columnGapInput.dispatchEvent(new Event('change', { bubbles: true }));
+    enterPreviewMode();
+
+    expect(getPreviewStatus()?.textContent).toBe('Previewing unsaved working changes');
+    expect(getPreviewFrame()?.dataset.previewSource).toBe('working');
+    expect(
+      document
+        .querySelector('.pb-preview-frame .pb-section[data-layout="1-1"]')
+        ?.getAttribute('style')
+    ).toContain('--pb-column-gap: 77px;');
   });
 
   it('shows a migration banner in the header editor for a legacy page without meta.header', async () => {

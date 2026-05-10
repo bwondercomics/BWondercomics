@@ -1,6 +1,6 @@
 # Docs Index - 0.8.0 Reader + Builder Appearance Lock
 
-Last updated: 2026-04-26
+Last updated: 2026-05-10
 
 Current release focus:
 
@@ -16,6 +16,7 @@ Recommended starting points:
 - `docs/ROADMAP.md` - release checklist through `1.0.0`.
 - `docs/READER_BUILDER_QA.md` - `0.8.0` manual QA worksheet for reader + page-builder lock.
 - `docs/BUILDER_PLAN.md` - current page-builder architecture, shipped header workflow, appearance contract, and remaining builder risks.
+- `docs/BUILDER_PREVIEW_PARITY_PLAN.md` - dedicated plan for making the builder preview match the reader at desktop, tablet, and mobile viewport sizes.
 - `docs/admin-overview.md` - admin panel and page-builder behavior.
 - `docs/reader-overview.md` - reader runtime behavior and builder-page loading.
 - `docs/API_REFERENCE.md` - backend route reference.
