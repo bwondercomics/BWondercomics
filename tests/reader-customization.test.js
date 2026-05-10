@@ -45,7 +45,7 @@ describe('reader customization bootstrap coordination', () => {
     expect(window.BattleBros.setSubtitles).not.toHaveBeenCalled();
   });
 
-  it('ignores stale legacy boot results without fetching page-config', async () => {
+  it('treats stale legacy boot results as defensive no-op compatibility input', async () => {
     const fetchMock = await importCustomizationWithBootSource('legacy');
 
     expect(fetchMock).not.toHaveBeenCalled();

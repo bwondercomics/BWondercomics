@@ -110,6 +110,44 @@ describe('reader builder presentation loading', () => {
     ]);
   });
 
+  it('keeps startup source results constrained to builder or none without page-config fetches', async () => {
+    const builderPage = getContractFixture('builderPage');
+    const scenarios = [
+      {
+        endpoint: '/api/pages/home/battle-bros',
+        response: jsonResponse({ page: builderPage }),
+        expected: { source: 'builder', page: builderPage },
+        expectedKeys: ['page', 'source'],
+      },
+      {
+        endpoint: '/api/pages/home/battle-bros',
+        response: jsonResponse({}, { ok: false, status: 404, statusText: 'Not Found' }),
+        expected: { source: 'none' },
+        expectedKeys: ['source'],
+      },
+    ];
+
+    for (const scenario of scenarios) {
+      const setSubtitles = vi.fn();
+      const fetchMock = vi.fn(async (url) => {
+        if (url === scenario.endpoint) {
+          return scenario.response;
+        }
+        throw new Error(`Unexpected fetch: ${url}`);
+      });
+      vi.stubGlobal('fetch', fetchMock);
+
+      const result = await loadPageConfigWithFallback(setSubtitles, 'battle-bros');
+
+      expect(['builder', 'none']).toContain(result.source);
+      expect(result).toEqual(scenario.expected);
+      expect(Object.keys(result).sort()).toEqual(scenario.expectedKeys);
+      expect(fetchMock.mock.calls.some(([url]) => String(url).includes('page-config.json'))).toBe(
+        false
+      );
+    }
+  });
+
   it('loads the effective homepage page for public series roots', async () => {
     const builderPage = buildContractFixture('builderPage', {
       slug: 'landing',
@@ -429,6 +467,96 @@ describe('reader builder presentation loading', () => {
       },
     });
     expect(headerState.header.appearance).toEqual(headerState.meta.appearance);
+  });
+
+  it('keeps live reader parity with backfilled V3 header metadata', () => {
+    const builderPage = getContractFixture('builderPage');
+    delete builderPage.meta.headerOverrides;
+    builderPage.meta.header = {
+      version: 3,
+      copy: {
+        title: 'Legacy Imported Header',
+        subtitle: 'Legacy Imported Subtitle',
+        subtitles: ['Legacy Imported Subtitle', 'Backfilled Extra'],
+      },
+      regions: {
+        left: ['brand'],
+        center: ['patron'],
+        right: ['status', 'entryControls', 'nav'],
+      },
+      blocks: {
+        brand: { enabled: true },
+        patron: { enabled: true },
+        status: { enabled: false },
+        entryControls: { enabled: true },
+        nav: { enabled: true },
+      },
+      appearance: {
+        top: {
+          background: {
+            color: '#112233',
+          },
+        },
+        navItemDefaults: {
+          text: {
+            color: '#ffffff',
+          },
+        },
+      },
+      nav: {
+        items: [
+          {
+            id: 'backfilled-nav',
+            label: 'Archive',
+            enabled: true,
+            style: 'secondary',
+            appearance: {
+              background: {
+                color: '#445566',
+              },
+            },
+            link: {
+              kind: 'url',
+              url: 'comics.html',
+              openInNewTab: false,
+            },
+          },
+        ],
+      },
+    };
+
+    const headerState = resolvePageHeaderState({
+      page: builderPage,
+      pageConfig: null,
+    });
+
+    applyBuilderPageToDOM(builderPage, { seriesId: 'battle-bros' });
+
+    const topbar = document.getElementById('topbar');
+    const archiveLink = document.querySelector('.nav-links .nav-link:not(#adminNavLink)');
+
+    expect(headerState.source).toBe('page-meta-v3');
+    expect(headerState.copy).toEqual(builderPage.meta.header.copy);
+    expect(headerState.header.regions).toEqual(builderPage.meta.header.regions);
+    expect(headerState.header.blocks.status.enabled).toBe(false);
+    expect(document.querySelector('.topbar .title h1')?.textContent).toBe(headerState.copy.title);
+    expect(document.getElementById('subtitle')?.textContent).toBe(headerState.copy.subtitle);
+    expect(
+      document.querySelector('.topbar-region[data-region="center"] > #patronWelcome')
+    ).not.toBeNull();
+    expect(document.querySelector('.topbar-region[data-region="right"] > #statusPanel')).toBeNull();
+    expect(
+      document.querySelector('.topbar-region[data-region="right"] > .entry-controls')
+    ).not.toBeNull();
+    expect(
+      document.querySelector('.topbar-region[data-region="right"] > .nav-links')
+    ).not.toBeNull();
+    expect(topbar?.getAttribute('style')).toContain('background: #112233');
+    expect(archiveLink?.textContent).toBe('Archive');
+    expect(archiveLink?.classList.contains('nav-link--secondary')).toBe(true);
+    expect(archiveLink?.getAttribute('href')).toContain('comics.html');
+    expect(archiveLink?.getAttribute('style')).toContain('background: #445566');
+    expect(archiveLink?.getAttribute('style')).toContain('color: #ffffff');
   });
 
   it('falls back to legacy shared header config plus page overrides when page.meta.header is missing', () => {

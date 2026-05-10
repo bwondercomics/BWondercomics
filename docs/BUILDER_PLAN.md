@@ -728,7 +728,7 @@ Test baseline expectations:
 
 ### Phase 8 - Runtime Fallback Retirement Pass
 
-Status: proposed next pass.
+Status: completed (`2026-05-10`).
 
 Goal: retire the remaining legacy runtime fallback paths now that the integrated builder, page-scoped header model, and appearance contract are stable. This phase is cleanup and migration hardening, not a new styling or editor-feature pass.
 
@@ -808,6 +808,8 @@ Goal: retire the remaining legacy runtime fallback paths now that the integrated
   - `npm run test:backend`
   - `npm run build`
   - `git diff --check`
+
+**Completion note (`2026-05-10`):** Frontend coverage now locks the full Phase 8 retirement acceptance contract: `tests/admin-page-builder-audit.test.js` treats the series-level audit as the clean/blocking source of truth, `tests/reader-data-builder.test.js` asserts that startup results are constrained to `source: 'builder'` or `source: 'none'` without any legacy `page-config.json` fetch and keeps reader DOM parity with backfilled V3 header metadata, and `tests/reader-customization.test.js` documents the old customization entrypoint as defensive no-op compatibility input instead of an active fallback path. Backend coverage in `backend/tests/test_backfill_page_headers.py` now also proves canonical V3 pages are true no-op dry-run/write cases and that removal readiness still blocks when a series lacks a published `reader` page. The full gate passed on `2026-05-10`: `npm run format:check`, `npm run format:py:check`, `npm run lint`, `npm run lint:py`, `npm test` (`41` files, `296` passed, `1` skipped), `npm run test:backend` (`66` passed), `npm run build`, and `git diff --check`.
 
 #### Acceptance Criteria
 

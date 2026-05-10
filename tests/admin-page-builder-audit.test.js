@@ -4,7 +4,7 @@ import { auditPageFallbacks, auditPagesFallbacks } from '../admin/page-builder/h
 import { buildContractFixture, getContractFixture } from './helpers/contracts.js';
 
 /**
- * Phase 5 – Fallback audit coverage.
+ * Phase 5 + Phase 8 Step 5 – fallback audit coverage.
  *
  * These tests are the source of truth for "when is the audit clean".
  * A bucket must reach count=0 across all builder pages before its
@@ -191,7 +191,7 @@ describe('auditPageFallbacks – per-page fallback inventory', () => {
   });
 });
 
-describe('auditPagesFallbacks – series-level aggregation', () => {
+describe('auditPagesFallbacks – Phase 8 retirement acceptance', () => {
   it('returns clean=true only when the series has a published reader page and zero page-level issues', () => {
     // Build a truly-clean page: v3 meta.header, no moduleType:'header' in sections.
     const page = buildContractFixture('builderPage', {

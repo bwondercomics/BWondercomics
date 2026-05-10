@@ -85,6 +85,13 @@ Use this worksheet for the `0.8.0` reader + builder lock pass. The goal is not t
 - [ ] Open-reader verification
   - From a published non-reader page, open the reader and confirm the selected page renders.
   - Repeat for a draft page and confirm the builder warning matches the actual reader route.
+- [ ] Runtime fallback retirement checks
+  - Open a published builder homepage or published `reader` page and confirm the reader renders builder content without any visible legacy-shell flash.
+  - Load a missing builder page slug and confirm the reader stays in the intended empty/error-safe state instead of repainting from legacy `page-config.json`.
+  - Verify a series with a published `reader` page reports clean audit readiness only when no fallback buckets remain; confirm a series without a published `reader` page still reports the expected blocking state.
+- [ ] Backfilled V3 header parity
+  - Open a page that was migrated into canonical `page.meta.header.version = 3`.
+  - Confirm builder canvas preview and live reader match for title, subtitle, placement, disabled blocks, and navigation button styling.
 - [ ] Series isolation
   - Switch to another series.
   - Confirm page list, homepage state, and builder edits remain scoped to the active series only.

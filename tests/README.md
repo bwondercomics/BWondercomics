@@ -54,13 +54,14 @@ Install backend dev dependencies into the repo virtualenv:
 - `tests/entries.test.js`: entry parsing, sorting, and normalization
 - `tests/state.test.js`: reader progress persistence
 - `tests/data.test.js`: reader data/page-config loading
-- `tests/reader-data-builder.test.js`: builder-first page loading, fallback retirement (`source: 'builder'` / `source: 'none'` only), and DOM application
+- `tests/reader-data-builder.test.js`: builder-first page loading, fallback retirement (`source: 'builder'` / `source: 'none'` only), no legacy `page-config.json` startup fetch, backfilled V3 header parity, and DOM application
 - `tests/reader-page-renderer.test.js`: reader page-builder module rendering contracts
 - `tests/reader-feed-panel.test.js`: feed/latest rendering, sanitization, and feed-mode behavior
 - `tests/reader-controls.test.js`: reader next/prev/restart behavior
 - `tests/reader-fullscreen.test.js`: fullscreen enter/exit and controls timing
 - `tests/reader-pointer.test.js`: swipe, drag, double-tap, and edge-zone behavior
 - `tests/reader-app.test.js`: reader boot against the live `index.html` contract
+- `tests/reader-customization.test.js`: reader boot/customization coordination so the legacy customization entrypoint stays a no-op compatibility layer
 - `tests/admin-smoke.test.js`: admin app boot against the live markup contract
 - `tests/admin-auth.test.js`: admin session/login/logout contract handling
 - `tests/admin-posts.test.js`: post save/render flow
@@ -72,13 +73,14 @@ Install backend dev dependencies into the repo virtualenv:
 - `tests/admin-page-builder-data.test.js`: page-builder data-layer fetch/create/update/delete wrappers
 - `tests/admin-page-builder-shell.test.js`: page-builder shell behavior including empty state, selection, canonical designer-route entry, publish state, section settings save/discard, canvas delete cleanup, page-header editing, and default module config wiring
 - `tests/admin-page-builder-preview.test.js`: module-editor save/delete flows and preview renderer contracts
+- `tests/admin-page-builder-audit.test.js`: fallback-retirement audit coverage, including published-`reader` readiness and blocking bucket aggregation
 - `tests/admin-designer.test.js`: admin-shell cleanup proving the legacy designer iframe host is gone
 - `tests/media-branding.test.js`: admin branding rules
 - `tests/diagnostics-snapshot.test.js`: diagnostics snapshot rendering and fallbacks
 - `tests/ops-app.test.js`: ops UI rendering states
 - `tests/helpers/contracts.js` + `tests/fixtures/contract-fixtures.json`: shared frontend contract fixtures for series, builder pages/modules, feed/latest payloads, tracking, and user-state contracts
 - `backend/tests/helpers.py`: shared backend route harness and contract seed helpers for series, builder pages, comments, premium codes, and visitor sessions
-- `backend/tests/test_*.py`: backend diagnostics/ops, branding, and core route contract behavior including page-builder, tracking, and user flows
+- `backend/tests/test_*.py`: backend diagnostics/ops, branding, and core route contract behavior including page-builder, tracking, user flows, and page-header backfill/readiness coverage
 
 ## Notes
 

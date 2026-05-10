@@ -10,6 +10,47 @@ from backend.tests.helpers import BackendRouteTestCase
 
 
 class BackfillPageHeadersTests(BackendRouteTestCase):
+    def test_clean_v3_pages_are_noop_in_dry_run_and_write_mode(self):
+        self.seed_page_config()
+        seeded = self.seed_builder_page("builderPage")
+
+        dry_run = backfill_series_page_headers(self.db, "battle-bros", write=False)
+        write_run = backfill_series_page_headers(self.db, "battle-bros", write=True)
+
+        for summary in (dry_run, write_run):
+            self.assertEqual(summary["scannedPages"], 1)
+            self.assertEqual(summary["pagesNeedingChanges"], 0)
+            self.assertEqual(summary["updatedPages"], 0)
+            self.assertEqual(summary["changedPageIds"], [])
+            self.assertEqual(summary["updatedPageIds"], [])
+            self.assertEqual(summary["pageReports"], [])
+            self.assertEqual(summary["blockingBucketSummary"], {})
+            self.assertTrue(summary["removalReadiness"]["canRemoveLegacyReaderFallback"])
+
+        unchanged = self.db.get(BuilderPage, seeded["page"].id)
+        self.assertEqual(unchanged.meta["header"]["version"], 3)
+        self.assertNotIn("headerOverrides", unchanged.meta)
+
+    def test_readiness_blocks_when_series_has_no_published_reader_page(self):
+        self.seed_page_config()
+        seeded = self.seed_builder_page("builderPage")
+        page = seeded["page"]
+        page.slug = "about"
+        page.is_homepage = False
+        self.db.commit()
+
+        summary = backfill_series_page_headers(self.db, "battle-bros", write=False)
+
+        self.assertEqual(summary["pagesNeedingChanges"], 0)
+        self.assertEqual(summary["updatedPages"], 0)
+        self.assertEqual(summary["blockingBucketSummary"]["missingPublishedReaderPage"]["count"], 1)
+        self.assertEqual(
+            summary["blockingBucketSummary"]["missingPublishedReaderPage"]["pageIds"],
+            [],
+        )
+        self.assertFalse(summary["removalReadiness"]["hasPublishedReaderPage"])
+        self.assertFalse(summary["removalReadiness"]["canRemoveLegacyReaderFallback"])
+
     def test_dry_run_reports_projected_cleanup_without_mutating_db(self):
         self.seed_page_config()
         self.seed_builder_page("builderPage")
