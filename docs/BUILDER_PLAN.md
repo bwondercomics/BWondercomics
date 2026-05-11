@@ -182,8 +182,12 @@ The shared module/page HTML path now removes most renderer duplication:
 - `reader/page-renderer.js` renders live page output through `admin/page-builder/shared-renderers.js`
 - `admin/page-builder/preview-renderers.js` configures that shared factory for the admin preview surface
 
-That establishes structural module parity, but the admin preview still does not run inside the full
-reader shell or a real iframe viewport.
+That established structural module parity first. The admin preview now runs inside a same-origin
+reader iframe backed by the shared preview contract, so preview mode uses the real `index.html`
+shell, real viewport dimensions, and the same reader-side `applyBuilderPageToDOM(...)` shell
+application path as runtime. Phase 4 hardening also clears controlled theme variables and panel
+shell state between snapshots so preview updates do not leak stale theme, opacity, spacing, or
+hidden-panel state from a previous page snapshot.
 
 ### Current page and button model
 

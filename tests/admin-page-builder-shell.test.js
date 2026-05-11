@@ -207,6 +207,37 @@ function getPreviewStatus() {
   return document.getElementById('pbCanvas')?.querySelector('.pb-preview-status');
 }
 
+function requestCurrentPreviewSnapshot() {
+  const iframe = getPreviewIframe();
+  const frame = getPreviewFrame();
+  expect(iframe).not.toBeNull();
+  expect(frame).not.toBeNull();
+
+  const iframeWindow = { postMessage: vi.fn() };
+  Object.defineProperty(iframe, 'contentWindow', {
+    configurable: true,
+    value: iframeWindow,
+  });
+
+  window.dispatchEvent(
+    new MessageEvent('message', {
+      data: {
+        type: BUILDER_PREVIEW_MESSAGE_TYPES.REQUEST_SNAPSHOT,
+        previewSession: frame.dataset.previewSession,
+        snapshotVersion: BUILDER_PREVIEW_SNAPSHOT_VERSION,
+        seriesId: 'battle-bros',
+        pageId: frame.dataset.pageId,
+        pageSlug: frame.dataset.pageSlug,
+      },
+      origin: window.location.origin,
+      source: iframeWindow,
+    })
+  );
+
+  const calls = iframeWindow.postMessage.mock.calls;
+  return calls[calls.length - 1]?.[0]?.snapshot || null;
+}
+
 describe('admin page-builder shell', () => {
   afterEach(() => {
     vi.clearAllMocks();
@@ -1368,6 +1399,69 @@ describe('admin page-builder shell', () => {
 
     expect(getPreviewStatus()?.textContent).toBe('Previewing unsaved working changes');
     expect(getPreviewFrame()?.dataset.previewSource).toBe('working');
+  });
+
+  it('posts reset and discarded theme draft snapshots to the reader preview', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector('.pb-editor-tab[data-tab="theme"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    const primaryInput = document.querySelector('.pb-theme-color-text[data-key="primary"]');
+    primaryInput.value = '#112233';
+    primaryInput.dispatchEvent(new Event('input', { bubbles: true }));
+    enterPreviewMode();
+
+    const dirtySnapshot = requestCurrentPreviewSnapshot();
+    expect(getPreviewFrame()?.dataset.previewSource).toBe('working');
+    expect(dirtySnapshot?.source).toBe('working');
+    expect(dirtySnapshot?.page.meta.theme.primary).toBe('#112233');
+
+    enterEditMode();
+    document
+      .getElementById('pbResetTheme')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+    enterPreviewMode();
+
+    const resetSnapshot = requestCurrentPreviewSnapshot();
+    expect(getPreviewFrame()?.dataset.previewSource).toBe('working');
+    expect(resetSnapshot?.source).toBe('working');
+    expect(resetSnapshot?.page.meta.theme).toEqual({
+      primary: '#00d9ff',
+      secondary: '#ff00ea',
+      accent: '#ffed00',
+      bgDark: '#0a0a12',
+      bgPanel: '#1a1a2e',
+      text: '#ffffff',
+      danger: '#ff3838',
+    });
+    expect(resetSnapshot?.page.meta.panelBackgrounds).toEqual({});
+    expect(resetSnapshot?.page.meta.panelSpacing).toEqual({});
+
+    enterEditMode();
+    document
+      .getElementById('pbDiscardTheme')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+    enterPreviewMode();
+
+    const discardedSnapshot = requestCurrentPreviewSnapshot();
+    expect(getPreviewFrame()?.dataset.previewSource).toBe('saved');
+    expect(discardedSnapshot?.source).toBe('saved');
+    expect(discardedSnapshot?.page.meta.theme).toEqual(selectedPage.meta.theme);
+    expect(discardedSnapshot?.page.meta.panelBackgrounds).toEqual(
+      selectedPage.meta.panelBackgrounds
+    );
+    expect(discardedSnapshot?.page.meta.panelSpacing).toEqual(selectedPage.meta.panelSpacing);
   });
 
   it('shows working preview status for dirty header drafts', async () => {

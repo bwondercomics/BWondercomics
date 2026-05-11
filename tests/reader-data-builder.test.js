@@ -21,6 +21,44 @@ function jsonResponse(body, options = {}) {
   };
 }
 
+function buildPanelSnapshot({ meta = {}, sectionSettings = {} } = {}) {
+  const page = getContractFixture('builderPage');
+  page.sections = [
+    {
+      id: 'panel-row',
+      sectionType: 'row',
+      layout: '1-1',
+      sortIndex: 0,
+      settings: { ...sectionSettings },
+      modules: [
+        {
+          id: 'left-panel-text',
+          moduleType: 'text',
+          columnIndex: 0,
+          sortIndex: 0,
+          config: {
+            content: '<p>Left panel</p>',
+          },
+        },
+        {
+          id: 'right-panel-text',
+          moduleType: 'text',
+          columnIndex: 1,
+          sortIndex: 0,
+          config: {
+            content: '<p>Right panel</p>',
+          },
+        },
+      ],
+    },
+  ];
+  page.meta = {
+    header: page.meta.header,
+    ...meta,
+  };
+  return page;
+}
+
 describe('reader builder presentation loading', () => {
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -294,6 +332,111 @@ describe('reader builder presentation loading', () => {
     expect(leftBuilder?.querySelector('.pb-module--promo')).not.toBeNull();
     expect(rightBuilder?.querySelector('.pb-module--feed')).not.toBeNull();
     expect(rightBuilder?.querySelector('.latest-name')?.textContent).toBe('Issue 10 Released');
+  });
+
+  it('mounts the reader shell contract used by preview and runtime page application', () => {
+    expect(document.querySelector('header.topbar#topbar')).not.toBeNull();
+    expect(document.querySelector('.viewerWrap')).not.toBeNull();
+    expect(document.getElementById('leftPanel')).not.toBeNull();
+    expect(document.getElementById('mainContent')).not.toBeNull();
+    expect(document.getElementById('viewport')).not.toBeNull();
+    expect(document.getElementById('controls')).not.toBeNull();
+    expect(document.getElementById('rightPanel')).not.toBeNull();
+  });
+
+  it('clears stale page theme variables before applying the next snapshot', () => {
+    const themedPage = getContractFixture('builderPage');
+    const defaultThemePage = getContractFixture('builderPage');
+    delete defaultThemePage.meta.theme;
+
+    applyBuilderPageToDOM(themedPage, { seriesId: 'battle-bros' });
+
+    expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#ffcc00');
+    expect(document.documentElement.style.getPropertyValue('--bg-panel')).toBe('#151a33');
+
+    applyBuilderPageToDOM(defaultThemePage, { seriesId: 'battle-bros' });
+
+    [
+      '--primary',
+      '--secondary',
+      '--accent',
+      '--bg-dark',
+      '--bg-panel',
+      '--text',
+      '--danger',
+    ].forEach((cssVar) => {
+      expect(document.documentElement.style.getPropertyValue(cssVar)).toBe('');
+    });
+  });
+
+  it('resets panel background, spacing, and visibility state between snapshots', () => {
+    const firstPage = buildPanelSnapshot({
+      sectionSettings: {
+        panelEnabled: {
+          left: true,
+          right: false,
+        },
+      },
+      meta: {
+        theme: {},
+        panelSpacing: {
+          left: 18,
+          right: 26,
+        },
+        panelBackgrounds: {
+          left: {
+            path: 'media/panels/left-grid.png',
+            fit: 'contain',
+            focus: 'top',
+            opacity: 0.42,
+          },
+          right: {
+            path: 'media/panels/right-burst.png',
+            fit: 'cover',
+            focus: 'center',
+            opacity: 0.6,
+          },
+        },
+      },
+    });
+
+    const secondPage = buildPanelSnapshot({
+      meta: {
+        theme: {},
+        panelBackgrounds: {
+          left: {
+            path: 'media/panels/left-second.png',
+          },
+        },
+      },
+    });
+
+    applyBuilderPageToDOM(firstPage, { seriesId: 'battle-bros' });
+
+    const leftPanel = document.getElementById('leftPanel');
+    const rightPanel = document.getElementById('rightPanel');
+    const leftBuilder = leftPanel?.querySelector('.panel-builder--left');
+    const rightBuilder = rightPanel?.querySelector('.panel-builder--right');
+
+    expect(leftPanel?.style.getPropertyValue('--panel-bg-opacity')).toBe('0.42');
+    expect(rightPanel?.style.getPropertyValue('--panel-bg-opacity')).toBe('0.6');
+    expect(leftBuilder?.style.getPropertyValue('--pb-panel-gap')).toBe('18px');
+    expect(rightBuilder?.style.getPropertyValue('--pb-panel-gap')).toBe('26px');
+    expect(rightPanel?.style.display).toBe('none');
+
+    applyBuilderPageToDOM(secondPage, { seriesId: 'battle-bros' });
+
+    expect(leftPanel?.style.getPropertyValue('--panel-bg-image')).toContain(
+      '/assets/media/panels/left-second.png'
+    );
+    expect(leftPanel?.style.getPropertyValue('--panel-bg-size')).toBe('cover');
+    expect(leftPanel?.style.getPropertyValue('--panel-bg-position')).toBe('center');
+    expect(leftPanel?.style.getPropertyValue('--panel-bg-opacity')).toBe('');
+    expect(rightPanel?.style.getPropertyValue('--panel-bg-image')).toBe('');
+    expect(rightPanel?.style.getPropertyValue('--panel-bg-opacity')).toBe('');
+    expect(leftBuilder?.style.getPropertyValue('--pb-panel-gap')).toBe('');
+    expect(rightBuilder?.style.getPropertyValue('--pb-panel-gap')).toBe('');
+    expect(rightPanel?.style.display).toBe('');
   });
 
   it('uses first-class page header copy before legacy header-module fallback', () => {

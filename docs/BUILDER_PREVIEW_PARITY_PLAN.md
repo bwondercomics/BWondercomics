@@ -1,7 +1,8 @@
 # Builder Preview Parity Plan
 
 Status: Phase 2 and Phase 3 iframe preview synchronization implemented (`2026-05-11`);
-Phase 3.5 follow-up pending.
+Phase 3.5 refactor extraction is landed but still open for optional polish; Phase 4 parity
+hardening is complete; Phase 5 responsive verification is pending.
 
 Goal: make the page builder preview a trustworthy representation of the page as it will render in
 the public reader at desktop, tablet, and mobile sizes.
@@ -365,6 +366,17 @@ current page snapshot.
 
 Deliverable: preview iframe and live reader route are applying the same page snapshot through the
 same shell-level functions.
+
+**Completion note (`2026-05-11`):** Phase 4 shell-parity hardening is implemented. `reader/data.js`
+now clears the controlled builder theme CSS variable set before applying each snapshot, clears the
+controlled panel background variable set before reapplying panel backgrounds, and resets left/right
+panel visibility before evaluating the next snapshot's `panelEnabled` settings. That closes the
+sequential-snapshot stale-state gaps the audit called out for theme overrides, panel background
+opacity, and hidden panel display state. Coverage also expanded in
+`tests/reader-data-builder.test.js` to assert the real reader shell contract plus theme/panel reset
+behavior, and in `tests/admin-page-builder-shell.test.js` to assert that builder theme reset and
+discard flows send the correct working-versus-saved preview snapshots back through the iframe
+bridge.
 
 ### Phase 5 - Responsive Parity
 

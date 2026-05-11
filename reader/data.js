@@ -19,6 +19,23 @@ import {
   resolvePageHeaderState,
 } from '../admin/page-builder/header-config.js';
 
+const BUILDER_THEME_CSS_VARS = Object.freeze([
+  '--primary',
+  '--secondary',
+  '--accent',
+  '--bg-dark',
+  '--bg-panel',
+  '--text',
+  '--danger',
+]);
+
+const PANEL_BACKGROUND_CSS_VARS = Object.freeze([
+  '--panel-bg-image',
+  '--panel-bg-size',
+  '--panel-bg-position',
+  '--panel-bg-opacity',
+]);
+
 /**
  * Loads entry data from the public series endpoint
  * Fetches entry list, page URLs, and status message from the database-backed API
@@ -254,12 +271,14 @@ export function extractSubtitlesFromBuilderPage(page, pageConfig = null) {
  * @param {Object} page - The page data from the builder API
  */
 function applyPageTheme(page) {
+  const root = document.documentElement;
+  BUILDER_THEME_CSS_VARS.forEach((cssVar) => {
+    root.style.removeProperty(cssVar);
+  });
+
   if (!page?.meta?.theme) return;
 
-  const theme = page.meta.theme;
-  const root = document.documentElement;
-
-  Object.entries(theme).forEach(([key, value]) => {
+  Object.entries(page.meta.theme).forEach(([key, value]) => {
     if (!value) return;
     // Convert camelCase to kebab-case: bgDark -> bg-dark
     const cssVar = '--' + key.replace(/([A-Z])/g, '-$1').toLowerCase();
@@ -286,11 +305,10 @@ function applyPanelBackgrounds(page) {
 
   const applyToPanel = (panel, config) => {
     if (!panel) return;
+    PANEL_BACKGROUND_CSS_VARS.forEach((cssVar) => {
+      panel.style.removeProperty(cssVar);
+    });
     if (!config || !config.path) {
-      panel.style.removeProperty('--panel-bg-image');
-      panel.style.removeProperty('--panel-bg-size');
-      panel.style.removeProperty('--panel-bg-position');
-      panel.style.removeProperty('--panel-bg-opacity');
       return;
     }
     const url = resolveAssetUrl(config.path);
@@ -304,6 +322,13 @@ function applyPanelBackgrounds(page) {
 
   applyToPanel(leftPanel, backgrounds.left);
   applyToPanel(rightPanel, backgrounds.right);
+}
+
+function resetPanelVisibility() {
+  const leftPanel = document.getElementById('leftPanel');
+  const rightPanel = document.getElementById('rightPanel');
+  if (leftPanel) leftPanel.style.display = '';
+  if (rightPanel) rightPanel.style.display = '';
 }
 
 /**
@@ -389,6 +414,7 @@ export function applyBuilderPageToDOM(page, options = {}) {
   });
 
   // Check panel visibility from section settings
+  resetPanelVisibility();
   for (const section of page.sections) {
     const settings = section.settings || {};
     if (settings.panelEnabled) {

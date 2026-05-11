@@ -56,3 +56,6 @@ deploy/stoat/for-web-dist/
 .vite/
 node_modules/.vite/
 deploy/*.env.bak*
+
+# Temporary docs workspaces
+docs/temp/
