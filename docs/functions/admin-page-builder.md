@@ -8,6 +8,11 @@ This document describes the current builder runtime under `admin/page-builder/` 
 - [💾 Current Data Model](#-current-data-model)
 - [⚙️ Current Builder Flow](#️-current-builder-flow)
 - [🔌 Builder Orchestrator (admin/page-builder.js)](#-builder-orchestrator-adminpage-builderjs)
+- [📐 Layout Utilities (layout.js)](#-layout-utilities-layoutjs)
+- [📝 Draft Manager (draft-manager.js)](#-draft-manager-draft-managerjs)
+- [🚚 Page Actions (page-actions.js)](#-page-actions-page-actionsjs)
+- [🧱 Canvas Mutations (canvas-mutations.js)](#-canvas-mutations-canvas-mutationsjs)
+- [👁️ Preview Manager (preview-manager.js)](#️-preview-manager-preview-managerjs)
 - [💾 Data API (data.js)](#-data-api-datajs)
 - [🏗️ Header Configuration (header-config.js)](#️-header-configuration-header-configjs)
 - [📝 Header Editor (header-editor.js)](#-header-editor-header-editorjs)
@@ -76,21 +81,22 @@ Modules currently own: `moduleType`, `columnIndex`, `sortIndex`, and `config`.
 6. The right inspector shell is rendered by `editor-panel.js`.
 7. User actions call `data.js` mutators, update local state, then rerender affected surfaces.
 
-There is no separate long-lived client-side draft store in `data.js`. The main mutable state lives in `admin/page-builder.js`, while persistence happens through explicit backend updates.
+There is no separate long-lived client-side draft store in `data.js`. `admin/page-builder.js` still owns the top-level mutable builder state and composition root, while focused factories now own specific workflows: `draft-manager.js` handles draft normalization/save-discard flows, `page-actions.js` handles page lifecycle actions, `canvas-mutations.js` handles structural section/module mutations, and `preview-manager.js` handles the iframe preview handshake/render path.
 
 Fallback-retirement readiness is a separate developer workflow, not part of the normal editor boot path: the page list from `fetchPages(...)` is intentionally summary-only, so any runtime-fallback audit must hydrate each page with `fetchPage(...)` or use `loadFallbackRetirementGate(...)` before calling `auditPagesFallbacks(...)`.
 
 ## 🔌 Builder Orchestrator (admin/page-builder.js)
 
-This is the main coordinator. It owns mutable builder state and wires together the rail, canvas, and inspector.
+This is the main coordinator. It owns the remaining top-level mutable builder state and wires together the rail, canvas, inspector, and extracted manager modules.
 Its responsibilities include:
 
 - loading page lists and the active page
 - keeping the current series and selected page in sync with the route
 - tracking selected surface, selected module, active section, and insertion targets
-- initializing and saving page settings, header drafts, and theme drafts
+- storing the builder-wide state consumed by the extracted factories, including current page, selection state, dirty scope, canvas mode, and active preview width
+- instantiating `createDraftManager(...)`, `createPageActions(...)`, `createCanvasMutations(...)`, and `createPreviewManager(...)`
 - `normalizeHeaderDraft` resolves normal headers with `pageConfig: null` and tags a `source` field (`page-meta-v3`, `page-meta-stale`, `legacy-import`) so migration-only badges can flag non-canonical header records
-- applying module, section, and page mutations through `data.js`
+- delegating draft saves/discards, publish/page actions, structural mutations, and preview synchronization to those focused factories
 - rerendering the rail, canvas, and inspector after state changes
 - rendering status badges and reader-preview links
 
@@ -105,6 +111,77 @@ The top-level coordinator now owns the canonical designer-entry behavior in addi
 - **Default Page Resolution**: Designer mode resolves pages in this order: requested slug, `reader`, homepage, then first page in sort order.
 - **Normal Builder Landing Surface**: Outside designer mode, opening or creating a page now defaults to the `page-settings` surface so slug, title, page type, publish state, and homepage assignment are immediately editable without an extra click.
 - **`onSeriesChange()`**: Re-opens the visible builder shell after a series switch and preserves designer-mode routing when applicable.
+
+## 📐 Layout Utilities (layout.js)
+
+This module holds the responsive shell-mode helpers that were extracted from the main builder file.
+
+Current responsibilities:
+
+- define the persisted localStorage keys for editor and sidebar mode
+- derive the current viewport band (`wide`, `medium`, `stacked`)
+- resolve the effective editor mode (`docked`, `overlay`, `collapsed`) and sidebar mode (`expanded`, `collapsed`) from stored preference plus viewport size
+- compute sidebar and inspector widths used by the shell layout
+
+`admin/page-builder.js` still owns the DOM mutations that apply those derived values, but the breakpoint and width math now lives in `layout.js`.
+
+## 📝 Draft Manager (draft-manager.js)
+
+This factory owns the explicit local-draft lifecycle for builder surfaces that save intentionally rather than immediately.
+
+Current responsibilities:
+
+- normalize theme and header draft state from the active page
+- initialize drafts for modules, theme, header, page settings, and section settings
+- clear selected module / active section draft state when selection changes
+- save and discard module drafts through `updateModule(...)`
+- save and discard theme, header, and page-settings drafts through `updatePage(...)`
+- reset theme drafts back to the default theme token set
+
+The draft manager does not own the canonical source of truth for builder state; it receives state and setters from `admin/page-builder.js` and mutates them through the injected action contract.
+
+## 🚚 Page Actions (page-actions.js)
+
+This factory owns the higher-level page lifecycle flows that were previously inlined into the orchestrator.
+
+Current responsibilities:
+
+- disable/restore the Save Draft and Publish buttons while a page action is in flight
+- publish or unpublish the active page through `updatePage(...)`
+- load series pages through `fetchPages(...)`
+- create pages and upload builder assets through the existing data-layer helpers
+- activate a page, including designer-surface routing behavior
+- guard page switching and deletion behind `ensureCleanWorkspace(...)`
+- reorder and delete pages from the sidebar
+
+## 🧱 Canvas Mutations (canvas-mutations.js)
+
+This factory owns the immediate structural mutations for sections and modules.
+
+Current responsibilities:
+
+- insert modules with default config at an exact section/column/index target
+- move modules within a column or across sections/columns
+- preserve hidden compatibility-only `header` modules in module-order calculations while excluding them from visible canvas counts
+- insert and reorder sections
+- update section layout
+- apply local order updates after backend reorder calls so the canvas can rerender from the latest in-memory shape
+
+## 👁️ Preview Manager (preview-manager.js)
+
+This factory owns the admin side of the iframe-based reader preview.
+
+Current responsibilities:
+
+- build iframe URLs with `builderPreview=1`, the active page slug/id, and the current preview session token
+- derive preview identity from the active series/page/draft state
+- clone the current page into a preview snapshot and merge the active local dirty draft when needed
+- send `SNAPSHOT` messages to the reader iframe and answer `REQUEST_SNAPSHOT`
+- validate inbound `ACK` and `ERROR` messages through `validatePreviewEnvelope(...)`
+- update `.pb-preview-frame` dataset attributes and `.pb-preview-status` copy
+- rerender the preview frame whenever preview mode or viewport state changes
+
+`admin/page-builder.js` still owns the top-level `canvasMode` and `previewWidth` state, but the preview handshake/render logic itself is no longer inlined there.
 
 ## 💾 Data API (data.js)
 
@@ -308,11 +385,11 @@ Buttons renderer behavior now uses the shared appearance contract directly:
 
 ## 👁️ Preview Renderers (preview-renderers.js)
 
-A bridge that configures the shared rendering pipeline for the Admin environment. Used only for the edit-canvas HTML output inside the builder; the live iframe preview path now goes through `reader/preview-bridge.js` instead. Retains `initPreviewPromoCarousels` and `initPreviewEmailForms` as legacy hooks for any remaining canvas-div rendering paths.
+A bridge that configures the shared rendering pipeline for the Admin environment. It is still used for builder-owned HTML rendering paths, but the live preview mode no longer uses it directly; iframe preview now runs through `preview-manager.js` on the admin side and `reader/preview-bridge.js` on the reader side. `preview-renderers.js` retains `initPreviewPromoCarousels` and `initPreviewEmailForms` as legacy hooks for any remaining canvas-div rendering paths.
 
 ## 🧾 Preview Contract (preview-contract.js)
 
-Defines the shared contract for the builder's iframe-based reader preview. Both `admin/page-builder.js` (sender) and `reader/preview-bridge.js` (receiver) import from this module.
+Defines the shared contract for the builder's iframe-based reader preview. `admin/page-builder/preview-manager.js` is the current admin-side sender, and `reader/preview-bridge.js` is the receiver.
 
 Key exports:
 
@@ -327,7 +404,7 @@ Key exports:
 - `validatePreviewSnapshotPayload(snapshot, expected)` — validates snapshot shape, version, source, draftMode, page structure, and identity fields
 - `validatePreviewEnvelope(message, expected)` — validates any inbound `postMessage` data: unknown types are rejected, session/identity fields are checked, and `SNAPSHOT` messages are forwarded to `validatePreviewSnapshotPayload`
 
-`admin/page-builder.js` now uses the full message-type registry to drive the iframe handshake: it listens for `REQUEST_SNAPSHOT` from the iframe and responds with a `SNAPSHOT` message; it handles `ACK` by marking the frame ready and `ERROR` by surfacing the error in the preview status bar. A new preview session token (`previewSession`) is minted on page/series identity change to prevent stale message acceptance.
+`preview-manager.js` now uses the full message-type registry to drive the iframe handshake: it listens for `REQUEST_SNAPSHOT` from the iframe and responds with a `SNAPSHOT` message; it handles `ACK` by marking the frame ready and `ERROR` by surfacing the error in the preview status bar. A new preview session token (`previewSession`) is minted on page/series identity change to prevent stale message acceptance.
 
 ## 🎡 Promo Renderer (promo-renderer.js)
 
@@ -339,7 +416,7 @@ Registries include `MODULE_TYPES`, `LAYOUT_OPTIONS`, and theme tokens like `THEM
 
 ## 🛠️ Shared Helpers (helpers.js)
 
-Shared helper coverage includes asset URL resolution, image fit and focal-point helpers, and HTML/attribute escaping logic.
+Shared helper coverage now includes deep cloning, default module-config generation, page/module display helpers, asset URL resolution, image fit and focal-point helpers, and HTML/attribute escaping logic. These helpers are shared across the extracted builder factories as well as the remaining orchestrator code.
 
 ## 🎨 Appearance Utilities (appearance-utils.js)
 
@@ -386,7 +463,7 @@ Again: `header` is compatibility-only in the catalog and is not part of the norm
 
 ## 📜 Important Accuracy Notes
 
-- The builder's mutable UI state is primarily coordinated in `admin/page-builder.js`, not in `data.js`.
+- The builder's mutable UI state is still primarily coordinated in `admin/page-builder.js`, not in `data.js`, but major workflow clusters now live in focused factories: `draft-manager.js`, `page-actions.js`, `canvas-mutations.js`, and `preview-manager.js`.
 - Header editing is page-scoped through `page.meta.header`, not primarily through a normal `header` module.
 - The admin canvas is an editing surface with builder chrome. Preview mode now renders through a real reader iframe (`index.html?builderPreview=1`) for full reader-shell parity, not through a constrained div.
 - Shared renderer parity exists at the module/section/page HTML level through `shared-renderers.js`. The iframe preview approach means real viewport dimensions, real media queries, and real reader-side JavaScript all run in preview.
