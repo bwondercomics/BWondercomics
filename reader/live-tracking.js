@@ -19,6 +19,19 @@ let context = {
   pageNumber: null,
 };
 
+function isBuilderPreview() {
+  try {
+    const raw = new URLSearchParams(window.location.search || '').get('builderPreview');
+    return ['1', 'true', 'yes'].includes(
+      String(raw || '')
+        .trim()
+        .toLowerCase()
+    );
+  } catch {
+    return false;
+  }
+}
+
 function canTrack() {
   try {
     return localStorage.getItem(COUNT_VIEWS_KEY) !== 'false';
@@ -113,7 +126,7 @@ export function updateLiveContext(partial = {}) {
 }
 
 export function initLiveTracking() {
-  if (started || !canTrack()) return;
+  if (started || !canTrack() || isBuilderPreview()) return;
   started = true;
   visitorId = getVisitorId();
   updateContext({

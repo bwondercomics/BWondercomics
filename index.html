@@ -728,6 +728,10 @@
     <script>
       // Load the analytics loader without Vite bundling it.
       (() => {
+        const params = new URLSearchParams(window.location.search || '');
+        const previewFlag = String(params.get('builderPreview') || '').toLowerCase();
+        if (['1', 'true', 'yes'].includes(previewFlag)) return;
+
         const script = document.createElement('script');
         script.defer = true;
         script.src = '/analytics.js';

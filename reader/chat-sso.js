@@ -6,6 +6,17 @@
   // Caddy still redirects to /api/chat/sso/start automatically when needed.
   const CHAT_ENTRY_URL = 'https://chat.bwondercomics.com/';
 
+  function isBuilderPreview() {
+    const raw = new URLSearchParams(window.location.search || '').get('builderPreview');
+    return ['1', 'true', 'yes'].includes(
+      String(raw || '')
+        .trim()
+        .toLowerCase()
+    );
+  }
+
+  if (isBuilderPreview()) return;
+
   function readSafeNextPath() {
     const params = new URLSearchParams(window.location.search);
     const raw = params.get('next');

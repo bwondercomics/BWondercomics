@@ -16,6 +16,10 @@ function getSafeModeUrl(config) {
 }
 
 async function checkSafeMode() {
+  const params = new URLSearchParams(window.location.search || '');
+  const previewFlag = String(params.get('builderPreview') || '').toLowerCase();
+  if (['1', 'true', 'yes'].includes(previewFlag)) return;
+
   const host = window.location.hostname.toLowerCase();
   if (host === 'localhost' || host === '127.0.0.1') return;
 

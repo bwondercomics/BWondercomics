@@ -381,8 +381,12 @@ export function applyBuilderPageToDOM(page, options = {}) {
   // Apply left/right panel content based on columns
   const leftModules = findPanelModules('left');
   const rightModules = findPanelModules('right');
-  renderPanelStack('left', leftModules, panelSpacing, panelBackgrounds);
-  renderPanelStack('right', rightModules, panelSpacing, panelBackgrounds);
+  renderPanelStack('left', leftModules, panelSpacing, panelBackgrounds, {
+    previewMode: !!options.previewMode,
+  });
+  renderPanelStack('right', rightModules, panelSpacing, panelBackgrounds, {
+    previewMode: !!options.previewMode,
+  });
 
   // Check panel visibility from section settings
   for (const section of page.sections) {
@@ -409,7 +413,7 @@ export function applyBuilderPageToDOM(page, options = {}) {
 /**
  * Render builder modules into panel stacks.
  */
-function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {}) {
+function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {}, options = {}) {
   const panelId = side === 'left' ? 'leftPanel' : 'rightPanel';
   const panel = document.getElementById(panelId);
   if (!panel) return;
@@ -466,7 +470,7 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
   }
 
   container.innerHTML = modules.map(({ module }) => renderModule(module)).join('');
-  initEmailForms(container);
+  initEmailForms(container, { previewMode: !!options.previewMode });
   initPromoCarousels(container);
   initFeedModules(container);
 }

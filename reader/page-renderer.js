@@ -67,7 +67,7 @@ export async function fetchPage(slug, seriesId = null) {
 /**
  * Mount a page into a container element.
  */
-export async function mountPage(container, slug, seriesId = null) {
+export async function mountPage(container, slug, seriesId = null, options = {}) {
   if (!container) {
     logger.error('mountPage: container is required');
     return;
@@ -84,15 +84,16 @@ export async function mountPage(container, slug, seriesId = null) {
   container.innerHTML = renderPage(page);
 
   // Initialize interactive modules
-  initEmailForms(container);
+  initEmailForms(container, { previewMode: !!options.previewMode });
   initPromoCarousels(container);
 }
 
 /**
  * Initialize email signup forms within a container.
  */
-export function initEmailForms(container) {
+export function initEmailForms(container, options = {}) {
   if (!container) return;
+  const previewMode = !!options.previewMode;
   container.querySelectorAll('[data-email-signup]').forEach((form) => {
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -101,6 +102,10 @@ export function initEmailForms(container) {
       const email = input?.value?.trim();
 
       if (!email) return;
+      if (previewMode) {
+        if (status) status.textContent = 'Form works! (Preview mode - not submitted)';
+        return;
+      }
 
       try {
         const res = await fetch('/api/email/subscribe', {

@@ -4,12 +4,17 @@ import { flushReaderUi, mountReaderDom, stubReaderGlobals } from './helpers/read
 
 const fitOnPageFrame = vi.fn();
 
-async function bootCommentsModule() {
+async function bootCommentsModule({ previewMode = false } = {}) {
   vi.resetModules();
   fitOnPageFrame.mockReset();
   document.body.innerHTML = '';
   mountReaderDom();
   stubReaderGlobals(vi);
+  window.happyDOM.setURL(
+    previewMode
+      ? 'http://localhost:3000/index.html?series=battle-bros&page=reader&pageId=page-1&builderPreview=1&previewSession=session-1'
+      : 'http://localhost:3000/index.html'
+  );
 
   const fetchMock = vi.fn(async (url, options = {}) => {
     if (url === '/api/session') {
@@ -64,6 +69,7 @@ describe('reader comments layout fitting', () => {
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    window.happyDOM.setURL('http://localhost:3000/index.html');
     document.body.innerHTML = '';
   });
 
@@ -106,5 +112,26 @@ describe('reader comments layout fitting', () => {
 
     expect(panel.classList.contains('collapsed')).toBe(true);
     expect(fitOnPageFrame.mock.calls.length).toBeGreaterThan(afterLogout);
+  });
+
+  it('does not run auth or comment POST actions in preview mode', async () => {
+    const { fetchMock } = await bootCommentsModule({ previewMode: true });
+    const panel = document.getElementById('comicCommentsSection');
+    const authForm = panel.querySelector('.auth-form');
+    const emailInput = panel.querySelector('input[type="email"]');
+    const passwordInput = panel.querySelector('input[type="password"]');
+    const textarea = panel.querySelector('.comment-textarea');
+    const commentForm = panel.querySelector('.comment-form');
+
+    emailInput.value = 'reader@example.com';
+    passwordInput.value = 'password123';
+    authForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    textarea.value = 'Preview comment';
+    commentForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await flushReaderUi(4);
+
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/login', expect.anything());
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/comments', expect.anything());
+    expect(panel.textContent).toContain('read-only in preview mode');
   });
 });

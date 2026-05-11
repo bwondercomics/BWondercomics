@@ -43,6 +43,24 @@ export function isDraftPageRequested() {
   return raw === '1' || raw === 'true' || raw === 'yes';
 }
 
+export function isBuilderPreviewRequested(search = window.location.search) {
+  const params = new URLSearchParams(search);
+  const raw = String(params.get('builderPreview') || '')
+    .trim()
+    .toLowerCase();
+  return raw === '1' || raw === 'true' || raw === 'yes';
+}
+
+export function getPreviewSessionToken(search = window.location.search) {
+  const params = new URLSearchParams(search);
+  return String(params.get('previewSession') || '').trim();
+}
+
+export function getPreviewPageId(search = window.location.search) {
+  const params = new URLSearchParams(search);
+  return String(params.get('pageId') || '').trim();
+}
+
 export function getSeriesDataPath(seriesId = DEFAULT_SERIES_ID) {
   // DB-backed chapters JSON endpoint.
   const id = sanitizeSeriesId(seriesId) || DEFAULT_SERIES_ID;

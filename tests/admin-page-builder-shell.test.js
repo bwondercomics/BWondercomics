@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  BUILDER_PREVIEW_MESSAGE_TYPES,
+  BUILDER_PREVIEW_SNAPSHOT_VERSION,
+} from '../admin/page-builder/preview-contract.js';
 import { buildContractFixture, getContractFixture } from './helpers/contracts.js';
 import { flushAdminUi, mountAdminDom, stubAdminGlobals } from './helpers/admin-fixture.js';
 
@@ -193,6 +197,10 @@ function enterEditMode() {
 
 function getPreviewFrame() {
   return document.getElementById('pbCanvas')?.querySelector('.pb-preview-frame');
+}
+
+function getPreviewIframe() {
+  return document.getElementById('pbCanvas')?.querySelector('.pb-preview-iframe');
 }
 
 function getPreviewStatus() {
@@ -1121,9 +1129,9 @@ describe('admin page-builder shell', () => {
     expect(widthToggles?.hidden).toBe(false);
     // Layout gets data-canvas-mode so CSS can collapse sidebar + editor
     expect(layout?.dataset.canvasMode).toBe('preview');
-    // Preview frame wraps shared-renderer output
+    // Preview frame hosts the real reader shell iframe
     expect(canvas?.querySelector('.pb-preview-frame')).not.toBeNull();
-    expect(canvas?.querySelector('.pb-page')).not.toBeNull();
+    expect(canvas?.querySelector('.pb-preview-iframe')).not.toBeNull();
     // Structural edit UI is gone
     expect(canvas?.querySelector('div[data-section-id]')).toBeNull();
 
@@ -1164,12 +1172,20 @@ describe('admin page-builder shell', () => {
     const widthToggles = document.getElementById('pbWidthToggles');
 
     expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('desktop');
+    const initialIframe = getPreviewIframe();
+    const initialSrc = initialIframe?.getAttribute('src');
+    expect(initialSrc).toContain('/index.html?');
+    expect(initialSrc).toContain('builderPreview=1');
 
     // Switch to tablet
     widthToggles
       ?.querySelector('[data-width="tablet"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('tablet');
+    expect(getPreviewIframe()).toBe(initialIframe);
+    expect(getPreviewIframe()?.getAttribute('src')).toBe(initialSrc);
+    expect(getPreviewIframe()?.getAttribute('width')).toBe('768');
+    expect(getPreviewIframe()?.getAttribute('height')).toBe('1024');
     expect(
       widthToggles
         ?.querySelector('[data-width="tablet"]')
@@ -1186,6 +1202,9 @@ describe('admin page-builder shell', () => {
       ?.querySelector('[data-width="mobile"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('mobile');
+    expect(getPreviewIframe()).toBe(initialIframe);
+    expect(getPreviewIframe()?.getAttribute('width')).toBe('375');
+    expect(getPreviewIframe()?.getAttribute('height')).toBe('812');
 
     // Back to desktop
     widthToggles
@@ -1219,6 +1238,78 @@ describe('admin page-builder shell', () => {
     expect(getPreviewFrame()?.dataset.snapshotVersion).toBe('1');
     expect(getPreviewFrame()?.dataset.viewportWidth).toBe('1280');
     expect(getPreviewFrame()?.dataset.viewportHeight).toBe('900');
+    expect(getPreviewFrame()?.dataset.previewSession).toBeTruthy();
+    expect(getPreviewIframe()?.getAttribute('src')).toContain('builderPreview=1');
+    expect(getPreviewIframe()?.getAttribute('src')).toContain(
+      `pageId=${encodeURIComponent(selectedPage.id)}`
+    );
+    expect(getPreviewIframe()?.getAttribute('src')).toContain(
+      `previewSession=${encodeURIComponent(getPreviewFrame()?.dataset.previewSession || '')}`
+    );
+  });
+
+  it('posts snapshots to the reader iframe and validates preview responses', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const iframe = getPreviewIframe();
+    const frame = getPreviewFrame();
+    const iframeWindow = { postMessage: vi.fn() };
+    Object.defineProperty(iframe, 'contentWindow', {
+      configurable: true,
+      value: iframeWindow,
+    });
+    const request = {
+      type: BUILDER_PREVIEW_MESSAGE_TYPES.REQUEST_SNAPSHOT,
+      previewSession: frame.dataset.previewSession,
+      snapshotVersion: BUILDER_PREVIEW_SNAPSHOT_VERSION,
+      seriesId: 'battle-bros',
+      pageId: selectedPage.id,
+      pageSlug: selectedPage.slug,
+    };
+
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: request,
+        origin: window.location.origin,
+        source: iframeWindow,
+      })
+    );
+
+    expect(iframeWindow.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: BUILDER_PREVIEW_MESSAGE_TYPES.SNAPSHOT,
+        previewSession: frame.dataset.previewSession,
+        snapshot: expect.objectContaining({
+          pageId: selectedPage.id,
+          pageSlug: selectedPage.slug,
+        }),
+      }),
+      window.location.origin
+    );
+
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: {
+          type: BUILDER_PREVIEW_MESSAGE_TYPES.ACK,
+          previewSession: frame.dataset.previewSession,
+          snapshotVersion: BUILDER_PREVIEW_SNAPSHOT_VERSION,
+          seriesId: 'battle-bros',
+          pageId: selectedPage.id,
+          pageSlug: selectedPage.slug,
+        },
+        origin: window.location.origin,
+        source: iframeWindow,
+      })
+    );
+
+    expect(frame.dataset.previewReady).toBe('true');
   });
 
   it('previews dirty module drafts without mutating the saved page snapshot', async () => {
@@ -1246,7 +1337,7 @@ describe('admin page-builder shell', () => {
 
     expect(getPreviewStatus()?.textContent).toBe('Previewing unsaved working changes');
     expect(getPreviewFrame()?.dataset.previewSource).toBe('working');
-    expect(document.getElementById('pbCanvas')?.textContent).toContain('Draft preview text');
+    expect(getPreviewIframe()).not.toBeNull();
 
     enterEditMode();
 
@@ -1349,11 +1440,7 @@ describe('admin page-builder shell', () => {
 
     expect(getPreviewStatus()?.textContent).toBe('Previewing unsaved working changes');
     expect(getPreviewFrame()?.dataset.previewSource).toBe('working');
-    expect(
-      document
-        .querySelector('.pb-preview-frame .pb-section[data-layout="1-1"]')
-        ?.getAttribute('style')
-    ).toContain('--pb-column-gap: 77px;');
+    expect(getPreviewIframe()).not.toBeNull();
   });
 
   it('shows a migration banner in the header editor for a legacy page without meta.header', async () => {

@@ -11,6 +11,14 @@ import { fitOnPageFrame } from './transform.js';
 
   let commentCtx = null;
   let pendingFrameFit = null;
+  const isPreviewMode = (() => {
+    const raw = new URLSearchParams(window.location.search || '').get('builderPreview');
+    return ['1', 'true', 'yes'].includes(
+      String(raw || '')
+        .trim()
+        .toLowerCase()
+    );
+  })();
 
   function scheduleOnPageFrameFit() {
     const runFit = () => {
@@ -41,6 +49,7 @@ import { fitOnPageFrame } from './transform.js';
       return data.user || null;
     },
     async login(email, password) {
+      if (isPreviewMode) throw new Error('Comments are read-only in preview mode.');
       const res = await fetch('/api/login', {
         method: 'POST',
         credentials: 'same-origin',
@@ -52,6 +61,7 @@ import { fitOnPageFrame } from './transform.js';
       return data.user;
     },
     async register(email, password, displayName, inviteCode, emailOptIn) {
+      if (isPreviewMode) throw new Error('Comments are read-only in preview mode.');
       const res = await fetch('/api/register', {
         method: 'POST',
         credentials: 'same-origin',
@@ -63,6 +73,7 @@ import { fitOnPageFrame } from './transform.js';
       return data.user;
     },
     async logout() {
+      if (isPreviewMode) return;
       await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
     },
     async fetchComments(targetId) {
@@ -75,6 +86,7 @@ import { fitOnPageFrame } from './transform.js';
       return Array.isArray(data.comments) ? data.comments : [];
     },
     async postComment(targetId, message) {
+      if (isPreviewMode) throw new Error('Comments are read-only in preview mode.');
       const res = await fetch('/api/comments', {
         method: 'POST',
         credentials: 'same-origin',
@@ -86,6 +98,7 @@ import { fitOnPageFrame } from './transform.js';
       return data.comment;
     },
     async moderateComment(targetId, commentId, action) {
+      if (isPreviewMode) throw new Error('Comments are read-only in preview mode.');
       const res = await fetch('/api/admin/comments', {
         method: 'POST',
         credentials: 'same-origin',
@@ -280,6 +293,20 @@ import { fitOnPageFrame } from './transform.js';
   window.toggleReaderComments = toggleReaderComments;
 
   function updateSectionForUser(ctx) {
+    if (isPreviewMode) {
+      ctx.authStatus.textContent = 'Comments are read-only in preview mode';
+      ctx.authForm.style.display = 'none';
+      ctx.signoutBtn.style.display = 'none';
+      ctx.commentForm.classList.add('disabled');
+      ctx.textarea.disabled = true;
+      ctx.submitBtn.disabled = true;
+      ctx.commentHint.textContent = 'Preview mode does not post comments.';
+      ctx.authError.textContent = '';
+      ctx.commentError.textContent = '';
+      scheduleOnPageFrameFit();
+      return;
+    }
+
     const user = ctx.user;
     if (user) {
       ctx.authStatus.textContent = `Signed in as ${user.displayName || user.email}`;

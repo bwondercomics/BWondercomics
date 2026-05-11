@@ -1,6 +1,6 @@
 # Builder Preview Parity Plan
 
-Status: draft plan (`2026-05-10`)
+Status: Phase 2 and Phase 3 implemented (`2026-05-11`)
 
 Goal: make the page builder preview a trustworthy representation of the page as it will render in
 the public reader at desktop, tablet, and mobile sizes.
@@ -270,6 +270,8 @@ parameter.
 
 Deliverable: an iframe-loadable reader preview host that can render a posted builder page snapshot.
 
+**Completion note (`2026-05-11`):** Phase 2 is implemented. `reader/preview-bridge.js` is the new reader-side handshake module, lazy-imported by `reader/app.js` only when `?builderPreview=1` is present. It sends `REQUEST_SNAPSHOT`, validates the `SNAPSHOT` reply with `validatePreviewEnvelope(...)` from `preview-contract.js`, sends `ACK` on success or `ERROR` on failure, and resolves with `{ source: 'builder', page, previewMode: true, snapshot }`. The full side-effect guard list from step 8 is implemented: analytics (`initReaderAnalytics`), live tracking (`initLiveTracking`), email form submission (`initEmailSignupForm` + `initEmailForms` on page-renderer and data paths), comments write operations (login/register/postComment/moderateComment in `comic-comments.js`), chat SSO (`chat-sso.js` exits at startup), safe-mode redirect (`safe-mode.js` returns immediately), user-settings overlay (`user-settings.js` disables the open button), fullscreen (`fullscreen.js` `toggleFullscreen` returns immediately), and all link/navigation clicks via a capture-phase `click` suppressor in `attachEventHandlers`. The `index.html` analytics loader also bails out on `?builderPreview=1` before injecting the script tag. Test coverage lives in `tests/reader-preview-bridge.test.js` and `tests/reader-preview-side-effects.test.js`.
+
 ### Phase 3 - Builder Preview Manager
 
 1. Replace the current preview `innerHTML` path in `admin/page-builder.js::renderPreview()` with an
@@ -310,6 +312,8 @@ Deliverable: an iframe-loadable reader preview host that can render a posted bui
 
 Deliverable: admin preview mode renders a real reader iframe and keeps it synchronized with the
 current page snapshot.
+
+**Completion note (`2026-05-11`):** Phase 3 is implemented. `admin/page-builder.js` now owns the full iframe lifecycle in `renderPreview()`. It tracks a `previewSession` UUID (minted via `crypto.randomUUID()` with a fallback) and a `previewIdentity` string derived from `seriesId|pageId|pageSlug|draftMode`. On identity change or first render, the iframe is (re)created with `getPreviewIframeUrl(snapshot, session)` and the frame dataset is updated by `updatePreviewFrameDataset(...)`. The `handlePreviewMessage(event)` listener is registered once globally and validates message origin, source, and the full `validatePreviewEnvelope(...)` contract before dispatching on type: `REQUEST_SNAPSHOT` triggers `postPreviewSnapshot()`; `ACK` sets `frame.dataset.previewReady = 'true'`; `ERROR` surfaces the error in the `.pb-preview-status` bar. On repeated preview renders without an identity change (e.g. working-draft updates), `postPreviewSnapshot()` is called directly rather than reloading the iframe. The old `preview-renderers.js`-based div path is replaced.
 
 ### Phase 4 - Full Reader Shell Parity
 
@@ -555,7 +559,7 @@ Likely implementation files:
 - `reader/data.js`
 - `reader/page-renderer.js`
 - `reader/header-layout.js`
-- `reader/preview-bridge.js` if added
+- `reader/preview-bridge.js`
 - `assets/css/main.core.18-page-builder.css`
 - `assets/css/main.core.17-responsive.css`
 - `assets/css/main.responsive.css`

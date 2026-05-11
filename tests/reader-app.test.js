@@ -32,12 +32,21 @@ function buildReaderEntryData() {
   };
 }
 
-async function bootReaderApp({ sessionKey = 'guest', savedProgress = null } = {}) {
+async function bootReaderApp({
+  sessionKey = 'guest',
+  savedProgress = null,
+  builderPreview = false,
+} = {}) {
   vi.resetModules();
   mountReaderDom();
   stubReaderGlobals(vi);
   document.documentElement.classList.add('reader-bootstrap-loading');
   window.__bwReaderBootRelease = window.setTimeout(() => {}, 5000);
+  window.happyDOM.setURL(
+    builderPreview
+      ? 'http://localhost:3000/index.html?series=battle-bros&page=reader&pageId=fixture-builder-page&builderPreview=1&previewSession=session-1'
+      : 'http://localhost:3000/index.html'
+  );
   localStorage.clear();
   if (savedProgress) {
     localStorage.setItem(STORAGE.PROGRESS_KEY, JSON.stringify(savedProgress));
@@ -50,6 +59,11 @@ async function bootReaderApp({ sessionKey = 'guest', savedProgress = null } = {}
   }));
   const loadLatestPost = vi.fn(async () => getContractFixture('latestPost'));
   const applyBuilderPageToDOM = vi.fn();
+  const requestPreviewSnapshot = vi.fn(async () => ({
+    source: 'builder',
+    page: getContractFixture('builderPage'),
+    previewMode: true,
+  }));
   const renderStatusPanel = vi.fn();
   const render = vi.fn();
   const renderLatestUpdate = vi.fn();
@@ -77,6 +91,9 @@ async function bootReaderApp({ sessionKey = 'guest', savedProgress = null } = {}
     loadPageConfigWithFallback,
     loadLatestPost,
     applyBuilderPageToDOM,
+  }));
+  vi.doMock('../reader/preview-bridge.js', () => ({
+    requestPreviewSnapshot,
   }));
   vi.doMock('../reader/render.js', () => ({
     renderStatusPanel,
@@ -154,6 +171,7 @@ async function bootReaderApp({ sessionKey = 'guest', savedProgress = null } = {}
       loggerLog,
       nextPage,
       prevPage,
+      requestPreviewSnapshot,
       render,
       renderGallery,
       renderLatestUpdate,
@@ -172,6 +190,7 @@ async function bootReaderApp({ sessionKey = 'guest', savedProgress = null } = {}
 describe('reader app bootstrap', () => {
   afterEach(() => {
     vi.useRealTimers();
+    window.happyDOM.setURL('http://localhost:3000/index.html');
   });
 
   it('boots the reader against the live markup contract and restores saved progress', async () => {
@@ -213,6 +232,24 @@ describe('reader app bootstrap', () => {
     expect(document.documentElement.classList.contains('reader-bootstrap-loading')).toBe(false);
     expect(document.body.dataset.readerPageSource).toBe('builder');
     expect(events.length).toBeGreaterThan(0);
+  });
+
+  it('boots builder preview from the parent snapshot instead of the page API', async () => {
+    const { mocks } = await bootReaderApp({ builderPreview: true });
+
+    expect(mocks.loadEntryData).toHaveBeenCalledWith('battle-bros');
+    expect(mocks.loadPageConfigWithFallback).not.toHaveBeenCalled();
+    expect(mocks.requestPreviewSnapshot).toHaveBeenCalledWith({
+      seriesId: 'battle-bros',
+      pageSlug: 'reader',
+    });
+    expect(mocks.initReaderAnalytics).not.toHaveBeenCalled();
+    expect(mocks.initEmailSignupForm).toHaveBeenCalledWith({ previewMode: true });
+    expect(mocks.applyBuilderPageToDOM).toHaveBeenCalledWith(getContractFixture('builderPage'), {
+      seriesId: 'battle-bros',
+      previewMode: true,
+    });
+    expect(document.body.dataset.readerPageSource).toBe('builder');
   });
 
   it('opens store entries externally and restores the active entry selection', async () => {

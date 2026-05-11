@@ -25,11 +25,13 @@ This document summarizes how the reader portion of the site is organized, what e
 - `reader/email.js` — Builds share/email link data from the current page/entry.
 - `reader/customization.js` — No-op compatibility module retained for the old script entry; waits for bootstrap state but does not fetch page-config or mutate the reader shell.
 - `reader/header-layout.js` — Applies the effective page header layout to the live topbar by reusing the existing DOM blocks.
+- `reader/preview-bridge.js` — Lazy-loaded only when `?builderPreview=1` is present. Sends a `REQUEST_SNAPSHOT` postMessage to the parent admin frame, validates the `SNAPSHOT` reply using the shared preview contract, and resolves with a page result that is applied to the reader shell in read-only mode. All reader side effects (analytics, live tracking, comments, email forms, chat SSO, safe-mode, user settings, fullscreen) are suppressed when this module is active.
 - `assets/css/main.core.11-viewport.css` — Viewport rules for the default/fullscreen layouts and the optional `.viewport.dynamic-frame` mode.
 
 ## Runtime Flow
 
 1. `app.js` init: set bootstrap-loading state → fetch entries + resolve either the effective homepage page or an explicitly requested builder page, plus latest post → render initial page(s) and attach controls → reapply the builder page as the final DOM state when the builder source wins → release bootstrap state.
+   - **Builder preview mode** (`?builderPreview=1`): the normal page-config fetch path is skipped. `app.js` lazy-imports `reader/preview-bridge.js` and awaits a validated snapshot from the parent admin frame. The snapshot is applied via `applyBuilderPageToDOM(...)` with `previewMode: true`; all side-effect hooks are suppressed for the session.
 2. Controls: UI/keyboard/gesture handlers update `state` → `render` redraws → `gallery`/overlays sync to the new state.
 3. Persistence: `state.saveProgress` writes entry/page to `localStorage`; errors are caught so reading is not blocked.
 4. Layout: `render` chooses single vs two-page mode based on the aspect ratio threshold (`TWO_PAGE_ASPECT_RATIO`), caches visible page dimensions, and in the fixed-height desktop layout resizes the viewport frame to the visible page or spread. Stacked/mobile keeps the existing full-width flow, and fullscreen stays on the height-fit path.

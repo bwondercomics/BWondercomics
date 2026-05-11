@@ -77,7 +77,12 @@ async function handleMouseLeaveControls() {
 import { renderLatestUpdate } from './latest.js';
 import { initRightPanelFeed } from './feed-panel.js';
 import { initEmailSignupForm } from './email.js';
-import { getActiveSeriesId, getExplicitPageSlug, isDraftPageRequested } from './series.js';
+import {
+  getActiveSeriesId,
+  getExplicitPageSlug,
+  isBuilderPreviewRequested,
+  isDraftPageRequested,
+} from './series.js';
 
 (function () {
   'use strict';
@@ -661,11 +666,29 @@ import { getActiveSeriesId, getExplicitPageSlug, isDraftPageRequested } from './
     });
   }
 
-  function attachEventHandlers() {
+  function attachEventHandlers(options = {}) {
+    const previewMode = !!options.previewMode;
+    if (previewMode) {
+      document.addEventListener(
+        'click',
+        (event) => {
+          const link = event.target?.closest?.('a[href]');
+          if (!link) return;
+          event.preventDefault();
+          event.stopPropagation();
+        },
+        true
+      );
+    }
+
     // Book turn promo click handler
     const bookTurnPromo = document.getElementById('bookTurnPromo');
     if (bookTurnPromo) {
-      bookTurnPromo.addEventListener('click', () => {
+      bookTurnPromo.addEventListener('click', (event) => {
+        if (previewMode) {
+          event.preventDefault();
+          return;
+        }
         window.open(
           'https://bwondercomics.bigcartel.com/product/battle-bros-volume-1',
           '_blank',
@@ -684,7 +707,7 @@ import { getActiveSeriesId, getExplicitPageSlug, isDraftPageRequested } from './
     if (el.zoomIn) el.zoomIn.addEventListener('click', zoomIn);
     if (el.zoomOut) el.zoomOut.addEventListener('click', zoomOut);
     if (el.fitBtn) el.fitBtn.addEventListener('click', fitToScreen);
-    if (el.fullscreenBtn) {
+    if (el.fullscreenBtn && !previewMode) {
       el.fullscreenBtn.addEventListener('click', toggleFullscreen);
     }
 
@@ -737,7 +760,7 @@ import { getActiveSeriesId, getExplicitPageSlug, isDraftPageRequested } from './
         case 'f':
         case 'F':
           e.preventDefault();
-          toggleFullscreen();
+          if (!previewMode) toggleFullscreen();
           break;
         case '?':
           e.preventDefault();
@@ -747,36 +770,40 @@ import { getActiveSeriesId, getExplicitPageSlug, isDraftPageRequested } from './
           e.preventDefault();
           closeShortcutsOverlay();
           hideEndOfEntry();
-          if (document.fullscreenElement) {
+          if (!previewMode && document.fullscreenElement) {
             document.exitFullscreen();
           }
           break;
       }
     });
 
-    document.addEventListener('fullscreenchange', onFullscreenChange);
+    if (!previewMode) {
+      document.addEventListener('fullscreenchange', onFullscreenChange);
+    }
 
     // Throttle fullscreen edge detection to reduce overhead (100ms = 10fps max)
-    document.addEventListener(
-      'mousemove',
-      throttle((e) => {
-        if (document.fullscreenElement) {
-          const vh = window.innerHeight;
-          // Use percentage-based thresholds for better scaling on small screens
-          const topThreshold = Math.min(150, vh * 0.15);
-          const bottomThreshold = Math.min(200, vh * 0.2);
-          const nearEdge = e.clientY < topThreshold || e.clientY > vh - bottomThreshold;
-          if (nearEdge) showControlsBar();
-        }
-      }, 100)
-    );
+    if (!previewMode) {
+      document.addEventListener(
+        'mousemove',
+        throttle((e) => {
+          if (document.fullscreenElement) {
+            const vh = window.innerHeight;
+            // Use percentage-based thresholds for better scaling on small screens
+            const topThreshold = Math.min(150, vh * 0.15);
+            const bottomThreshold = Math.min(200, vh * 0.2);
+            const nearEdge = e.clientY < topThreshold || e.clientY > vh - bottomThreshold;
+            if (nearEdge) showControlsBar();
+          }
+        }, 100)
+      );
+    }
 
-    if (el.topbar) {
+    if (el.topbar && !previewMode) {
       el.topbar.addEventListener('mouseenter', handleMouseEnterControls);
       el.topbar.addEventListener('mouseleave', handleMouseLeaveControls);
     }
 
-    if (el.controls) {
+    if (el.controls && !previewMode) {
       el.controls.addEventListener('mouseenter', handleMouseEnterControls);
       el.controls.addEventListener('mouseleave', handleMouseLeaveControls);
     }
@@ -786,6 +813,11 @@ import { getActiveSeriesId, getExplicitPageSlug, isDraftPageRequested } from './
         const nextName = e.target.value;
         const meta = entryMeta?.[nextName] || {};
         if (String(meta.releaseType || '').toLowerCase() === 'store' && meta.storeUrl) {
+          if (previewMode) {
+            el.entry.value = state.currentEntry;
+            syncEntrySelectDisplay();
+            return;
+          }
           window.open(meta.storeUrl, '_blank', 'noopener,noreferrer');
           el.entry.value = state.currentEntry;
           syncEntrySelectDisplay();
@@ -884,16 +916,34 @@ import { getActiveSeriesId, getExplicitPageSlug, isDraftPageRequested } from './
     releaseReaderBootstrap('error');
   }
 
+  function handlePreviewLoadError(error) {
+    const viewport = document.getElementById('viewport');
+    if (viewport) {
+      viewport.innerHTML = `
+          <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;padding:24px;text-align:center;gap:12px;">
+            <div style="font-family:'Bebas Neue',sans-serif;font-size:32px;color:var(--danger);letter-spacing:2px;">PREVIEW UNAVAILABLE</div>
+            <div style="max-width:560px;line-height:1.6;opacity:0.95;">The builder preview snapshot could not be loaded.</div>
+            <div style="font-size:14px;color:rgba(255,255,255,0.65);font-family:monospace;">${error?.message || 'Unknown preview error'}</div>
+          </div>
+        `;
+    }
+    readerBootState.resolvePageConfig({ source: 'error', previewMode: true });
+    releaseReaderBootstrap('error');
+  }
+
   // ==================== INITIALIZATION ====================
 
-  function init(pageSource = 'none') {
+  function init(pageSource = 'none', options = {}) {
+    const previewMode = !!options.previewMode;
     initElements();
     initEntrySelect();
-    initReaderAnalytics();
+    if (!previewMode) {
+      initReaderAnalytics();
+    }
     // renderGallery(); // Loaded on open
     setInitialSubtitle();
     renderStatusPanel(statusMessage || 'ready', statusTimerRef);
-    initEmailSignupForm();
+    initEmailSignupForm({ previewMode });
 
     const navigableEntries = getNavigableEntries();
     const availableEntries = navigableEntries.length
@@ -939,7 +989,7 @@ import { getActiveSeriesId, getExplicitPageSlug, isDraftPageRequested } from './
       new CustomEvent('entryChanged', { detail: { chapter: state.currentEntry } })
     );
 
-    attachEventHandlers();
+    attachEventHandlers({ previewMode });
     render();
     releaseReaderBootstrap(pageSource);
 
@@ -951,6 +1001,7 @@ import { getActiveSeriesId, getExplicitPageSlug, isDraftPageRequested } from './
   async function start() {
     const seriesId = getActiveSeriesId();
     const explicitPageSlug = getExplicitPageSlug();
+    const previewMode = isBuilderPreviewRequested();
 
     try {
       const data = await loadEntryData(seriesId);
@@ -1008,6 +1059,26 @@ import { getActiveSeriesId, getExplicitPageSlug, isDraftPageRequested } from './
       unitLabelSingular,
       seriesId,
     });
+    if (previewMode) {
+      try {
+        const { requestPreviewSnapshot } = await import('./preview-bridge.js');
+        const pageResult = await requestPreviewSnapshot({
+          seriesId,
+          pageSlug: explicitPageSlug || 'reader',
+        });
+        readerBootState.resolvePageConfig(pageResult);
+        loadLatestUpdate();
+        init(pageResult.source, { previewMode: true });
+        applyBuilderPageToDOM(pageResult.page, {
+          seriesId,
+          previewMode: true,
+        });
+      } catch (err) {
+        handlePreviewLoadError(err);
+      }
+      return;
+    }
+
     const pageResult = await loadPageConfigWithFallback(setSubtitles, seriesId, {
       pageSlug: explicitPageSlug,
       draft: role === 'admin' && isDraftPageRequested(),

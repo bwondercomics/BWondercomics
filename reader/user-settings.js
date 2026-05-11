@@ -33,6 +33,16 @@ import { API } from './constants.js';
   let currentUser = null;
 
   if (!overlay || !openBtn) return;
+  const previewFlag = String(
+    new URLSearchParams(window.location.search || '').get('builderPreview') || ''
+  )
+    .trim()
+    .toLowerCase();
+  if (['1', 'true', 'yes'].includes(previewFlag)) {
+    openBtn.disabled = true;
+    openBtn.setAttribute('aria-disabled', 'true');
+    return;
+  }
 
   function setStatus(message, isError = false) {
     if (!statusEl) return;

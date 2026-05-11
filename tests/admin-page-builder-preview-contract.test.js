@@ -1,14 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  BUILDER_PREVIEW_MESSAGE_TYPES,
   BUILDER_PREVIEW_SOURCES,
   BUILDER_PREVIEW_SNAPSHOT_VERSION,
   PREVIEW_VIEWPORT_ORDER,
   PREVIEW_VIEWPORTS,
+  buildPreviewControlMessage,
+  buildPreviewSnapshotMessage,
   getPreviewStatusCopy,
   getPreviewViewport,
+  isPreviewMessageType,
   isPreviewSource,
   isPreviewViewportId,
+  validatePreviewEnvelope,
+  validatePreviewSnapshotPayload,
 } from '../admin/page-builder/preview-contract.js';
 
 describe('admin page-builder preview contract', () => {
@@ -40,5 +46,55 @@ describe('admin page-builder preview contract', () => {
       'Previewing unsaved working changes'
     );
     expect(getPreviewStatusCopy('unknown')).toBe('Previewing saved draft');
+  });
+
+  it('builds and validates preview message envelopes separately from payloads', () => {
+    const snapshot = {
+      seriesId: 'battle-bros',
+      pageId: 'page-1',
+      pageSlug: 'reader',
+      draftMode: 'published',
+      snapshotVersion: BUILDER_PREVIEW_SNAPSHOT_VERSION,
+      source: BUILDER_PREVIEW_SOURCES.SAVED,
+      page: { id: 'page-1', sections: [] },
+      options: {},
+    };
+    const expected = {
+      previewSession: 'session-1',
+      seriesId: 'battle-bros',
+      pageId: 'page-1',
+      pageSlug: 'reader',
+    };
+
+    expect(isPreviewMessageType(BUILDER_PREVIEW_MESSAGE_TYPES.REQUEST_SNAPSHOT)).toBe(true);
+    expect(isPreviewMessageType(BUILDER_PREVIEW_MESSAGE_TYPES.SNAPSHOT)).toBe(true);
+    expect(isPreviewMessageType(BUILDER_PREVIEW_MESSAGE_TYPES.ACK)).toBe(true);
+    expect(isPreviewMessageType(BUILDER_PREVIEW_MESSAGE_TYPES.ERROR)).toBe(true);
+    expect(isPreviewMessageType('builder-preview:other')).toBe(false);
+
+    expect(validatePreviewSnapshotPayload(snapshot, expected)).toEqual({ valid: true, reason: '' });
+
+    const envelope = buildPreviewSnapshotMessage(snapshot, 'session-1');
+    expect(envelope).toEqual({
+      type: BUILDER_PREVIEW_MESSAGE_TYPES.SNAPSHOT,
+      previewSession: 'session-1',
+      snapshot,
+    });
+    expect(validatePreviewEnvelope(envelope, expected)).toEqual({ valid: true, reason: '' });
+
+    const ack = buildPreviewControlMessage(BUILDER_PREVIEW_MESSAGE_TYPES.ACK, expected);
+    expect(validatePreviewEnvelope(ack, expected)).toEqual({ valid: true, reason: '' });
+
+    expect(
+      validatePreviewEnvelope(buildPreviewSnapshotMessage(snapshot, 'wrong-session'), expected)
+        .valid
+    ).toBe(false);
+    expect(
+      validatePreviewSnapshotPayload({ ...snapshot, snapshotVersion: 99 }, expected).valid
+    ).toBe(false);
+    expect(validatePreviewSnapshotPayload({ ...snapshot, pageSlug: 'about' }, expected).valid).toBe(
+      false
+    );
+    expect(validatePreviewEnvelope({ type: 'unknown' }, expected).valid).toBe(false);
   });
 });

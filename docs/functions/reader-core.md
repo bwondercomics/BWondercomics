@@ -39,6 +39,7 @@ This document describes the current reader runtime under `reader/`. It replaces 
 - [📰 Feed Panel (feed-panel.js)](#-feed-panel-feed-paneljs)
 - [💬 Chat SSO Integration (chat-sso.js)](#-chat-sso-integration-chat-ssojs)
 - [🛡️ Safe Mode Guard (safe-mode.js)](#️-safe-mode-guard-safe-modejs)
+- [🌉 Builder Preview Bridge (preview-bridge.js)](#-builder-preview-bridge-preview-bridgejs)
 - [📜 Current Behavioral Contracts](#-current-behavioral-contracts)
 - [⚠️ Deprecated Or Easy-To-Misstate Areas](#️-deprecated-or-easy-to-misstate-areas)
 
@@ -71,13 +72,14 @@ The reader is split into three layers:
 3. `loadPageConfigWithFallback()` resolves builder content from two paths:
    - when the URL has an explicit `?page=<slug>`, it loads `/api/pages/<seriesId>/<slug>` or the admin by-slug draft endpoint
    - when no explicit page slug is present, it loads `/api/pages/home/<seriesId>` or the admin homepage draft endpoint so the series root follows homepage assignment instead of hard-coding `reader`
-4. Missing builder pages resolve to `source: 'none'`; normal startup does not fetch legacy `page-config.json`.
-5. After the first render or error state is ready, `app.js` releases bootstrap hiding and exposes `window.BattleBros` subtitle helpers.
-6. `reader/customization.js` waits for the boot result and remains a no-op so `source: 'none'` cannot repaint the legacy shell.
+4. **Builder preview mode** (`?builderPreview=1`): when the URL carries this flag, `app.js` skips `loadPageConfigWithFallback()` entirely, lazy-imports `reader/preview-bridge.js`, and calls `requestPreviewSnapshot(...)`. The bridge sends a `REQUEST_SNAPSHOT` message to the parent admin frame, validates the `SNAPSHOT` reply, and returns a resolved page result. That result is applied via `applyBuilderPageToDOM(...)` with `previewMode: true` so all side-effect hooks are suppressed. If the request times out or the snapshot is invalid, `handlePreviewLoadError()` surfaces an inline error and releases bootstrap state with `source: 'error'`.
+5. Missing builder pages resolve to `source: 'none'`; normal startup does not fetch legacy `page-config.json`.
+6. After the first render or error state is ready, `app.js` releases bootstrap hiding and exposes `window.BattleBros` subtitle helpers.
+7. `reader/customization.js` waits for the boot result and remains a no-op so `source: 'none'` cannot repaint the legacy shell.
 
 ## 🔌 Main Entry Point (app.js)
 
-The composition root. Loads runtime data, applies premium gating, initializes DOM bindings, coordinates boot-state handoff, lazy-loads `gallery.js` and `fullscreen.js`, and reacts to session changes.
+The composition root. Loads runtime data, applies premium gating, initializes DOM bindings, coordinates boot-state handoff, lazy-loads `gallery.js` and `fullscreen.js`, and reacts to session changes. In builder preview mode (`?builderPreview=1`) the normal data-fetch path is bypassed; the reader instead waits for a validated snapshot from the admin frame via `preview-bridge.js`. A `previewMode` flag propagates through `init(...)` and `attachEventHandlers(...)` to suppress fullscreen, mouse-edge controls, topbar hover handlers, navigation links, store-entry redirects, and analytics initialization.
 
 ## 💾 Data Hydration (data.js)
 
@@ -88,6 +90,7 @@ Important current behavior:
 - `loadHomepageBuilderPage()` is the root-path loader used when no explicit page slug is requested
 - root-path builder loading now follows the effective homepage resolver instead of always requesting the `reader` slug directly
 - `applyBuilderPageToDOM()` resolves header state once and reuses that same state for both visible copy and shared topbar layout
+- `applyBuilderPageToDOM()` accepts a `previewMode` option that propagates to `renderPanelStack(...)` and `initEmailForms(...)` so email signup forms show a preview stub instead of submitting
 - normal startup resolves V3 page headers with `pageConfig: null`; optional legacy config remains accepted only for migration/safety helper calls
 
 ## 💾 Global State (state.js)
@@ -112,7 +115,7 @@ Scale/pan math, reset/zoom helpers, desktop on-page frame sizing, and fullscreen
 
 ## 🔲 Fullscreen Manager (fullscreen.js)
 
-Fullscreen entry/exit, controls-bar visibility, and coordination with frame fitting.
+Fullscreen entry/exit, controls-bar visibility, and coordination with frame fitting. In builder preview mode (`?builderPreview=1`) `toggleFullscreen()` returns immediately, so the preview iframe cannot go fullscreen.
 
 ## 🪟 Overlays Management (overlays.js)
 
@@ -138,10 +141,13 @@ Entry sorting, numeric extraction, and sanitized entry/page normalization.
 
 Series id, page slug, draft-mode parsing, and public file-path helpers.
 
-Current distinction:
+Current exports include:
 
-- `getExplicitPageSlug()` returns only a user-supplied `?page=` slug
-- the reader no longer invents `reader` as an explicit request at the URL-parsing layer; missing `?page=` now means "use the effective homepage resolver"
+- `getExplicitPageSlug()` — returns only a user-supplied `?page=` slug; the reader no longer invents `reader` as an explicit request
+- `isBuilderPreviewRequested()` — returns `true` when `?builderPreview=1` (or `true`/`yes`) is present
+- `getPreviewSessionToken()` — returns the `?previewSession=` token used to match `postMessage` envelopes
+- `getPreviewPageId()` — returns the `?pageId=` parameter for identity validation in the bridge
+- `getRequestedPageSlug()` — returns the `?page=` parameter without defaulting to empty string, used by `preview-bridge.js` for snapshot identity
 
 ## 🛠️ Utilities (utils.js)
 
@@ -154,6 +160,8 @@ Debug logging facade used across reader modules.
 ## 📄 Builder Page Renderer (page-renderer.js)
 
 Reader-side page renderer built on the shared builder renderers. Exports `renderPage`, `renderModule`, `fetchPage`, `mountPage`, `initEmailForms`, and `initPromoCarousels`.
+
+`mountPage(container, slug, seriesId, options)` and `initEmailForms(container, options)` both accept a `previewMode` option that shows a stub confirmation message instead of submitting to the API.
 
 ## 🏗️ Header Layout (header-layout.js)
 
@@ -183,7 +191,7 @@ Analytics and live tracking are separate systems. `analytics.js` handles reader 
 
 ## 📡 Live Tracker (live-tracking.js)
 
-Maintains a lightweight visitor heartbeat to `/api/track/visitor` with visitor id, path, series id, entry label, and page number. It handles active-visitor presence tracking.
+Maintains a lightweight visitor heartbeat to `/api/track/visitor` with visitor id, path, series id, entry label, and page number. It handles active-visitor presence tracking. In builder preview mode (`?builderPreview=1`) `initLiveTracking()` exits immediately without starting the heartbeat, so no tracking events fire from preview.
 
 ## 🎯 Comment Targets (comment-targets.js)
 
@@ -192,6 +200,8 @@ Builds stable target ids such as `battle-bros:entry-5` and post target ids.
 ## 🗣️ Comments Engine (comic-comments.js)
 
 Self-contained reader comments UI. It handles session checks, sign-in/register/sign-out, comment posting, admin moderation calls, entry-target changes, and comment-panel collapse/expand behavior. It also requests `fitOnPageFrame()` after comment layout changes.
+
+In builder preview mode (`?builderPreview=1`) the comment UI enters a read-only state: the auth form is hidden, the comment form is disabled with an explanatory hint, and all mutating API calls (`login`, `register`, `postComment`, `moderateComment`) throw immediately without a network request. `logout()` is silently ignored.
 
 Note: `comic-comments.js` currently uses its own local fetch helpers instead of importing `reader/api.js` or `reader/auth.js`.
 
@@ -213,11 +223,11 @@ Shared endpoint and status-code constants used by auth/API/user-settings helpers
 
 ## 👤 User Settings Overlay (user-settings.js)
 
-Overlay-driven account UI for sign-in, email opt-in, premium-code redeem, comment management, logout, and account deletion.
+Overlay-driven account UI for sign-in, email opt-in, premium-code redeem, comment management, logout, and account deletion. In builder preview mode (`?builderPreview=1`) the open button is disabled and `aria-disabled` is set, preventing the overlay from opening.
 
 ## 📧 Email Signup form (email.js)
 
-Email signup form handler. Binds submit events, handles API submission, and displays success/error feedback inline.
+Email signup form handler. Binds submit events, handles API submission, and displays success/error feedback inline. Accepts a `previewMode` option: when set, form submission shows a stub "Form works! (Preview mode - not submitted)" message instead of calling the API.
 
 ## 🚀 Latest Posts Widget (latest.js)
 
@@ -229,11 +239,19 @@ Powers the right-panel feed surface and builder feed modules. It loads `/api/pos
 
 ## 💬 Chat SSO Integration (chat-sso.js)
 
-Chat/community handoff support.
+Chat/community handoff support. In builder preview mode (`?builderPreview=1`) the module exits immediately at startup, so no SSO handoff or redirect flow is initiated.
 
 ## 🛡️ Safe Mode Guard (safe-mode.js)
 
-Optional redirect guard. It reads `/page-config.json` on non-local hosts and redirects to `safeModeUrl` when safe mode is enabled.
+Optional redirect guard. It reads `/page-config.json` on non-local hosts and redirects to `safeModeUrl` when safe mode is enabled. In builder preview mode (`?builderPreview=1`) `checkSafeMode()` returns immediately, so no page-config fetch or redirect occurs inside the preview iframe.
+
+## 🌉 Builder Preview Bridge (preview-bridge.js)
+
+Handles the reader side of the admin-to-iframe preview handshake. Only loaded when `?builderPreview=1` is present; the module is lazy-imported by `reader/app.js` in that path.
+
+Key export: `requestPreviewSnapshot(options)` — sends a `REQUEST_SNAPSHOT` control message to the parent admin frame, waits up to 5 seconds for a `SNAPSHOT` reply, validates the reply with `validatePreviewEnvelope(...)` from `preview-contract.js`, sends `ACK` on success or `ERROR` on failure, and resolves with `{ source: 'builder', page, previewMode: true, snapshot }`. The identity contract (series id, page id, page slug, preview session token) is assembled from `reader/series.js` helpers and validated on both sides to prevent stale or misrouted messages.
+
+Also exports: `validatePreviewMessageEvent(event, expected)` — validates a raw `MessageEvent` from the parent frame, checking origin and source before delegating to `validatePreviewEnvelope(...)`.
 
 ## 📜 Current Behavioral Contracts
 

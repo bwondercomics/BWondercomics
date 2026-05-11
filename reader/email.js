@@ -1,7 +1,8 @@
 // Email signup form handler (internal API).
-export function initEmailSignupForm() {
+export function initEmailSignupForm(options = {}) {
   const form = document.getElementById('emailSignupForm');
   const messageDiv = document.getElementById('emailFormMessage');
+  const previewMode = !!options.previewMode;
 
   if (!form) return;
 
@@ -14,6 +15,14 @@ export function initEmailSignupForm() {
     const source = form.dataset.source || 'homepage';
 
     if (!email) return;
+    if (previewMode) {
+      if (messageDiv) {
+        messageDiv.textContent = 'Form works! (Preview mode - not submitted)';
+        messageDiv.className = 'email-form-message success';
+        messageDiv.style.display = 'block';
+      }
+      return;
+    }
 
     submitBtn.disabled = true;
     submitBtn.textContent = 'SENDING...';

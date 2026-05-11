@@ -15,6 +15,15 @@ function isCoarsePointer() {
   );
 }
 
+function isBuilderPreview() {
+  const raw = new URLSearchParams(window.location.search || '').get('builderPreview');
+  return ['1', 'true', 'yes'].includes(
+    String(raw || '')
+      .trim()
+      .toLowerCase()
+  );
+}
+
 function getFullscreenHideDelay() {
   if (document.fullscreenElement && isCoarsePointer()) {
     return CONFIG.CONTROLS_HIDE_DELAY + 6000;
@@ -101,6 +110,7 @@ export function onFullscreenChange() {
 }
 
 export function toggleFullscreen() {
+  if (isBuilderPreview()) return;
   // Request or exit fullscreen mode.
   if (!document.fullscreenElement) {
     document.documentElement.requestFullscreen().catch(() => {});

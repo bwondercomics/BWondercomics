@@ -18,19 +18,16 @@ import {
 import { normalizeHeaderNavItems } from './page-builder/link-utils.js';
 import { createSidebarPanel } from './page-builder/sidebar-panel.js';
 import {
-  renderPreviewPage,
-  initPreviewEmailForms,
-  initPreviewPromoCarousels,
-  setPreviewSeriesId,
-} from './page-builder/preview-renderers.js';
-import {
+  BUILDER_PREVIEW_MESSAGE_TYPES,
   BUILDER_PREVIEW_SNAPSHOT_VERSION,
   BUILDER_PREVIEW_SOURCES,
   DEFAULT_BUILDER_PREVIEW_SIDE_EFFECTS,
   PREVIEW_VIEWPORT_ORDER,
+  buildPreviewSnapshotMessage,
   getPreviewStatusCopy,
   getPreviewViewport,
   isPreviewViewportId,
+  validatePreviewEnvelope,
 } from './page-builder/preview-contract.js';
 import {
   fetchPages,
@@ -250,6 +247,10 @@ function createPageBuilder({
   let canvasMode = 'edit';
   /** @type {'desktop'|'tablet'|'mobile'} */
   let previewWidth = PREVIEW_VIEWPORT_ORDER[0];
+  let previewSession = '';
+  let previewIdentity = '';
+  let latestPreviewSnapshot = null;
+  let previewMessageBound = false;
   /** @type {'builder'|'designer'} */
   let activeEntrypoint = 'builder';
   /** @type {''|'header'} */
@@ -833,6 +834,103 @@ function createPageBuilder({
     return `../index.html?${params.toString()}`;
   }
 
+  function createPreviewSessionToken() {
+    if (window.crypto && typeof window.crypto.randomUUID === 'function') {
+      return window.crypto.randomUUID();
+    }
+    return `preview-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+  }
+
+  function getPreviewIdentity(snapshot) {
+    if (!snapshot) return '';
+    return [
+      snapshot.seriesId || '',
+      snapshot.pageId || '',
+      snapshot.pageSlug || '',
+      snapshot.draftMode || '',
+    ].join('|');
+  }
+
+  function getPreviewIframeUrl(snapshot, session) {
+    const params = new URLSearchParams({
+      series: snapshot.seriesId || getSeriesId(),
+      page: String(snapshot.pageSlug || '').trim() || 'reader',
+      pageId: snapshot.pageId || '',
+      builderPreview: '1',
+      previewSession: session,
+    });
+    if (snapshot.draftMode === 'draft') {
+      params.set('draft', '1');
+    }
+    return new URL(`/index.html?${params.toString()}`, window.location.origin).toString();
+  }
+
+  function getPreviewExpectedIdentity(snapshot = latestPreviewSnapshot) {
+    return {
+      previewSession,
+      snapshotVersion: BUILDER_PREVIEW_SNAPSHOT_VERSION,
+      seriesId: snapshot?.seriesId || '',
+      pageId: snapshot?.pageId || '',
+      pageSlug: snapshot?.pageSlug || '',
+    };
+  }
+
+  function postPreviewSnapshot() {
+    const iframe = /** @type {HTMLIFrameElement|null} */ (
+      el.pbCanvas?.querySelector('.pb-preview-iframe')
+    );
+    if (!iframe?.contentWindow || !latestPreviewSnapshot || !previewSession) return;
+    iframe.contentWindow.postMessage(
+      buildPreviewSnapshotMessage(latestPreviewSnapshot, previewSession),
+      window.location.origin
+    );
+  }
+
+  function updatePreviewFrameDataset(frame, snapshot, viewport) {
+    if (!frame || !snapshot) return;
+    frame.dataset.width = viewport.id;
+    frame.dataset.previewSource = snapshot.source || '';
+    frame.dataset.pageId = snapshot.pageId || '';
+    frame.dataset.pageSlug = snapshot.pageSlug || '';
+    frame.dataset.draftMode = snapshot.draftMode || '';
+    frame.dataset.snapshotVersion = String(snapshot.snapshotVersion || '');
+    frame.dataset.viewportWidth = String(viewport.width);
+    frame.dataset.viewportHeight = String(viewport.height);
+    frame.dataset.previewSession = previewSession;
+  }
+
+  function handlePreviewMessage(event) {
+    const iframe = /** @type {HTMLIFrameElement|null} */ (
+      el.pbCanvas?.querySelector('.pb-preview-iframe')
+    );
+    if (!iframe || !latestPreviewSnapshot || event.origin !== window.location.origin) return;
+    if (event.source && iframe.contentWindow && event.source !== iframe.contentWindow) return;
+
+    const validation = validatePreviewEnvelope(event.data, getPreviewExpectedIdentity());
+    if (!validation.valid) return;
+
+    if (event.data.type === BUILDER_PREVIEW_MESSAGE_TYPES.REQUEST_SNAPSHOT) {
+      postPreviewSnapshot();
+      return;
+    }
+
+    const frame = /** @type {HTMLElement|null} */ (el.pbCanvas?.querySelector('.pb-preview-frame'));
+    if (event.data.type === BUILDER_PREVIEW_MESSAGE_TYPES.ACK) {
+      if (frame) frame.dataset.previewReady = 'true';
+      return;
+    }
+    if (event.data.type === BUILDER_PREVIEW_MESSAGE_TYPES.ERROR) {
+      if (frame) frame.dataset.previewError = event.data.error || 'Preview failed';
+      const status = /** @type {HTMLElement|null} */ (
+        el.pbCanvas?.querySelector('.pb-preview-status')
+      );
+      if (status) {
+        status.dataset.status = 'danger';
+        status.textContent = event.data.error || 'Preview failed';
+      }
+    }
+  }
+
   function setPageActionState(activeButton, busyText) {
     const buttons = [el.pbSaveDraft, el.pbPublish].filter(Boolean);
     const original = new Map(buttons.map((button) => [button, button.textContent]));
@@ -1366,35 +1464,79 @@ function createPageBuilder({
     if (!el.pbCanvas) return;
 
     const snapshot = createPreviewPageSnapshot();
-    const html = snapshot
-      ? renderPreviewPage(snapshot.page)
-      : '<div class="pb-canvas-empty"><p>Select a page to preview it.</p></div>';
-    const statusHtml = snapshot
-      ? `<div class="pb-canvas-notice pb-preview-status" data-status="${snapshot.source === BUILDER_PREVIEW_SOURCES.WORKING ? 'warning' : 'neutral'}" data-preview-source="${escapeAttr(snapshot.source)}">${getPreviewStatusCopy(snapshot.source)}</div>`
-      : '';
+    if (!snapshot) {
+      latestPreviewSnapshot = null;
+      previewIdentity = '';
+      previewSession = '';
+      el.pbCanvas.dataset.mode = 'preview';
+      el.pbCanvas.innerHTML =
+        '<div class="pb-canvas-empty"><p>Select a page to preview it.</p></div>';
+      return;
+    }
+
     const viewport = snapshot?.options?.viewport || getPreviewViewport(previewWidth);
+    const nextIdentity = getPreviewIdentity(snapshot);
+    const shouldReload = !previewSession || previewIdentity !== nextIdentity;
+    if (shouldReload) {
+      previewSession = createPreviewSessionToken();
+      previewIdentity = nextIdentity;
+    }
+    latestPreviewSnapshot = snapshot;
 
     el.pbCanvas.dataset.mode = 'preview';
-    el.pbCanvas.innerHTML = `
-      ${statusHtml}
-      <div class="pb-preview-frame"
-           data-width="${escapeAttr(viewport.id)}"
-           data-preview-source="${escapeAttr(snapshot?.source || '')}"
-           data-page-id="${escapeAttr(snapshot?.pageId || '')}"
-           data-page-slug="${escapeAttr(snapshot?.pageSlug || '')}"
-           data-draft-mode="${escapeAttr(snapshot?.draftMode || '')}"
-           data-snapshot-version="${escapeAttr(String(snapshot?.snapshotVersion || ''))}"
-           data-viewport-width="${escapeAttr(String(viewport.width))}"
-           data-viewport-height="${escapeAttr(String(viewport.height))}">
-        ${html}
-      </div>
-    `;
+    const statusHtml = `<div class="pb-canvas-notice pb-preview-status" data-status="${snapshot.source === BUILDER_PREVIEW_SOURCES.WORKING ? 'warning' : 'neutral'}" data-preview-source="${escapeAttr(snapshot.source)}">${getPreviewStatusCopy(snapshot.source)}</div>`;
+    const existingFrame = /** @type {HTMLElement|null} */ (
+      el.pbCanvas.querySelector('.pb-preview-frame')
+    );
+    const existingIframe = /** @type {HTMLIFrameElement|null} */ (
+      el.pbCanvas.querySelector('.pb-preview-iframe')
+    );
 
-    const frame = el.pbCanvas.querySelector('.pb-preview-frame');
-    if (frame) {
-      initPreviewEmailForms(frame);
-      initPreviewPromoCarousels(frame);
+    if (shouldReload || !existingFrame || !existingIframe) {
+      const iframeUrl = getPreviewIframeUrl(snapshot, previewSession);
+      el.pbCanvas.innerHTML = `
+        ${statusHtml}
+        <div class="pb-preview-frame"
+             data-width="${escapeAttr(viewport.id)}"
+             data-preview-source="${escapeAttr(snapshot.source || '')}"
+             data-page-id="${escapeAttr(snapshot.pageId || '')}"
+             data-page-slug="${escapeAttr(snapshot.pageSlug || '')}"
+             data-draft-mode="${escapeAttr(snapshot.draftMode || '')}"
+             data-snapshot-version="${escapeAttr(String(snapshot.snapshotVersion || ''))}"
+             data-viewport-width="${escapeAttr(String(viewport.width))}"
+             data-viewport-height="${escapeAttr(String(viewport.height))}"
+             data-preview-session="${escapeAttr(previewSession)}">
+          <iframe
+            class="pb-preview-iframe"
+            title="Reader preview"
+            src="${escapeAttr(iframeUrl)}"
+            width="${escapeAttr(String(viewport.width))}"
+            height="${escapeAttr(String(viewport.height))}"
+            loading="eager"
+            referrerpolicy="same-origin">
+          </iframe>
+        </div>
+      `;
+      const iframe = /** @type {HTMLIFrameElement|null} */ (
+        el.pbCanvas.querySelector('.pb-preview-iframe')
+      );
+      iframe?.addEventListener('load', postPreviewSnapshot);
+      return;
     }
+
+    const status = /** @type {HTMLElement|null} */ (
+      el.pbCanvas.querySelector('.pb-preview-status')
+    );
+    if (status) {
+      status.dataset.status =
+        snapshot.source === BUILDER_PREVIEW_SOURCES.WORKING ? 'warning' : 'neutral';
+      status.dataset.previewSource = snapshot.source || '';
+      status.textContent = getPreviewStatusCopy(snapshot.source);
+    }
+    updatePreviewFrameDataset(existingFrame, snapshot, viewport);
+    existingIframe.width = String(viewport.width);
+    existingIframe.height = String(viewport.height);
+    postPreviewSnapshot();
   }
 
   function renderCanvas() {
@@ -1715,6 +1857,10 @@ function createPageBuilder({
 
   function initPageBuilder() {
     applyEditorMode();
+    if (!previewMessageBound) {
+      window.addEventListener('message', handlePreviewMessage);
+      previewMessageBound = true;
+    }
 
     if (el.pbToggleEditor) {
       el.pbToggleEditor.addEventListener('click', toggleEditorMode);
@@ -1888,12 +2034,26 @@ function createPageBuilder({
           b.classList.toggle('pb-width-toggle--active', b.dataset.width === previewWidth);
         });
 
-        // Update existing preview frame in-place (no full re-render needed)
+        // Update existing preview iframe in-place; identity changes trigger a reload elsewhere.
         const frame = /** @type {HTMLElement|null} */ (
           el.pbCanvas?.querySelector('.pb-preview-frame')
         );
+        const iframe = /** @type {HTMLIFrameElement|null} */ (
+          el.pbCanvas?.querySelector('.pb-preview-iframe')
+        );
+        const viewport = getPreviewViewport(previewWidth);
         if (frame) {
-          frame.dataset.width = previewWidth;
+          frame.dataset.width = viewport.id;
+          frame.dataset.viewportWidth = String(viewport.width);
+          frame.dataset.viewportHeight = String(viewport.height);
+        }
+        if (iframe) {
+          iframe.width = String(viewport.width);
+          iframe.height = String(viewport.height);
+        }
+        if (latestPreviewSnapshot?.options) {
+          latestPreviewSnapshot.options.viewport = { ...viewport };
+          postPreviewSnapshot();
         }
       });
     }
@@ -1903,7 +2063,9 @@ function createPageBuilder({
     const nextPageSlug = isDesignerMode() ? currentPage?.slug || '' : '';
     currentPage = null;
     resetBuilderState();
-    setPreviewSeriesId(getSeriesId());
+    previewSession = '';
+    previewIdentity = '';
+    latestPreviewSnapshot = null;
     if (el.pageBuilderSection?.style.display !== 'none') {
       showPageBuilderSection({
         entrypoint: activeEntrypoint,
