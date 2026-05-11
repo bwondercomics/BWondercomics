@@ -2,61 +2,71 @@
 
 ## 🚀 Pre-Commit Checklist
 
-Before every commit, run through this quick checklist:
+Use this checklist in order. For doc-only changes, run the documentation and format checks that
+apply. For code, phase, milestone, release, or cross-contract changes, run the full relevant gate and
+record anything skipped.
 
-### **Code Quality**
+### **Scope**
+
+- Review `git status --short` and `git diff` before staging.
+- If a task says to "commit the changes" after a completed phase or implementation pass, include all
+  tracked worktree changes that belong to that phase.
+- Keep one commit per cohesive task or phase. If tracked changes include unrelated work, confirm
+  scope before committing.
+- Ignored or generated files stay out of the commit unless they are explicitly requested and
+  intentionally force-added.
+
+### **Quality Gate**
 
 ```bash
-# 1. Check for debugging code
-grep -r "console.log" reader/ admin/
-grep -r "debugger" reader/ admin/
+# Review scope and whitespace
+git status --short
+git diff
+git diff --check
 
-# 2. Check for TODO comments
-grep -r "TODO" reader/ admin/ backend/
+# Review unexpected debug or placeholder code
+rg -n "console\\.log|debugger" reader/ admin/
+rg -n "TODO|FIXME" reader/ admin/ backend/ tests/
 
-# 3. Run tests
+# Frontend and shared docs/assets
+npm run format:check
+npm run lint
 npm test
 
-# 3b. Run backend tests
+# Backend
+npm run format:py:check
+npm run lint:py
 npm run test:backend
 
-# 3c. Generate frontend coverage report (informational, not a gate)
-npm run test:coverage
-
-# 4. Lint + format (JS)
-npm run lint
-npm run format:check
-
-# 5. Lint + format (backend)
-python -m ruff check backend/app
-python -m ruff format backend/app
+# App behavior, asset, or release-facing changes
+npm run build
 ```
 
-### **Contract Fixtures**
+Run `npm run test:coverage` when coverage output is part of the task, release gate, or CI parity
+check.
 
-- Treat `tests/fixtures/contract-fixtures.json` and `backend/tests/helpers.py` as the canonical reader/admin/backend contract layer.
-- If a backend payload shape changes, update that shared contract layer and at least one frontend test plus one backend test.
+### **Docs and Contracts**
 
-### **Security**
+- Update any docs that became stale because of the change before committing.
+- If the task completes a named phase, pass, or implementation milestone, include the matching doc
+  updates in the same scoped commit unless told otherwise.
+- Prefer canonical docs over local notes or ignored temp docs when updating source-of-truth
+  documentation.
+- Treat `tests/fixtures/contract-fixtures.json` and `backend/tests/helpers.py` as the canonical
+  reader/admin/backend contract layer.
+- If a backend payload shape changes, update that shared contract layer plus at least one frontend
+  test and one backend test.
 
-- [ ] No hardcoded credentials or API keys
-- [ ] All user inputs sanitized
-- [ ] Auth checks in place for protected routes
-- [ ] HTTPS enforced in production
+### **Final Review**
 
-### **Performance**
-
-- [ ] No N+1 database queries
-- [ ] Images optimized (WebP, responsive sizes)
-- [ ] Lazy loading for off-screen content
-- [ ] No render-blocking resources
-
-### **Accessibility**
-
-- [ ] All images have alt text
-- [ ] Interactive elements keyboard accessible
-- [ ] Proper heading hierarchy (h1 → h2 → h3)
-- [ ] Focus indicators visible
+- Security: no hardcoded secrets, protected routes have auth checks, and user-controlled input is
+  validated or sanitized.
+- Performance: no obvious N+1 queries, unbounded fetches, oversized images, or render-blocking
+  assets in the changed path.
+- Accessibility: meaningful image alt text, keyboard-accessible controls, visible focus states, and
+  logical heading order.
+- Verification: record commands run and anything important not run. Phase or milestone commits
+  should include a commit message body with the implementation summary and verification status.
 
 ---
 
