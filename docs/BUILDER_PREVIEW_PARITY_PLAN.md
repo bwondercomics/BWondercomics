@@ -2,7 +2,8 @@
 
 Status: Phase 2 and Phase 3 iframe preview synchronization implemented (`2026-05-11`);
 Phase 3.5 refactor extraction is landed but still open for optional polish; Phase 4 parity
-hardening is complete; Phase 5 responsive verification is pending.
+hardening is complete; Phase 5 responsive parity instrumentation is implemented; Phase 6 visual
+verification is pending.
 
 Goal: make the page builder preview a trustworthy representation of the page as it will render in
 the public reader at desktop, tablet, and mobile sizes.
@@ -403,6 +404,19 @@ bridge.
 
 Deliverable: desktop/tablet/mobile modes trigger the same CSS and JavaScript branches as the live
 reader at those viewport sizes.
+
+**Completion note (`2026-05-11`):** Phase 5 responsive parity instrumentation is implemented. The
+admin preview now gives the iframe exact preset CSS pixel dimensions from `PREVIEW_VIEWPORTS` and
+scrolls the real preview canvas instead of shrinking the iframe to the admin canvas. The preview
+contract now includes `builder-preview:metrics`, explicit media-query branch names, metrics payload
+validation, and reader-to-admin metrics messages. The reader bridge stores the active preview
+snapshot context, emits metrics after snapshot application and debounced resize renders, reports
+two-page mode, branch flags, iframe inner dimensions, and element-level overflow offenders, and
+keeps listening for follow-up preview snapshots. The admin preview manager validates metrics,
+stores them on `.pb-preview-frame.dataset`, and exposes an admin-frame debug overlay enabled by
+`?previewDebug=1` or `localStorage.pb-preview-debug = "1"`. Focused coverage now verifies metrics
+contract validation, exact iframe sizing, preview response handling, two-page expectations for all
+presets, branch flags, and overflow offender reporting.
 
 ### Phase 6 - Visual Verification
 

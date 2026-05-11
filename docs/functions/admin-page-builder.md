@@ -177,7 +177,10 @@ Current responsibilities:
 - derive preview identity from the active series/page/draft state
 - clone the current page into a preview snapshot and merge the active local dirty draft when needed
 - send `SNAPSHOT` messages to the reader iframe and answer `REQUEST_SNAPSHOT`
-- validate inbound `ACK` and `ERROR` messages through `validatePreviewEnvelope(...)`
+- validate inbound `ACK`, `ERROR`, and `METRICS` messages through `validatePreviewEnvelope(...)`
+- apply exact preset width/height styles to both `.pb-preview-frame` and `.pb-preview-iframe`
+- store responsive metrics on `.pb-preview-frame.dataset`, including inner dimensions, branch flags, and overflow offenders
+- render the admin-side preview debug overlay when metrics are present and debug mode is enabled
 - update `.pb-preview-frame` dataset attributes and `.pb-preview-status` copy
 - rerender the preview frame whenever preview mode or viewport state changes
 
@@ -394,17 +397,20 @@ Defines the shared contract for the builder's iframe-based reader preview. `admi
 Key exports:
 
 - `PREVIEW_VIEWPORTS` and `PREVIEW_VIEWPORT_ORDER` — canonical Desktop, Tablet, and Mobile presets with iframe-ready dimensions (`1280x900`, `768x1024`, `375x812`)
+- `PREVIEW_MEDIA_QUERIES` — named responsive `matchMedia(...)` probes used for parity metrics (`aspectMax7By5`, `aspectMax5By7`, `maxWidth768`, `maxWidth480`)
 - `BUILDER_PREVIEW_SNAPSHOT_VERSION` — version marker for builder preview payloads
 - `BUILDER_PREVIEW_SOURCES` — `saved` for hydrated API pages and `working` for cloned snapshots that include an active local draft
-- `BUILDER_PREVIEW_MESSAGE_TYPES` — `REQUEST_SNAPSHOT`, `SNAPSHOT`, `ACK`, `ERROR`; the full `postMessage` type registry shared by sender and receiver
+- `BUILDER_PREVIEW_MESSAGE_TYPES` — `REQUEST_SNAPSHOT`, `SNAPSHOT`, `ACK`, `ERROR`, `METRICS`; the full `postMessage` type registry shared by sender and receiver
 - `DEFAULT_BUILDER_PREVIEW_SIDE_EFFECTS` — default preview policy for disabling or stubbing mutating reader behavior
 - `getPreviewViewport(...)`, `isPreviewViewportId(...)`, `isPreviewSource(...)`, `isPreviewMessageType(...)`, and `getPreviewStatusCopy(...)` — small validation/copy helpers
 - `buildPreviewSnapshotMessage(snapshot, previewSession)` — constructs the typed `SNAPSHOT` envelope sent from the admin to the iframe
 - `buildPreviewControlMessage(type, details)` — constructs `REQUEST_SNAPSHOT`, `ACK`, or `ERROR` envelopes sent from the iframe back to the admin
+- `buildPreviewMetricsMessage(metrics, details)` — constructs the typed `METRICS` envelope sent from the reader iframe back to the admin
 - `validatePreviewSnapshotPayload(snapshot, expected)` — validates snapshot shape, version, source, draftMode, page structure, and identity fields
-- `validatePreviewEnvelope(message, expected)` — validates any inbound `postMessage` data: unknown types are rejected, session/identity fields are checked, and `SNAPSHOT` messages are forwarded to `validatePreviewSnapshotPayload`
+- `validatePreviewMetricsPayload(metrics, expected)` — validates viewport identity, exact preset dimensions, branch-flag booleans, and overflow offender structure
+- `validatePreviewEnvelope(message, expected)` — validates any inbound `postMessage` data: unknown types are rejected, session/identity fields are checked, `SNAPSHOT` messages are forwarded to `validatePreviewSnapshotPayload`, and `METRICS` messages are forwarded to `validatePreviewMetricsPayload`
 
-`preview-manager.js` now uses the full message-type registry to drive the iframe handshake: it listens for `REQUEST_SNAPSHOT` from the iframe and responds with a `SNAPSHOT` message; it handles `ACK` by marking the frame ready and `ERROR` by surfacing the error in the preview status bar. A new preview session token (`previewSession`) is minted on page/series identity change to prevent stale message acceptance.
+`preview-manager.js` now uses the full message-type registry to drive the iframe handshake and responsive verification loop: it listens for `REQUEST_SNAPSHOT` from the iframe and responds with a `SNAPSHOT` message; it handles `ACK` by marking the frame ready, `ERROR` by surfacing the error in the preview status bar, and `METRICS` by persisting the latest responsive measurements onto the frame dataset for optional debug display. A new preview session token (`previewSession`) is minted on page/series identity change to prevent stale message acceptance.
 
 ## 🎡 Promo Renderer (promo-renderer.js)
 
@@ -468,6 +474,7 @@ Again: `header` is compatibility-only in the catalog and is not part of the norm
 - The admin canvas is an editing surface with builder chrome. Preview mode now renders through a real reader iframe (`index.html?builderPreview=1`) for full reader-shell parity, not through a constrained div.
 - Shared renderer parity exists at the module/section/page HTML level through `shared-renderers.js`. The iframe preview approach means real viewport dimensions, real media queries, and real reader-side JavaScript all run in preview.
 - The iframe preview bridge (`reader/preview-bridge.js`) and the `postMessage` protocol defined in `preview-contract.js` are implemented. The snapshot merge path covers module config, theme metadata, normalized header metadata, page settings, and section spacing without mutating `currentPage`.
+- Phase 5 responsive parity instrumentation is also implemented: the iframe now keeps exact preset dimensions, the admin preview canvas scrolls instead of shrinking those presets, and preview metrics now verify breakpoint branches, two-page mode expectations, and horizontal overflow risks.
 - Legacy `page-config` and legacy `header` module content still exist as migration/backfill inputs. Normal reader startup and page-builder header editing resolve V3 page headers with `pageConfig: null`; stored legacy `header` modules are later cleanup debt once V3 metadata exists.
 
 ## 📚 Related Docs

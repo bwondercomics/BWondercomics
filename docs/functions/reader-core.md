@@ -72,14 +72,14 @@ The reader is split into three layers:
 3. `loadPageConfigWithFallback()` resolves builder content from two paths:
    - when the URL has an explicit `?page=<slug>`, it loads `/api/pages/<seriesId>/<slug>` or the admin by-slug draft endpoint
    - when no explicit page slug is present, it loads `/api/pages/home/<seriesId>` or the admin homepage draft endpoint so the series root follows homepage assignment instead of hard-coding `reader`
-4. **Builder preview mode** (`?builderPreview=1`): when the URL carries this flag, `app.js` skips `loadPageConfigWithFallback()` entirely, lazy-imports `reader/preview-bridge.js`, and calls `requestPreviewSnapshot(...)`. The bridge sends a `REQUEST_SNAPSHOT` message to the parent admin frame, validates the `SNAPSHOT` reply, and returns a resolved page result. That result is applied via `applyBuilderPageToDOM(...)` with `previewMode: true` so all side-effect hooks are suppressed. If the request times out or the snapshot is invalid, `handlePreviewLoadError()` surfaces an inline error and releases bootstrap state with `source: 'error'`.
+4. **Builder preview mode** (`?builderPreview=1`): when the URL carries this flag, `app.js` skips `loadPageConfigWithFallback()` entirely, lazy-imports `reader/preview-bridge.js`, and calls `requestPreviewSnapshot(...)`. The bridge sends a `REQUEST_SNAPSHOT` message to the parent admin frame, validates the `SNAPSHOT` reply, and returns a resolved page result. That result is applied via `applyBuilderPageToDOM(...)` with `previewMode: true` so all side-effect hooks are suppressed. After the snapshot is applied, the bridge stores preview identity context, emits a validated `METRICS` payload back to the admin frame, and stays subscribed for follow-up `SNAPSHOT` updates from the builder. If the request times out or the snapshot is invalid, `handlePreviewLoadError()` surfaces an inline error and releases bootstrap state with `source: 'error'`.
 5. Missing builder pages resolve to `source: 'none'`; normal startup does not fetch legacy `page-config.json`.
 6. After the first render or error state is ready, `app.js` releases bootstrap hiding and exposes `window.BattleBros` subtitle helpers.
 7. `reader/customization.js` waits for the boot result and remains a no-op so `source: 'none'` cannot repaint the legacy shell.
 
 ## 🔌 Main Entry Point (app.js)
 
-The composition root. Loads runtime data, applies premium gating, initializes DOM bindings, coordinates boot-state handoff, lazy-loads `gallery.js` and `fullscreen.js`, and reacts to session changes. In builder preview mode (`?builderPreview=1`) the normal data-fetch path is bypassed; the reader instead waits for a validated snapshot from the admin frame via `preview-bridge.js`. A `previewMode` flag propagates through `init(...)` and `attachEventHandlers(...)` to suppress fullscreen, mouse-edge controls, topbar hover handlers, navigation links, store-entry redirects, and analytics initialization.
+The composition root. Loads runtime data, applies premium gating, initializes DOM bindings, coordinates boot-state handoff, lazy-loads `gallery.js`, `fullscreen.js`, and the preview bridge, and reacts to session changes. In builder preview mode (`?builderPreview=1`) the normal data-fetch path is bypassed; the reader instead waits for a validated snapshot from the admin frame via `preview-bridge.js`. A `previewMode` flag propagates through `init(...)` and `attachEventHandlers(...)` to suppress fullscreen, mouse-edge controls, topbar hover handlers, navigation links, store-entry redirects, and analytics initialization. Preview mode also emits responsive metrics after snapshot application and after the debounced resize `render()` path completes.
 
 ## 💾 Data Hydration (data.js)
 
@@ -247,11 +247,16 @@ Optional redirect guard. It reads `/page-config.json` on non-local hosts and red
 
 ## 🌉 Builder Preview Bridge (preview-bridge.js)
 
-Handles the reader side of the admin-to-iframe preview handshake. Only loaded when `?builderPreview=1` is present; the module is lazy-imported by `reader/app.js` in that path.
+Handles the reader side of the admin-to-iframe preview handshake and responsive metrics reporting. Only loaded when `?builderPreview=1` is present; the module is lazy-imported by `reader/app.js` in that path.
 
-Key export: `requestPreviewSnapshot(options)` — sends a `REQUEST_SNAPSHOT` control message to the parent admin frame, waits up to 5 seconds for a `SNAPSHOT` reply, validates the reply with `validatePreviewEnvelope(...)` from `preview-contract.js`, sends `ACK` on success or `ERROR` on failure, and resolves with `{ source: 'builder', page, previewMode: true, snapshot }`. The identity contract (series id, page id, page slug, preview session token) is assembled from `reader/series.js` helpers and validated on both sides to prevent stale or misrouted messages.
+Key export: `requestPreviewSnapshot(options)` — sends a `REQUEST_SNAPSHOT` control message to the parent admin frame, waits up to 5 seconds for a `SNAPSHOT` reply, validates the reply with `validatePreviewEnvelope(...)` from `preview-contract.js`, sends `ACK` on success or `ERROR` on failure, stores the accepted snapshot as active preview context, and resolves with `{ source: 'builder', page, previewMode: true, snapshot }`. The identity contract (series id, page id, page slug, preview session token) is assembled from `reader/series.js` helpers and validated on both sides to prevent stale or misrouted messages.
 
-Also exports: `validatePreviewMessageEvent(event, expected)` — validates a raw `MessageEvent` from the parent frame, checking origin and source before delegating to `validatePreviewEnvelope(...)`.
+Also exports:
+
+- `subscribePreviewSnapshots(onSnapshot, options)` — keeps listening for follow-up `SNAPSHOT` messages after initial boot, revalidates them, acknowledges them, and lets `app.js` reapply the updated page snapshot without a full iframe reload.
+- `setPreviewMetricsContext(snapshot, overrides)` — stores the active snapshot identity used for metrics messages.
+- `collectPreviewMetrics(snapshot?)` and `emitPreviewMetrics(reason)` — gather iframe `innerWidth`/`innerHeight`, named media-query branch flags, two-page-mode state, and overflow offenders, then post a `builder-preview:metrics` envelope back to the admin frame.
+- `validatePreviewMessageEvent(event, expected)` — validates a raw `MessageEvent` from the parent frame, checking origin and source before delegating to `validatePreviewEnvelope(...)`.
 
 ## 📜 Current Behavioral Contracts
 

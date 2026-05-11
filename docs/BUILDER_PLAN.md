@@ -187,7 +187,11 @@ reader iframe backed by the shared preview contract, so preview mode uses the re
 shell, real viewport dimensions, and the same reader-side `applyBuilderPageToDOM(...)` shell
 application path as runtime. Phase 4 hardening also clears controlled theme variables and panel
 shell state between snapshots so preview updates do not leak stale theme, opacity, spacing, or
-hidden-panel state from a previous page snapshot.
+hidden-panel state from a previous page snapshot. Phase 5 responsive parity instrumentation then
+removed the old `max-width` clamp behavior: the preview frame and iframe now take exact preset CSS
+pixel dimensions, the preview canvas scrolls when the preset is larger than the admin viewport,
+and the reader bridge reports validated responsive metrics back to the admin frame for Desktop,
+Tablet, and Mobile verification.
 
 ### Current page and button model
 
@@ -417,7 +421,7 @@ Deliberately not in this phase:
 - Added `admin/page-builder/preview-contract.js` with the versioned preview snapshot contract, source labels, side-effect policy, and iframe-ready viewport dimensions: Desktop `1280x900`, Tablet `768x1024`, and Mobile `375x812`.
 - Preview mode now labels whether it is rendering the saved hydrated page or an unsaved working snapshot.
 - When the active dirty scope is `module`, `theme`, `header`, `page-settings`, or `section`, preview merges that local draft into a cloned page snapshot without mutating `currentPage`.
-- The current preview still uses `.pb-preview-frame`; exact full reader-shell parity remains a later iframe/preview-bridge phase tracked in `docs/BUILDER_PREVIEW_PARITY_PLAN.md`.
+- At that point the preview still used a clamped `.pb-preview-frame`; later Phase 3-5 parity work replaced that path with the current reader iframe, exact preset sizing, and preview metrics instrumentation tracked in `docs/BUILDER_PREVIEW_PARITY_PLAN.md`.
 
 ### Phase 3 - Page management pass ✅
 
