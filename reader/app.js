@@ -24,6 +24,7 @@ import {
 // Code splitting: lazy load heavier modules on demand.
 let galleryModule = null;
 let fullscreenModule = null;
+let previewBridgeModule = null;
 
 async function loadGalleryModule() {
   if (!galleryModule) {
@@ -37,6 +38,13 @@ async function loadFullscreenModule() {
     fullscreenModule = await import('./fullscreen.js');
   }
   return fullscreenModule;
+}
+
+async function loadPreviewBridgeModule() {
+  if (!previewBridgeModule) {
+    previewBridgeModule = await import('./preview-bridge.js');
+  }
+  return previewBridgeModule;
 }
 
 // Wrapper functions that load modules on-demand
@@ -73,6 +81,12 @@ async function handleMouseEnterControls() {
 async function handleMouseLeaveControls() {
   const mod = await loadFullscreenModule();
   return mod.handleMouseLeaveControls();
+}
+
+function emitPreviewMetrics(reason) {
+  loadPreviewBridgeModule()
+    .then((mod) => mod.emitPreviewMetrics?.(reason))
+    .catch(() => {});
 }
 import { renderLatestUpdate } from './latest.js';
 import { initRightPanelFeed } from './feed-panel.js';
@@ -834,6 +848,7 @@ import {
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(() => {
         render();
+        if (previewMode) emitPreviewMetrics('resize');
       }, 150);
     });
 
@@ -1061,8 +1076,8 @@ import {
     });
     if (previewMode) {
       try {
-        const { requestPreviewSnapshot } = await import('./preview-bridge.js');
-        const pageResult = await requestPreviewSnapshot({
+        const previewBridge = await loadPreviewBridgeModule();
+        const pageResult = await previewBridge.requestPreviewSnapshot({
           seriesId,
           pageSlug: explicitPageSlug || 'reader',
         });
@@ -1073,6 +1088,26 @@ import {
           seriesId,
           previewMode: true,
         });
+        previewBridge.setPreviewMetricsContext?.(pageResult.snapshot, {
+          seriesId,
+          pageId: pageResult.snapshot?.pageId,
+          pageSlug: pageResult.snapshot?.pageSlug || explicitPageSlug || 'reader',
+        });
+        previewBridge.emitPreviewMetrics?.('snapshot-applied');
+        previewBridge.subscribePreviewSnapshots?.(
+          (nextPageResult) => {
+            applyBuilderPageToDOM(nextPageResult.page, {
+              seriesId,
+              previewMode: true,
+            });
+            previewBridge.emitPreviewMetrics?.('snapshot-updated');
+          },
+          {
+            seriesId,
+            pageId: pageResult.snapshot?.pageId,
+            pageSlug: pageResult.snapshot?.pageSlug || explicitPageSlug || 'reader',
+          }
+        );
       } catch (err) {
         handlePreviewLoadError(err);
       }

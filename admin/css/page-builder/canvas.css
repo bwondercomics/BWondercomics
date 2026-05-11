@@ -168,6 +168,10 @@
   padding: 16px;
 }
 
+.pb-canvas[data-mode='preview'] {
+  overflow: auto;
+}
+
 .pb-canvas-empty {
   display: flex;
   flex-direction: column;
@@ -642,32 +646,35 @@
 
 .pb-preview-frame {
   margin: 0 auto;
-  width: 100%;
-  max-width: min(100%, var(--pb-preview-width, 1280px));
-  overflow-y: visible;
-  overflow-x: hidden;
-  transition: max-width 0.25s ease;
+  overflow: visible;
   padding: 0;
-}
-
-.pb-preview-frame[data-width='desktop'] {
-  --pb-preview-width: 1280px;
-}
-
-.pb-preview-frame[data-width='tablet'] {
-  --pb-preview-width: 768px;
-}
-
-.pb-preview-frame[data-width='mobile'] {
-  --pb-preview-width: 375px;
+  position: relative;
 }
 
 .pb-preview-iframe {
   display: block;
-  width: 100%;
-  max-width: 100%;
   border: 0;
   background: var(--bg-dark, #05070b);
+}
+
+.pb-preview-debug-overlay {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 3;
+  max-width: min(420px, calc(100% - 16px));
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 217, 255, 0.45);
+  background: rgba(5, 7, 11, 0.88);
+  color: #e8fbff;
+  font:
+    11px/1.45 'JetBrains Mono',
+    'SFMono-Regular',
+    Consolas,
+    monospace;
+  white-space: pre-wrap;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 /* ==================== CANVAS PREVIEW MODE ==================== */

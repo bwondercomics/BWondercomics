@@ -3,6 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   BUILDER_PREVIEW_MESSAGE_TYPES,
   BUILDER_PREVIEW_SNAPSHOT_VERSION,
+  PREVIEW_VIEWPORTS,
+  buildPreviewMetricsMessage,
 } from '../admin/page-builder/preview-contract.js';
 import { buildContractFixture, getContractFixture } from './helpers/contracts.js';
 import { flushAdminUi, mountAdminDom, stubAdminGlobals } from './helpers/admin-fixture.js';
@@ -1204,9 +1206,17 @@ describe('admin page-builder shell', () => {
 
     expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('desktop');
     const initialIframe = getPreviewIframe();
+    const initialFrame = getPreviewFrame();
     const initialSrc = initialIframe?.getAttribute('src');
     expect(initialSrc).toContain('/index.html?');
     expect(initialSrc).toContain('builderPreview=1');
+    expect(canvas?.dataset.mode).toBe('preview');
+    expect(canvas?.querySelector('.pb-preview-container')).toBeNull();
+    expect(initialFrame?.parentElement).toBe(canvas);
+    expect(initialFrame?.style.width).toBe('1280px');
+    expect(initialFrame?.style.height).toBe('900px');
+    expect(initialIframe?.style.width).toBe('1280px');
+    expect(initialIframe?.style.height).toBe('900px');
 
     // Switch to tablet
     widthToggles
@@ -1217,6 +1227,10 @@ describe('admin page-builder shell', () => {
     expect(getPreviewIframe()?.getAttribute('src')).toBe(initialSrc);
     expect(getPreviewIframe()?.getAttribute('width')).toBe('768');
     expect(getPreviewIframe()?.getAttribute('height')).toBe('1024');
+    expect(getPreviewFrame()?.style.width).toBe('768px');
+    expect(getPreviewFrame()?.style.height).toBe('1024px');
+    expect(getPreviewIframe()?.style.width).toBe('768px');
+    expect(getPreviewIframe()?.style.height).toBe('1024px');
     expect(
       widthToggles
         ?.querySelector('[data-width="tablet"]')
@@ -1236,12 +1250,18 @@ describe('admin page-builder shell', () => {
     expect(getPreviewIframe()).toBe(initialIframe);
     expect(getPreviewIframe()?.getAttribute('width')).toBe('375');
     expect(getPreviewIframe()?.getAttribute('height')).toBe('812');
+    expect(getPreviewFrame()?.style.width).toBe('375px');
+    expect(getPreviewFrame()?.style.height).toBe('812px');
+    expect(getPreviewIframe()?.style.width).toBe('375px');
+    expect(getPreviewIframe()?.style.height).toBe('812px');
 
     // Back to desktop
     widthToggles
       ?.querySelector('[data-width="desktop"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('desktop');
+    expect(getPreviewFrame()?.style.width).toBe('1280px');
+    expect(getPreviewFrame()?.style.height).toBe('900px');
 
     const invalidWidth = document.createElement('button');
     invalidWidth.dataset.width = 'wide';
@@ -1341,6 +1361,44 @@ describe('admin page-builder shell', () => {
     );
 
     expect(frame.dataset.previewReady).toBe('true');
+
+    const metrics = {
+      viewport: { ...PREVIEW_VIEWPORTS.mobile },
+      innerWidth: 375,
+      innerHeight: 812,
+      pageSlug: selectedPage.slug,
+      snapshotVersion: BUILDER_PREVIEW_SNAPSHOT_VERSION,
+      twoPageMode: false,
+      branchFlags: {
+        aspectMax7By5: true,
+        aspectMax5By7: true,
+        maxWidth768: true,
+        maxWidth480: true,
+      },
+      overflow: {
+        hasOverflow: true,
+        rootHasOverflow: false,
+        offenders: [{ selector: '.pb-html', index: 0 }],
+      },
+    };
+    window.dispatchEvent(
+      new MessageEvent('message', {
+        data: buildPreviewMetricsMessage(metrics, {
+          previewSession: frame.dataset.previewSession,
+          seriesId: 'battle-bros',
+          pageId: selectedPage.id,
+          pageSlug: selectedPage.slug,
+        }),
+        origin: window.location.origin,
+        source: iframeWindow,
+      })
+    );
+
+    expect(frame.dataset.metricsPreset).toBe('mobile');
+    expect(frame.dataset.metricsInnerWidth).toBe('375');
+    expect(frame.dataset.metricsInnerHeight).toBe('812');
+    expect(frame.dataset.metricsHasOverflow).toBe('true');
+    expect(frame.dataset.metricsOverflowOffenders).toContain('.pb-html');
   });
 
   it('previews dirty module drafts without mutating the saved page snapshot', async () => {

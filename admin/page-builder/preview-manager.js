@@ -32,6 +32,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
   let previewSession = '';
   let previewIdentity = '';
   let latestPreviewSnapshot = null;
+  let latestPreviewMetrics = null;
   let previewMessageBound = false;
 
   function getPreviewIframeUrl(snapshot, session) {
@@ -80,6 +81,81 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     frame.dataset.viewportWidth = String(viewport.width);
     frame.dataset.viewportHeight = String(viewport.height);
     frame.dataset.previewSession = previewSession;
+    frame.style.width = `${viewport.width}px`;
+    frame.style.height = `${viewport.height}px`;
+  }
+
+  function applyPreviewIframeSize(iframe, viewport) {
+    if (!iframe || !viewport) return;
+    iframe.width = String(viewport.width);
+    iframe.height = String(viewport.height);
+    iframe.style.width = `${viewport.width}px`;
+    iframe.style.height = `${viewport.height}px`;
+  }
+
+  function isPreviewDebugEnabled() {
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      const queryValue = String(params.get('previewDebug') || '').toLowerCase();
+      if (queryValue === '1' || queryValue === 'true' || queryValue === 'yes') return true;
+      return localStorage.getItem('pb-preview-debug') === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  function renderPreviewDebugOverlay(frame, metrics = latestPreviewMetrics) {
+    if (!frame) return;
+    let overlay = frame.querySelector('.pb-preview-debug-overlay');
+    if (!isPreviewDebugEnabled() || !metrics) {
+      overlay?.remove();
+      return;
+    }
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'pb-preview-debug-overlay';
+      overlay.setAttribute('aria-live', 'polite');
+      frame.appendChild(overlay);
+    }
+
+    const viewport = metrics.viewport || {};
+    const branchFlags = Object.entries(metrics.branchFlags || {})
+      .map(([key, value]) => `${key}: ${value ? 'on' : 'off'}`)
+      .join(', ');
+    const offenders = metrics.overflow?.offenders || [];
+    const offenderText = offenders.length
+      ? offenders
+          .map((item) => item.selector)
+          .slice(0, 6)
+          .join(', ')
+      : 'none';
+
+    overlay.textContent = [
+      `Preset: ${viewport.label || viewport.id || 'unknown'} (${viewport.width || '?'}x${viewport.height || '?'})`,
+      `Inner: ${metrics.innerWidth || '?'}x${metrics.innerHeight || '?'}`,
+      `Page: ${metrics.pageSlug || 'unknown'} · Snapshot v${metrics.snapshotVersion || '?'}`,
+      `Two-page: ${metrics.twoPageMode ? 'on' : 'off'}`,
+      `Branches: ${branchFlags || 'none'}`,
+      `Overflow: ${metrics.overflow?.hasOverflow ? 'yes' : 'no'} · ${offenderText}`,
+    ].join('\n');
+  }
+
+  function storePreviewMetrics(frame, metrics) {
+    if (!frame || !metrics) return;
+    latestPreviewMetrics = metrics;
+    const viewport = metrics.viewport || {};
+    frame.dataset.metricsPreset = viewport.id || '';
+    frame.dataset.metricsExpectedWidth = String(viewport.width ?? '');
+    frame.dataset.metricsExpectedHeight = String(viewport.height ?? '');
+    frame.dataset.metricsInnerWidth = String(metrics.innerWidth ?? '');
+    frame.dataset.metricsInnerHeight = String(metrics.innerHeight ?? '');
+    frame.dataset.metricsPageSlug = metrics.pageSlug || '';
+    frame.dataset.metricsSnapshotVersion = String(metrics.snapshotVersion ?? '');
+    frame.dataset.metricsTwoPageMode = metrics.twoPageMode ? 'true' : 'false';
+    frame.dataset.metricsBranchFlags = JSON.stringify(metrics.branchFlags || {});
+    frame.dataset.metricsHasOverflow = metrics.overflow?.hasOverflow ? 'true' : 'false';
+    frame.dataset.metricsOverflowOffenders = JSON.stringify(metrics.overflow?.offenders || []);
+    renderPreviewDebugOverlay(frame, metrics);
   }
 
   function handlePreviewMessage(event) {
@@ -98,6 +174,10 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     }
 
     const frame = /** @type {HTMLElement|null} */ (el.pbCanvas?.querySelector('.pb-preview-frame'));
+    if (event.data.type === BUILDER_PREVIEW_MESSAGE_TYPES.METRICS) {
+      storePreviewMetrics(frame, event.data.metrics);
+      return;
+    }
     if (event.data.type === BUILDER_PREVIEW_MESSAGE_TYPES.ACK) {
       if (frame) frame.dataset.previewReady = 'true';
       return;
@@ -218,6 +298,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     if (shouldReload) {
       previewSession = createPreviewSessionToken();
       previewIdentity = nextIdentity;
+      latestPreviewMetrics = null;
     }
     latestPreviewSnapshot = snapshot;
 
@@ -243,13 +324,15 @@ export function createPreviewManager({ el, getState, actions, deps }) {
              data-snapshot-version="${escapeAttr(String(snapshot.snapshotVersion || ''))}"
              data-viewport-width="${escapeAttr(String(viewport.width))}"
              data-viewport-height="${escapeAttr(String(viewport.height))}"
-             data-preview-session="${escapeAttr(previewSession)}">
+             data-preview-session="${escapeAttr(previewSession)}"
+             style="width: ${escapeAttr(String(viewport.width))}px; height: ${escapeAttr(String(viewport.height))}px;">
           <iframe
             class="pb-preview-iframe"
             title="Reader preview"
             src="${escapeAttr(iframeUrl)}"
             width="${escapeAttr(String(viewport.width))}"
             height="${escapeAttr(String(viewport.height))}"
+            style="width: ${escapeAttr(String(viewport.width))}px; height: ${escapeAttr(String(viewport.height))}px;"
             loading="eager"
             referrerpolicy="same-origin">
           </iframe>
@@ -272,8 +355,8 @@ export function createPreviewManager({ el, getState, actions, deps }) {
       status.textContent = getPreviewStatusCopy(snapshot.source);
     }
     updatePreviewFrameDataset(existingFrame, snapshot, viewport);
-    existingIframe.width = String(viewport.width);
-    existingIframe.height = String(viewport.height);
+    applyPreviewIframeSize(existingIframe, viewport);
+    renderPreviewDebugOverlay(existingFrame);
     postPreviewSnapshot();
   }
 
@@ -291,10 +374,12 @@ export function createPreviewManager({ el, getState, actions, deps }) {
       frame.dataset.width = viewport.id;
       frame.dataset.viewportWidth = String(viewport.width);
       frame.dataset.viewportHeight = String(viewport.height);
+      frame.style.width = `${viewport.width}px`;
+      frame.style.height = `${viewport.height}px`;
+      renderPreviewDebugOverlay(frame);
     }
     if (iframe) {
-      iframe.width = String(viewport.width);
-      iframe.height = String(viewport.height);
+      applyPreviewIframeSize(iframe, viewport);
     }
     if (latestPreviewSnapshot?.options) {
       latestPreviewSnapshot.options.viewport = { ...viewport };

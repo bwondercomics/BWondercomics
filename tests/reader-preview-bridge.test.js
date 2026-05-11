@@ -123,4 +123,39 @@ describe('reader preview bridge', () => {
       window.location.origin
     );
   });
+
+  it('subscribes to follow-up preview snapshots and acknowledges them', async () => {
+    setPreviewUrl();
+    const postMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => {});
+    const onSnapshot = vi.fn();
+    const { subscribePreviewSnapshots } = await import('../reader/preview-bridge.js');
+
+    const unsubscribe = subscribePreviewSnapshots(onSnapshot, {
+      seriesId: 'battle-bros',
+      pageId: 'page-1',
+      pageSlug: 'reader',
+    });
+    const snapshot = buildSnapshot({
+      page: { id: 'page-1', sections: [{ id: 'section-1', modules: [] }] },
+    });
+    dispatchPreviewMessage(buildPreviewSnapshotMessage(snapshot, 'session-1'));
+
+    expect(onSnapshot).toHaveBeenCalledWith({
+      source: 'builder',
+      page: snapshot.page,
+      previewMode: true,
+      snapshot,
+    });
+    expect(postMessage).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        type: BUILDER_PREVIEW_MESSAGE_TYPES.ACK,
+        previewSession: 'session-1',
+      }),
+      window.location.origin
+    );
+
+    unsubscribe();
+    dispatchPreviewMessage(buildPreviewSnapshotMessage(snapshot, 'session-1'));
+    expect(onSnapshot).toHaveBeenCalledTimes(1);
+  });
 });

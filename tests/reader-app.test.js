@@ -59,11 +59,27 @@ async function bootReaderApp({
   }));
   const loadLatestPost = vi.fn(async () => getContractFixture('latestPost'));
   const applyBuilderPageToDOM = vi.fn();
+  const previewSnapshot = {
+    seriesId: 'battle-bros',
+    pageId: 'fixture-builder-page',
+    pageSlug: 'reader',
+    draftMode: 'published',
+    snapshotVersion: 1,
+    source: 'saved',
+    page: getContractFixture('builderPage'),
+    options: {
+      viewport: { id: 'desktop', label: 'Desktop', width: 1280, height: 900 },
+    },
+  };
   const requestPreviewSnapshot = vi.fn(async () => ({
     source: 'builder',
-    page: getContractFixture('builderPage'),
+    page: previewSnapshot.page,
     previewMode: true,
+    snapshot: previewSnapshot,
   }));
+  const setPreviewMetricsContext = vi.fn();
+  const emitPreviewMetrics = vi.fn();
+  const subscribePreviewSnapshots = vi.fn();
   const renderStatusPanel = vi.fn();
   const render = vi.fn();
   const renderLatestUpdate = vi.fn();
@@ -94,6 +110,9 @@ async function bootReaderApp({
   }));
   vi.doMock('../reader/preview-bridge.js', () => ({
     requestPreviewSnapshot,
+    setPreviewMetricsContext,
+    emitPreviewMetrics,
+    subscribePreviewSnapshots,
   }));
   vi.doMock('../reader/render.js', () => ({
     renderStatusPanel,
@@ -172,6 +191,9 @@ async function bootReaderApp({
       nextPage,
       prevPage,
       requestPreviewSnapshot,
+      setPreviewMetricsContext,
+      emitPreviewMetrics,
+      subscribePreviewSnapshots,
       render,
       renderGallery,
       renderLatestUpdate,

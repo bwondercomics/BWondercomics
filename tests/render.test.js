@@ -3,6 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
+import { PREVIEW_VIEWPORTS } from '../admin/page-builder/preview-contract.js';
 
 // Mock the dependencies
 vi.mock('../reader/config.js', () => ({
@@ -86,6 +87,20 @@ describe('isTwoPageMode', () => {
     const result = isTwoPageMode();
     // Should be very close to the threshold
     expect(typeof result).toBe('boolean');
+  });
+
+  it('matches builder preview viewport two-page expectations', () => {
+    const cases = [
+      [PREVIEW_VIEWPORTS.desktop, true],
+      [PREVIEW_VIEWPORTS.tablet, false],
+      [PREVIEW_VIEWPORTS.mobile, false],
+    ];
+
+    for (const [viewport, expected] of cases) {
+      global.innerWidth = viewport.width;
+      global.innerHeight = viewport.height;
+      expect(isTwoPageMode()).toBe(expected);
+    }
   });
 });
 
