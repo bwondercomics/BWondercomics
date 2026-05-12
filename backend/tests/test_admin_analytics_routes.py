@@ -717,7 +717,7 @@ class AdminAnalyticsRouteTests(BackendRouteTestCase):
         self._insert_umami_session("session-a", "visitor-a")
         self._insert_umami_event(
             session_id="session-a",
-            created_at=now - timedelta(days=1),
+            created_at=now - timedelta(minutes=5),
             event_name="reader_page_view",
             data={
                 "series": "battle-bros",

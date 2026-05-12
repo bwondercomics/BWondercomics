@@ -33,6 +33,10 @@ npm run format:check
 npm run lint
 npm test
 
+# Browser visual parity, required for preview/parity/release-facing UI phases
+npx playwright install chromium
+npm run test:visual
+
 # Backend
 npm run format:py:check
 npm run lint:py
@@ -44,6 +48,11 @@ npm run build
 
 Run `npm run test:coverage` when coverage output is part of the task, release gate, or CI parity
 check.
+
+`npm run test:visual` is intentionally outside `npm run test:all`; run it for browser preview
+parity, screenshot baseline, release gate, or other visual contract changes. If the local Linux host
+is missing Chromium runtime libraries, run `npx playwright install-deps chromium` with system package
+privileges before rerunning the visual suite.
 
 ### **Docs and Contracts**
 

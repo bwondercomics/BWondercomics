@@ -1,8 +1,9 @@
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
     environment: 'happy-dom',
+    exclude: [...configDefaults.exclude, 'tests/visual/**'],
     setupFiles: ['tests/setup.js'],
     coverage: {
       provider: 'v8',

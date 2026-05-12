@@ -1524,6 +1524,7 @@ describe('admin page-builder shell', () => {
 
   it('shows working preview status for dirty header drafts', async () => {
     const selectedPage = getContractFixture('builderPage');
+    const originalHeader = JSON.parse(JSON.stringify(selectedPage.meta.header));
     const { manager } = await setupPageBuilder({
       fetchPagesResults: [[selectedPage]],
       fetchPageResult: selectedPage,
@@ -1542,10 +1543,16 @@ describe('admin page-builder shell', () => {
 
     expect(getPreviewStatus()?.textContent).toBe('Previewing unsaved working changes');
     expect(getPreviewFrame()?.dataset.previewSource).toBe('working');
+
+    const snapshot = requestCurrentPreviewSnapshot();
+    expect(snapshot?.source).toBe('working');
+    expect(snapshot?.page.meta.header.copy.title).toBe('Draft Header Title');
+    expect(selectedPage.meta.header).toEqual(originalHeader);
   });
 
   it('shows working preview status and slug metadata for dirty page settings drafts', async () => {
     const selectedPage = getContractFixture('builderPage');
+    const originalSlug = selectedPage.slug;
     const { manager } = await setupPageBuilder({
       fetchPagesResults: [[selectedPage]],
       fetchPageResult: selectedPage,
@@ -1565,11 +1572,17 @@ describe('admin page-builder shell', () => {
     expect(getPreviewStatus()?.textContent).toBe('Previewing unsaved working changes');
     expect(getPreviewFrame()?.dataset.previewSource).toBe('working');
     expect(getPreviewFrame()?.dataset.pageSlug).toBe('draft-reader');
+
+    const snapshot = requestCurrentPreviewSnapshot();
+    expect(snapshot?.source).toBe('working');
+    expect(snapshot?.page.slug).toBe('draft-reader');
+    expect(selectedPage.slug).toBe(originalSlug);
   });
 
   it('previews dirty section settings drafts', async () => {
     const selectedPage = getContractFixture('builderPage');
     const targetSection = selectedPage.sections.find((section) => section.layout === '1-1');
+    const originalSettings = JSON.parse(JSON.stringify(targetSection.settings));
     const { manager } = await setupPageBuilder({
       fetchPagesResults: [[selectedPage]],
       fetchPageResult: selectedPage,
@@ -1593,6 +1606,14 @@ describe('admin page-builder shell', () => {
     expect(getPreviewStatus()?.textContent).toBe('Previewing unsaved working changes');
     expect(getPreviewFrame()?.dataset.previewSource).toBe('working');
     expect(getPreviewIframe()).not.toBeNull();
+
+    const snapshot = requestCurrentPreviewSnapshot();
+    const previewSection = snapshot?.page.sections.find(
+      (section) => section.id === targetSection.id
+    );
+    expect(snapshot?.source).toBe('working');
+    expect(previewSection?.settings.columnGap).toBe(77);
+    expect(targetSection.settings).toEqual(originalSettings);
   });
 
   it('shows a migration banner in the header editor for a legacy page without meta.header', async () => {

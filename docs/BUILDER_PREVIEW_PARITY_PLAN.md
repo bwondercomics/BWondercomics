@@ -3,7 +3,7 @@
 Status: Phase 2 and Phase 3 iframe preview synchronization implemented (`2026-05-11`);
 Phase 3.5 refactor extraction is landed but still open for optional polish; Phase 4 parity
 hardening is complete; Phase 5 responsive parity instrumentation is implemented; Phase 6 visual
-verification is pending.
+verification is implemented.
 
 Goal: make the page builder preview a trustworthy representation of the page as it will render in
 the public reader at desktop, tablet, and mobile sizes.
@@ -420,43 +420,59 @@ presets, branch flags, and overflow offender reporting.
 
 ### Phase 6 - Visual Verification
 
-Decision gate: either adopt browser-level visual verification for this pass or explicitly mark
-manual screenshot QA as the temporary substitute. If Playwright or an equivalent tool is deferred,
-the plan must record that automated visual regression coverage is intentionally absent and that the
-manual QA checklist is the release gate for visual parity.
+Decision: Playwright is adopted for this pass. Manual screenshot QA remains a supplemental Phase 7
+release activity, not the temporary substitute for missing browser coverage.
 
-1. Keep existing Vitest coverage for:
-   - shared renderer module contracts
-   - admin shell preview toggle behavior
-   - reader DOM application
-   - header appearance parity
-2. Add unit coverage for:
-   - preview viewport constants
-   - preview snapshot merging
-   - postMessage payload validation
-   - preview side-effect stubs
-3. Add browser-level visual checks. The recommended tool is Playwright, added as a dev dependency
-   only if the project accepts that dependency.
-4. Visual checks should compare:
+1. Keep existing Vitest coverage for shared renderer contracts, admin preview shell behavior,
+   reader DOM application, header appearance parity, viewport constants, postMessage validation,
+   responsive metrics, and preview side-effect guards.
+2. Add focused Vitest coverage for the remaining contract gaps:
+   - dirty `header`, `page-settings`, and `section` preview snapshots merge the draft shape
+   - preview snapshot merging does not mutate `currentPage`
+   - `chat-sso.js`, `safe-mode.js`, and `comic-comments.js` stay inert/read-only in builder preview
+3. Add Playwright as the browser visual test tool:
+   - `@playwright/test` dev dependency
+   - `npm run test:visual`
+   - `npm run test:visual:update`
+   - `playwright.config.js` on a dedicated strict Vite port, `127.0.0.1:3107`
+4. Add `tests/visual/builder-preview-parity.spec.js` to compare:
    - builder preview iframe at Desktop vs reader route at Desktop
    - builder preview iframe at Tablet vs reader route at Tablet
    - builder preview iframe at Mobile vs reader route at Mobile
 5. Stabilize visual tests by:
-   - using seeded builder fixtures
-   - disabling animations/transitions in test mode
-   - freezing timers where needed
-   - using stable latest/feed fixtures or mocking those API responses
-   - waiting for fonts/images before screenshots
+   - using `tests/fixtures/contract-fixtures.json`
+   - mocking reader/admin boot endpoints (`/api/session`, `/series.json`, `/data.json`,
+     page-builder APIs, post/feed APIs, `/media.json`, `/api/track/visitor`, and admin dashboard
+     support endpoints)
+   - intercepting gitignored media/protected image paths with deterministic PNGs
+   - disabling animations/transitions, freezing time, and waiting for fonts/images before screenshots
 6. Add non-screenshot browser assertions:
    - iframe `innerWidth` equals selected preset width
    - no horizontal overflow at Mobile
-   - expected mobile/desktop CSS branches are active
-   - same key elements exist in preview and reader
-7. If Playwright is not adopted in the first pass, create a manual screenshot checklist and keep
-   the automated work limited to Vitest until the dependency decision is made.
+   - expected media-query branch metrics are active
+   - stable reader shell/module selectors exist in preview and reader
+7. The admin route must be exercised like the product:
+   - open `/admin/index.html?view=designer&series=battle-bros&page=reader&surface=header`
+   - mock an admin session
+   - wait for Edit mode
+   - click `#pbViewPreview`
+   - select the requested `[data-width]` preset
+   - wait for `.pb-preview-frame[data-preview-ready="true"]`, surfacing `previewError` diagnostics
+     if the iframe handshake fails
 
-Deliverable: repeatable evidence that preview and reader match at all three required viewport
-classes.
+Deliverable: repeatable Playwright evidence that preview and reader match at all three required
+viewport classes.
+
+**Completion note (`2026-05-11`):** Phase 6 adopts Playwright and adds visual parity coverage for
+Desktop, Tablet, and Mobile using the same seeded builder fixture for public reader and admin iframe
+preview. The Playwright suite runs against a strict Vite server on `127.0.0.1:3107`, mocks the
+actual reader/admin boot endpoints, stubs media/protected images, freezes visual timing, compares
+iframe-internal screenshots to the reader route baseline, and asserts iframe width, branch metrics,
+mobile overflow, and key shell/module selectors. Focused Vitest coverage now also verifies dirty
+header/page-settings/section preview snapshot merges without mutating the source page, plus
+preview-mode chat SSO, safe-mode, and comments write guards. Run `npx playwright install chromium`
+once after dependency install before using `npm run test:visual`; on Linux hosts missing browser
+runtime libraries, run `npx playwright install-deps chromium` with system package privileges.
 
 ### Phase 7 - Manual QA
 
@@ -522,12 +538,11 @@ npm run format:py:check
 npm run lint
 npm run lint:py
 npm test
+npm run test:visual
 npm run test:backend
 npm run build
 git diff --check
 ```
-
-If browser visual tests are added, include that command in the gate.
 
 Because this work affects the public reader runtime, shared builder modules, public CSS, and public
 HTML behavior, `dist/` must be rebuilt before browser verification or release claims.

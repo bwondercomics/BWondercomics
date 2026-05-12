@@ -5,6 +5,7 @@
 This repo has two active test surfaces:
 
 - Frontend/admin tests via `Vitest` in `tests/`
+- Browser visual parity tests via `Playwright` in `tests/visual/`
 - Backend tests via Python `unittest` in `backend/tests/`
 
 The test suite is intended to reflect current production terminology and behavior. Use the codebase as the source of truth: `entry` is the current reader/admin naming, and older `chapter` references are legacy.
@@ -34,6 +35,21 @@ Run both:
 ```bash
 npm run test:all
 ```
+
+Browser visual parity:
+
+```bash
+npx playwright install chromium
+npm run test:visual
+```
+
+`npm run test:visual` is intentionally separate from `npm run test:all` because screenshot
+baselines and browser installation are release-gate concerns, not the default unit/backend loop.
+The Playwright server uses strict local Vite port `127.0.0.1:3107`; override it with
+`PLAYWRIGHT_VISUAL_PORT` only when that port is unavailable.
+On Linux hosts that are missing Chromium runtime libraries such as `libasound.so.2`, run
+`npx playwright install-deps chromium` with system package privileges before running the visual
+suite.
 
 Quality gates used for the `0.7.9` to `1.0.0` hardening pass:
 
@@ -102,6 +118,7 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - `tests/helpers/reader-fixture.js`: live reader markup harness from `index.html`
 - `tests/reader-preview-bridge.test.js`: `reader/preview-bridge.js` handshake protocol — `requestPreviewSnapshot(...)` resolves on valid `SNAPSHOT`, rejects on timeout or invalid envelope, and sends correct `ACK`/`ERROR` control messages; `validatePreviewMessageEvent(...)` rejects cross-origin and cross-source events
 - `tests/reader-preview-side-effects.test.js`: end-to-end reader preview side-effect guards — verifies that `?builderPreview=1` suppresses analytics initialization, live tracking, email form submission, comment mutations, chat SSO, safe-mode redirect, user-settings overlay, fullscreen, and external navigation links while leaving read-only reader shell behavior intact
+- `tests/visual/builder-preview-parity.spec.js`: Playwright visual parity coverage for the admin builder preview iframe against the public reader route at Desktop, Tablet, and Mobile. It uses seeded contract fixtures, mocked reader/admin endpoints, deterministic media placeholders, frozen visual timing, iframe width/metrics/overflow assertions, and committed screenshot baselines.
 
 ## Backend Test Files
 
