@@ -3,7 +3,7 @@
 Status: Phase 2 and Phase 3 iframe preview synchronization implemented (`2026-05-11`);
 Phase 3.5 refactor extraction is landed but still open for optional polish; Phase 4 parity
 hardening is complete; Phase 5 responsive parity instrumentation is implemented; Phase 6 visual
-verification is implemented.
+verification is implemented; Phase 7 manual QA and Phase 8 documentation cleanup are complete.
 
 Goal: make the page builder preview a trustworthy representation of the page as it will render in
 the public reader at desktop, tablet, and mobile sizes.
@@ -12,26 +12,26 @@ This plan is intentionally focused on preview fidelity. It does not expand the b
 freeform visual editor, and it does not change the existing explicit save/publish model unless a
 preview snapshot needs to include local unsaved draft state.
 
-## Audit Follow-Up
+## Baseline Audit Follow-Up
 
-The current code audit verified the core diagnosis in this plan:
+The baseline code audit for this plan verified the original diagnosis:
 
-- the builder preview still uses a `max-width` div frame, so viewport media queries are not exact
-- the builder preview renders module/page HTML, not the full reader shell
+- the old builder preview used a `max-width` div frame, so viewport media queries were not exact
+- the old builder preview rendered module/page HTML, not the full reader shell
 - the live reader applies page data through `applyBuilderPageToDOM(...)`, which also controls
   header, theme, panels, and runtime module initialization
 
-Known stale documentation to correct during implementation:
+Phase 8 corrected the known stale documentation called out by that audit:
 
-- `docs/BUILDER_PLAN.md` currently claims the shared-renderer preview is visually identical to the
-  reader; that is only true at the shared module HTML level, not at full responsive reader-shell
-  fidelity.
-- `docs/admin-overview.md` describes the current `max-width` preview frame and no-rerender width
-  switching as the intended behavior; that will become false once iframe preview lands.
+- `docs/BUILDER_PLAN.md` now distinguishes the structural edit canvas from the current iframe
+  preview path.
+- `docs/admin-overview.md` now describes the same-origin iframe preview, exact viewport presets,
+  `postMessage` snapshot bridge, and responsive metrics rather than the old frame clamp.
+- Compact context notes now match the active Edit/Preview toggle.
 
-## Problem Statement
+## Original Problem Statement
 
-The builder currently has two useful but incomplete preview surfaces:
+At the start of this parity work, the builder had two useful but incomplete preview surfaces:
 
 - Edit mode: `admin/page-builder/canvas-renderer.js` renders an authoring canvas with structural
   controls, insert zones, and a representative page-header surface.
@@ -39,9 +39,9 @@ The builder currently has two useful but incomplete preview surfaces:
   `admin/page-builder/preview-renderers.js`, which delegates module HTML output to
   `admin/page-builder/shared-renderers.js`.
 
-That shared renderer work is valuable, but the current preview is still not exact enough:
+That shared renderer work was valuable, but the old preview was not exact enough:
 
-- The desktop/tablet/mobile toggle changes `.pb-preview-frame[data-width]` with `max-width`.
+- The desktop/tablet/mobile toggle changed `.pb-preview-frame[data-width]` with `max-width`.
   CSS media queries still evaluate against the browser viewport, not that inner frame. A 375px
   preview inside a wide admin window can therefore fail to trigger the same mobile CSS that the
   reader uses on a real 375px viewport.
@@ -49,9 +49,9 @@ That shared renderer work is valuable, but the current preview is still not exac
   `reader/data.js` via `applyBuilderPageToDOM(...)`, which also updates `header.topbar`,
   `#leftPanel`, `#rightPanel`, theme CSS variables, panel backgrounds, panel visibility, reader
   controls, and mounted modules.
-- The current preview uses preview-only placeholders for some live mounts. That is fine for a
+- The old preview used preview-only placeholders for some live mounts. That was fine for a
   structural preview, but it is not the same as the final page.
-- Current tests prove shared renderer structure and shell toggle behavior. They do not prove
+- The original tests proved shared renderer structure and shell toggle behavior. They did not prove
   viewport media-query behavior, full reader shell parity, scroll/header state, or visual parity
   between builder preview and the reader route.
 
@@ -203,8 +203,9 @@ Phase 1 contract addendum:
   - Desktop: `1280 x 900`
   - Tablet: `768 x 1024`
   - Mobile: `375 x 812`
-- `PREVIEW_VIEWPORT_ORDER` is `desktop`, `tablet`, `mobile`; the current div preview still writes
-  that id to `.pb-preview-frame[data-width]` until the iframe phase replaces the frame.
+- `PREVIEW_VIEWPORT_ORDER` is `desktop`, `tablet`, `mobile`; at this Phase 1 checkpoint, the
+  then-current div preview still wrote that id to `.pb-preview-frame[data-width]` until the iframe
+  phase replaced the frame.
 - Preview snapshot payloads use `snapshotVersion: 1` and include `seriesId`, `pageId`, `pageSlug`,
   `draftMode`, `source`, `page`, and `options`.
 - `draftMode` is `draft` when `currentPage.isPublished === false`, otherwise `published`.
@@ -522,7 +523,8 @@ module-renderer/admin-preview Vitest coverage.
 4. Update `docs/functions/reader-core.md` for:
    - reader preview bridge
    - preview side-effect stubs
-   - exact-preview query parameter
+   - actual preview query parameters (`builderPreview=1`, `previewSession`, `page`, `pageId`, and
+     optional `draft=1`)
 5. Remove stale statements that say either:
    - preview is only a structural canvas
    - preview is exact when it still uses max-width framing
@@ -535,6 +537,16 @@ module-renderer/admin-preview Vitest coverage.
 7. Remove the old div-based preview path after the iframe path is stable.
 
 Deliverable: docs describe the actual preview architecture without contradictory notes.
+
+**Completion note (`2026-05-14`):** Phase 8 documentation cleanup is implemented. The builder plan
+now treats the edit canvas as structural and the current Preview mode as the iframe-based
+reader-shell preview. Admin overview, builder function docs, reader function docs, style docs, and
+compact context notes now describe `preview-manager.js`, `reader/preview-bridge.js`, exact
+`PREVIEW_VIEWPORTS` sizing, validated `postMessage` snapshots, responsive metrics, and preview-mode
+side-effect stubs. The stale `exact-preview` wording was resolved as documentation debt; the
+implemented query flag remains `builderPreview=1`. `admin/page-builder/preview-renderers.js` was
+not removed because direct renderer tests still import it; docs now describe it as a retained
+direct-render support path, not the active live preview implementation.
 
 ### Phase 9 - Release Gate
 

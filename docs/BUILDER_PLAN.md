@@ -117,19 +117,24 @@ Shipped behavior in the admin builder:
 - explicit `Save Draft` and `Publish Changes`
 - page status badges in the page list and page header
 - "Open Reader" / draft preview link
+- Edit/Preview mode toggle with Desktop, Tablet, and Mobile iframe presets
 
-The current canvas is an edit surface, not a true live page preview.
+The current edit canvas is an authoring surface, not the live page render.
+Preview mode is the full reader-shell preview path.
 
-What the canvas currently does well:
+What the edit canvas currently does well:
 
 - shows page structure
 - shows section layout
 - shows module ordering
 - supports insertion and reordering efficiently
 
-What it does not do yet:
+What preview mode now covers:
 
-- render the actual page as the user will see it on the public reader
+- loads the real reader shell in a same-origin iframe
+- renders through the reader-side `applyBuilderPageToDOM(...)` path
+- uses exact Desktop, Tablet, and Mobile iframe dimensions from `PREVIEW_VIEWPORTS`
+- includes unsaved local drafts in a clearly labeled working snapshot
 
 ### Current editor coverage
 
@@ -180,7 +185,8 @@ Release-discipline rule for builder work:
 The shared module/page HTML path now removes most renderer duplication:
 
 - `reader/page-renderer.js` renders live page output through `admin/page-builder/shared-renderers.js`
-- `admin/page-builder/preview-renderers.js` configures that shared factory for the admin preview surface
+- `admin/page-builder/preview-renderers.js` still configures that shared factory for direct
+  renderer tests and any builder-owned non-iframe render helpers
 
 That established structural module parity first. The admin preview now runs inside a same-origin
 reader iframe backed by the shared preview contract, so preview mode uses the real `index.html`
@@ -243,7 +249,7 @@ The earlier draft is now stale in these important ways:
 - Theme editing is shipped and page-scoped.
 - Section drag/drop and spacing controls are shipped.
 - Button, social, promo, feed, and email module editors are shipped.
-- The builder still does not have a true live preview in the main editing surface.
+- The older builder-only div preview has been replaced by a same-origin reader iframe preview.
 - The reader still has fallback behavior in some paths, so "no fallback in dev" is not currently true.
 - Page creation still uses prompt dialogs.
 - Page reordering exists in the backend API but does not yet exist in the builder UI.
@@ -293,11 +299,14 @@ Missing today:
 
 This does not need enterprise collaboration, but it does need basic overwrite protection.
 
-#### 3. The builder is still more structural than visual
+#### 3. The builder is still more structured than freeform
 
-The current canvas is efficient for arranging modules, but it is not a trustworthy preview of the actual page.
+The edit canvas is efficient for arranging modules, while the separate Preview mode is the
+trustworthy reader-shell render. That is intentional: the builder is structured page authoring, not
+a freeform WYSIWYG design tool.
 
-That makes authoring less confident than it should be, especially compared to the useful preview loops in stronger builders.
+The remaining visual-authoring gap is richer controls and clearer feedback inside the inspector and
+canvas, not the absence of a live preview loop.
 
 #### 4. Several common modules still depend on weak editor coverage
 
@@ -305,14 +314,14 @@ The builder is strongest where there are structured controls.
 
 It is weakest where authors have to fall back to raw JSON for common modules. That is not a good steady-state authoring experience.
 
-#### 5. Preview/live parity is still incomplete
+#### 5. Preview/live parity is now implemented
 
-Admin preview and live reader rendering now share the module/page HTML factory, so the earlier
-duplicate-renderer drift has been reduced.
+Admin preview and live reader rendering share the module/page HTML factory, and Preview mode now
+loads the real reader route in an iframe.
 
-The remaining gap is shell and viewport fidelity: the current preview frame does not execute the
-full reader route, topbar/panel shell, or CSS media queries inside a real 375/768/1280px viewport.
-`docs/BUILDER_PREVIEW_PARITY_PLAN.md` is the dedicated plan for closing that gap.
+The dedicated parity work in `docs/BUILDER_PREVIEW_PARITY_PLAN.md` closed the earlier shell and
+viewport gaps: preview uses `builderPreview=1`, validated `postMessage` snapshots, exact iframe
+dimensions, reader-side side-effect guards, and responsive metrics for Desktop, Tablet, and Mobile.
 
 ## Updated priorities
 
@@ -340,11 +349,11 @@ These are still the highest-value priorities, but the first security pass is now
 
 ### P1 - Make the builder more useful without making it heavy
 
-1. Add a real preview mode inside the builder.
+1. Maintain the iframe-based reader preview mode inside the builder.
 2. Keep the current structural canvas for drag/drop and page assembly.
-3. Use a lightweight preview approach:
-   - page or section preview using real render output
-   - desktop/mobile width toggles
+3. Keep the preview approach lightweight:
+   - real reader-shell iframe output
+   - Desktop, Tablet, and Mobile viewport presets
    - no full freeform WYSIWYG canvas
 4. Replace `prompt()` page creation with a proper modal or form.
 5. Add UI for:
@@ -407,13 +416,20 @@ Deliberately not in this phase:
 - prefer shared render logic over a third rendering path
 - add mobile/desktop width toggles
 
-**Implemented (2026-04-13):**
+**Implemented initially (2026-04-13), then superseded by iframe parity work (2026-05-11):**
 
 - Extracted `admin/page-builder/shared-renderers.js` — the single source of truth for module HTML output, replacing the two previously duplicated renderer implementations (~450-line and ~620-line files each cut by 70-75%)
 - Rewrote `reader/page-renderer.js` and `admin/page-builder/preview-renderers.js` to delegate to the shared factory via a three-option interface (`resolveImageUrl`, `getSeriesId`, `showMountPlaceholders`)
-- Added Edit/Preview canvas mode toggle to the builder toolbar; preview mode renders `renderPreviewPage(currentPage)` wrapped in a centred `.pb-preview-frame` using the shared renderer. This gives structural module/page HTML parity with the reader renderer, but it is not full reader-shell or real-viewport parity.
-- Added Desktop (1280px) / Tablet (768px) / Mobile (375px) width presets sourced from the site's `variables.css` breakpoints; width changes update the frame `data-width` attribute in-place with a CSS `max-width` transition, no re-render
-- Enhanced preview to utilize the full viewport width by injecting `data-canvas-mode='preview'` into the CSS grid, automatically collapsing the sidebar and inspector elements globally to prevent the preview frame from being constrained inside the gutter
+- Added the Edit/Preview canvas mode toggle to the builder toolbar. The first pass rendered
+  `renderPreviewPage(currentPage)` in a builder-owned frame; the active implementation now renders
+  a same-origin reader iframe through `admin/page-builder/preview-manager.js` and
+  `reader/preview-bridge.js`.
+- Added Desktop, Tablet, and Mobile preview presets. The first pass used a clamped builder frame;
+  the active implementation uses exact iframe dimensions from `PREVIEW_VIEWPORTS`
+  (`1280x900`, `768x1024`, `375x812`) and lets the admin preview canvas scroll when needed.
+- Preview mode still uses `data-canvas-mode='preview'` to give the preview surface room by hiding
+  builder side panels, but responsive behavior now comes from the iframe viewport rather than admin
+  CSS approximations.
 - Added 7 new tests (5 parity + 2 integration); full suite: 36 files, 207 passing, 0 regressions
 
 **Contract addendum (2026-05-10):**

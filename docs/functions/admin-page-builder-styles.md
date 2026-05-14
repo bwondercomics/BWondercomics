@@ -45,7 +45,8 @@ The `layout.css` module defines the top-level shell. It uses a **Data-Attribute 
     - `[data-editor-mode='docked']`: Expands the editor to 520px for complex module editing.
     - `[data-editor-mode='overlay']`: Remaps the editor to `position: absolute`, floating over the canvas for tablet viewports.
     - `[data-viewport-band='stacked']`: Triggers a vertical 1-column stack for mobile authoring.
-    - `[data-canvas-mode='preview']`: Hides all side panels to provide a 100% width canvas preview.
+    - `[data-canvas-mode='preview']`: Hides all side panels so the iframe preview host has the
+      full available admin canvas width.
 
 ### Visual Architecture
 
@@ -69,7 +70,8 @@ Manages the persistent left-side panel for page navigation and the module librar
 
 ## 🖌️ Canvas (canvas.css)
 
-The staging environment where the actual page layout is constructed and previewed.
+The staging environment where the page layout is edited and where the iframe preview host is
+rendered.
 
 ### Principal Components
 
@@ -80,7 +82,9 @@ The staging environment where the actual page layout is constructed and previewe
   - Empty regions display a `.pb-page-header-empty-region` indicator.
 - **Section Grid Layout**: `.pb-section-columns` drives horizontal layout via `data-layout` attributes (e.g. `1-1`, `1-2`, `1-3-1`) determining how CSS Grid distributes `.pb-column` children.
 - **Target Selections**: `.pb-section` and `.pb-module` use `.selected` classes to render cyan highlight borders when targeted by the right-hand Inspector.
-- **Preview Scaling**: Provides width restraints (`.pb-preview-frame[data-width='...']`) limiting layout bounds to `desktop`, `tablet`, or `mobile` constraints.
+- **Preview Host**: `.pb-preview-frame` and `.pb-preview-iframe` receive exact dimensions from the
+  shared `PREVIEW_VIEWPORTS` contract (`desktop`, `tablet`, or `mobile`). The admin canvas scrolls
+  around those dimensions instead of using max-width restraints to approximate responsive behavior.
 
 ---
 

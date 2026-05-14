@@ -176,6 +176,7 @@ Current responsibilities:
 - build iframe URLs with `builderPreview=1`, the active page slug/id, and the current preview session token
 - derive preview identity from the active series/page/draft state
 - clone the current page into a preview snapshot and merge the active local dirty draft when needed
+  through the internal snapshot helper
 - send `SNAPSHOT` messages to the reader iframe and answer `REQUEST_SNAPSHOT`
 - validate inbound `ACK`, `ERROR`, and `METRICS` messages through `validatePreviewEnvelope(...)`
 - apply exact preset width/height styles to both `.pb-preview-frame` and `.pb-preview-iframe`
@@ -183,6 +184,10 @@ Current responsibilities:
 - render the admin-side preview debug overlay when metrics are present and debug mode is enabled
 - update `.pb-preview-frame` dataset attributes and `.pb-preview-status` copy
 - rerender the preview frame whenever preview mode or viewport state changes
+
+The snapshot merge path covers the dirty scopes owned by the explicit-save editor model:
+`module`, `theme`, `header`, `page-settings`, and `section`. It always works on a cloned page
+snapshot so previewing unsaved changes does not mutate `currentPage`.
 
 `admin/page-builder.js` still owns the top-level `canvasMode` and `previewWidth` state, but the preview handshake/render logic itself is no longer inlined there.
 
@@ -388,7 +393,12 @@ Buttons renderer behavior now uses the shared appearance contract directly:
 
 ## 👁️ Preview Renderers (preview-renderers.js)
 
-A bridge that configures the shared rendering pipeline for the Admin environment. It is still used for builder-owned HTML rendering paths, but the live preview mode no longer uses it directly; iframe preview now runs through `preview-manager.js` on the admin side and `reader/preview-bridge.js` on the reader side. `preview-renderers.js` retains `initPreviewPromoCarousels` and `initPreviewEmailForms` as legacy hooks for any remaining canvas-div rendering paths.
+A direct-render adapter that configures the shared rendering pipeline for the Admin environment.
+It is retained for renderer-level tests and any builder-owned non-iframe render helpers, but it is
+not the active live preview implementation. Live Preview mode now runs through
+`preview-manager.js` on the admin side and `reader/preview-bridge.js` on the reader side.
+`preview-renderers.js` still exports `renderPreviewPage`, `renderPreviewModule`,
+`initPreviewPromoCarousels`, and `initPreviewEmailForms` for those direct-render contracts.
 
 ## 🧾 Preview Contract (preview-contract.js)
 
@@ -396,7 +406,7 @@ Defines the shared contract for the builder's iframe-based reader preview. `admi
 
 Key exports:
 
-- `PREVIEW_VIEWPORTS` and `PREVIEW_VIEWPORT_ORDER` — canonical Desktop, Tablet, and Mobile presets with iframe-ready dimensions (`1280x900`, `768x1024`, `375x812`)
+- `PREVIEW_VIEWPORTS` and `PREVIEW_VIEWPORT_ORDER` — canonical Desktop, Tablet, and Mobile presets with exact iframe dimensions (`1280x900`, `768x1024`, `375x812`)
 - `PREVIEW_MEDIA_QUERIES` — named responsive `matchMedia(...)` probes used for parity metrics (`aspectMax7By5`, `aspectMax5By7`, `maxWidth768`, `maxWidth480`)
 - `BUILDER_PREVIEW_SNAPSHOT_VERSION` — version marker for builder preview payloads
 - `BUILDER_PREVIEW_SOURCES` — `saved` for hydrated API pages and `working` for cloned snapshots that include an active local draft
@@ -471,7 +481,7 @@ Again: `header` is compatibility-only in the catalog and is not part of the norm
 
 - The builder's mutable UI state is still primarily coordinated in `admin/page-builder.js`, not in `data.js`, but major workflow clusters now live in focused factories: `draft-manager.js`, `page-actions.js`, `canvas-mutations.js`, and `preview-manager.js`.
 - Header editing is page-scoped through `page.meta.header`, not primarily through a normal `header` module.
-- The admin canvas is an editing surface with builder chrome. Preview mode now renders through a real reader iframe (`index.html?builderPreview=1`) for full reader-shell parity, not through a constrained div.
+- The admin canvas is an editing surface with builder chrome. Preview mode now renders through a real reader iframe (`index.html?builderPreview=1`) for full reader-shell parity, not through a constrained div or the direct `preview-renderers.js` path.
 - Shared renderer parity exists at the module/section/page HTML level through `shared-renderers.js`. The iframe preview approach means real viewport dimensions, real media queries, and real reader-side JavaScript all run in preview.
 - The iframe preview bridge (`reader/preview-bridge.js`) and the `postMessage` protocol defined in `preview-contract.js` are implemented. The snapshot merge path covers module config, theme metadata, normalized header metadata, page settings, and section spacing without mutating `currentPage`.
 - Phase 5 responsive parity instrumentation is also implemented: the iframe now keeps exact preset dimensions, the admin preview canvas scrolls instead of shrinking those presets, and preview metrics now verify breakpoint branches, two-page mode expectations, and horizontal overflow risks.

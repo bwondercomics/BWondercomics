@@ -143,9 +143,11 @@ sudo ufw delete allow from 10.0.0.0/24 to any port 5173 proto tcp
 Vite proxies these to the API (so data.json/series.json work):
 `/api`, `/data.json`, `/series.json`, `/page-config.json`, `/media.json`, `/series/*`, `/analytics.js`.
 
-## Recent Builder / Promo Changes (2026-01-28)
+## Recent Builder / Promo Changes (updated 2026-05-14)
 
-- Page Builder is now **edit-only**: preview toggle removed.
+- Page Builder has an **Edit/Preview** toggle. Edit mode is the structural canvas; Preview mode
+  loads the real reader shell in a same-origin iframe using `builderPreview=1`,
+  `previewSession`, and exact Desktop/Tablet/Mobile viewport presets.
 - Builder header toggles removed: **Disable Fallback** and **Published** are no longer in UI.
 - Header canvas and editor only show provenance badges for migration states (`legacy-import`, `page-meta-stale`, etc); normal V3 header editing resolves with `pageConfig: null`.
 - Promo image picker is **simple select/upload** (no crop/focus/zoom editor).

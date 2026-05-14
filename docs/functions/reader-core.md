@@ -149,6 +149,10 @@ Current exports include:
 - `getPreviewPageId()` — returns the `?pageId=` parameter for identity validation in the bridge
 - `getRequestedPageSlug()` — returns the `?page=` parameter without defaulting to empty string, used by `preview-bridge.js` for snapshot identity
 
+Builder preview uses these query parameters: `builderPreview=1`, `previewSession=<token>`,
+`page=<slug>`, `pageId=<id>`, and optional `draft=1`. There is no `exact-preview` query flag; exact
+preview behavior comes from the iframe viewport dimensions and the validated snapshot bridge.
+
 ## 🛠️ Utilities (utils.js)
 
 Lightweight helpers such as throttling and cached measurement.
@@ -258,6 +262,11 @@ Also exports:
 - `collectPreviewMetrics(snapshot?)` and `emitPreviewMetrics(reason)` — gather iframe `innerWidth`/`innerHeight`, named media-query branch flags, two-page-mode state, and overflow offenders, then post a `builder-preview:metrics` envelope back to the admin frame.
 - `validatePreviewMessageEvent(event, expected)` — validates a raw `MessageEvent` from the parent frame, checking origin and source before delegating to `validatePreviewEnvelope(...)`.
 
+Preview side-effect stubs are intentionally distributed through the reader modules they protect:
+analytics and live tracking do not start, fullscreen returns without action, user settings is inert,
+safe mode and chat SSO return early, comment writes are blocked, email forms show a preview-only
+success message, and navigation clicks are suppressed by the preview-mode event handlers.
+
 ## 📜 Current Behavioral Contracts
 
 - Two-page mode is derived at render time; it is not a separate persisted mode toggle in `state`.
@@ -272,6 +281,8 @@ Also exports:
 - `page-config.json` is not a normal reader-page source. Builder pages are primary, and safe mode is the intentional remaining runtime reader consumer.
 - Legacy reader fallback for the default `reader` slug has been retired after the series-level fallback audit gate.
 - `reader/customization.js` is intentionally a no-op compatibility module.
+- Exact builder preview is not controlled by an `exact-preview` URL flag. Use `builderPreview=1`
+  with the preview bridge query parameters described above.
 - Comments, auth, and API helpers exist as separate modules, but not every reader surface is consolidated onto those abstractions yet.
 
 ## Related Docs
