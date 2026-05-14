@@ -1,9 +1,9 @@
 # Builder Preview Parity Plan
 
-Status: Phase 2 and Phase 3 iframe preview synchronization implemented (`2026-05-11`);
-Phase 3.5 refactor extraction is landed but still open for optional polish; Phase 4 parity
-hardening is complete; Phase 5 responsive parity instrumentation is implemented; Phase 6 visual
-verification is implemented; Phase 7 manual QA and Phase 8 documentation cleanup are complete.
+Status: Complete through Phase 9 release-gate verification (`2026-05-14`). Phase 2 and Phase 3
+iframe preview synchronization landed on `2026-05-11`; Phase 3.5 refactor extraction, Phase 4
+parity hardening, Phase 5 responsive parity instrumentation, Phase 6 visual verification, Phase 7
+manual QA, Phase 8 documentation cleanup, and Phase 9 release-gate verification are complete.
 
 Goal: make the page builder preview a trustworthy representation of the page as it will render in
 the public reader at desktop, tablet, and mobile sizes.
@@ -330,7 +330,17 @@ current page snapshot.
 6. Do not add `pb-preview-legacy` retroactively unless Phase 4 or Phase 5 verification finds a
    concrete rollback need.
 
-**Completion note (`2026-05-11`):** This refactor pass is now in progress and the main extraction goals in this phase are landed. `admin/page-builder.js` remains the composition root, but the previous monolithic closure is now split across `admin/page-builder/preview-manager.js`, `draft-manager.js`, `page-actions.js`, `canvas-mutations.js`, and `layout.js`. `preview-manager.js` handles iframe preview synchronization, `draft-manager.js` owns explicit draft normalization/save/discard flows, `page-actions.js` owns page activation/publish/delete/reorder flows, `canvas-mutations.js` owns structural section/module mutations, and `layout.js` owns responsive editor/sidebar mode helpers. `helpers.js` also now carries the shared clone/default-config/display helpers those modules reuse. Remaining follow-ups in this phase are optional debounce/loading-state polish and any later rollback-only fallback work.
+**Completion note (`2026-05-11`, closed `2026-05-14`):** This refactor pass is complete for the
+preview-parity scope. `admin/page-builder.js` remains the composition root, but the previous
+monolithic closure is now split across `admin/page-builder/preview-manager.js`, `draft-manager.js`,
+`page-actions.js`, `canvas-mutations.js`, and `layout.js`. `preview-manager.js` handles iframe
+preview synchronization, `draft-manager.js` owns explicit draft normalization/save/discard flows,
+`page-actions.js` owns page activation/publish/delete/reorder flows, `canvas-mutations.js` owns
+structural section/module mutations, and `layout.js` owns responsive editor/sidebar mode helpers.
+`helpers.js` also now carries the shared clone/default-config/display helpers those modules reuse.
+Debounce timing for repeated working-draft posts and richer loading-state polish remain
+non-blocking enhancement candidates only; they are not required for preview parity unless future
+manual or automated verification shows a concrete user-facing issue.
 
 ### Phase 4 - Full Reader Shell Parity
 
@@ -567,9 +577,18 @@ git diff --check
 Because this work affects the public reader runtime, shared builder modules, public CSS, and public
 HTML behavior, `dist/` must be rebuilt before browser verification or release claims.
 
+**Completion note (`2026-05-14`):** Phase 9 passed in the required order. Verification run:
+`npm run format:check`; `npm run format:py:check` (`45` Python files already formatted);
+`npm run lint`; `npm run lint:py`; `npm test` (`45` files passed, `329` tests passed, `1`
+skipped); `npm run test:visual` (`3` Chromium visual parity tests passed); `npm run test:backend`
+(`66` tests passed); `npm run build` (`113` modules transformed); and `git diff --check`. Known
+warnings were non-failing: Playwright's Vite server repeated the existing public-directory root-path
+asset warnings, and the production build repeated the existing `reader/fullscreen.js`
+dynamic/static import chunking warning.
+
 ## Acceptance Criteria
 
-The plan is complete when all of these are true:
+The plan is complete because the Phase 9 gate verifies all of these criteria:
 
 - Preview mode renders through an iframe or equivalent real viewport, not a `max-width` div.
 - Desktop, Tablet, and Mobile presets set real iframe viewport dimensions.
@@ -612,20 +631,19 @@ The plan is complete when all of these are true:
 - Risk: screenshot tests become flaky.
   Mitigation: freeze animations, seed data, wait for assets, and use DOM assertions for critical
   layout facts before relying on image diffs.
-- Risk: browser-level visual tooling is deferred.
-  Mitigation: explicitly mark the gap, require the manual screenshot matrix as the temporary release
-  gate, and keep DOM-level viewport assertions in Vitest/browser smoke coverage where possible.
+- Risk: browser-level visual tooling becomes stale after future reader or builder UI changes.
+  Mitigation: keep `npm run test:visual` in the release gate for preview, parity, responsive, and
+  reader-facing UI work; update committed Playwright screenshots only after reviewing real visual
+  diffs.
 
 ## File Impact Map
 
-Likely implementation files:
+Implemented and verified areas:
 
 - `admin/page-builder.js`
-- `admin/index.html`
-- `admin/page-builder/constants.js`
-- `admin/page-builder/preview-renderers.js`
+- `admin/page-builder/preview-manager.js`
+- `admin/page-builder/preview-contract.js`
 - `admin/page-builder/shared-renderers.js`
-- `admin/page-builder/canvas-events.js`
 - `admin/page-builder/header-config.js`
 - `admin/css/page-builder/canvas.css`
 - `admin/css/page-builder/layout.css`
@@ -633,26 +651,30 @@ Likely implementation files:
 - `reader/app.js`
 - `reader/data.js`
 - `reader/page-renderer.js`
-- `reader/header-layout.js`
 - `reader/preview-bridge.js`
 - `assets/css/main.core.18-page-builder.css`
 - `assets/css/main.core.17-responsive.css`
 - `assets/css/main.responsive.css`
 
-Likely test files:
+Verified test coverage:
 
 - `tests/admin-page-builder-shell.test.js`
 - `tests/admin-page-builder-preview.test.js`
+- `tests/admin-page-builder-preview-contract.test.js`
 - `tests/reader-data-builder.test.js`
 - `tests/reader-page-renderer.test.js`
+- `tests/reader-preview-bridge.test.js`
+- `tests/reader-preview-metrics.test.js`
+- `tests/reader-preview-side-effects.test.js`
 - `tests/header-appearance.test.js`
-- new preview bridge or visual parity tests
+- `tests/shared-renderers-parity.test.js`
+- `tests/visual/builder-preview-parity.spec.js`
 
-Likely docs:
+Updated docs:
 
 - `docs/BUILDER_PLAN.md`
 - `docs/admin-overview.md`
 - `docs/functions/admin-page-builder.md`
 - `docs/functions/reader-core.md`
-- `docs/READER_BUILDER_QA.md`
+- `docs/BUILDER_PREVIEW_PHASE7_QA.md`
 - `docs/TEST_DOCUMENTATION.md`
