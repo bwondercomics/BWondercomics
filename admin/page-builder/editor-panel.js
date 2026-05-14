@@ -93,13 +93,48 @@ function renderShell({
   `;
 }
 
+function getPageIdentity(page) {
+  return page?.id || page?.slug || '';
+}
+
+function getEditorContextKey(state) {
+  const pageKey = getPageIdentity(state.currentPage);
+  if (!pageKey) return 'empty';
+  if (state.activeEditorTab === 'theme') return `${pageKey}:theme`;
+  if (state.selectedCanvasSurface === 'page-header') return `${pageKey}:page-header`;
+  if (state.selectedCanvasSurface === 'page-settings') return `${pageKey}:page-settings`;
+  return `${pageKey}:module:${state.selectedModuleId || 'none'}`;
+}
+
 export function createEditorPanelRenderer({ el, getState, actions, helpers, deps }) {
+  function captureEditorContentScroll() {
+    const content = el.pbModuleEditor?.querySelector('.pb-editor-content');
+    if (!content) return null;
+    return {
+      contextKey: el.pbModuleEditor.dataset.editorContextKey || '',
+      scrollLeft: content.scrollLeft,
+      scrollTop: content.scrollTop,
+    };
+  }
+
+  function restoreEditorContentScroll(snapshot, contextKey) {
+    if (el.pbModuleEditor) {
+      el.pbModuleEditor.dataset.editorContextKey = contextKey;
+    }
+    const content = el.pbModuleEditor?.querySelector('.pb-editor-content');
+    if (!content || snapshot?.contextKey !== contextKey) return;
+    content.scrollLeft = snapshot.scrollLeft;
+    content.scrollTop = snapshot.scrollTop;
+  }
+
   function renderEditorPanel() {
     if (!el.pbModuleEditor) return;
 
     let state = getState();
+    const scrollSnapshot = captureEditorContentScroll();
 
     if (!state.currentPage) {
+      const editorContextKey = getEditorContextKey(state);
       el.pbModuleEditor.innerHTML = renderShell({
         activeEditorTab: state.activeEditorTab,
         kicker: 'Inspector',
@@ -117,6 +152,7 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
         `,
         disableTabs: true,
       });
+      restoreEditorContentScroll(scrollSnapshot, editorContextKey);
       return;
     }
 
@@ -135,6 +171,7 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
     }
 
     state = getState();
+    const editorContextKey = getEditorContextKey(state);
 
     const selectedModuleRecord = helpers.getSelectedModuleRecord(state.selectedModuleId);
     const pageTitle = helpers.getPageDisplayTitle(state.currentPage);
@@ -218,6 +255,7 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       contentHtml,
       footerHtml,
     });
+    restoreEditorContentScroll(scrollSnapshot, editorContextKey);
 
     el.pbModuleEditor.querySelectorAll('.pb-editor-tab').forEach((tab) => {
       tab.addEventListener('click', () => {

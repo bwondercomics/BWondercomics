@@ -54,6 +54,37 @@ parity, screenshot baseline, release gate, or other visual contract changes. If 
 is missing Chromium runtime libraries, run `npx playwright install-deps chromium` with system package
 privileges before rerunning the visual suite.
 
+### **Testing Map**
+
+Use the narrowest test that proves the change, then broaden when the change crosses a boundary.
+
+- `npm test` runs the Vitest suite in `happy-dom`. This is the default fast check for JavaScript
+  behavior in `reader/`, `admin/`, `ops/`, shared renderers, fixture contracts, and most page-builder
+  interactions.
+- `npm run test:backend` runs Python `unittest` tests for backend routes, persistence rules,
+  authentication, analytics, diagnostics, premium access, and API payload contracts.
+- `npm run test:all` runs the JavaScript and backend suites together. It does not include Playwright.
+- `npm run test:visual` runs Playwright against `tests/visual/**`. This starts a local Vite server,
+  opens Chromium, compares browser screenshots to committed snapshots, and checks preview-vs-reader
+  parity at desktop, tablet, and mobile widths.
+- `npm run test:coverage` is for coverage reporting, release gates, or CI parity checks. It is not
+  needed after every small change.
+
+Playwright is not a replacement for Vitest or backend tests. Treat it as a browser-level visual
+contract: it catches layout, responsive, iframe, and screenshot drift that DOM/unit tests cannot see,
+but it is slower and can fail when local Chromium dependencies are missing. Vite messages like
+`Files in the public directory are served at the root path` are warnings unless the Playwright run
+ends with failed tests.
+
+For typical changes:
+
+- Pure JavaScript behavior: run `npm test`.
+- Backend/API behavior: run `npm run test:backend`, and run `npm test` too if a frontend contract
+  consumes the changed payload.
+- Page-builder, reader preview, responsive layout, or release-facing UI: run `npm test` and
+  `npm run test:visual`.
+- Broad release or milestone work: run the full quality gate above.
+
 ### **Docs and Contracts**
 
 - Update any docs that became stale because of the change before committing.

@@ -416,6 +416,39 @@ describe('admin page-builder shell', () => {
     expect(document.querySelector('.pb-editor-tab.active[data-tab="modules"]')).not.toBeNull();
   });
 
+  it('keeps the inspector scroll position when same-panel option changes rerender controls', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+      viewportWidth: 1600,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector('[data-action="select-page-header"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const content = document.querySelector('.pb-editor-content');
+    expect(content).not.toBeNull();
+    content.scrollTop = 420;
+
+    const destinationTypeSelect = document.querySelector(
+      '.pb-header-nav-input[data-item-key="kind"]'
+    );
+    expect(destinationTypeSelect).not.toBeNull();
+    destinationTypeSelect.value = 'url';
+    destinationTypeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(1);
+
+    const nextContent = document.querySelector('.pb-editor-content');
+    expect(nextContent).not.toBe(content);
+    expect(nextContent?.scrollTop).toBe(420);
+    expect(document.querySelector('.pb-header-nav-input[data-item-key="url"]')).not.toBeNull();
+  });
+
   it('renders the empty state and adds a new page through the modal flow', async () => {
     const page = buildContractFixture('builderPage', {
       id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeee99',
