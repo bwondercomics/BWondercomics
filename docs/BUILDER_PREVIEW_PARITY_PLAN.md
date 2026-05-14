@@ -502,6 +502,14 @@ Checklist:
 
 Deliverable: completed QA notes, with every mismatch classified as blocker, major, or minor.
 
+**Completion note (`2026-05-14`):** Phase 7 manual-QA evidence is recorded in
+`docs/BUILDER_PREVIEW_PHASE7_QA.md`. The pass used the local rebuilt bundle plus the Chromium visual
+parity suite and focused preview contract tests to cover published reader preview parity, draft
+routing, unsaved working snapshot labels, common module renderer coverage, mobile iframe metrics,
+and preview side-effect guards. No blocker, major, or minor mismatches were found. Verification run:
+`npm run build`, `npm run test:visual`, focused preview Vitest coverage, and focused
+module-renderer/admin-preview Vitest coverage.
+
 ### Phase 8 - Documentation And Cleanup
 
 1. Update `docs/BUILDER_PLAN.md` to replace the older preview-pass note with the new source of
