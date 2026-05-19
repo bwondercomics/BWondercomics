@@ -737,11 +737,17 @@ describe('reader builder presentation loading', () => {
     applyBuilderPageToDOM(emptyPage);
 
     const leftBuilder = document.getElementById('leftPanel')?.querySelector('.panel-builder--left');
+    const leftPanel = document.getElementById('leftPanel');
     const rightBuilder = document
       .getElementById('rightPanel')
       ?.querySelector('.panel-builder--right');
+    const rightPanel = document.getElementById('rightPanel');
 
     expect(leftBuilder?.textContent).toContain('No panel modules.');
     expect(rightBuilder?.textContent?.trim() || '').toBe('');
+    expect(leftPanel?.classList.contains('side-panel--empty')).toBe(true);
+    expect(rightPanel?.classList.contains('side-panel--empty')).toBe(true);
+    expect(leftBuilder?.classList.contains('panel-builder--empty')).toBe(true);
+    expect(rightBuilder?.classList.contains('panel-builder--empty')).toBe(true);
   });
 });

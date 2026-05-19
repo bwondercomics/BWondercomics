@@ -23,6 +23,7 @@
     order: 1;
     width: 100%;
     flex: 0 0 100%;
+    overflow: visible;
   }
 
   /* Viewport and controls use natural document flow within wrapper */
@@ -54,16 +55,20 @@
     max-width: none !important;
     min-height: auto;
     flex: 0 0 calc(50% - 6px) !important;
+    height: auto;
+    overflow: visible;
   }
 
   .side-panel.left {
     order: 2;
     height: auto;
-    min-height: 580px;
-    align-self: stretch;
+    min-height: auto;
+    align-self: flex-start;
+    overflow: visible;
   }
 
   .side-panel.left .left-panel-content {
+    height: auto;
     padding: 12px;
     gap: 8px;
   }
@@ -105,8 +110,36 @@
     flex-direction: column;
     padding: 12px 12px 76px;
     height: auto;
+    min-height: auto;
+    align-self: flex-start;
+    overflow: visible;
+  }
+
+  .side-panel.feed-mode,
+  .side-panel.right.feed-mode {
+    overflow: visible;
+  }
+
+  .side-panel.side-panel--empty {
+    aspect-ratio: 1646 / 2804;
     min-height: 320px;
-    align-self: stretch;
+  }
+
+  .side-panel .panel-builder,
+  .side-panel .panel-builder.feed-mode,
+  .panel-builder.feed-mode .pb-module--feed,
+  .right-stack,
+  .right-panel-feed,
+  .pb-feed-module,
+  .pb-feed-module.feed-mode,
+  .pb-feed-module.feed-mode .right-panel-feed,
+  .right-panel-feed .latest-body,
+  .pb-feed-module.feed-mode .right-panel-feed .latest-body {
+    flex: 0 0 auto;
+    height: auto;
+    max-height: none;
+    min-height: 0;
+    overflow: visible;
   }
 
   .side-panel.right .preview {
@@ -125,7 +158,8 @@
     min-height: 0;
     max-height: none;
     margin-top: 0;
-    flex: 1 1 auto;
+    flex: 0 0 auto;
+    overflow: visible;
   }
 
   .panel-btn {
@@ -148,7 +182,8 @@
   }
 
   .side-panel.left {
-    height: 180px;
+    height: auto;
+    min-height: auto;
   }
 
   .side-panel.left .left-panel-content {
@@ -281,6 +316,24 @@
     gap: 4px;
   }
 
+  .topbar-layout {
+    gap: 4px 6px;
+    align-items: center;
+  }
+
+  .topbar-region {
+    flex: 0 1 auto;
+    gap: 4px;
+  }
+
+  .topbar-region:empty {
+    display: none;
+  }
+
+  .topbar-region[data-region='left'] {
+    flex: 1 1 auto;
+  }
+
   /* Row 1: Brand aligned left */
   .brand {
     display: flex;
@@ -304,14 +357,9 @@
     font-size: 8px;
   }
 
-  /* Status panel: right side of row 1 */
+  /* Status text is desktop chrome; hiding it keeps the phone header compact. */
   .status-panel {
-    position: absolute;
-    top: 4px;
-    right: 8px;
-    text-align: right;
-    font-size: 10px;
-    max-width: calc(100% - 100px);
+    display: none !important;
   }
 
   .status-text {
@@ -402,13 +450,6 @@
   .title h1 {
     font-size: 14px;
     letter-spacing: 1px;
-  }
-
-  .status-panel {
-    top: 3px;
-    right: 6px;
-    font-size: 9px;
-    max-width: calc(100% - 95px);
   }
 
   .status-text {

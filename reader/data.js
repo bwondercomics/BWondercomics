@@ -475,6 +475,9 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
   container.classList.add('panel-builder');
   container.classList.toggle('panel-builder--left', side === 'left');
   container.classList.toggle('panel-builder--right', side === 'right');
+  const isEmptyPanel = !modules.length;
+  panel.classList.toggle('side-panel--empty', isEmptyPanel);
+  container.classList.toggle('panel-builder--empty', isEmptyPanel);
 
   const gapValue = panelSpacing?.[side];
   if (gapValue !== undefined && gapValue !== null && gapValue !== '') {
@@ -489,7 +492,7 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
   // Sort by sortIndex
   modules.sort((a, b) => (a.module.sortIndex || 0) - (b.module.sortIndex || 0));
 
-  if (!modules.length) {
+  if (isEmptyPanel) {
     const hideEmptyText = !!panelBackgrounds?.[side]?.hideEmptyText;
     container.innerHTML = hideEmptyText ? '' : '<div class="pb-page-empty">No panel modules.</div>';
     return;
