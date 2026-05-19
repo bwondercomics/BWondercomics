@@ -51,6 +51,8 @@ describe('admin page-builder editor and preview renderers', () => {
     expect(
       feedWrapper.querySelector('[data-style-key="headingBgColor"]')?.getAttribute('value')
     ).toBe('#ffed00');
+    expect(feedWrapper.querySelectorAll('.pb-inspector-section').length).toBeGreaterThanOrEqual(4);
+    expect(feedWrapper.querySelector('.pb-inspector-section[open]')).toBeNull();
     expect(emailWrapper.querySelector('[data-key="heading"]')?.getAttribute('value')).toBe(
       'Join the List'
     );
@@ -73,7 +75,9 @@ describe('admin page-builder editor and preview renderers', () => {
     expect(themeHtml).toContain('Presets');
     expect(themeHtml).toContain('Color System');
     expect(themeHtml).toContain('Panel Backgrounds');
-    expect(themeHtml).toContain('Panel Spacing & Empty States');
+    expect(wrapper.textContent).toContain('Panel Spacing & Empty States');
+    expect(wrapper.querySelectorAll('.pb-inspector-section')).toHaveLength(4);
+    expect(wrapper.querySelector('.pb-inspector-section[open]')).toBeNull();
     expect(
       wrapper.querySelector('.pb-theme-color-text[data-key="primary"]')?.getAttribute('value')
     ).toBe('#112233');

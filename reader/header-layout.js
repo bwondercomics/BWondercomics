@@ -1,5 +1,8 @@
 import { appearanceToInlineStyle } from '../admin/page-builder/appearance-utils.js';
 import {
+  HEADER_REGION_ORDER,
+  HEADER_ROW_ORDER,
+  normalizeHeaderConfig,
   resolveHeaderNavItemAppearance,
   resolveHeaderShellScrolledAppearance,
   resolveHeaderShellTopAppearance,
@@ -113,24 +116,12 @@ function ensureHeaderScaffold() {
     topbar.appendChild(stash);
   }
 
-  const regions = {};
-  ['left', 'center', 'right'].forEach((region) => {
-    let node = layout.querySelector(`.topbar-region[data-region="${region}"]`);
-    if (!node) {
-      node = document.createElement('div');
-      node.className = 'topbar-region';
-      node.dataset.region = region;
-      layout.appendChild(node);
-    }
-    regions[region] = node;
-  });
-
   const headerActions = topbar.querySelector('.header-actions');
   if (headerActions && !headerActions.children.length) {
     headerActions.remove();
   }
 
-  return { topbar, layout, stash, regions };
+  return { topbar, layout, stash };
 }
 
 function collectHeaderBlocks(topbar) {
@@ -183,7 +174,7 @@ export function applySharedHeaderLayout(pageConfig = null, options = {}) {
       pageConfig,
       normalizeNavItems: normalizeHeaderNavItems,
     });
-  const headerConfig = headerState.header;
+  const headerConfig = normalizeHeaderConfig(headerState.header, normalizeHeaderNavItems);
   const blocks = collectHeaderBlocks(scaffold.topbar);
   activeAppearanceTopbar = scaffold.topbar;
   activeTopAppearance = resolveHeaderShellTopAppearance(headerConfig);
@@ -199,16 +190,36 @@ export function applySharedHeaderLayout(pageConfig = null, options = {}) {
 
   renderNavItems(blocks.nav, headerConfig, seriesId);
 
-  ['left', 'center', 'right'].forEach((region) => {
-    const regionNode = scaffold.regions[region];
-    regionNode.innerHTML = '';
-    (headerConfig.regions?.[region] || []).forEach((blockId) => {
-      const blockEl = blocks[blockId];
-      const enabled = headerConfig.blocks?.[blockId]?.enabled !== false;
-      if (!blockEl || !enabled) return;
-      blockEl.style.display = '';
-      regionNode.appendChild(blockEl);
+  scaffold.layout.replaceChildren();
+
+  HEADER_ROW_ORDER.forEach((rowId) => {
+    const rowRegions = HEADER_REGION_ORDER.map((region) => {
+      const blockIds = (headerConfig.layoutRows?.[rowId]?.[region] || []).filter((blockId) => {
+        const enabled = headerConfig.blocks?.[blockId]?.enabled !== false;
+        return !!blocks[blockId] && enabled;
+      });
+      return { region, blockIds };
     });
+    if (!rowRegions.some(({ blockIds }) => blockIds.length > 0)) return;
+
+    const rowNode = document.createElement('div');
+    rowNode.className = 'topbar-layout-row';
+    rowNode.dataset.row = rowId;
+
+    rowRegions.forEach(({ region, blockIds }) => {
+      if (!blockIds.length) return;
+      const regionNode = document.createElement('div');
+      regionNode.className = 'topbar-region';
+      regionNode.dataset.region = region;
+      blockIds.forEach((blockId) => {
+        const blockEl = blocks[blockId];
+        blockEl.style.display = '';
+        regionNode.appendChild(blockEl);
+      });
+      rowNode.appendChild(regionNode);
+    });
+
+    scaffold.layout.appendChild(rowNode);
   });
 
   const headerActions = scaffold.topbar.querySelector('.header-actions');

@@ -1,4 +1,5 @@
 import { escapeAttr, escapeHtml, resolveAssetUrl } from './helpers.js';
+import { renderInspectorSection } from './inspector-sections.js';
 
 export function generatePromoItemId() {
   return 'promo-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
@@ -155,14 +156,12 @@ export function renderPromoEditor(config) {
     .join('');
 
   return `
-      <section class="pb-editor-section-card">
-        <div class="pb-editor-section-head">
-          <div>
-            <span class="pb-editor-section-kicker">Content</span>
-            <h4 class="pb-editor-section-title">Promo Items</h4>
-          </div>
-          <p class="pb-editor-section-copy">Manage slide order, image assets, CTA copy, and slide-specific appearance settings.</p>
-        </div>
+      ${renderInspectorSection({
+        kicker: 'Content',
+        title: 'Promo Items',
+        summary: `${items.length} slide${items.length === 1 ? '' : 's'}`,
+        copy: 'Manage slide order, image assets, CTA copy, and slide-specific appearance settings.',
+        body: `
         <div class="pb-promo-items-section">
           <div class="pb-editor-toolbar">
             <label class="pb-editor-label">Slides</label>
@@ -172,16 +171,15 @@ export function renderPromoEditor(config) {
         <div class="pb-promo-items-list" id="pbPromoItemsList">
           ${itemsHtml || '<div class="pb-promo-empty">No promo items. Click "Add Item" to create one.</div>'}
         </div>
-      </section>
+        `,
+      })}
 
-      <section class="pb-editor-section-card">
-        <div class="pb-editor-section-head">
-          <div>
-            <span class="pb-editor-section-kicker">Behavior</span>
-            <h4 class="pb-editor-section-title">Carousel Behavior</h4>
-          </div>
-          <p class="pb-editor-section-copy">Control autoplay, navigation, height, and motion for the entire promo module.</p>
-        </div>
+      ${renderInspectorSection({
+        kicker: 'Behavior',
+        title: 'Carousel Behavior',
+        summary: config.autoRotate !== false ? 'Auto-rotate on' : 'Manual',
+        copy: 'Control autoplay, navigation, height, and motion for the entire promo module.',
+        body: `
         <div class="pb-editor-field">
           <label class="pb-editor-label">
             <input type="checkbox" id="pbPromoAutoRotate" ${config.autoRotate !== false ? 'checked' : ''}> Auto-rotate slides
@@ -217,7 +215,8 @@ export function renderPromoEditor(config) {
             <option value="slide" ${config.transition === 'slide' ? 'selected' : ''}>Slide</option>
           </select>
         </div>
-      </section>
+        `,
+      })}
     `;
 }
 

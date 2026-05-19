@@ -4,9 +4,11 @@ import {
   removeAppearanceLeaf,
   renderAppearanceControls,
   setAppearanceLeaf,
+  syncAppearanceColorInputs,
   toSparseAppearance,
 } from './appearance-editor.js';
 import { escapeAttr, escapeHtml } from './helpers.js';
+import { renderInspectorSection } from './inspector-sections.js';
 import {
   isBuilderPageTargetMissing,
   normalizeButtonsConfig,
@@ -156,31 +158,27 @@ export function renderButtonsEditor(config = {}, pages = []) {
     .join('');
 
   return `
-    <section class="pb-editor-section-card">
-      <div class="pb-editor-section-head">
-        <div>
-          <span class="pb-editor-section-kicker">Appearance</span>
-          <h4 class="pb-editor-section-title">Button Defaults</h4>
+    ${renderInspectorSection({
+      kicker: 'Appearance',
+      title: 'Button Defaults',
+      summary: normalized.defaults?.appearance ? 'Custom' : 'Default',
+      copy: 'Define optional inline appearance defaults for the module before per-button overrides are applied.',
+      body: defaultsHtml,
+    })}
+    ${renderInspectorSection({
+      kicker: 'Navigation',
+      title: 'Buttons',
+      summary: `${normalized.buttons.length} button${normalized.buttons.length === 1 ? '' : 's'}`,
+      copy: 'Create reusable buttons with internal page targets, anchors, or URLs.',
+      body: `
+        <div class="pb-promo-editor-list">
+          ${buttonsHtml || '<div class="pb-promo-empty">No buttons. Click "+ Add Button" to create one.</div>'}
         </div>
-        <p class="pb-editor-section-copy">Define optional inline appearance defaults for the module before per-button overrides are applied.</p>
-      </div>
-      ${defaultsHtml}
-    </section>
-    <section class="pb-editor-section-card">
-      <div class="pb-editor-section-head">
-        <div>
-          <span class="pb-editor-section-kicker">Navigation</span>
-          <h4 class="pb-editor-section-title">Buttons</h4>
+        <div class="pb-editor-actions">
+          <button type="button" class="btn-secondary" id="pbButtonsAddButton">+ Add Button</button>
         </div>
-        <p class="pb-editor-section-copy">Create reusable buttons with internal page targets, anchors, or URLs.</p>
-      </div>
-      <div class="pb-promo-editor-list">
-        ${buttonsHtml || '<div class="pb-promo-empty">No buttons. Click "+ Add Button" to create one.</div>'}
-      </div>
-      <div class="pb-editor-actions">
-        <button type="button" class="btn-secondary" id="pbButtonsAddButton">+ Add Button</button>
-      </div>
-    </section>
+      `,
+    })}
   `;
 }
 
@@ -352,8 +350,10 @@ export function bindButtonsEditorEvents({
       const key = input.dataset.appearanceKey;
       const index = input.dataset.itemIndex ? parseInt(input.dataset.itemIndex, 10) : null;
       if (!scope || !key) return;
+      const value = syncAppearanceColorInputs(el.pbModuleEditor, input);
+      if (value === null) return;
       const nextConfig = normalizeButtonsConfig(config);
-      updateAppearanceTarget(nextConfig, scope, index, key, input.value);
+      updateAppearanceTarget(nextConfig, scope, index, key, value);
       commit(nextConfig);
     });
   });

@@ -110,6 +110,7 @@ const APPEARANCE_GROUPS = [
 ];
 
 const APPEARANCE_FIELDS = APPEARANCE_GROUPS.flatMap((group) => group.fields);
+const HEX_COLOR_RE = /^#[0-9A-Fa-f]{6}$/;
 
 function cloneValue(value) {
   return JSON.parse(JSON.stringify(value ?? null));
@@ -192,7 +193,13 @@ function renderAppearanceInput(field, scope, index, value, checked, ariaLabel = 
   }
 
   if (field.inputType === 'color') {
-    return `<input type="color" class="pb-promo-style-color pb-appearance-input" data-appearance-input="true" data-appearance-scope="${scope}" data-appearance-key="${field.key}"${indexAttr} value="${escapeAttr(String(value))}"${disabledAttr}${labelAttr}>`;
+    const colorValue = isValidHexColor(value) ? String(value) : field.defaultValue;
+    return `
+      <div class="pb-appearance-color-control">
+        <input type="color" class="pb-promo-style-color pb-appearance-input" data-appearance-input="true" data-appearance-input-kind="picker" data-appearance-scope="${scope}" data-appearance-key="${field.key}"${indexAttr} value="${escapeAttr(colorValue)}"${disabledAttr}${labelAttr}>
+        <input type="text" class="pb-editor-input pb-appearance-input pb-appearance-color-hex" data-appearance-input="true" data-appearance-input-kind="hex" data-appearance-scope="${scope}" data-appearance-key="${field.key}"${indexAttr} value="${escapeAttr(String(value))}" maxlength="7" spellcheck="false"${disabledAttr} aria-label="${escapeAttr(`${ariaLabel} Hex`)}">
+      </div>
+    `;
   }
 
   if (field.inputType === 'range') {
@@ -225,10 +232,12 @@ function renderAppearanceControls(appearance, scope, index = null, title = '', c
       .join('');
 
     return `
-      <div class="pb-style-group">
-        <div class="pb-style-group-title">${escapeHtml(group.title)}</div>
+      <details class="pb-style-group pb-editor-accordion pb-appearance-group">
+        <summary class="pb-style-group-title pb-editor-accordion-toggle">${escapeHtml(group.title)}</summary>
+        <div class="pb-editor-accordion-content">
         ${fieldsHtml}
-      </div>
+        </div>
+      </details>
     `;
   }).join('');
 
@@ -247,15 +256,60 @@ function renderAppearanceControls(appearance, scope, index = null, title = '', c
   `;
 }
 
+function isValidHexColor(value) {
+  return HEX_COLOR_RE.test(String(value || '').trim());
+}
+
+function getAppearanceInputValue(input) {
+  if (input?.dataset?.appearanceInputKind === 'hex') {
+    const value = String(input.value || '').trim();
+    const valid = isValidHexColor(value);
+    if (valid) {
+      input.removeAttribute('aria-invalid');
+    } else {
+      input.setAttribute('aria-invalid', 'true');
+    }
+    return valid ? value : null;
+  }
+  input?.removeAttribute?.('aria-invalid');
+  return input?.value;
+}
+
+function syncAppearanceColorInputs(root, input) {
+  const value = getAppearanceInputValue(input);
+  if (value === null) return null;
+  if (!input?.dataset?.appearanceInputKind) return value;
+
+  const scope = input.dataset.appearanceScope;
+  const key = input.dataset.appearanceKey;
+  const index = input.dataset.itemIndex;
+  const selector = [
+    '[data-appearance-input="true"]',
+    '[data-appearance-input-kind]',
+    `[data-appearance-scope="${scope}"]`,
+    `[data-appearance-key="${key}"]`,
+    index !== undefined ? `[data-item-index="${index}"]` : ':not([data-item-index])',
+  ].join('');
+  root?.querySelectorAll(selector).forEach((pairedInput) => {
+    if (pairedInput === input) return;
+    pairedInput.value = value;
+    pairedInput.removeAttribute('aria-invalid');
+  });
+  return value;
+}
+
 export {
   APPEARANCE_FIELDS,
   APPEARANCE_GROUPS,
   cloneValue,
   getAppearanceLeaf,
+  getAppearanceInputValue,
   isObject,
+  isValidHexColor,
   pruneEmptyBranches,
   removeAppearanceLeaf,
   renderAppearanceControls,
   setAppearanceLeaf,
+  syncAppearanceColorInputs,
   toSparseAppearance,
 };

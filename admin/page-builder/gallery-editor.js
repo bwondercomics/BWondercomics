@@ -1,4 +1,5 @@
 import { escapeAttr, escapeHtml } from './helpers.js';
+import { renderInspectorSection } from './inspector-sections.js';
 
 function cloneValue(value) {
   return JSON.parse(JSON.stringify(value ?? null));
@@ -59,35 +60,33 @@ export function renderGalleryEditor(config = {}) {
     .join('');
 
   return `
-    <section class="pb-editor-section-card">
-      <div class="pb-editor-section-head">
-        <div>
-          <span class="pb-editor-section-kicker">Content</span>
-          <h4 class="pb-editor-section-title">Gallery Layout</h4>
-        </div>
-        <p class="pb-editor-section-copy">Configure the grid columns for the gallery.</p>
-      </div>
+    ${renderInspectorSection({
+      kicker: 'Layout',
+      title: 'Gallery Layout',
+      summary: `${normalized.columns} columns`,
+      copy: 'Configure the grid columns for the gallery.',
+      body: `
       <div class="pb-editor-field">
         <label class="pb-editor-label">Columns</label>
         <input type="number" class="pb-editor-input pb-gallery-main-input" data-key="columns" min="1" max="6" value="${normalized.columns}">
       </div>
-    </section>
+      `,
+    })}
 
-    <section class="pb-editor-section-card">
-      <div class="pb-editor-section-head">
-        <div>
-          <span class="pb-editor-section-kicker">Content</span>
-          <h4 class="pb-editor-section-title">Images</h4>
-        </div>
-        <p class="pb-editor-section-copy">Manage the images displayed in the gallery grid.</p>
-      </div>
+    ${renderInspectorSection({
+      kicker: 'Content',
+      title: 'Images',
+      summary: `${normalized.images.length} image${normalized.images.length === 1 ? '' : 's'}`,
+      copy: 'Manage the images displayed in the gallery grid.',
+      body: `
       <div class="pb-promo-editor-list">
         ${imagesHtml || '<div class="pb-promo-empty">No images. Click "+ Add Image" to create one.</div>'}
       </div>
       <div class="pb-editor-actions">
         <button type="button" class="btn-secondary" id="pbGalleryAddImage">+ Add Image</button>
       </div>
-    </section>
+      `,
+    })}
   `;
 }
 

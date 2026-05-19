@@ -7,6 +7,7 @@ import {
   renderHeaderEditorContent,
 } from '../admin/page-builder/header-editor.js';
 import {
+  createPageHeaderMeta,
   normalizeHeaderConfig,
   resolveHeaderNavItemAppearance,
   resolveHeaderShellScrolledAppearance,
@@ -164,6 +165,87 @@ describe('header appearance', () => {
     vi.restoreAllMocks();
   });
 
+  it('normalizes legacy header regions into the top layout row', () => {
+    const header = normalizeHeaderConfig({
+      regions: {
+        left: ['brand'],
+        center: ['nav'],
+        right: ['status', 'entryControls', 'patron'],
+      },
+    });
+
+    expect(header.layoutRows).toEqual({
+      top: {
+        left: ['brand'],
+        center: ['nav'],
+        right: ['status', 'entryControls', 'patron'],
+      },
+      middle: {
+        left: [],
+        center: [],
+        right: [],
+      },
+      bottom: {
+        left: [],
+        center: [],
+        right: [],
+      },
+    });
+    expect(header.regions).toEqual({
+      left: ['brand'],
+      center: ['nav'],
+      right: ['status', 'entryControls', 'patron'],
+    });
+  });
+
+  it('removes duplicate and invalid row placements while keeping flattened regions in sync', () => {
+    const header = normalizeHeaderConfig({
+      layoutRows: {
+        top: {
+          left: ['brand', 'not-a-block', 'nav'],
+          center: ['brand'],
+          right: [],
+        },
+        middle: {
+          left: [],
+          center: [],
+          right: ['status', 'nav'],
+        },
+        bottom: {
+          left: ['entryControls'],
+          center: [],
+          right: [],
+        },
+      },
+    });
+    const meta = createPageHeaderMeta(header);
+
+    expect(header.layoutRows).toEqual({
+      top: {
+        left: ['brand', 'nav'],
+        center: ['patron'],
+        right: [],
+      },
+      middle: {
+        left: [],
+        center: [],
+        right: ['status'],
+      },
+      bottom: {
+        left: ['entryControls'],
+        center: [],
+        right: [],
+      },
+    });
+    expect(header.regions).toEqual({
+      left: ['brand', 'nav', 'entryControls'],
+      center: ['patron'],
+      right: ['status'],
+    });
+    expect(meta.layoutRows).toEqual(header.layoutRows);
+    expect(meta.regions).toEqual(header.regions);
+  });
+
   it('resolves shell top and scrolled appearance with sparse scrolled overlays', () => {
     const header = normalizeHeaderConfig({
       appearance: {
@@ -270,7 +352,7 @@ describe('header appearance', () => {
       kind: 'toggle',
     });
     topColorInput.value = '#112233';
-    expect(topColorInput.getAttribute('aria-label')).toBe('Top Background Color');
+    expect(topColorInput.getAttribute('aria-label')).toBe('Normal Header Background Color');
     topColorToggle.checked = true;
     topColorToggle.dispatchEvent(new Event('change', { bubbles: true }));
 
@@ -293,6 +375,65 @@ describe('header appearance', () => {
     scrolledRadiusToggle.dispatchEvent(new Event('change', { bubbles: true }));
 
     expect(setDraftState.mock.lastCall[0].header.appearance.scrolled.border.radius).toBe(18);
+  });
+
+  it('renders header categories collapsed and syncs appearance picker and hex fields', () => {
+    const { wrapper, setDraftState, markDirty } = mountHeaderEditor();
+
+    const sections = wrapper.querySelectorAll('.pb-inspector-section');
+    expect(sections.length).toBeGreaterThanOrEqual(5);
+    expect(wrapper.querySelector('.pb-inspector-section[open]')).toBeNull();
+
+    const textSection = sections[0];
+    const partsSection = sections[1];
+    textSection.open = true;
+    partsSection.open = true;
+    expect(textSection.open).toBe(true);
+    expect(partsSection.open).toBe(true);
+    expect(markDirty).not.toHaveBeenCalled();
+  });
+
+  it('syncs shared appearance picker and hex inputs without saving invalid hex values', () => {
+    const { wrapper, setDraftState } = mountHeaderEditor({
+      draftState: {
+        header: {
+          appearance: {
+            top: {
+              background: {
+                color: '#00d9ff',
+              },
+            },
+          },
+        },
+        copy: {
+          title: 'Header Title',
+          subtitle: '',
+          subtitles: [],
+        },
+      },
+    });
+    const colorPicker = wrapper.querySelector(
+      '[data-appearance-input="true"][data-appearance-input-kind="picker"][data-appearance-scope="shell-top"][data-appearance-key="background.color"]'
+    );
+    const colorHex = wrapper.querySelector(
+      '[data-appearance-input="true"][data-appearance-input-kind="hex"][data-appearance-scope="shell-top"][data-appearance-key="background.color"]'
+    );
+
+    colorPicker.value = '#445566';
+    colorPicker.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(colorHex.value).toBe('#445566');
+    expect(setDraftState.mock.lastCall[0].header.appearance.top.background.color).toBe('#445566');
+
+    const callCount = setDraftState.mock.calls.length;
+    colorHex.value = 'not-hex';
+    colorHex.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(colorHex.getAttribute('aria-invalid')).toBe('true');
+    expect(setDraftState.mock.calls.length).toBe(callCount);
+
+    colorHex.value = '#778899';
+    colorHex.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(colorPicker.value).toBe('#778899');
+    expect(setDraftState.mock.lastCall[0].header.appearance.top.background.color).toBe('#778899');
   });
 
   it('writes nav defaults and per-item overrides and prunes unchecked leaves', () => {
@@ -442,8 +583,91 @@ describe('header appearance', () => {
     wrapper
       .querySelector('.pb-header-layout-button[data-action="move-right"][data-block-id="brand"]')
       ?.dispatchEvent(new Event('click', { bubbles: true }));
+    expect(setDraftState.mock.lastCall[0].header.layoutRows.top.center).toContain('brand');
     expect(setDraftState.mock.lastCall[0].header.regions.center).toContain('brand');
     expect(renderEditorPanel).toHaveBeenCalledTimes(2);
+  });
+
+  it('moves a header block down into an empty row without requiring another block above it', () => {
+    const { wrapper, setDraftState } = mountHeaderEditor({
+      draftState: {
+        header: {
+          layoutRows: {
+            top: {
+              left: ['brand'],
+              center: ['patron', 'status'],
+              right: ['entryControls', 'nav'],
+            },
+            middle: {
+              left: [],
+              center: [],
+              right: [],
+            },
+            bottom: {
+              left: [],
+              center: [],
+              right: [],
+            },
+          },
+          nav: { items: [] },
+        },
+        copy: {
+          title: 'Header Title',
+          subtitle: '',
+          subtitles: [],
+        },
+      },
+    });
+
+    wrapper
+      .querySelector('.pb-header-layout-button[data-action="move-down"][data-block-id="brand"]')
+      ?.dispatchEvent(new Event('click', { bubbles: true }));
+
+    const header = setDraftState.mock.lastCall[0].header;
+    expect(header.layoutRows.top.left).not.toContain('brand');
+    expect(header.layoutRows.middle.left).toContain('brand');
+    expect(header.regions.left).toContain('brand');
+  });
+
+  it('moves header blocks left and right without changing their row', () => {
+    const { wrapper, setDraftState } = mountHeaderEditor({
+      draftState: {
+        header: {
+          layoutRows: {
+            top: {
+              left: ['patron', 'status'],
+              center: [],
+              right: ['entryControls', 'nav'],
+            },
+            middle: {
+              left: ['brand'],
+              center: [],
+              right: [],
+            },
+            bottom: {
+              left: [],
+              center: [],
+              right: [],
+            },
+          },
+          nav: { items: [] },
+        },
+        copy: {
+          title: 'Header Title',
+          subtitle: '',
+          subtitles: [],
+        },
+      },
+    });
+
+    wrapper
+      .querySelector('.pb-header-layout-button[data-action="move-right"][data-block-id="brand"]')
+      ?.dispatchEvent(new Event('click', { bubbles: true }));
+
+    const header = setDraftState.mock.lastCall[0].header;
+    expect(header.layoutRows.middle.left).not.toContain('brand');
+    expect(header.layoutRows.middle.center).toContain('brand');
+    expect(header.layoutRows.top.center).not.toContain('brand');
   });
 
   it('applies merged author nav link appearance, keeps admin link untouched, and toggles topbar shell state on scroll', () => {
@@ -522,6 +746,82 @@ describe('header appearance', () => {
     expect(topbar?.classList.contains('topbar--scrolled')).toBe(true);
     expect(topbar?.getAttribute('style')).toContain('border-radius: 14px');
     expect(topbar?.style.getPropertyValue('border-radius')).toBe('14px');
+  });
+
+  it('renders only non-empty enabled header rows and cells in the live header', () => {
+    createHeaderDom();
+
+    const header = normalizeHeaderConfig({
+      layoutRows: {
+        top: {
+          left: ['brand'],
+          center: [],
+          right: [],
+        },
+        middle: {
+          left: [],
+          center: ['status'],
+          right: [],
+        },
+        bottom: {
+          left: ['patron'],
+          center: ['entryControls'],
+          right: ['nav'],
+        },
+      },
+      blocks: {
+        brand: { enabled: true },
+        patron: { enabled: false },
+        status: { enabled: true },
+        entryControls: { enabled: false },
+        nav: { enabled: false },
+      },
+      nav: {
+        items: [
+          {
+            id: 'about',
+            label: 'About',
+            enabled: true,
+            link: {
+              kind: 'builder-page',
+              pageSlug: 'about',
+            },
+          },
+        ],
+      },
+    });
+
+    applySharedHeaderLayout(null, {
+      headerState: {
+        header,
+        copy: {
+          title: 'Reader',
+          subtitle: '',
+          subtitles: [],
+        },
+      },
+    });
+
+    expect(header.layoutRows.bottom.right).toContain('nav');
+    expect(document.querySelectorAll('.topbar-layout-row')).toHaveLength(2);
+    expect(
+      document.querySelector(
+        '.topbar-layout-row[data-row="top"] .topbar-region[data-region="left"] > .brand'
+      )
+    ).not.toBeNull();
+    expect(
+      document.querySelector(
+        '.topbar-layout-row[data-row="middle"] .topbar-region[data-region="center"] > #statusPanel'
+      )
+    ).not.toBeNull();
+    expect(document.querySelector('.topbar-layout-row[data-row="bottom"]')).toBeNull();
+    expect(
+      document.querySelector(
+        '.topbar-layout-row[data-row="top"] .topbar-region[data-region="center"]'
+      )
+    ).toBeNull();
+    expect(document.querySelector('.topbar-layout-row .nav-links')).toBeNull();
+    expect(document.querySelector('.topbar-stash .nav-links')?.style.display).toBe('none');
   });
 
   it('clears shell appearance data, classes, and controlled inline styles when a later page has no appearance', () => {

@@ -1,5 +1,6 @@
 import { THEME_COLORS, THEME_PRESETS } from './constants.js';
 import { escapeAttr, formatFocus, normalizeFit, parseFocus } from './helpers.js';
+import { renderInspectorSection } from './inspector-sections.js';
 
 function cloneThemeDraft(draft = {}) {
   return JSON.parse(
@@ -65,18 +66,14 @@ export function renderThemeEditorContent(currentPage, draftMeta = null) {
   const leftGap = panelSpacing.left ?? '';
   const rightGap = panelSpacing.right ?? '';
 
-  const renderSectionCard = (kicker, title, copy, body) => `
-    <section class="pb-editor-section-card">
-      <div class="pb-editor-section-head">
-        <div>
-          <span class="pb-editor-section-kicker">${kicker}</span>
-          <h4 class="pb-editor-section-title">${title}</h4>
-        </div>
-        <p class="pb-editor-section-copy">${copy}</p>
-      </div>
-      ${body}
-    </section>
-  `;
+  const renderSectionCard = (kicker, title, copy, body, summary = title) =>
+    renderInspectorSection({
+      kicker,
+      title,
+      summary,
+      copy,
+      body,
+    });
 
   const renderPanelSurfaceCard = (panel, title, bg, opacity) => `
     <div class="pb-editor-subcard">

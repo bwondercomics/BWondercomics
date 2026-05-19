@@ -2,33 +2,52 @@ import { escapeHtml } from './helpers.js';
 import { bindHeaderEditorEvents, renderHeaderEditorContent } from './header-editor.js';
 import { bindModuleEditorEvents, renderModuleEditorContent } from './module-editor.js';
 import { bindThemeEditorEvents, renderThemeEditorContent } from './theme-editor.js';
+import { renderInspectorSection } from './inspector-sections.js';
 
 function renderPageSettingsContent(draft) {
   if (!draft) return '';
   return `
-    <div class="form-editor">
-      <div class="form-group">
-        <label class="form-label" for="pbEditPageSlug">Page Slug</label>
-        <input type="text" id="pbEditPageSlug" class="form-input" value="${escapeHtml(draft.slug)}" />
-        <div class="settings-note">Used in the URL (letters, numbers, dashes).</div>
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="pbEditPageTitle">Page Title</label>
-        <input type="text" id="pbEditPageTitle" class="form-input" value="${escapeHtml(draft.title)}" />
-      </div>
-      <div class="form-group">
-        <label class="form-label" for="pbEditPageType">Page Type</label>
-        <input type="text" id="pbEditPageType" class="form-input" value="${escapeHtml(draft.pageType || '')}" />
-        <div class="settings-note">e.g., custom, reader, gallery.</div>
-      </div>
-      <div class="form-group">
-        <label style="display: flex; align-items: center; gap: 10px; font-size: 0.95rem;">
-          <input type="checkbox" id="pbEditIsHomepage" ${draft.isHomepage ? 'checked' : ''} />
-          Is Homepage
-        </label>
-        <div class="settings-note" style="margin-top: 6px;">Check to make this page the default landing page for the series.</div>
-      </div>
-    </div>
+    ${renderInspectorSection({
+      kicker: 'Identity',
+      title: 'Page Identity',
+      summary: draft.slug || 'Page URL',
+      copy: 'Control the page URL, title, and type.',
+      body: `
+        <div class="form-editor">
+          <div class="form-group">
+            <label class="form-label" for="pbEditPageSlug">Page Slug</label>
+            <input type="text" id="pbEditPageSlug" class="form-input" value="${escapeHtml(draft.slug)}" />
+            <div class="settings-note">Used in the URL (letters, numbers, dashes).</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="pbEditPageTitle">Page Title</label>
+            <input type="text" id="pbEditPageTitle" class="form-input" value="${escapeHtml(draft.title)}" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="pbEditPageType">Page Type</label>
+            <input type="text" id="pbEditPageType" class="form-input" value="${escapeHtml(draft.pageType || '')}" />
+            <div class="settings-note">e.g., custom, reader, gallery.</div>
+          </div>
+        </div>
+      `,
+    })}
+    ${renderInspectorSection({
+      kicker: 'Publishing',
+      title: 'Publishing',
+      summary: draft.isHomepage ? 'Homepage' : 'Standard page',
+      copy: 'Choose whether this page is the default landing page for the series.',
+      body: `
+        <div class="form-editor">
+          <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 10px; font-size: 0.95rem;">
+              <input type="checkbox" id="pbEditIsHomepage" ${draft.isHomepage ? 'checked' : ''} />
+              Is Homepage
+            </label>
+            <div class="settings-note" style="margin-top: 6px;">Check to make this page the default landing page for the series.</div>
+          </div>
+        </div>
+      `,
+    })}
   `;
 }
 

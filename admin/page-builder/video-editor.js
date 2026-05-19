@@ -1,4 +1,5 @@
 import { escapeAttr } from './helpers.js';
+import { renderInspectorSection } from './inspector-sections.js';
 
 function normalizeVideoConfig(config = {}) {
   return {
@@ -9,21 +10,18 @@ function normalizeVideoConfig(config = {}) {
 export function renderVideoEditor(config = {}) {
   const normalized = normalizeVideoConfig(config);
 
-  return `
-    <section class="pb-editor-section-card">
-      <div class="pb-editor-section-head">
-        <div>
-          <span class="pb-editor-section-kicker">Content</span>
-          <h4 class="pb-editor-section-title">Video Link</h4>
-        </div>
-        <p class="pb-editor-section-copy">Must be a valid HTTPS YouTube or Vimeo link.</p>
-      </div>
+  return renderInspectorSection({
+    kicker: 'Content',
+    title: 'Video Link',
+    summary: normalized.url || 'No URL',
+    copy: 'Must be a valid HTTPS YouTube or Vimeo link.',
+    body: `
       <div class="pb-editor-field">
         <label class="pb-editor-label">Video URL</label>
         <input type="text" class="pb-editor-input pb-video-input" data-key="url" value="${escapeAttr(normalized.url || '')}">
       </div>
-    </section>
-  `;
+    `,
+  });
 }
 
 export function bindVideoEditorEvents({ el, draftConfig, setDraftConfig, markDirty }) {

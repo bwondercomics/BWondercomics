@@ -1,4 +1,5 @@
 import { escapeAttr, escapeHtml, resolveAssetUrl } from './helpers.js';
+import { renderInspectorSection } from './inspector-sections.js';
 
 export function generateSocialButtonId() {
   return 'social-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
@@ -106,15 +107,12 @@ export function renderSocialEditor(config) {
     })
     .join('');
 
-  return `
-    <section class="pb-editor-section-card">
-      <div class="pb-editor-section-head">
-        <div>
-          <span class="pb-editor-section-kicker">Content</span>
-          <h4 class="pb-editor-section-title">Social Buttons</h4>
-        </div>
-        <p class="pb-editor-section-copy">Manage button order, icon assets, destination URLs, and per-button styling.</p>
-      </div>
+  return renderInspectorSection({
+    kicker: 'Content',
+    title: 'Social Buttons',
+    summary: `${buttons.length} button${buttons.length === 1 ? '' : 's'}`,
+    copy: 'Manage button order, icon assets, destination URLs, and per-button styling.',
+    body: `
       <div class="pb-promo-items-section">
         <div class="pb-editor-toolbar">
           <button type="button" class="btn-secondary" id="pbSocialAddButton">+ Add Button</button>
@@ -123,8 +121,8 @@ export function renderSocialEditor(config) {
           ${buttonsHtml || '<div class="pb-promo-empty">No buttons. Click "+ Add Button" to create one.</div>'}
         </div>
       </div>
-    </section>
-  `;
+    `,
+  });
 }
 
 export function bindSocialEditorEvents({

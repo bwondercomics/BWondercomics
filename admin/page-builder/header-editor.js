@@ -1,6 +1,7 @@
 import {
   cloneValue as cloneAppearanceValue,
   isObject,
+  syncAppearanceColorInputs,
   removeAppearanceLeaf,
   renderAppearanceControls,
   setAppearanceLeaf,
@@ -10,6 +11,7 @@ import { escapeAttr, escapeHtml } from './helpers.js';
 import {
   HEADER_BLOCK_DEFS,
   HEADER_REGION_ORDER,
+  HEADER_ROW_ORDER,
   cloneValue,
   normalizeHeaderConfig,
   normalizeHeaderCopy,
@@ -20,39 +22,34 @@ import {
   normalizeHeaderNavItems,
   normalizeLinkTarget,
 } from './link-utils.js';
-
-function renderSectionCard(kicker, title, copy, body) {
-  return `
-    <section class="pb-editor-section-card">
-      <div class="pb-editor-section-head">
-        <div>
-          <span class="pb-editor-section-kicker">${escapeHtml(kicker)}</span>
-          <h4 class="pb-editor-section-title">${escapeHtml(title)}</h4>
-        </div>
-        <p class="pb-editor-section-copy">${escapeHtml(copy)}</p>
-      </div>
-      ${body}
-    </section>
-  `;
-}
+import { renderInspectorSection } from './inspector-sections.js';
 
 function getRegionLabel(region) {
   return String(region || '').replace(/^\w/, (char) => char.toUpperCase());
 }
 
-function findBlockRegion(header, blockId) {
-  return (
-    HEADER_REGION_ORDER.find((region) => (header.regions?.[region] || []).includes(blockId)) ||
-    'left'
-  );
+function getRowLabel(rowId) {
+  return String(rowId || '').replace(/^\w/, (char) => char.toUpperCase());
+}
+
+function findBlockPlacement(header, blockId) {
+  for (const rowId of HEADER_ROW_ORDER) {
+    for (const region of HEADER_REGION_ORDER) {
+      if ((header.layoutRows?.[rowId]?.[region] || []).includes(blockId)) {
+        return { rowId, region };
+      }
+    }
+  }
+  return { rowId: 'top', region: 'left' };
 }
 
 function renderCopyEditor(copy) {
-  return renderSectionCard(
-    'Header Copy',
-    'Title, Subtitle, and Rotating Lines',
-    'This is the text readers see in the live header. Rotating lines cycle through the list below.',
-    `
+  return renderInspectorSection({
+    kicker: 'Header',
+    title: 'Header Text',
+    summary: copy.title || 'Page title',
+    copy: 'This is the text readers see in the live header. Rotating lines cycle through the list below.',
+    body: `
       <div class="pb-editor-field">
         <label class="pb-editor-label">Title</label>
         <input type="text" class="pb-editor-input pb-header-copy-input" data-copy-key="title" value="${escapeAttr(copy.title || '')}">
@@ -66,8 +63,8 @@ function renderCopyEditor(copy) {
         <textarea class="pb-editor-textarea pb-header-copy-input" data-copy-key="subtitles" placeholder="One line per subtitle">${escapeHtml((copy.subtitles || []).join('\n'))}</textarea>
         <p class="pb-editor-help">Use one line per rotating subtitle. Leave blank if this page should stay static.</p>
       </div>
-    `
-  );
+    `,
+  });
 }
 
 function renderLinkFields(item, index, pages) {
@@ -191,11 +188,12 @@ function renderNavigationEditor(header, pages) {
     )
     .join('');
 
-  return renderSectionCard(
-    'Navigation Buttons',
-    'Buttons in the Header',
-    'Choose which buttons appear in this page header and where each one goes.',
-    `
+  return renderInspectorSection({
+    kicker: 'Navigation',
+    title: 'Navigation Buttons',
+    summary: `${navItems.length} button${navItems.length === 1 ? '' : 's'}`,
+    copy: 'Choose which buttons appear in this page header and where each one goes.',
+    body: `
       ${renderAppearanceControls(
         header.appearance?.navItemDefaults,
         'nav-defaults',
@@ -209,8 +207,8 @@ function renderNavigationEditor(header, pages) {
       <div class="pb-editor-actions">
         <button type="button" class="btn-secondary" id="pbHeaderAddNavItem">+ Add Button</button>
       </div>
-    `
-  );
+    `,
+  });
 }
 
 function renderPartsEditor(header) {
@@ -231,86 +229,110 @@ function renderPartsEditor(header) {
     `;
   }).join('');
 
-  return renderSectionCard(
-    'Header Parts',
-    'What Readers See',
-    'Turn built-in header parts on or off for this page.',
-    `<div class="pb-header-toggle-list">${partsHtml}</div>`
-  );
+  const visibleCount = HEADER_BLOCK_DEFS.filter(
+    (block) => header.blocks?.[block.id]?.enabled !== false
+  ).length;
+  return renderInspectorSection({
+    kicker: 'Parts',
+    title: 'Header Parts',
+    summary: `${visibleCount} visible`,
+    copy: 'Turn built-in header parts on or off for this page.',
+    body: `<div class="pb-header-toggle-list">${partsHtml}</div>`,
+  });
 }
 
 function renderPlacementEditor(header) {
-  const board = HEADER_REGION_ORDER.map((region) => {
-    const blockIds = header.regions?.[region] || [];
-    const regionBlocks = blockIds
-      .map((blockId, index) => {
-        const block = HEADER_BLOCK_DEFS.find((item) => item.id === blockId);
-        const enabled = header.blocks?.[blockId]?.enabled !== false;
-        return `
-          <div
-            class="pb-header-layout-card ${enabled ? '' : 'is-disabled'}"
-            data-block-id="${blockId}"
-            draggable="true"
-          >
-            <div class="pb-header-layout-card-head">
-              <div class="pb-header-layout-card-drag-handle" aria-hidden="true">⠿</div>
-              <div>
-                <strong>${escapeHtml(block?.label || blockId)}</strong>
-                <div class="pb-editor-help">${enabled ? 'Visible' : 'Hidden on this page'}</div>
+  const board = HEADER_ROW_ORDER.map((rowId, rowIndex) => {
+    const rowCells = HEADER_REGION_ORDER.map((region) => {
+      const blockIds = header.layoutRows?.[rowId]?.[region] || [];
+      const regionBlocks = blockIds
+        .map((blockId) => {
+          const block = HEADER_BLOCK_DEFS.find((item) => item.id === blockId);
+          const enabled = header.blocks?.[blockId]?.enabled !== false;
+          return `
+            <div
+              class="pb-header-layout-card ${enabled ? '' : 'is-disabled'}"
+              data-block-id="${blockId}"
+              draggable="true"
+            >
+              <div class="pb-header-layout-card-head">
+                <div class="pb-header-layout-card-drag-handle" aria-hidden="true">⠿</div>
+                <div>
+                  <strong>${escapeHtml(block?.label || blockId)}</strong>
+                  <div class="pb-editor-help">${enabled ? 'Visible' : 'Hidden on this page'}</div>
+                </div>
+                <span class="pb-header-layout-region-chip">${escapeHtml(getRowLabel(rowId))} / ${escapeHtml(getRegionLabel(region))}</span>
               </div>
-              <span class="pb-header-layout-region-chip">${escapeHtml(getRegionLabel(region))}</span>
+              <div class="pb-header-layout-actions">
+                <button type="button" class="btn-secondary pb-header-layout-button" data-action="move-left" data-block-id="${blockId}" ${region === 'left' ? 'disabled' : ''}>Move Left</button>
+                <button type="button" class="btn-secondary pb-header-layout-button" data-action="move-right" data-block-id="${blockId}" ${region === 'right' ? 'disabled' : ''}>Move Right</button>
+                <button type="button" class="btn-secondary pb-header-layout-button" data-action="move-up" data-block-id="${blockId}" ${rowIndex === 0 ? 'disabled' : ''}>Move Up</button>
+                <button type="button" class="btn-secondary pb-header-layout-button" data-action="move-down" data-block-id="${blockId}" ${rowIndex === HEADER_ROW_ORDER.length - 1 ? 'disabled' : ''}>Move Down</button>
+              </div>
             </div>
-            <div class="pb-header-layout-actions">
-              <button type="button" class="btn-secondary pb-header-layout-button" data-action="move-left" data-block-id="${blockId}" ${region === 'left' ? 'disabled' : ''}>Move Left</button>
-              <button type="button" class="btn-secondary pb-header-layout-button" data-action="move-right" data-block-id="${blockId}" ${region === 'right' ? 'disabled' : ''}>Move Right</button>
-              <button type="button" class="btn-secondary pb-header-layout-button" data-action="move-up" data-block-id="${blockId}" ${index === 0 ? 'disabled' : ''}>Move Up</button>
-              <button type="button" class="btn-secondary pb-header-layout-button" data-action="move-down" data-block-id="${blockId}" ${index === blockIds.length - 1 ? 'disabled' : ''}>Move Down</button>
-            </div>
-          </div>
-        `;
-      })
-      .join('');
+          `;
+        })
+        .join('');
+
+      return `
+        <div
+          class="pb-header-region pb-header-region--board"
+          data-row="${rowId}"
+          data-region="${region}"
+        >
+          <div class="pb-header-region-title">${escapeHtml(getRegionLabel(region))}</div>
+          ${regionBlocks || '<div class="pb-editor-help pb-header-region-empty">Drop blocks here</div>'}
+        </div>
+      `;
+    }).join('');
 
     return `
-      <div class="pb-header-region pb-header-region--board" data-region="${region}">
-        <div class="pb-header-region-title">${escapeHtml(getRegionLabel(region))}</div>
-        ${regionBlocks || '<div class="pb-editor-help pb-header-region-empty">Drop blocks here</div>'}
+      <div class="pb-header-layout-row" data-row="${rowId}">
+        <div class="pb-header-layout-row-title">${escapeHtml(getRowLabel(rowId))}</div>
+        <div class="pb-header-layout-row-cells">${rowCells}</div>
       </div>
     `;
   }).join('');
 
-  return renderSectionCard(
-    'Placement',
-    'Header Layout Board',
-    'Drag blocks between regions, or use the buttons below each block.',
-    `<div class="pb-header-layout-grid">${board}</div>`
-  );
+  return renderInspectorSection({
+    kicker: 'Placement',
+    title: 'Placement',
+    summary: '3 rows',
+    copy: 'Drag blocks between cells, or use the buttons below each block.',
+    body: `<div class="pb-header-layout-grid">${board}</div>`,
+  });
 }
 
 function renderShellAppearanceEditor(header) {
-  return renderSectionCard(
-    'Appearance',
-    'Header Shell',
-    'Control the top header shell style and the sparse appearance overlay applied after the page scrolls.',
-    `
+  const hasAppearance = !!(
+    header.appearance?.top ||
+    header.appearance?.scrolled ||
+    header.appearance?.navItemDefaults
+  );
+  return renderInspectorSection({
+    kicker: 'Styling',
+    title: 'Header Styling',
+    summary: hasAppearance ? 'Custom' : 'Default',
+    copy: 'Control the normal header style and the optional style used after the reader scrolls.',
+    body: `
       <div class="pb-appearance-stack">
         ${renderAppearanceControls(
           header.appearance?.top,
           'shell-top',
           null,
-          'Top',
-          'These sparse values apply while the page is at the top.'
+          'Normal Header',
+          'Styles used before the reader scrolls.'
         )}
         ${renderAppearanceControls(
           header.appearance?.scrolled,
           'shell-scrolled',
           null,
-          'Scrolled',
-          'These sparse values merge on top of Top after the reader scrolls.'
+          'After Page Scroll',
+          'Styles used once the sticky header has scrolled.'
         )}
       </div>
-    `
-  );
+    `,
+  });
 }
 
 function renderSourceBanner(source) {
@@ -340,44 +362,53 @@ export function renderHeaderEditorContent({ draftState, pages = [] }) {
   return [
     renderSourceBanner(draftState?.source),
     renderCopyEditor(copy),
-    renderShellAppearanceEditor(header),
-    renderNavigationEditor(header, pages),
     renderPartsEditor(header),
     renderPlacementEditor(header),
+    renderNavigationEditor(header, pages),
+    renderShellAppearanceEditor(header),
   ].join('');
 }
 
-function moveBlockToRegion(header, blockId, nextRegion) {
+function moveBlockToPlacement(header, blockId, nextRowId, nextRegion) {
   const nextHeader = normalizeHeaderConfig(cloneValue(header), normalizeHeaderNavItems);
-  HEADER_REGION_ORDER.forEach((region) => {
-    nextHeader.regions[region] = (nextHeader.regions[region] || []).filter((id) => id !== blockId);
+  HEADER_ROW_ORDER.forEach((rowId) => {
+    HEADER_REGION_ORDER.forEach((region) => {
+      nextHeader.layoutRows[rowId][region] = (nextHeader.layoutRows[rowId][region] || []).filter(
+        (id) => id !== blockId
+      );
+    });
   });
-  nextHeader.regions[nextRegion] = nextHeader.regions[nextRegion] || [];
-  nextHeader.regions[nextRegion].push(blockId);
-  return nextHeader;
-}
-
-function moveBlockWithinRegion(header, blockId, direction) {
-  const nextHeader = normalizeHeaderConfig(cloneValue(header), normalizeHeaderNavItems);
-  const region = findBlockRegion(nextHeader, blockId);
-  const items = nextHeader.regions[region] || [];
-  const index = items.indexOf(blockId);
-  if (index === -1) return nextHeader;
-  const targetIndex = direction === 'up' ? index - 1 : index + 1;
-  if (targetIndex < 0 || targetIndex >= items.length) return nextHeader;
-  [items[index], items[targetIndex]] = [items[targetIndex], items[index]];
-  return nextHeader;
+  nextHeader.layoutRows[nextRowId][nextRegion] = nextHeader.layoutRows[nextRowId][nextRegion] || [];
+  nextHeader.layoutRows[nextRowId][nextRegion].push(blockId);
+  return normalizeHeaderConfig(nextHeader, normalizeHeaderNavItems);
 }
 
 function moveBlockAcrossRegions(header, blockId, direction) {
-  const currentRegion = findBlockRegion(header, blockId);
-  const currentIndex = HEADER_REGION_ORDER.indexOf(currentRegion);
+  const placement = findBlockPlacement(
+    normalizeHeaderConfig(header, normalizeHeaderNavItems),
+    blockId
+  );
+  const currentIndex = HEADER_REGION_ORDER.indexOf(placement.region);
   if (currentIndex === -1) {
     return normalizeHeaderConfig(cloneValue(header), normalizeHeaderNavItems);
   }
   const nextRegion = HEADER_REGION_ORDER[currentIndex + direction];
   if (!nextRegion) return normalizeHeaderConfig(cloneValue(header), normalizeHeaderNavItems);
-  return moveBlockToRegion(header, blockId, nextRegion);
+  return moveBlockToPlacement(header, blockId, placement.rowId, nextRegion);
+}
+
+function moveBlockAcrossRows(header, blockId, direction) {
+  const placement = findBlockPlacement(
+    normalizeHeaderConfig(header, normalizeHeaderNavItems),
+    blockId
+  );
+  const currentIndex = HEADER_ROW_ORDER.indexOf(placement.rowId);
+  if (currentIndex === -1) {
+    return normalizeHeaderConfig(cloneValue(header), normalizeHeaderNavItems);
+  }
+  const nextRowId = HEADER_ROW_ORDER[currentIndex + direction];
+  if (!nextRowId) return normalizeHeaderConfig(cloneValue(header), normalizeHeaderNavItems);
+  return moveBlockToPlacement(header, blockId, nextRowId, placement.region);
 }
 
 function setCopyValue(state, key, value) {
@@ -590,10 +621,16 @@ export function bindHeaderEditorEvents({
     zone.addEventListener('drop', (event) => {
       event.preventDefault();
       zone.classList.remove('is-drag-over');
+      const targetRowId = zone.dataset.row;
       const targetRegion = zone.dataset.region;
-      if (!draggedBlockId || !targetRegion) return;
+      if (!draggedBlockId || !targetRowId || !targetRegion) return;
       const nextState = cloneValue(state);
-      nextState.header = moveBlockToRegion(nextState.header, draggedBlockId, targetRegion);
+      nextState.header = moveBlockToPlacement(
+        nextState.header,
+        draggedBlockId,
+        targetRowId,
+        targetRegion
+      );
       draggedBlockId = null;
       commit(nextState, { rerenderEditor: true, rerenderCanvas: true });
     });
@@ -610,9 +647,9 @@ export function bindHeaderEditorEvents({
       } else if (action === 'move-right') {
         nextState.header = moveBlockAcrossRegions(nextState.header, blockId, 1);
       } else if (action === 'move-up') {
-        nextState.header = moveBlockWithinRegion(nextState.header, blockId, 'up');
+        nextState.header = moveBlockAcrossRows(nextState.header, blockId, -1);
       } else if (action === 'move-down') {
-        nextState.header = moveBlockWithinRegion(nextState.header, blockId, 'down');
+        nextState.header = moveBlockAcrossRows(nextState.header, blockId, 1);
       }
       commit(nextState, { rerenderEditor: true, rerenderCanvas: true });
     });
@@ -711,8 +748,10 @@ export function bindHeaderEditorEvents({
       const key = input.dataset.appearanceKey;
       const index = input.dataset.itemIndex ? parseInt(input.dataset.itemIndex, 10) : null;
       if (!scope || !key) return;
+      const value = syncAppearanceColorInputs(el.pbModuleEditor, input);
+      if (value === null) return;
       const nextState = cloneValue(state);
-      updateAppearanceTarget(nextState, scope, index, key, input.value);
+      updateAppearanceTarget(nextState, scope, index, key, value);
       commit(nextState, { rerenderCanvas: true });
     });
   });

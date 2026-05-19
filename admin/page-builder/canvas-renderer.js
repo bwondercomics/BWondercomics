@@ -4,6 +4,7 @@ import { escapeAttr, escapeHtml } from './helpers.js';
 import {
   HEADER_BLOCK_DEFS,
   HEADER_REGION_ORDER,
+  HEADER_ROW_ORDER,
   normalizeHeaderCopy,
   resolveHeaderNavItemAppearance,
   resolveHeaderShellTopAppearance,
@@ -15,6 +16,10 @@ const INSERTABLE_MODULE_TYPES = MODULE_TYPES.filter((module) => module.type !== 
 
 function formatRegionLabel(region) {
   return String(region || '').replace(/^\w/, (char) => char.toUpperCase());
+}
+
+function formatRowLabel(rowId) {
+  return String(rowId || '').replace(/^\w/, (char) => char.toUpperCase());
 }
 
 function getHeaderPreviewState({ currentPage, activeHeaderDraft }) {
@@ -131,29 +136,38 @@ function renderPageHeaderSurface(state) {
         </div>
       </div>
       <div class="pb-page-header-surface-layout">
-        ${HEADER_REGION_ORDER.map((region) => {
-          const blockIds = headerState.header?.regions?.[region] || [];
+        ${HEADER_ROW_ORDER.map((rowId) => {
+          const visibleCells = HEADER_REGION_ORDER.map((region) => {
+            const blockIds = headerState.header?.layoutRows?.[rowId]?.[region] || [];
+            return { region, blockIds };
+          }).filter(({ blockIds }) => blockIds.length > 0);
+          if (!visibleCells.length) return '';
           return `
-            <div class="pb-page-header-region" data-region="${region}">
-              <div class="pb-page-header-region-label">${escapeHtml(formatRegionLabel(region))}</div>
-              <div class="pb-page-header-region-stack">
-                ${
-                  blockIds.length
-                    ? blockIds
-                        .map((blockId) => {
-                          const block = HEADER_BLOCK_DEFS.find((item) => item.id === blockId);
-                          const enabled = headerState.header?.blocks?.[blockId]?.enabled !== false;
-                          return `
-                          <div class="pb-page-header-part ${enabled ? '' : 'is-disabled'}">
-                            <span class="pb-page-header-part-label">${escapeHtml(block?.label || blockId)}</span>
-                            ${getHeaderBlockPreview(blockId, headerState, state.currentPage)}
-                          </div>
-                        `;
-                        })
-                        .join('')
-                    : '<div class="pb-page-header-empty-region">Empty region</div>'
-                }
-              </div>
+            <div class="pb-page-header-surface-row" data-row="${rowId}">
+              ${visibleCells
+                .map(
+                  ({ region, blockIds }) => `
+                    <div class="pb-page-header-region" data-region="${region}">
+                      <div class="pb-page-header-region-label">${escapeHtml(formatRowLabel(rowId))} / ${escapeHtml(formatRegionLabel(region))}</div>
+                      <div class="pb-page-header-region-stack">
+                        ${blockIds
+                          .map((blockId) => {
+                            const block = HEADER_BLOCK_DEFS.find((item) => item.id === blockId);
+                            const enabled =
+                              headerState.header?.blocks?.[blockId]?.enabled !== false;
+                            return `
+                              <div class="pb-page-header-part ${enabled ? '' : 'is-disabled'}">
+                                <span class="pb-page-header-part-label">${escapeHtml(block?.label || blockId)}</span>
+                                ${getHeaderBlockPreview(blockId, headerState, state.currentPage)}
+                              </div>
+                            `;
+                          })
+                          .join('')}
+                      </div>
+                    </div>
+                  `
+                )
+                .join('')}
             </div>
           `;
         }).join('')}

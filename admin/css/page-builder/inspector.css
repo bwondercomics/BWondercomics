@@ -120,7 +120,10 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 16px 18px 18px;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scroll-padding-bottom: 96px;
+  padding: 16px 18px 96px;
 }
 
 .pb-editor-footer {
@@ -235,6 +238,75 @@
   padding: 16px;
 }
 
+.pb-inspector-section {
+  padding: 0;
+  overflow: visible;
+}
+
+.pb-inspector-section-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  list-style: none;
+  color: inherit;
+}
+
+.pb-inspector-section-summary::-webkit-details-marker {
+  display: none;
+}
+
+.pb-inspector-section-summary::after {
+  content: '+';
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.pb-inspector-section[open] > .pb-inspector-section-summary::after {
+  content: '-';
+}
+
+.pb-inspector-section-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.pb-inspector-section-summary .pb-editor-section-title {
+  display: block;
+  margin: 0;
+}
+
+.pb-inspector-section-meta {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.pb-inspector-section-body {
+  padding: 0 16px 16px;
+  overflow: visible;
+}
+
+.pb-inspector-section-body > .pb-editor-section-copy:first-child {
+  margin-bottom: 14px;
+}
+
 .pb-editor-section-card--summary {
   padding: 14px 16px;
   background:
@@ -281,6 +353,28 @@
 }
 
 .pb-header-layout-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pb-header-layout-row {
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.pb-header-layout-row-title {
+  margin-bottom: 10px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.68);
+}
+
+.pb-header-layout-row-cells {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;

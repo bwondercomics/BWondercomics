@@ -14,6 +14,7 @@ import { bindGalleryEditorEvents, renderGalleryEditor } from './gallery-editor.j
 import { bindVideoEditorEvents, renderVideoEditor } from './video-editor.js';
 import { bindDividerEditorEvents, renderDividerEditor } from './divider-editor.js';
 import { bindEntryGalleryEditorEvents, renderEntryGalleryEditor } from './entry-gallery-editor.js';
+import { renderInspectorSection } from './inspector-sections.js';
 function cloneConfig(config = {}) {
   return JSON.parse(JSON.stringify(config || {}));
 }
@@ -27,77 +28,24 @@ function findSelectedModule(currentPage, selectedModuleId) {
   return null;
 }
 
-function formatModuleLabel(moduleType) {
-  return String(moduleType || 'module')
-    .replace(/-/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
-}
-
-function getModuleSummary(moduleType, config) {
-  switch (moduleType) {
-    case 'header':
-      return config.title || 'Header copy';
-    case 'text':
-      return (
-        config.content
-          ?.replace(/<[^>]*>/g, '')
-          .trim()
-          .slice(0, 90) || 'Rich text block'
-      );
-    case 'image':
-      return config.src || config.alt || 'Image block';
-    case 'gallery':
-      return `${config.images?.length || 0} image(s)`;
-    case 'video':
-      return config.url || 'Video module';
-    case 'divider':
-      return `${config.style === 'dashed' || config.style === 'dotted' ? config.style.charAt(0).toUpperCase() + config.style.slice(1) : 'Solid'} line`;
-    case 'entry-gallery':
-      return `Series entries (${config.columns || 3} cols)`;
-    case 'promo':
-      return `${config.items?.length || 0} promo item${(config.items?.length || 0) === 1 ? '' : 's'}`;
-    case 'social':
-      return `${config.buttons?.length || 0} social button${(config.buttons?.length || 0) === 1 ? '' : 's'}`;
-    case 'buttons':
-      return `${config.buttons?.length || 0} button${(config.buttons?.length || 0) === 1 ? '' : 's'}`;
-    case 'feed':
-      return `Feed module · limit ${config.limit || 0}`;
-    case 'email-signup':
-      return config.heading || 'Email signup form';
-    case 'spacer':
-      return `${config.height || 40}px spacer`;
-    case 'reader':
-      return 'Reader embed and comments';
-    default:
-      return formatModuleLabel(moduleType);
-  }
-}
-
 function renderSectionCard(kicker, title, copy, body) {
-  return `
-    <section class="pb-editor-section-card">
-      <div class="pb-editor-section-head">
-        <div>
-          <span class="pb-editor-section-kicker">${kicker}</span>
-          <h4 class="pb-editor-section-title">${title}</h4>
-        </div>
-        <p class="pb-editor-section-copy">${copy}</p>
-      </div>
-      ${body}
-    </section>
-  `;
+  return renderInspectorSection({
+    kicker,
+    title,
+    summary: title,
+    copy,
+    body,
+  });
 }
 
 function renderAccordionCard(title, copy, body) {
-  return `
-    <details class="pb-editor-accordion">
-      <summary class="pb-editor-accordion-toggle">${title}</summary>
-      <div class="pb-editor-accordion-content">
-        <p class="pb-editor-accordion-copy">${copy}</p>
-        ${body}
-      </div>
-    </details>
-  `;
+  return renderInspectorSection({
+    kicker: title,
+    title,
+    summary: title,
+    copy,
+    body,
+  });
 }
 
 function renderRawConfigCard(config) {
@@ -539,18 +487,6 @@ export function renderModuleEditorContent({
   const moduleType = selectedModule.moduleType;
   const contentSections = [];
 
-  contentSections.push(`
-    <section class="pb-editor-section-card pb-editor-section-card--summary">
-      <div class="pb-editor-summary">
-        <span class="pb-editor-summary-badge">${escapeHtml(formatModuleLabel(moduleType))}</span>
-        <div class="pb-editor-summary-body">
-          <h4 class="pb-editor-summary-title">${escapeHtml(getModuleSummary(moduleType, config))}</h4>
-          <p class="pb-editor-summary-copy">Grouped controls keep content, behavior, appearance, and raw config close together without a long unstructured form.</p>
-        </div>
-      </div>
-    </section>
-  `);
-
   switch (moduleType) {
     case 'header':
       contentSections.push(
@@ -828,7 +764,7 @@ export function renderModuleEditorContent({
           'Color Styling',
           'Tune headings, buttons, feed items, and the outer frame.',
           `
-          <details class="pb-editor-accordion" open>
+          <details class="pb-editor-accordion">
             <summary class="pb-editor-accordion-toggle">Color Options</summary>
             <div class="pb-editor-accordion-content">
               <div class="pb-style-group">

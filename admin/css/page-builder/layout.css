@@ -107,7 +107,7 @@
 .page-builder-layout[data-viewport-band='stacked'] {
   grid-template-columns: 1fr;
   grid-auto-rows: auto;
-  overflow-y: auto;
+  overflow: hidden;
   padding-right: 0;
 }
 
@@ -121,7 +121,8 @@
   position: relative;
   width: 100%;
   max-width: none;
-  min-height: 360px;
+  height: min(720px, calc(100vh - var(--admin-header-offset, 76px) - 64px));
+  min-height: min(520px, calc(100vh - var(--admin-header-offset, 76px) - 64px));
 }
 
 .page-builder-layout[data-viewport-band='stacked'][data-editor-mode='collapsed']

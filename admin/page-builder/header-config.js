@@ -1,7 +1,32 @@
 import { mergeAppearance, normalizeAppearance } from './appearance-utils.js';
 
 const HEADER_REGION_ORDER = ['left', 'center', 'right'];
+const HEADER_ROW_ORDER = ['top', 'middle', 'bottom'];
 const HEADER_BLOCK_IDS = ['brand', 'patron', 'status', 'entryControls', 'nav'];
+
+const DEFAULT_HEADER_REGIONS = Object.freeze({
+  left: Object.freeze(['brand']),
+  center: Object.freeze(['patron', 'status']),
+  right: Object.freeze(['entryControls', 'nav']),
+});
+
+const DEFAULT_HEADER_LAYOUT_ROWS = Object.freeze({
+  top: Object.freeze({
+    left: DEFAULT_HEADER_REGIONS.left,
+    center: DEFAULT_HEADER_REGIONS.center,
+    right: DEFAULT_HEADER_REGIONS.right,
+  }),
+  middle: Object.freeze({
+    left: Object.freeze([]),
+    center: Object.freeze([]),
+    right: Object.freeze([]),
+  }),
+  bottom: Object.freeze({
+    left: Object.freeze([]),
+    center: Object.freeze([]),
+    right: Object.freeze([]),
+  }),
+});
 
 const HEADER_BLOCK_DEFS = [
   {
@@ -39,14 +64,53 @@ function getHeaderBlockDefinition(blockId) {
   return HEADER_BLOCK_DEFS.find((block) => block.id === blockId) || null;
 }
 
+function cloneHeaderRegions(regions = {}) {
+  return Object.fromEntries(
+    HEADER_REGION_ORDER.map((region) => [
+      region,
+      Array.isArray(regions?.[region]) ? regions[region].slice() : [],
+    ])
+  );
+}
+
+function createEmptyLayoutRows() {
+  return Object.fromEntries(
+    HEADER_ROW_ORDER.map((rowId) => [
+      rowId,
+      Object.fromEntries(HEADER_REGION_ORDER.map((region) => [region, []])),
+    ])
+  );
+}
+
+function cloneHeaderLayoutRows(layoutRows = DEFAULT_HEADER_LAYOUT_ROWS) {
+  const rows = createEmptyLayoutRows();
+  HEADER_ROW_ORDER.forEach((rowId) => {
+    HEADER_REGION_ORDER.forEach((region) => {
+      rows[rowId][region] = Array.isArray(layoutRows?.[rowId]?.[region])
+        ? layoutRows[rowId][region].slice()
+        : [];
+    });
+  });
+  return rows;
+}
+
+function getDefaultBlockPlacement(blockId) {
+  for (const rowId of HEADER_ROW_ORDER) {
+    for (const region of HEADER_REGION_ORDER) {
+      if ((DEFAULT_HEADER_LAYOUT_ROWS[rowId]?.[region] || []).includes(blockId)) {
+        return { rowId, region };
+      }
+    }
+  }
+  return { rowId: 'top', region: 'right' };
+}
+
 function createDefaultHeaderConfig() {
+  const layoutRows = cloneHeaderLayoutRows();
   return {
     version: 2,
-    regions: {
-      left: ['brand'],
-      center: ['patron', 'status'],
-      right: ['entryControls', 'nav'],
-    },
+    layoutRows,
+    regions: flattenLayoutRows(layoutRows),
     blocks: Object.fromEntries(HEADER_BLOCK_IDS.map((id) => [id, { enabled: true }])),
     nav: {
       items: [
@@ -74,7 +138,7 @@ function createDefaultHeaderCopy(page = null) {
 }
 
 function normalizeRegions(rawRegions = {}) {
-  const defaults = createDefaultHeaderConfig().regions;
+  const defaults = DEFAULT_HEADER_REGIONS;
   const normalized = {
     left: Array.isArray(rawRegions.left) ? rawRegions.left.slice() : defaults.left.slice(),
     center: Array.isArray(rawRegions.center) ? rawRegions.center.slice() : defaults.center.slice(),
@@ -90,15 +154,77 @@ function normalizeRegions(rawRegions = {}) {
   });
   HEADER_BLOCK_IDS.forEach((id) => {
     if (!seen.has(id)) {
-      const fallbackRegion = defaults.left.includes(id)
-        ? 'left'
-        : defaults.center.includes(id)
-          ? 'center'
-          : 'right';
-      normalized[fallbackRegion].push(id);
+      const { region } = getDefaultBlockPlacement(id);
+      normalized[region].push(id);
     }
   });
   return normalized;
+}
+
+function getRawLayoutRow(rawLayoutRows, rowId, rowIndex) {
+  if (Array.isArray(rawLayoutRows)) {
+    const indexedRow = rawLayoutRows[rowIndex];
+    if (indexedRow && typeof indexedRow === 'object' && !Array.isArray(indexedRow)) {
+      return indexedRow;
+    }
+    return null;
+  }
+  if (rawLayoutRows && typeof rawLayoutRows === 'object') {
+    const keyedRow = rawLayoutRows[rowId];
+    if (keyedRow && typeof keyedRow === 'object' && !Array.isArray(keyedRow)) {
+      return keyedRow;
+    }
+  }
+  return null;
+}
+
+function normalizeLayoutRows(rawLayoutRows = null, rawRegions = null) {
+  const rows = createEmptyLayoutRows();
+  const seen = new Set();
+  const hasLayoutRows =
+    (Array.isArray(rawLayoutRows) && rawLayoutRows.length > 0) ||
+    (!!rawLayoutRows && typeof rawLayoutRows === 'object' && !Array.isArray(rawLayoutRows));
+  const legacyTopRow = hasLayoutRows ? null : normalizeRegions(rawRegions || {});
+
+  HEADER_ROW_ORDER.forEach((rowId, rowIndex) => {
+    const rowSource = hasLayoutRows ? getRawLayoutRow(rawLayoutRows, rowId, rowIndex) || {} : {};
+    HEADER_REGION_ORDER.forEach((region) => {
+      const sourceIds = hasLayoutRows
+        ? Array.isArray(rowSource[region])
+          ? rowSource[region]
+          : []
+        : rowId === 'top'
+          ? legacyTopRow[region] || []
+          : [];
+      sourceIds.forEach((id) => {
+        if (!HEADER_BLOCK_IDS.includes(id) || seen.has(id)) return;
+        seen.add(id);
+        rows[rowId][region].push(id);
+      });
+    });
+  });
+
+  HEADER_BLOCK_IDS.forEach((id) => {
+    if (seen.has(id)) return;
+    const { rowId, region } = getDefaultBlockPlacement(id);
+    rows[rowId][region].push(id);
+  });
+
+  return rows;
+}
+
+function flattenLayoutRows(layoutRows = null) {
+  const regions = cloneHeaderRegions();
+  const rows = layoutRows || DEFAULT_HEADER_LAYOUT_ROWS;
+  HEADER_ROW_ORDER.forEach((rowId) => {
+    HEADER_REGION_ORDER.forEach((region) => {
+      const blockIds = Array.isArray(rows?.[rowId]?.[region]) ? rows[rowId][region] : [];
+      blockIds.forEach((blockId) => {
+        regions[region].push(blockId);
+      });
+    });
+  });
+  return regions;
 }
 
 function normalizeBlocks(rawBlocks = {}, rawNav = {}) {
@@ -145,9 +271,11 @@ function normalizeHeaderConfig(rawConfig = null, normalizeNavItems = (items) => 
   const config =
     rawConfig && typeof rawConfig === 'object' && !Array.isArray(rawConfig) ? rawConfig : {};
   const blocks = normalizeBlocks(config.blocks, config.nav);
+  const layoutRows = normalizeLayoutRows(config.layoutRows, config.regions);
   return {
     version: 2,
-    regions: normalizeRegions(config.regions),
+    layoutRows,
+    regions: flattenLayoutRows(layoutRows),
     blocks,
     nav: {
       items: normalizeNavItems(config.nav?.items || defaults.nav.items),
@@ -225,6 +353,7 @@ function createPageHeaderMeta(
   return {
     version: 3,
     copy,
+    layoutRows: layout.layoutRows,
     regions: layout.regions,
     blocks: layout.blocks,
     nav: layout.nav,
@@ -453,6 +582,7 @@ export {
   HEADER_BLOCK_DEFS,
   HEADER_BLOCK_IDS,
   HEADER_REGION_ORDER,
+  HEADER_ROW_ORDER,
   cloneValue,
   createDefaultHeaderConfig,
   createDefaultHeaderCopy,
@@ -463,6 +593,7 @@ export {
   getLegacyHeaderCopyFallback,
   getLegacyHeaderModuleCopy,
   getPageHeaderSource,
+  normalizeLayoutRows,
   normalizeHeaderConfig,
   normalizeHeaderCopy,
   normalizeHeaderOverrides,

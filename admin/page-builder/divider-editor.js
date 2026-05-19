@@ -1,4 +1,5 @@
 import { escapeAttr } from './helpers.js';
+import { renderInspectorSection } from './inspector-sections.js';
 
 function normalizeDividerConfig(config = {}) {
   return {
@@ -10,15 +11,12 @@ function normalizeDividerConfig(config = {}) {
 export function renderDividerEditor(config = {}) {
   const normalized = normalizeDividerConfig(config);
 
-  return `
-    <section class="pb-editor-section-card">
-      <div class="pb-editor-section-head">
-        <div>
-          <span class="pb-editor-section-kicker">Appearance</span>
-          <h4 class="pb-editor-section-title">Divider Styling</h4>
-        </div>
-        <p class="pb-editor-section-copy">Choose the style and color of the horizontal ruling line.</p>
-      </div>
+  return renderInspectorSection({
+    kicker: 'Appearance',
+    title: 'Divider Styling',
+    summary: `${normalized.style || 'solid'} line`,
+    copy: 'Choose the style and color of the horizontal ruling line.',
+    body: `
       <div class="pb-editor-field">
         <label class="pb-editor-label">Style</label>
         <select class="pb-editor-select pb-divider-input" data-key="style">
@@ -31,8 +29,8 @@ export function renderDividerEditor(config = {}) {
         <label class="pb-editor-label">Color</label>
         <input type="color" class="pb-promo-style-color pb-divider-input" data-key="color" value="${escapeAttr(normalized.color || '#ffffff')}">
       </div>
-    </section>
-  `;
+    `,
+  });
 }
 
 export function bindDividerEditorEvents({ el, draftConfig, setDraftConfig, markDirty }) {

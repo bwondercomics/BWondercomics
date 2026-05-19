@@ -296,6 +296,7 @@
 
 @media (max-width: 620px) {
   .status-panel {
+    display: none !important;
     max-width: 120px;
     font-size: 10px;
   }
@@ -317,6 +318,11 @@
   }
 
   .topbar-layout {
+    gap: 4px;
+    align-items: stretch;
+  }
+
+  .topbar-layout-row {
     gap: 4px 6px;
     align-items: center;
   }
@@ -355,11 +361,6 @@
 
   .title .subtitle {
     font-size: 8px;
-  }
-
-  /* Status text is desktop chrome; hiding it keeps the phone header compact. */
-  .status-panel {
-    display: none !important;
   }
 
   .status-text {

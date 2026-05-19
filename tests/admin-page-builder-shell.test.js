@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -30,6 +32,16 @@ function createDragLikeEvent(type, dataTransfer, init = {}) {
     });
   }
   return event;
+}
+
+function readCss(path) {
+  return readFileSync(path, 'utf8');
+}
+
+function getCssRule(css, selector) {
+  const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = css.match(new RegExp(`${escapedSelector}\\s*\\{([^}]*)\\}`, 'm'));
+  return match?.[1] || '';
 }
 
 async function setupPageBuilder({
@@ -449,6 +461,29 @@ describe('admin page-builder shell', () => {
     expect(document.querySelector('.pb-header-nav-input[data-item-key="url"]')).not.toBeNull();
   });
 
+  it('keeps the right inspector on one panel scroll without clipping open categories', () => {
+    const inspectorCss = readCss('admin/css/page-builder/inspector.css');
+    const layoutCss = readCss('admin/css/page-builder/layout.css');
+    const editorContentRule = getCssRule(inspectorCss, '.pb-editor-content');
+    const sectionRule = getCssRule(inspectorCss, '.pb-inspector-section');
+    const sectionBodyRule = getCssRule(inspectorCss, '.pb-inspector-section-body');
+    const stackedLayoutRule = getCssRule(
+      layoutCss,
+      ".page-builder-layout[data-viewport-band='stacked']"
+    );
+
+    expect(editorContentRule).toContain('overflow-y: auto');
+    expect(editorContentRule).toContain('overscroll-behavior: contain');
+    expect(editorContentRule).toContain('scroll-padding-bottom: 96px');
+    expect(sectionRule).toContain('overflow: visible');
+    expect(sectionBodyRule).toContain('overflow: visible');
+    expect(stackedLayoutRule).toContain('overflow: hidden');
+    expect(layoutCss).toContain(
+      ".page-builder-layout[data-viewport-band='stacked'] .page-builder-editor {\n  position: relative;"
+    );
+    expect(layoutCss).toContain('height: min(720px');
+  });
+
   it('renders the empty state and adds a new page through the modal flow', async () => {
     const page = buildContractFixture('builderPage', {
       id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeee99',
@@ -496,6 +531,8 @@ describe('admin page-builder shell', () => {
 
     expect(document.querySelector('.pb-editor-kicker')?.textContent).toContain('Page Settings');
     expect(document.getElementById('pbSavePageSettings')).not.toBeNull();
+    expect(document.querySelectorAll('.pb-inspector-section')).toHaveLength(2);
+    expect(document.querySelector('.pb-inspector-section[open]')).toBeNull();
 
     // Check initial values
     const slugInput = document.getElementById('pbEditPageSlug');
@@ -1844,7 +1881,7 @@ describe('Phase 6 Step 3 — header editor UX upgrades', () => {
     expect(chipText).toContain('Ch. 42');
   });
 
-  it('canvas preview shows empty-region indicator when a header region has no blocks', async () => {
+  it('canvas preview omits empty header cells instead of reserving space', async () => {
     const selectedPage = getContractFixture('builderPage');
     selectedPage.meta.header.regions = {
       left: ['brand', 'patron', 'status', 'entryControls', 'nav'],
@@ -1862,9 +1899,8 @@ describe('Phase 6 Step 3 — header editor UX upgrades', () => {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await flushAdminUi(3);
 
-    const emptyRegions = document.querySelectorAll('.pb-page-header-empty-region');
-    expect(emptyRegions.length).toBeGreaterThanOrEqual(1);
-    expect(emptyRegions[0]?.textContent?.trim()).toBe('Empty region');
+    expect(document.querySelector('.pb-page-header-empty-region')).toBeNull();
+    expect(document.querySelectorAll('.pb-page-header-region')).toHaveLength(1);
   });
 
   it('placement board section description reflects drag-first workflow copy', async () => {
@@ -1888,7 +1924,7 @@ describe('Phase 6 Step 3 — header editor UX upgrades', () => {
     const sectionCopies = Array.from(document.querySelectorAll('.pb-editor-section-copy')).map(
       (el) => el.textContent?.trim()
     );
-    expect(sectionCopies.some((t) => t?.includes('Drag blocks between regions'))).toBe(true);
+    expect(sectionCopies.some((t) => t?.includes('Drag blocks between cells'))).toBe(true);
   });
 });
 
