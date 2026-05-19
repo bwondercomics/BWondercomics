@@ -1,0 +1,977 @@
+# Full-Page Live Builder Plan
+
+Status: Planned - revised product direction
+Reference source: `docs/website-references/grapesjs-dev`
+Owner surface: `admin/page-builder/`, `reader/`, shared builder renderers, builder backend routes, and builder tests
+
+## Purpose
+
+This plan adapts the useful parts of GrapesJS into the BWonderComics builder as a full-page live
+editor. The live page canvas becomes the primary and eventually only authoring surface. The builder
+opens as a full-page workspace with a top toolbar and side panel, and authors edit the rendered page
+directly instead of switching between a structural builder and a separate preview.
+
+Preview becomes a chrome-free display of the page. In preview mode, the side panel and top toolbar
+are hidden, and a small top-left restore button brings the editor menus back.
+
+The plan keeps BWonderComics' custom CMS behavior. Modules such as reader, feed, entry picker, and
+media gallery must continue to connect to the entry-management system, series data, protected media,
+and feed behavior. The direction is to make comic page, feed page, and media gallery page behaviors
+available as modules that can be placed inside normal builder pages.
+
+## Product Direction
+
+The target editor is closer to GrapesJS than the current builder shell:
+
+- the builder takes over the whole admin page when opened
+- the top toolbar owns page actions, device mode, preview toggle, save/publish, undo/redo when
+  implemented, and menu visibility
+- the side panel owns pages, blocks/modules, layers, settings, styles, and selected-module controls
+- the center canvas is the real page render and supports direct selection, hover, toolbar actions,
+  drag/drop insertion, and eventually inline editing
+- desktop, tablet, and phone display modes are first-class editing targets
+- each display mode can have element-level overrides where the data contract supports them
+- preview mode shows the page without editor chrome, with only a small restore-menu button
+
+The target content model is also broader than the current series-scoped page model:
+
+- every series still has an attached reader page
+- site pages can exist outside a specific series
+- comic/reader, feed, and media gallery become structured modules that can be placed inside pages
+- authors can still create dedicated reader, feed, or gallery pages by building a page around the
+  corresponding module
+
+## Trusted References
+
+Local GrapesJS reference:
+
+- `docs/website-references/grapesjs-dev/docs/README.md` - GrapesJS is a builder framework for
+  HTML-like structures, which supports using BWonderComics' structured module tree instead of
+  arbitrary saved HTML.
+- `docs/website-references/grapesjs-dev/docs/modules/Components.md` - Components separate the
+  source-of-truth model from the canvas view. BWonderComics should keep `BuilderPage`,
+  `BuilderSection`, and `BuilderModule` as canonical records while the live canvas is only the view.
+- `docs/website-references/grapesjs-dev/docs/modules/Canvas.md` and
+  `packages/core/src/canvas/model/CanvasSpot.ts` - Canvas spots are overlay elements for hover,
+  selection, target, spacing, and resize UI. This maps to admin-only overlays on top of the reader
+  iframe/live canvas.
+- `packages/core/src/commands/view/SelectComponent.ts` - GrapesJS centralizes hover/select handling
+  inside the canvas frame, recalculates geometry on scroll/resize/update, and separates local hover
+  tools from selected-component tools.
+- `docs/website-references/grapesjs-dev/docs/modules/Blocks.md` - Blocks are reusable component
+  templates. The BWonderComics module palette should act as the block manager.
+- `docs/website-references/grapesjs-dev/docs/modules/Traits.md` - Traits are selected-component
+  settings. BWonderComics' existing module editors should become the selected-module settings panel.
+- `docs/website-references/grapesjs-dev/docs/modules/Style-manager.md` - Style sectors and
+  properties provide a reference for constrained appearance controls.
+- `docs/website-references/grapesjs-dev/docs/modules/Commands.md`,
+  `docs/website-references/grapesjs-dev/docs/api/undo_manager.md`, and
+  `packages/core/src/keymaps/config.ts` - Commands, undo/redo, and keymaps should be centralized
+  before the live editor exposes broad shortcuts.
+- `packages/core/src/device_manager/model/Device.ts` and
+  `packages/core/src/device_manager/index.ts` - Device selection changes the canvas frame size.
+  BWonderComics already has Desktop, Tablet, and Mobile preview dimensions, but this plan promotes
+  them from preview presets to editable device targets.
+
+Current BWonderComics reference:
+
+- `docs/functions/admin-page-builder.md` - Current builder architecture, explicit draft lifecycle,
+  preview handshake, shared renderers, and module catalog.
+- `docs/BUILDER_PLAN.md` - Current implementation snapshot: pages are series-scoped, preview uses a
+  same-origin reader iframe, and the builder recognizes `reader`, `entry-gallery`, and `feed`
+  modules.
+- `backend/app/models.py`, `backend/app/page_store.py`, and `backend/app/routes/page_builder.py` -
+  Current backend stores builder pages with `series_id`, `page_type`, sections, and modules.
+- `admin/page-builder/shared-renderers.js` and `reader/page-renderer.js` - Shared module/page
+  rendering path that must remain the source of live page output.
+- `reader/data.js` and `reader/app.js` - Reader-side page loading and DOM application for builder
+  pages.
+
+## Reference Conclusions
+
+1. Use GrapesJS as an architecture reference, not as a runtime dependency for the canonical page
+   model.
+2. Do not preserve the current structural canvas as the long-term editor. It can remain as a
+   temporary fallback during migration, but the live canvas is the target editor.
+3. Keep BWonderComics modules structured and backend-sanitized. The page is still built from typed
+   modules, not arbitrary DOM saved from the browser.
+4. Promote Desktop, Tablet, and Phone from preview-only viewports into editable device contexts.
+5. Do not flatten custom comic behavior into static pages. Reader, feed, entry picker, and gallery
+   modules must remain connected to series entries, media, permissions, and existing feed logic.
+6. Change the page model deliberately. Moving from series-scoped pages to site pages plus
+   series-attached reader pages requires backend schema, routing, admin UX, and migration work.
+
+## Target Experience
+
+When the builder opens:
+
+- the admin shell gives the builder the full page
+- a top toolbar remains fixed above the canvas
+- a side panel can switch between pages, modules, layers, settings, styles, and selected target
+- the canvas shows the live page render at the selected device size
+- modules can be dragged from the side panel onto the canvas
+- clicking a rendered element selects it and opens its controls in the side panel
+- selected elements show GrapesJS-style hover/selection outlines and a compact inline toolbar
+- Save/Publish remains explicit unless a later autosave policy is intentionally designed
+
+Device editing:
+
+- Desktop, Tablet, and Phone are toolbar modes
+- each mode changes the canvas frame dimensions
+- authors can select the same module in any device mode
+- module and section controls can store per-device overrides only for supported fields
+- unsupported fields remain global and clearly apply to every device
+- render resolution uses this order: device override -> global module/section/page setting ->
+  theme/default
+
+Preview:
+
+- preview hides the top toolbar and side panel
+- preview uses the same page canvas without editor overlays
+- a small top-left button restores the menus
+- preview still supports Desktop, Tablet, and Phone display modes when useful
+- preview side effects remain disabled in builder preview sessions
+
+## Page and Module Model Direction
+
+### Page Scope
+
+Current state:
+
+- `BuilderPage` is scoped by `series_id`
+- public page routes are shaped around `/api/pages/{series_id}/{slug}`
+- admin page lists are loaded by `series_id`
+
+Target state:
+
+- site pages can be global and not tied to a series
+- series-attached pages still exist where series context is required
+- each series has one attached reader page, either as a series-owned page or a global page with a
+  series binding
+- page links can target global pages or series-attached pages without ambiguity
+
+Proposed page fields:
+
+- `scope`: `site` or `series`
+- `seriesId`: required only for `scope=series`
+- `slug`, `title`, `pageType`, `isPublished`, `isHomepage`, `sortIndex`, `meta`
+- optional `bindings` for route roles such as `reader`, `feed`, or `gallery`
+
+### Special Modules
+
+Comic page, feed page, and media gallery page should become modules:
+
+- `comic-reader` or current `reader` module: renders the comic reading experience for a selected
+  or active series
+- `feed` module: renders updates/feed content, with configurable source, range, layout, and entry
+  linking
+- `media-gallery` module: renders media library/gallery content with access-aware image behavior
+- `entry-gallery` remains an entry-picker/gallery module and can share source controls with the
+  reader/feed/gallery modules
+
+These modules must support:
+
+- active series context when the page is series-bound
+- explicit series selection when placed on a global page
+- existing entry-management data
+- premium/protected media behavior
+- existing feed-page behavior
+- draft/preview safety
+
+## Phase 1 - Full-Page Builder Shell
+
+Goal: Make the builder own the full admin viewport and establish the GrapesJS-style chrome.
+
+Implementation:
+
+- Add a full-page builder route/state that hides normal admin dashboard chrome while active.
+- Replace the current split builder layout with:
+  - top toolbar
+  - collapsible side panel
+  - canvas viewport
+  - overlay layer
+- Move current page actions, save/publish, device controls, preview toggle, and page status into
+  the top toolbar.
+- Move page list, module palette, selected target controls, layers, settings, and styles into the
+  side panel.
+- Keep current sidebar/inspector code only as migration input; the target UI should not feel like
+  the old structural canvas with a preview bolted on.
+
+Acceptance criteria:
+
+- Opening the builder fills the page.
+- The top toolbar and side panel are the only editor chrome.
+- Existing page selection, save, publish, and module editing controls remain reachable.
+- The old structural canvas can be hidden behind a temporary debug/fallback affordance, but it is
+  not the primary authoring surface.
+
+Detailed implementation plan:
+
+Summary:
+
+- Convert the existing admin page builder into a full-viewport editor shell: normal admin header/nav
+  hidden, a fixed builder toolbar on top, one collapsible side panel, a central live canvas viewport,
+  and an empty overlay layer reserved for later selection/hover UI.
+- Use the existing `view=designer` route as the full-page route; do not add backend APIs or schema
+  changes.
+
+Important public interface/type changes:
+
+- No backend API, database schema, or saved builder-record contract changes.
+- Add builder-shell DOM affordances for `pbBuilderToolbar`, `pbBuilderSidePanel`,
+  `pbCanvasViewport`, and `pbCanvasOverlay`.
+- Keep existing `pbCanvas`, `pbPageTitle`, `pbViewToggles`, `pbWidthToggles`, `pbSaveDraft`,
+  `pbPublish`, `pbPageList`, `pbModulePalette`, and `pbModuleEditor` roles reachable so existing
+  event binding can migrate without changing save/publish behavior.
+
+Key changes:
+
+- Update the shell markup so `pbBuilderToolbar` owns page title/status, Add Page, device controls,
+  Preview/Live toggle, Save Draft, Publish, side-panel toggle, and an Exit/Back control.
+- Change `showPageBuilderSection()` so it activates full-shell state by default:
+  - keep `admin-page-builder-open` as the shell class
+  - hide normal admin header/nav via CSS while active
+  - keep route shape as `admin/index.html?view=designer&series=...&page=...&surface=header`
+  - make Exit return to the dashboard through an injected callback rather than relying on admin nav
+    visibility
+- Make the live iframe preview the primary canvas view for Phase 1, using the existing
+  `preview-manager.js` path and always-visible device controls.
+- Keep the structural canvas behind a small `Structure Debug` fallback affordance only.
+- Replace the old left-sidebar/right-inspector split with one side panel:
+  - Pages uses the existing page list renderer
+  - Modules uses the existing module palette
+  - Layers renders a simple current-page tree from sections/modules and can select a module, header,
+    or page settings
+  - Settings renders the existing selected target editor
+  - Styles renders the existing theme/style controls
+- Update layout CSS to use a full-viewport grid with toolbar row and workspace row, no section-card
+  border/padding around the builder, side-panel collapse to a narrow rail on desktop, drawer-style
+  behavior on small screens, and an overlay layer above the canvas with `pointer-events: none` until
+  later phases.
+
+Test plan:
+
+- Update builder shell tests to cover:
+  - builder route opens full-page and hides admin header/nav
+  - toolbar contains page actions, status, save/publish, view/device controls
+  - side-panel tabs expose Pages, Modules, Layers, Settings, Styles
+  - structural canvas is not default and only appears through fallback
+  - live preview iframe remains same-origin with existing `builderPreview=1` behavior
+- Add responsive assertions for desktop and narrow viewport side-panel collapse.
+- Run targeted shell tests first: `npm test -- tests/admin-page-builder-shell.test.js`.
+- Final gate: `npm test`, `npm run test:visual`, `npm run build`, `git diff --check`.
+
+Assumptions:
+
+- Phase 1 does not implement direct iframe selection, drag/drop overlays, inline editing, or
+  chrome-free preview restore; those remain later phases.
+- GrapesJS remains an architecture reference only; no runtime dependency is added.
+- Existing builder records remain the source of truth; DOM/iframe output is still a rendered view.
+- Active series changes from inside the full-page builder are out of scope; the toolbar shows series
+  context, and changing series happens after exiting the builder.
+
+## Phase 2 - Live Canvas as the Editor
+
+Goal: Use the real page render as the editable canvas.
+
+Implementation:
+
+- Make the current reader-iframe preview path the default canvas renderer for edit mode.
+- Add preview markers to shared page render output when builder editing is active:
+  - page: `data-builder-page-id`
+  - sections: `data-builder-section-id`, `data-builder-section-index`, `data-builder-layout`
+  - columns: `data-builder-column-index`
+  - modules: `data-builder-module-id`, `data-builder-module-type`
+- Add reader-header markers in the reader header runtime for page-header selection.
+- Keep marker emission out of normal public reader output unless a public use is intentionally
+  added.
+- Preserve the existing preview snapshot merge path so unsaved drafts can render before save.
+
+Acceptance criteria:
+
+- The live canvas renders through the same reader/shared-renderer path used by public pages.
+- Every editable module, section, column, and header surface has a stable target identity.
+- Public reader output outside builder sessions does not gain admin-only markers.
+
+Detailed implementation plan:
+
+Summary:
+
+- Treat Phase 2 as dependent on Phase 1 being completed first.
+- Make the builder edit canvas use the existing same-origin reader iframe path, while preserving the
+  preview snapshot merge flow for unsaved drafts.
+- Add opt-in builder target markers only when the iframe is rendering an active builder editing
+  session.
+
+Trusted references:
+
+- Current preview architecture: `docs/functions/admin-page-builder.md`,
+  `docs/BUILDER_PREVIEW_PARITY_PLAN.md`, and `README.md`.
+- Current implementation entrypoints: `admin/page-builder.js`,
+  `admin/page-builder/preview-manager.js`, `reader/app.js`, `reader/data.js`,
+  `reader/header-layout.js`, and `admin/page-builder/shared-renderers.js`.
+- GrapesJS reference remains architectural only: canvas iframe editing, model/view separation, and
+  iframe event constraints.
+
+Important public interface/type changes:
+
+- No backend API, database schema, or saved builder-record changes.
+- Extend preview snapshot options with `builderEditing: true | false`; default false.
+- Extend reader application options with `builderEditing`, passed only from validated builder
+  preview snapshots.
+- Extend shared renderers with an opt-in marker flag; public/default rendering must not emit
+  `data-builder-*`.
+
+Key changes:
+
+- Update the builder canvas render path so normal edit mode uses
+  `previewManager.renderPreview({ builderEditing: true })` instead of the structural canvas
+  renderer. Keep the structural canvas only as the Phase 1 debug/fallback affordance.
+- Keep `builderPreview=1`, preview session identity, viewport sizing, `REQUEST_SNAPSHOT`/`SNAPSHOT`
+  validation, metrics, and dirty-draft snapshot merging unchanged.
+- Add marker emission in the shared renderer when `builderEditing` is true:
+  - page: `data-builder-page-id`
+  - section: `data-builder-section-id`, `data-builder-section-index`, `data-builder-layout`
+  - column: `data-builder-column-index`
+  - module: `data-builder-module-id`, `data-builder-module-type`
+- Ensure unknown module wrappers also receive module markers when an id/type exists.
+- Add reader-shell markers in `applyBuilderPageToDOM(...)` and `renderPanelStack(...)` for the
+  actual iframe path, because live preview currently applies pages through the reader shell rather
+  than only `renderPage(...)`.
+- Add header selection markers in `applySharedHeaderLayout(...)` on `header.topbar#topbar`, using
+  `data-builder-page-id` plus `data-builder-surface="page-header"` when `builderEditing` is true.
+- Remove or avoid stale marker attributes whenever `builderEditing` is false, including after
+  subsequent snapshot updates.
+- Do not add Phase 3 behavior here: no hover bridge, click selection, overlay geometry, link
+  interception expansion, drag/drop, or inline toolbar.
+
+Test plan:
+
+- Update shared renderer tests to prove markers are absent by default and present only with the
+  marker flag.
+- Update reader page-renderer/data tests to cover page, section, column, module, panel, and header
+  markers in builder editing mode, plus marker cleanup in normal public mode.
+- Update reader app/preview bridge tests to prove `snapshot.options.builderEditing` is passed into
+  `applyBuilderPageToDOM(...)`.
+- Update builder shell tests so edit mode defaults to the reader iframe and the structural canvas is
+  not the normal edit surface.
+- Run targeted tests first: `npm test -- tests/shared-renderers-parity.test.js
+  tests/reader-page-renderer.test.js tests/reader-data-builder.test.js tests/reader-app.test.js
+  tests/admin-page-builder-shell.test.js`.
+- Final gate for implementation: `npm test`, `npm run test:visual`, `npm run build`,
+  `git diff --check`.
+
+Assumptions:
+
+- Phase 1 creates the full-page shell and keeps a temporary structure-debug fallback.
+- Existing page, section, and module ids from the backend are the stable identities; Phase 2 does
+  not synthesize or persist new ids.
+- Admin-only marker attributes are allowed inside validated builder iframe sessions, but public
+  reader output outside those sessions must remain free of `data-builder-*`.
+
+## Phase 3 - Canvas Interaction Bridge and Overlays
+
+Goal: Add GrapesJS-style selection, hover, toolbar, and insert overlays.
+
+Implementation:
+
+- Extend `admin/page-builder/preview-contract.js` with target interaction messages:
+  - `TARGETS`
+  - `TARGET_HOVER`
+  - `TARGET_SELECT`
+  - `TARGET_ACTION`
+- Add validators for target payloads and preserve existing preview session/page identity checks.
+- Add a reader-side interaction bridge that:
+  - collects marked targets
+  - measures target rectangles
+  - sends target geometry after render, scroll, resize, and snapshot changes
+  - captures hover/click events inside the iframe
+  - blocks unsafe links/forms while editing
+- Add an admin overlay layer above the iframe:
+  - hover outline
+  - selected outline
+  - compact selected toolbar
+  - drop/insert target lines
+  - stale-target cleanup
+- Keep overlay elements admin-only and `pointer-events: none` by default, with toolbar/drop controls
+  opting into pointer events.
+
+Acceptance criteria:
+
+- Hovering live page elements shows accurate outlines.
+- Clicking a module selects it in the side panel.
+- Clicking the header selects header settings.
+- Overlay geometry remains correct after scrolling, resizing, device switching, and rerendering.
+
+Detailed implementation plan:
+
+Summary:
+
+- Add live-canvas hover, selection, and insertion overlays on top of the reader iframe, using the
+  Phase 2 marker contract as the target source.
+- Treat Phase 3 as dependent on Phase 1 and Phase 2. If target markers are absent, the overlay stays
+  empty and fails quietly.
+- Extend the existing preview manager and preview bridge instead of adding a second message channel.
+
+Trusted references:
+
+- GrapesJS Canvas Spots: https://grapesjs.com/docs/modules/Canvas.html - select, hover, and target
+  overlays live above the canvas and keep pointer events off by default.
+- GrapesJS Canvas API: https://grapesjs.com/docs/api/canvas.html - spots update on canvas changes
+  and can be filtered by type.
+- MDN `postMessage`: https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage - keep
+  exact-origin messaging plus sender/source validation.
+- MDN `getBoundingClientRect`:
+  https://developer.mozilla.org/en-US/docs/Web/API/Element/getBoundingClientRect - target rects are
+  viewport-relative and must refresh after scroll.
+- MDN `pointer-events`: https://developer.mozilla.org/en-US/docs/Web/CSS/pointer-events - the
+  overlay container can pass through pointer events while toolbar controls opt in.
+
+Important public interface/type changes:
+
+- No backend API, database schema, or saved builder-record changes.
+- Extend `BUILDER_PREVIEW_MESSAGE_TYPES` with `TARGETS`, `TARGET_HOVER`, `TARGET_SELECT`, and
+  `TARGET_ACTION`.
+- Add target payload builders and validators to `admin/page-builder/preview-contract.js`; every
+  target message must keep the existing `origin`, `source`, `previewSession`, `snapshotVersion`,
+  `seriesId`, `pageId`, and `pageSlug` checks.
+- Standardize target references as:
+  `{ kind, key, pageId, sectionId?, columnIndex?, moduleId?, moduleType?, surface? }`, where `kind`
+  is `page`, `header`, `section`, `column`, or `module`.
+- Standardize geometry messages as iframe viewport CSS pixels:
+  `{ target, rect: { top, left, right, bottom, width, height }, visible, order, label }`.
+- Use `TARGET_ACTION` only for admin-to-reader interaction requests such as `refresh-targets`,
+  `clear-hover`, and `scroll-into-view`. Toolbar mutations remain admin-side and call existing
+  builder actions directly.
+
+Key changes:
+
+- Add a reader-side target bridge owned by `reader/preview-bridge.js`. It starts only after a
+  validated snapshot has `options.builderEditing === true`, and stops otherwise.
+- Collect Phase 2 markers from the rendered reader document, measure them with
+  `getBoundingClientRect()`, deduplicate nested targets, and emit `TARGETS` after initial render,
+  snapshot updates, scroll, resize, image/load events, and DOM mutations.
+- Capture pointer movement and clicks in the iframe. Hover changes emit `TARGET_HOVER`; clicks emit
+  `TARGET_SELECT`, prevent normal reader/link behavior, and prefer the most specific target in this
+  order: module, header, column, section, page.
+- Block unsafe iframe interactions while editing: anchor navigation, form submit, store redirects,
+  and other interactive controls must be prevented before they trigger public-reader side effects.
+- Extend `admin/page-builder/preview-manager.js` to store latest targets, hovered target, selected
+  target, and a target sequence number. Ignore stale target messages from older sessions or older
+  sequences.
+- Render an admin-only overlay layer inside `.pb-preview-frame`, above `.pb-preview-iframe`. The
+  overlay container uses `pointer-events: none`; selected toolbar buttons and insert controls use
+  `pointer-events: auto`.
+- Draw a hover outline, selected outline, compact selected toolbar, and insert/drop guide lines from
+  the latest target geometry. Clamp toolbar placement inside the iframe frame so it stays reachable
+  near edges.
+- Map `TARGET_SELECT` through one centralized builder action, such as `selectCanvasTarget(targetRef)`:
+  modules call existing module selection, header calls existing header selection, page calls page
+  settings, section opens section settings, and column is used for insert guidance only.
+- Use existing dirty-workspace guards before switching selection. If selection is blocked by unsaved
+  changes, keep the current selection and show the existing editor status warning.
+- Render insert lines from target geometry but keep Phase 6 drag/drop out of scope. In Phase 3,
+  insert controls may open the existing module picker for before/after module and empty-column
+  insertion.
+- Clear overlays on iframe reload, preview session reset, page identity change, target timeout, and
+  device switch until fresh `TARGETS` arrive.
+
+Test plan:
+
+- Add preview-contract tests for the new message registry, valid target geometry, invalid target
+  kinds/actions, non-finite rects, overlong strings, bad sessions, and page identity mismatches.
+- Add reader bridge tests for target collection, hover/click message emission, link/form blocking,
+  scroll/resize refresh scheduling, snapshot-update refresh, and disabled behavior when
+  `builderEditing` is false.
+- Add admin preview-manager/shell tests for overlay creation, stale cleanup, hover outline
+  rendering, selected outline rendering, toolbar pointer-event opt-in, `TARGET_SELECT` mapping to
+  module/header/page/section actions, and dirty-guard blocking.
+- Add or extend visual coverage to verify overlay alignment at Desktop, Tablet, and Mobile,
+  including after scroll, device switch, and rerender.
+- Run targeted tests first: `npm test -- tests/admin-page-builder-preview-contract.test.js
+  tests/reader-preview-bridge.test.js tests/admin-page-builder-shell.test.js`.
+- Final gate for implementation: `npm test`, `npm run test:visual`, `npm run build`,
+  `git diff --check`.
+
+Assumptions:
+
+- Phase 1 provides the full-page builder shell and preview frame surface.
+- Phase 2 provides opt-in `builderEditing` snapshots and stable `data-builder-*` markers for page,
+  header, sections, columns, and modules.
+- GrapesJS remains an architecture reference only; no runtime dependency is added.
+- Phase 3 does not implement inline text editing, arbitrary DOM editing, full drag/drop composition,
+  undo/redo, or per-device overrides.
+
+## Phase 4 - Device Modes and Per-Device Overrides
+
+Goal: Let authors edit Desktop, Tablet, and Phone versions of the same page.
+
+Implementation:
+
+- Promote `PREVIEW_VIEWPORTS` into editor device presets:
+  - Desktop
+  - Tablet
+  - Phone
+- Store active device mode in builder state and reflect it in the top toolbar.
+- Extend page/section/module config contracts with a sparse responsive override shape, for example:
+  - `responsive.desktop`
+  - `responsive.tablet`
+  - `responsive.phone`
+- Define supported override categories before UI exposure:
+  - section spacing and layout
+  - column/module gap
+  - module visibility per device
+  - module width/alignment where renderer support exists
+  - appearance fields that already have sanitizer and renderer support
+- Add resolver helpers that merge global config with the active device override.
+- Update shared renderers and reader runtime to apply the selected device context in builder edit
+  mode without changing public responsive CSS behavior unintentionally.
+
+Acceptance criteria:
+
+- Device buttons change the editable canvas size.
+- Selecting a module in any device mode edits the same module identity.
+- Supported fields can be overridden per device.
+- Unsupported fields remain global.
+- Saving and reloading preserves global and per-device settings separately.
+
+Detailed implementation plan:
+
+Summary:
+
+- Treat Phase 4 as dependent on Phases 1-3 for the live iframe edit canvas, builder target markers,
+  and overlay selection bridge.
+- Promote the existing viewport presets into editor device presets. Keep the saved/API ids as
+  `desktop`, `tablet`, and `mobile`, but label `mobile` as `Phone` in the toolbar.
+- Add sparse per-device overrides to the existing JSON-backed records without a database migration:
+  `page.meta.responsive`, `section.settings.responsive`, and `module.config.responsive`.
+- Apply responsive overrides in builder edit/device context first. Public reader output keeps the
+  existing global config plus CSS media-query behavior unless public device resolution is designed
+  intentionally in a later pass.
+
+Trusted references:
+
+- GrapesJS Device Manager: https://grapesjs.com/docs/api/device_manager.html - device selection
+  updates the canvas frame size, matching this phase's toolbar/device-frame behavior.
+- MDN media queries: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_media_queries/Using_media_queries -
+  existing public responsive behavior should remain viewport/CSS driven unless deliberately changed.
+- MDN `postMessage`: https://developer.mozilla.org/en-US/docs/Web/API/Window/postMessage - keep
+  exact-origin iframe messaging and sender validation when sending device context through snapshots.
+- MDN deep copy: https://developer.mozilla.org/en-US/docs/Glossary/Deep_copy - snapshot merges must
+  avoid mutating the active builder page while previewing unsaved per-device drafts.
+
+Important public interface/type changes:
+
+- Add builder-device exports in `admin/page-builder/preview-contract.js`, reusing
+  `PREVIEW_VIEWPORTS` dimensions while preserving the current preview exports for compatibility.
+- Rename the builder state concept from `previewWidth` to `activeDeviceId`; keep a compatibility
+  alias only where Phase 1-3 code still expects `previewWidth`.
+- Extend preview snapshots with `options.deviceId` and keep `options.viewport` as the exact iframe
+  frame dimensions.
+- Whitelist responsive override fields before exposing UI:
+  - section: `layout`, `moduleGap`, `columnGap`, `sectionGap`, `paddingTop`, `paddingBottom`,
+    `backgroundColor`
+  - module: `hidden`, text `alignment`, gallery/entry-gallery `columns`, spacer `height`, and
+    existing sanitized `appearance` branches for `buttons`
+  - page/header: existing sanitized header appearance branches only
+- Drop unsupported responsive fields in frontend normalizers and backend sanitizers.
+
+Key changes:
+
+- Add a responsive utility module that normalizes sparse override maps, resolves
+  `device override -> global value -> renderer/default`, prunes empty branches, and exposes helpers
+  for page, section, and module resolution.
+- Update `backend/app/builder_security.py` so page meta, section settings, and module configs
+  preserve only whitelisted `responsive.desktop`, `responsive.tablet`, and `responsive.mobile`
+  fields.
+- Update shared renderers to accept `{ deviceId, builderEditing }` options and resolve effective
+  section settings/module config before rendering.
+- Update reader preview application so validated builder snapshots pass the selected device context
+  into shared renderers only for builder editing sessions.
+- Render modules hidden on the active device as selectable placeholders in builder edit mode; omit
+  them from visible output when not in builder edit mode.
+- Make device switching resize the iframe/frame, update toolbar active state, preserve selected
+  page/section/module identity, clear stale Phase 3 overlay geometry, and request fresh targets.
+- Update section/module/header editors so only whitelisted fields expose a Global vs Current Device
+  control. Global edits save to the existing fields; current-device edits save to
+  `responsive[activeDeviceId]`.
+- Keep module order, `columnIndex`, and structural placement global in Phase 4. Section layout
+  overrides affect the rendered grid only; renderers must keep enough column wrappers to avoid
+  dropping modules whose global `columnIndex` is greater than the active layout column count.
+
+Test plan:
+
+- Add responsive utility tests for merge precedence, sparse pruning, invalid device ids,
+  unsupported fields, and empty override cleanup.
+- Add backend tests proving responsive overrides round-trip through page, section, and module
+  sanitizers while unsupported keys are removed.
+- Extend preview-contract tests for device ids, toolbar labels, snapshot `options.deviceId`, and
+  viewport compatibility.
+- Extend shell tests for device buttons in edit mode, iframe resize without page identity loss,
+  selected module persistence across device switches, and save/reload separation between global and
+  per-device values.
+- Extend renderer/reader tests proving default public output is unchanged, builder device context
+  applies overrides, hidden modules behave correctly, and existing responsive CSS still stacks at
+  viewport breakpoints.
+- Run targeted tests first: `npm test -- tests/admin-page-builder-preview-contract.test.js
+  tests/admin-page-builder-shell.test.js tests/reader-page-renderer.test.js
+  tests/shared-renderers-parity.test.js`.
+- Final gate for implementation: `npm test`, `npm run test:visual`, `npm run test:backend`,
+  `npm run build`, `git diff --check`.
+
+Assumptions:
+
+- Phase 4 does not implement per-device drag/drop placement, per-device module ordering, public
+  viewport auto-selection for saved overrides, or new styling fields without existing sanitizer and
+  renderer support.
+- The saved responsive key remains `mobile` for compatibility with current `PREVIEW_VIEWPORTS`;
+  only UI copy changes to `Phone`.
+- Because Phases 1-3 are not complete yet, this plan describes the final Phase 4 integration points
+  and should be implemented after those prerequisites or adapted if their contracts change.
+
+## Phase 5 - Side Panel as Blocks, Layers, Traits, and Styles
+
+Goal: Make the side panel the only editor, using GrapesJS concepts mapped to local modules.
+
+Implementation:
+
+- Turn the current module palette into a block panel backed by the existing module registry.
+- Add or formalize a module descriptor registry with:
+  - module label/category/icon
+  - default config
+  - editor component
+  - allowed parent/drop behavior
+  - quick toolbar actions
+  - supported responsive overrides
+  - supported appearance sectors
+  - required page or series context
+- Add a layers panel that reflects page -> sections -> columns -> modules.
+- Treat existing module editors as trait panels for selected modules.
+- Treat `appearance-editor.js` and `appearance-utils.js` as the constrained style manager.
+- Do not expose arbitrary CSS except through explicitly sanitized modules such as `html`.
+
+Acceptance criteria:
+
+- The side panel can switch between blocks, layers, selected settings, and styles.
+- Selected live-canvas targets and side-panel selection stay in sync.
+- Module capabilities come from a single descriptor source.
+- Styling controls only appear for fields with frontend normalization, backend sanitization, and
+  shared renderer support.
+
+Detailed implementation plan:
+
+Summary:
+
+- Treat Phase 5 as dependent on Phases 1-4 for the full-page shell, live-canvas target markers,
+  selection bridge, and device override contract.
+- Convert the side panel into the single editing surface for Blocks, Layers, selected Settings, and
+  constrained Styles.
+- Keep BWonderComics pages/modules as the canonical model. GrapesJS concepts guide the UX, but no
+  arbitrary DOM/CSS model is introduced.
+
+Trusted references:
+
+- GrapesJS Blocks: https://grapesjs.com/docs/modules/Blocks - blocks are reusable component
+  templates and can use a custom UI.
+- GrapesJS Layers: https://grapesjs.com/docs/modules/Layers.html - layers represent loaded
+  components as a tree.
+- GrapesJS Traits: https://grapesjs.com/docs/modules/Traits.html - traits are selected-component
+  settings and support custom managers.
+- GrapesJS Style Manager: https://grapesjs.com/docs/modules/Style-manager.html - style sectors and
+  properties can be constrained per component.
+
+Important interface/type changes:
+
+- Add a descriptor-backed module registry that becomes the single source for module label,
+  category, icon, insertability, default config, editor render/bind handlers, allowed drop targets,
+  quick actions, required context, responsive overrides, and appearance sectors.
+- Derive the old `MODULE_TYPES`, `getDefaultConfig`, `getModuleLabel`, palette data, inline picker
+  data, and selected-module editor behavior from the descriptor registry.
+- Add side-panel state for `blocks`, `layers`, `settings`, and `styles`; keep any Phase 1 Pages tab
+  intact if already present.
+- Add a unified selected target shape, such as `page`, `header`, `section`, or `module`, with
+  compatibility bridges to existing `selectedModuleId`, `selectedCanvasSurface`, and
+  `activeSectionId`.
+
+Key changes:
+
+- Blocks: replace the current module palette with a descriptor-driven block panel grouped by
+  category. Exclude non-insertable descriptors such as `header`, and use descriptor default config
+  for insertions.
+- Layers: render a tree from current page data: page -> header/sections -> columns -> modules.
+  Layer clicks select the matching live-canvas target and open Settings; reordering remains Phase 6
+  scope.
+- Traits/Settings: treat existing module editors as selected-module trait panels. Move
+  descriptor-specific render/bind functions out of the hard-coded switch over time, while preserving
+  current draft/save/discard behavior.
+- Styles: use `appearance-editor.js` and `appearance-utils.js` as the constrained style manager.
+  Show style sectors only when the descriptor field is backed by frontend normalization, backend
+  sanitization, and shared renderer output.
+- Security: keep raw CSS unavailable. The `html` module remains a sanitized advanced content
+  module, not a style-manager escape hatch.
+
+Test plan:
+
+- Add descriptor tests proving every supported module has one descriptor, insertable blocks exclude
+  `header`, default configs match current behavior, and unknown modules fall back safely.
+- Extend side-panel shell tests for tab switching, block grouping, layer tree rendering, and
+  layer-to-canvas/canvas-to-layer selection sync.
+- Extend editor tests proving module settings still render and bind through descriptors,
+  dirty-state guards still block unsafe selection changes, and existing raw JSON exceptions do not
+  expand.
+- Add style-manager tests proving unsupported modules do not show style controls and supported
+  appearance fields round-trip through frontend normalization, backend sanitization, and shared
+  renderer parity.
+- Run targeted tests first: `npm test -- tests/admin-page-builder-shell.test.js
+  tests/admin-page-builder-preview.test.js tests/appearance-utils.test.js
+  tests/shared-renderers-parity.test.js`.
+- Final implementation gate: `npm test`, `npm run test:visual`, `npm run test:backend`,
+  `npm run build`, `git diff --check`.
+
+Assumptions:
+
+- Phase 5 does not implement live drag/drop movement, inline toolbars, undo/redo, or inline text
+  editing; those stay in later phases.
+- Phase 5 does not add new styling fields unless all three contracts exist: frontend normalizer,
+  backend sanitizer, and shared renderer support.
+- Because Phases 1-4 are not complete yet, this plan describes the final integration points and
+  should be implemented after those prerequisites or adapted if their contracts change.
+
+## Phase 6 - Drag, Drop, Move, and Inline Toolbar Actions
+
+Goal: Make live-page composition happen directly on the canvas.
+
+Implementation:
+
+- Drag modules from the blocks panel to the live canvas.
+- Use target geometry from the iframe bridge to show deterministic insert lines:
+  - before/after module
+  - start/end of column
+  - before/after section
+- Translate drops into existing mutation operations:
+  - `insertModuleAt(sectionId, columnIndex, insertIndex, moduleType)`
+  - `moveModuleToTarget(moduleId, sectionId, columnIndex, insertIndex)`
+  - `insertSectionAt(insertIndex)` when section-level insertion is enabled
+- Add inline toolbar actions for:
+  - edit/settings
+  - duplicate when implemented
+  - move
+  - delete
+  - insert before/after
+  - hide on current device when responsive visibility exists
+- Keep destructive actions behind current confirmations until undo has real coverage.
+
+Acceptance criteria:
+
+- Authors can build page structure without returning to the old structural canvas.
+- Drag/drop uses existing backend mutations and error handling.
+- Inline toolbar actions and side-panel actions call the same command layer.
+
+## Phase 7 - Preview Chrome Collapse
+
+Goal: Make preview a page display without editor menus.
+
+Implementation:
+
+- Add preview mode to the top toolbar.
+- When preview is active:
+  - hide top toolbar
+  - hide side panel
+  - hide canvas overlays
+  - keep the page display at the selected device size or a fit-to-window mode
+  - show a small top-left restore button
+- The restore button exits preview and brings back the editor menus.
+- Maintain preview side-effect suppression:
+  - email submissions stubbed
+  - analytics writes disabled
+  - comment submissions disabled
+  - external navigation disabled unless explicitly opened
+  - fullscreen disabled
+
+Acceptance criteria:
+
+- Preview visually reads as the page, not the editor.
+- The only editor UI in preview is the small restore button.
+- Restoring returns to the same page, selected device, and selected target.
+
+## Phase 8 - Page Scope and Routing Migration
+
+Goal: Support global site pages plus series-attached reader pages.
+
+Implementation:
+
+- Design and add backend schema for page scope:
+  - `scope`
+  - nullable `series_id` or equivalent binding table
+  - route role/bindings for reader/feed/gallery where needed
+- Preserve existing series pages through migration.
+- Add APIs for:
+  - global page list
+  - series page list
+  - global page by slug
+  - series page by slug
+  - page bindings for reader/feed/gallery roles
+- Update admin page list UI so authors understand whether a page is global or series-attached.
+- Update link selectors so builder-page links can target global pages or series pages.
+- Keep every series attached to a reader page. Missing reader attachments should be treated as a
+  setup warning, not silently substituted with legacy config.
+
+Acceptance criteria:
+
+- Existing series-scoped pages still load after migration.
+- New global pages can be created and published without selecting a series.
+- Each series can identify its attached reader page.
+- Public routing resolves global pages and series-attached pages unambiguously.
+
+## Phase 9 - Special CMS Modules
+
+Goal: Convert comic/reader, feed, and media gallery page behavior into reusable modules.
+
+Implementation:
+
+- Keep or rename the current `reader` module as the comic reader module.
+- Add or formalize:
+  - `feed` module as the feed page behavior
+  - `media-gallery` module for media/gallery page behavior
+  - `entry-gallery` module for selectable entry lists/grids
+- Add source configuration:
+  - use active page series
+  - choose a specific series
+  - all series where allowed
+  - filter by entry label, status, tag, date, or access where supported
+- Ensure modules continue to use existing entry-management and media-access systems.
+- Add page templates that create dedicated pages around these modules:
+  - reader page template
+  - feed page template
+  - media gallery page template
+- Make these templates optional conveniences, not separate hardcoded page types.
+
+Acceptance criteria:
+
+- A global page can contain a feed, media gallery, or selected series module.
+- A series reader page can contain the reader module and still behave as the canonical reader for
+  that series.
+- Dedicated feed/gallery/reader pages can be created by composing normal pages with these modules.
+- Existing feed, reader, and entry-gallery behavior is not regressed.
+
+## Phase 10 - Command, Keymap, and Undo Foundation
+
+Goal: Centralize editor actions before broad shortcuts and undo are advertised.
+
+Implementation:
+
+- Add a command registry, for example `admin/page-builder/commands.js`, with IDs such as:
+  - `builder:select`
+  - `builder:select-parent`
+  - `builder:select-next`
+  - `builder:select-prev`
+  - `builder:insert`
+  - `builder:move`
+  - `builder:delete-selected`
+  - `builder:duplicate-selected`
+  - `builder:set-device`
+  - `builder:toggle-preview`
+  - `builder:toggle-menus`
+- Route top toolbar, side panel, inline toolbar, and keymaps through commands.
+- Add keymaps only after focus guards are solid for inputs, textareas, selects, contenteditable
+  regions, and media pickers.
+- Treat undo/redo as staged:
+  - local draft undo first
+  - structural undo only after reversible transaction records exist
+  - delete undo only after restoration semantics are explicit
+
+Acceptance criteria:
+
+- Toolbar and keyboard actions call the same commands.
+- Shortcuts do not fire while typing in controls.
+- Undo/redo UI only appears for implemented and tested scopes.
+
+## Phase 11 - Inline Editing
+
+Goal: Edit text-like content directly in the live canvas when the module data model supports it.
+
+Implementation:
+
+- Start with the `text` module.
+- Add a preview-local rich text/contenteditable adapter that writes to `activeModuleDraft`.
+- Reuse existing text sanitization.
+- Keep the side panel synchronized with inline draft edits.
+- Later candidates:
+  - button labels
+  - promo copy
+  - header title/subtitle
+  - feed/gallery display labels where data ownership is clear
+
+Acceptance criteria:
+
+- Inline editing updates the draft, not the DOM as canonical state.
+- Save/discard behaves the same as side-panel edits.
+- Switching targets, devices, or preview mode does not lose or double-apply edits.
+
+## Phase 12 - Testing and Release Gates
+
+Unit and integration coverage:
+
+- page scope migration and routing
+- global page APIs and series-attached page APIs
+- special module config normalization and sanitization
+- responsive override resolution
+- live-canvas target marker emission
+- preview-contract target message validation
+- reader target collection and geometry payloads
+- admin overlay mapping and stale cleanup
+- side-panel selection synchronization
+- command/keymap focus guards
+
+Visual/browser coverage:
+
+- open builder and confirm full-page editor shell
+- switch Desktop, Tablet, and Phone and confirm canvas dimensions
+- select live page modules and edit through the side panel
+- save per-device overrides and confirm reload behavior
+- collapse to preview and restore menus with the top-left button
+- drag modules into the live canvas
+- create a global page with feed/media-gallery modules
+- open a series reader page with the reader module attached
+
+Release verification order:
+
+1. `npm test`
+2. `npm run test:visual`
+3. `npm run test:backend`
+4. `npm run build`
+5. `git diff --check`
+
+## Risks and Guardrails
+
+- Do not make browser DOM the source of truth. The canonical state remains typed builder records and
+  drafts.
+- Do not lose custom CMS behavior while generalizing pages. Reader, feed, entry picker, and media
+  gallery modules must stay connected to entries, series, permissions, and media access.
+- Do not expose arbitrary CSS. Device overrides and style controls need explicit data contracts and
+  sanitizers.
+- Do not remove series reader guarantees. Every series still needs an attached reader page.
+- Do not ship per-device editing as visual-only behavior. Overrides must save, reload, and render
+  predictably.
+- Do not advertise undo/redo beyond implemented transaction coverage.
+
+## Suggested Implementation Order
+
+1. Full-page builder shell
+2. Live canvas as the editor
+3. Interaction bridge and overlays
+4. Device modes and per-device overrides
+5. Side panel blocks/layers/traits/styles
+6. Live drag/drop and inline toolbar actions
+7. Preview chrome collapse and restore button
+8. Page scope/routing migration
+9. Special CMS modules and page templates
+10. Command/keymap/undo foundation
+11. Inline editing
+12. Full visual and release verification
+
+The first shippable milestone should include Phases 1-4: the builder opens full-page, the live
+reader canvas is the editor, elements can be selected from the rendered page, and Desktop/Tablet/
+Phone modes are real editable contexts. The page-scope migration and special module work should be
+planned early but shipped behind explicit migration tests because it changes public routing and
+series behavior.
