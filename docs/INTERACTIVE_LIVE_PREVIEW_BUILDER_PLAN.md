@@ -1,8 +1,57 @@
-# Full-Page Live Builder Plan
+# Full-Page Live Builder Plan, Part 1 of 2
 
-Status: Planned - revised product direction
+Status: Planned - not started
+Plan state: Design/specification only. No phase in this plan should be treated as implemented until
+future completion notes say so explicitly.
+Scope of this file: shared direction, references, target model, and Phases 1-5.
+Companion file: [Part 2 - Phases 6-12, risks, and implementation order](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md)
 Reference source: `docs/website-references/grapesjs-dev`
 Owner surface: `admin/page-builder/`, `reader/`, shared builder renderers, builder backend routes, and builder tests
+
+## Reading Map
+
+This document is Part 1 of one two-part plan. Read it before Part 2 when implementing the feature,
+because later phases depend on the product direction, data contracts, and iframe-editing assumptions
+defined here.
+
+Part 1 contains:
+
+- [Purpose](#purpose)
+- [Product Direction](#product-direction)
+- [Trusted References](#trusted-references)
+- [Reference Conclusions](#reference-conclusions)
+- [Target Experience](#target-experience)
+- [Page and Module Model Direction](#page-and-module-model-direction)
+- [Phase 1 - Full-Page Builder Shell](#phase-1---full-page-builder-shell)
+- [Phase 2 - Live Canvas as the Editor](#phase-2---live-canvas-as-the-editor)
+- [Phase 3 - Canvas Interaction Bridge and Overlays](#phase-3---canvas-interaction-bridge-and-overlays)
+- [Phase 4 - Device Modes and Per-Device Overrides](#phase-4---device-modes-and-per-device-overrides)
+- [Phase 5 - Side Panel as Blocks, Layers, Traits, and Styles](#phase-5---side-panel-as-blocks-layers-traits-and-styles)
+
+Part 2 contains:
+
+- [Phase 6 - Drag/drop and toolbar actions](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md#phase-6---drag-drop-move-and-inline-toolbar-actions)
+- [Phase 7 - Preview Chrome Collapse](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md#phase-7---preview-chrome-collapse)
+- [Phase 8 - Page Scope and Routing Migration](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md#phase-8---page-scope-and-routing-migration)
+- [Phase 9 - Special CMS Modules](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md#phase-9---special-cms-modules)
+- [Phase 10 - Commands, keymaps, and undo](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md#phase-10---command-keymap-and-undo-foundation)
+- [Phase 11 - Inline Editing](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md#phase-11---inline-editing)
+- [Phase 12 - Testing and Release Gates](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md#phase-12---testing-and-release-gates)
+- [Risks and Guardrails](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md#risks-and-guardrails)
+- [Suggested Implementation Order](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md#suggested-implementation-order)
+
+## Developer and LLM Notes
+
+- Treat both files as one plan. Do not infer that Part 1 is a complete implementation plan by
+  itself.
+- Treat every phase as future work. The test plans and acceptance criteria describe gates for future
+  implementation, not current evidence.
+- Start at Phase 1 unless a user explicitly asks for a later exploratory spike. Later phases assume
+  the shell, live iframe canvas, target markers, overlays, and device contracts from earlier phases.
+- Keep the saved builder records as the source of truth. Browser DOM, iframe output, and overlays
+  are views or editing affordances only.
+- When closing a phase, add concrete completion notes and verification results instead of replacing
+  the phase history.
 
 ## Purpose
 
@@ -356,8 +405,8 @@ Test plan:
 - Update builder shell tests so edit mode defaults to the reader iframe and the structural canvas is
   not the normal edit surface.
 - Run targeted tests first: `npm test -- tests/shared-renderers-parity.test.js
-  tests/reader-page-renderer.test.js tests/reader-data-builder.test.js tests/reader-app.test.js
-  tests/admin-page-builder-shell.test.js`.
+tests/reader-page-renderer.test.js tests/reader-data-builder.test.js tests/reader-app.test.js
+tests/admin-page-builder-shell.test.js`.
 - Final gate for implementation: `npm test`, `npm run test:visual`, `npm run build`,
   `git diff --check`.
 
@@ -470,9 +519,10 @@ Key changes:
   settings, section opens section settings, and column is used for insert guidance only.
 - Use existing dirty-workspace guards before switching selection. If selection is blocked by unsaved
   changes, keep the current selection and show the existing editor status warning.
-- Render insert lines from target geometry but keep Phase 6 drag/drop out of scope. In Phase 3,
-  insert controls may open the existing module picker for before/after module and empty-column
-  insertion.
+- Render insert lines from target geometry but keep
+  [Phase 6 drag/drop](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md#phase-6---drag-drop-move-and-inline-toolbar-actions)
+  out of scope. In Phase 3, insert controls may open the existing module picker for before/after
+  module and empty-column insertion.
 - Clear overlays on iframe reload, preview session reset, page identity change, target timeout, and
   device switch until fresh `TARGETS` arrive.
 
@@ -489,7 +539,7 @@ Test plan:
 - Add or extend visual coverage to verify overlay alignment at Desktop, Tablet, and Mobile,
   including after scroll, device switch, and rerender.
 - Run targeted tests first: `npm test -- tests/admin-page-builder-preview-contract.test.js
-  tests/reader-preview-bridge.test.js tests/admin-page-builder-shell.test.js`.
+tests/reader-preview-bridge.test.js tests/admin-page-builder-shell.test.js`.
 - Final gate for implementation: `npm test`, `npm run test:visual`, `npm run build`,
   `git diff --check`.
 
@@ -614,8 +664,8 @@ Test plan:
   applies overrides, hidden modules behave correctly, and existing responsive CSS still stacks at
   viewport breakpoints.
 - Run targeted tests first: `npm test -- tests/admin-page-builder-preview-contract.test.js
-  tests/admin-page-builder-shell.test.js tests/reader-page-renderer.test.js
-  tests/shared-renderers-parity.test.js`.
+tests/admin-page-builder-shell.test.js tests/reader-page-renderer.test.js
+tests/shared-renderers-parity.test.js`.
 - Final gate for implementation: `npm test`, `npm run test:visual`, `npm run test:backend`,
   `npm run build`, `git diff --check`.
 
@@ -626,7 +676,7 @@ Assumptions:
   renderer support.
 - The saved responsive key remains `mobile` for compatibility with current `PREVIEW_VIEWPORTS`;
   only UI copy changes to `Phone`.
-- Because Phases 1-3 are not complete yet, this plan describes the final Phase 4 integration points
+- Because Phases 1-3 have not started yet, this plan describes the final Phase 4 integration points
   and should be implemented after those prerequisites or adapted if their contracts change.
 
 ## Phase 5 - Side Panel as Blocks, Layers, Traits, and Styles
@@ -699,7 +749,8 @@ Key changes:
   category. Exclude non-insertable descriptors such as `header`, and use descriptor default config
   for insertions.
 - Layers: render a tree from current page data: page -> header/sections -> columns -> modules.
-  Layer clicks select the matching live-canvas target and open Settings; reordering remains Phase 6
+  Layer clicks select the matching live-canvas target and open Settings; reordering remains
+  [Phase 6](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md#phase-6---drag-drop-move-and-inline-toolbar-actions)
   scope.
 - Traits/Settings: treat existing module editors as selected-module trait panels. Move
   descriptor-specific render/bind functions out of the hard-coded switch over time, while preserving
@@ -723,8 +774,8 @@ Test plan:
   appearance fields round-trip through frontend normalization, backend sanitization, and shared
   renderer parity.
 - Run targeted tests first: `npm test -- tests/admin-page-builder-shell.test.js
-  tests/admin-page-builder-preview.test.js tests/appearance-utils.test.js
-  tests/shared-renderers-parity.test.js`.
+tests/admin-page-builder-preview.test.js tests/appearance-utils.test.js
+tests/shared-renderers-parity.test.js`.
 - Final implementation gate: `npm test`, `npm run test:visual`, `npm run test:backend`,
   `npm run build`, `git diff --check`.
 
@@ -734,244 +785,7 @@ Assumptions:
   editing; those stay in later phases.
 - Phase 5 does not add new styling fields unless all three contracts exist: frontend normalizer,
   backend sanitizer, and shared renderer support.
-- Because Phases 1-4 are not complete yet, this plan describes the final integration points and
+- Because Phases 1-4 have not started yet, this plan describes the final integration points and
   should be implemented after those prerequisites or adapted if their contracts change.
 
-## Phase 6 - Drag, Drop, Move, and Inline Toolbar Actions
-
-Goal: Make live-page composition happen directly on the canvas.
-
-Implementation:
-
-- Drag modules from the blocks panel to the live canvas.
-- Use target geometry from the iframe bridge to show deterministic insert lines:
-  - before/after module
-  - start/end of column
-  - before/after section
-- Translate drops into existing mutation operations:
-  - `insertModuleAt(sectionId, columnIndex, insertIndex, moduleType)`
-  - `moveModuleToTarget(moduleId, sectionId, columnIndex, insertIndex)`
-  - `insertSectionAt(insertIndex)` when section-level insertion is enabled
-- Add inline toolbar actions for:
-  - edit/settings
-  - duplicate when implemented
-  - move
-  - delete
-  - insert before/after
-  - hide on current device when responsive visibility exists
-- Keep destructive actions behind current confirmations until undo has real coverage.
-
-Acceptance criteria:
-
-- Authors can build page structure without returning to the old structural canvas.
-- Drag/drop uses existing backend mutations and error handling.
-- Inline toolbar actions and side-panel actions call the same command layer.
-
-## Phase 7 - Preview Chrome Collapse
-
-Goal: Make preview a page display without editor menus.
-
-Implementation:
-
-- Add preview mode to the top toolbar.
-- When preview is active:
-  - hide top toolbar
-  - hide side panel
-  - hide canvas overlays
-  - keep the page display at the selected device size or a fit-to-window mode
-  - show a small top-left restore button
-- The restore button exits preview and brings back the editor menus.
-- Maintain preview side-effect suppression:
-  - email submissions stubbed
-  - analytics writes disabled
-  - comment submissions disabled
-  - external navigation disabled unless explicitly opened
-  - fullscreen disabled
-
-Acceptance criteria:
-
-- Preview visually reads as the page, not the editor.
-- The only editor UI in preview is the small restore button.
-- Restoring returns to the same page, selected device, and selected target.
-
-## Phase 8 - Page Scope and Routing Migration
-
-Goal: Support global site pages plus series-attached reader pages.
-
-Implementation:
-
-- Design and add backend schema for page scope:
-  - `scope`
-  - nullable `series_id` or equivalent binding table
-  - route role/bindings for reader/feed/gallery where needed
-- Preserve existing series pages through migration.
-- Add APIs for:
-  - global page list
-  - series page list
-  - global page by slug
-  - series page by slug
-  - page bindings for reader/feed/gallery roles
-- Update admin page list UI so authors understand whether a page is global or series-attached.
-- Update link selectors so builder-page links can target global pages or series pages.
-- Keep every series attached to a reader page. Missing reader attachments should be treated as a
-  setup warning, not silently substituted with legacy config.
-
-Acceptance criteria:
-
-- Existing series-scoped pages still load after migration.
-- New global pages can be created and published without selecting a series.
-- Each series can identify its attached reader page.
-- Public routing resolves global pages and series-attached pages unambiguously.
-
-## Phase 9 - Special CMS Modules
-
-Goal: Convert comic/reader, feed, and media gallery page behavior into reusable modules.
-
-Implementation:
-
-- Keep or rename the current `reader` module as the comic reader module.
-- Add or formalize:
-  - `feed` module as the feed page behavior
-  - `media-gallery` module for media/gallery page behavior
-  - `entry-gallery` module for selectable entry lists/grids
-- Add source configuration:
-  - use active page series
-  - choose a specific series
-  - all series where allowed
-  - filter by entry label, status, tag, date, or access where supported
-- Ensure modules continue to use existing entry-management and media-access systems.
-- Add page templates that create dedicated pages around these modules:
-  - reader page template
-  - feed page template
-  - media gallery page template
-- Make these templates optional conveniences, not separate hardcoded page types.
-
-Acceptance criteria:
-
-- A global page can contain a feed, media gallery, or selected series module.
-- A series reader page can contain the reader module and still behave as the canonical reader for
-  that series.
-- Dedicated feed/gallery/reader pages can be created by composing normal pages with these modules.
-- Existing feed, reader, and entry-gallery behavior is not regressed.
-
-## Phase 10 - Command, Keymap, and Undo Foundation
-
-Goal: Centralize editor actions before broad shortcuts and undo are advertised.
-
-Implementation:
-
-- Add a command registry, for example `admin/page-builder/commands.js`, with IDs such as:
-  - `builder:select`
-  - `builder:select-parent`
-  - `builder:select-next`
-  - `builder:select-prev`
-  - `builder:insert`
-  - `builder:move`
-  - `builder:delete-selected`
-  - `builder:duplicate-selected`
-  - `builder:set-device`
-  - `builder:toggle-preview`
-  - `builder:toggle-menus`
-- Route top toolbar, side panel, inline toolbar, and keymaps through commands.
-- Add keymaps only after focus guards are solid for inputs, textareas, selects, contenteditable
-  regions, and media pickers.
-- Treat undo/redo as staged:
-  - local draft undo first
-  - structural undo only after reversible transaction records exist
-  - delete undo only after restoration semantics are explicit
-
-Acceptance criteria:
-
-- Toolbar and keyboard actions call the same commands.
-- Shortcuts do not fire while typing in controls.
-- Undo/redo UI only appears for implemented and tested scopes.
-
-## Phase 11 - Inline Editing
-
-Goal: Edit text-like content directly in the live canvas when the module data model supports it.
-
-Implementation:
-
-- Start with the `text` module.
-- Add a preview-local rich text/contenteditable adapter that writes to `activeModuleDraft`.
-- Reuse existing text sanitization.
-- Keep the side panel synchronized with inline draft edits.
-- Later candidates:
-  - button labels
-  - promo copy
-  - header title/subtitle
-  - feed/gallery display labels where data ownership is clear
-
-Acceptance criteria:
-
-- Inline editing updates the draft, not the DOM as canonical state.
-- Save/discard behaves the same as side-panel edits.
-- Switching targets, devices, or preview mode does not lose or double-apply edits.
-
-## Phase 12 - Testing and Release Gates
-
-Unit and integration coverage:
-
-- page scope migration and routing
-- global page APIs and series-attached page APIs
-- special module config normalization and sanitization
-- responsive override resolution
-- live-canvas target marker emission
-- preview-contract target message validation
-- reader target collection and geometry payloads
-- admin overlay mapping and stale cleanup
-- side-panel selection synchronization
-- command/keymap focus guards
-
-Visual/browser coverage:
-
-- open builder and confirm full-page editor shell
-- switch Desktop, Tablet, and Phone and confirm canvas dimensions
-- select live page modules and edit through the side panel
-- save per-device overrides and confirm reload behavior
-- collapse to preview and restore menus with the top-left button
-- drag modules into the live canvas
-- create a global page with feed/media-gallery modules
-- open a series reader page with the reader module attached
-
-Release verification order:
-
-1. `npm test`
-2. `npm run test:visual`
-3. `npm run test:backend`
-4. `npm run build`
-5. `git diff --check`
-
-## Risks and Guardrails
-
-- Do not make browser DOM the source of truth. The canonical state remains typed builder records and
-  drafts.
-- Do not lose custom CMS behavior while generalizing pages. Reader, feed, entry picker, and media
-  gallery modules must stay connected to entries, series, permissions, and media access.
-- Do not expose arbitrary CSS. Device overrides and style controls need explicit data contracts and
-  sanitizers.
-- Do not remove series reader guarantees. Every series still needs an attached reader page.
-- Do not ship per-device editing as visual-only behavior. Overrides must save, reload, and render
-  predictably.
-- Do not advertise undo/redo beyond implemented transaction coverage.
-
-## Suggested Implementation Order
-
-1. Full-page builder shell
-2. Live canvas as the editor
-3. Interaction bridge and overlays
-4. Device modes and per-device overrides
-5. Side panel blocks/layers/traits/styles
-6. Live drag/drop and inline toolbar actions
-7. Preview chrome collapse and restore button
-8. Page scope/routing migration
-9. Special CMS modules and page templates
-10. Command/keymap/undo foundation
-11. Inline editing
-12. Full visual and release verification
-
-The first shippable milestone should include Phases 1-4: the builder opens full-page, the live
-reader canvas is the editor, elements can be selected from the rendered page, and Desktop/Tablet/
-Phone modes are real editable contexts. The page-scope migration and special module work should be
-planned early but shipped behind explicit migration tests because it changes public routing and
-series behavior.
+Continue in [Part 2 - Phases 6-12, risks, and implementation order](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md).
