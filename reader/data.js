@@ -18,6 +18,7 @@ import {
   createEffectivePageHeader,
   resolvePageHeaderState,
 } from '../admin/page-builder/header-config.js';
+import { escapeHtml } from '../admin/page-builder/helpers.js';
 
 const BUILDER_THEME_CSS_VARS = Object.freeze([
   '--primary',
@@ -331,13 +332,100 @@ function resetPanelVisibility() {
   if (rightPanel) rightPanel.style.display = '';
 }
 
+function syncReaderShellBuilderMarkers(page, builderEditing) {
+  const pageTargets = [document.body, document.querySelector('.viewerWrap')].filter(Boolean);
+  pageTargets.forEach((target) => {
+    if (builderEditing && page?.id) {
+      target.setAttribute('data-builder-page-id', String(page.id));
+      return;
+    }
+    target.removeAttribute('data-builder-page-id');
+  });
+  if (!builderEditing) {
+    const topbar = document.querySelector('header.topbar#topbar');
+    topbar?.removeAttribute('data-builder-page-id');
+    topbar?.removeAttribute('data-builder-surface');
+  }
+}
+
+function builderMarkerAttrs(attrs = {}, enabled = false) {
+  if (!enabled) return '';
+  return Object.entries(attrs)
+    .filter(([, value]) => value !== undefined && value !== null && String(value) !== '')
+    .map(([key, value]) => ` ${key}="${escapeHtml(String(value))}"`)
+    .join('');
+}
+
+function getPanelModuleColumnIndex(item, side) {
+  const rawIndex = item?.module?.columnIndex;
+  const parsed = Number(rawIndex);
+  if (Number.isFinite(parsed)) return parsed;
+  if (side === 'right') {
+    const layout = item?.section?.layout || '1';
+    return Math.max(0, layout.split('-').length - 1);
+  }
+  return 0;
+}
+
+function renderPanelBuilderEditingStack(side, modules) {
+  const groups = new Map();
+  modules.forEach((item) => {
+    const sectionIndex = Number.isFinite(Number(item.sectionIndex)) ? Number(item.sectionIndex) : 0;
+    const columnIndex = getPanelModuleColumnIndex(item, side);
+    const sectionId = item.section?.id || `section-${sectionIndex}`;
+    const groupKey = `${sectionId}:${columnIndex}`;
+    if (!groups.has(groupKey)) {
+      groups.set(groupKey, {
+        section: item.section || {},
+        sectionIndex,
+        columnIndex,
+        modules: [],
+      });
+    }
+    groups.get(groupKey).modules.push(item.module);
+  });
+
+  return Array.from(groups.values())
+    .map(({ section, sectionIndex, columnIndex, modules: groupModules }) => {
+      const layout = String(section.layout || '1');
+      const sectionAttrs = builderMarkerAttrs(
+        {
+          'data-builder-section-id': section.id,
+          'data-builder-section-index': sectionIndex,
+          'data-builder-layout': layout,
+        },
+        true
+      );
+      const columnAttrs = builderMarkerAttrs(
+        {
+          'data-builder-column-index': columnIndex,
+        },
+        true
+      );
+      const modulesHtml = groupModules
+        .map((module) => renderModule(module, { builderEditing: true }))
+        .join('');
+      return `
+        <div class="pb-builder-panel-section"${sectionAttrs}>
+          <div class="pb-builder-panel-column"${columnAttrs}>${modulesHtml}</div>
+        </div>
+      `;
+    })
+    .join('');
+}
+
 /**
  * Apply page builder modules to the existing DOM elements.
  * Updates header, panels, and other elements based on module config.
  * @param {Object} page - The page data from the builder API
  */
 export function applyBuilderPageToDOM(page, options = {}) {
-  if (!page || !page.sections) return;
+  const builderEditing = options.builderEditing === true;
+  if (!page || !page.sections) {
+    syncReaderShellBuilderMarkers(null, false);
+    return;
+  }
+  syncReaderShellBuilderMarkers(page, builderEditing);
   const headerState = resolvePageHeaderState({
     page,
     pageConfig: options.pageConfig || null,
@@ -347,6 +435,7 @@ export function applyBuilderPageToDOM(page, options = {}) {
     seriesId: options.seriesId || getActiveSeriesId(),
     page,
     headerState,
+    builderEditing,
   });
 
   // Apply theme first
@@ -371,7 +460,7 @@ export function applyBuilderPageToDOM(page, options = {}) {
 
   const findPanelModules = (side) => {
     const results = [];
-    for (const section of page.sections) {
+    for (const [sectionIndex, section] of page.sections.entries()) {
       const layout = section.layout || '1';
       const colCount = layout.split('-').length;
       const leftIndex = 0;
@@ -379,9 +468,9 @@ export function applyBuilderPageToDOM(page, options = {}) {
       for (const mod of section.modules || []) {
         if (!PANEL_MODULE_TYPES.has(mod.moduleType)) continue;
         if (side === 'left' && mod.columnIndex === leftIndex) {
-          results.push({ module: mod, section });
+          results.push({ module: mod, section, sectionIndex });
         } else if (side === 'right' && colCount > 1 && mod.columnIndex === rightIndex) {
-          results.push({ module: mod, section });
+          results.push({ module: mod, section, sectionIndex });
         }
       }
     }
@@ -408,9 +497,11 @@ export function applyBuilderPageToDOM(page, options = {}) {
   const rightModules = findPanelModules('right');
   renderPanelStack('left', leftModules, panelSpacing, panelBackgrounds, {
     previewMode: !!options.previewMode,
+    builderEditing,
   });
   renderPanelStack('right', rightModules, panelSpacing, panelBackgrounds, {
     previewMode: !!options.previewMode,
+    builderEditing,
   });
 
   // Check panel visibility from section settings
@@ -443,6 +534,7 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
   const panelId = side === 'left' ? 'leftPanel' : 'rightPanel';
   const panel = document.getElementById(panelId);
   if (!panel) return;
+  const builderEditing = options.builderEditing === true;
 
   const legacyRightSelectors = [
     '#rightPanelFeedBar',
@@ -475,6 +567,11 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
   container.classList.add('panel-builder');
   container.classList.toggle('panel-builder--left', side === 'left');
   container.classList.toggle('panel-builder--right', side === 'right');
+  if (builderEditing) {
+    container.dataset.builderSurface = side === 'left' ? 'left-panel' : 'right-panel';
+  } else {
+    container.removeAttribute('data-builder-surface');
+  }
   const isEmptyPanel = !modules.length;
   panel.classList.toggle('side-panel--empty', isEmptyPanel);
   container.classList.toggle('panel-builder--empty', isEmptyPanel);
@@ -498,7 +595,9 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
     return;
   }
 
-  container.innerHTML = modules.map(({ module }) => renderModule(module)).join('');
+  container.innerHTML = builderEditing
+    ? renderPanelBuilderEditingStack(side, modules)
+    : modules.map(({ module }) => renderModule(module)).join('');
   initEmailForms(container, { previewMode: !!options.previewMode });
   initPromoCarousels(container);
   initFeedModules(container);

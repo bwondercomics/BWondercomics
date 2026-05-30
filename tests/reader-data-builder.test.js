@@ -344,6 +344,45 @@ describe('reader builder presentation loading', () => {
     expect(document.getElementById('rightPanel')).not.toBeNull();
   });
 
+  it('emits and cleans builder editing markers in the reader shell', () => {
+    const builderPage = buildPanelSnapshot();
+
+    applyBuilderPageToDOM(builderPage, {
+      seriesId: 'battle-bros',
+      previewMode: true,
+      builderEditing: true,
+    });
+
+    const header = document.querySelector('header.topbar#topbar');
+    const leftSection = document.querySelector('#leftPanel .pb-builder-panel-section');
+    const leftColumn = document.querySelector('#leftPanel .pb-builder-panel-column');
+    const leftModule = document.querySelector('#leftPanel .pb-module');
+
+    expect(document.body.dataset.builderPageId).toBe(builderPage.id);
+    expect(document.querySelector('.viewerWrap')?.dataset.builderPageId).toBe(builderPage.id);
+    expect(header?.dataset.builderPageId).toBe(builderPage.id);
+    expect(header?.dataset.builderSurface).toBe('page-header');
+    expect(leftSection?.dataset.builderSectionId).toBe('panel-row');
+    expect(leftSection?.dataset.builderSectionIndex).toBe('0');
+    expect(leftSection?.dataset.builderLayout).toBe('1-1');
+    expect(leftColumn?.dataset.builderColumnIndex).toBe('0');
+    expect(leftModule?.dataset.builderModuleId).toBe('left-panel-text');
+    expect(leftModule?.dataset.builderModuleType).toBe('text');
+
+    applyBuilderPageToDOM(builderPage, {
+      seriesId: 'battle-bros',
+      previewMode: true,
+    });
+
+    expect(document.body.hasAttribute('data-builder-page-id')).toBe(false);
+    expect(document.querySelector('.viewerWrap')?.hasAttribute('data-builder-page-id')).toBe(false);
+    expect(header?.hasAttribute('data-builder-page-id')).toBe(false);
+    expect(header?.hasAttribute('data-builder-surface')).toBe(false);
+    expect(document.querySelector('[data-builder-section-id]')).toBeNull();
+    expect(document.querySelector('[data-builder-column-index]')).toBeNull();
+    expect(document.querySelector('[data-builder-module-id]')).toBeNull();
+  });
+
   it('clears stale page theme variables before applying the next snapshot', () => {
     const themedPage = getContractFixture('builderPage');
     const defaultThemePage = getContractFixture('builderPage');

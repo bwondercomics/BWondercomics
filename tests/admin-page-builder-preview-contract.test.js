@@ -77,6 +77,15 @@ describe('admin page-builder preview contract', () => {
     expect(isPreviewMessageType('builder-preview:other')).toBe(false);
 
     expect(validatePreviewSnapshotPayload(snapshot, expected)).toEqual({ valid: true, reason: '' });
+    expect(
+      validatePreviewSnapshotPayload(
+        {
+          ...snapshot,
+          options: { builderEditing: true },
+        },
+        expected
+      )
+    ).toEqual({ valid: true, reason: '' });
 
     const envelope = buildPreviewSnapshotMessage(snapshot, 'session-1');
     expect(envelope).toEqual({
@@ -99,6 +108,10 @@ describe('admin page-builder preview contract', () => {
     expect(validatePreviewSnapshotPayload({ ...snapshot, pageSlug: 'about' }, expected).valid).toBe(
       false
     );
+    expect(
+      validatePreviewSnapshotPayload({ ...snapshot, options: { builderEditing: 'true' } }, expected)
+        .valid
+    ).toBe(false);
     expect(validatePreviewEnvelope({ type: 'unknown' }, expected).valid).toBe(false);
   });
 

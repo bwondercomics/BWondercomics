@@ -1,7 +1,7 @@
 # Full-Page Live Builder Plan, Part 1 of 2
 
-Status: In progress - Phase 1 complete
-Plan state: Phase 1 has a completion note below. All later phases remain planned until future
+Status: In progress - Phase 2 complete
+Plan state: Phases 1 and 2 have completion notes below. All later phases remain planned until future
 completion notes say otherwise.
 Scope of this file: shared direction, references, target model, and Phases 1-5.
 Companion file: [Part 2 - Phases 6-12, risks, and implementation order](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md)
@@ -442,6 +442,36 @@ Assumptions:
   not synthesize or persist new ids.
 - Admin-only marker attributes are allowed inside validated builder iframe sessions, but public
   reader output outside those sessions must remain free of `data-builder-*`.
+
+Completion note (`2026-05-30`): Phase 2 is implemented. The default live builder canvas now calls
+`previewManager.renderPreview({ builderEditing: true })`, and the versioned preview snapshot carries
+`options.builderEditing` through the existing `builderPreview=1` / `previewSession` handshake. The
+reader preview bridge exposes the validated flag to `reader/app.js`, which passes it into
+`applyBuilderPageToDOM(...)`. Shared renderers and the reader shell now emit admin-only
+`data-builder-*` target markers for page, section, column, module, and page-header surfaces only
+inside builder editing sessions. Normal public reader output and normal snapshot reapplication clean
+those markers back out. Unknown module wrappers also carry module id/type markers when editing is
+enabled. The saved builder-page API shape, database schema, public routes, side-effect guard model,
+dirty-draft merge path, metrics path, and viewport sizing contract did not change.
+
+Verification completed for this phase:
+
+- `node --check admin/page-builder/shared-renderers.js` - passed.
+- `node --check admin/page-builder/preview-manager.js` - passed.
+- `node --check reader/data.js` - passed.
+- `node --check reader/page-renderer.js` - passed.
+- `node --check reader/preview-bridge.js` - passed.
+- `node --check reader/app.js` - passed.
+- `npm test -- tests/shared-renderers-parity.test.js tests/reader-page-renderer.test.js
+tests/reader-data-builder.test.js tests/reader-preview-bridge.test.js tests/reader-app.test.js
+tests/admin-page-builder-preview-contract.test.js tests/admin-page-builder-shell.test.js` -
+  passed (`7` files, `98` tests).
+- `npm test` - passed (`45` files, `342` passed, `1` skipped).
+- `npm run format:check` - passed.
+- `npm run lint` - passed.
+- `npm run build` - passed with the existing Vite fullscreen chunk warning.
+- `npm run test:visual` - passed (`3` Playwright tests).
+- `git diff --check` - passed.
 
 ## Phase 3 - Canvas Interaction Bridge and Overlays
 

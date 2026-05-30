@@ -64,6 +64,7 @@ export const PREVIEW_MEDIA_QUERIES = Object.freeze({
  * @property {number} height
  *
  * @typedef {Object} BuilderPreviewOptions
+ * @property {boolean} builderEditing
  * @property {BuilderPreviewViewport} viewport
  * @property {Record<string, string>} sideEffects
  * @property {{top: number, left: number}} scrollState
@@ -186,6 +187,13 @@ export function validatePreviewSnapshotPayload(snapshot, expected = {}) {
     !Array.isArray(snapshot.page.sections)
   ) {
     return validationResult(false, 'Snapshot page is missing sections.');
+  }
+  if (
+    snapshot.options &&
+    Object.prototype.hasOwnProperty.call(snapshot.options, 'builderEditing') &&
+    typeof snapshot.options.builderEditing !== 'boolean'
+  ) {
+    return validationResult(false, 'Snapshot builderEditing option is invalid.');
   }
 
   const identityChecks = [

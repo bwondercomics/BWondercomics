@@ -96,6 +96,14 @@
   margin-bottom: 0;
 }
 
+.panel-builder .pb-builder-panel-section,
+.panel-builder .pb-builder-panel-column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pb-panel-gap, 12px);
+  min-width: 0;
+}
+
 @media (min-width: 1024px) {
   .side-panel .panel-builder {
     overflow-y: hidden;

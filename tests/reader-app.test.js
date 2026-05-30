@@ -68,6 +68,7 @@ async function bootReaderApp({
     source: 'saved',
     page: getContractFixture('builderPage'),
     options: {
+      builderEditing: true,
       viewport: { id: 'desktop', label: 'Desktop', width: 1280, height: 900 },
     },
   };
@@ -75,6 +76,7 @@ async function bootReaderApp({
     source: 'builder',
     page: previewSnapshot.page,
     previewMode: true,
+    builderEditing: true,
     snapshot: previewSnapshot,
   }));
   const setPreviewMetricsContext = vi.fn();
@@ -270,6 +272,7 @@ describe('reader app bootstrap', () => {
     expect(mocks.applyBuilderPageToDOM).toHaveBeenCalledWith(getContractFixture('builderPage'), {
       seriesId: 'battle-bros',
       previewMode: true,
+      builderEditing: true,
     });
     expect(document.body.dataset.readerPageSource).toBe('builder');
   });

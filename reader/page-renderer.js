@@ -32,14 +32,20 @@ export const renderModule = _renderers.renderModule;
  * Render a complete page to HTML, including the page-id data attribute
  * that reader pages use for live context.
  */
-export function renderPage(page) {
+export function renderPage(page, options = {}) {
   if (!page || !page.sections) {
     return '<div class="pb-page-empty">Page not configured.</div>';
   }
 
-  const sectionsHtml = page.sections.map((section) => _renderers.renderSection(section)).join('');
+  const builderEditing = options.builderEditing === true;
+  const sectionsHtml = page.sections
+    .map((section, sectionIndex) =>
+      _renderers.renderSection(section, { builderEditing, sectionIndex })
+    )
+    .join('');
+  const builderAttrs = builderEditing ? ` data-builder-page-id="${escapeHtml(page.id || '')}"` : '';
 
-  return `<div class="pb-page" data-page-id="${escapeHtml(page.id || '')}">${sectionsHtml}</div>`;
+  return `<div class="pb-page" data-page-id="${escapeHtml(page.id || '')}"${builderAttrs}>${sectionsHtml}</div>`;
 }
 
 /**
@@ -81,7 +87,7 @@ export async function mountPage(container, slug, seriesId = null, options = {}) 
     return;
   }
 
-  container.innerHTML = renderPage(page);
+  container.innerHTML = renderPage(page, { builderEditing: options.builderEditing === true });
 
   // Initialize interactive modules
   initEmailForms(container, { previewMode: !!options.previewMode });

@@ -1087,6 +1087,7 @@ import {
         applyBuilderPageToDOM(pageResult.page, {
           seriesId,
           previewMode: true,
+          builderEditing: pageResult.builderEditing === true,
         });
         previewBridge.setPreviewMetricsContext?.(pageResult.snapshot, {
           seriesId,
@@ -1099,6 +1100,7 @@ import {
             applyBuilderPageToDOM(nextPageResult.page, {
               seriesId,
               previewMode: true,
+              builderEditing: nextPageResult.builderEditing === true,
             });
             previewBridge.emitPreviewMetrics?.('snapshot-updated');
           },

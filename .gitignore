@@ -58,6 +58,9 @@ deploy/stoat/for-web-dist/
 node_modules/.vite/
 deploy/*.env.bak*
 
+# Local agent workflow notes
+AGENTS.md
+
 # Temporary docs workspaces
 docs/temp/
 docs/temp -do not edit/

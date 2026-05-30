@@ -61,13 +61,14 @@ describe('reader preview bridge', () => {
       window.location.origin
     );
 
-    const snapshot = buildSnapshot();
+    const snapshot = buildSnapshot({ options: { builderEditing: true } });
     dispatchPreviewMessage(buildPreviewSnapshotMessage(snapshot, 'session-1'));
 
     await expect(resultPromise).resolves.toEqual({
       source: 'builder',
       page: snapshot.page,
       previewMode: true,
+      builderEditing: true,
       snapshot,
     });
     expect(postMessage).toHaveBeenLastCalledWith(
@@ -144,6 +145,7 @@ describe('reader preview bridge', () => {
       source: 'builder',
       page: snapshot.page,
       previewMode: true,
+      builderEditing: false,
       snapshot,
     });
     expect(postMessage).toHaveBeenLastCalledWith(

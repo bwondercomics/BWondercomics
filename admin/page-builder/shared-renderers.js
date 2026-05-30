@@ -13,6 +13,9 @@
  * @param {boolean}                  [options.showMountPlaceholders]  - Show text placeholders for
  *                                                                      dynamically-mounted modules
  *                                                                      (reader, entry-gallery)
+ * @param {boolean}                  [options.builderEditing]         - Emit admin-only target
+ *                                                                      markers for live builder
+ *                                                                      editing sessions
  */
 
 import { escapeHtml } from './helpers.js';
@@ -37,7 +40,22 @@ export function createRenderers({
   resolveImageUrl = /** @type {function(string): string} */ ((path) => path),
   getSeriesId = /** @type {function(): string} */ (() => ''),
   showMountPlaceholders = false,
+  builderEditing = false,
 } = {}) {
+  function isBuilderEditingEnabled(renderOptions = {}) {
+    return renderOptions.builderEditing === undefined
+      ? !!builderEditing
+      : renderOptions.builderEditing === true;
+  }
+
+  function builderMarkerAttrs(attrs = {}, enabled = false) {
+    if (!enabled) return '';
+    return Object.entries(attrs)
+      .filter(([, value]) => value !== undefined && value !== null && String(value) !== '')
+      .map(([key, value]) => ` ${key}="${escapeHtml(String(value))}"`)
+      .join('');
+  }
+
   function resolveModuleImageUrl(path) {
     const raw = sanitizeAssetUrl(path || '');
     if (!raw) return '';
@@ -362,22 +380,31 @@ export function createRenderers({
       }),
   };
 
-  function renderModule(mod) {
+  function renderModule(mod, renderOptions = {}) {
     const type = mod.moduleType || 'text';
     const safeType = String(type || 'text').replace(/[^a-z0-9_-]/gi, '') || 'unknown';
     const config = mod.config || {};
+    const emitMarkers = isBuilderEditingEnabled(renderOptions);
+    const markerAttrs = builderMarkerAttrs(
+      {
+        'data-builder-module-id': mod?.id,
+        'data-builder-module-type': type,
+      },
+      emitMarkers
+    );
+    const moduleIdAttr = mod?.id ? ` data-module-id="${escapeHtml(String(mod.id))}"` : '';
 
     const renderer = MODULE_RENDERERS[type];
     if (!renderer) {
-      return `<div class="pb-module pb-module--unknown">[Unknown module: ${escapeHtml(type)}]</div>`;
+      return `<div class="pb-module pb-module--unknown"${moduleIdAttr}${markerAttrs}>[Unknown module: ${escapeHtml(type)}]</div>`;
     }
 
-    const moduleIdAttr = mod?.id ? ` data-module-id="${escapeHtml(String(mod.id))}"` : '';
     const content = renderer(config, mod);
-    return `<div class="pb-module pb-module--${safeType}"${moduleIdAttr}>${content}</div>`;
+    return `<div class="pb-module pb-module--${safeType}"${moduleIdAttr}${markerAttrs}>${content}</div>`;
   }
 
-  function renderSection(section) {
+  function renderSection(section, renderOptions = {}) {
+    const emitMarkers = isBuilderEditingEnabled(renderOptions);
     const layout = sanitizeKeyword(
       section.layout,
       ['1', '1-1', '1-2', '2-1', '1-1-1', '1-3-1'],
@@ -415,24 +442,52 @@ export function createRenderers({
       .sort((a, b) => Number(a) - Number(b))
       .map((colIdx) => {
         const modules = columnModules[colIdx];
-        const modulesHtml = modules.map((mod) => renderModule(mod)).join('');
-        return `<div class="pb-column">${modulesHtml}</div>`;
+        const modulesHtml = modules
+          .map((mod) => renderModule(mod, { ...renderOptions, builderEditing: emitMarkers }))
+          .join('');
+        const columnMarkerAttrs = builderMarkerAttrs(
+          {
+            'data-builder-column-index': colIdx,
+          },
+          emitMarkers
+        );
+        return `<div class="pb-column"${columnMarkerAttrs}>${modulesHtml}</div>`;
       })
       .join('');
 
+    const sectionMarkerAttrs = builderMarkerAttrs(
+      {
+        'data-builder-section-id': section?.id,
+        'data-builder-section-index': renderOptions.sectionIndex,
+        'data-builder-layout': layout,
+      },
+      emitMarkers
+    );
+
     return `
-      <section class="pb-section" data-layout="${layout}" style="${style}">
+      <section class="pb-section" data-layout="${layout}"${sectionMarkerAttrs} style="${style}">
         <div class="pb-section-columns pb-layout--${layout}">${columnsHtml}</div>
       </section>
     `;
   }
 
-  function renderPage(page) {
+  function renderPage(page, renderOptions = {}) {
     if (!page?.sections) {
       return '<div class="pb-page-empty">No sections configured</div>';
     }
-    const sectionsHtml = page.sections.map((s) => renderSection(s)).join('');
-    return `<div class="pb-page">${sectionsHtml}</div>`;
+    const emitMarkers = isBuilderEditingEnabled(renderOptions);
+    const sectionsHtml = page.sections
+      .map((section, sectionIndex) =>
+        renderSection(section, { ...renderOptions, builderEditing: emitMarkers, sectionIndex })
+      )
+      .join('');
+    const pageMarkerAttrs = builderMarkerAttrs(
+      {
+        'data-builder-page-id': page?.id,
+      },
+      emitMarkers
+    );
+    return `<div class="pb-page"${pageMarkerAttrs}>${sectionsHtml}</div>`;
   }
 
   return { MODULE_RENDERERS, renderModule, renderSection, renderPage };

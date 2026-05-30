@@ -914,7 +914,7 @@ function createPageBuilder({
     syncCanvasModeUi();
 
     if (canvasMode === 'preview') {
-      previewManager.renderPreview();
+      previewManager.renderPreview({ builderEditing: true });
       renderLiveCanvasStatus();
       renderStructureDebugSurface(true);
       return;

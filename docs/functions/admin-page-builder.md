@@ -80,7 +80,8 @@ Modules currently own: `moduleType`, `columnIndex`, `sortIndex`, and `config`.
    panel.
 5. The side panel is rendered by `sidebar-panel.js` and exposes Pages, Modules, Layers, Settings,
    and Styles.
-6. The default canvas is the live iframe preview rendered by `preview-manager.js`.
+6. The default canvas is the live iframe preview rendered by `preview-manager.js` with
+   `builderEditing: true`, so the reader iframe can emit admin-only target markers.
 7. The structural canvas is still rendered by `canvas-renderer.js` as the temporary
    **Structure Debug** fallback.
 8. User actions call `data.js` mutators, update local state, then rerender affected surfaces.
@@ -119,6 +120,10 @@ The top-level coordinator now owns the canonical designer-entry behavior in addi
 - **Canvas Default**: The live iframe preview is the default canvas. The structural renderer remains
   available through **Structure Debug** and is also kept as a hidden fallback surface so existing
   module/section editing flows remain reachable until direct live-canvas selection lands.
+- **Builder Editing Markers**: Live builder snapshots set `options.builderEditing: true`. The
+  reader iframe applies that flag through `applyBuilderPageToDOM(...)`, shared renderers, and
+  header layout code to emit `data-builder-*` markers for page, section, column, module, and
+  page-header targets. Public/default reader rendering keeps those attributes absent.
 - **Default Page Resolution**: Designer mode resolves pages in this order: requested slug, `reader`, homepage, then first page in sort order.
 - **Normal Builder Landing Surface**: Outside designer mode, opening or creating a page now defaults to the `page-settings` surface so slug, title, page type, publish state, and homepage assignment are immediately editable without an extra click.
 - **`onSeriesChange()`**: Re-opens the visible builder shell after a series switch and preserves designer-mode routing when applicable.
@@ -189,6 +194,7 @@ Current responsibilities:
 - derive preview identity from the active series/page/draft state
 - clone the current page into a preview snapshot and merge the active local dirty draft when needed
   through the internal snapshot helper
+- set `snapshot.options.builderEditing` when the live builder canvas is rendering an editable iframe
 - send `SNAPSHOT` messages to the reader iframe and answer `REQUEST_SNAPSHOT`
 - validate inbound `ACK`, `ERROR`, and `METRICS` messages through `validatePreviewEnvelope(...)`
 - apply exact preset width/height styles to both `.pb-preview-frame` and `.pb-preview-iframe`
@@ -433,7 +439,7 @@ Key exports:
 - `buildPreviewSnapshotMessage(snapshot, previewSession)` — constructs the typed `SNAPSHOT` envelope sent from the admin to the iframe
 - `buildPreviewControlMessage(type, details)` — constructs `REQUEST_SNAPSHOT`, `ACK`, or `ERROR` envelopes sent from the iframe back to the admin
 - `buildPreviewMetricsMessage(metrics, details)` — constructs the typed `METRICS` envelope sent from the reader iframe back to the admin
-- `validatePreviewSnapshotPayload(snapshot, expected)` — validates snapshot shape, version, source, draftMode, page structure, and identity fields
+- `validatePreviewSnapshotPayload(snapshot, expected)` — validates snapshot shape, version, source, draftMode, page structure, optional `builderEditing` boolean, and identity fields
 - `validatePreviewMetricsPayload(metrics, expected)` — validates viewport identity, exact preset dimensions, branch-flag booleans, and overflow offender structure
 - `validatePreviewEnvelope(message, expected)` — validates any inbound `postMessage` data: unknown types are rejected, session/identity fields are checked, `SNAPSHOT` messages are forwarded to `validatePreviewSnapshotPayload`, and `METRICS` messages are forwarded to `validatePreviewMetricsPayload`
 
@@ -500,7 +506,7 @@ Again: `header` is compatibility-only in the catalog and is not part of the norm
 - Header editing is page-scoped through `page.meta.header`, not primarily through a normal `header` module.
 - The admin canvas is an editing surface with builder chrome. Preview mode now renders through a real reader iframe (`index.html?builderPreview=1`) for full reader-shell parity, not through a constrained div or the direct `preview-renderers.js` path.
 - Shared renderer parity exists at the module/section/page HTML level through `shared-renderers.js`. The iframe preview approach means real viewport dimensions, real media queries, and real reader-side JavaScript all run in preview.
-- The iframe preview bridge (`reader/preview-bridge.js`) and the `postMessage` protocol defined in `preview-contract.js` are implemented. The snapshot merge path covers module config, theme metadata, normalized header metadata, page settings, and section spacing without mutating `currentPage`.
+- The iframe preview bridge (`reader/preview-bridge.js`) and the `postMessage` protocol defined in `preview-contract.js` are implemented. The snapshot merge path covers module config, theme metadata, normalized header metadata, page settings, and section spacing without mutating `currentPage`. Validated live-builder snapshots can opt into `builderEditing` markers; public reader output keeps admin-only `data-builder-*` attributes absent.
 - Phase 5 responsive parity instrumentation is also implemented: the iframe now keeps exact preset dimensions, the admin preview canvas scrolls instead of shrinking those presets, and preview metrics now verify breakpoint branches, two-page mode expectations, and horizontal overflow risks.
 - Legacy `page-config` and legacy `header` module content still exist as migration/backfill inputs. Normal reader startup and page-builder header editing resolve V3 page headers with `pageConfig: null`; stored legacy `header` modules are later cleanup debt once V3 metadata exists.
 

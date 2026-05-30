@@ -124,6 +124,17 @@ function ensureHeaderScaffold() {
   return { topbar, layout, stash };
 }
 
+function syncHeaderBuilderMarkers(topbar, page, builderEditing) {
+  if (!topbar) return;
+  if (builderEditing && page?.id) {
+    topbar.setAttribute('data-builder-page-id', String(page.id));
+    topbar.setAttribute('data-builder-surface', 'page-header');
+    return;
+  }
+  topbar.removeAttribute('data-builder-page-id');
+  topbar.removeAttribute('data-builder-surface');
+}
+
 function collectHeaderBlocks(topbar) {
   return Object.fromEntries(
     Object.entries(BLOCK_SELECTORS).map(([blockId, selector]) => [
@@ -167,6 +178,7 @@ export function applySharedHeaderLayout(pageConfig = null, options = {}) {
 
   const seriesId = options.seriesId || 'battle-bros';
   const currentPage = options.page || null;
+  const builderEditing = options.builderEditing === true;
   const headerState =
     options.headerState ||
     resolvePageHeaderState({
@@ -176,6 +188,7 @@ export function applySharedHeaderLayout(pageConfig = null, options = {}) {
     });
   const headerConfig = normalizeHeaderConfig(headerState.header, normalizeHeaderNavItems);
   const blocks = collectHeaderBlocks(scaffold.topbar);
+  syncHeaderBuilderMarkers(scaffold.topbar, currentPage, builderEditing);
   activeAppearanceTopbar = scaffold.topbar;
   activeTopAppearance = resolveHeaderShellTopAppearance(headerConfig);
   activeScrolledAppearance = resolveHeaderShellScrolledAppearance(headerConfig);

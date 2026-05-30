@@ -91,6 +91,57 @@ describe('shared renderer parity', () => {
     expect(readerSections.length).toBeGreaterThan(0);
   });
 
+  it('omits builder target markers by default', () => {
+    const page = getContractFixture('builderPage');
+    const html = makeReaderRenderers().renderPage(page);
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+
+    expect(wrapper.querySelector('[data-builder-page-id]')).toBeNull();
+    expect(wrapper.querySelector('[data-builder-section-id]')).toBeNull();
+    expect(wrapper.querySelector('[data-builder-column-index]')).toBeNull();
+    expect(wrapper.querySelector('[data-builder-module-id]')).toBeNull();
+    expect(wrapper.querySelector('[data-builder-module-type]')).toBeNull();
+  });
+
+  it('emits stable builder target markers only when builder editing is enabled', () => {
+    const page = getContractFixture('builderPage');
+    const html = makeReaderRenderers().renderPage(page, { builderEditing: true });
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+
+    const firstSection = page.sections[0];
+    const firstModule = firstSection.modules[0];
+
+    expect(wrapper.querySelector('.pb-page')?.dataset.builderPageId).toBe(page.id);
+    expect(wrapper.querySelector('.pb-section')?.dataset.builderSectionId).toBe(firstSection.id);
+    expect(wrapper.querySelector('.pb-section')?.dataset.builderSectionIndex).toBe('0');
+    expect(wrapper.querySelector('.pb-section')?.dataset.builderLayout).toBe(firstSection.layout);
+    expect(wrapper.querySelector('.pb-column')?.dataset.builderColumnIndex).toBe('0');
+    expect(wrapper.querySelector('.pb-module')?.dataset.builderModuleId).toBe(firstModule.id);
+    expect(wrapper.querySelector('.pb-module')?.dataset.builderModuleType).toBe(
+      firstModule.moduleType
+    );
+  });
+
+  it('emits module markers for unknown modules in builder editing mode', () => {
+    const html = makeReaderRenderers().renderModule(
+      {
+        id: 'module-unknown',
+        moduleType: 'mystery-box',
+        config: {},
+      },
+      { builderEditing: true }
+    );
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = html;
+    const module = wrapper.querySelector('.pb-module--unknown');
+
+    expect(module?.dataset.moduleId).toBe('module-unknown');
+    expect(module?.dataset.builderModuleId).toBe('module-unknown');
+    expect(module?.dataset.builderModuleType).toBe('mystery-box');
+  });
+
   it('reader omits mount placeholders, preview shows them', () => {
     const readerMod = { moduleType: 'reader', config: { showPanels: true, showComments: true } };
     const galleryMod = { moduleType: 'entry-gallery', config: { columns: 3 } };

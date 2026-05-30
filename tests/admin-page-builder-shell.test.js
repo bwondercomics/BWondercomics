@@ -1352,6 +1352,7 @@ describe('admin page-builder shell', () => {
     expect(getPreviewFrame()?.dataset.pageSlug).toBe(selectedPage.slug);
     expect(getPreviewFrame()?.dataset.draftMode).toBe('published');
     expect(getPreviewFrame()?.dataset.snapshotVersion).toBe('1');
+    expect(getPreviewFrame()?.dataset.builderEditing).toBe('true');
     expect(getPreviewFrame()?.dataset.viewportWidth).toBe('1280');
     expect(getPreviewFrame()?.dataset.viewportHeight).toBe('900');
     expect(getPreviewFrame()?.dataset.previewSession).toBeTruthy();
@@ -1405,6 +1406,9 @@ describe('admin page-builder shell', () => {
         snapshot: expect.objectContaining({
           pageId: selectedPage.id,
           pageSlug: selectedPage.slug,
+          options: expect.objectContaining({
+            builderEditing: true,
+          }),
         }),
       }),
       window.location.origin

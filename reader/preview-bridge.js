@@ -222,6 +222,7 @@ export function requestPreviewSnapshot(options = {}) {
         source: 'builder',
         page: message.snapshot.page,
         previewMode: true,
+        builderEditing: message.snapshot.options?.builderEditing === true,
         snapshot: message.snapshot,
       });
     };
@@ -275,6 +276,7 @@ export function subscribePreviewSnapshots(onSnapshot, options = {}) {
         source: 'builder',
         page: message.snapshot.page,
         previewMode: true,
+        builderEditing: message.snapshot.options?.builderEditing === true,
         snapshot: message.snapshot,
       });
     } catch (err) {

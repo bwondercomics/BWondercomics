@@ -215,4 +215,26 @@ describe('reader page renderer', () => {
     expect(sections[1].querySelectorAll('.pb-column')).toHaveLength(2);
     expect(sections[1].querySelector('.pb-module--feed')).not.toBeNull();
   });
+
+  it('emits builder editing target markers only when requested', () => {
+    const page = getContractFixture('builderPage');
+    const publicWrapper = parseModuleHtml(renderPage(page));
+    const editingWrapper = parseModuleHtml(renderPage(page, { builderEditing: true }));
+    const firstSection = page.sections[0];
+    const firstModule = firstSection.modules[0];
+
+    expect(publicWrapper.querySelector('[data-builder-page-id]')).toBeNull();
+    expect(publicWrapper.querySelector('[data-builder-module-id]')).toBeNull();
+    expect(editingWrapper.querySelector('.pb-page')?.dataset.builderPageId).toBe(page.id);
+    expect(editingWrapper.querySelector('.pb-section')?.dataset.builderSectionId).toBe(
+      firstSection.id
+    );
+    expect(editingWrapper.querySelector('.pb-column')?.dataset.builderColumnIndex).toBe('0');
+    expect(editingWrapper.querySelector('.pb-module')?.dataset.builderModuleId).toBe(
+      firstModule.id
+    );
+    expect(editingWrapper.querySelector('.pb-module')?.dataset.builderModuleType).toBe(
+      firstModule.moduleType
+    );
+  });
 });

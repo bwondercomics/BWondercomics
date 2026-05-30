@@ -78,6 +78,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     frame.dataset.pageSlug = snapshot.pageSlug || '';
     frame.dataset.draftMode = snapshot.draftMode || '';
     frame.dataset.snapshotVersion = String(snapshot.snapshotVersion || '');
+    frame.dataset.builderEditing = snapshot.options?.builderEditing === true ? 'true' : 'false';
     frame.dataset.viewportWidth = String(viewport.width);
     frame.dataset.viewportHeight = String(viewport.height);
     frame.dataset.previewSession = previewSession;
@@ -252,7 +253,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     }
   }
 
-  function createPreviewPageSnapshot() {
+  function createPreviewPageSnapshot(options = {}) {
     const { currentPage, dirtyScope, previewWidth } = getState();
     if (!currentPage) return null;
 
@@ -270,6 +271,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
       source,
       page: pageSnapshot,
       options: {
+        builderEditing: options.builderEditing === true,
         viewport: { ...viewport },
         sideEffects: { ...DEFAULT_BUILDER_PREVIEW_SIDE_EFFECTS },
         scrollState: { top: 0, left: 0 },
@@ -277,10 +279,10 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     };
   }
 
-  function renderPreview() {
+  function renderPreview(options = {}) {
     if (!el.pbCanvas) return;
 
-    const snapshot = createPreviewPageSnapshot();
+    const snapshot = createPreviewPageSnapshot(options);
     if (!snapshot) {
       latestPreviewSnapshot = null;
       previewIdentity = '';
@@ -322,6 +324,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
              data-page-slug="${escapeAttr(snapshot.pageSlug || '')}"
              data-draft-mode="${escapeAttr(snapshot.draftMode || '')}"
              data-snapshot-version="${escapeAttr(String(snapshot.snapshotVersion || ''))}"
+             data-builder-editing="${snapshot.options?.builderEditing === true ? 'true' : 'false'}"
              data-viewport-width="${escapeAttr(String(viewport.width))}"
              data-viewport-height="${escapeAttr(String(viewport.height))}"
              data-preview-session="${escapeAttr(previewSession)}"
