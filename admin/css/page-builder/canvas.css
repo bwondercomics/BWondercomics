@@ -162,10 +162,13 @@
 }
 
 .pb-canvas {
+  position: relative;
+  z-index: 1;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   padding: 16px;
+  background: rgba(0, 0, 0, 0.14);
 }
 
 .pb-canvas[data-mode='preview'] {

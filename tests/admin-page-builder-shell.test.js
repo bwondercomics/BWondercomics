@@ -258,7 +258,7 @@ describe('admin page-builder shell', () => {
     vi.restoreAllMocks();
   });
 
-  it('mounts the editor toggle beside the inspector rail and persists wide-screen mode changes', async () => {
+  it('mounts the side-panel toggles in the full-page builder shell', async () => {
     const { manager } = await setupPageBuilder({
       fetchPagesResults: [[]],
       viewportWidth: 1600,
@@ -267,21 +267,38 @@ describe('admin page-builder shell', () => {
     await manager.showPageBuilderSection();
 
     const layout = document.querySelector('.page-builder-layout');
-    const toggle = document.getElementById('pbToggleEditor');
+    const toolbarToggle = document.getElementById('pbToggleSidebar');
+    const railToggle = document.getElementById('pbToggleEditor');
 
-    expect(toggle?.closest('.page-builder-editor')).not.toBeNull();
+    expect(document.getElementById('adminDashboard')?.classList).toContain(
+      'admin-page-builder-open'
+    );
+    expect(document.getElementById('pbBuilderToolbar')).not.toBeNull();
+    expect(document.getElementById('pbBuilderSidePanel')).not.toBeNull();
+    expect(document.getElementById('pbCanvasViewport')).not.toBeNull();
+    expect(document.getElementById('pbCanvasOverlay')).not.toBeNull();
+    expect(
+      Array.from(document.querySelectorAll('.pb-sidebar-tab')).map((tab) => tab.textContent?.trim())
+    ).toEqual(['Pages', 'Modules', 'Layers', 'Settings', 'Styles']);
+    expect(document.getElementById('pbAddPage')?.closest('#pbBuilderToolbar')).not.toBeNull();
+    expect(document.getElementById('pbSaveDraft')?.closest('#pbBuilderToolbar')).not.toBeNull();
+    expect(document.getElementById('pbPublish')?.closest('#pbBuilderToolbar')).not.toBeNull();
+    expect(document.getElementById('pbWidthToggles')?.closest('#pbBuilderToolbar')).not.toBeNull();
+    expect(railToggle?.closest('.page-builder-sidebar')).not.toBeNull();
+    expect(toolbarToggle?.closest('.pb-builder-toolbar')).not.toBeNull();
     expect(document.querySelector('.pb-canvas-header #pbToggleEditor')).toBeNull();
-    expect(layout?.dataset.editorMode).toBe('docked');
-    expect(layout?.style.getPropertyValue('--pb-editor-width')).toBe('520px');
+    expect(layout?.dataset.editorMode).toBe('side-panel');
+    expect(layout?.dataset.sidebarMode).toBe('expanded');
+    expect(layout?.style.getPropertyValue('--pb-sidebar-width')).toBe('280px');
 
-    toggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    expect(layout?.dataset.editorMode).toBe('collapsed');
-    expect(layout?.style.getPropertyValue('--pb-editor-width')).toBe('320px');
-    expect(window.localStorage.getItem('pb-editor-mode')).toBe('collapsed');
+    toolbarToggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(layout?.dataset.sidebarMode).toBe('collapsed');
+    expect(layout?.style.getPropertyValue('--pb-sidebar-width')).toBe('72px');
+    expect(window.localStorage.getItem('pb-sidebar-mode')).toBe('collapsed');
 
-    toggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    expect(layout?.dataset.editorMode).toBe('docked');
-    expect(window.localStorage.getItem('pb-editor-mode')).toBe('docked');
+    railToggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(layout?.dataset.sidebarMode).toBe('expanded');
+    expect(window.localStorage.getItem('pb-sidebar-mode')).toBe('expanded');
   });
 
   it('does not fetch series page-config during normal V3 page-builder startup', async () => {
@@ -305,7 +322,7 @@ describe('admin page-builder shell', () => {
     }
   });
 
-  it('routes nav-collapsed free space into the editor panel instead of the canvas', async () => {
+  it('keeps normal admin header and nav hidden while the full-page builder is active', async () => {
     const { manager } = await setupPageBuilder({
       fetchPagesResults: [[]],
       viewportWidth: 1600,
@@ -313,24 +330,17 @@ describe('admin page-builder shell', () => {
 
     await manager.showPageBuilderSection();
 
-    const layout = document.querySelector('.page-builder-layout');
-    const navToggle = document.getElementById('adminNavToggle');
     const dashboard = document.getElementById('adminDashboard');
-    const editorToggle = document.getElementById('pbToggleEditor');
+    const adminHeaderRule = getCssRule(
+      readCss('admin/css/page-builder/layout.css'),
+      '.admin-shell.admin-page-builder-open .admin-header,\n.admin-shell.admin-page-builder-open .admin-nav'
+    );
 
-    expect(layout?.style.getPropertyValue('--pb-editor-width')).toBe('520px');
-
-    dashboard?.classList.add('nav-collapsed');
-    navToggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    await flushAdminUi(1);
-
-    expect(layout?.style.getPropertyValue('--pb-editor-width')).toBe('620px');
-
-    editorToggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    expect(layout?.style.getPropertyValue('--pb-editor-width')).toBe('420px');
+    expect(dashboard?.classList).toContain('admin-page-builder-open');
+    expect(adminHeaderRule).toContain('display: none');
   });
 
-  it('lets the left rail collapse and sends that recovered width to the inspector', async () => {
+  it('lets the unified side panel collapse from the toolbar and rail controls', async () => {
     const { manager } = await setupPageBuilder({
       fetchPagesResults: [[]],
       viewportWidth: 1600,
@@ -340,30 +350,29 @@ describe('admin page-builder shell', () => {
 
     const layout = document.querySelector('.page-builder-layout');
     const sidebarToggle = document.getElementById('pbToggleSidebar');
+    const railToggle = document.getElementById('pbToggleEditor');
     const railLabel = document.getElementById('pbSidebarRailLabel');
 
     expect(layout?.dataset.sidebarMode).toBe('expanded');
-    expect(layout?.style.getPropertyValue('--pb-sidebar-width')).toBe('200px');
-    expect(layout?.style.getPropertyValue('--pb-editor-width')).toBe('520px');
+    expect(layout?.style.getPropertyValue('--pb-sidebar-width')).toBe('280px');
     expect(railLabel?.textContent).toBe('Pages');
 
     sidebarToggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(layout?.dataset.sidebarMode).toBe('collapsed');
     expect(layout?.style.getPropertyValue('--pb-sidebar-width')).toBe('72px');
-    expect(layout?.style.getPropertyValue('--pb-editor-width')).toBe('648px');
     expect(window.localStorage.getItem('pb-sidebar-mode')).toBe('collapsed');
-    expect(sidebarToggle?.getAttribute('aria-label')).toBe('Expand left panel');
+    expect(sidebarToggle?.getAttribute('aria-label')).toBe('Expand side panel');
+    expect(railToggle?.getAttribute('aria-label')).toBe('Expand side panel');
 
-    sidebarToggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    railToggle?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(layout?.dataset.sidebarMode).toBe('expanded');
-    expect(layout?.style.getPropertyValue('--pb-sidebar-width')).toBe('200px');
-    expect(layout?.style.getPropertyValue('--pb-editor-width')).toBe('520px');
+    expect(layout?.style.getPropertyValue('--pb-sidebar-width')).toBe('280px');
     expect(window.localStorage.getItem('pb-sidebar-mode')).toBe('expanded');
   });
 
-  it('switches the inspector to overlay mode on narrower desktop widths', async () => {
+  it('keeps the side panel as a drawer on narrower desktop widths', async () => {
     const { manager } = await setupPageBuilder({
       fetchPagesResults: [[]],
       viewportWidth: 1280,
@@ -372,13 +381,13 @@ describe('admin page-builder shell', () => {
     await manager.showPageBuilderSection();
 
     const layout = document.querySelector('.page-builder-layout');
-    expect(layout?.dataset.editorMode).toBe('overlay');
+    expect(layout?.dataset.editorMode).toBe('side-panel');
     expect(layout?.dataset.viewportBand).toBe('medium');
 
     setViewportWidth(1600);
     window.dispatchEvent(new Event('resize'));
 
-    expect(layout?.dataset.editorMode).toBe('docked');
+    expect(layout?.dataset.editorMode).toBe('side-panel');
     expect(layout?.dataset.viewportBand).toBe('wide');
   });
 
@@ -461,27 +470,22 @@ describe('admin page-builder shell', () => {
     expect(document.querySelector('.pb-header-nav-input[data-item-key="url"]')).not.toBeNull();
   });
 
-  it('keeps the right inspector on one panel scroll without clipping open categories', () => {
+  it('keeps the unified side panel on one inspector scroll without clipping open categories', () => {
     const inspectorCss = readCss('admin/css/page-builder/inspector.css');
     const layoutCss = readCss('admin/css/page-builder/layout.css');
     const editorContentRule = getCssRule(inspectorCss, '.pb-editor-content');
     const sectionRule = getCssRule(inspectorCss, '.pb-inspector-section');
     const sectionBodyRule = getCssRule(inspectorCss, '.pb-inspector-section-body');
-    const stackedLayoutRule = getCssRule(
-      layoutCss,
-      ".page-builder-layout[data-viewport-band='stacked']"
-    );
 
     expect(editorContentRule).toContain('overflow-y: auto');
     expect(editorContentRule).toContain('overscroll-behavior: contain');
     expect(editorContentRule).toContain('scroll-padding-bottom: 96px');
     expect(sectionRule).toContain('overflow: visible');
     expect(sectionBodyRule).toContain('overflow: visible');
-    expect(stackedLayoutRule).toContain('overflow: hidden');
-    expect(layoutCss).toContain(
-      ".page-builder-layout[data-viewport-band='stacked'] .page-builder-editor {\n  position: relative;"
-    );
-    expect(layoutCss).toContain('height: min(720px');
+    expect(layoutCss).toContain('.admin-shell.admin-page-builder-open .admin-header');
+    expect(layoutCss).toContain("grid-template-areas: 'content'");
+    expect(layoutCss).toContain('.page-builder-layout[data-sidebar-mode');
+    expect(layoutCss).toContain('.pb-canvas-overlay');
   });
 
   it('renders the empty state and adds a new page through the modal flow', async () => {
@@ -1200,7 +1204,7 @@ describe('admin page-builder shell', () => {
     );
   });
 
-  it('toggles between edit and preview canvas modes via the view toggle buttons', async () => {
+  it('defaults to the live iframe canvas and keeps structure behind the debug toggle', async () => {
     const selectedPage = getContractFixture('builderPage');
     const { manager } = await setupPageBuilder({
       fetchPagesResults: [[selectedPage]],
@@ -1219,38 +1223,29 @@ describe('admin page-builder shell', () => {
     const widthToggles = document.getElementById('pbWidthToggles');
     const layout = document.querySelector('.page-builder-layout');
 
-    // Starts in edit mode — structural canvas visible, width toggles hidden, no canvas-mode attr
-    expect(canvas?.dataset.mode).toBe('edit');
-    expect(widthToggles?.hidden).toBe(true);
-    expect(layout?.dataset.canvasMode).toBeUndefined();
-    expect(canvas?.querySelector('div[data-section-id]')).not.toBeNull();
-
-    // Switch to preview mode
-    previewBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-
+    // Starts in live mode. The same-origin iframe is primary, and structure stays hidden.
     expect(canvas?.dataset.mode).toBe('preview');
     expect(widthToggles?.hidden).toBe(false);
-    // Layout gets data-canvas-mode so CSS can collapse sidebar + editor
-    expect(layout?.dataset.canvasMode).toBe('preview');
-    // Preview frame hosts the real reader shell iframe
+    expect(layout?.dataset.canvasMode).toBe('live');
     expect(canvas?.querySelector('.pb-preview-frame')).not.toBeNull();
     expect(canvas?.querySelector('.pb-preview-iframe')).not.toBeNull();
-    // Structural edit UI is gone
-    expect(canvas?.querySelector('div[data-section-id]')).toBeNull();
-
-    // Preview button should be active, edit button inactive
+    expect(canvas?.querySelector('.pb-structure-debug-surface')?.hidden).toBe(true);
     expect(previewBtn?.classList.contains('pb-view-toggle--active')).toBe(true);
     expect(editBtn?.classList.contains('pb-view-toggle--active')).toBe(false);
 
-    // Switch back to edit mode
+    // Switch to the temporary structural fallback.
     editBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(canvas?.dataset.mode).toBe('edit');
-    expect(widthToggles?.hidden).toBe(true);
-    // Layout attribute is cleared
-    expect(layout?.dataset.canvasMode).toBeUndefined();
+    expect(widthToggles?.hidden).toBe(false);
+    expect(layout?.dataset.canvasMode).toBe('structure');
     expect(canvas?.querySelector('div[data-section-id]')).not.toBeNull();
     expect(editBtn?.classList.contains('pb-view-toggle--active')).toBe(true);
+
+    previewBtn?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(canvas?.dataset.mode).toBe('preview');
+    expect(layout?.dataset.canvasMode).toBe('live');
+    expect(previewBtn?.classList.contains('pb-view-toggle--active')).toBe(true);
   });
 
   it('cycles through desktop/tablet/mobile preview widths without re-rendering', async () => {

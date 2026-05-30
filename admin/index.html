@@ -830,14 +830,103 @@
         <!-- Page Builder Section -->
         <section class="section" id="pageBuilderSection" style="display: none">
           <div class="page-builder">
+            <header class="pb-builder-toolbar" id="pbBuilderToolbar">
+              <div class="pb-builder-toolbar-main">
+                <button
+                  type="button"
+                  class="btn-small btn-secondary pb-side-panel-toggle"
+                  id="pbToggleSidebar"
+                  aria-controls="pbBuilderSidePanel"
+                  aria-expanded="true"
+                >
+                  Panel
+                </button>
+                <div class="pb-page-title" id="pbPageTitle"></div>
+              </div>
+              <div class="pb-builder-toolbar-actions">
+                <div class="page-builder-actions pb-builder-toolbar-group">
+                  <button type="button" class="btn-small btn-secondary" id="pbAddPage">
+                    + Page
+                  </button>
+                </div>
+                <div
+                  id="pbViewToggles"
+                  class="page-builder-actions pb-builder-toolbar-group pb-builder-toolbar-group--view"
+                >
+                  <button
+                    type="button"
+                    class="btn-small btn-secondary pb-view-toggle pb-view-toggle--active"
+                    data-view="preview"
+                    id="pbViewPreview"
+                    title="Live page canvas"
+                  >
+                    Live
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-small btn-secondary pb-view-toggle"
+                    data-view="edit"
+                    id="pbViewEdit"
+                    title="Open the temporary structural fallback canvas"
+                  >
+                    Structure Debug
+                  </button>
+                </div>
+                <div
+                  id="pbWidthToggles"
+                  class="page-builder-actions pb-builder-toolbar-group pb-builder-toolbar-group--width"
+                  aria-label="Canvas device size"
+                >
+                  <button
+                    type="button"
+                    class="btn-small btn-secondary pb-width-toggle pb-width-toggle--active"
+                    data-width="desktop"
+                    title="Desktop (1280px)"
+                  >
+                    Desktop
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-small btn-secondary pb-width-toggle"
+                    data-width="tablet"
+                    title="Tablet (768px)"
+                  >
+                    Tablet
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-small btn-secondary pb-width-toggle"
+                    data-width="mobile"
+                    title="Phone (375px)"
+                  >
+                    Phone
+                  </button>
+                </div>
+                <div
+                  class="page-builder-actions pb-builder-toolbar-group pb-builder-toolbar-group--publish"
+                >
+                  <button type="button" class="btn-small btn-secondary" id="pbSaveDraft">
+                    Save Draft
+                  </button>
+                  <button type="button" class="btn-small btn-primary" id="pbPublish">
+                    Publish Changes
+                  </button>
+                </div>
+                <div class="page-builder-actions pb-builder-toolbar-group">
+                  <button type="button" class="btn-small btn-secondary" id="pbExitBuilder">
+                    Exit
+                  </button>
+                </div>
+              </div>
+            </header>
+
             <!-- Page Builder Layout -->
             <div class="page-builder-layout" data-editor-mode="collapsed">
-              <!-- Left Sidebar: Page List -->
-              <aside class="page-builder-sidebar">
+              <aside class="page-builder-sidebar" id="pbBuilderSidePanel">
                 <button
                   type="button"
                   class="btn-small btn-secondary pb-sidebar-rail-toggle"
-                  id="pbToggleSidebar"
+                  id="pbToggleEditor"
                   aria-controls="pbSidebarBody"
                   aria-expanded="true"
                 >
@@ -850,6 +939,9 @@
                   <div class="pb-sidebar-tabs">
                     <button class="pb-sidebar-tab active" data-tab="pages">Pages</button>
                     <button class="pb-sidebar-tab" data-tab="modules">Modules</button>
+                    <button class="pb-sidebar-tab" data-tab="layers">Layers</button>
+                    <button class="pb-sidebar-tab" data-tab="settings">Settings</button>
+                    <button class="pb-sidebar-tab" data-tab="styles">Styles</button>
                   </div>
                   <div class="pb-sidebar-content" data-content="pages">
                     <div id="pbPageList" class="pb-page-list"></div>
@@ -857,111 +949,27 @@
                   <div class="pb-sidebar-content" data-content="modules" hidden>
                     <div id="pbModulePalette" class="pb-module-palette"></div>
                   </div>
-                </div>
-              </aside>
-
-              <!-- Main Canvas Area -->
-              <main class="page-builder-canvas">
-                <div class="pb-canvas-header">
-                  <div class="pb-canvas-header-main">
-                    <div class="pb-page-title" id="pbPageTitle"></div>
-                    <div class="pb-canvas-header-actions">
-                      <div class="page-builder-actions pb-canvas-header-actions-group">
-                        <button type="button" class="btn-small btn-secondary" id="pbAddPage">
-                          + Page
-                        </button>
-                      </div>
-                      <div
-                        id="pbViewToggles"
-                        class="page-builder-actions pb-canvas-header-actions-group pb-canvas-header-actions-group--view"
-                      >
-                        <button
-                          type="button"
-                          class="btn-small btn-secondary pb-view-toggle pb-view-toggle--active"
-                          data-view="edit"
-                          id="pbViewEdit"
-                          title="Structural editing canvas"
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          class="btn-small btn-secondary pb-view-toggle"
-                          data-view="preview"
-                          id="pbViewPreview"
-                          title="Live page preview"
-                        >
-                          Preview
-                        </button>
-                      </div>
-                      <div
-                        id="pbWidthToggles"
-                        class="page-builder-actions pb-canvas-header-actions-group pb-canvas-header-actions-group--width"
-                        hidden
-                        aria-label="Preview width"
-                      >
-                        <button
-                          type="button"
-                          class="btn-small btn-secondary pb-width-toggle pb-width-toggle--active"
-                          data-width="desktop"
-                          title="Desktop (1280px)"
-                        >
-                          🖥
-                        </button>
-                        <button
-                          type="button"
-                          class="btn-small btn-secondary pb-width-toggle"
-                          data-width="tablet"
-                          title="Tablet (768px)"
-                        >
-                          📱
-                        </button>
-                        <button
-                          type="button"
-                          class="btn-small btn-secondary pb-width-toggle"
-                          data-width="mobile"
-                          title="Mobile (375px)"
-                        >
-                          📲
-                        </button>
-                      </div>
-                      <div
-                        class="page-builder-actions pb-canvas-header-actions-group pb-canvas-header-actions-group--publish"
-                      >
-                        <button type="button" class="btn-small btn-secondary" id="pbSaveDraft">
-                          Save Draft
-                        </button>
-                        <button type="button" class="btn-small btn-primary" id="pbPublish">
-                          Publish Changes
-                        </button>
+                  <div class="pb-sidebar-content" data-content="layers" hidden>
+                    <div id="pbLayerTree" class="pb-layer-tree"></div>
+                  </div>
+                  <div class="pb-sidebar-content" data-content="inspector" hidden>
+                    <div id="pbModuleEditor" class="pb-module-editor">
+                      <div class="pb-editor-empty">
+                        <p>Click on a module to edit its settings.</p>
                       </div>
                     </div>
                   </div>
                 </div>
+              </aside>
+
+              <main class="page-builder-canvas" id="pbCanvasViewport">
+                <div id="pbCanvasOverlay" class="pb-canvas-overlay" aria-hidden="true"></div>
                 <div id="pbCanvas" class="pb-canvas">
                   <div class="pb-canvas-empty">
                     <p>Select a page from the sidebar or create a new one to get started.</p>
                   </div>
                 </div>
               </main>
-
-              <!-- Right Sidebar: Module Editor -->
-              <aside class="page-builder-editor">
-                <button
-                  type="button"
-                  class="btn-small btn-secondary pb-editor-rail-toggle"
-                  id="pbToggleEditor"
-                  aria-controls="pbModuleEditor"
-                  aria-expanded="true"
-                >
-                  Expand
-                </button>
-                <div id="pbModuleEditor" class="pb-module-editor">
-                  <div class="pb-editor-empty">
-                    <p>Click on a module to edit its settings.</p>
-                  </div>
-                </div>
-              </aside>
             </div>
           </div>
         </section>

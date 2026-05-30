@@ -76,10 +76,14 @@ Modules currently own: `moduleType`, `columnIndex`, `sortIndex`, and `config`.
 1. `admin/page-builder.js` loads the page list for the active series with `fetchPages(...)`.
 2. The selected page is resolved from the route or first available page.
 3. The active page detail is loaded with `fetchPage(...)`.
-4. The left rail is rendered by `sidebar-panel.js`.
-5. The canvas is rendered by `canvas-renderer.js`.
-6. The right inspector shell is rendered by `editor-panel.js`.
-7. User actions call `data.js` mutators, update local state, then rerender affected surfaces.
+4. The full-page shell hides normal admin chrome and renders the top toolbar plus unified side
+   panel.
+5. The side panel is rendered by `sidebar-panel.js` and exposes Pages, Modules, Layers, Settings,
+   and Styles.
+6. The default canvas is the live iframe preview rendered by `preview-manager.js`.
+7. The structural canvas is still rendered by `canvas-renderer.js` as the temporary
+   **Structure Debug** fallback.
+8. User actions call `data.js` mutators, update local state, then rerender affected surfaces.
 
 There is no separate long-lived client-side draft store in `data.js`. `admin/page-builder.js` still owns the top-level mutable builder state and composition root, while focused factories now own specific workflows: `draft-manager.js` handles draft normalization/save-discard flows, `page-actions.js` handles page lifecycle actions, `canvas-mutations.js` handles structural section/module mutations, and `preview-manager.js` handles the iframe preview handshake/render path.
 
@@ -97,7 +101,8 @@ Its responsibilities include:
 - instantiating `createDraftManager(...)`, `createPageActions(...)`, `createCanvasMutations(...)`, and `createPreviewManager(...)`
 - `normalizeHeaderDraft` resolves normal headers with `pageConfig: null` and tags a `source` field (`page-meta-v3`, `page-meta-stale`, `legacy-import`) so migration-only badges can flag non-canonical header records
 - delegating draft saves/discards, publish/page actions, structural mutations, and preview synchronization to those focused factories
-- rerendering the rail, canvas, and inspector after state changes
+- rerendering the side panel, live canvas, structure-debug fallback, and inspector after state
+  changes
 - rendering status badges and reader-preview links
 
 **Designer Mode Integration**:
@@ -108,6 +113,12 @@ The top-level coordinator now owns the canonical designer-entry behavior in addi
   - `pageSlug` requests a specific page by slug.
   - `surface: 'header'` opens the structured page-header editor immediately.
   - `historyMode` controls whether route updates use `pushState` or `replaceState`.
+- **Full-Page Shell**: Opening the builder adds `admin-page-builder-open`, hides the normal admin
+  header/nav through CSS, and uses the top builder toolbar plus one side panel as the only editor
+  chrome.
+- **Canvas Default**: The live iframe preview is the default canvas. The structural renderer remains
+  available through **Structure Debug** and is also kept as a hidden fallback surface so existing
+  module/section editing flows remain reachable until direct live-canvas selection lands.
 - **Default Page Resolution**: Designer mode resolves pages in this order: requested slug, `reader`, homepage, then first page in sort order.
 - **Normal Builder Landing Surface**: Outside designer mode, opening or creating a page now defaults to the `page-settings` surface so slug, title, page type, publish state, and homepage assignment are immediately editable without an extra click.
 - **`onSeriesChange()`**: Re-opens the visible builder shell after a series switch and preserves designer-mode routing when applicable.
@@ -118,10 +129,11 @@ This module holds the responsive shell-mode helpers that were extracted from the
 
 Current responsibilities:
 
-- define the persisted localStorage keys for editor and sidebar mode
+- define the persisted localStorage keys for shell side-panel mode
 - derive the current viewport band (`wide`, `medium`, `stacked`)
-- resolve the effective editor mode (`docked`, `overlay`, `collapsed`) and sidebar mode (`expanded`, `collapsed`) from stored preference plus viewport size
-- compute sidebar and inspector widths used by the shell layout
+- resolve the effective side-panel mode (`expanded`, `collapsed`) from stored preference plus
+  viewport size
+- compute the side-panel width used by the shell layout
 
 `admin/page-builder.js` still owns the DOM mutations that apply those derived values, but the breakpoint and width math now lives in `layout.js`.
 
@@ -183,7 +195,8 @@ Current responsibilities:
 - store responsive metrics on `.pb-preview-frame.dataset`, including inner dimensions, branch flags, and overflow offenders
 - render the admin-side preview debug overlay when metrics are present and debug mode is enabled
 - update `.pb-preview-frame` dataset attributes and `.pb-preview-status` copy
-- rerender the preview frame whenever preview mode or viewport state changes
+- render the default live canvas and rerender the preview frame whenever live mode, dirty draft, or
+  viewport state changes
 
 The snapshot merge path covers the dirty scopes owned by the explicit-save editor model:
 `module`, `theme`, `header`, `page-settings`, and `section`. It always works on a cloned page
@@ -307,16 +320,18 @@ Important behavior:
 
 ## 📂 Sidebar Rail (sidebar-panel.js)
 
-This file renders the left rail. Current responsibilities:
+This file renders the unified side panel. Current responsibilities:
 
 - page list rendering and selection
 - page drag/drop reorder
 - module palette rendering (palette excludes `header`)
-- page/library tab switching
+- layer tree rendering for page settings, page header, sections, and modules
+- Pages, Modules, Layers, Settings, and Styles tab switching
+- routing Settings and Styles tabs into the existing `editor-panel.js` inspector shell
 
 ## 🖌️ Canvas Renderer (canvas-renderer.js)
 
-Responsible for the **Structural Wrapper** and the interactive "Admin-only" layers of the canvas.
+Responsible for the **Structure Debug** fallback and the interactive admin-only structural canvas.
 
 - **`renderCanvasSnapshot({ state, helpers })`**: The main orchestration export that returns the full canvas and page title HTML.
 - **Page Title Bar**: Renders the context header showing the current page slug, type, and status badges, along with the "Page Settings" access point.
@@ -325,7 +340,9 @@ Responsible for the **Structural Wrapper** and the interactive "Admin-only" laye
 - **Section Controls**: Renders section reorder handles, layout selectors, and spacing settings (Module, Column, Section Gap).
 - **Insert Zones**: Manages the placement of `renderModuleInsertBar`, `renderSectionInsertBar`, and the module picker grid.
 
-The canvas is an editing surface, not a full fidelity reader render.
+The structural canvas is no longer the default authoring surface. Live mode uses the real reader
+iframe; Structure Debug keeps existing module/section editing reachable until the later
+live-canvas selection and overlay phases replace those interactions.
 
 ## 🖱️ Canvas Events (canvas-events.js)
 

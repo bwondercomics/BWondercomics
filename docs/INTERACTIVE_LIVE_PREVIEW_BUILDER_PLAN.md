@@ -1,8 +1,8 @@
 # Full-Page Live Builder Plan, Part 1 of 2
 
-Status: Planned - not started
-Plan state: Design/specification only. No phase in this plan should be treated as implemented until
-future completion notes say so explicitly.
+Status: In progress - Phase 1 complete
+Plan state: Phase 1 has a completion note below. All later phases remain planned until future
+completion notes say otherwise.
 Scope of this file: shared direction, references, target model, and Phases 1-5.
 Companion file: [Part 2 - Phases 6-12, risks, and implementation order](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md)
 Reference source: `docs/website-references/grapesjs-dev`
@@ -318,6 +318,31 @@ Assumptions:
 - Existing builder records remain the source of truth; DOM/iframe output is still a rendered view.
 - Active series changes from inside the full-page builder are out of scope; the toolbar shows series
   context, and changing series happens after exiting the builder.
+
+Completion note (`2026-05-30`):
+
+Phase 1 is implemented for the full-page builder shell. The admin page builder now opens with
+normal admin header/nav hidden behind `admin-page-builder-open`, renders a top toolbar with page
+status/actions, save/publish, live/structure toggle, exact device controls, side-panel toggle, and an
+Exit action, and uses a single side panel for Pages, Modules, Layers, Settings, and Styles. The live
+same-origin iframe preview is now the default canvas using the existing `builderPreview=1` /
+`previewSession` path; the structural canvas remains available through `Structure Debug` and is kept
+as a hidden fallback surface while live mode is active so current module/section editing remains
+reachable until later direct-canvas phases land. `pbBuilderToolbar`, `pbBuilderSidePanel`,
+`pbCanvasViewport`, and `pbCanvasOverlay` are present as planned shell anchors. No backend API,
+database schema, public route, or saved builder-record contract changed.
+
+Verification completed for this phase:
+
+- `npm test -- tests/admin-page-builder-shell.test.js` - passed (`46` tests).
+- `npm test` - passed (`45` files, `337` passed, `1` skipped).
+- `npm run lint` - passed.
+- `npm run format:check` - passed.
+- `npm run build` - passed with the existing Vite fullscreen chunk warning.
+- `npm run test:visual` - passed (`3` Playwright tests). The visual test now asserts the new default
+  live canvas, then recreates the iframe through `Structure Debug` -> `Live` before screenshot
+  capture to keep timing-sensitive parity screenshots stable.
+- `git diff --check` - passed.
 
 ## Phase 2 - Live Canvas as the Editor
 

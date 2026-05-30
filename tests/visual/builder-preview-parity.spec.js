@@ -403,11 +403,12 @@ async function getPreviewFrame(page) {
   return frame;
 }
 
-async function waitForPreviewReady(page) {
+async function waitForPreviewReady(page, viewportId = '') {
   try {
-    await page.waitForSelector('.pb-preview-frame[data-preview-ready="true"]', {
-      timeout: 15_000,
-    });
+    const selector = viewportId
+      ? `.pb-preview-frame[data-preview-ready="true"][data-width="${viewportId}"][data-metrics-preset="${viewportId}"]`
+      : '.pb-preview-frame[data-preview-ready="true"]';
+    await page.waitForSelector(selector, { timeout: 15_000 });
   } catch (error) {
     const diagnostics = await page.locator('.pb-preview-frame').evaluate((frame) => ({
       ...frame.dataset,
@@ -482,13 +483,14 @@ test.describe('builder preview visual parity', () => {
       );
 
       await expect(adminPage.locator('#pageBuilderSection')).toBeVisible();
-      await expect(adminPage.locator('#pbViewEdit')).toHaveClass(/pb-view-toggle--active/);
-      await expect(adminPage.locator('.pb-page-header-surface')).toBeVisible();
-
+      await expect(adminPage.locator('#pbViewPreview')).toHaveClass(/pb-view-toggle--active/);
+      await expect(adminPage.locator('.pb-preview-frame')).toBeVisible();
+      await adminPage.locator('#pbViewEdit').click();
       await adminPage.locator('#pbViewPreview').click();
+
       await expect(adminPage.locator('#pbWidthToggles')).toBeVisible();
       await adminPage.locator(`#pbWidthToggles [data-width="${viewportId}"]`).click();
-      await waitForPreviewReady(adminPage);
+      await waitForPreviewReady(adminPage, viewportId);
 
       const previewFrame = await getPreviewFrame(adminPage);
       await assertPreviewShell(previewFrame);

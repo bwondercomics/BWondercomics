@@ -44,11 +44,11 @@
 @media (max-width: 720px) {
   .admin-shell.admin-page-builder-open .admin-content,
   .admin-shell.admin-page-builder-open #pageBuilderSection {
-    padding: 8px;
+    padding: 0;
   }
 
   .page-builder-layout {
-    gap: 12px;
+    gap: 0;
   }
 
   .pb-canvas-header,

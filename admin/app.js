@@ -402,6 +402,9 @@ const pageBuilderManager = createPageBuilder({
   getActiveSeriesId: seriesManager.getActiveSeriesId,
   hideAllSections,
   setActiveNav,
+  onExitBuilder: () => {
+    dashboardManager.showDashboardSection();
+  },
   onDesignerRouteChange: (route, mode = 'replace') => {
     setDesignerRoute(
       {

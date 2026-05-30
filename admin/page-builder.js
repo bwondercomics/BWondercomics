@@ -21,10 +21,8 @@ import {
 } from './page-builder/helpers.js';
 import { createEffectivePageHeader, createPageHeaderMeta } from './page-builder/header-config.js';
 import {
-  EDITOR_MODE_KEY,
   SIDEBAR_MODE_KEY,
   getEditorWidth,
-  getEffectiveEditorMode,
   getEffectiveSidebarMode,
   getSidebarWidth,
   getViewportEditorBand,
@@ -60,6 +58,7 @@ function createPageBuilder({
   hideAllSections,
   setActiveNav,
   onDesignerRouteChange,
+  onExitBuilder,
 }) {
   let pages = [];
   let currentPage = null;
@@ -81,7 +80,7 @@ function createPageBuilder({
   let draggedModuleId = null;
   let draggedSectionId = null;
   /** @type {'edit'|'preview'} */
-  let canvasMode = 'edit';
+  let canvasMode = 'preview';
   /** @type {'desktop'|'tablet'|'mobile'} */
   let previewWidth = PREVIEW_VIEWPORT_ORDER[0];
   /** @type {'builder'|'designer'} */
@@ -289,26 +288,43 @@ function createPageBuilder({
     },
   });
 
-  const { renderPageList, renderModulePalette, bindSidebarTabs } = createSidebarPanel({
-    el,
-    getState: () => ({
-      currentPage,
-      pages,
-    }),
-    actions: {
-      selectPage: (pageId) => pageActions.selectPage(pageId),
-      deletePage: (pageId) => pageActions.deletePageFromSidebar(pageId),
-      reorderSidebarPages: (pageIds) => pageActions.reorderSidebarPages(pageIds),
-      setDraggedModuleId: (moduleId) => {
-        draggedModuleId = moduleId;
+  const { renderPageList, renderLayerTree, renderModulePalette, bindSidebarTabs } =
+    createSidebarPanel({
+      el,
+      getState: () => ({
+        currentPage,
+        pages,
+        selectedCanvasSurface,
+        selectedModuleId,
+      }),
+      actions: {
+        selectPage: (pageId) => pageActions.selectPage(pageId),
+        deletePage: (pageId) => pageActions.deletePageFromSidebar(pageId),
+        reorderSidebarPages: (pageIds) => pageActions.reorderSidebarPages(pageIds),
+        setDraggedModuleId: (moduleId) => {
+          draggedModuleId = moduleId;
+        },
+        selectPageHeader: () => {
+          selectPageHeaderFromCanvas();
+          showSidePanelTab('settings');
+        },
+        selectPageSettings: () => {
+          selectPageSettingsFromCanvas();
+          showSidePanelTab('settings');
+        },
+        selectModule: (moduleId) => {
+          selectModule(moduleId);
+          showSidePanelTab('settings');
+        },
+        selectInspectorTab: (nextTab) => selectInspectorTab(nextTab),
+        syncSidebarRailLabel,
       },
-      syncSidebarRailLabel,
-    },
-    helpers: {
-      getPageDisplayTitle,
-      renderPageStatusBadges,
-    },
-  });
+      helpers: {
+        getPageDisplayTitle,
+        getModuleLabel,
+        renderPageStatusBadges,
+      },
+    });
 
   const pageActions = createPageActions({
     el,
@@ -430,6 +446,46 @@ function createPageBuilder({
     el.pbSidebarRailLabel.textContent = activeTab?.textContent?.trim() || 'Pages';
   }
 
+  function showSidePanelTab(tabName = 'settings') {
+    const sidebar = document.querySelector('.page-builder-sidebar');
+    if (!sidebar) return;
+    const targetTab = sidebar.querySelector(`.pb-sidebar-tab[data-tab="${tabName}"]`);
+    const contentTarget = tabName === 'settings' || tabName === 'styles' ? 'inspector' : tabName;
+    if (!targetTab) return;
+
+    sidebar
+      .querySelectorAll('.pb-sidebar-tab')
+      .forEach((button) => button.classList.toggle('active', button === targetTab));
+    sidebar.querySelectorAll('.pb-sidebar-content').forEach((content) => {
+      content.hidden = content.dataset.content !== contentTarget;
+    });
+    syncSidebarRailLabel();
+  }
+
+  function selectInspectorTab(nextTab) {
+    if (nextTab === activeEditorTab) return true;
+    if (
+      !ensureCleanWorkspace('Save or discard your current changes before switching inspector tabs.')
+    ) {
+      renderEditorPanel();
+      return false;
+    }
+
+    activeEditorTab = nextTab === 'theme' ? 'theme' : 'modules';
+    if (activeEditorTab === 'theme') {
+      draftManager.initializeThemeDraft();
+    } else if (selectedCanvasSurface === 'page-header') {
+      draftManager.initializeHeaderDraft();
+    } else if (selectedCanvasSurface === 'page-settings') {
+      draftManager.initializePageSettingsDraft();
+    } else if (selectedModuleId) {
+      draftManager.initializeModuleDraft(selectedModuleId);
+    }
+    setEditorStatus('', 'neutral');
+    renderEditorPanel();
+    return true;
+  }
+
   function setEditorStatus(message = '', type = 'neutral') {
     editorStatus = { message, type };
     updateEditorFooterUi();
@@ -444,6 +500,7 @@ function createPageBuilder({
       dirtyScope = null;
     }
     updateEditorFooterUi();
+    refreshLiveCanvasForDraftChange();
   }
 
   function markDirty(scope) {
@@ -459,6 +516,12 @@ function createPageBuilder({
     } else if (scope === 'section') {
       setCanvasStatus('Unsaved section settings. Save or discard before switching.', 'warning');
     }
+    refreshLiveCanvasForDraftChange();
+  }
+
+  function refreshLiveCanvasForDraftChange() {
+    if (canvasMode !== 'preview' || !el.pbCanvas) return;
+    renderCanvas();
   }
 
   function updateEditorFooterUi() {
@@ -596,57 +659,39 @@ function createPageBuilder({
     if (!layout) return;
 
     const band = getViewportEditorBand();
-    const mode = getEffectiveEditorMode();
     const sidebarMode = getEffectiveSidebarMode();
-    const isOpen = mode !== 'collapsed';
-    const label = isOpen ? '\u276F' : '\u276E';
-    const actionLabel = isOpen ? 'Collapse' : 'Expand';
     const sidebarCollapsed = sidebarMode === 'collapsed';
     const sidebarLabel = sidebarCollapsed ? '\u276F' : '\u276E';
     const sidebarActionLabel = sidebarCollapsed ? 'Expand' : 'Collapse';
 
-    layout.dataset.editorMode = mode;
+    layout.dataset.editorMode = 'side-panel';
     layout.dataset.viewportBand = band;
     layout.dataset.sidebarMode = sidebarMode;
     layout.style.setProperty('--pb-sidebar-width', getSidebarWidth(sidebarMode));
-    layout.style.setProperty(
-      '--pb-editor-width',
-      getEditorWidth(mode, sidebarMode, el.adminDashboard?.classList.contains('nav-collapsed'))
-    );
+    layout.style.setProperty('--pb-editor-width', getEditorWidth('collapsed', sidebarMode, false));
     syncSidebarRailLabel();
 
     if (el.pbToggleEditor) {
-      el.pbToggleEditor.textContent = label;
-      el.pbToggleEditor.setAttribute('aria-expanded', String(isOpen));
-      el.pbToggleEditor.setAttribute('aria-label', `${actionLabel} editor panel`);
-      el.pbToggleEditor.dataset.mode = mode;
+      el.pbToggleEditor.textContent = sidebarLabel;
+      el.pbToggleEditor.setAttribute('aria-expanded', String(!sidebarCollapsed));
+      el.pbToggleEditor.setAttribute('aria-label', `${sidebarActionLabel} side panel`);
+      el.pbToggleEditor.dataset.mode = sidebarMode;
       el.pbToggleEditor.dataset.viewportBand = band;
+      el.pbToggleEditor.hidden = band === 'stacked';
     }
 
     if (el.pbToggleSidebar) {
-      el.pbToggleSidebar.textContent = sidebarLabel;
+      el.pbToggleSidebar.textContent = sidebarCollapsed ? 'Show Panel' : 'Hide Panel';
       el.pbToggleSidebar.setAttribute('aria-expanded', String(!sidebarCollapsed));
-      el.pbToggleSidebar.setAttribute('aria-label', `${sidebarActionLabel} left panel`);
-      el.pbToggleSidebar.hidden = band === 'stacked';
+      el.pbToggleSidebar.setAttribute('aria-label', `${sidebarActionLabel} side panel`);
+      el.pbToggleSidebar.hidden = false;
       el.pbToggleSidebar.dataset.mode = sidebarMode;
       el.pbToggleSidebar.dataset.viewportBand = band;
     }
   }
 
   function toggleEditorMode() {
-    const band = getViewportEditorBand();
-    const currentMode = getEffectiveEditorMode();
-    const nextMode =
-      band === 'wide'
-        ? currentMode === 'docked'
-          ? 'collapsed'
-          : 'docked'
-        : currentMode === 'collapsed'
-          ? 'overlay'
-          : 'collapsed';
-
-    localStorage.setItem(EDITOR_MODE_KEY, nextMode);
-    applyEditorMode();
+    toggleSidebarMode();
   }
 
   function toggleSidebarMode() {
@@ -865,13 +910,40 @@ function createPageBuilder({
 
   function renderCanvas() {
     if (!el.pbCanvas) return;
+    renderLayerTree();
+    syncCanvasModeUi();
 
     if (canvasMode === 'preview') {
       previewManager.renderPreview();
+      renderLiveCanvasStatus();
+      renderStructureDebugSurface(true);
       return;
     }
 
-    el.pbCanvas.dataset.mode = 'edit';
+    renderLiveCanvasStatus();
+    renderStructureDebugSurface(false);
+  }
+
+  function renderLiveCanvasStatus() {
+    const existing = el.pbCanvas?.querySelector('.pb-live-canvas-status');
+    if (!el.pbCanvas || canvasMode !== 'preview' || !canvasStatus.message) {
+      existing?.remove();
+      return;
+    }
+    const notice = existing || document.createElement('div');
+    notice.className = 'pb-canvas-notice pb-live-canvas-status';
+    notice.dataset.status = canvasStatus.type || 'neutral';
+    notice.textContent = canvasStatus.message;
+    if (!existing) {
+      el.pbCanvas.prepend(notice);
+    }
+  }
+
+  function renderStructureDebugSurface(hidden = false) {
+    if (!el.pbCanvas) return;
+    if (!hidden) {
+      el.pbCanvas.dataset.mode = 'edit';
+    }
 
     const { pageTitleHtml, canvasHtml } = renderCanvasSnapshot({
       state: {
@@ -902,8 +974,57 @@ function createPageBuilder({
     if (el.pbPageTitle) {
       el.pbPageTitle.innerHTML = pageTitleHtml;
     }
-    el.pbCanvas.innerHTML = canvasHtml;
+
+    if (!hidden) {
+      el.pbCanvas.innerHTML = canvasHtml;
+      bindCanvasEvents();
+      return;
+    }
+
+    let debugSurface = el.pbCanvas.querySelector('.pb-structure-debug-surface');
+    if (!debugSurface) {
+      debugSurface = document.createElement('div');
+      debugSurface.className = 'pb-structure-debug-surface';
+      el.pbCanvas.appendChild(debugSurface);
+    }
+    debugSurface.hidden = true;
+    debugSurface.setAttribute('aria-hidden', 'true');
+    debugSurface.innerHTML = canvasHtml;
     bindCanvasEvents();
+  }
+
+  function syncCanvasModeUi() {
+    const layout = /** @type {HTMLElement|null} */ (document.querySelector('.page-builder-layout'));
+    if (layout) {
+      if (canvasMode === 'preview') {
+        layout.dataset.canvasMode = 'live';
+      } else {
+        layout.dataset.canvasMode = 'structure';
+      }
+    }
+    el.pbViewToggles?.querySelectorAll('.pb-view-toggle').forEach((node) => {
+      const button = /** @type {HTMLElement} */ (node);
+      button.classList.toggle('pb-view-toggle--active', button.dataset.view === canvasMode);
+    });
+    el.pbWidthToggles?.querySelectorAll('.pb-width-toggle').forEach((node) => {
+      const button = /** @type {HTMLElement} */ (node);
+      button.classList.toggle('pb-width-toggle--active', button.dataset.width === previewWidth);
+    });
+  }
+
+  function exitBuilder() {
+    if (!ensureCleanWorkspace('Save or discard your current changes before exiting the builder.')) {
+      renderCanvas();
+      renderEditorPanel();
+      return;
+    }
+    activeEntrypoint = 'builder';
+    activeDesignerSurface = '';
+    if (typeof onExitBuilder === 'function') {
+      onExitBuilder();
+      return;
+    }
+    hideAllSections();
   }
 
   // ==================== Public Methods ====================
@@ -923,6 +1044,7 @@ function createPageBuilder({
 
     activeEntrypoint = entrypoint;
     activeDesignerSurface = requestedSurface;
+    canvasMode = 'preview';
 
     hideAllSections();
     if (el.adminDashboard) {
@@ -950,6 +1072,7 @@ function createPageBuilder({
         renderPageList();
         renderCanvas();
         renderEditorPanel();
+        renderLayerTree();
         syncDesignerRoute(historyMode);
       }
     } else {
@@ -964,13 +1087,15 @@ function createPageBuilder({
     applyEditorMode();
     previewManager.bindMessageHandler();
 
+    if (el.pbToggleSidebar) {
+      el.pbToggleSidebar.addEventListener('click', toggleSidebarMode);
+    }
+
     if (el.pbToggleEditor) {
       el.pbToggleEditor.addEventListener('click', toggleEditorMode);
     }
 
-    if (el.pbToggleSidebar) {
-      el.pbToggleSidebar.addEventListener('click', toggleSidebarMode);
-    }
+    el.pbExitBuilder?.addEventListener('click', exitBuilder);
 
     if (!editorResizeBound) {
       window.addEventListener('resize', applyEditorMode);
@@ -1094,25 +1219,6 @@ function createPageBuilder({
           const b = /** @type {HTMLElement} */ (node);
           b.classList.toggle('pb-view-toggle--active', b.dataset.view === canvasMode);
         });
-
-        // Show width toggles only in preview mode
-        if (el.pbWidthToggles) {
-          el.pbWidthToggles.hidden = canvasMode !== 'preview';
-        }
-
-        // Set data-canvas-mode on the layout grid so CSS collapses sidebar + editor
-        const layout = /** @type {HTMLElement|null} */ (
-          document.querySelector('.page-builder-layout')
-        );
-        if (layout) {
-          if (canvasMode === 'preview') {
-            layout.dataset.canvasMode = 'preview';
-          } else {
-            delete layout.dataset.canvasMode;
-            // Restore sidebar/editor to their persisted state
-            applyEditorMode();
-          }
-        }
 
         renderCanvas();
       });

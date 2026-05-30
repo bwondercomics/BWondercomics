@@ -2,7 +2,7 @@ export const EDITOR_MODE_KEY = 'pb-editor-mode';
 export const SIDEBAR_MODE_KEY = 'pb-sidebar-mode';
 export const WIDE_EDITOR_BREAKPOINT = 1440;
 export const STACK_EDITOR_BREAKPOINT = 1100;
-export const SIDEBAR_EXPANDED_WIDTH = 200;
+export const SIDEBAR_EXPANDED_WIDTH = 280;
 export const SIDEBAR_COLLAPSED_WIDTH = 72;
 
 export function getViewportEditorBand() {
