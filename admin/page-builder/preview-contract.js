@@ -14,6 +14,24 @@ export const BUILDER_PREVIEW_MESSAGE_TYPES = Object.freeze({
   ACK: 'builder-preview:ack',
   ERROR: 'builder-preview:error',
   METRICS: 'builder-preview:metrics',
+  TARGETS: 'builder-preview:targets',
+  TARGET_HOVER: 'builder-preview:target-hover',
+  TARGET_SELECT: 'builder-preview:target-select',
+  TARGET_ACTION: 'builder-preview:target-action',
+});
+
+export const BUILDER_PREVIEW_TARGET_KINDS = Object.freeze({
+  PAGE: 'page',
+  HEADER: 'header',
+  SECTION: 'section',
+  COLUMN: 'column',
+  MODULE: 'module',
+});
+
+export const BUILDER_PREVIEW_TARGET_ACTIONS = Object.freeze({
+  REFRESH_TARGETS: 'refresh-targets',
+  CLEAR_HOVER: 'clear-hover',
+  SCROLL_INTO_VIEW: 'scroll-into-view',
 });
 
 export const BUILDER_PREVIEW_SOURCES = Object.freeze({
@@ -88,9 +106,46 @@ export const PREVIEW_MEDIA_QUERIES = Object.freeze({
  * @property {boolean} twoPageMode
  * @property {Record<string, boolean>} branchFlags
  * @property {{hasOverflow: boolean, rootHasOverflow: boolean, offenders: Array<Object>}} overflow
+ *
+ * @typedef {Object} BuilderPreviewTargetRef
+ * @property {'page'|'header'|'section'|'column'|'module'} kind
+ * @property {string} key
+ * @property {string} pageId
+ * @property {string=} sectionId
+ * @property {number=} columnIndex
+ * @property {string=} moduleId
+ * @property {string=} moduleType
+ * @property {string=} surface
+ *
+ * @typedef {Object} BuilderPreviewTargetRect
+ * @property {number} top
+ * @property {number} left
+ * @property {number} right
+ * @property {number} bottom
+ * @property {number} width
+ * @property {number} height
+ *
+ * @typedef {Object} BuilderPreviewTargetGeometry
+ * @property {BuilderPreviewTargetRef} target
+ * @property {BuilderPreviewTargetRect} rect
+ * @property {boolean} visible
+ * @property {number} order
+ * @property {string} label
  */
 
 const VALID_PREVIEW_MESSAGE_TYPES = new Set(Object.values(BUILDER_PREVIEW_MESSAGE_TYPES));
+const VALID_PREVIEW_TARGET_KINDS = new Set(Object.values(BUILDER_PREVIEW_TARGET_KINDS));
+const VALID_PREVIEW_TARGET_ACTIONS = new Set(Object.values(BUILDER_PREVIEW_TARGET_ACTIONS));
+const TARGET_MESSAGE_TYPES = new Set([
+  BUILDER_PREVIEW_MESSAGE_TYPES.TARGETS,
+  BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_HOVER,
+  BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT,
+  BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_ACTION,
+]);
+const MAX_TARGET_ITEMS = 500;
+const MAX_TARGET_STRING_LENGTH = 180;
+const MAX_TARGET_LABEL_LENGTH = 120;
+const MAX_RECT_ABS_VALUE = 1000000;
 
 export function isPreviewViewportId(id) {
   return Object.prototype.hasOwnProperty.call(PREVIEW_VIEWPORTS, String(id || ''));
@@ -158,6 +213,39 @@ export function buildPreviewMetricsMessage(metrics, details = {}) {
   };
 }
 
+export function buildPreviewTargetMessage(type, payload = {}, details = {}) {
+  const message = {
+    type,
+    previewSession: normalizeIdentity(details.previewSession),
+    snapshotVersion:
+      details.snapshotVersion ?? payload.snapshotVersion ?? BUILDER_PREVIEW_SNAPSHOT_VERSION,
+    seriesId: normalizeIdentity(details.seriesId),
+    pageId: normalizeIdentity(details.pageId),
+    pageSlug: normalizeIdentity(details.pageSlug),
+    sequence: Number.isSafeInteger(payload.sequence) ? payload.sequence : 0,
+  };
+
+  if (payload.reason) {
+    message.reason = String(payload.reason).slice(0, MAX_TARGET_LABEL_LENGTH);
+  }
+
+  if (type === BUILDER_PREVIEW_MESSAGE_TYPES.TARGETS) {
+    message.targets = Array.isArray(payload.targets) ? payload.targets : [];
+    return message;
+  }
+
+  if (type === BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_ACTION) {
+    message.action = String(payload.action || '');
+    if (payload.target !== undefined) {
+      message.target = payload.target;
+    }
+    return message;
+  }
+
+  message.target = payload.target ?? null;
+  return message;
+}
+
 function isFiniteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value);
 }
@@ -166,6 +254,17 @@ function isPlainObject(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
   const proto = Object.getPrototypeOf(value);
   return proto === Object.prototype || proto === null;
+}
+
+function isBoundedString(value, maxLength = MAX_TARGET_STRING_LENGTH, allowEmpty = false) {
+  if (typeof value !== 'string') return false;
+  const normalized = value.trim();
+  if (!allowEmpty && !normalized) return false;
+  return normalized.length <= maxLength;
+}
+
+function isSafeNonNegativeInteger(value) {
+  return Number.isSafeInteger(value) && value >= 0;
 }
 
 export function validatePreviewSnapshotPayload(snapshot, expected = {}) {
@@ -281,6 +380,146 @@ export function validatePreviewMetricsPayload(metrics, expected = {}) {
   return validationResult(true);
 }
 
+export function validatePreviewTargetRef(target) {
+  if (!isPlainObject(target)) {
+    return validationResult(false, 'Target reference must be an object.');
+  }
+  if (!VALID_PREVIEW_TARGET_KINDS.has(target.kind)) {
+    return validationResult(false, 'Target kind is unsupported.');
+  }
+  if (!isBoundedString(target.key)) {
+    return validationResult(false, 'Target key is invalid.');
+  }
+  if (!isBoundedString(target.pageId)) {
+    return validationResult(false, 'Target pageId is invalid.');
+  }
+
+  for (const field of ['sectionId', 'moduleId', 'moduleType', 'surface']) {
+    if (
+      target[field] !== undefined &&
+      target[field] !== null &&
+      !isBoundedString(target[field], MAX_TARGET_STRING_LENGTH, true)
+    ) {
+      return validationResult(false, `Target ${field} is invalid.`);
+    }
+  }
+  if (target.columnIndex !== undefined && target.columnIndex !== null) {
+    if (!isSafeNonNegativeInteger(target.columnIndex)) {
+      return validationResult(false, 'Target columnIndex is invalid.');
+    }
+  }
+
+  if (target.kind === BUILDER_PREVIEW_TARGET_KINDS.MODULE && !isBoundedString(target.moduleId)) {
+    return validationResult(false, 'Module target is missing moduleId.');
+  }
+  if (target.kind === BUILDER_PREVIEW_TARGET_KINDS.SECTION && !isBoundedString(target.sectionId)) {
+    return validationResult(false, 'Section target is missing sectionId.');
+  }
+  if (target.kind === BUILDER_PREVIEW_TARGET_KINDS.COLUMN) {
+    if (!isBoundedString(target.sectionId)) {
+      return validationResult(false, 'Column target is missing sectionId.');
+    }
+    if (!isSafeNonNegativeInteger(target.columnIndex)) {
+      return validationResult(false, 'Column target is missing columnIndex.');
+    }
+  }
+  if (
+    target.kind === BUILDER_PREVIEW_TARGET_KINDS.HEADER &&
+    target.surface !== undefined &&
+    target.surface !== 'page-header'
+  ) {
+    return validationResult(false, 'Header target surface is invalid.');
+  }
+
+  return validationResult(true);
+}
+
+function validatePreviewTargetRect(rect) {
+  if (!isPlainObject(rect)) {
+    return validationResult(false, 'Target rect must be an object.');
+  }
+  for (const field of ['top', 'left', 'right', 'bottom', 'width', 'height']) {
+    if (!isFiniteNumber(rect[field]) || Math.abs(rect[field]) > MAX_RECT_ABS_VALUE) {
+      return validationResult(false, `Target rect ${field} is invalid.`);
+    }
+  }
+  if (rect.width < 0 || rect.height < 0) {
+    return validationResult(false, 'Target rect dimensions are invalid.');
+  }
+  return validationResult(true);
+}
+
+export function validatePreviewTargetGeometry(targetGeometry) {
+  if (!isPlainObject(targetGeometry)) {
+    return validationResult(false, 'Target geometry must be an object.');
+  }
+  const targetValidation = validatePreviewTargetRef(targetGeometry.target);
+  if (!targetValidation.valid) return targetValidation;
+
+  const rectValidation = validatePreviewTargetRect(targetGeometry.rect);
+  if (!rectValidation.valid) return rectValidation;
+
+  if (typeof targetGeometry.visible !== 'boolean') {
+    return validationResult(false, 'Target visibility is invalid.');
+  }
+  if (!isSafeNonNegativeInteger(targetGeometry.order)) {
+    return validationResult(false, 'Target order is invalid.');
+  }
+  if (!isBoundedString(targetGeometry.label, MAX_TARGET_LABEL_LENGTH, true)) {
+    return validationResult(false, 'Target label is invalid.');
+  }
+  return validationResult(true);
+}
+
+export function validatePreviewTargetsPayload(message) {
+  if (!isPlainObject(message)) {
+    return validationResult(false, 'Target message must be an object.');
+  }
+  if (!isSafeNonNegativeInteger(message.sequence)) {
+    return validationResult(false, 'Target sequence is invalid.');
+  }
+  if (!Array.isArray(message.targets) || message.targets.length > MAX_TARGET_ITEMS) {
+    return validationResult(false, 'Target list is invalid.');
+  }
+  for (const targetGeometry of message.targets) {
+    const validation = validatePreviewTargetGeometry(targetGeometry);
+    if (!validation.valid) return validation;
+  }
+  return validationResult(true);
+}
+
+export function validatePreviewTargetStatePayload(message, { allowNull = false } = {}) {
+  if (!isPlainObject(message)) {
+    return validationResult(false, 'Target state message must be an object.');
+  }
+  if (!isSafeNonNegativeInteger(message.sequence)) {
+    return validationResult(false, 'Target sequence is invalid.');
+  }
+  if (allowNull && message.target === null) {
+    return validationResult(true);
+  }
+  return validatePreviewTargetRef(message.target);
+}
+
+export function validatePreviewTargetActionPayload(message) {
+  if (!isPlainObject(message)) {
+    return validationResult(false, 'Target action message must be an object.');
+  }
+  if (!isSafeNonNegativeInteger(message.sequence)) {
+    return validationResult(false, 'Target sequence is invalid.');
+  }
+  if (!VALID_PREVIEW_TARGET_ACTIONS.has(message.action)) {
+    return validationResult(false, 'Target action is unsupported.');
+  }
+  if (message.action === BUILDER_PREVIEW_TARGET_ACTIONS.SCROLL_INTO_VIEW) {
+    return validatePreviewTargetRef(message.target);
+  }
+  if (message.target !== undefined && message.target !== null) {
+    return validatePreviewTargetRef(message.target);
+  }
+  return validationResult(true);
+}
+
 export function validatePreviewEnvelope(message, expected = {}) {
   if (!message || typeof message !== 'object') {
     return validationResult(false, 'Preview message must be an object.');
@@ -313,6 +552,12 @@ export function validatePreviewEnvelope(message, expected = {}) {
     return validatePreviewMetricsPayload(message.metrics, expected);
   }
   if (
+    TARGET_MESSAGE_TYPES.has(message.type) &&
+    message.snapshotVersion !== BUILDER_PREVIEW_SNAPSHOT_VERSION
+  ) {
+    return validationResult(false, 'Unsupported snapshot version.');
+  }
+  if (
     message.snapshotVersion !== undefined &&
     message.snapshotVersion !== BUILDER_PREVIEW_SNAPSHOT_VERSION
   ) {
@@ -328,6 +573,18 @@ export function validatePreviewEnvelope(message, expected = {}) {
     if (normalizedExpected && normalizeIdentity(message[key]) !== normalizedExpected) {
       return validationResult(false, `Preview message ${key} mismatch.`);
     }
+  }
+  if (TARGET_MESSAGE_TYPES.has(message.type)) {
+    if (message.type === BUILDER_PREVIEW_MESSAGE_TYPES.TARGETS) {
+      return validatePreviewTargetsPayload(message);
+    }
+    if (message.type === BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_HOVER) {
+      return validatePreviewTargetStatePayload(message, { allowNull: true });
+    }
+    if (message.type === BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT) {
+      return validatePreviewTargetStatePayload(message);
+    }
+    return validatePreviewTargetActionPayload(message);
   }
   return validationResult(true);
 }

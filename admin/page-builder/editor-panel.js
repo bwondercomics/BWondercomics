@@ -51,6 +51,34 @@ function renderPageSettingsContent(draft) {
   `;
 }
 
+function renderSectionSettingsContent(section, draft) {
+  if (!section || !draft) return '';
+  return `
+    ${renderInspectorSection({
+      kicker: 'Section',
+      title: 'Spacing',
+      summary: section.layout || 'Layout',
+      copy: 'Adjust spacing for this section.',
+      body: `
+        <div class="form-editor">
+          <div class="form-group">
+            <label class="form-label" for="pbEditSectionModuleGap">Module Gap</label>
+            <input type="number" id="pbEditSectionModuleGap" class="form-input" value="${escapeHtml(String(draft.moduleGap ?? ''))}" min="0" step="1" placeholder="16" data-section-setting="moduleGap" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="pbEditSectionColumnGap">Column Gap</label>
+            <input type="number" id="pbEditSectionColumnGap" class="form-input" value="${escapeHtml(String(draft.columnGap ?? ''))}" min="0" step="1" placeholder="16" data-section-setting="columnGap" />
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="pbEditSectionGap">Section Gap</label>
+            <input type="number" id="pbEditSectionGap" class="form-input" value="${escapeHtml(String(draft.sectionGap ?? ''))}" min="0" step="1" placeholder="24" data-section-setting="sectionGap" />
+          </div>
+        </div>
+      `,
+    })}
+  `;
+}
+
 function renderTabs(activeEditorTab, disableTabs = false) {
   return `
     <div class="pb-editor-tabs" data-count="2" role="tablist" aria-label="Inspector tabs">
@@ -122,6 +150,9 @@ function getEditorContextKey(state) {
   if (state.activeEditorTab === 'theme') return `${pageKey}:theme`;
   if (state.selectedCanvasSurface === 'page-header') return `${pageKey}:page-header`;
   if (state.selectedCanvasSurface === 'page-settings') return `${pageKey}:page-settings`;
+  if (state.selectedCanvasSurface === 'section') {
+    return `${pageKey}:section:${state.activeSectionId || 'none'}`;
+  }
   return `${pageKey}:module:${state.selectedModuleId || 'none'}`;
 }
 
@@ -240,6 +271,19 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
           <button class="btn-primary" id="pbSavePageSettings" data-action="save-current" type="button">Save Settings</button>
         `,
       });
+    } else if (state.selectedCanvasSurface === 'section' && state.activeSectionId) {
+      const section = helpers.getSectionRecord(state.activeSectionId);
+      contentHtml = renderSectionSettingsContent(section, state.activeSectionDraft);
+      kicker = 'Section';
+      title = 'Section Settings';
+      subtitle = `Adjust spacing for ${pageTitle}.`;
+      footerHtml = renderFooter({
+        scope: 'section',
+        actionsHtml: `
+          <button class="btn-secondary" id="pbDiscardSectionSettings" data-action="discard-current" type="button">Discard</button>
+          <button class="btn-primary" id="pbSaveSectionSettings" data-action="save-current" type="button">Save Settings</button>
+        `,
+      });
     } else {
       contentHtml = renderModuleEditorContent({
         currentPage: state.currentPage,
@@ -297,6 +341,8 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
           actions.initializeHeaderDraft();
         } else if (nextState.selectedCanvasSurface === 'page-settings') {
           actions.initializePageSettingsDraft();
+        } else if (nextState.selectedCanvasSurface === 'section') {
+          actions.setActiveEditorTab('modules');
         } else if (nextState.selectedModuleId) {
           actions.initializeModuleDraft(nextState.selectedModuleId);
         }
@@ -373,6 +419,22 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       });
       document.getElementById('pbDiscardPageSettings')?.addEventListener('click', () => {
         actions.discardActivePageSettingsDraft();
+      });
+    } else if (state.selectedCanvasSurface === 'section') {
+      el.pbModuleEditor.querySelectorAll('[data-section-setting]').forEach((input) => {
+        input.addEventListener('change', (e) => {
+          actions.updateActiveSectionDraftField(
+            /** @type {HTMLElement} */ (e.target).dataset.sectionSetting,
+            /** @type {HTMLInputElement} */ (e.target).value
+          );
+        });
+      });
+
+      document.getElementById('pbSaveSectionSettings')?.addEventListener('click', async () => {
+        await actions.saveSectionSettings();
+      });
+      document.getElementById('pbDiscardSectionSettings')?.addEventListener('click', () => {
+        actions.discardSectionSettings();
       });
     } else if (selectedModuleRecord) {
       bindModuleEditorEvents({

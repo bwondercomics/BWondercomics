@@ -10,6 +10,7 @@ import {
   buildPreviewControlMessage,
   buildPreviewMetricsMessage,
   buildPreviewSnapshotMessage,
+  buildPreviewTargetMessage,
   getPreviewStatusCopy,
   getPreviewViewport,
   isPreviewMessageType,
@@ -18,6 +19,8 @@ import {
   validatePreviewEnvelope,
   validatePreviewMetricsPayload,
   validatePreviewSnapshotPayload,
+  validatePreviewTargetGeometry,
+  validatePreviewTargetRef,
 } from '../admin/page-builder/preview-contract.js';
 
 describe('admin page-builder preview contract', () => {
@@ -74,6 +77,10 @@ describe('admin page-builder preview contract', () => {
     expect(isPreviewMessageType(BUILDER_PREVIEW_MESSAGE_TYPES.ACK)).toBe(true);
     expect(isPreviewMessageType(BUILDER_PREVIEW_MESSAGE_TYPES.ERROR)).toBe(true);
     expect(isPreviewMessageType(BUILDER_PREVIEW_MESSAGE_TYPES.METRICS)).toBe(true);
+    expect(isPreviewMessageType(BUILDER_PREVIEW_MESSAGE_TYPES.TARGETS)).toBe(true);
+    expect(isPreviewMessageType(BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_HOVER)).toBe(true);
+    expect(isPreviewMessageType(BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT)).toBe(true);
+    expect(isPreviewMessageType(BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_ACTION)).toBe(true);
     expect(isPreviewMessageType('builder-preview:other')).toBe(false);
 
     expect(validatePreviewSnapshotPayload(snapshot, expected)).toEqual({ valid: true, reason: '' });
@@ -176,5 +183,122 @@ describe('admin page-builder preview contract', () => {
     expect(validatePreviewMetricsPayload({ ...metrics, pageSlug: 'about' }, expected).valid).toBe(
       false
     );
+  });
+
+  it('builds and validates preview target payloads', () => {
+    const expected = {
+      previewSession: 'session-1',
+      seriesId: 'battle-bros',
+      pageId: 'page-1',
+      pageSlug: 'reader',
+    };
+    const target = {
+      kind: 'module',
+      key: 'module:module-1',
+      pageId: 'page-1',
+      sectionId: 'section-1',
+      columnIndex: 0,
+      moduleId: 'module-1',
+      moduleType: 'text',
+    };
+    const geometry = {
+      target,
+      rect: { top: 10, left: 20, right: 220, bottom: 90, width: 200, height: 80 },
+      visible: true,
+      order: 0,
+      label: 'Text module',
+    };
+
+    expect(validatePreviewTargetRef(target)).toEqual({ valid: true, reason: '' });
+    expect(validatePreviewTargetGeometry(geometry)).toEqual({ valid: true, reason: '' });
+
+    const targets = buildPreviewTargetMessage(
+      BUILDER_PREVIEW_MESSAGE_TYPES.TARGETS,
+      { sequence: 7, targets: [geometry] },
+      expected
+    );
+    expect(validatePreviewEnvelope(targets, expected)).toEqual({ valid: true, reason: '' });
+
+    const hover = buildPreviewTargetMessage(
+      BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_HOVER,
+      { sequence: 7, target: null },
+      expected
+    );
+    expect(validatePreviewEnvelope(hover, expected)).toEqual({ valid: true, reason: '' });
+
+    const select = buildPreviewTargetMessage(
+      BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT,
+      { sequence: 7, target },
+      expected
+    );
+    expect(validatePreviewEnvelope(select, expected)).toEqual({ valid: true, reason: '' });
+
+    const action = buildPreviewTargetMessage(
+      BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_ACTION,
+      { sequence: 7, action: 'scroll-into-view', target },
+      expected
+    );
+    expect(validatePreviewEnvelope(action, expected)).toEqual({ valid: true, reason: '' });
+  });
+
+  it('rejects invalid preview target payloads', () => {
+    const expected = {
+      previewSession: 'session-1',
+      seriesId: 'battle-bros',
+      pageId: 'page-1',
+      pageSlug: 'reader',
+    };
+    const target = {
+      kind: 'module',
+      key: 'module:module-1',
+      pageId: 'page-1',
+      moduleId: 'module-1',
+    };
+    const geometry = {
+      target,
+      rect: { top: 10, left: 20, right: 220, bottom: 90, width: 200, height: 80 },
+      visible: true,
+      order: 0,
+      label: 'Module',
+    };
+
+    expect(validatePreviewTargetRef({ ...target, kind: 'widget' }).valid).toBe(false);
+    expect(validatePreviewTargetRef({ ...target, moduleId: '' }).valid).toBe(false);
+    expect(
+      validatePreviewTargetGeometry({
+        ...geometry,
+        rect: { ...geometry.rect, width: Number.NaN },
+      }).valid
+    ).toBe(false);
+    expect(
+      validatePreviewEnvelope(
+        buildPreviewTargetMessage(
+          BUILDER_PREVIEW_MESSAGE_TYPES.TARGETS,
+          { sequence: 1, targets: [{ ...geometry, label: 'x'.repeat(140) }] },
+          expected
+        ),
+        expected
+      ).valid
+    ).toBe(false);
+    expect(
+      validatePreviewEnvelope(
+        buildPreviewTargetMessage(
+          BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_ACTION,
+          { sequence: 1, action: 'delete-target', target },
+          expected
+        ),
+        expected
+      ).valid
+    ).toBe(false);
+    expect(
+      validatePreviewEnvelope(
+        buildPreviewTargetMessage(
+          BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT,
+          { sequence: 1, target },
+          { ...expected, pageSlug: 'about' }
+        ),
+        expected
+      ).valid
+    ).toBe(false);
   });
 });

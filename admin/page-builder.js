@@ -153,6 +153,9 @@ function createPageBuilder({
       activePageSettingsDraft,
       activeModuleDraft,
       activeModuleDraftId,
+      activeSectionId,
+      activeSectionDraft,
+      dirtyScope,
     }),
     actions: {
       ensureCleanWorkspace,
@@ -175,6 +178,7 @@ function createPageBuilder({
         markDirty('page-settings');
         renderEditorPanel();
       },
+      updateActiveSectionDraftField,
       setActiveModuleDraft: (nextDraft) => {
         activeModuleDraft = cloneValue(nextDraft);
       },
@@ -198,11 +202,14 @@ function createPageBuilder({
       discardActivePageSettingsDraft: draftManager.discardActivePageSettingsDraft,
       saveActiveModuleDraft: draftManager.saveActiveModuleDraft,
       discardActiveModuleDraft: draftManager.discardActiveModuleDraft,
+      saveSectionSettings,
+      discardSectionSettings,
       renderCanvas,
       updateEditorFooterUi,
     },
     helpers: {
       getSelectedModuleRecord,
+      getSectionRecord,
       getPageDisplayTitle,
       getModuleLabel,
       getModulePreview,
@@ -402,6 +409,7 @@ function createPageBuilder({
       setPreviewWidth: (nextWidth) => {
         previewWidth = nextWidth;
       },
+      selectCanvasTarget,
     },
     deps: {
       getSeriesId,
@@ -516,6 +524,7 @@ function createPageBuilder({
     } else if (scope === 'section') {
       setCanvasStatus('Unsaved section settings. Save or discard before switching.', 'warning');
     }
+    updateEditorFooterUi();
     refreshLiveCanvasForDraftChange();
   }
 
@@ -541,24 +550,28 @@ function createPageBuilder({
     if (statusEl) {
       let message = '';
       let type = 'neutral';
+      const cleanMessages = {
+        theme: 'Theme changes save explicitly.',
+        header: 'Header changes save explicitly.',
+        'page-settings': 'Page settings save explicitly.',
+        section: 'Section spacing saves explicitly.',
+        module: 'Module changes save explicitly.',
+      };
+      const dirtyMessages = {
+        theme: 'Theme draft has unsaved changes.',
+        header: 'Header draft has unsaved changes.',
+        'page-settings': 'Page settings have unsaved changes.',
+        section: 'Section settings have unsaved changes.',
+        module: 'Module draft has unsaved changes.',
+      };
       if (isDirty) {
-        message =
-          footerScope === 'theme'
-            ? 'Theme draft has unsaved changes.'
-            : footerScope === 'header'
-              ? 'Header draft has unsaved changes.'
-              : 'Module draft has unsaved changes.';
+        message = dirtyMessages[footerScope] || dirtyMessages.module;
         type = 'warning';
       } else if (editorStatus.message) {
         message = editorStatus.message;
         type = editorStatus.type || 'neutral';
       } else {
-        message =
-          footerScope === 'theme'
-            ? 'Theme changes save explicitly.'
-            : footerScope === 'header'
-              ? 'Header changes save explicitly.'
-              : 'Module changes save explicitly.';
+        message = cleanMessages[footerScope] || cleanMessages.module;
       }
       statusEl.textContent = message;
       statusEl.dataset.status = type;
@@ -744,8 +757,10 @@ function createPageBuilder({
   function toggleSectionSettings(sectionId) {
     if (activeSectionId === sectionId && dirtyScope !== 'section') {
       draftManager.clearActiveSectionState();
+      selectedCanvasSurface = null;
       setCanvasStatus('', 'neutral');
       renderCanvas();
+      renderEditorPanel();
       return;
     }
 
@@ -758,9 +773,13 @@ function createPageBuilder({
       return;
     }
 
+    draftManager.clearSelectedModuleState();
+    selectedCanvasSurface = 'section';
+    activeEditorTab = 'modules';
     draftManager.initializeSectionDraft(sectionId);
     setCanvasStatus('', 'neutral');
     renderCanvas();
+    renderEditorPanel();
   }
 
   function updateActiveSectionDraftField(key, rawValue) {
@@ -812,43 +831,48 @@ function createPageBuilder({
   }
 
   function selectPageHeaderFromCanvas() {
-    if (selectedCanvasSurface === 'page-header') return;
+    if (selectedCanvasSurface === 'page-header') return true;
     if (
       !ensureCleanWorkspace(
         'Save or discard your current changes before switching to the page header.'
       )
     ) {
       renderEditorPanel();
-      return;
+      return false;
     }
 
     draftManager.clearSelectedModuleState();
+    draftManager.clearActiveSectionState();
     activateHeaderSurface();
     renderCanvas();
     renderEditorPanel();
     syncDesignerRoute('replace');
+    return true;
   }
 
   function selectPageSettingsFromCanvas() {
-    if (selectedCanvasSurface === 'page-settings') return;
+    if (selectedCanvasSurface === 'page-settings') return true;
     if (
       !ensureCleanWorkspace('Save or discard your current changes before editing page settings.')
     ) {
       renderEditorPanel();
-      return;
+      return false;
     }
 
     draftManager.clearSelectedModuleState();
+    draftManager.clearActiveSectionState();
     selectedCanvasSurface = 'page-settings';
     activeEditorTab = 'modules';
     draftManager.initializePageSettingsDraft();
     setEditorStatus('', 'neutral');
     renderCanvas();
     renderEditorPanel();
+    return true;
   }
 
   function selectModule(moduleId) {
-    if (selectedModuleId === moduleId) return;
+    if (selectedModuleId === moduleId) return true;
+    if (!getSelectedModuleRecord(moduleId)) return false;
     if (
       dirtyScope === 'module' ||
       dirtyScope === 'theme' ||
@@ -860,17 +884,76 @@ function createPageBuilder({
         ensureCleanWorkspace(
           'Save or discard your current changes before selecting another module.'
         );
-        return;
+        return false;
       }
     }
 
     selectedModuleId = moduleId;
     selectedCanvasSurface = null;
+    draftManager.clearActiveSectionState();
     activeEditorTab = 'modules';
     draftManager.initializeModuleDraft(moduleId);
     setEditorStatus('', 'neutral');
     renderCanvas();
     renderEditorPanel();
+    return true;
+  }
+
+  function selectSectionFromCanvas(sectionId) {
+    if (!sectionId || !getSectionRecord(sectionId)) return false;
+    if (selectedCanvasSurface === 'section' && activeSectionId === sectionId) return true;
+    if (dirtyScope === 'section' && activeSectionId !== sectionId) {
+      setCanvasStatus(
+        'Save or discard the current section settings before switching sections.',
+        'warning'
+      );
+      renderCanvas();
+      return false;
+    }
+    if (
+      dirtyScope &&
+      dirtyScope !== 'section' &&
+      !ensureCleanWorkspace('Save or discard your current changes before selecting a section.')
+    ) {
+      renderEditorPanel();
+      return false;
+    }
+
+    draftManager.clearSelectedModuleState();
+    selectedCanvasSurface = 'section';
+    activeEditorTab = 'modules';
+    draftManager.initializeSectionDraft(sectionId);
+    setCanvasStatus('', 'neutral');
+    renderCanvas();
+    renderEditorPanel();
+    showSidePanelTab('settings');
+    return true;
+  }
+
+  function selectCanvasTarget(target) {
+    if (!target || typeof target !== 'object') return false;
+    if (target.kind === 'module') {
+      const accepted = selectModule(target.moduleId);
+      if (accepted) showSidePanelTab('settings');
+      return accepted;
+    }
+    if (target.kind === 'header') {
+      const accepted = selectPageHeaderFromCanvas();
+      if (accepted) showSidePanelTab('settings');
+      return accepted;
+    }
+    if (target.kind === 'page') {
+      const accepted = selectPageSettingsFromCanvas();
+      if (accepted) showSidePanelTab('settings');
+      return accepted;
+    }
+    if (target.kind === 'section') {
+      return selectSectionFromCanvas(target.sectionId);
+    }
+    if (target.kind === 'column' && target.sectionId) {
+      return selectSectionFromCanvas(target.sectionId);
+    }
+    return false;
   }
 
   async function deleteModuleFromCanvas(moduleId) {

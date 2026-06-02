@@ -81,6 +81,8 @@ async function bootReaderApp({
   }));
   const setPreviewMetricsContext = vi.fn();
   const emitPreviewMetrics = vi.fn();
+  const startPreviewTargetBridge = vi.fn();
+  const stopPreviewTargetBridge = vi.fn();
   const subscribePreviewSnapshots = vi.fn();
   const renderStatusPanel = vi.fn();
   const render = vi.fn();
@@ -114,6 +116,8 @@ async function bootReaderApp({
     requestPreviewSnapshot,
     setPreviewMetricsContext,
     emitPreviewMetrics,
+    startPreviewTargetBridge,
+    stopPreviewTargetBridge,
     subscribePreviewSnapshots,
   }));
   vi.doMock('../reader/render.js', () => ({
@@ -195,6 +199,8 @@ async function bootReaderApp({
       requestPreviewSnapshot,
       setPreviewMetricsContext,
       emitPreviewMetrics,
+      startPreviewTargetBridge,
+      stopPreviewTargetBridge,
       subscribePreviewSnapshots,
       render,
       renderGallery,
@@ -274,6 +280,17 @@ describe('reader app bootstrap', () => {
       previewMode: true,
       builderEditing: true,
     });
+    expect(mocks.startPreviewTargetBridge).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pageId: 'fixture-builder-page',
+        options: expect.objectContaining({ builderEditing: true }),
+      }),
+      {
+        seriesId: 'battle-bros',
+        pageId: 'fixture-builder-page',
+        pageSlug: 'reader',
+      }
+    );
     expect(document.body.dataset.readerPageSource).toBe('builder');
   });
 

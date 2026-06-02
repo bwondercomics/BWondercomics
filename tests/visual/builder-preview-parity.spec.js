@@ -437,6 +437,32 @@ async function collectPreviewMetricsDataset(page) {
   }));
 }
 
+async function assertSelectedOverlayAlignment(page) {
+  const alignment = await page.locator('.pb-preview-frame').evaluate((frame) => {
+    const iframe = frame.querySelector('.pb-preview-iframe');
+    const target = iframe?.contentDocument?.querySelector('[data-builder-module-type="text"]');
+    const selected = frame.querySelector('.pb-preview-target-box--selected');
+    if (!iframe || !target || !selected) {
+      return { ready: false };
+    }
+    const frameRect = frame.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const selectedRect = selected.getBoundingClientRect();
+    return {
+      ready: true,
+      top: Math.abs(selectedRect.top - (frameRect.top + targetRect.top)),
+      left: Math.abs(selectedRect.left - (frameRect.left + targetRect.left)),
+      width: Math.abs(selectedRect.width - targetRect.width),
+      height: Math.abs(selectedRect.height - targetRect.height),
+    };
+  });
+  expect(alignment.ready).toBe(true);
+  expect(alignment.top).toBeLessThanOrEqual(2);
+  expect(alignment.left).toBeLessThanOrEqual(2);
+  expect(alignment.width).toBeLessThanOrEqual(2);
+  expect(alignment.height).toBeLessThanOrEqual(2);
+}
+
 test.describe('builder preview visual parity', () => {
   for (const viewportId of PREVIEW_VIEWPORT_ORDER) {
     const viewport = PREVIEW_VIEWPORTS[viewportId];
@@ -519,6 +545,18 @@ test.describe('builder preview visual parity', () => {
         `builder-preview-parity-${viewportId}.png`,
         snapshotOptions(viewportId)
       );
+
+      await adminPage.waitForSelector('.pb-preview-frame[data-target-count]');
+      const textTarget = previewFrame.locator('[data-builder-module-type="text"]').first();
+      await textTarget.hover();
+      await expect(adminPage.locator('.pb-preview-target-box--hover')).toBeVisible();
+      await textTarget.click();
+      await expect(adminPage.locator('.pb-preview-target-box--selected')).toBeVisible();
+      await expect(adminPage.locator('.pb-preview-target-toolbar')).toBeVisible();
+      await assertSelectedOverlayAlignment(adminPage);
+      await previewFrame.evaluate(() => window.scrollTo(0, 48));
+      await adminPage.waitForTimeout(120);
+      await assertSelectedOverlayAlignment(adminPage);
 
       await adminContext.close();
       await readerContext.close();

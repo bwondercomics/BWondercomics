@@ -704,6 +704,75 @@
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
+.pb-preview-target-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.pb-preview-target-box {
+  position: absolute;
+  box-sizing: border-box;
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.pb-preview-target-box--hover {
+  border: 2px solid rgba(126, 245, 227, 0.9);
+  box-shadow: 0 0 0 1px rgba(5, 7, 11, 0.65);
+}
+
+.pb-preview-target-box--selected {
+  border: 2px solid var(--primary, #00d9ff);
+  box-shadow:
+    0 0 0 1px rgba(5, 7, 11, 0.75),
+    0 0 0 4px rgba(0, 217, 255, 0.18);
+}
+
+.pb-preview-insert-guide {
+  position: absolute;
+  height: 2px;
+  min-width: 24px;
+  border-radius: 999px;
+  background: var(--accent, #ffed00);
+  box-shadow: 0 0 0 1px rgba(5, 7, 11, 0.72);
+  pointer-events: none;
+}
+
+.pb-preview-target-toolbar {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 180px;
+  min-height: 28px;
+  padding: 4px;
+  border: 1px solid rgba(0, 217, 255, 0.52);
+  border-radius: 8px;
+  background: rgba(5, 7, 11, 0.92);
+  color: #e8fbff;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
+  pointer-events: auto;
+}
+
+.pb-preview-target-toolbar-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.pb-preview-target-toolbar .btn-small {
+  min-height: 24px;
+  padding: 3px 8px;
+  font-size: 0.68rem;
+  line-height: 1;
+  pointer-events: auto;
+}
+
 /* ==================== CANVAS PREVIEW MODE ==================== */
 
 /* Hide structural editing controls when canvas is in preview mode */

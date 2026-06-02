@@ -7,6 +7,7 @@ import {
   BUILDER_PREVIEW_SNAPSHOT_VERSION,
   PREVIEW_VIEWPORTS,
   buildPreviewMetricsMessage,
+  buildPreviewTargetMessage,
 } from '../admin/page-builder/preview-contract.js';
 import { buildContractFixture, getContractFixture } from './helpers/contracts.js';
 import { flushAdminUi, mountAdminDom, stubAdminGlobals } from './helpers/admin-fixture.js';
@@ -219,6 +220,27 @@ function getPreviewIframe() {
 
 function getPreviewStatus() {
   return document.getElementById('pbCanvas')?.querySelector('.pb-preview-status');
+}
+
+function attachPreviewIframeWindow() {
+  const iframe = getPreviewIframe();
+  expect(iframe).not.toBeNull();
+  const iframeWindow = { postMessage: vi.fn() };
+  Object.defineProperty(iframe, 'contentWindow', {
+    configurable: true,
+    value: iframeWindow,
+  });
+  return iframeWindow;
+}
+
+function dispatchPreviewMessageFromIframe(message, iframeWindow) {
+  window.dispatchEvent(
+    new MessageEvent('message', {
+      data: message,
+      origin: window.location.origin,
+      source: iframeWindow,
+    })
+  );
 }
 
 function requestCurrentPreviewSnapshot() {
@@ -473,9 +495,12 @@ describe('admin page-builder shell', () => {
   it('keeps the unified side panel on one inspector scroll without clipping open categories', () => {
     const inspectorCss = readCss('admin/css/page-builder/inspector.css');
     const layoutCss = readCss('admin/css/page-builder/layout.css');
+    const canvasCss = readCss('admin/css/page-builder/canvas.css');
     const editorContentRule = getCssRule(inspectorCss, '.pb-editor-content');
     const sectionRule = getCssRule(inspectorCss, '.pb-inspector-section');
     const sectionBodyRule = getCssRule(inspectorCss, '.pb-inspector-section-body');
+    const targetOverlayRule = getCssRule(canvasCss, '.pb-preview-target-overlay');
+    const targetToolbarRule = getCssRule(canvasCss, '.pb-preview-target-toolbar');
 
     expect(editorContentRule).toContain('overflow-y: auto');
     expect(editorContentRule).toContain('overscroll-behavior: contain');
@@ -486,6 +511,8 @@ describe('admin page-builder shell', () => {
     expect(layoutCss).toContain("grid-template-areas: 'content'");
     expect(layoutCss).toContain('.page-builder-layout[data-sidebar-mode');
     expect(layoutCss).toContain('.pb-canvas-overlay');
+    expect(targetOverlayRule).toContain('pointer-events: none');
+    expect(targetToolbarRule).toContain('pointer-events: auto');
   });
 
   it('renders the empty state and adds a new page through the modal flow', async () => {
@@ -1468,6 +1495,192 @@ describe('admin page-builder shell', () => {
     expect(frame.dataset.metricsInnerHeight).toBe('812');
     expect(frame.dataset.metricsHasOverflow).toBe('true');
     expect(frame.dataset.metricsOverflowOffenders).toContain('.pb-html');
+  });
+
+  it('renders live canvas target overlays and maps target selection to the inspector', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const textSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === textModule.id)
+    );
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const expected = {
+      previewSession: frame.dataset.previewSession,
+      seriesId: 'battle-bros',
+      pageId: selectedPage.id,
+      pageSlug: selectedPage.slug,
+    };
+    const target = {
+      kind: 'module',
+      key: `module:${textModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: textSection.id,
+      columnIndex: textModule.columnIndex,
+      moduleId: textModule.id,
+      moduleType: textModule.moduleType,
+    };
+    const geometry = {
+      target,
+      rect: { top: 48, left: 32, right: 272, bottom: 148, width: 240, height: 100 },
+      visible: true,
+      order: 0,
+      label: 'Text module',
+    };
+
+    dispatchPreviewMessageFromIframe(
+      buildPreviewTargetMessage(
+        BUILDER_PREVIEW_MESSAGE_TYPES.TARGETS,
+        { sequence: 3, targets: [geometry] },
+        expected
+      ),
+      iframeWindow
+    );
+    expect(frame.dataset.targetSequence).toBe('3');
+    expect(frame.dataset.targetCount).toBe('1');
+
+    dispatchPreviewMessageFromIframe(
+      buildPreviewTargetMessage(
+        BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_HOVER,
+        { sequence: 3, target },
+        expected
+      ),
+      iframeWindow
+    );
+    expect(frame.querySelector('.pb-preview-target-box--hover')).not.toBeNull();
+
+    dispatchPreviewMessageFromIframe(
+      buildPreviewTargetMessage(
+        BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT,
+        { sequence: 3, target },
+        expected
+      ),
+      iframeWindow
+    );
+    await flushAdminUi(2);
+
+    expect(frame.dataset.selectedTargetKey).toBe(`module:${textModule.id}`);
+    expect(frame.querySelector('.pb-preview-target-box--selected')).not.toBeNull();
+    expect(frame.querySelector('.pb-preview-target-toolbar')?.textContent).toContain('Text module');
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Text Module');
+  });
+
+  it('ignores stale target geometry and blocks dirty target selection switches', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const modules = selectedPage.sections.flatMap((section) => section.modules || []);
+    const textModule = modules.find((module) => module.moduleType === 'text');
+    const imageModule = modules.find((module) => module.moduleType === 'image');
+    const textSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === textModule.id)
+    );
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector(`.pb-module[data-module-id="${textModule.id}"]`)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+    const contentInput = document.querySelector('[data-key="content"]');
+    contentInput.value = '<p>Dirty text</p>';
+    contentInput.dispatchEvent(new Event('input', { bubbles: true }));
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const expected = {
+      previewSession: frame.dataset.previewSession,
+      seriesId: 'battle-bros',
+      pageId: selectedPage.id,
+      pageSlug: selectedPage.slug,
+    };
+    const textTarget = {
+      kind: 'module',
+      key: `module:${textModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: textSection.id,
+      columnIndex: textModule.columnIndex,
+      moduleId: textModule.id,
+      moduleType: textModule.moduleType,
+    };
+    const imageTarget = {
+      kind: 'module',
+      key: `module:${imageModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: textSection.id,
+      columnIndex: imageModule.columnIndex,
+      moduleId: imageModule.id,
+      moduleType: imageModule.moduleType,
+    };
+
+    dispatchPreviewMessageFromIframe(
+      buildPreviewTargetMessage(
+        BUILDER_PREVIEW_MESSAGE_TYPES.TARGETS,
+        {
+          sequence: 5,
+          targets: [
+            {
+              target: textTarget,
+              rect: { top: 20, left: 20, right: 120, bottom: 80, width: 100, height: 60 },
+              visible: true,
+              order: 0,
+              label: 'Text module',
+            },
+          ],
+        },
+        expected
+      ),
+      iframeWindow
+    );
+    dispatchPreviewMessageFromIframe(
+      buildPreviewTargetMessage(
+        BUILDER_PREVIEW_MESSAGE_TYPES.TARGETS,
+        {
+          sequence: 4,
+          targets: [
+            {
+              target: imageTarget,
+              rect: { top: 200, left: 20, right: 120, bottom: 280, width: 100, height: 80 },
+              visible: true,
+              order: 0,
+              label: 'Image module',
+            },
+          ],
+        },
+        expected
+      ),
+      iframeWindow
+    );
+    expect(frame.dataset.targetSequence).toBe('5');
+    expect(frame.dataset.targetCount).toBe('1');
+
+    dispatchPreviewMessageFromIframe(
+      buildPreviewTargetMessage(
+        BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT,
+        { sequence: 5, target: imageTarget },
+        expected
+      ),
+      iframeWindow
+    );
+    await flushAdminUi(1);
+
+    expect(frame.dataset.selectedTargetKey || '').toBe('');
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Text Module');
+    expect(document.querySelector('[data-editor-status]')?.textContent).toMatch(/unsaved changes/i);
   });
 
   it('previews dirty module drafts without mutating the saved page snapshot', async () => {

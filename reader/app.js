@@ -1095,6 +1095,11 @@ import {
           pageSlug: pageResult.snapshot?.pageSlug || explicitPageSlug || 'reader',
         });
         previewBridge.emitPreviewMetrics?.('snapshot-applied');
+        previewBridge.startPreviewTargetBridge?.(pageResult.snapshot, {
+          seriesId,
+          pageId: pageResult.snapshot?.pageId,
+          pageSlug: pageResult.snapshot?.pageSlug || explicitPageSlug || 'reader',
+        });
         previewBridge.subscribePreviewSnapshots?.(
           (nextPageResult) => {
             applyBuilderPageToDOM(nextPageResult.page, {
@@ -1103,6 +1108,15 @@ import {
               builderEditing: nextPageResult.builderEditing === true,
             });
             previewBridge.emitPreviewMetrics?.('snapshot-updated');
+            if (nextPageResult.builderEditing === true) {
+              previewBridge.startPreviewTargetBridge?.(nextPageResult.snapshot, {
+                seriesId,
+                pageId: nextPageResult.snapshot?.pageId,
+                pageSlug: nextPageResult.snapshot?.pageSlug || explicitPageSlug || 'reader',
+              });
+            } else {
+              previewBridge.stopPreviewTargetBridge?.();
+            }
           },
           {
             seriesId,

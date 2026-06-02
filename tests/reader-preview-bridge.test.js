@@ -41,6 +41,8 @@ describe('reader preview bridge', () => {
     vi.useRealTimers();
     vi.resetModules();
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    document.body.innerHTML = '';
     window.happyDOM.setURL('http://localhost:3000/index.html');
   });
 
@@ -159,5 +161,137 @@ describe('reader preview bridge', () => {
     unsubscribe();
     dispatchPreviewMessage(buildPreviewSnapshotMessage(snapshot, 'session-1'));
     expect(onSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('collects marked builder targets with viewport-relative geometry', async () => {
+    setPreviewUrl();
+    document.body.innerHTML = `
+      <div class="viewerWrap" data-builder-page-id="page-1">
+        <header class="topbar" data-builder-page-id="page-1" data-builder-surface="page-header"></header>
+        <section data-builder-section-id="section-1" data-builder-section-index="0">
+          <div data-builder-column-index="0">
+            <article data-builder-module-id="module-1" data-builder-module-type="text"></article>
+          </div>
+        </section>
+      </div>
+    `;
+    const rects = new Map([
+      ['.viewerWrap', { top: 0, left: 0, right: 800, bottom: 600, width: 800, height: 600 }],
+      ['header', { top: 4, left: 0, right: 800, bottom: 44, width: 800, height: 40 }],
+      ['section', { top: 80, left: 20, right: 780, bottom: 280, width: 760, height: 200 }],
+      [
+        '[data-builder-column-index]',
+        { top: 90, left: 30, right: 400, bottom: 260, width: 370, height: 170 },
+      ],
+      ['article', { top: 100, left: 40, right: 240, bottom: 180, width: 200, height: 80 }],
+    ]);
+    rects.forEach((rect, selector) => {
+      document.querySelector(selector).getBoundingClientRect = () => rect;
+    });
+
+    const { collectPreviewTargets } = await import('../reader/preview-bridge.js');
+    const targets = collectPreviewTargets(buildSnapshot({ options: { builderEditing: true } }));
+
+    expect(targets.map((item) => item.target.kind)).toEqual([
+      'page',
+      'header',
+      'section',
+      'column',
+      'module',
+    ]);
+    expect(targets.at(-1)).toMatchObject({
+      target: {
+        key: 'module:module-1',
+        moduleId: 'module-1',
+        moduleType: 'text',
+        sectionId: 'section-1',
+        columnIndex: 0,
+      },
+      rect: { top: 100, left: 40, width: 200, height: 80 },
+      visible: true,
+      label: 'text module',
+    });
+  });
+
+  it('emits hover/select target messages and blocks iframe interactions while editing', async () => {
+    setPreviewUrl();
+    vi.stubGlobal('requestAnimationFrame', (callback) => {
+      callback();
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    document.body.innerHTML = `
+      <a href="https://example.com" data-builder-page-id="page-1">
+        <span data-builder-section-id="section-1">
+          <span data-builder-column-index="0">
+            <button data-builder-module-id="module-1" data-builder-module-type="buttons">Store</button>
+          </span>
+        </span>
+      </a>
+      <form><button type="submit">Submit</button></form>
+    `;
+    document
+      .querySelectorAll(
+        '[data-builder-page-id], [data-builder-section-id], [data-builder-column-index], [data-builder-module-id]'
+      )
+      .forEach((element, index) => {
+        element.getBoundingClientRect = () => ({
+          top: index * 10,
+          left: index * 10,
+          right: index * 10 + 100,
+          bottom: index * 10 + 40,
+          width: 100,
+          height: 40,
+        });
+      });
+    const postMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => {});
+    const { startPreviewTargetBridge } = await import('../reader/preview-bridge.js');
+
+    const cleanup = startPreviewTargetBridge(buildSnapshot({ options: { builderEditing: true } }));
+    const target = document.querySelector('[data-builder-module-id]');
+    target.dispatchEvent(new Event('pointermove', { bubbles: true, cancelable: true }));
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    target.dispatchEvent(click);
+    const submit = new Event('submit', { bubbles: true, cancelable: true });
+    document.querySelector('form').dispatchEvent(submit);
+
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: BUILDER_PREVIEW_MESSAGE_TYPES.TARGETS,
+        targets: expect.arrayContaining([
+          expect.objectContaining({ target: expect.objectContaining({ moduleId: 'module-1' }) }),
+        ]),
+      }),
+      window.location.origin
+    );
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_HOVER,
+        target: expect.objectContaining({ moduleId: 'module-1' }),
+      }),
+      window.location.origin
+    );
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT,
+        target: expect.objectContaining({ moduleId: 'module-1' }),
+      }),
+      window.location.origin
+    );
+    expect(click.defaultPrevented).toBe(true);
+    expect(submit.defaultPrevented).toBe(true);
+    cleanup();
+  });
+
+  it('does not start the target bridge when builder editing is disabled', async () => {
+    setPreviewUrl();
+    const postMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => {});
+    const { collectPreviewTargets, startPreviewTargetBridge } =
+      await import('../reader/preview-bridge.js');
+    const snapshot = buildSnapshot({ options: { builderEditing: false } });
+
+    expect(collectPreviewTargets(snapshot)).toEqual([]);
+    expect(startPreviewTargetBridge(snapshot)).toBeNull();
+    expect(postMessage).not.toHaveBeenCalled();
   });
 });

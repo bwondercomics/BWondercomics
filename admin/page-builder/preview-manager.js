@@ -1,4 +1,4 @@
-import { cloneValue, escapeAttr } from './helpers.js';
+import { cloneValue, escapeAttr, escapeHtml } from './helpers.js';
 import {
   BUILDER_PREVIEW_MESSAGE_TYPES,
   BUILDER_PREVIEW_SNAPSHOT_VERSION,
@@ -28,11 +28,35 @@ function getPreviewIdentity(snapshot) {
   ].join('|');
 }
 
+function getTargetKey(target) {
+  return target?.key || '';
+}
+
+function clampNumber(value, min, max) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return min;
+  return Math.min(max, Math.max(min, parsed));
+}
+
+function getTargetStyle(targetGeometry) {
+  const rect = targetGeometry?.rect || {};
+  return [
+    `top: ${Math.max(0, Number(rect.top) || 0)}px`,
+    `left: ${Math.max(0, Number(rect.left) || 0)}px`,
+    `width: ${Math.max(0, Number(rect.width) || 0)}px`,
+    `height: ${Math.max(0, Number(rect.height) || 0)}px`,
+  ].join('; ');
+}
+
 export function createPreviewManager({ el, getState, actions, deps }) {
   let previewSession = '';
   let previewIdentity = '';
   let latestPreviewSnapshot = null;
   let latestPreviewMetrics = null;
+  let latestPreviewTargets = [];
+  let latestTargetSequence = -1;
+  let hoveredTargetKey = '';
+  let selectedTargetKey = '';
   let previewMessageBound = false;
 
   function getPreviewIframeUrl(snapshot, session) {
@@ -141,6 +165,137 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     ].join('\n');
   }
 
+  function findTargetGeometry(targetKey) {
+    if (!targetKey) return null;
+    return latestPreviewTargets.find((item) => getTargetKey(item.target) === targetKey) || null;
+  }
+
+  function ensurePreviewTargetOverlay(frame) {
+    if (!frame || latestPreviewSnapshot?.options?.builderEditing !== true) return null;
+    let overlay = frame.querySelector('.pb-preview-target-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.className = 'pb-preview-target-overlay';
+      overlay.setAttribute('aria-hidden', 'true');
+      frame.appendChild(overlay);
+    }
+    return overlay;
+  }
+
+  function bindPreviewTargetOverlayControls(overlay) {
+    overlay
+      .querySelector('[data-preview-target-action="settings"]')
+      ?.addEventListener('click', () => {
+        const selectedGeometry = findTargetGeometry(selectedTargetKey);
+        if (!selectedGeometry?.target) return;
+        actions.selectCanvasTarget?.(selectedGeometry.target);
+      });
+  }
+
+  function renderPreviewTargetOverlay(frame = el.pbCanvas?.querySelector('.pb-preview-frame')) {
+    if (!frame) return;
+    if (latestPreviewSnapshot?.options?.builderEditing !== true) {
+      frame.querySelector('.pb-preview-target-overlay')?.remove();
+      return;
+    }
+
+    const overlay = ensurePreviewTargetOverlay(frame);
+    if (!overlay) return;
+
+    const hoverGeometry = findTargetGeometry(hoveredTargetKey);
+    const selectedGeometry = findTargetGeometry(selectedTargetKey);
+    const frameWidth = Number(frame.dataset.viewportWidth) || frame.clientWidth || 0;
+    const selectedRect = selectedGeometry?.rect || null;
+    const toolbarWidth = 180;
+    const toolbarLeft = selectedRect
+      ? clampNumber(selectedRect.left, 4, Math.max(4, frameWidth - toolbarWidth - 4))
+      : 4;
+    const toolbarTop = selectedRect
+      ? selectedRect.top > 40
+        ? Math.max(4, selectedRect.top - 36)
+        : selectedRect.bottom + 8
+      : 4;
+
+    const hoverHtml =
+      hoverGeometry?.visible && getTargetKey(hoverGeometry.target) !== selectedTargetKey
+        ? `<div class="pb-preview-target-box pb-preview-target-box--hover" style="${escapeAttr(getTargetStyle(hoverGeometry))}"></div>`
+        : '';
+    const selectedHtml = selectedGeometry?.visible
+      ? `<div class="pb-preview-target-box pb-preview-target-box--selected" style="${escapeAttr(getTargetStyle(selectedGeometry))}"></div>`
+      : '';
+    const guideHtml = selectedGeometry?.visible
+      ? `
+        <div class="pb-preview-insert-guide pb-preview-insert-guide--before" style="top: ${escapeAttr(String(Math.max(0, selectedRect.top)))}px; left: ${escapeAttr(String(Math.max(0, selectedRect.left)))}px; width: ${escapeAttr(String(Math.max(0, selectedRect.width)))}px;"></div>
+        <div class="pb-preview-insert-guide pb-preview-insert-guide--after" style="top: ${escapeAttr(String(Math.max(0, selectedRect.bottom)))}px; left: ${escapeAttr(String(Math.max(0, selectedRect.left)))}px; width: ${escapeAttr(String(Math.max(0, selectedRect.width)))}px;"></div>
+      `
+      : '';
+    const toolbarHtml = selectedGeometry?.visible
+      ? `
+        <div
+          class="pb-preview-target-toolbar"
+          style="top: ${escapeAttr(String(toolbarTop))}px; left: ${escapeAttr(String(toolbarLeft))}px;"
+        >
+          <span class="pb-preview-target-toolbar-label">${escapeHtml(selectedGeometry.label || 'Selected')}</span>
+          <button type="button" class="btn-small btn-secondary" data-preview-target-action="settings">Settings</button>
+        </div>
+      `
+      : '';
+
+    overlay.innerHTML = `${hoverHtml}${selectedHtml}${guideHtml}${toolbarHtml}`;
+    bindPreviewTargetOverlayControls(overlay);
+  }
+
+  function resetPreviewTargets(options = {}) {
+    const previousSequence = latestTargetSequence;
+    latestPreviewTargets = [];
+    latestTargetSequence = options.preserveSequence ? previousSequence : -1;
+    hoveredTargetKey = '';
+    selectedTargetKey = '';
+    const frame = /** @type {HTMLElement|null} */ (el.pbCanvas?.querySelector('.pb-preview-frame'));
+    if (frame) {
+      if (options.preserveSequence && latestTargetSequence >= 0) {
+        frame.dataset.targetSequence = String(latestTargetSequence);
+      } else {
+        delete frame.dataset.targetSequence;
+      }
+      delete frame.dataset.targetCount;
+      delete frame.dataset.hoveredTargetKey;
+      delete frame.dataset.selectedTargetKey;
+    }
+    if (options.render !== false) {
+      renderPreviewTargetOverlay(frame);
+    }
+  }
+
+  function storePreviewTargets(frame, message) {
+    if (!frame || (latestTargetSequence >= 0 && message.sequence <= latestTargetSequence)) return;
+    latestTargetSequence = message.sequence;
+    latestPreviewTargets = Array.isArray(message.targets) ? message.targets : [];
+    if (hoveredTargetKey && !findTargetGeometry(hoveredTargetKey)) hoveredTargetKey = '';
+    if (selectedTargetKey && !findTargetGeometry(selectedTargetKey)) selectedTargetKey = '';
+    frame.dataset.targetSequence = String(latestTargetSequence);
+    frame.dataset.targetCount = String(latestPreviewTargets.length);
+    renderPreviewTargetOverlay(frame);
+  }
+
+  function handleTargetHover(frame, message) {
+    if (!frame || message.sequence < latestTargetSequence) return;
+    hoveredTargetKey = getTargetKey(message.target);
+    frame.dataset.hoveredTargetKey = hoveredTargetKey;
+    renderPreviewTargetOverlay(frame);
+  }
+
+  function handleTargetSelect(frame, message) {
+    if (!frame || message.sequence < latestTargetSequence) return;
+    const targetKey = getTargetKey(message.target);
+    const accepted = actions.selectCanvasTarget?.(message.target) !== false;
+    if (accepted) {
+      selectedTargetKey = targetKey;
+      frame.dataset.selectedTargetKey = selectedTargetKey;
+    }
+    renderPreviewTargetOverlay(frame);
+  }
+
   function storePreviewMetrics(frame, metrics) {
     if (!frame || !metrics) return;
     latestPreviewMetrics = metrics;
@@ -175,6 +330,18 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     }
 
     const frame = /** @type {HTMLElement|null} */ (el.pbCanvas?.querySelector('.pb-preview-frame'));
+    if (event.data.type === BUILDER_PREVIEW_MESSAGE_TYPES.TARGETS) {
+      storePreviewTargets(frame, event.data);
+      return;
+    }
+    if (event.data.type === BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_HOVER) {
+      handleTargetHover(frame, event.data);
+      return;
+    }
+    if (event.data.type === BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT) {
+      handleTargetSelect(frame, event.data);
+      return;
+    }
     if (event.data.type === BUILDER_PREVIEW_MESSAGE_TYPES.METRICS) {
       storePreviewMetrics(frame, event.data.metrics);
       return;
@@ -287,6 +454,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
       latestPreviewSnapshot = null;
       previewIdentity = '';
       previewSession = '';
+      resetPreviewTargets({ render: false });
       el.pbCanvas.dataset.mode = 'preview';
       el.pbCanvas.innerHTML =
         '<div class="pb-canvas-empty"><p>Select a page to preview it.</p></div>';
@@ -301,6 +469,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
       previewSession = createPreviewSessionToken();
       previewIdentity = nextIdentity;
       latestPreviewMetrics = null;
+      resetPreviewTargets({ render: false });
     }
     latestPreviewSnapshot = snapshot;
 
@@ -345,6 +514,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
         el.pbCanvas.querySelector('.pb-preview-iframe')
       );
       iframe?.addEventListener('load', postPreviewSnapshot);
+      renderPreviewTargetOverlay(el.pbCanvas.querySelector('.pb-preview-frame'));
       return;
     }
 
@@ -360,6 +530,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     updatePreviewFrameDataset(existingFrame, snapshot, viewport);
     applyPreviewIframeSize(existingIframe, viewport);
     renderPreviewDebugOverlay(existingFrame);
+    renderPreviewTargetOverlay(existingFrame);
     postPreviewSnapshot();
   }
 
@@ -386,6 +557,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     }
     if (latestPreviewSnapshot?.options) {
       latestPreviewSnapshot.options.viewport = { ...viewport };
+      resetPreviewTargets({ preserveSequence: true });
       postPreviewSnapshot();
     }
     return true;
@@ -395,6 +567,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     previewSession = '';
     previewIdentity = '';
     latestPreviewSnapshot = null;
+    resetPreviewTargets();
   }
 
   function bindMessageHandler() {

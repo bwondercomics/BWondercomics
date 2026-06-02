@@ -1,8 +1,8 @@
 # Full-Page Live Builder Plan, Part 1 of 2
 
-Status: In progress - Phase 2 complete
-Plan state: Phases 1 and 2 have completion notes below. All later phases remain planned until future
-completion notes say otherwise.
+Status: In progress - Phase 3 complete
+Plan state: Phases 1, 2, and 3 have completion notes below. All later phases remain planned until
+future completion notes say otherwise.
 Scope of this file: shared direction, references, target model, and Phases 1-5.
 Companion file: [Part 2 - Phases 6-12, risks, and implementation order](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md)
 Reference source: `docs/website-references/grapesjs-dev`
@@ -44,8 +44,8 @@ Part 2 contains:
 
 - Treat both files as one plan. Do not infer that Part 1 is a complete implementation plan by
   itself.
-- Treat every phase as future work. The test plans and acceptance criteria describe gates for future
-  implementation, not current evidence.
+- Treat phases without completion notes as future work. The test plans and acceptance criteria
+  describe gates for future implementation, not current evidence.
 - Start at Phase 1 unless a user explicitly asks for a later exploratory spike. Later phases assume
   the shell, live iframe canvas, target markers, overlays, and device contracts from earlier phases.
 - Keep the saved builder records as the source of truth. Browser DOM, iframe output, and overlays
@@ -606,6 +606,42 @@ Assumptions:
 - GrapesJS remains an architecture reference only; no runtime dependency is added.
 - Phase 3 does not implement inline text editing, arbitrary DOM editing, full drag/drop composition,
   undo/redo, or per-device overrides.
+
+Completion note (`2026-06-02`): Phase 3 is implemented. The preview contract now includes
+validated `TARGETS`, `TARGET_HOVER`, `TARGET_SELECT`, and `TARGET_ACTION` envelopes with standardized
+target refs, iframe viewport CSS-pixel geometry, sequence handling, and target action validation.
+`reader/preview-bridge.js` now starts a builder-editing-only target bridge after validated snapshots
+are applied. It collects Phase 2 `data-builder-*` markers, measures page/header/section/column/module
+targets, emits target geometry after render/layout changes, emits hover/select events from iframe
+pointer interaction, blocks iframe links/forms/controls while editing, and accepts non-mutating target
+actions such as refresh, clear-hover, and scroll-into-view. `admin/page-builder/preview-manager.js`
+stores latest target geometry, ignores stale target lists, clears overlays on reload/session/device
+changes, and renders admin-only hover outlines, selected outlines, selected-target toolbar chrome, and
+insert guide lines above the iframe with pointer events disabled except for toolbar controls.
+`admin/page-builder.js` now routes live-canvas target selection through `selectCanvasTarget(...)`, so
+module, header, page, section, and column selections reuse existing dirty-workspace guards and
+inspector flows. Section targets now open the existing section spacing draft in the side-panel
+inspector. The durable admin/reader docs were updated to describe live target geometry and overlays as
+current behavior. Phase 3 intentionally does not implement inline editing, full drag/drop, arbitrary
+DOM editing, undo/redo, or per-device overrides.
+
+Verification completed for this phase:
+
+- `node --check admin/page-builder/preview-contract.js` - passed.
+- `node --check reader/preview-bridge.js` - passed.
+- `node --check admin/page-builder/preview-manager.js` - passed.
+- `node --check admin/page-builder.js` - passed.
+- `node --check admin/page-builder/editor-panel.js` - passed.
+- `npm test -- tests/admin-page-builder-preview-contract.test.js tests/reader-preview-bridge.test.js
+tests/reader-app.test.js tests/admin-page-builder-shell.test.js` - passed (`4` files, `66` tests).
+- `npm test` - passed (`45` files, `349` passed, `1` skipped).
+- `npm run test:visual` - passed (`3` Playwright tests) with the existing Vite public-directory
+  path warnings.
+- `node ./node_modules/vite/bin/vite.js build` - passed with the existing fullscreen
+  dynamic/static import warning.
+- `npm run lint` - passed.
+- `npm run format:check` - passed.
+- `git diff --check` - passed.
 
 ## Phase 4 - Device Modes and Per-Device Overrides
 
