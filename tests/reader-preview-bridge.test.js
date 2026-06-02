@@ -254,6 +254,11 @@ describe('reader preview bridge', () => {
     target.dispatchEvent(click);
     const submit = new Event('submit', { bubbles: true, cancelable: true });
     document.querySelector('form').dispatchEvent(submit);
+    const blockedKeys = ['ArrowRight', '+', '?', 'Enter', ' '].map((key) => {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      target.dispatchEvent(event);
+      return event;
+    });
 
     expect(postMessage).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -280,7 +285,16 @@ describe('reader preview bridge', () => {
     );
     expect(click.defaultPrevented).toBe(true);
     expect(submit.defaultPrevented).toBe(true);
+    blockedKeys.forEach((event) => expect(event.defaultPrevented).toBe(true));
     cleanup();
+
+    const afterCleanup = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      bubbles: true,
+      cancelable: true,
+    });
+    target.dispatchEvent(afterCleanup);
+    expect(afterCleanup.defaultPrevented).toBe(false);
   });
 
   it('does not start the target bridge when builder editing is disabled', async () => {
@@ -293,5 +307,13 @@ describe('reader preview bridge', () => {
     expect(collectPreviewTargets(snapshot)).toEqual([]);
     expect(startPreviewTargetBridge(snapshot)).toBeNull();
     expect(postMessage).not.toHaveBeenCalled();
+
+    const keydown = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      bubbles: true,
+      cancelable: true,
+    });
+    document.dispatchEvent(keydown);
+    expect(keydown.defaultPrevented).toBe(false);
   });
 });

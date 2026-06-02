@@ -11,6 +11,8 @@ import {
   validatePreviewEnvelope,
 } from './preview-contract.js';
 
+const TARGET_STALE_TIMEOUT_MS = 1500;
+
 function createPreviewSessionToken() {
   if (window.crypto && typeof window.crypto.randomUUID === 'function') {
     return window.crypto.randomUUID();
@@ -58,6 +60,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
   let hoveredTargetKey = '';
   let selectedTargetKey = '';
   let previewMessageBound = false;
+  let targetStaleTimeoutId = null;
 
   function getPreviewIframeUrl(snapshot, session) {
     const params = new URLSearchParams({
@@ -170,6 +173,25 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     return latestPreviewTargets.find((item) => getTargetKey(item.target) === targetKey) || null;
   }
 
+  function clearTargetStaleTimeout() {
+    if (!targetStaleTimeoutId) return;
+    window.clearTimeout(targetStaleTimeoutId);
+    targetStaleTimeoutId = null;
+  }
+
+  function scheduleTargetStaleTimeout(frame, sequence = latestTargetSequence) {
+    clearTargetStaleTimeout();
+    if (!frame || latestPreviewSnapshot?.options?.builderEditing !== true) return;
+    if (!latestPreviewTargets.length && !hoveredTargetKey && !selectedTargetKey) return;
+    const expectedSequence = Number.isSafeInteger(sequence) ? sequence : latestTargetSequence;
+    targetStaleTimeoutId = window.setTimeout(() => {
+      targetStaleTimeoutId = null;
+      if (latestTargetSequence === expectedSequence) {
+        resetPreviewTargets({ preserveSequence: true });
+      }
+    }, TARGET_STALE_TIMEOUT_MS);
+  }
+
   function ensurePreviewTargetOverlay(frame) {
     if (!frame || latestPreviewSnapshot?.options?.builderEditing !== true) return null;
     let overlay = frame.querySelector('.pb-preview-target-overlay');
@@ -246,6 +268,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
   }
 
   function resetPreviewTargets(options = {}) {
+    clearTargetStaleTimeout();
     const previousSequence = latestTargetSequence;
     latestPreviewTargets = [];
     latestTargetSequence = options.preserveSequence ? previousSequence : -1;
@@ -269,6 +292,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
 
   function storePreviewTargets(frame, message) {
     if (!frame || (latestTargetSequence >= 0 && message.sequence <= latestTargetSequence)) return;
+    clearTargetStaleTimeout();
     latestTargetSequence = message.sequence;
     latestPreviewTargets = Array.isArray(message.targets) ? message.targets : [];
     if (hoveredTargetKey && !findTargetGeometry(hoveredTargetKey)) hoveredTargetKey = '';
@@ -531,6 +555,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     applyPreviewIframeSize(existingIframe, viewport);
     renderPreviewDebugOverlay(existingFrame);
     renderPreviewTargetOverlay(existingFrame);
+    scheduleTargetStaleTimeout(existingFrame, latestTargetSequence);
     postPreviewSnapshot();
   }
 

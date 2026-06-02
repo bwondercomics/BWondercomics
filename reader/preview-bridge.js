@@ -43,6 +43,22 @@ const TARGET_SELECTOR = [
   '[data-builder-section-id]',
   '[data-builder-page-id]',
 ].join(',');
+const BUILDER_EDITING_BLOCKED_KEYS = new Set([
+  'ArrowLeft',
+  'ArrowRight',
+  '+',
+  '=',
+  '-',
+  '0',
+  'f',
+  'F',
+  '?',
+  'Escape',
+  'Enter',
+  ' ',
+  'Space',
+  'Spacebar',
+]);
 
 function getExpectedIdentity(overrides = {}) {
   return {
@@ -489,6 +505,12 @@ export function startPreviewTargetBridge(
     event.stopImmediatePropagation?.();
   };
 
+  const handleKeyDown = (event) => {
+    if (BUILDER_EDITING_BLOCKED_KEYS.has(event.key)) {
+      blockInteractiveEvent(event);
+    }
+  };
+
   const handlePointerMove = (event) => {
     const target = findTargetFromEventTarget(event.target, snapshot);
     const key = getTargetKey(target);
@@ -538,6 +560,7 @@ export function startPreviewTargetBridge(
   document.addEventListener('click', handleClick, true);
   document.addEventListener('submit', blockInteractiveEvent, true);
   document.addEventListener('change', blockInteractiveEvent, true);
+  document.addEventListener('keydown', handleKeyDown, true);
   window.addEventListener('scroll', handleLoadOrScroll, true);
   window.addEventListener('resize', handleResize);
   window.addEventListener('message', handleActionMessage);
@@ -574,6 +597,7 @@ export function startPreviewTargetBridge(
     document.removeEventListener('click', handleClick, true);
     document.removeEventListener('submit', blockInteractiveEvent, true);
     document.removeEventListener('change', blockInteractiveEvent, true);
+    document.removeEventListener('keydown', handleKeyDown, true);
     window.removeEventListener('scroll', handleLoadOrScroll, true);
     window.removeEventListener('resize', handleResize);
     window.removeEventListener('message', handleActionMessage);

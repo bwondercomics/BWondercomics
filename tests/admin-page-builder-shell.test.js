@@ -276,6 +276,7 @@ function requestCurrentPreviewSnapshot() {
 
 describe('admin page-builder shell', () => {
   afterEach(() => {
+    vi.useRealTimers();
     vi.clearAllMocks();
     vi.restoreAllMocks();
   });
@@ -1574,6 +1575,114 @@ describe('admin page-builder shell', () => {
     expect(frame.querySelector('.pb-preview-target-box--selected')).not.toBeNull();
     expect(frame.querySelector('.pb-preview-target-toolbar')?.textContent).toContain('Text module');
     expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Text Module');
+  });
+
+  it('clears stale live target overlays when a preview refresh never returns fresh targets', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const textSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === textModule.id)
+    );
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const expected = {
+      previewSession: frame.dataset.previewSession,
+      seriesId: 'battle-bros',
+      pageId: selectedPage.id,
+      pageSlug: selectedPage.slug,
+    };
+    const textTarget = {
+      kind: 'module',
+      key: `module:${textModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: textSection.id,
+      columnIndex: textModule.columnIndex,
+      moduleId: textModule.id,
+      moduleType: textModule.moduleType,
+    };
+    const pageTarget = {
+      kind: 'page',
+      key: `page:${selectedPage.id}`,
+      pageId: selectedPage.id,
+    };
+    const buildGeometry = (target, top = 48) => ({
+      target,
+      rect: { top, left: 32, right: 272, bottom: top + 100, width: 240, height: 100 },
+      visible: true,
+      order: 0,
+      label: target.kind === 'page' ? 'Page' : 'Text module',
+    });
+    const sendTargets = (sequence, geometry) => {
+      dispatchPreviewMessageFromIframe(
+        buildPreviewTargetMessage(
+          BUILDER_PREVIEW_MESSAGE_TYPES.TARGETS,
+          { sequence, targets: [geometry] },
+          expected
+        ),
+        iframeWindow
+      );
+    };
+    const sendTargetState = (type, sequence, target) => {
+      dispatchPreviewMessageFromIframe(
+        buildPreviewTargetMessage(type, { sequence, target }, expected),
+        iframeWindow
+      );
+    };
+
+    vi.useFakeTimers();
+
+    sendTargets(3, buildGeometry(textTarget));
+    sendTargetState(BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_HOVER, 3, textTarget);
+    sendTargetState(BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT, 3, textTarget);
+
+    expect(frame.dataset.targetSequence).toBe('3');
+    expect(frame.dataset.targetCount).toBe('1');
+    expect(frame.dataset.hoveredTargetKey).toBe(textTarget.key);
+    expect(frame.dataset.selectedTargetKey).toBe(textTarget.key);
+    expect(frame.querySelector('.pb-preview-target-box--selected')).not.toBeNull();
+    expect(frame.querySelector('.pb-preview-target-toolbar')).not.toBeNull();
+
+    vi.advanceTimersByTime(1499);
+
+    expect(frame.dataset.targetCount).toBe('1');
+    expect(frame.dataset.selectedTargetKey).toBe(textTarget.key);
+    expect(frame.querySelector('.pb-preview-target-box--selected')).not.toBeNull();
+
+    vi.advanceTimersByTime(1);
+
+    expect(frame.dataset.targetSequence).toBe('3');
+    expect(frame.dataset.targetCount).toBeUndefined();
+    expect(frame.dataset.hoveredTargetKey).toBeUndefined();
+    expect(frame.dataset.selectedTargetKey).toBeUndefined();
+    expect(frame.querySelector('.pb-preview-target-box--hover')).toBeNull();
+    expect(frame.querySelector('.pb-preview-target-box--selected')).toBeNull();
+    expect(frame.querySelector('.pb-preview-target-toolbar')).toBeNull();
+
+    sendTargets(10, buildGeometry(pageTarget));
+    sendTargetState(BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT, 10, pageTarget);
+    expect(frame.dataset.selectedTargetKey).toBe(pageTarget.key);
+    expect(frame.querySelector('.pb-preview-target-box--selected')).not.toBeNull();
+
+    vi.advanceTimersByTime(1000);
+    sendTargets(11, buildGeometry(pageTarget, 72));
+    vi.advanceTimersByTime(1000);
+
+    expect(frame.dataset.targetSequence).toBe('11');
+    expect(frame.dataset.targetCount).toBe('1');
+    expect(frame.dataset.selectedTargetKey).toBe(pageTarget.key);
+    expect(frame.querySelector('.pb-preview-target-box--selected')).not.toBeNull();
+    expect(frame.querySelector('.pb-preview-target-toolbar')).not.toBeNull();
   });
 
   it('ignores stale target geometry and blocks dirty target selection switches', async () => {
