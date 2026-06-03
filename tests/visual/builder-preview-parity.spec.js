@@ -558,6 +558,35 @@ test.describe('builder preview visual parity', () => {
       await adminPage.waitForTimeout(120);
       await assertSelectedOverlayAlignment(adminPage);
 
+      const frameBeforeChrome = await collectPreviewMetricsDataset(adminPage);
+      await adminPage.locator('#pbEnterPreview').click();
+      await expect(adminPage.locator('#pbRestorePreviewChrome')).toBeVisible();
+      await expect(adminPage.locator('#pbBuilderToolbar')).toBeHidden();
+      await expect(adminPage.locator('#pbBuilderSidePanel')).toBeHidden();
+      await expect(adminPage.locator('.pb-preview-status')).toBeHidden();
+      await expect(adminPage.locator('.pb-preview-target-overlay')).toHaveCount(0);
+      await expect(adminPage.locator('.pb-preview-frame')).toHaveAttribute(
+        'data-builder-editing',
+        'false'
+      );
+      const frameDuringChrome = await collectPreviewMetricsDataset(adminPage);
+      expect(frameDuringChrome.previewSession).toBe(frameBeforeChrome.previewSession);
+      expect(frameDuringChrome.width).toBe(viewportId);
+      expect(frameDuringChrome.viewportWidth).toBe(String(viewport.width));
+      expect(frameDuringChrome.viewportHeight).toBe(String(viewport.height));
+
+      await adminPage.locator('#pbRestorePreviewChrome').click();
+      await waitForPreviewReady(adminPage, viewportId);
+      await adminPage.waitForSelector('.pb-preview-frame[data-target-count]');
+      await expect(adminPage.locator('#pbBuilderToolbar')).toBeVisible();
+      await expect(adminPage.locator('#pbBuilderSidePanel')).toBeVisible();
+      await expect(adminPage.locator('.pb-preview-frame')).toHaveAttribute(
+        'data-builder-editing',
+        'true'
+      );
+      await expect(adminPage.locator('.pb-preview-target-box--selected')).toBeVisible();
+      await expect(adminPage.locator('.pb-preview-target-toolbar')).toBeVisible();
+
       await adminContext.close();
       await readerContext.close();
     });

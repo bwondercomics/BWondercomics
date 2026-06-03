@@ -232,6 +232,18 @@ function enterPreviewMode() {
     ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 }
 
+function enterChromePreview() {
+  document
+    .getElementById('pbEnterPreview')
+    ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+}
+
+function restoreChromePreview() {
+  document
+    .getElementById('pbRestorePreviewChrome')
+    ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+}
+
 function enterEditMode() {
   document.getElementById('pbViewEdit')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 }
@@ -696,6 +708,10 @@ describe('admin page-builder shell', () => {
     expect(layoutCss).toContain("grid-template-areas: 'content'");
     expect(layoutCss).toContain('.page-builder-layout[data-sidebar-mode');
     expect(layoutCss).toContain('.pb-canvas-overlay');
+    expect(layoutCss).toContain(".page-builder[data-chrome-mode='preview']");
+    expect(layoutCss).toContain(".page-builder[data-chrome-mode='preview'] .pb-builder-toolbar");
+    expect(layoutCss).toContain(".page-builder[data-chrome-mode='preview'] .page-builder-sidebar");
+    expect(layoutCss).toContain('.pb-preview-restore');
     expect(targetOverlayRule).toContain('pointer-events: none');
     expect(targetToolbarRule).toContain('pointer-events: auto');
   });
@@ -1993,6 +2009,226 @@ describe('admin page-builder shell', () => {
     expect(frame.dataset.metricsInnerHeight).toBe('812');
     expect(frame.dataset.metricsHasOverflow).toBe('true');
     expect(frame.dataset.metricsOverflowOffenders).toContain('.pb-html');
+  });
+
+  it('collapses editor chrome over the live iframe and restores the selected target', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const textSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === textModule.id)
+    );
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+    document
+      .querySelector('#pbWidthToggles [data-width="mobile"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    const frame = getPreviewFrame();
+    const iframe = getPreviewIframe();
+    const iframeWindow = attachPreviewIframeWindow();
+    const target = {
+      kind: 'module',
+      key: `module:${textModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: textSection.id,
+      columnIndex: textModule.columnIndex,
+      moduleId: textModule.id,
+      moduleType: textModule.moduleType,
+    };
+    const geometry = {
+      target,
+      rect: { top: 48, left: 32, right: 272, bottom: 148, width: 240, height: 100 },
+      visible: true,
+      order: 0,
+      label: 'Text module',
+    };
+    sendPreviewTargets({ frame, iframeWindow, page: selectedPage, targets: [geometry] });
+    sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
+    await flushAdminUi(2);
+
+    const initialSrc = iframe?.getAttribute('src');
+    const initialSession = frame.dataset.previewSession;
+    const initialFrame = getPreviewFrame();
+    const initialIframe = getPreviewIframe();
+    document.getElementById('pbCanvas').scrollTop = 33;
+
+    expect(frame.querySelector('.pb-preview-target-toolbar')).not.toBeNull();
+    expect(getPreviewStatus()).not.toBeNull();
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Text Module');
+
+    enterChromePreview();
+    await flushAdminUi(2);
+
+    const collapsedSnapshot = iframeWindow.postMessage.mock.calls
+      .map((call) => call[0])
+      .filter((message) => message?.type === BUILDER_PREVIEW_MESSAGE_TYPES.SNAPSHOT)
+      .at(-1)?.snapshot;
+    const root = document.querySelector('.page-builder');
+
+    expect(root?.dataset.chromeMode).toBe('preview');
+    expect(document.querySelector('.page-builder-layout')?.dataset.canvasMode).toBe('live');
+    expect(document.getElementById('pbRestorePreviewChrome')?.hidden).toBe(false);
+    expect(document.activeElement).toBe(document.getElementById('pbRestorePreviewChrome'));
+    expect(document.getElementById('pbEnterPreview')?.disabled).toBe(true);
+    expect(getPreviewFrame()).toBe(initialFrame);
+    expect(getPreviewIframe()).toBe(initialIframe);
+    expect(getPreviewIframe()?.getAttribute('src')).toBe(initialSrc);
+    expect(getPreviewFrame()?.dataset.previewSession).toBe(initialSession);
+    expect(getPreviewFrame()?.dataset.width).toBe('mobile');
+    expect(getPreviewFrame()?.dataset.deviceId).toBe('mobile');
+    expect(getPreviewFrame()?.dataset.viewportWidth).toBe('375');
+    expect(getPreviewFrame()?.dataset.viewportHeight).toBe('812');
+    expect(getPreviewFrame()?.dataset.builderEditing).toBe('false');
+    expect(getPreviewFrame()?.dataset.targetCount).toBeUndefined();
+    expect(getPreviewFrame()?.querySelector('.pb-preview-target-overlay')).toBeNull();
+    expect(collapsedSnapshot?.options.builderEditing).toBe(false);
+    expect(collapsedSnapshot?.source).toBe('saved');
+
+    restoreChromePreview();
+    await flushAdminUi(2);
+
+    const restoredSnapshot = iframeWindow.postMessage.mock.calls
+      .map((call) => call[0])
+      .filter((message) => message?.type === BUILDER_PREVIEW_MESSAGE_TYPES.SNAPSHOT)
+      .at(-1)?.snapshot;
+    expect(root?.dataset.chromeMode).toBe('edit');
+    expect(document.getElementById('pbRestorePreviewChrome')?.hidden).toBe(true);
+    expect(document.getElementById('pbEnterPreview')?.disabled).toBe(false);
+    expect(getPreviewFrame()).toBe(initialFrame);
+    expect(getPreviewIframe()?.getAttribute('src')).toBe(initialSrc);
+    expect(getPreviewFrame()?.dataset.previewSession).toBe(initialSession);
+    expect(getPreviewFrame()?.dataset.builderEditing).toBe('true');
+    expect(restoredSnapshot?.options.builderEditing).toBe(true);
+    expect(getPreviewFrame()?.querySelector('.pb-preview-target-box--selected')).toBeNull();
+    expect(getPreviewFrame()?.querySelector('.pb-preview-target-toolbar')).toBeNull();
+
+    sendPreviewTargets({
+      frame: getPreviewFrame(),
+      iframeWindow,
+      page: selectedPage,
+      targets: [geometry],
+      sequence: 3,
+    });
+    await flushAdminUi(2);
+
+    expect(getPreviewFrame()?.dataset.selectedTargetKey).toBeUndefined();
+    expect(getPreviewFrame()?.querySelector('.pb-preview-target-box--selected')).toBeNull();
+    expect(getPreviewFrame()?.querySelector('.pb-preview-target-toolbar')).toBeNull();
+
+    sendPreviewTargets({
+      frame: getPreviewFrame(),
+      iframeWindow,
+      page: selectedPage,
+      targets: [geometry],
+      sequence: 4,
+    });
+    await flushAdminUi(2);
+
+    expect(getPreviewFrame()?.dataset.selectedTargetKey).toBe(target.key);
+    expect(getPreviewFrame()?.querySelector('.pb-preview-target-box--selected')).not.toBeNull();
+    expect(getPreviewFrame()?.querySelector('.pb-preview-target-toolbar')).not.toBeNull();
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Text Module');
+    expect(document.querySelector('.pb-sidebar-tab.active')?.dataset.tab).toBe('settings');
+    expect(document.getElementById('pbCanvas')?.scrollTop).toBe(33);
+  });
+
+  it('restores Structure Debug after chrome-collapsed preview exits', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await openBuilderPage(manager);
+    enterEditMode();
+    await flushAdminUi(1);
+
+    expect(document.querySelector('.page-builder-layout')?.dataset.canvasMode).toBe('structure');
+    expect(document.getElementById('pbCanvas')?.dataset.mode).toBe('edit');
+    expect(getPreviewFrame()).toBeNull();
+
+    enterChromePreview();
+    await flushAdminUi(2);
+
+    expect(document.querySelector('.page-builder')?.dataset.chromeMode).toBe('preview');
+    expect(document.querySelector('.page-builder-layout')?.dataset.canvasMode).toBe('live');
+    expect(document.getElementById('pbCanvas')?.dataset.mode).toBe('preview');
+    expect(getPreviewFrame()).not.toBeNull();
+    expect(getPreviewFrame()?.dataset.builderEditing).toBe('false');
+
+    restoreChromePreview();
+    await flushAdminUi(2);
+
+    expect(document.querySelector('.page-builder')?.dataset.chromeMode).toBe('edit');
+    expect(document.querySelector('.page-builder-layout')?.dataset.canvasMode).toBe('structure');
+    expect(document.getElementById('pbCanvas')?.dataset.mode).toBe('edit');
+    expect(getPreviewFrame()).toBeNull();
+    expect(
+      document.getElementById('pbCanvas')?.querySelector('div[data-section-id]')
+    ).not.toBeNull();
+  });
+
+  it('keeps dirty drafts as working snapshots while chrome preview is collapsed', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const textSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === textModule.id)
+    );
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const target = {
+      kind: 'module',
+      key: `module:${textModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: textSection.id,
+      columnIndex: textModule.columnIndex,
+      moduleId: textModule.id,
+      moduleType: textModule.moduleType,
+    };
+    sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
+    await flushAdminUi(2);
+
+    const contentInput = document.querySelector('[data-key="content"]');
+    contentInput.value = '<p>Dirty chrome preview text</p>';
+    contentInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAdminUi(2);
+    expect(getPreviewFrame()?.dataset.previewSource).toBe('working');
+
+    enterChromePreview();
+    await flushAdminUi(2);
+
+    const collapsedSnapshot = iframeWindow.postMessage.mock.calls
+      .map((call) => call[0])
+      .filter((message) => message?.type === BUILDER_PREVIEW_MESSAGE_TYPES.SNAPSHOT)
+      .at(-1)?.snapshot;
+
+    expect(getPreviewFrame()?.dataset.previewSource).toBe('working');
+    expect(collapsedSnapshot?.source).toBe('working');
+    expect(collapsedSnapshot?.options.builderEditing).toBe(false);
+    const collapsedModule = collapsedSnapshot?.page.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.id === textModule.id);
+    expect(collapsedModule?.config.content).toContain('Dirty chrome preview text');
+    expect(document.querySelector('.pb-editor-footer-status')?.textContent).toContain('unsaved');
   });
 
   it('renders live canvas target overlays and maps target selection to the inspector', async () => {

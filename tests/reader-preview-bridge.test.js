@@ -316,4 +316,48 @@ describe('reader preview bridge', () => {
     document.dispatchEvent(keydown);
     expect(keydown.defaultPrevented).toBe(false);
   });
+
+  it('stops an active target bridge when a follow-up snapshot disables builder editing', async () => {
+    setPreviewUrl();
+    vi.stubGlobal('requestAnimationFrame', (callback) => {
+      callback();
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    document.body.innerHTML = `
+      <button data-builder-page-id="page-1" data-builder-module-id="module-1" data-builder-module-type="buttons">Store</button>
+    `;
+    const target = document.querySelector('[data-builder-module-id]');
+    target.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      right: 100,
+      bottom: 40,
+      width: 100,
+      height: 40,
+    });
+    const postMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => {});
+    const { startPreviewTargetBridge } = await import('../reader/preview-bridge.js');
+
+    expect(startPreviewTargetBridge(buildSnapshot({ options: { builderEditing: true } }))).not.toBe(
+      null
+    );
+    const callsAfterStart = postMessage.mock.calls.length;
+    expect(startPreviewTargetBridge(buildSnapshot({ options: { builderEditing: false } }))).toBe(
+      null
+    );
+
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    target.dispatchEvent(click);
+    const keydown = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      bubbles: true,
+      cancelable: true,
+    });
+    target.dispatchEvent(keydown);
+
+    expect(click.defaultPrevented).toBe(false);
+    expect(keydown.defaultPrevented).toBe(false);
+    expect(postMessage).toHaveBeenCalledTimes(callsAfterStart);
+  });
 });

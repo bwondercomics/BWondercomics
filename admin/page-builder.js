@@ -61,6 +61,12 @@ import {
   reorderPages,
 } from './page-builder/data.js';
 
+const BUILDER_CHROME_COMMANDS = Object.freeze({
+  TOGGLE_PREVIEW: 'builder:toggle-preview',
+  ENTER_PREVIEW: 'builder:enter-preview',
+  EXIT_PREVIEW: 'builder:exit-preview',
+});
+
 function createPageBuilder({
   sanitizeSeriesId,
   getActiveSeriesId,
@@ -92,6 +98,11 @@ function createPageBuilder({
   let liveDragState = null;
   /** @type {'edit'|'preview'} */
   let canvasMode = 'preview';
+  /** @type {'edit'|'preview'} */
+  let editorChromeMode = 'edit';
+  /** @type {'edit'|'preview'|null} */
+  let preChromeCanvasMode = null;
+  let previewChromeRestoreState = null;
   /** @type {'desktop'|'tablet'|'mobile'} */
   let activeDeviceId = BUILDER_DEVICE_ORDER[0];
   /** @type {'global'|'device'} */
@@ -101,6 +112,19 @@ function createPageBuilder({
   /** @type {''|'header'} */
   let activeDesignerSurface = '';
   let structuralCommands = null;
+
+  function runBuilderCommand(commandId, payload = {}) {
+    switch (commandId) {
+      case BUILDER_CHROME_COMMANDS.TOGGLE_PREVIEW:
+        return editorChromeMode === 'preview' ? exitChromePreview() : enterChromePreview();
+      case BUILDER_CHROME_COMMANDS.ENTER_PREVIEW:
+        return enterChromePreview();
+      case BUILDER_CHROME_COMMANDS.EXIT_PREVIEW:
+        return exitChromePreview();
+      default:
+        return runStructuralCommand(commandId, payload);
+    }
+  }
 
   function runStructuralCommand(commandId, payload = {}) {
     if (!structuralCommands) return { ok: false, status: 'Structural commands unavailable.' };
@@ -558,17 +582,35 @@ function createPageBuilder({
     return (currentPage?.sections || []).find((section) => section.id === sectionId) || null;
   }
 
+  function getTargetKey(target) {
+    if (!target || typeof target !== 'object') return '';
+    if (target.key) return String(target.key);
+    if (target.kind === 'module' && target.moduleId) return `module:${target.moduleId}`;
+    if (target.kind === 'section' && target.sectionId) return `section:${target.sectionId}`;
+    if (target.kind === 'header' && target.pageId) return `header:${target.pageId}`;
+    if (target.kind === 'page' && target.pageId) return `page:${target.pageId}`;
+    if (target.kind === 'column' && target.sectionId && Number.isSafeInteger(target.columnIndex)) {
+      return `column:${target.sectionId}:${target.columnIndex}`;
+    }
+    return '';
+  }
+
   function getSelectedTarget() {
     const pageId = currentPage?.id || null;
     if (!pageId) return null;
     if (selectedCanvasSurface === 'page-header') {
-      return { kind: 'header', pageId };
+      return { kind: 'header', key: `header:${pageId}`, pageId };
     }
     if (selectedCanvasSurface === 'page-settings') {
-      return { kind: 'page', pageId };
+      return { kind: 'page', key: `page:${pageId}`, pageId };
     }
     if (selectedCanvasSurface === 'section' && activeSectionId) {
-      return { kind: 'section', pageId, sectionId: activeSectionId };
+      return {
+        kind: 'section',
+        key: `section:${activeSectionId}`,
+        pageId,
+        sectionId: activeSectionId,
+      };
     }
     const selectedModule = getSelectedModuleRecord(selectedModuleId);
     if (selectedModule) {
@@ -577,6 +619,7 @@ function createPageBuilder({
       );
       return {
         kind: 'module',
+        key: `module:${selectedModule.id}`,
         pageId,
         sectionId: section?.id || null,
         moduleId: selectedModule.id,
@@ -589,6 +632,26 @@ function createPageBuilder({
     if (!el.pbSidebarRailLabel) return;
     const activeTab = document.querySelector('.page-builder-sidebar .pb-sidebar-tab.active');
     el.pbSidebarRailLabel.textContent = activeTab?.textContent?.trim() || 'Pages';
+  }
+
+  function getBuilderRoot() {
+    return el.pageBuilderSection?.querySelector('.page-builder') || null;
+  }
+
+  function syncChromeModeUi() {
+    const isChromePreview = editorChromeMode === 'preview';
+    const root = getBuilderRoot();
+    if (root) {
+      root.dataset.chromeMode = isChromePreview ? 'preview' : 'edit';
+    }
+    if (el.pbEnterPreview) {
+      el.pbEnterPreview.setAttribute('aria-pressed', String(isChromePreview));
+      el.pbEnterPreview.disabled = isChromePreview;
+    }
+    if (el.pbRestorePreviewChrome) {
+      el.pbRestorePreviewChrome.hidden = !isChromePreview;
+      el.pbRestorePreviewChrome.setAttribute('aria-hidden', String(!isChromePreview));
+    }
   }
 
   function showSidePanelTab(tabName = 'settings') {
@@ -757,6 +820,9 @@ function createPageBuilder({
     draggedModuleId = null;
     draggedSectionId = null;
     liveDragState = null;
+    editorChromeMode = 'edit';
+    preChromeCanvasMode = null;
+    previewChromeRestoreState = null;
   }
 
   function getDefaultDesignerPage(pageSlug = '') {
@@ -868,7 +934,10 @@ function createPageBuilder({
 
   function applyEditorMode() {
     const layout = document.querySelector('.page-builder-layout');
-    if (!layout) return;
+    if (!layout) {
+      syncChromeModeUi();
+      return;
+    }
 
     const band = getViewportEditorBand();
     const sidebarMode = getEffectiveSidebarMode();
@@ -900,6 +969,7 @@ function createPageBuilder({
       el.pbToggleSidebar.dataset.mode = sidebarMode;
       el.pbToggleSidebar.dataset.viewportBand = band;
     }
+    syncChromeModeUi();
   }
 
   function toggleEditorMode() {
@@ -911,6 +981,61 @@ function createPageBuilder({
     const nextMode = getEffectiveSidebarMode() === 'collapsed' ? 'expanded' : 'collapsed';
     localStorage.setItem(SIDEBAR_MODE_KEY, nextMode);
     applyEditorMode();
+  }
+
+  function enterChromePreview() {
+    if (editorChromeMode === 'preview') return { ok: true };
+    const selectedTarget = getSelectedTarget();
+    preChromeCanvasMode = canvasMode;
+    previewChromeRestoreState = {
+      canvasMode,
+      activeSidePanelTab,
+      selectedTarget: selectedTarget ? cloneValue(selectedTarget) : null,
+      selectedTargetKey: getTargetKey(selectedTarget),
+      scrollTop: el.pbCanvas?.scrollTop || 0,
+      scrollLeft: el.pbCanvas?.scrollLeft || 0,
+    };
+    activeInsertTarget = null;
+    if (liveDragState) {
+      runStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.DRAG_END);
+    }
+    editorChromeMode = 'preview';
+    canvasMode = 'preview';
+    renderCanvas();
+    applyEditorMode();
+    window.requestAnimationFrame(() => {
+      el.pbRestorePreviewChrome?.focus();
+    });
+    return { ok: true };
+  }
+
+  function exitChromePreview() {
+    if (editorChromeMode !== 'preview') return { ok: true };
+    const restoreState = previewChromeRestoreState || {};
+    editorChromeMode = 'edit';
+    canvasMode = preChromeCanvasMode || restoreState.canvasMode || 'preview';
+    preChromeCanvasMode = null;
+    previewChromeRestoreState = null;
+    renderCanvas();
+    renderEditorPanel();
+    applyEditorMode();
+    if (restoreState.activeSidePanelTab) {
+      showSidePanelTab(restoreState.activeSidePanelTab);
+    }
+    if (canvasMode === 'preview') {
+      previewManager.restoreSelectedTarget?.(
+        restoreState.selectedTarget || restoreState.selectedTargetKey || null
+      );
+      previewManager.requestTargetRefresh?.(restoreState.selectedTarget || null);
+    }
+    window.requestAnimationFrame(() => {
+      if (el.pbCanvas) {
+        el.pbCanvas.scrollTop = restoreState.scrollTop || 0;
+        el.pbCanvas.scrollLeft = restoreState.scrollLeft || 0;
+      }
+      el.pbEnterPreview?.focus();
+    });
+    return { ok: true };
   }
 
   function getReaderUrl(page) {
@@ -1228,9 +1353,11 @@ function createPageBuilder({
     syncCanvasModeUi();
 
     if (canvasMode === 'preview') {
-      previewManager.renderPreview({ builderEditing: true });
+      previewManager.renderPreview({ builderEditing: editorChromeMode === 'edit' });
       renderLiveCanvasStatus();
-      renderStructureDebugSurface(true);
+      if (editorChromeMode === 'edit') {
+        renderStructureDebugSurface(true);
+      }
       return;
     }
 
@@ -1240,7 +1367,12 @@ function createPageBuilder({
 
   function renderLiveCanvasStatus() {
     const existing = el.pbCanvas?.querySelector('.pb-live-canvas-status');
-    if (!el.pbCanvas || canvasMode !== 'preview' || !canvasStatus.message) {
+    if (
+      !el.pbCanvas ||
+      canvasMode !== 'preview' ||
+      editorChromeMode !== 'edit' ||
+      !canvasStatus.message
+    ) {
       existing?.remove();
       return;
     }
@@ -1324,6 +1456,7 @@ function createPageBuilder({
       const button = /** @type {HTMLElement} */ (node);
       button.classList.toggle('pb-width-toggle--active', button.dataset.width === activeDeviceId);
     });
+    syncChromeModeUi();
   }
 
   function exitBuilder() {
@@ -1359,6 +1492,9 @@ function createPageBuilder({
     activeEntrypoint = entrypoint;
     activeDesignerSurface = requestedSurface;
     canvasMode = 'preview';
+    editorChromeMode = 'edit';
+    preChromeCanvasMode = null;
+    previewChromeRestoreState = null;
 
     hideAllSections();
     if (el.adminDashboard) {
@@ -1410,6 +1546,12 @@ function createPageBuilder({
     }
 
     el.pbExitBuilder?.addEventListener('click', exitBuilder);
+    el.pbEnterPreview?.addEventListener('click', () => {
+      runBuilderCommand(BUILDER_CHROME_COMMANDS.ENTER_PREVIEW);
+    });
+    el.pbRestorePreviewChrome?.addEventListener('click', () => {
+      runBuilderCommand(BUILDER_CHROME_COMMANDS.EXIT_PREVIEW);
+    });
 
     if (!editorResizeBound) {
       window.addEventListener('resize', applyEditorMode);

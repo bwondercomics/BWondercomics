@@ -188,6 +188,8 @@ export const el = {
   pbAddPage: document.getElementById('pbAddPage'),
   pbSaveDraft: document.getElementById('pbSaveDraft'),
   pbPublish: document.getElementById('pbPublish'),
+  pbEnterPreview: document.getElementById('pbEnterPreview'),
+  pbRestorePreviewChrome: document.getElementById('pbRestorePreviewChrome'),
   pbToggleSidebar: document.getElementById('pbToggleSidebar'),
   pbToggleEditor: document.getElementById('pbToggleEditor'),
   pbPageList: document.getElementById('pbPageList'),

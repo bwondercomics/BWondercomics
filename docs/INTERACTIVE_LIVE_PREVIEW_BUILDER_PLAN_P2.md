@@ -322,6 +322,37 @@ Assumptions:
 - Existing preview side-effect guards remain authoritative and must not be weakened.
 - Browser zoom is not used for responsive parity. Exact iframe CSS pixels remain authoritative.
 
+Completion note (`2026-06-03`): Phase 7 is implemented as a chrome-collapsed Preview state over the
+existing live reader iframe. The builder now has command-addressable `builder:enter-preview`,
+`builder:exit-preview`, and `builder:toggle-preview` behavior through local shell commands, a
+toolbar Preview button, and a single top-left Edit restore button. Collapsed Preview preserves the
+current iframe URL, `previewSession`, selected Desktop/Tablet/Phone dimensions, working/saved
+snapshot source, and dirty draft merge path while sending `options.builderEditing: false` so target
+geometry and inline editor chrome stop. Restoring returns to the prior Live or Structure Debug mode,
+keeps the side-panel tab and selected target state, requests fresh target geometry, and redraws the
+selected overlay only after a fresh target list arrives. No backend API, database schema, saved
+builder record, public reader output, or preview message contract changed.
+A corrective stale-target patch preserves the last accepted target sequence while chrome is
+collapsed, so old queued `TARGETS` messages remain ignored after restore while visible overlay state
+is still cleared.
+
+Verification refreshed for this phase:
+
+- `node --check admin/page-builder.js`
+- `node --check admin/page-builder/preview-manager.js`
+- `node --check admin/dom.js`
+- `node --check tests/admin-page-builder-shell.test.js`
+- `node --check tests/reader-preview-bridge.test.js`
+- `node --check tests/visual/builder-preview-parity.spec.js`
+- `npm test -- tests/admin-page-builder-shell.test.js tests/reader-preview-bridge.test.js tests/reader-preview-side-effects.test.js tests/admin-page-builder-preview-contract.test.js`
+- `npm run format:check`
+- `npm run lint`
+- `npm test`
+- `npm run test:backend`
+- `npm run build`
+- `npm run test:visual`
+- `git diff --check`
+
 ## Phase 8 - Page Scope and Routing Migration
 
 Goal: Support global site pages plus series-attached reader pages.

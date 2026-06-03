@@ -830,6 +830,14 @@
         <!-- Page Builder Section -->
         <section class="section" id="pageBuilderSection" style="display: none">
           <div class="page-builder">
+            <button
+              type="button"
+              class="btn-small btn-secondary pb-preview-restore"
+              id="pbRestorePreviewChrome"
+              hidden
+            >
+              Edit
+            </button>
             <header class="pb-builder-toolbar" id="pbBuilderToolbar">
               <div class="pb-builder-toolbar-main">
                 <button
@@ -870,6 +878,14 @@
                     title="Open the temporary structural fallback canvas"
                   >
                     Structure Debug
+                  </button>
+                  <button
+                    type="button"
+                    class="btn-small btn-secondary"
+                    id="pbEnterPreview"
+                    title="Hide editor chrome and preview the page"
+                  >
+                    Preview
                   </button>
                 </div>
                 <div

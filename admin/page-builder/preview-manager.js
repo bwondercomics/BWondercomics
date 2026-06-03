@@ -149,6 +149,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
   let latestTargetSequence = -1;
   let hoveredTargetKey = '';
   let selectedTargetKey = '';
+  let pendingRestoreTargetKey = '';
   let previewMessageBound = false;
   let targetStaleTimeoutId = null;
 
@@ -283,6 +284,26 @@ export function createPreviewManager({ el, getState, actions, deps }) {
   function findTargetGeometry(targetKey) {
     if (!targetKey) return null;
     return latestPreviewTargets.find((item) => getTargetKey(item.target) === targetKey) || null;
+  }
+
+  function getRestoreTargetKey(targetOrKey) {
+    if (!targetOrKey) return '';
+    if (typeof targetOrKey === 'string') return targetOrKey;
+    return getTargetKey(targetOrKey);
+  }
+
+  function applyPendingRestoreTarget(frame) {
+    if (!pendingRestoreTargetKey) return;
+    const restoreKey = pendingRestoreTargetKey;
+    pendingRestoreTargetKey = '';
+    const geometry = findTargetGeometry(restoreKey);
+    if (geometry) {
+      selectedTargetKey = restoreKey;
+      if (frame) frame.dataset.selectedTargetKey = restoreKey;
+      return;
+    }
+    selectedTargetKey = '';
+    if (frame) delete frame.dataset.selectedTargetKey;
   }
 
   function clearTargetStaleTimeout() {
@@ -486,6 +507,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     latestTargetSequence = options.preserveSequence ? previousSequence : -1;
     hoveredTargetKey = '';
     selectedTargetKey = '';
+    pendingRestoreTargetKey = '';
     const frame = /** @type {HTMLElement|null} */ (el.pbCanvas?.querySelector('.pb-preview-frame'));
     if (frame) {
       if (options.preserveSequence && latestTargetSequence >= 0) {
@@ -507,10 +529,16 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     clearTargetStaleTimeout();
     latestTargetSequence = message.sequence;
     latestPreviewTargets = Array.isArray(message.targets) ? message.targets : [];
+    applyPendingRestoreTarget(frame);
     if (hoveredTargetKey && !findTargetGeometry(hoveredTargetKey)) hoveredTargetKey = '';
     if (selectedTargetKey && !findTargetGeometry(selectedTargetKey)) selectedTargetKey = '';
     frame.dataset.targetSequence = String(latestTargetSequence);
     frame.dataset.targetCount = String(latestPreviewTargets.length);
+    if (selectedTargetKey) {
+      frame.dataset.selectedTargetKey = selectedTargetKey;
+    } else {
+      delete frame.dataset.selectedTargetKey;
+    }
     renderPreviewTargetOverlay(frame);
   }
 
@@ -567,14 +595,17 @@ export function createPreviewManager({ el, getState, actions, deps }) {
 
     const frame = /** @type {HTMLElement|null} */ (el.pbCanvas?.querySelector('.pb-preview-frame'));
     if (event.data.type === BUILDER_PREVIEW_MESSAGE_TYPES.TARGETS) {
+      if (latestPreviewSnapshot?.options?.builderEditing !== true) return;
       storePreviewTargets(frame, event.data);
       return;
     }
     if (event.data.type === BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_HOVER) {
+      if (latestPreviewSnapshot?.options?.builderEditing !== true) return;
       handleTargetHover(frame, event.data);
       return;
     }
     if (event.data.type === BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT) {
+      if (latestPreviewSnapshot?.options?.builderEditing !== true) return;
       handleTargetSelect(frame, event.data);
       return;
     }
@@ -712,6 +743,9 @@ export function createPreviewManager({ el, getState, actions, deps }) {
       resetPreviewTargets({ render: false });
     }
     latestPreviewSnapshot = snapshot;
+    if (snapshot.options?.builderEditing !== true) {
+      resetPreviewTargets({ render: false, preserveSequence: true });
+    }
 
     el.pbCanvas.dataset.mode = 'preview';
     const statusHtml = `<div class="pb-canvas-notice pb-preview-status" data-status="${snapshot.source === BUILDER_PREVIEW_SOURCES.WORKING ? 'warning' : 'neutral'}" data-preview-source="${escapeAttr(snapshot.source)}">${getPreviewStatusCopy(snapshot.source)}</div>`;
@@ -770,6 +804,12 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     }
     updatePreviewFrameDataset(existingFrame, snapshot, viewport);
     applyPreviewIframeSize(existingIframe, viewport);
+    if (snapshot.options?.builderEditing !== true) {
+      existingFrame.querySelector('.pb-preview-debug-overlay')?.remove();
+      renderPreviewTargetOverlay(existingFrame);
+      postPreviewSnapshot();
+      return;
+    }
     renderPreviewDebugOverlay(existingFrame);
     renderPreviewTargetOverlay(existingFrame);
     scheduleTargetStaleTimeout(existingFrame, latestTargetSequence);
@@ -835,10 +875,26 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     postTargetAction(BUILDER_PREVIEW_TARGET_ACTIONS.REFRESH_TARGETS, target);
   }
 
+  function restoreSelectedTarget(targetOrKey = null) {
+    pendingRestoreTargetKey = getRestoreTargetKey(targetOrKey);
+    hoveredTargetKey = '';
+    selectedTargetKey = '';
+    const frame = /** @type {HTMLElement|null} */ (el.pbCanvas?.querySelector('.pb-preview-frame'));
+    if (frame) {
+      delete frame.dataset.hoveredTargetKey;
+      delete frame.dataset.selectedTargetKey;
+      if (latestPreviewTargets.length) {
+        applyPendingRestoreTarget(frame);
+      }
+    }
+    renderPreviewTargetOverlay(frame);
+  }
+
   return {
     bindMessageHandler,
     getSnapshot,
     requestTargetRefresh,
+    restoreSelectedTarget,
     renderTargetOverlay,
     renderPreview,
     resetSession,

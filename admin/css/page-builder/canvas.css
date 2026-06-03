@@ -175,6 +175,11 @@
   overflow: auto;
 }
 
+.page-builder[data-chrome-mode='preview'] .pb-canvas {
+  padding: 0;
+  background: var(--bg-dark, #05070b);
+}
+
 .pb-canvas-empty {
   display: flex;
   flex-direction: column;
