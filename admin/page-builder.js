@@ -31,7 +31,12 @@ import { normalizeHeaderNavItems } from './page-builder/link-utils.js';
 import { createPageActions } from './page-builder/page-actions.js';
 import { createPreviewManager } from './page-builder/preview-manager.js';
 import { createSidebarPanel } from './page-builder/sidebar-panel.js';
-import { PREVIEW_VIEWPORT_ORDER } from './page-builder/preview-contract.js';
+import { BUILDER_DEVICE_ORDER } from './page-builder/preview-contract.js';
+import {
+  isSectionResponsiveField,
+  pruneEmptyResponsiveOverrides,
+  setResponsiveOverrideValue,
+} from './page-builder/responsive-overrides.js';
 import {
   fetchPages,
   fetchPage,
@@ -82,7 +87,9 @@ function createPageBuilder({
   /** @type {'edit'|'preview'} */
   let canvasMode = 'preview';
   /** @type {'desktop'|'tablet'|'mobile'} */
-  let previewWidth = PREVIEW_VIEWPORT_ORDER[0];
+  let activeDeviceId = BUILDER_DEVICE_ORDER[0];
+  /** @type {'global'|'device'} */
+  let responsiveEditScope = 'global';
   /** @type {'builder'|'designer'} */
   let activeEntrypoint = 'builder';
   /** @type {''|'header'} */
@@ -155,6 +162,9 @@ function createPageBuilder({
       activeModuleDraftId,
       activeSectionId,
       activeSectionDraft,
+      activeDeviceId,
+      previewWidth: activeDeviceId,
+      responsiveEditScope,
       dirtyScope,
     }),
     actions: {
@@ -165,6 +175,9 @@ function createPageBuilder({
       initializeModuleDraft: draftManager.initializeModuleDraft,
       setActiveEditorTab: (nextTab) => {
         activeEditorTab = nextTab;
+      },
+      setResponsiveEditScope: (nextScope) => {
+        responsiveEditScope = nextScope === 'device' ? 'device' : 'global';
       },
       setActiveThemeDraft: (nextDraft) => {
         activeThemeDraft = cloneValue(nextDraft);
@@ -401,15 +414,20 @@ function createPageBuilder({
       activePageSettingsDraft,
       activeSectionId,
       activeSectionDraft,
-      previewWidth,
+      activeDeviceId,
+      previewWidth: activeDeviceId,
     }),
     actions: {
       buildNormalizedPageMeta,
       buildSectionSettingsFromDraft,
+      setActiveDeviceId: (nextDeviceId) => {
+        activeDeviceId = nextDeviceId;
+      },
       setPreviewWidth: (nextWidth) => {
-        previewWidth = nextWidth;
+        activeDeviceId = nextWidth;
       },
       selectCanvasTarget,
+      renderEditorPanel: () => renderEditorPanel(),
     },
     deps: {
       getSeriesId,
@@ -735,22 +753,41 @@ function createPageBuilder({
   }
 
   function buildNormalizedPageMeta(page = currentPage, draftState = activeHeaderDraft) {
+    const responsive = pruneEmptyResponsiveOverrides(
+      draftState && Object.prototype.hasOwnProperty.call(draftState, 'responsive')
+        ? draftState.responsive
+        : (page?.meta?.responsive ?? {})
+    );
     const nextMeta = {
       ...(page?.meta || {}),
       header: cloneValue(buildNormalizedPageHeader(page, draftState)),
     };
+    if (Object.keys(responsive).length) {
+      nextMeta.responsive = responsive;
+    } else {
+      delete nextMeta.responsive;
+    }
     delete nextMeta.headerOverrides;
     return nextMeta;
   }
 
   function buildSectionSettingsFromDraft(draft = activeSectionDraft) {
-    const settings = {};
-    ['moduleGap', 'columnGap', 'sectionGap'].forEach((key) => {
-      const value = draft?.[key];
+    const settings = cloneValue(draft || {}) || {};
+    ['moduleGap', 'columnGap', 'sectionGap', 'paddingTop', 'paddingBottom'].forEach((key) => {
+      const value = settings?.[key];
       if (value !== '' && value !== null && value !== undefined) {
         settings[key] = value;
+      } else {
+        delete settings[key];
       }
     });
+    if (!settings.backgroundColor) {
+      delete settings.backgroundColor;
+    }
+    settings.responsive = pruneEmptyResponsiveOverrides(settings.responsive);
+    if (!Object.keys(settings.responsive).length) {
+      delete settings.responsive;
+    }
     return settings;
   }
 
@@ -784,10 +821,19 @@ function createPageBuilder({
 
   function updateActiveSectionDraftField(key, rawValue) {
     if (!activeSectionDraft || !key) return;
-    const raw = String(rawValue || '').trim();
-    activeSectionDraft[key] = raw ? Math.max(0, Math.round(Number(raw) || 0)) : '';
+    const raw = String(rawValue ?? '').trim();
+    let value = raw;
+    if (['moduleGap', 'columnGap', 'sectionGap', 'paddingTop', 'paddingBottom'].includes(key)) {
+      value = raw ? Math.max(0, Math.round(Number(raw) || 0)) : '';
+    }
+    if (responsiveEditScope === 'device' && isSectionResponsiveField(key)) {
+      setResponsiveOverrideValue(activeSectionDraft, activeDeviceId, key, value);
+    } else if (key !== 'layout') {
+      activeSectionDraft[key] = value;
+    }
     markDirty('section');
     renderCanvas();
+    renderEditorPanel();
   }
 
   function discardSectionSettings() {
@@ -1091,7 +1137,7 @@ function createPageBuilder({
     });
     el.pbWidthToggles?.querySelectorAll('.pb-width-toggle').forEach((node) => {
       const button = /** @type {HTMLElement} */ (node);
-      button.classList.toggle('pb-width-toggle--active', button.dataset.width === previewWidth);
+      button.classList.toggle('pb-width-toggle--active', button.dataset.width === activeDeviceId);
     });
   }
 
@@ -1319,7 +1365,7 @@ function createPageBuilder({
 
         el.pbWidthToggles.querySelectorAll('.pb-width-toggle').forEach((node) => {
           const b = /** @type {HTMLElement} */ (node);
-          b.classList.toggle('pb-width-toggle--active', b.dataset.width === previewWidth);
+          b.classList.toggle('pb-width-toggle--active', b.dataset.width === activeDeviceId);
         });
       });
     }

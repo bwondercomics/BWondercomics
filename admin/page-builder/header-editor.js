@@ -23,6 +23,12 @@ import {
   normalizeLinkTarget,
 } from './link-utils.js';
 import { renderInspectorSection } from './inspector-sections.js';
+import {
+  getBuilderDeviceLabel,
+  getResponsiveBranch,
+  normalizeBuilderDeviceId,
+  pruneEmptyResponsiveOverrides,
+} from './responsive-overrides.js';
 
 function getRegionLabel(region) {
   return String(region || '').replace(/^\w/, (char) => char.toUpperCase());
@@ -335,6 +341,63 @@ function renderShellAppearanceEditor(header) {
   });
 }
 
+function renderResponsiveScopeControl({ activeDeviceId, responsiveEditScope }) {
+  const deviceLabel = getBuilderDeviceLabel(activeDeviceId);
+  return renderInspectorSection({
+    kicker: 'Device',
+    title: 'Edit Scope',
+    summary: responsiveEditScope === 'device' ? deviceLabel : 'Global',
+    copy: '',
+    body: `
+      <div class="form-editor">
+        <div class="form-group">
+          <label class="form-label" for="pbResponsiveEditScope">Scope</label>
+          <select id="pbResponsiveEditScope" class="form-input" data-responsive-edit-scope>
+            <option value="global" ${responsiveEditScope === 'global' ? 'selected' : ''}>Global</option>
+            <option value="device" ${responsiveEditScope === 'device' ? 'selected' : ''}>Current Device (${escapeHtml(deviceLabel)})</option>
+          </select>
+        </div>
+      </div>
+    `,
+  });
+}
+
+function renderDeviceAppearanceEditor(appearance = {}, activeDeviceId = 'desktop') {
+  const deviceLabel = getBuilderDeviceLabel(activeDeviceId);
+  const hasAppearance = !!(appearance?.top || appearance?.scrolled || appearance?.navItemDefaults);
+  return renderInspectorSection({
+    kicker: 'Styling',
+    title: 'Header Styling',
+    summary: hasAppearance ? deviceLabel : 'Default',
+    copy: 'Control header appearance for the active device without changing global header content.',
+    body: `
+      <div class="pb-appearance-stack">
+        ${renderAppearanceControls(
+          appearance?.top,
+          'shell-top',
+          null,
+          'Normal Header',
+          'Styles used before the reader scrolls.'
+        )}
+        ${renderAppearanceControls(
+          appearance?.scrolled,
+          'shell-scrolled',
+          null,
+          'After Page Scroll',
+          'Styles used once the sticky header has scrolled.'
+        )}
+        ${renderAppearanceControls(
+          appearance?.navItemDefaults,
+          'nav-defaults',
+          null,
+          'Header Nav Defaults',
+          'Set device-specific defaults that author-created header buttons inherit.'
+        )}
+      </div>
+    `,
+  });
+}
+
 function renderSourceBanner(source) {
   if (source === 'legacy-import') {
     return `
@@ -355,12 +418,36 @@ function renderSourceBanner(source) {
   return '';
 }
 
-export function renderHeaderEditorContent({ draftState, pages = [] }) {
+export function renderHeaderEditorContent({
+  draftState,
+  pages = [],
+  activeDeviceId = 'desktop',
+  responsiveEditScope = 'global',
+}) {
+  const normalizedDeviceId = normalizeBuilderDeviceId(activeDeviceId);
+  const scope = responsiveEditScope === 'device' ? 'device' : 'global';
   const header = normalizeHeaderConfig(draftState?.header, normalizeHeaderNavItems);
   const copy = normalizeHeaderCopy(draftState?.copy);
+  const responsiveAppearance = getResponsiveBranch(draftState || {}, normalizedDeviceId)?.header
+    ?.appearance;
+
+  if (scope === 'device') {
+    return [
+      renderSourceBanner(draftState?.source),
+      renderResponsiveScopeControl({
+        activeDeviceId: normalizedDeviceId,
+        responsiveEditScope: scope,
+      }),
+      renderDeviceAppearanceEditor(responsiveAppearance || {}, normalizedDeviceId),
+    ].join('');
+  }
 
   return [
     renderSourceBanner(draftState?.source),
+    renderResponsiveScopeControl({
+      activeDeviceId: normalizedDeviceId,
+      responsiveEditScope: scope,
+    }),
     renderCopyEditor(copy),
     renderPartsEditor(header),
     renderPlacementEditor(header),
@@ -453,19 +540,26 @@ export function bindHeaderEditorEvents({
   markDirty,
   renderEditorPanel,
   renderCanvas,
+  activeDeviceId = 'desktop',
+  responsiveEditScope = 'global',
 }) {
+  const normalizedDeviceId = normalizeBuilderDeviceId(activeDeviceId);
+  const useDeviceAppearance = responsiveEditScope === 'device';
   let state = {
     source: draftState?.source || null,
     header: normalizeHeaderConfig(draftState?.header, normalizeHeaderNavItems),
     copy: normalizeHeaderCopy(draftState?.copy),
+    responsive: pruneEmptyResponsiveOverrides(draftState?.responsive || {}),
   };
 
   const commit = (nextState, options = {}) => {
     const { rerenderEditor = false, rerenderCanvas = true } = options;
+    const responsive = pruneEmptyResponsiveOverrides(nextState?.responsive || {});
     state = {
       source: nextState?.source || state.source || null,
       header: normalizeHeaderConfig(nextState.header, normalizeHeaderNavItems),
       copy: normalizeHeaderCopy(nextState.copy),
+      responsive,
     };
     setDraftState(cloneValue(state));
     markDirty('header');
@@ -510,12 +604,47 @@ export function bindHeaderEditorEvents({
     }
   };
 
+  const ensureResponsiveAppearanceRoot = (nextState) => {
+    nextState.responsive = isObject(nextState.responsive) ? nextState.responsive : {};
+    nextState.responsive[normalizedDeviceId] = isObject(nextState.responsive[normalizedDeviceId])
+      ? nextState.responsive[normalizedDeviceId]
+      : {};
+    const branch = nextState.responsive[normalizedDeviceId];
+    branch.header = isObject(branch.header) ? branch.header : {};
+    branch.header.appearance = isObject(branch.header.appearance) ? branch.header.appearance : {};
+    return branch.header.appearance;
+  };
+
+  const cleanupResponsiveRoot = (nextState) => {
+    const responsive = pruneEmptyResponsiveOverrides(nextState.responsive || {});
+    if (Object.keys(responsive).length) {
+      nextState.responsive = responsive;
+    } else {
+      delete nextState.responsive;
+    }
+  };
+
   const resolveAppearanceTarget = (nextState, scope, index) => {
     if (scope === 'nav-item') {
+      if (useDeviceAppearance) return null;
       return Number.isInteger(index) ? nextState.header.nav.items[index] : null;
     }
     const key = SHELL_APPEARANCE_SCOPE_TO_KEY[scope];
     if (!key) return null;
+    if (useDeviceAppearance) {
+      const root = ensureResponsiveAppearanceRoot(nextState);
+      return {
+        appearance: root[key],
+        setAppearance(appearance) {
+          if (appearance) {
+            root[key] = appearance;
+          } else {
+            delete root[key];
+            cleanupResponsiveRoot(nextState);
+          }
+        },
+      };
+    }
     const root = ensureHeaderAppearanceRoot(nextState);
     return {
       appearance: root[key],

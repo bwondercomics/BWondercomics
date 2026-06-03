@@ -1,7 +1,7 @@
 # Full-Page Live Builder Plan, Part 1 of 2
 
-Status: In progress - Phase 3 complete
-Plan state: Phases 1, 2, and 3 have completion notes below. All later phases remain planned until
+Status: In progress - Phase 4 complete
+Plan state: Phases 1, 2, 3, and 4 have completion notes below. All later phases remain planned until
 future completion notes say otherwise.
 Scope of this file: shared direction, references, target model, and Phases 1-5.
 Companion file: [Part 2 - Phases 6-12, risks, and implementation order](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md)
@@ -657,7 +657,7 @@ Implementation:
 - Extend page/section/module config contracts with a sparse responsive override shape, for example:
   - `responsive.desktop`
   - `responsive.tablet`
-  - `responsive.phone`
+  - `responsive.mobile`
 - Define supported override categories before UI exposure:
   - section spacing and layout
   - column/module gap
@@ -767,8 +767,69 @@ Assumptions:
   renderer support.
 - The saved responsive key remains `mobile` for compatibility with current `PREVIEW_VIEWPORTS`;
   only UI copy changes to `Phone`.
-- Because Phases 1-3 have not started yet, this plan describes the final Phase 4 integration points
-  and should be implemented after those prerequisites or adapted if their contracts change.
+- Phase 4 was implemented after the Phase 1-3 completion notes; future adaptations should keep
+  those current contracts authoritative over earlier planning assumptions.
+
+Completion note (`2026-06-02`): Phase 4 is implemented. The builder now treats the existing
+Desktop/Tablet/Mobile viewport presets as editable devices, labels `mobile` as `Phone` in the
+builder toolbar, stores the active device in builder state, and includes `options.deviceId` in live
+preview snapshots while preserving `options.viewport` compatibility. Sparse responsive overrides are
+supported in `page.meta.responsive`, `section.settings.responsive`, and `module.config.responsive`
+without schema changes. The shared responsive utility normalizes/prunes device branches, resolves
+effective section/module values only for builder-editing device context, and keeps public reader
+rendering on global values. Backend sanitizers now preserve only whitelisted responsive page/header,
+section, and module fields.
+
+The inspector exposes Global vs Current Device scope controls for section spacing/layout and module
+fields with renderer support. Current-device edits save whitelisted fields to
+`responsive[activeDeviceId]`; unsupported fields and structural placement stay global. Text
+alignment, gallery and entry-gallery columns, spacer height, module hidden state, and buttons
+appearance branches are covered. Device-hidden modules render as selectable placeholders in the live
+builder canvas. Device switching resizes the iframe, updates toolbar state, preserves selection
+identity, refreshes snapshots with the active device, and reuses the Phase 3 stale-overlay cleanup.
+
+Verification passed:
+
+- Individual `node --check` runs for `admin/page-builder/responsive-overrides.js`,
+  `admin/page-builder/preview-contract.js`, `admin/page-builder/preview-manager.js`,
+  `admin/page-builder.js`, editor modules, shared renderers, reader preview files, and the updated
+  targeted JS tests.
+- `python3 -m py_compile backend/app/builder_security.py backend/tests/test_page_builder_routes.py`
+- `npm test -- tests/responsive-overrides.test.js
+tests/admin-page-builder-preview-contract.test.js tests/admin-page-builder-shell.test.js
+tests/reader-page-renderer.test.js tests/shared-renderers-parity.test.js`
+- `./.venv/bin/python -m unittest backend.tests.test_page_builder_routes`
+- `npm test`
+- `npm run test:backend`
+- `npm run build`
+- `npm run test:visual`
+- `git diff --check`
+
+Corrective patch note (`2026-06-03`): Phase 4 audit findings are fixed. Current Device module
+scope is now override-only: unsupported content, media, list, link, style, raw JSON, and structural
+controls are hidden or ignored, while supported module overrides continue to save sparsely. Header
+editing now carries a sparse `activeHeaderDraft.responsive` branch, exposes Current Device controls
+only for sanitized header shell appearance (`top`, `scrolled`, and `navItemDefaults`), includes
+dirty header responsive branches in live preview snapshots, and saves device appearance without
+replacing global `meta.header`. Reader-shell live preview panel routing now uses global structural
+placement for left/right membership during builder editing, so right-panel modules remain visible and
+selectable when the active device layout collapses columns.
+
+Additional verification passed for the corrective patch:
+
+- `node --check admin/page-builder/module-editor.js admin/page-builder/button-editor.js
+admin/page-builder/header-editor.js admin/page-builder/gallery-editor.js
+admin/page-builder/entry-gallery-editor.js reader/data.js`
+- `node --check tests/admin-page-builder-shell.test.js tests/reader-data-builder.test.js
+admin/page-builder.js admin/page-builder/editor-panel.js admin/page-builder/draft-manager.js`
+- `npm test -- tests/admin-page-builder-shell.test.js tests/reader-data-builder.test.js
+tests/reader-page-renderer.test.js tests/shared-renderers-parity.test.js
+tests/responsive-overrides.test.js`
+- `npm test`
+- `npm run test:backend`
+- `npm run build`
+- `npm run test:visual`
+- `git diff --check`
 
 ## Phase 5 - Side Panel as Blocks, Layers, Traits, and Styles
 

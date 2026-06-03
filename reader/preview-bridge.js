@@ -662,6 +662,7 @@ export function requestPreviewSnapshot(options = {}) {
         page: message.snapshot.page,
         previewMode: true,
         builderEditing: message.snapshot.options?.builderEditing === true,
+        deviceId: message.snapshot.options?.deviceId,
         snapshot: message.snapshot,
       });
     };
@@ -716,6 +717,7 @@ export function subscribePreviewSnapshots(onSnapshot, options = {}) {
         page: message.snapshot.page,
         previewMode: true,
         builderEditing: message.snapshot.options?.builderEditing === true,
+        deviceId: message.snapshot.options?.deviceId,
         snapshot: message.snapshot,
       });
     } catch (err) {

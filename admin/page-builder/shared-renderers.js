@@ -16,6 +16,9 @@
  * @param {boolean}                  [options.builderEditing]         - Emit admin-only target
  *                                                                      markers for live builder
  *                                                                      editing sessions
+ * @param {'desktop'|'tablet'|'mobile'} [options.deviceId]            - Active builder device
+ *                                                                      context for sparse
+ *                                                                      responsive overrides
  */
 
 import { escapeHtml } from './helpers.js';
@@ -26,6 +29,12 @@ import {
   shouldOpenLinkInNewTab,
 } from './link-utils.js';
 import { appearanceToInlineStyle, mergeAppearance } from './appearance-utils.js';
+import {
+  getEffectiveModuleConfig,
+  getEffectiveSectionLayout,
+  getEffectiveSectionSettings,
+  isModuleHiddenForDevice,
+} from './responsive-overrides.js';
 import {
   sanitizeAssetUrl,
   sanitizeBuilderHtml,
@@ -383,8 +392,16 @@ export function createRenderers({
   function renderModule(mod, renderOptions = {}) {
     const type = mod.moduleType || 'text';
     const safeType = String(type || 'text').replace(/[^a-z0-9_-]/gi, '') || 'unknown';
-    const config = mod.config || {};
     const emitMarkers = isBuilderEditingEnabled(renderOptions);
+    const hiddenOnDevice = isModuleHiddenForDevice(mod, {
+      ...renderOptions,
+      builderEditing: emitMarkers,
+    });
+    if (hiddenOnDevice && !emitMarkers) return '';
+    const config = getEffectiveModuleConfig(mod, {
+      ...renderOptions,
+      builderEditing: emitMarkers,
+    });
     const markerAttrs = builderMarkerAttrs(
       {
         'data-builder-module-id': mod?.id,
@@ -399,19 +416,25 @@ export function createRenderers({
       return `<div class="pb-module pb-module--unknown"${moduleIdAttr}${markerAttrs}>[Unknown module: ${escapeHtml(type)}]</div>`;
     }
 
-    const content = renderer(config, mod);
-    return `<div class="pb-module pb-module--${safeType}"${moduleIdAttr}${markerAttrs}>${content}</div>`;
+    const hiddenClass = hiddenOnDevice ? ' pb-module--hidden-device' : '';
+    const content = hiddenOnDevice
+      ? '<div class="pb-module-hidden-placeholder">Hidden on this device</div>'
+      : renderer(config, mod);
+    return `<div class="pb-module pb-module--${safeType}${hiddenClass}"${moduleIdAttr}${markerAttrs}>${content}</div>`;
   }
 
   function renderSection(section, renderOptions = {}) {
     const emitMarkers = isBuilderEditingEnabled(renderOptions);
     const layout = sanitizeKeyword(
-      section.layout,
+      getEffectiveSectionLayout(section, { ...renderOptions, builderEditing: emitMarkers }),
       ['1', '1-1', '1-2', '2-1', '1-1-1', '1-3-1'],
       '1'
     );
     const columnCount = layout.split('-').length;
-    const settings = section.settings || {};
+    const settings = getEffectiveSectionSettings(section, {
+      ...renderOptions,
+      builderEditing: emitMarkers,
+    });
 
     let style = '';
     const backgroundColor = sanitizeColor(settings.backgroundColor);

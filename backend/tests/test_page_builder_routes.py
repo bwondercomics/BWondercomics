@@ -578,6 +578,163 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.assertNotIn("appearance", plain_page["meta"]["header"])
         self.assertNotIn("appearance", plain_payload["meta"]["header"])
 
+    def test_builder_security_sanitizes_responsive_overrides(self):
+        self.seed_contract_series()
+        page = page_builder.api_create_page(
+            page_builder.CreatePageRequest(
+                slug="responsive-contract",
+                title="Responsive Contract",
+                meta={
+                    "header": {"copy": {"title": "Responsive Contract"}},
+                    "responsive": {
+                        "mobile": {
+                            "header": {
+                                "appearance": {
+                                    "top": {"background": {"color": "#112233"}},
+                                    "unknown": {"color": "#ffffff"},
+                                },
+                            },
+                            "unsafe": {"value": "drop"},
+                        },
+                        "watch": {"header": {"appearance": {"top": {"text": {"color": "#fff"}}}}},
+                    },
+                },
+            ),
+            self.admin_request("/api/admin/pages", "POST"),
+            "battle-bros",
+            self.db,
+        )["page"]
+
+        section = page_builder.api_add_section(
+            page["id"],
+            page_builder.CreateSectionRequest(
+                sectionType="row",
+                layout="1-1",
+                settings={
+                    "moduleGap": 20,
+                    "responsive": {
+                        "mobile": {
+                            "layout": "1",
+                            "moduleGap": -10,
+                            "backgroundColor": "not-a-color",
+                            "unsafe": "drop",
+                        },
+                        "tablet": {"columnGap": 24},
+                    },
+                },
+            ),
+            self.admin_request(f"/api/admin/pages/{page['id']}/sections", "POST"),
+            self.db,
+        )["section"]
+
+        page_builder.api_add_module(
+            section["id"],
+            page_builder.CreateModuleRequest(
+                moduleType="text",
+                columnIndex=0,
+                config={
+                    "content": "<p>Copy</p>",
+                    "alignment": "left",
+                    "responsive": {
+                        "mobile": {
+                            "alignment": "right",
+                            "hidden": True,
+                            "content": "<script>drop()</script>",
+                        },
+                        "tablet": {
+                            "alignment": "sideways",
+                            "hidden": False,
+                        },
+                    },
+                },
+            ),
+            self.admin_request(f"/api/admin/sections/{section['id']}/modules", "POST"),
+            self.db,
+        )
+        page_builder.api_add_module(
+            section["id"],
+            page_builder.CreateModuleRequest(
+                moduleType="buttons",
+                columnIndex=1,
+                config={
+                    "buttons": [
+                        {
+                            "id": "read-now",
+                            "text": "Read",
+                            "link": {"kind": "builder-page", "pageSlug": "reader"},
+                        }
+                    ],
+                    "responsive": {
+                        "mobile": {
+                            "defaults": {
+                                "appearance": {
+                                    "background": {"color": "#202020", "opacity": 2}
+                                }
+                            },
+                            "buttons": [
+                                {
+                                    "id": "read-now",
+                                    "text": "Drop",
+                                    "appearance": {"text": {"color": "#ffffff"}},
+                                }
+                            ],
+                            "text": "drop",
+                        }
+                    },
+                },
+            ),
+            self.admin_request(f"/api/admin/sections/{section['id']}/modules", "POST"),
+            self.db,
+        )
+
+        payload = page_builder.api_get_page(
+            page["id"],
+            self.admin_request(f"/api/admin/pages/{page['id']}"),
+            self.db,
+        )["page"]
+
+        self.assertNotIn("watch", payload["meta"]["responsive"])
+        self.assertNotIn("unsafe", payload["meta"]["responsive"]["mobile"])
+        self.assertEqual(
+            payload["meta"]["responsive"]["mobile"]["header"]["appearance"]["top"]["background"][
+                "color"
+            ],
+            "#112233",
+        )
+
+        section_payload = payload["sections"][0]
+        self.assertEqual(section_payload["settings"]["moduleGap"], 20)
+        self.assertEqual(section_payload["settings"]["responsive"]["mobile"]["layout"], "1")
+        self.assertEqual(section_payload["settings"]["responsive"]["mobile"]["moduleGap"], 0)
+        self.assertNotIn("backgroundColor", section_payload["settings"]["responsive"]["mobile"])
+        self.assertNotIn("unsafe", section_payload["settings"]["responsive"]["mobile"])
+        self.assertEqual(section_payload["settings"]["responsive"]["tablet"]["columnGap"], 24)
+
+        text_module = next(
+            module for module in section_payload["modules"] if module["moduleType"] == "text"
+        )
+        self.assertEqual(text_module["config"]["alignment"], "left")
+        self.assertEqual(text_module["config"]["responsive"]["mobile"]["alignment"], "right")
+        self.assertEqual(text_module["config"]["responsive"]["mobile"]["hidden"], True)
+        self.assertNotIn("content", text_module["config"]["responsive"]["mobile"])
+        self.assertEqual(text_module["config"]["responsive"]["tablet"]["hidden"], False)
+        self.assertNotIn("alignment", text_module["config"]["responsive"]["tablet"])
+
+        buttons_module = next(
+            module for module in section_payload["modules"] if module["moduleType"] == "buttons"
+        )
+        button_responsive = buttons_module["config"]["responsive"]["mobile"]
+        self.assertEqual(
+            button_responsive["defaults"]["appearance"]["background"]["color"], "#202020"
+        )
+        self.assertEqual(
+            button_responsive["defaults"]["appearance"]["background"]["opacity"], 1.0
+        )
+        self.assertEqual(button_responsive["buttons"][0]["id"], "read-now")
+        self.assertEqual(button_responsive["buttons"][0]["appearance"]["text"]["color"], "#ffffff")
+        self.assertNotIn("text", button_responsive["buttons"][0])
+        self.assertNotIn("text", button_responsive)
+
     def test_builder_security_rejects_invalid_structure_and_sanitizes_legacy_reads(self):
         self.seed_contract_series()
         page = page_builder.api_create_page(

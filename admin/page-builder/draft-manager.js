@@ -41,6 +41,7 @@ export function createDraftManager({ getState, actions, deps }) {
         subtitle: '',
         subtitles: [],
       }),
+      responsive: cloneValue(page?.meta?.responsive || {}),
     };
   }
 
@@ -66,6 +67,7 @@ export function createDraftManager({ getState, actions, deps }) {
             source: 'default',
             header: createDefaultHeaderConfig(),
             copy: normalizeHeaderCopy(null, { title: 'Page Title', subtitle: '', subtitles: [] }),
+            responsive: {},
           }
     );
   }
@@ -90,6 +92,7 @@ export function createDraftManager({ getState, actions, deps }) {
     const settings = section.settings || {};
     actions.setActiveSectionId(sectionId);
     actions.setActiveSectionDraft({
+      ...cloneValue(settings),
       moduleGap: settings.moduleGap ?? '',
       columnGap: settings.columnGap ?? '',
       sectionGap: settings.sectionGap ?? '',

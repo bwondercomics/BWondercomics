@@ -626,6 +626,23 @@
   box-shadow: 0 0 0 2px rgba(0, 217, 255, 0.2);
 }
 
+.pb-module--hidden-device {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-style: dashed;
+  border-color: rgba(255, 237, 0, 0.45);
+  background: rgba(255, 237, 0, 0.08);
+}
+
+.pb-module-hidden-placeholder {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.72);
+  text-transform: uppercase;
+}
+
 .pb-module-header {
   display: flex;
   justify-content: space-between;

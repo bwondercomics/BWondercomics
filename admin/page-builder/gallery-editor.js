@@ -1,5 +1,6 @@
 import { escapeAttr, escapeHtml } from './helpers.js';
 import { renderInspectorSection } from './inspector-sections.js';
+import { setResponsiveOverrideValue } from './responsive-overrides.js';
 
 function cloneValue(value) {
   return JSON.parse(JSON.stringify(value ?? null));
@@ -18,13 +19,15 @@ export function normalizeGalleryImage(image) {
 export function normalizeGalleryConfig(config = {}) {
   const images = Array.isArray(config.images) ? config.images.map(normalizeGalleryImage) : [];
   return {
+    ...cloneValue(config),
     images,
     columns: typeof config.columns === 'number' ? config.columns : 3,
   };
 }
 
-export function renderGalleryEditor(config = {}) {
+export function renderGalleryEditor(config = {}, options = {}) {
   const normalized = normalizeGalleryConfig(config);
+  const deviceOnly = options.deviceOnly === true;
   const imagesHtml = normalized.images
     .map(
       (image, index) => `
@@ -59,20 +62,23 @@ export function renderGalleryEditor(config = {}) {
     )
     .join('');
 
-  return `
-    ${renderInspectorSection({
-      kicker: 'Layout',
-      title: 'Gallery Layout',
-      summary: `${normalized.columns} columns`,
-      copy: 'Configure the grid columns for the gallery.',
-      body: `
+  const layoutSection = renderInspectorSection({
+    kicker: 'Layout',
+    title: 'Gallery Layout',
+    summary: `${normalized.columns} columns`,
+    copy: 'Configure the grid columns for the gallery.',
+    body: `
       <div class="pb-editor-field">
         <label class="pb-editor-label">Columns</label>
         <input type="number" class="pb-editor-input pb-gallery-main-input" data-key="columns" min="1" max="6" value="${normalized.columns}">
       </div>
       `,
-    })}
+  });
 
+  if (deviceOnly) return layoutSection;
+
+  return `
+    ${layoutSection}
     ${renderInspectorSection({
       kicker: 'Content',
       title: 'Images',
@@ -99,6 +105,8 @@ export function bindGalleryEditorEvents({
   openImagePicker,
   fetchAssets,
   uploadAssetFile,
+  activeDeviceId = 'desktop',
+  responsiveEditScope = 'global',
 }) {
   let config = normalizeGalleryConfig(draftConfig);
 
@@ -116,11 +124,18 @@ export function bindGalleryEditorEvents({
       const nextConfig = normalizeGalleryConfig(config);
       const key = input.dataset.key;
       if (key === 'columns') {
-        nextConfig[key] = parseInt(input.value, 10) || 3;
+        const value = parseInt(input.value, 10) || 3;
+        if (responsiveEditScope === 'device') {
+          setResponsiveOverrideValue(nextConfig, activeDeviceId, key, value);
+        } else {
+          nextConfig[key] = value;
+        }
       }
       commit(nextConfig);
     });
   });
+
+  if (responsiveEditScope === 'device') return;
 
   document.getElementById('pbGalleryAddImage')?.addEventListener('click', () => {
     const nextConfig = normalizeGalleryConfig(config);

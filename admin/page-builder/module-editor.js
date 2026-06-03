@@ -15,6 +15,13 @@ import { bindVideoEditorEvents, renderVideoEditor } from './video-editor.js';
 import { bindDividerEditorEvents, renderDividerEditor } from './divider-editor.js';
 import { bindEntryGalleryEditorEvents, renderEntryGalleryEditor } from './entry-gallery-editor.js';
 import { renderInspectorSection } from './inspector-sections.js';
+import {
+  getBuilderDeviceLabel,
+  getEffectiveModuleConfig,
+  isModuleHiddenForDevice,
+  isModuleResponsiveField,
+  setResponsiveOverrideValue,
+} from './responsive-overrides.js';
 function cloneConfig(config = {}) {
   return JSON.parse(JSON.stringify(config || {}));
 }
@@ -61,11 +68,20 @@ function renderRawConfigCard(config) {
   );
 }
 
-function collectGenericModuleDraft(root, baseConfig = {}) {
+function collectGenericModuleDraft(root, baseConfig = {}, options = {}) {
   const nextConfig = cloneConfig(baseConfig);
   const keyedInputs = Array.from(root.querySelectorAll('[data-key]'));
   const rawInput = keyedInputs.find((input) => input.dataset.key === '_raw');
-  if (rawInput) {
+  const scopeControl = root.querySelector('[data-responsive-edit-scope]');
+  const responsiveEditScope =
+    scopeControl?.value === 'device'
+      ? 'device'
+      : options.responsiveEditScope === 'device'
+        ? 'device'
+        : 'global';
+  const moduleType = options.moduleType || '';
+  const activeDeviceId = scopeControl?.dataset.responsiveDeviceId || options.activeDeviceId;
+  if (rawInput && responsiveEditScope !== 'device') {
     try {
       Object.assign(nextConfig, JSON.parse(rawInput.value));
     } catch {
@@ -76,17 +92,29 @@ function collectGenericModuleDraft(root, baseConfig = {}) {
   keyedInputs.forEach((input) => {
     const key = input.dataset.key;
     if (!key || key === '_raw') return;
+    let value;
     if (input.type === 'checkbox') {
-      nextConfig[key] = input.checked;
+      value = input.checked;
     } else if (input.type === 'number') {
-      nextConfig[key] = parseInt(input.value, 10) || 0;
+      value = parseInt(input.value, 10) || 0;
     } else {
-      nextConfig[key] = input.value;
+      value = input.value;
+    }
+    if (responsiveEditScope === 'device' && isModuleResponsiveField(moduleType, key)) {
+      const globalValue = cloneConfig(baseConfig)[key];
+      setResponsiveOverrideValue(nextConfig, activeDeviceId, key, value);
+      if (globalValue === undefined) {
+        delete nextConfig[key];
+      } else {
+        nextConfig[key] = globalValue;
+      }
+    } else if (responsiveEditScope !== 'device') {
+      nextConfig[key] = value;
     }
   });
 
   const styleFields = root.querySelectorAll('[data-style-key]');
-  if (styleFields.length > 0) {
+  if (styleFields.length > 0 && responsiveEditScope !== 'device') {
     nextConfig.style = nextConfig.style || {};
     styleFields.forEach((input) => {
       const key = input.dataset.styleKey;
@@ -102,6 +130,121 @@ function collectGenericModuleDraft(root, baseConfig = {}) {
   }
 
   return nextConfig;
+}
+
+function renderTextAlignmentCard(config = {}) {
+  return renderSectionCard(
+    'Behavior',
+    'Alignment',
+    'Choose how the text block aligns inside its container.',
+    `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Alignment</label>
+        <select class="pb-editor-select" data-key="alignment">
+          <option value="left" ${config.alignment === 'left' ? 'selected' : ''}>Left</option>
+          <option value="center" ${config.alignment === 'center' ? 'selected' : ''}>Center</option>
+          <option value="right" ${config.alignment === 'right' ? 'selected' : ''}>Right</option>
+        </select>
+      </div>
+    `
+  );
+}
+
+function renderSpacerHeightCard(config = {}) {
+  return renderSectionCard(
+    'Behavior',
+    'Spacing',
+    'Increase or reduce the vertical separation introduced by this spacer module.',
+    `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Height (px)</label>
+        <input type="number" class="pb-editor-input" data-key="height" value="${config.height || 40}">
+      </div>
+    `
+  );
+}
+
+function renderDeviceModuleOverrideSections(moduleType, config, pages) {
+  if (moduleType === 'text') {
+    return [renderTextAlignmentCard(config)];
+  }
+  if (moduleType === 'spacer') {
+    return [renderSpacerHeightCard(config)];
+  }
+  if (moduleType === 'gallery') {
+    return [renderGalleryEditor(config, { deviceOnly: true })];
+  }
+  if (moduleType === 'entry-gallery') {
+    return [renderEntryGalleryEditor(config, { deviceOnly: true })];
+  }
+  if (moduleType === 'buttons') {
+    return [renderButtonsEditor(config, pages, { deviceOnly: true })];
+  }
+  return [];
+}
+
+function renderResponsiveScopeCard({
+  activeDeviceId,
+  responsiveEditScope,
+  hidden,
+  supportsDeviceFields,
+}) {
+  if (!supportsDeviceFields) return '';
+  const deviceLabel = getBuilderDeviceLabel(activeDeviceId);
+  const showDeviceControls = responsiveEditScope === 'device';
+  return renderSectionCard(
+    'Device',
+    'Edit Scope',
+    responsiveEditScope === 'device' ? deviceLabel : 'Global',
+    `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Scope</label>
+        <select class="pb-editor-select" data-responsive-edit-scope data-responsive-device-id="${escapeAttr(activeDeviceId)}">
+          <option value="global" ${responsiveEditScope === 'global' ? 'selected' : ''}>Global</option>
+          <option value="device" ${responsiveEditScope === 'device' ? 'selected' : ''}>Current Device (${escapeHtml(deviceLabel)})</option>
+        </select>
+      </div>
+      ${
+        showDeviceControls
+          ? `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">
+          <input type="checkbox" data-responsive-module-key="hidden" ${hidden ? 'checked' : ''}> Hidden on ${escapeHtml(deviceLabel)}
+        </label>
+      </div>
+      `
+          : ''
+      }
+    `
+  );
+}
+
+function bindResponsiveModuleDraftEvents({
+  el,
+  draftConfig,
+  setDraftConfig,
+  markDirty,
+  activeDeviceId,
+  renderEditorPanel,
+}) {
+  el.pbModuleEditor.querySelectorAll('[data-responsive-module-key]').forEach((input) => {
+    const eventName = input.type === 'checkbox' ? 'change' : 'input';
+    input.addEventListener(eventName, () => {
+      const key = input.dataset.responsiveModuleKey;
+      if (!key) return;
+      const nextConfig = cloneConfig(draftConfig || {});
+      let value = input.value;
+      if (input.type === 'checkbox') {
+        value = input.checked;
+      } else if (input.type === 'number') {
+        value = parseInt(input.value, 10) || 0;
+      }
+      setResponsiveOverrideValue(nextConfig, activeDeviceId, key, value);
+      setDraftConfig(nextConfig);
+      markDirty('module');
+      renderEditorPanel?.();
+    });
+  });
 }
 
 function normalizePromoItem(item = {}) {
@@ -437,10 +580,16 @@ function bindGenericModuleDraftEvents({
   draftConfig,
   setDraftConfig,
   markDirty,
+  activeDeviceId,
+  responsiveEditScope,
 }) {
   const syncDraft = () => {
     setDraftConfig(
-      collectGenericModuleDraft(el.pbModuleEditor, draftConfig || selectedModule.config || {})
+      collectGenericModuleDraft(el.pbModuleEditor, draftConfig || selectedModule.config || {}, {
+        activeDeviceId,
+        moduleType: selectedModule.moduleType,
+        responsiveEditScope,
+      })
     );
     markDirty('module');
   };
@@ -456,6 +605,8 @@ export function renderModuleEditorContent({
   selectedModuleId,
   draftConfig = null,
   pages = [],
+  activeDeviceId = 'desktop',
+  responsiveEditScope = 'global',
 }) {
   if (!selectedModuleId) {
     return `
@@ -483,9 +634,33 @@ export function renderModuleEditorContent({
     `;
   }
 
-  const config = draftConfig || selectedModule.config || {};
+  const baseConfig = draftConfig || selectedModule.config || {};
+  const config =
+    responsiveEditScope === 'device'
+      ? getEffectiveModuleConfig(
+          { ...selectedModule, config: baseConfig },
+          { builderEditing: true, deviceId: activeDeviceId }
+        )
+      : baseConfig;
   const moduleType = selectedModule.moduleType;
   const contentSections = [];
+  const supportsDeviceFields = true;
+  contentSections.push(
+    renderResponsiveScopeCard({
+      activeDeviceId,
+      responsiveEditScope,
+      hidden: isModuleHiddenForDevice(
+        { ...selectedModule, config: baseConfig },
+        { builderEditing: true, deviceId: activeDeviceId }
+      ),
+      supportsDeviceFields,
+    })
+  );
+
+  if (responsiveEditScope === 'device') {
+    contentSections.push(...renderDeviceModuleOverrideSections(moduleType, config, pages));
+    return contentSections.join('');
+  }
 
   switch (moduleType) {
     case 'header':
@@ -522,23 +697,7 @@ export function renderModuleEditorContent({
         `
         )
       );
-      contentSections.push(
-        renderSectionCard(
-          'Behavior',
-          'Alignment',
-          'Choose how the text block aligns inside its container.',
-          `
-          <div class="pb-editor-field">
-            <label class="pb-editor-label">Alignment</label>
-            <select class="pb-editor-select" data-key="alignment">
-              <option value="left" ${config.alignment === 'left' ? 'selected' : ''}>Left</option>
-              <option value="center" ${config.alignment === 'center' ? 'selected' : ''}>Center</option>
-              <option value="right" ${config.alignment === 'right' ? 'selected' : ''}>Right</option>
-            </select>
-          </div>
-        `
-        )
-      );
+      contentSections.push(renderTextAlignmentCard(config));
       break;
 
     case 'image':
@@ -566,19 +725,7 @@ export function renderModuleEditorContent({
       break;
 
     case 'spacer':
-      contentSections.push(
-        renderSectionCard(
-          'Behavior',
-          'Spacing',
-          'Increase or reduce the vertical separation introduced by this spacer module.',
-          `
-          <div class="pb-editor-field">
-            <label class="pb-editor-label">Height (px)</label>
-            <input type="number" class="pb-editor-input" data-key="height" value="${config.height || 40}">
-          </div>
-        `
-        )
-      );
+      contentSections.push(renderSpacerHeightCard(config));
       break;
 
     case 'html':
@@ -868,7 +1015,7 @@ export function renderModuleEditorContent({
     'reader',
     'feed',
   ]);
-  if (MODULES_RETAINING_RAW_CARD.has(moduleType)) {
+  if (MODULES_RETAINING_RAW_CARD.has(moduleType) && responsiveEditScope !== 'device') {
     contentSections.push(renderRawConfigCard(config));
   }
 
@@ -887,9 +1034,74 @@ export function bindModuleEditorEvents({
   openImagePicker,
   fetchAssets,
   uploadAssetFile,
+  activeDeviceId = 'desktop',
+  responsiveEditScope = 'global',
 }) {
   const selectedModule = findSelectedModule(currentPage, selectedModuleId);
   if (!selectedModule) return;
+
+  bindResponsiveModuleDraftEvents({
+    el,
+    draftConfig,
+    setDraftConfig,
+    markDirty,
+    activeDeviceId,
+    renderEditorPanel,
+  });
+
+  if (responsiveEditScope === 'device') {
+    if (selectedModule.moduleType === 'buttons') {
+      bindButtonsEditorEvents({
+        el,
+        draftConfig,
+        setDraftConfig,
+        renderEditorPanel,
+        markDirty,
+        pages,
+        activeDeviceId,
+        responsiveEditScope,
+      });
+      return;
+    }
+    if (selectedModule.moduleType === 'gallery') {
+      bindGalleryEditorEvents({
+        el,
+        draftConfig,
+        setDraftConfig,
+        renderEditorPanel,
+        markDirty,
+        openImagePicker,
+        fetchAssets,
+        uploadAssetFile,
+        activeDeviceId,
+        responsiveEditScope,
+      });
+      return;
+    }
+    if (selectedModule.moduleType === 'entry-gallery') {
+      bindEntryGalleryEditorEvents({
+        el,
+        draftConfig,
+        setDraftConfig,
+        markDirty,
+        activeDeviceId,
+        responsiveEditScope,
+      });
+      return;
+    }
+    if (selectedModule.moduleType === 'text' || selectedModule.moduleType === 'spacer') {
+      bindGenericModuleDraftEvents({
+        el,
+        selectedModule,
+        draftConfig,
+        setDraftConfig,
+        markDirty,
+        activeDeviceId,
+        responsiveEditScope,
+      });
+    }
+    return;
+  }
 
   if (selectedModule.moduleType === 'promo') {
     bindPromoDraftEvents({
@@ -901,6 +1113,8 @@ export function bindModuleEditorEvents({
       openImagePicker,
       fetchAssets,
       uploadAssetFile,
+      activeDeviceId,
+      responsiveEditScope,
     });
     return;
   }
@@ -927,6 +1141,8 @@ export function bindModuleEditorEvents({
       renderEditorPanel,
       markDirty,
       pages,
+      activeDeviceId,
+      responsiveEditScope,
     });
     return;
   }
@@ -941,6 +1157,8 @@ export function bindModuleEditorEvents({
       openImagePicker,
       fetchAssets,
       uploadAssetFile,
+      activeDeviceId,
+      responsiveEditScope,
     });
     return;
   }
@@ -951,6 +1169,8 @@ export function bindModuleEditorEvents({
       draftConfig,
       setDraftConfig,
       markDirty,
+      activeDeviceId,
+      responsiveEditScope,
     });
     return;
   }
@@ -971,6 +1191,8 @@ export function bindModuleEditorEvents({
       draftConfig,
       setDraftConfig,
       markDirty,
+      activeDeviceId,
+      responsiveEditScope,
     });
     return;
   }
@@ -981,5 +1203,7 @@ export function bindModuleEditorEvents({
     draftConfig,
     setDraftConfig,
     markDirty,
+    activeDeviceId,
+    responsiveEditScope,
   });
 }

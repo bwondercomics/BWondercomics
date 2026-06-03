@@ -1088,6 +1088,7 @@ import {
           seriesId,
           previewMode: true,
           builderEditing: pageResult.builderEditing === true,
+          deviceId: pageResult.deviceId || pageResult.snapshot?.options?.deviceId,
         });
         previewBridge.setPreviewMetricsContext?.(pageResult.snapshot, {
           seriesId,
@@ -1106,6 +1107,7 @@ import {
               seriesId,
               previewMode: true,
               builderEditing: nextPageResult.builderEditing === true,
+              deviceId: nextPageResult.deviceId || nextPageResult.snapshot?.options?.deviceId,
             });
             previewBridge.emitPreviewMetrics?.('snapshot-updated');
             if (nextPageResult.builderEditing === true) {

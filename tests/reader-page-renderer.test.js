@@ -155,6 +155,72 @@ describe('reader page renderer', () => {
     expect(wrapper.querySelector('.pb-btn')?.hasAttribute('style')).toBe(false);
   });
 
+  it('keeps public output global while builder preview applies device overrides', () => {
+    const page = {
+      id: 'reader-responsive',
+      sections: [
+        {
+          id: 'section-responsive',
+          layout: '1-1',
+          settings: {
+            responsive: {
+              mobile: {
+                layout: '1',
+              },
+            },
+          },
+          modules: [
+            {
+              id: 'text-responsive',
+              moduleType: 'text',
+              columnIndex: 0,
+              config: {
+                content: '<p>Responsive copy</p>',
+                alignment: 'left',
+                responsive: {
+                  mobile: {
+                    alignment: 'center',
+                  },
+                },
+              },
+            },
+            {
+              id: 'hidden-responsive',
+              moduleType: 'spacer',
+              columnIndex: 0,
+              config: {
+                height: 60,
+                responsive: {
+                  mobile: {
+                    hidden: true,
+                  },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    };
+
+    const publicWrapper = parseModuleHtml(renderPage(page));
+    expect(publicWrapper.querySelector('.pb-section')?.dataset.layout).toBe('1-1');
+    expect(publicWrapper.querySelector('.pb-text')?.getAttribute('style')).toContain(
+      'text-align: left'
+    );
+    expect(publicWrapper.querySelector('.pb-module--spacer')).not.toBeNull();
+
+    const builderWrapper = parseModuleHtml(
+      renderPage(page, { builderEditing: true, deviceId: 'mobile' })
+    );
+    expect(builderWrapper.querySelector('.pb-section')?.dataset.layout).toBe('1');
+    expect(builderWrapper.querySelector('.pb-text')?.getAttribute('style')).toContain(
+      'text-align: center'
+    );
+    expect(builderWrapper.querySelector('.pb-module--hidden-device')?.dataset.builderModuleId).toBe(
+      'hidden-responsive'
+    );
+  });
+
   it('sanitizes dangerous builder html and urls during rendering', () => {
     const text = parseModuleHtml(
       renderModule({

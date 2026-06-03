@@ -51,6 +51,22 @@
   margin-bottom: 0;
 }
 
+.pb-module--hidden-device {
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed rgba(255, 237, 0, 0.5);
+  background: rgba(255, 237, 0, 0.08);
+}
+
+.pb-module-hidden-placeholder {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.78);
+  text-transform: uppercase;
+}
+
 /* Header Module */
 .pb-header {
   text-align: center;

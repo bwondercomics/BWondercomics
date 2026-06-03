@@ -1,6 +1,11 @@
-import { escapeHtml } from './helpers.js';
+import { escapeAttr, escapeHtml } from './helpers.js';
 import { bindHeaderEditorEvents, renderHeaderEditorContent } from './header-editor.js';
 import { bindModuleEditorEvents, renderModuleEditorContent } from './module-editor.js';
+import {
+  getBuilderDeviceLabel,
+  getEffectiveSectionLayout,
+  getEffectiveSectionSettings,
+} from './responsive-overrides.js';
 import { bindThemeEditorEvents, renderThemeEditorContent } from './theme-editor.js';
 import { renderInspectorSection } from './inspector-sections.js';
 
@@ -51,27 +56,89 @@ function renderPageSettingsContent(draft) {
   `;
 }
 
-function renderSectionSettingsContent(section, draft) {
+function renderResponsiveScopeControl({ activeDeviceId, responsiveEditScope }) {
+  const deviceLabel = getBuilderDeviceLabel(activeDeviceId);
+  return renderInspectorSection({
+    kicker: 'Device',
+    title: 'Edit Scope',
+    summary: responsiveEditScope === 'device' ? deviceLabel : 'Global',
+    copy: '',
+    body: `
+      <div class="form-editor">
+        <div class="form-group">
+          <label class="form-label" for="pbResponsiveEditScope">Scope</label>
+          <select id="pbResponsiveEditScope" class="form-input" data-responsive-edit-scope>
+            <option value="global" ${responsiveEditScope === 'global' ? 'selected' : ''}>Global</option>
+            <option value="device" ${responsiveEditScope === 'device' ? 'selected' : ''}>Current Device (${escapeHtml(deviceLabel)})</option>
+          </select>
+        </div>
+      </div>
+    `,
+  });
+}
+
+function renderSectionSettingsContent(section, draft, options = {}) {
   if (!section || !draft) return '';
+  const activeDeviceId = options.activeDeviceId;
+  const responsiveEditScope = options.responsiveEditScope === 'device' ? 'device' : 'global';
+  const displaySection =
+    responsiveEditScope === 'device'
+      ? {
+          ...section,
+          settings: draft,
+        }
+      : section;
+  const displayDraft =
+    responsiveEditScope === 'device'
+      ? getEffectiveSectionSettings(displaySection, {
+          builderEditing: true,
+          deviceId: activeDeviceId,
+        })
+      : draft;
+  const displayLayout =
+    responsiveEditScope === 'device'
+      ? getEffectiveSectionLayout(displaySection, {
+          builderEditing: true,
+          deviceId: activeDeviceId,
+        })
+      : section.layout || '1';
   return `
+    ${renderResponsiveScopeControl({ activeDeviceId, responsiveEditScope })}
     ${renderInspectorSection({
       kicker: 'Section',
       title: 'Spacing',
-      summary: section.layout || 'Layout',
+      summary: displayLayout || 'Layout',
       copy: 'Adjust spacing for this section.',
       body: `
         <div class="form-editor">
+          ${
+            responsiveEditScope === 'device'
+              ? `
+          <div class="form-group">
+            <label class="form-label" for="pbEditSectionLayout">Layout</label>
+            <select id="pbEditSectionLayout" class="form-input" data-section-setting="layout">
+              ${['1', '1-1', '1-2', '2-1', '1-1-1', '1-3-1']
+                .map(
+                  (layout) =>
+                    `<option value="${escapeAttr(layout)}" ${displayLayout === layout ? 'selected' : ''}>${escapeHtml(layout)}</option>`
+                )
+                .join('')}
+            </select>
+          </div>
+          `
+              : ''
+          }
           <div class="form-group">
             <label class="form-label" for="pbEditSectionModuleGap">Module Gap</label>
-            <input type="number" id="pbEditSectionModuleGap" class="form-input" value="${escapeHtml(String(draft.moduleGap ?? ''))}" min="0" step="1" placeholder="16" data-section-setting="moduleGap" />
+            <input type="number" id="pbEditSectionModuleGap" class="form-input" value="${escapeHtml(String(displayDraft.moduleGap ?? ''))}" min="0" step="1" placeholder="16" data-section-setting="moduleGap" />
           </div>
           <div class="form-group">
             <label class="form-label" for="pbEditSectionColumnGap">Column Gap</label>
-            <input type="number" id="pbEditSectionColumnGap" class="form-input" value="${escapeHtml(String(draft.columnGap ?? ''))}" min="0" step="1" placeholder="16" data-section-setting="columnGap" />
+            <input type="number" id="pbEditSectionColumnGap" class="form-input" value="${escapeHtml(String(displayDraft.columnGap ?? ''))}" min="0" step="1" placeholder="16" data-section-setting="columnGap" />
           </div>
           <div class="form-group">
             <label class="form-label" for="pbEditSectionGap">Section Gap</label>
-            <input type="number" id="pbEditSectionGap" class="form-input" value="${escapeHtml(String(draft.sectionGap ?? ''))}" min="0" step="1" placeholder="24" data-section-setting="sectionGap" />
+            <input type="number" id="pbEditSectionGap" class="form-input" value="${escapeHtml(String(displayDraft.sectionGap ?? ''))}" min="0" step="1" placeholder="24" data-section-setting="sectionGap" />
           </div>
         </div>
       `,
@@ -248,6 +315,8 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       contentHtml = renderHeaderEditorContent({
         draftState: state.activeHeaderDraft,
         pages: state.pages,
+        activeDeviceId: state.activeDeviceId,
+        responsiveEditScope: state.responsiveEditScope,
       });
       kicker = 'Page Header';
       title = 'Header Settings';
@@ -273,7 +342,10 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       });
     } else if (state.selectedCanvasSurface === 'section' && state.activeSectionId) {
       const section = helpers.getSectionRecord(state.activeSectionId);
-      contentHtml = renderSectionSettingsContent(section, state.activeSectionDraft);
+      contentHtml = renderSectionSettingsContent(section, state.activeSectionDraft, {
+        activeDeviceId: state.activeDeviceId,
+        responsiveEditScope: state.responsiveEditScope,
+      });
       kicker = 'Section';
       title = 'Section Settings';
       subtitle = `Adjust spacing for ${pageTitle}.`;
@@ -290,6 +362,8 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
         selectedModuleId: state.selectedModuleId,
         draftConfig: selectedModuleRecord ? state.activeModuleDraft : null,
         pages: state.pages,
+        activeDeviceId: state.activeDeviceId,
+        responsiveEditScope: state.responsiveEditScope,
       });
       kicker = selectedModuleRecord ? 'Selected Module' : 'Module Inspector';
       title = selectedModuleRecord
@@ -319,6 +393,15 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       footerHtml,
     });
     restoreEditorContentScroll(scrollSnapshot, editorContextKey);
+
+    el.pbModuleEditor
+      .querySelector('[data-responsive-edit-scope]')
+      ?.addEventListener('change', (event) => {
+        actions.setResponsiveEditScope(
+          /** @type {HTMLSelectElement} */ (event.target).value === 'device' ? 'device' : 'global'
+        );
+        renderEditorPanel();
+      });
 
     el.pbModuleEditor.querySelectorAll('.pb-editor-tab').forEach((tab) => {
       tab.addEventListener('click', () => {
@@ -380,6 +463,8 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
         markDirty: actions.markDirty,
         renderEditorPanel,
         renderCanvas: actions.renderCanvas,
+        activeDeviceId: state.activeDeviceId,
+        responsiveEditScope: state.responsiveEditScope,
       });
 
       document.getElementById('pbSaveHeader')?.addEventListener('click', async () => {
@@ -452,6 +537,8 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
         openImagePicker: deps.openImagePicker,
         fetchAssets: deps.fetchAssets,
         uploadAssetFile: deps.uploadAssetFile,
+        activeDeviceId: state.activeDeviceId,
+        responsiveEditScope: state.responsiveEditScope,
       });
 
       document.getElementById('pbSaveModule')?.addEventListener('click', async () => {

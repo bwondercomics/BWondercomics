@@ -5,9 +5,10 @@ import {
   BUILDER_PREVIEW_SOURCES,
   DEFAULT_BUILDER_PREVIEW_SIDE_EFFECTS,
   buildPreviewSnapshotMessage,
+  getBuilderDevice,
   getPreviewStatusCopy,
   getPreviewViewport,
-  isPreviewViewportId,
+  isBuilderDeviceId,
   validatePreviewEnvelope,
 } from './preview-contract.js';
 
@@ -100,6 +101,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
   function updatePreviewFrameDataset(frame, snapshot, viewport) {
     if (!frame || !snapshot) return;
     frame.dataset.width = viewport.id;
+    frame.dataset.deviceId = snapshot.options?.deviceId || viewport.id;
     frame.dataset.previewSource = snapshot.source || '';
     frame.dataset.pageId = snapshot.pageId || '';
     frame.dataset.pageSlug = snapshot.pageSlug || '';
@@ -445,14 +447,16 @@ export function createPreviewManager({ el, getState, actions, deps }) {
   }
 
   function createPreviewPageSnapshot(options = {}) {
-    const { currentPage, dirtyScope, previewWidth } = getState();
+    const { currentPage, dirtyScope, activeDeviceId, previewWidth } = getState();
     if (!currentPage) return null;
 
     const pageSnapshot = cloneValue(currentPage);
     const source = dirtyScope ? BUILDER_PREVIEW_SOURCES.WORKING : BUILDER_PREVIEW_SOURCES.SAVED;
     applyPreviewWorkingDraft(pageSnapshot);
 
-    const viewport = getPreviewViewport(previewWidth);
+    const deviceId = isBuilderDeviceId(activeDeviceId) ? activeDeviceId : previewWidth;
+    const device = getBuilderDevice(deviceId);
+    const viewport = getPreviewViewport(device.id);
     return {
       seriesId: deps.getSeriesId(),
       pageId: pageSnapshot.id || currentPage.id || '',
@@ -463,6 +467,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
       page: pageSnapshot,
       options: {
         builderEditing: options.builderEditing === true,
+        deviceId: device.id,
         viewport: { ...viewport },
         sideEffects: { ...DEFAULT_BUILDER_PREVIEW_SIDE_EFFECTS },
         scrollState: { top: 0, left: 0 },
@@ -485,8 +490,9 @@ export function createPreviewManager({ el, getState, actions, deps }) {
       return;
     }
 
-    const { previewWidth } = getState();
-    const viewport = snapshot?.options?.viewport || getPreviewViewport(previewWidth);
+    const { activeDeviceId, previewWidth } = getState();
+    const viewport =
+      snapshot?.options?.viewport || getPreviewViewport(activeDeviceId || previewWidth);
     const nextIdentity = getPreviewIdentity(snapshot);
     const shouldReload = !previewSession || previewIdentity !== nextIdentity;
     if (shouldReload) {
@@ -512,6 +518,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
         ${statusHtml}
         <div class="pb-preview-frame"
              data-width="${escapeAttr(viewport.id)}"
+             data-device-id="${escapeAttr(snapshot.options?.deviceId || viewport.id)}"
              data-preview-source="${escapeAttr(snapshot.source || '')}"
              data-page-id="${escapeAttr(snapshot.pageId || '')}"
              data-page-slug="${escapeAttr(snapshot.pageSlug || '')}"
@@ -560,10 +567,12 @@ export function createPreviewManager({ el, getState, actions, deps }) {
   }
 
   function setViewport(nextWidth) {
-    if (!isPreviewViewportId(nextWidth)) return false;
-    if (nextWidth === getState().previewWidth) return false;
+    if (!isBuilderDeviceId(nextWidth)) return false;
+    const { activeDeviceId, previewWidth } = getState();
+    if (nextWidth === (activeDeviceId || previewWidth)) return false;
 
-    actions.setPreviewWidth(nextWidth);
+    actions.setActiveDeviceId?.(nextWidth);
+    actions.setPreviewWidth?.(nextWidth);
     const viewport = getPreviewViewport(nextWidth);
     const frame = /** @type {HTMLElement|null} */ (el.pbCanvas?.querySelector('.pb-preview-frame'));
     const iframe = /** @type {HTMLIFrameElement|null} */ (
@@ -571,6 +580,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     );
     if (frame) {
       frame.dataset.width = viewport.id;
+      frame.dataset.deviceId = viewport.id;
       frame.dataset.viewportWidth = String(viewport.width);
       frame.dataset.viewportHeight = String(viewport.height);
       frame.style.width = `${viewport.width}px`;
@@ -581,10 +591,12 @@ export function createPreviewManager({ el, getState, actions, deps }) {
       applyPreviewIframeSize(iframe, viewport);
     }
     if (latestPreviewSnapshot?.options) {
+      latestPreviewSnapshot.options.deviceId = viewport.id;
       latestPreviewSnapshot.options.viewport = { ...viewport };
       resetPreviewTargets({ preserveSequence: true });
       postPreviewSnapshot();
     }
+    actions.renderEditorPanel?.();
     return true;
   }
 

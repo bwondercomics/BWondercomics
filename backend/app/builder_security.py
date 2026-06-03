@@ -30,6 +30,16 @@ ALLOWED_MODULE_TYPES = {
 ALLOWED_LAYOUTS = {"1", "1-1", "1-2", "2-1", "1-1-1", "1-3-1"}
 LAYOUT_COLUMN_COUNTS = {layout: len(layout.split("-")) for layout in ALLOWED_LAYOUTS}
 ALLOWED_SECTION_TYPES = {"row"}
+BUILDER_DEVICE_IDS = ("desktop", "tablet", "mobile")
+SECTION_RESPONSIVE_FIELDS = {
+    "layout",
+    "moduleGap",
+    "columnGap",
+    "sectionGap",
+    "paddingTop",
+    "paddingBottom",
+    "backgroundColor",
+}
 HEADER_BLOCK_IDS = {"brand", "patron", "status", "entryControls", "nav"}
 HEADER_REGIONS = ("left", "center", "right")
 
@@ -687,12 +697,129 @@ def sanitize_header_shell_appearance(raw: Any) -> dict[str, Any] | None:
     return result
 
 
+def _prune_empty_dicts(value: Any) -> Any:
+    if isinstance(value, list):
+        items = [_prune_empty_dicts(item) for item in value]
+        return [item for item in items if item not in ({}, [])]
+    if not isinstance(value, dict):
+        return value
+    pruned = {
+        key: pruned_value
+        for key, item in value.items()
+        if (pruned_value := _prune_empty_dicts(item)) not in ({}, [])
+    }
+    return pruned
+
+
+def sanitize_page_responsive(raw: Any) -> dict[str, Any]:
+    responsive = raw if isinstance(raw, dict) else {}
+    sanitized: dict[str, Any] = {}
+    for device_id in BUILDER_DEVICE_IDS:
+        branch = responsive.get(device_id)
+        if not isinstance(branch, dict):
+            continue
+        branch_payload: dict[str, Any] = {}
+        header = branch.get("header")
+        if isinstance(header, dict):
+            appearance = sanitize_header_shell_appearance(header.get("appearance"))
+            if appearance is not None:
+                branch_payload["header"] = {"appearance": appearance}
+        branch_payload = _prune_empty_dicts(branch_payload)
+        if branch_payload:
+            sanitized[device_id] = branch_payload
+    return sanitized
+
+
+def sanitize_section_responsive(raw: Any) -> dict[str, Any]:
+    responsive = raw if isinstance(raw, dict) else {}
+    sanitized: dict[str, Any] = {}
+    for device_id in BUILDER_DEVICE_IDS:
+        branch = responsive.get(device_id)
+        if not isinstance(branch, dict):
+            continue
+        branch_payload: dict[str, Any] = {}
+        layout = str(branch.get("layout") or "").strip()
+        if layout in ALLOWED_LAYOUTS:
+            branch_payload["layout"] = layout
+        background_color = sanitize_color(branch.get("backgroundColor"))
+        if background_color:
+            branch_payload["backgroundColor"] = background_color
+        for key in ("paddingTop", "paddingBottom", "moduleGap", "columnGap", "sectionGap"):
+            if key in branch:
+                branch_payload[key] = _clamp_int(branch.get(key), 0, 0, 600)
+        branch_payload = _prune_empty_dicts(branch_payload)
+        if branch_payload:
+            sanitized[device_id] = branch_payload
+    return sanitized
+
+
+def sanitize_buttons_responsive_branch(branch: dict[str, Any]) -> dict[str, Any]:
+    branch_payload: dict[str, Any] = {}
+    defaults = branch.get("defaults") if isinstance(branch.get("defaults"), dict) else {}
+    defaults_appearance = sanitize_appearance(defaults.get("appearance"))
+    if defaults_appearance is not None:
+        branch_payload["defaults"] = {"appearance": defaults_appearance}
+
+    raw_buttons = branch.get("buttons") if isinstance(branch.get("buttons"), list) else []
+    buttons = []
+    for item in raw_buttons[:20]:
+        current = item if isinstance(item, dict) else {}
+        appearance = sanitize_appearance(current.get("appearance"))
+        button_payload: dict[str, Any] = {}
+        button_id = _sanitize_id_like(current.get("id"))
+        if button_id:
+            button_payload["id"] = button_id
+        if appearance is not None:
+            button_payload["appearance"] = appearance
+        if button_payload:
+            buttons.append(button_payload)
+    if buttons:
+        branch_payload["buttons"] = buttons
+    return _prune_empty_dicts(branch_payload)
+
+
+def sanitize_module_responsive(module_type: str, raw: Any) -> dict[str, Any]:
+    responsive = raw if isinstance(raw, dict) else {}
+    sanitized: dict[str, Any] = {}
+    for device_id in BUILDER_DEVICE_IDS:
+        branch = responsive.get(device_id)
+        if not isinstance(branch, dict):
+            continue
+        branch_payload: dict[str, Any] = {}
+        if "hidden" in branch:
+            branch_payload["hidden"] = _coerce_bool(branch.get("hidden"), False)
+        if module_type == "text":
+            alignment = str(branch.get("alignment") or "").strip().lower()
+            if alignment in {"left", "center", "right"}:
+                branch_payload["alignment"] = alignment
+        elif module_type in {"gallery", "entry-gallery"}:
+            if "columns" in branch:
+                branch_payload["columns"] = _clamp_int(branch.get("columns"), 3, 1, 6)
+        elif module_type == "spacer":
+            if "height" in branch:
+                branch_payload["height"] = _clamp_int(branch.get("height"), 40, 0, 600)
+        elif module_type == "buttons":
+            branch_payload.update(sanitize_buttons_responsive_branch(branch))
+        branch_payload = _prune_empty_dicts(branch_payload)
+        if branch_payload:
+            sanitized[device_id] = branch_payload
+    return sanitized
+
+
 def sanitize_page_meta(raw_meta: Any) -> dict[str, Any]:
     meta = raw_meta if isinstance(raw_meta, dict) else {}
     sanitized = {
         key: _deepcopy(value)
         for key, value in meta.items()
-        if key not in {"header", "headerOverrides", "theme", "panelBackgrounds", "panelSpacing"}
+        if key
+        not in {
+            "header",
+            "headerOverrides",
+            "theme",
+            "panelBackgrounds",
+            "panelSpacing",
+            "responsive",
+        }
     }
     if "header" in meta:
         sanitized["header"] = sanitize_header_meta(meta.get("header"))
@@ -704,6 +831,9 @@ def sanitize_page_meta(raw_meta: Any) -> dict[str, Any]:
         sanitized["panelBackgrounds"] = sanitize_panel_backgrounds(meta.get("panelBackgrounds"))
     if "panelSpacing" in meta:
         sanitized["panelSpacing"] = sanitize_panel_spacing(meta.get("panelSpacing"))
+    responsive = sanitize_page_responsive(meta.get("responsive"))
+    if responsive:
+        sanitized["responsive"] = responsive
     return sanitized
 
 
@@ -725,6 +855,10 @@ def sanitize_section_settings(raw_settings: Any) -> dict[str, Any]:
             "left": _coerce_bool(panel_enabled.get("left"), True),
             "right": _coerce_bool(panel_enabled.get("right"), True),
         }
+
+    responsive = sanitize_section_responsive(settings.get("responsive"))
+    if responsive:
+        sanitized["responsive"] = responsive
 
     return sanitized
 
@@ -847,25 +981,37 @@ def sanitize_promo_item_style(raw_style: Any) -> dict[str, Any]:
 def sanitize_module_config(module_type: str, raw_config: Any) -> dict[str, Any]:
     config = raw_config if isinstance(raw_config, dict) else {}
 
+    def with_responsive(sanitized: dict[str, Any]) -> dict[str, Any]:
+        responsive = sanitize_module_responsive(module_type, config.get("responsive"))
+        if responsive:
+            sanitized["responsive"] = responsive
+        return sanitized
+
     if module_type == "header":
-        return {
-            "title": _coerce_string(config.get("title"), "", 200),
-            "subtitle": _coerce_string(config.get("subtitle"), "", 300),
-        }
+        return with_responsive(
+            {
+                "title": _coerce_string(config.get("title"), "", 200),
+                "subtitle": _coerce_string(config.get("subtitle"), "", 300),
+            }
+        )
 
     if module_type == "text":
         alignment = str(config.get("alignment") or "left").strip().lower()
-        return {
-            "content": sanitize_html_fragment(config.get("content"), "text"),
-            "alignment": alignment if alignment in {"left", "center", "right"} else "left",
-        }
+        return with_responsive(
+            {
+                "content": sanitize_html_fragment(config.get("content"), "text"),
+                "alignment": alignment if alignment in {"left", "center", "right"} else "left",
+            }
+        )
 
     if module_type == "image":
-        return {
-            "src": sanitize_asset_url(config.get("src")),
-            "alt": _coerce_string(config.get("alt"), "", 300),
-            "caption": _coerce_string(config.get("caption"), "", 300),
-        }
+        return with_responsive(
+            {
+                "src": sanitize_asset_url(config.get("src")),
+                "alt": _coerce_string(config.get("alt"), "", 300),
+                "caption": _coerce_string(config.get("caption"), "", 300),
+            }
+        )
 
     if module_type == "gallery":
         images = config.get("images")
@@ -880,13 +1026,15 @@ def sanitize_module_config(module_type: str, raw_config: Any) -> dict[str, Any]:
                     alt = ""
                 if src:
                     normalized_images.append({"src": src, "alt": alt})
-        return {
-            "images": normalized_images,
-            "columns": _clamp_int(config.get("columns"), 3, 1, 6),
-        }
+        return with_responsive(
+            {
+                "images": normalized_images,
+                "columns": _clamp_int(config.get("columns"), 3, 1, 6),
+            }
+        )
 
     if module_type == "video":
-        return {"url": sanitize_video_url(config.get("url"))}
+        return with_responsive({"url": sanitize_video_url(config.get("url"))})
 
     if module_type == "social":
         buttons = []
@@ -901,16 +1049,18 @@ def sanitize_module_config(module_type: str, raw_config: Any) -> dict[str, Any]:
                     "style": sanitize_social_style(current.get("style")),
                 }
             )
-        return {"buttons": buttons[:20]}
+        return with_responsive({"buttons": buttons[:20]})
 
     if module_type == "email-signup":
-        return {
-            "heading": _coerce_string(config.get("heading"), "Join the List", 120),
-            "subtext": _coerce_string(config.get("subtext"), "", 240),
-            "placeholder": _coerce_string(config.get("placeholder"), "your@email.com", 120),
-            "buttonText": _coerce_string(config.get("buttonText"), "Subscribe", 60),
-            "style": sanitize_email_style(config.get("style")),
-        }
+        return with_responsive(
+            {
+                "heading": _coerce_string(config.get("heading"), "Join the List", 120),
+                "subtext": _coerce_string(config.get("subtext"), "", 240),
+                "placeholder": _coerce_string(config.get("placeholder"), "your@email.com", 120),
+                "buttonText": _coerce_string(config.get("buttonText"), "Subscribe", 60),
+                "style": sanitize_email_style(config.get("style")),
+            }
+        )
 
     if module_type == "promo":
         items = []
@@ -933,17 +1083,19 @@ def sanitize_module_config(module_type: str, raw_config: Any) -> dict[str, Any]:
                     "style": sanitize_promo_item_style(current.get("style")),
                 }
             )
-        return {
-            "items": items,
-            "height": _clamp_int(config.get("height"), 400, 160, 1200),
-            "showNavigation": _coerce_bool(config.get("showNavigation"), True),
-            "showIndicators": _coerce_bool(config.get("showIndicators"), True),
-            "autoRotate": _coerce_bool(config.get("autoRotate"), True),
-            "interval": _clamp_int(config.get("interval"), 5000, 1000, 60_000),
-            "transition": str(config.get("transition") or "fade").strip()
-            if str(config.get("transition") or "fade").strip() in {"fade", "slide"}
-            else "fade",
-        }
+        return with_responsive(
+            {
+                "items": items,
+                "height": _clamp_int(config.get("height"), 400, 160, 1200),
+                "showNavigation": _coerce_bool(config.get("showNavigation"), True),
+                "showIndicators": _coerce_bool(config.get("showIndicators"), True),
+                "autoRotate": _coerce_bool(config.get("autoRotate"), True),
+                "interval": _clamp_int(config.get("interval"), 5000, 1000, 60_000),
+                "transition": str(config.get("transition") or "fade").strip()
+                if str(config.get("transition") or "fade").strip() in {"fade", "slide"}
+                else "fade",
+            }
+        )
 
     if module_type == "buttons":
         buttons = []
@@ -967,46 +1119,54 @@ def sanitize_module_config(module_type: str, raw_config: Any) -> dict[str, Any]:
         defaults_appearance = sanitize_appearance(defaults_source.get("appearance"))
         if defaults_appearance is not None:
             sanitized["defaults"] = {"appearance": defaults_appearance}
-        return sanitized
+        return with_responsive(sanitized)
 
     if module_type == "spacer":
-        return {"height": _clamp_int(config.get("height"), 40, 0, 600)}
+        return with_responsive({"height": _clamp_int(config.get("height"), 40, 0, 600)})
 
     if module_type == "divider":
         style = str(config.get("style") or "solid").strip()
-        return {
-            "style": style if style in {"solid", "dashed", "dotted"} else "solid",
-            "color": sanitize_color(config.get("color")),
-        }
+        return with_responsive(
+            {
+                "style": style if style in {"solid", "dashed", "dotted"} else "solid",
+                "color": sanitize_color(config.get("color")),
+            }
+        )
 
     if module_type == "reader":
-        return {
-            "showPanels": _coerce_bool(config.get("showPanels"), True),
-            "showComments": _coerce_bool(config.get("showComments"), True),
-        }
+        return with_responsive(
+            {
+                "showPanels": _coerce_bool(config.get("showPanels"), True),
+                "showComments": _coerce_bool(config.get("showComments"), True),
+            }
+        )
 
     if module_type == "entry-gallery":
-        return {
-            "columns": _clamp_int(config.get("columns"), 3, 1, 6),
-            "showLabels": _coerce_bool(config.get("showLabels"), True),
-        }
+        return with_responsive(
+            {
+                "columns": _clamp_int(config.get("columns"), 3, 1, 6),
+                "showLabels": _coerce_bool(config.get("showLabels"), True),
+            }
+        )
 
     if module_type == "feed":
-        return {
-            "limit": _clamp_int(config.get("limit"), 5, 1, 25),
-            "heading": _coerce_string(config.get("heading"), "BWC FEED", 120),
-            "author": _coerce_string(config.get("author"), "", 120),
-            "showAuthor": _coerce_bool(config.get("showAuthor"), True),
-            "showDropdown": _coerce_bool(config.get("showDropdown"), True),
-            "feedLabel": _coerce_string(config.get("feedLabel"), "Open feed", 120),
-            "feedHref": sanitize_hyperlink(config.get("feedHref")) or "feed.html",
-            "showMediaButton": _coerce_bool(config.get("showMediaButton"), True),
-            "mediaLabel": _coerce_string(config.get("mediaLabel"), "Media", 120),
-            "mediaHref": sanitize_hyperlink(config.get("mediaHref")) or "media.html",
-            "style": sanitize_feed_style(config.get("style")),
-        }
+        return with_responsive(
+            {
+                "limit": _clamp_int(config.get("limit"), 5, 1, 25),
+                "heading": _coerce_string(config.get("heading"), "BWC FEED", 120),
+                "author": _coerce_string(config.get("author"), "", 120),
+                "showAuthor": _coerce_bool(config.get("showAuthor"), True),
+                "showDropdown": _coerce_bool(config.get("showDropdown"), True),
+                "feedLabel": _coerce_string(config.get("feedLabel"), "Open feed", 120),
+                "feedHref": sanitize_hyperlink(config.get("feedHref")) or "feed.html",
+                "showMediaButton": _coerce_bool(config.get("showMediaButton"), True),
+                "mediaLabel": _coerce_string(config.get("mediaLabel"), "Media", 120),
+                "mediaHref": sanitize_hyperlink(config.get("mediaHref")) or "media.html",
+                "style": sanitize_feed_style(config.get("style")),
+            }
+        )
 
     if module_type == "html":
-        return {"code": sanitize_html_fragment(config.get("code"), "html")}
+        return with_responsive({"code": sanitize_html_fragment(config.get("code"), "html")})
 
-    return {}
+    return with_responsive({})

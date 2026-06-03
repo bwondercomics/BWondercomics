@@ -383,6 +383,57 @@ describe('reader builder presentation loading', () => {
     expect(document.querySelector('[data-builder-module-id]')).toBeNull();
   });
 
+  it('keeps right-panel modules selectable when a builder device layout collapses columns', () => {
+    const builderPage = buildPanelSnapshot({
+      sectionSettings: {
+        responsive: {
+          mobile: {
+            layout: '1',
+          },
+        },
+      },
+    });
+
+    applyBuilderPageToDOM(builderPage, {
+      seriesId: 'battle-bros',
+      previewMode: true,
+      builderEditing: true,
+      deviceId: 'mobile',
+    });
+
+    const rightPanel = document.getElementById('rightPanel');
+    const rightColumn = rightPanel?.querySelector(
+      '.pb-builder-panel-column[data-builder-column-index="1"]'
+    );
+    const rightModule = rightPanel?.querySelector(
+      '.pb-module[data-builder-module-id="right-panel-text"]'
+    );
+
+    expect(rightPanel?.classList.contains('side-panel--empty')).toBe(false);
+    expect(rightColumn).not.toBeNull();
+    expect(rightModule).not.toBeNull();
+    expect(rightModule?.dataset.builderModuleType).toBe('text');
+  });
+
+  it('keeps non-builder panel routing governed by global structure', () => {
+    const builderPage = buildPanelSnapshot();
+    builderPage.sections[0].layout = '1';
+
+    applyBuilderPageToDOM(builderPage, {
+      seriesId: 'battle-bros',
+      deviceId: 'mobile',
+    });
+
+    expect(
+      document
+        .getElementById('rightPanel')
+        ?.querySelector('.pb-module[data-builder-module-id="right-panel-text"]')
+    ).toBeNull();
+    expect(document.getElementById('rightPanel')?.classList.contains('side-panel--empty')).toBe(
+      true
+    );
+  });
+
   it('clears stale page theme variables before applying the next snapshot', () => {
     const themedPage = getContractFixture('builderPage');
     const defaultThemePage = getContractFixture('builderPage');
@@ -649,6 +700,56 @@ describe('reader builder presentation loading', () => {
       },
     });
     expect(headerState.header.appearance).toEqual(headerState.meta.appearance);
+  });
+
+  it('applies header responsive appearance only in builder device context', () => {
+    const builderPage = getContractFixture('builderPage');
+    builderPage.meta.header.appearance = {
+      top: {
+        background: {
+          color: '#112233',
+        },
+      },
+    };
+    builderPage.meta.responsive = {
+      mobile: {
+        header: {
+          appearance: {
+            top: {
+              background: {
+                color: '#445566',
+              },
+            },
+          },
+        },
+      },
+    };
+
+    applyBuilderPageToDOM(builderPage, {
+      seriesId: 'battle-bros',
+      deviceId: 'mobile',
+    });
+    expect(document.getElementById('topbar')?.getAttribute('style')).toContain(
+      'background: #112233'
+    );
+
+    applyBuilderPageToDOM(builderPage, {
+      seriesId: 'battle-bros',
+      builderEditing: true,
+      deviceId: 'mobile',
+    });
+    expect(document.getElementById('topbar')?.getAttribute('style')).toContain(
+      'background: #445566'
+    );
+
+    applyBuilderPageToDOM(builderPage, {
+      seriesId: 'battle-bros',
+      builderEditing: true,
+      deviceId: 'tablet',
+    });
+    expect(document.getElementById('topbar')?.getAttribute('style')).toContain(
+      'background: #112233'
+    );
   });
 
   it('keeps live reader parity with backfilled V3 header metadata', () => {

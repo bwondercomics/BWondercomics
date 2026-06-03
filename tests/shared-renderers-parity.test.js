@@ -142,6 +142,88 @@ describe('shared renderer parity', () => {
     expect(module?.dataset.builderModuleType).toBe('mystery-box');
   });
 
+  it('applies responsive overrides only in builder device context', () => {
+    const page = {
+      id: 'page-responsive',
+      sections: [
+        {
+          id: 'section-responsive',
+          layout: '1-1',
+          settings: {
+            moduleGap: 20,
+            responsive: {
+              mobile: {
+                layout: '1',
+                moduleGap: 6,
+              },
+            },
+          },
+          modules: [
+            {
+              id: 'module-text',
+              moduleType: 'text',
+              columnIndex: 0,
+              sortIndex: 0,
+              config: {
+                content: '<p>Copy</p>',
+                alignment: 'left',
+                responsive: {
+                  mobile: {
+                    alignment: 'right',
+                  },
+                },
+              },
+            },
+            {
+              id: 'module-spacer',
+              moduleType: 'spacer',
+              columnIndex: 1,
+              sortIndex: 1,
+              config: {
+                height: 80,
+                responsive: {
+                  mobile: {
+                    hidden: true,
+                    height: 20,
+                  },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const renderer = makeReaderRenderers();
+
+    const publicWrapper = document.createElement('div');
+    publicWrapper.innerHTML = renderer.renderPage(page);
+    expect(publicWrapper.querySelector('.pb-section')?.dataset.layout).toBe('1-1');
+    expect(publicWrapper.querySelector('.pb-section')?.getAttribute('style')).toContain(
+      '--pb-module-gap: 20px'
+    );
+    expect(publicWrapper.querySelector('.pb-text')?.getAttribute('style')).toContain(
+      'text-align: left'
+    );
+    expect(publicWrapper.querySelector('.pb-module--spacer')).not.toBeNull();
+    expect(publicWrapper.querySelector('.pb-module--hidden-device')).toBeNull();
+
+    const builderWrapper = document.createElement('div');
+    builderWrapper.innerHTML = renderer.renderPage(page, {
+      builderEditing: true,
+      deviceId: 'mobile',
+    });
+    expect(builderWrapper.querySelector('.pb-section')?.dataset.layout).toBe('1');
+    expect(builderWrapper.querySelector('.pb-section')?.getAttribute('style')).toContain(
+      '--pb-module-gap: 6px'
+    );
+    expect(builderWrapper.querySelector('.pb-text')?.getAttribute('style')).toContain(
+      'text-align: right'
+    );
+    expect(builderWrapper.querySelector('.pb-module--hidden-device')?.dataset.builderModuleId).toBe(
+      'module-spacer'
+    );
+  });
+
   it('reader omits mount placeholders, preview shows them', () => {
     const readerMod = { moduleType: 'reader', config: { showPanels: true, showComments: true } };
     const galleryMod = { moduleType: 'entry-gallery', config: { columns: 3 } };

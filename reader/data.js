@@ -19,6 +19,7 @@ import {
   resolvePageHeaderState,
 } from '../admin/page-builder/header-config.js';
 import { escapeHtml } from '../admin/page-builder/helpers.js';
+import { mergeAppearance } from '../admin/page-builder/appearance-utils.js';
 
 const BUILDER_THEME_CSS_VARS = Object.freeze([
   '--primary',
@@ -36,6 +37,34 @@ const PANEL_BACKGROUND_CSS_VARS = Object.freeze([
   '--panel-bg-position',
   '--panel-bg-opacity',
 ]);
+
+function resolveHeaderPageForDevice(page, { builderEditing = false, deviceId = '' } = {}) {
+  if (!builderEditing || !deviceId) return page;
+  const responsiveHeader = page?.meta?.responsive?.[deviceId]?.header;
+  const responsiveAppearance = responsiveHeader?.appearance;
+  if (!responsiveAppearance || typeof responsiveAppearance !== 'object') return page;
+
+  const baseHeader = page?.meta?.header || {};
+  const baseAppearance = baseHeader.appearance || {};
+  return {
+    ...page,
+    meta: {
+      ...(page.meta || {}),
+      header: {
+        ...baseHeader,
+        appearance: {
+          ...baseAppearance,
+          top: mergeAppearance(baseAppearance.top, responsiveAppearance.top),
+          scrolled: mergeAppearance(baseAppearance.scrolled, responsiveAppearance.scrolled),
+          navItemDefaults: mergeAppearance(
+            baseAppearance.navItemDefaults,
+            responsiveAppearance.navItemDefaults
+          ),
+        },
+      },
+    },
+  };
+}
 
 /**
  * Loads entry data from the public series endpoint
@@ -367,7 +396,7 @@ function getPanelModuleColumnIndex(item, side) {
   return 0;
 }
 
-function renderPanelBuilderEditingStack(side, modules) {
+function renderPanelBuilderEditingStack(side, modules, options = {}) {
   const groups = new Map();
   modules.forEach((item) => {
     const sectionIndex = Number.isFinite(Number(item.sectionIndex)) ? Number(item.sectionIndex) : 0;
@@ -403,7 +432,7 @@ function renderPanelBuilderEditingStack(side, modules) {
         true
       );
       const modulesHtml = groupModules
-        .map((module) => renderModule(module, { builderEditing: true }))
+        .map((module) => renderModule(module, { builderEditing: true, deviceId: options.deviceId }))
         .join('');
       return `
         <div class="pb-builder-panel-section"${sectionAttrs}>
@@ -421,19 +450,21 @@ function renderPanelBuilderEditingStack(side, modules) {
  */
 export function applyBuilderPageToDOM(page, options = {}) {
   const builderEditing = options.builderEditing === true;
+  const deviceId = options.deviceId;
   if (!page || !page.sections) {
     syncReaderShellBuilderMarkers(null, false);
     return;
   }
   syncReaderShellBuilderMarkers(page, builderEditing);
+  const headerPage = resolveHeaderPageForDevice(page, { builderEditing, deviceId });
   const headerState = resolvePageHeaderState({
-    page,
+    page: headerPage,
     pageConfig: options.pageConfig || null,
   });
   const effectiveHeader = headerState.meta;
   applySharedHeaderLayout(options.pageConfig || null, {
     seriesId: options.seriesId || getActiveSeriesId(),
-    page,
+    page: headerPage,
     headerState,
     builderEditing,
   });
@@ -469,7 +500,11 @@ export function applyBuilderPageToDOM(page, options = {}) {
         if (!PANEL_MODULE_TYPES.has(mod.moduleType)) continue;
         if (side === 'left' && mod.columnIndex === leftIndex) {
           results.push({ module: mod, section, sectionIndex });
-        } else if (side === 'right' && colCount > 1 && mod.columnIndex === rightIndex) {
+        } else if (
+          side === 'right' &&
+          (builderEditing ? Number(mod.columnIndex || 0) > leftIndex : colCount > 1) &&
+          (builderEditing || mod.columnIndex === rightIndex)
+        ) {
           results.push({ module: mod, section, sectionIndex });
         }
       }
@@ -498,10 +533,12 @@ export function applyBuilderPageToDOM(page, options = {}) {
   renderPanelStack('left', leftModules, panelSpacing, panelBackgrounds, {
     previewMode: !!options.previewMode,
     builderEditing,
+    deviceId,
   });
   renderPanelStack('right', rightModules, panelSpacing, panelBackgrounds, {
     previewMode: !!options.previewMode,
     builderEditing,
+    deviceId,
   });
 
   // Check panel visibility from section settings
@@ -596,7 +633,7 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
   }
 
   container.innerHTML = builderEditing
-    ? renderPanelBuilderEditingStack(side, modules)
+    ? renderPanelBuilderEditingStack(side, modules, { deviceId: options.deviceId })
     : modules.map(({ module }) => renderModule(module)).join('');
   initEmailForms(container, { previewMode: !!options.previewMode });
   initPromoCarousels(container);

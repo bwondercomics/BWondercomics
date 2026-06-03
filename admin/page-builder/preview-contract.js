@@ -6,6 +6,14 @@ export const PREVIEW_VIEWPORTS = Object.freeze({
   mobile: Object.freeze({ id: 'mobile', label: 'Mobile', width: 375, height: 812 }),
 });
 
+export const BUILDER_DEVICE_ORDER = PREVIEW_VIEWPORT_ORDER;
+
+export const BUILDER_DEVICES = Object.freeze({
+  desktop: Object.freeze({ ...PREVIEW_VIEWPORTS.desktop, label: 'Desktop' }),
+  tablet: Object.freeze({ ...PREVIEW_VIEWPORTS.tablet, label: 'Tablet' }),
+  mobile: Object.freeze({ ...PREVIEW_VIEWPORTS.mobile, label: 'Phone' }),
+});
+
 export const BUILDER_PREVIEW_SNAPSHOT_VERSION = 1;
 
 export const BUILDER_PREVIEW_MESSAGE_TYPES = Object.freeze({
@@ -72,6 +80,7 @@ export const PREVIEW_MEDIA_QUERIES = Object.freeze({
 
 /**
  * @typedef {'desktop'|'tablet'|'mobile'} BuilderPreviewViewportId
+ * @typedef {'desktop'|'tablet'|'mobile'} BuilderDeviceId
  * @typedef {'saved'|'working'} BuilderPreviewSource
  * @typedef {'draft'|'published'} BuilderPreviewDraftMode
  *
@@ -83,6 +92,7 @@ export const PREVIEW_MEDIA_QUERIES = Object.freeze({
  *
  * @typedef {Object} BuilderPreviewOptions
  * @property {boolean} builderEditing
+ * @property {BuilderDeviceId=} deviceId
  * @property {BuilderPreviewViewport} viewport
  * @property {Record<string, string>} sideEffects
  * @property {{top: number, left: number}} scrollState
@@ -151,11 +161,20 @@ export function isPreviewViewportId(id) {
   return Object.prototype.hasOwnProperty.call(PREVIEW_VIEWPORTS, String(id || ''));
 }
 
+export function isBuilderDeviceId(id) {
+  return Object.prototype.hasOwnProperty.call(BUILDER_DEVICES, String(id || ''));
+}
+
 export function getPreviewViewport(id) {
   const normalizedId = String(id || '');
   return PREVIEW_VIEWPORTS[
     isPreviewViewportId(normalizedId) ? normalizedId : PREVIEW_VIEWPORT_ORDER[0]
   ];
+}
+
+export function getBuilderDevice(id) {
+  const normalizedId = String(id || '');
+  return BUILDER_DEVICES[isBuilderDeviceId(normalizedId) ? normalizedId : BUILDER_DEVICE_ORDER[0]];
 }
 
 export function isPreviewSource(source) {
@@ -293,6 +312,13 @@ export function validatePreviewSnapshotPayload(snapshot, expected = {}) {
     typeof snapshot.options.builderEditing !== 'boolean'
   ) {
     return validationResult(false, 'Snapshot builderEditing option is invalid.');
+  }
+  if (
+    snapshot.options &&
+    Object.prototype.hasOwnProperty.call(snapshot.options, 'deviceId') &&
+    !isBuilderDeviceId(snapshot.options.deviceId)
+  ) {
+    return validationResult(false, 'Snapshot deviceId option is invalid.');
   }
 
   const identityChecks = [

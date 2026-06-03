@@ -38,9 +38,10 @@ export function renderPage(page, options = {}) {
   }
 
   const builderEditing = options.builderEditing === true;
+  const deviceId = options.deviceId;
   const sectionsHtml = page.sections
     .map((section, sectionIndex) =>
-      _renderers.renderSection(section, { builderEditing, sectionIndex })
+      _renderers.renderSection(section, { builderEditing, deviceId, sectionIndex })
     )
     .join('');
   const builderAttrs = builderEditing ? ` data-builder-page-id="${escapeHtml(page.id || '')}"` : '';

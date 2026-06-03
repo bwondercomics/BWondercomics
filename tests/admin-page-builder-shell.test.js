@@ -806,6 +806,10 @@ describe('admin page-builder shell', () => {
       settings: {
         moduleGap: 28,
         columnGap: 24,
+        panelEnabled: {
+          left: true,
+          right: true,
+        },
         sectionGap: 40,
       },
     });
@@ -1128,6 +1132,79 @@ describe('admin page-builder shell', () => {
     expect(mocks.addModule).not.toHaveBeenCalled();
   });
 
+  it('saves current-device header appearance without replacing global header styling', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    selectedPage.meta.header.appearance = {
+      top: {
+        background: {
+          color: '#112233',
+        },
+      },
+    };
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector('[data-action="select-page-header"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+    document
+      .querySelector('[data-width="mobile"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    const scopeSelect = document.querySelector('[data-responsive-edit-scope]');
+    scopeSelect.value = 'device';
+    scopeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(1);
+
+    expect(document.querySelector('.pb-header-copy-input')).toBeNull();
+    expect(document.querySelector('.pb-header-nav-input')).toBeNull();
+    expect(document.querySelector('.pb-header-layout-card')).toBeNull();
+    const toggle = document.querySelector(
+      '[data-appearance-toggle="true"][data-appearance-scope="shell-top"][data-appearance-key="background.color"]'
+    );
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(1);
+
+    const colorInput = document.querySelector(
+      '[data-appearance-input="true"][data-appearance-input-kind="hex"][data-appearance-scope="shell-top"][data-appearance-key="background.color"]'
+    );
+    colorInput.value = '#445566';
+    colorInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    enterPreviewMode();
+    const snapshot = requestCurrentPreviewSnapshot();
+    expect(snapshot?.source).toBe('working');
+    expect(snapshot?.page.meta.responsive.mobile.header.appearance.top.background.color).toBe(
+      '#445566'
+    );
+    expect(snapshot?.page.meta.header.appearance.top.background.color).toBe('#112233');
+
+    document
+      .getElementById('pbSaveHeader')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    const savedMeta = mocks.updatePage.mock.calls.at(-1)?.[1]?.meta;
+    expect(savedMeta.header.appearance.top.background.color).toBe('#112233');
+    expect(savedMeta.responsive.mobile.header.appearance.top.background.color).toBe('#445566');
+
+    const globalScope = document.querySelector('[data-responsive-edit-scope]');
+    globalScope.value = 'global';
+    globalScope.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(1);
+    const globalColorInput = document.querySelector(
+      '[data-appearance-input="true"][data-appearance-input-kind="hex"][data-appearance-scope="shell-top"][data-appearance-key="background.color"]'
+    );
+    expect(globalColorInput?.value).toBe('#112233');
+  });
+
   it('opens the canonical designer surface with a requested page slug and syncs the route state', async () => {
     const readerPage = getContractFixture('builderPage');
     const aboutPage = buildContractFixture('builderPageDraft', {
@@ -1296,8 +1373,10 @@ describe('admin page-builder shell', () => {
 
     const canvas = document.getElementById('pbCanvas');
     const widthToggles = document.getElementById('pbWidthToggles');
+    expect(widthToggles?.querySelector('[data-width="mobile"]')?.textContent?.trim()).toBe('Phone');
 
     expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('desktop');
+    expect(canvas?.querySelector('.pb-preview-frame')?.dataset.deviceId).toBe('desktop');
     const initialIframe = getPreviewIframe();
     const initialFrame = getPreviewFrame();
     const initialSrc = initialIframe?.getAttribute('src');
@@ -1316,6 +1395,7 @@ describe('admin page-builder shell', () => {
       ?.querySelector('[data-width="tablet"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('tablet');
+    expect(canvas?.querySelector('.pb-preview-frame')?.dataset.deviceId).toBe('tablet');
     expect(getPreviewIframe()).toBe(initialIframe);
     expect(getPreviewIframe()?.getAttribute('src')).toBe(initialSrc);
     expect(getPreviewIframe()?.getAttribute('width')).toBe('768');
@@ -1340,6 +1420,7 @@ describe('admin page-builder shell', () => {
       ?.querySelector('[data-width="mobile"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('mobile');
+    expect(canvas?.querySelector('.pb-preview-frame')?.dataset.deviceId).toBe('mobile');
     expect(getPreviewIframe()).toBe(initialIframe);
     expect(getPreviewIframe()?.getAttribute('width')).toBe('375');
     expect(getPreviewIframe()?.getAttribute('height')).toBe('812');
@@ -1347,12 +1428,16 @@ describe('admin page-builder shell', () => {
     expect(getPreviewFrame()?.style.height).toBe('812px');
     expect(getPreviewIframe()?.style.width).toBe('375px');
     expect(getPreviewIframe()?.style.height).toBe('812px');
+    const mobileSnapshot = requestCurrentPreviewSnapshot();
+    expect(mobileSnapshot?.options.deviceId).toBe('mobile');
+    expect(mobileSnapshot?.options.viewport).toMatchObject({ id: 'mobile', width: 375 });
 
     // Back to desktop
     widthToggles
       ?.querySelector('[data-width="desktop"]')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('desktop');
+    expect(canvas?.querySelector('.pb-preview-frame')?.dataset.deviceId).toBe('desktop');
     expect(getPreviewFrame()?.style.width).toBe('1280px');
     expect(getPreviewFrame()?.style.height).toBe('900px');
 
@@ -1361,6 +1446,234 @@ describe('admin page-builder shell', () => {
     widthToggles?.appendChild(invalidWidth);
     invalidWidth.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('desktop');
+  });
+
+  it('saves current-device module overrides without replacing global config', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const globalAlignment = textModule.config.alignment;
+    const globalContent = textModule.config.content;
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector(`.pb-module[data-module-id="${textModule.id}"]`)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    document
+      .querySelector('[data-width="mobile"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    const scopeSelect = document.querySelector('[data-responsive-edit-scope]');
+    scopeSelect.value = 'device';
+    scopeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(1);
+
+    const alignmentSelect = document.querySelector('[data-key="alignment"]');
+    expect(document.querySelector('[data-key="content"]')).toBeNull();
+    expect(document.querySelector('[data-key="_raw"]')).toBeNull();
+    expect(alignmentSelect.value).toBe(globalAlignment);
+    alignmentSelect.value = 'right';
+    alignmentSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+    document
+      .getElementById('pbSaveModule')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const savedConfig = mocks.updateModule.mock.calls.at(-1)?.[1]?.config;
+    expect(savedConfig.alignment).toBe(globalAlignment);
+    expect(savedConfig.content).toBe(globalContent);
+    expect(savedConfig.responsive.mobile.alignment).toBe('right');
+    expect(textModule.config.alignment).toBe(globalAlignment);
+    expect(textModule.config.content).toBe(globalContent);
+    expect(textModule.config.responsive.mobile.alignment).toBe('right');
+
+    const globalScopeSelect = document.querySelector('[data-responsive-edit-scope]');
+    globalScopeSelect.value = 'global';
+    globalScopeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(1);
+    expect(document.querySelector('[data-key="alignment"]')?.value).toBe(globalAlignment);
+
+    const deviceScopeSelect = document.querySelector('[data-responsive-edit-scope]');
+    deviceScopeSelect.value = 'device';
+    deviceScopeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(1);
+    expect(document.querySelector('[data-key="alignment"]')?.value).toBe('right');
+  });
+
+  it('keeps global-only module controls out of current-device scope', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const feedModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'feed');
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector(`.pb-module[data-module-id="${feedModule.id}"]`)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    document
+      .querySelector('[data-width="mobile"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    const scopeSelect = document.querySelector('[data-responsive-edit-scope]');
+    scopeSelect.value = 'device';
+    scopeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(1);
+
+    expect(document.querySelector('[data-responsive-module-key="hidden"]')).not.toBeNull();
+    expect(document.querySelector('[data-key="heading"]')).toBeNull();
+    expect(document.querySelector('[data-key="feedHref"]')).toBeNull();
+    expect(document.querySelector('[data-style-key]')).toBeNull();
+    expect(document.querySelector('[data-key="_raw"]')).toBeNull();
+  });
+
+  it('limits current-device gallery and entry-gallery edits to columns', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const section = selectedPage.sections.find((item) => item.layout === '1-1');
+    const galleryModule = {
+      id: 'device-gallery-module',
+      moduleType: 'gallery',
+      columnIndex: 0,
+      sortIndex: 50,
+      config: {
+        columns: 3,
+        images: [{ src: 'media/gallery/a.png', alt: 'A' }],
+      },
+    };
+    const entryGalleryModule = {
+      id: 'device-entry-gallery-module',
+      moduleType: 'entry-gallery',
+      columnIndex: 0,
+      sortIndex: 51,
+      config: {
+        columns: 4,
+        showLabels: false,
+      },
+    };
+    section.modules.push(galleryModule, entryGalleryModule);
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector('[data-width="mobile"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    document
+      .querySelector(`.pb-module[data-module-id="${galleryModule.id}"]`)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+    const galleryScope = document.querySelector('[data-responsive-edit-scope]');
+    galleryScope.value = 'device';
+    galleryScope.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(1);
+
+    expect(document.querySelector('.pb-gallery-item')).toBeNull();
+    expect(document.getElementById('pbGalleryAddImage')).toBeNull();
+    const galleryColumns = document.querySelector('[data-key="columns"]');
+    galleryColumns.value = '5';
+    galleryColumns.dispatchEvent(new Event('input', { bubbles: true }));
+    document
+      .getElementById('pbSaveModule')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const savedGalleryConfig = mocks.updateModule.mock.calls.at(-1)?.[1]?.config;
+    expect(savedGalleryConfig.columns).toBe(3);
+    expect(savedGalleryConfig.images).toEqual(galleryModule.config.images);
+    expect(savedGalleryConfig.responsive.mobile.columns).toBe(5);
+
+    document
+      .querySelector(`.pb-module[data-module-id="${entryGalleryModule.id}"]`)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+    expect(document.querySelector('[data-key="showLabels"]')).toBeNull();
+    const entryColumns = document.querySelector('[data-key="columns"]');
+    entryColumns.value = '2';
+    entryColumns.dispatchEvent(new Event('input', { bubbles: true }));
+    document
+      .getElementById('pbSaveModule')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const savedEntryConfig = mocks.updateModule.mock.calls.at(-1)?.[1]?.config;
+    expect(savedEntryConfig.columns).toBe(4);
+    expect(savedEntryConfig.showLabels).toBe(false);
+    expect(savedEntryConfig.responsive.mobile.columns).toBe(2);
+  });
+
+  it('saves current-device button appearance without changing button content', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const buttonsModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'buttons');
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector('[data-width="mobile"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+    document
+      .querySelector(`.pb-module[data-module-id="${buttonsModule.id}"]`)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    const scopeSelect = document.querySelector('[data-responsive-edit-scope]');
+    scopeSelect.value = 'device';
+    scopeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(1);
+
+    expect(document.querySelector('.pb-button-input')).toBeNull();
+    expect(document.getElementById('pbButtonsAddButton')).toBeNull();
+    expect(document.querySelector('.pb-promo-action[data-action="remove"]')).toBeNull();
+
+    const toggle = document.querySelector(
+      '[data-appearance-toggle="true"][data-appearance-scope="defaults"][data-appearance-key="background.color"]'
+    );
+    toggle.checked = true;
+    toggle.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(1);
+
+    const colorInput = document.querySelector(
+      '[data-appearance-input="true"][data-appearance-input-kind="hex"][data-appearance-scope="defaults"][data-appearance-key="background.color"]'
+    );
+    colorInput.value = '#123456';
+    colorInput.dispatchEvent(new Event('input', { bubbles: true }));
+    document
+      .getElementById('pbSaveModule')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const savedConfig = mocks.updateModule.mock.calls.at(-1)?.[1]?.config;
+    expect(savedConfig.buttons).toEqual(buttonsModule.config.buttons);
+    expect(savedConfig.defaults?.appearance).toBeUndefined();
+    expect(savedConfig.responsive.mobile.defaults.appearance.background.color).toBe('#123456');
   });
 
   it('shows saved preview contract status and frame metadata with no dirty scope', async () => {

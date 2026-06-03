@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  BUILDER_DEVICE_ORDER,
+  BUILDER_DEVICES,
   BUILDER_PREVIEW_MESSAGE_TYPES,
   BUILDER_PREVIEW_SOURCES,
   BUILDER_PREVIEW_SNAPSHOT_VERSION,
@@ -13,6 +15,8 @@ import {
   buildPreviewTargetMessage,
   getPreviewStatusCopy,
   getPreviewViewport,
+  getBuilderDevice,
+  isBuilderDeviceId,
   isPreviewMessageType,
   isPreviewSource,
   isPreviewViewportId,
@@ -26,9 +30,12 @@ import {
 describe('admin page-builder preview contract', () => {
   it('defines ordered viewport presets with iframe dimensions', () => {
     expect(PREVIEW_VIEWPORT_ORDER).toEqual(['desktop', 'tablet', 'mobile']);
+    expect(BUILDER_DEVICE_ORDER).toEqual(['desktop', 'tablet', 'mobile']);
     expect(PREVIEW_VIEWPORTS.desktop).toMatchObject({ width: 1280, height: 900 });
     expect(PREVIEW_VIEWPORTS.tablet).toMatchObject({ width: 768, height: 1024 });
     expect(PREVIEW_VIEWPORTS.mobile).toMatchObject({ width: 375, height: 812 });
+    expect(PREVIEW_VIEWPORTS.mobile.label).toBe('Mobile');
+    expect(BUILDER_DEVICES.mobile).toMatchObject({ id: 'mobile', label: 'Phone', width: 375 });
     expect(BUILDER_PREVIEW_SNAPSHOT_VERSION).toBe(1);
   });
 
@@ -41,6 +48,11 @@ describe('admin page-builder preview contract', () => {
     expect(getPreviewViewport('mobile')).toBe(PREVIEW_VIEWPORTS.mobile);
     expect(getPreviewViewport('wide')).toBe(PREVIEW_VIEWPORTS.desktop);
     expect(getPreviewViewport()).toBe(PREVIEW_VIEWPORTS.desktop);
+
+    expect(isBuilderDeviceId('mobile')).toBe(true);
+    expect(isBuilderDeviceId('watch')).toBe(false);
+    expect(getBuilderDevice('mobile')).toBe(BUILDER_DEVICES.mobile);
+    expect(getBuilderDevice('watch')).toBe(BUILDER_DEVICES.desktop);
   });
 
   it('defines source validation and status copy', () => {
@@ -88,7 +100,7 @@ describe('admin page-builder preview contract', () => {
       validatePreviewSnapshotPayload(
         {
           ...snapshot,
-          options: { builderEditing: true },
+          options: { builderEditing: true, deviceId: 'mobile' },
         },
         expected
       )
@@ -117,6 +129,10 @@ describe('admin page-builder preview contract', () => {
     );
     expect(
       validatePreviewSnapshotPayload({ ...snapshot, options: { builderEditing: 'true' } }, expected)
+        .valid
+    ).toBe(false);
+    expect(
+      validatePreviewSnapshotPayload({ ...snapshot, options: { deviceId: 'watch' } }, expected)
         .valid
     ).toBe(false);
     expect(validatePreviewEnvelope({ type: 'unknown' }, expected).valid).toBe(false);
