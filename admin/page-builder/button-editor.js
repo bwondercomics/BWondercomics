@@ -117,6 +117,8 @@ function renderLinkFields(button, index, pages) {
 export function renderButtonsEditor(config = {}, pages = [], options = {}) {
   const normalized = normalizeButtonsConfig(config);
   const deviceOnly = options.deviceOnly === true;
+  const styleOnly = options.styleOnly === true;
+  const appearanceOnly = deviceOnly || styleOnly;
   const defaultsHtml = renderAppearanceControls(
     normalized.defaults?.appearance,
     'defaults',
@@ -134,11 +136,13 @@ export function renderButtonsEditor(config = {}, pages = [], options = {}) {
             <div class="pb-editor-help">${
               deviceOnly
                 ? 'Configure appearance overrides for this device.'
-                : 'Configure the label, style, and destination.'
+                : styleOnly
+                  ? 'Configure appearance without changing labels or destinations.'
+                  : 'Configure the label, style, and destination.'
             }</div>
           </div>
           ${
-            deviceOnly
+            appearanceOnly
               ? ''
               : `
           <div class="pb-promo-item-actions">
@@ -150,7 +154,7 @@ export function renderButtonsEditor(config = {}, pages = [], options = {}) {
           }
         </div>
         ${
-          deviceOnly
+          appearanceOnly
             ? ''
             : `
         <div class="pb-editor-field">
@@ -194,17 +198,17 @@ export function renderButtonsEditor(config = {}, pages = [], options = {}) {
     })}
     ${renderInspectorSection({
       kicker: 'Navigation',
-      title: deviceOnly ? 'Button Appearance' : 'Buttons',
+      title: appearanceOnly ? 'Button Appearance' : 'Buttons',
       summary: `${normalized.buttons.length} button${normalized.buttons.length === 1 ? '' : 's'}`,
-      copy: deviceOnly
-        ? 'Tune device-specific button appearance without changing labels, links, or order.'
+      copy: appearanceOnly
+        ? 'Tune button appearance without changing labels, links, or order.'
         : 'Create reusable buttons with internal page targets, anchors, or URLs.',
       body: `
         <div class="pb-promo-editor-list">
           ${buttonsHtml || '<div class="pb-promo-empty">No buttons configured.</div>'}
         </div>
         ${
-          deviceOnly
+          appearanceOnly
             ? ''
             : `
         <div class="pb-editor-actions">
@@ -241,6 +245,7 @@ export function bindButtonsEditorEvents({
   markDirty,
   activeDeviceId = 'desktop',
   responsiveEditScope = 'global',
+  styleOnly = false,
 }) {
   let config = normalizeButtonsDraftConfig(draftConfig);
   const useDeviceAppearance = responsiveEditScope === 'device';
@@ -324,7 +329,7 @@ export function bindButtonsEditorEvents({
       ].join('')
     );
 
-  if (!useDeviceAppearance) {
+  if (!useDeviceAppearance && !styleOnly) {
     document.getElementById('pbButtonsAddButton')?.addEventListener('click', () => {
       const nextConfig = normalizeButtonsConfig(config);
       nextConfig.buttons.push({

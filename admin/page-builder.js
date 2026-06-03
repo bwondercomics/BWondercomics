@@ -70,6 +70,7 @@ function createPageBuilder({
   let selectedModuleId = null;
   let selectedCanvasSurface = null;
   let activeEditorTab = 'modules';
+  let activeSidePanelTab = 'pages';
   let editorResizeBound = false;
   let activeModuleDraftId = null;
   let activeModuleDraft = null;
@@ -153,6 +154,7 @@ function createPageBuilder({
       currentPage,
       pages,
       activeEditorTab,
+      activeSidePanelTab,
       selectedCanvasSurface,
       selectedModuleId,
       activeThemeDraft,
@@ -314,8 +316,10 @@ function createPageBuilder({
       getState: () => ({
         currentPage,
         pages,
+        activeSectionId,
         selectedCanvasSurface,
         selectedModuleId,
+        selectedTarget: getSelectedTarget(),
       }),
       actions: {
         selectPage: (pageId) => pageActions.selectPage(pageId),
@@ -336,7 +340,18 @@ function createPageBuilder({
           selectModule(moduleId);
           showSidePanelTab('settings');
         },
+        selectSection: (sectionId) => {
+          selectSectionFromCanvas(sectionId);
+          showSidePanelTab('settings');
+        },
+        selectColumn: (sectionId) => {
+          selectSectionFromCanvas(sectionId);
+          showSidePanelTab('settings');
+        },
         selectInspectorTab: (nextTab) => selectInspectorTab(nextTab),
+        setActiveSidePanelTab: (nextTab) => {
+          activeSidePanelTab = nextTab || activeSidePanelTab;
+        },
         syncSidebarRailLabel,
       },
       helpers: {
@@ -466,6 +481,33 @@ function createPageBuilder({
     return (currentPage?.sections || []).find((section) => section.id === sectionId) || null;
   }
 
+  function getSelectedTarget() {
+    const pageId = currentPage?.id || null;
+    if (!pageId) return null;
+    if (selectedCanvasSurface === 'page-header') {
+      return { kind: 'header', pageId };
+    }
+    if (selectedCanvasSurface === 'page-settings') {
+      return { kind: 'page', pageId };
+    }
+    if (selectedCanvasSurface === 'section' && activeSectionId) {
+      return { kind: 'section', pageId, sectionId: activeSectionId };
+    }
+    const selectedModule = getSelectedModuleRecord(selectedModuleId);
+    if (selectedModule) {
+      const section = (currentPage.sections || []).find((item) =>
+        (item.modules || []).some((module) => module.id === selectedModule.id)
+      );
+      return {
+        kind: 'module',
+        pageId,
+        sectionId: section?.id || null,
+        moduleId: selectedModule.id,
+      };
+    }
+    return { kind: 'page', pageId };
+  }
+
   function syncSidebarRailLabel() {
     if (!el.pbSidebarRailLabel) return;
     const activeTab = document.querySelector('.page-builder-sidebar .pb-sidebar-tab.active');
@@ -479,6 +521,7 @@ function createPageBuilder({
     const contentTarget = tabName === 'settings' || tabName === 'styles' ? 'inspector' : tabName;
     if (!targetTab) return;
 
+    activeSidePanelTab = tabName;
     sidebar
       .querySelectorAll('.pb-sidebar-tab')
       .forEach((button) => button.classList.toggle('active', button === targetTab));
@@ -625,6 +668,7 @@ function createPageBuilder({
   function resetBuilderState() {
     draftManager.clearSelectedModuleState();
     selectedCanvasSurface = null;
+    activeSidePanelTab = 'pages';
     activeThemeDraft = currentPage ? draftManager.normalizeThemeDraft(currentPage) : null;
     activeHeaderDraft = currentPage ? draftManager.normalizeHeaderDraft(currentPage) : null;
     draftManager.initializePageSettingsDraft();

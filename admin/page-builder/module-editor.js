@@ -16,6 +16,11 @@ import { bindDividerEditorEvents, renderDividerEditor } from './divider-editor.j
 import { bindEntryGalleryEditorEvents, renderEntryGalleryEditor } from './entry-gallery-editor.js';
 import { renderInspectorSection } from './inspector-sections.js';
 import {
+  getModuleDescriptor,
+  getModuleEditorKind,
+  getModuleStyleSectors,
+} from './module-descriptors.js';
+import {
   getBuilderDeviceLabel,
   getEffectiveModuleConfig,
   isModuleHiddenForDevice,
@@ -165,22 +170,41 @@ function renderSpacerHeightCard(config = {}) {
 }
 
 function renderDeviceModuleOverrideSections(moduleType, config, pages) {
-  if (moduleType === 'text') {
+  const responsiveFields = getModuleDescriptor(moduleType).responsiveOverrides || [];
+  if (responsiveFields.includes('alignment')) {
     return [renderTextAlignmentCard(config)];
   }
-  if (moduleType === 'spacer') {
+  if (responsiveFields.includes('height')) {
     return [renderSpacerHeightCard(config)];
   }
-  if (moduleType === 'gallery') {
+  if (moduleType === 'gallery' && responsiveFields.includes('columns')) {
     return [renderGalleryEditor(config, { deviceOnly: true })];
   }
-  if (moduleType === 'entry-gallery') {
+  if (moduleType === 'entry-gallery' && responsiveFields.includes('columns')) {
     return [renderEntryGalleryEditor(config, { deviceOnly: true })];
   }
-  if (moduleType === 'buttons') {
+  if (moduleType === 'buttons' && responsiveFields.includes('defaults')) {
     return [renderButtonsEditor(config, pages, { deviceOnly: true })];
   }
   return [];
+}
+
+function renderStyleScopeCard({ activeDeviceId, responsiveEditScope }) {
+  const deviceLabel = getBuilderDeviceLabel(activeDeviceId);
+  return renderSectionCard(
+    'Device',
+    'Style Scope',
+    responsiveEditScope === 'device' ? deviceLabel : 'Global',
+    `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Scope</label>
+        <select class="pb-editor-select" data-responsive-edit-scope data-responsive-device-id="${escapeAttr(activeDeviceId)}">
+          <option value="global" ${responsiveEditScope === 'global' ? 'selected' : ''}>Global</option>
+          <option value="device" ${responsiveEditScope === 'device' ? 'selected' : ''}>Current Device (${escapeHtml(deviceLabel)})</option>
+        </select>
+      </div>
+    `
+  );
 }
 
 function renderResponsiveScopeCard({
@@ -600,6 +624,104 @@ function bindGenericModuleDraftEvents({
   });
 }
 
+function renderEmailSignupStyleSection(emailStyle = {}) {
+  return renderSectionCard(
+    'Appearance',
+    'Visual Styling',
+    'Tune typography and emphasis without editing raw JSON.',
+    `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Heading Font</label>
+        <select class="pb-editor-select" data-style-key="headingFont">
+          <option value="default" ${emailStyle.headingFont === 'default' ? 'selected' : ''}>Default</option>
+          <option value="display" ${emailStyle.headingFont === 'display' ? 'selected' : ''}>Display (Bebas)</option>
+          <option value="mono" ${emailStyle.headingFont === 'mono' ? 'selected' : ''}>Monospace</option>
+        </select>
+      </div>
+      <div class="pb-editor-field pb-editor-field--row">
+        <label class="pb-editor-label">Heading Color</label>
+        <input type="color" class="pb-promo-style-color" data-style-key="headingColor" value="${emailStyle.headingColor || '#ffffff'}">
+        <label><input type="checkbox" data-style-key="headingGlow" ${emailStyle.headingGlow ? 'checked' : ''}> Glow</label>
+      </div>
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Input Style</label>
+        <select class="pb-editor-select" data-style-key="inputStyle">
+          <option value="bubble" ${emailStyle.inputStyle === 'bubble' ? 'selected' : ''}>Bubble (glow border)</option>
+          <option value="flat" ${emailStyle.inputStyle === 'flat' ? 'selected' : ''}>Flat</option>
+        </select>
+      </div>
+      <div class="pb-editor-field pb-editor-field--row">
+        <label class="pb-editor-label">Button Color</label>
+        <input type="color" class="pb-promo-style-color" data-style-key="buttonColor" value="${emailStyle.buttonColor || '#00d9ff'}">
+        <label><input type="checkbox" data-style-key="buttonGlow" ${emailStyle.buttonGlow ? 'checked' : ''}> Glow</label>
+      </div>
+    `
+  );
+}
+
+function renderFeedStyleSection(feedStyle = {}) {
+  return renderSectionCard(
+    'Appearance',
+    'Color Styling',
+    'Tune headings, buttons, feed items, and the outer frame.',
+    `
+      <details class="pb-editor-accordion">
+        <summary class="pb-editor-accordion-toggle">Color Options</summary>
+        <div class="pb-editor-accordion-content">
+          <div class="pb-style-group">
+            <div class="pb-style-group-title">Heading & Author</div>
+            <div class="pb-editor-field pb-editor-field--row">
+              <label class="pb-editor-label">Heading Background</label>
+              <input type="color" class="pb-promo-style-color" data-style-key="headingBgColor" value="${feedStyle.headingBgColor || '#ffed00'}">
+            </div>
+            <div class="pb-editor-field pb-editor-field--row">
+              <label class="pb-editor-label">Heading Text</label>
+              <input type="color" class="pb-promo-style-color" data-style-key="headingTextColor" value="${feedStyle.headingTextColor || '#0a0a12'}">
+            </div>
+            <div class="pb-editor-field pb-editor-field--row">
+              <label class="pb-editor-label">Author Color</label>
+              <input type="color" class="pb-promo-style-color" data-style-key="authorColor" value="${feedStyle.authorColor || '#7ef5e3'}">
+            </div>
+          </div>
+          <div class="pb-style-group">
+            <div class="pb-style-group-title">Buttons</div>
+            <div class="pb-editor-field pb-editor-field--row">
+              <label class="pb-editor-label">Button Background</label>
+              <input type="color" class="pb-promo-style-color" data-style-key="buttonBgColor" value="${feedStyle.buttonBgColor || '#00d9ff'}">
+            </div>
+            <div class="pb-editor-field pb-editor-field--row">
+              <label class="pb-editor-label">Button Text</label>
+              <input type="color" class="pb-promo-style-color" data-style-key="buttonTextColor" value="${feedStyle.buttonTextColor || '#0a0a12'}">
+            </div>
+          </div>
+          <div class="pb-style-group">
+            <div class="pb-style-group-title">Feed Items</div>
+            <div class="pb-editor-field pb-editor-field--row">
+              <label class="pb-editor-label">Item Title</label>
+              <input type="color" class="pb-promo-style-color" data-style-key="itemTitleColor" value="${feedStyle.itemTitleColor || '#ffed00'}">
+            </div>
+            <div class="pb-editor-field pb-editor-field--row">
+              <label class="pb-editor-label">Item Date</label>
+              <input type="color" class="pb-promo-style-color" data-style-key="itemDateColor" value="${feedStyle.itemDateColor || '#00d9ff'}">
+            </div>
+            <div class="pb-editor-field pb-editor-field--row">
+              <label class="pb-editor-label">Item Border</label>
+              <input type="color" class="pb-promo-style-color" data-style-key="itemBorderColor" value="${feedStyle.itemBorderColor || '#00d9ff'}">
+            </div>
+          </div>
+          <div class="pb-style-group">
+            <div class="pb-style-group-title">Container</div>
+            <div class="pb-editor-field pb-editor-field--row">
+              <label class="pb-editor-label">Border Color</label>
+              <input type="color" class="pb-promo-style-color" data-style-key="borderColor" value="${feedStyle.borderColor || '#ffed00'}">
+            </div>
+          </div>
+        </div>
+      </details>
+    `
+  );
+}
+
 export function renderModuleEditorContent({
   currentPage,
   selectedModuleId,
@@ -662,7 +784,7 @@ export function renderModuleEditorContent({
     return contentSections.join('');
   }
 
-  switch (moduleType) {
+  switch (getModuleEditorKind(moduleType)) {
     case 'header':
       contentSections.push(
         renderSectionCard(
@@ -745,7 +867,6 @@ export function renderModuleEditorContent({
       break;
 
     case 'email-signup': {
-      const emailStyle = config.style || {};
       contentSections.push(
         renderSectionCard(
           'Content',
@@ -771,40 +892,7 @@ export function renderModuleEditorContent({
         `
         )
       );
-      contentSections.push(
-        renderSectionCard(
-          'Appearance',
-          'Visual Styling',
-          'Tune typography and emphasis without editing raw JSON.',
-          `
-          <div class="pb-editor-field">
-            <label class="pb-editor-label">Heading Font</label>
-            <select class="pb-editor-select" data-style-key="headingFont">
-              <option value="default" ${emailStyle.headingFont === 'default' ? 'selected' : ''}>Default</option>
-              <option value="display" ${emailStyle.headingFont === 'display' ? 'selected' : ''}>Display (Bebas)</option>
-              <option value="mono" ${emailStyle.headingFont === 'mono' ? 'selected' : ''}>Monospace</option>
-            </select>
-          </div>
-          <div class="pb-editor-field pb-editor-field--row">
-            <label class="pb-editor-label">Heading Color</label>
-            <input type="color" class="pb-promo-style-color" data-style-key="headingColor" value="${emailStyle.headingColor || '#ffffff'}">
-            <label><input type="checkbox" data-style-key="headingGlow" ${emailStyle.headingGlow ? 'checked' : ''}> Glow</label>
-          </div>
-          <div class="pb-editor-field">
-            <label class="pb-editor-label">Input Style</label>
-            <select class="pb-editor-select" data-style-key="inputStyle">
-              <option value="bubble" ${emailStyle.inputStyle === 'bubble' ? 'selected' : ''}>Bubble (glow border)</option>
-              <option value="flat" ${emailStyle.inputStyle === 'flat' ? 'selected' : ''}>Flat</option>
-            </select>
-          </div>
-          <div class="pb-editor-field pb-editor-field--row">
-            <label class="pb-editor-label">Button Color</label>
-            <input type="color" class="pb-promo-style-color" data-style-key="buttonColor" value="${emailStyle.buttonColor || '#00d9ff'}">
-            <label><input type="checkbox" data-style-key="buttonGlow" ${emailStyle.buttonGlow ? 'checked' : ''}> Glow</label>
-          </div>
-        `
-        )
-      );
+      contentSections.push(renderEmailSignupStyleSection(config.style || {}));
       break;
     }
 
@@ -843,7 +931,6 @@ export function renderModuleEditorContent({
       break;
 
     case 'feed': {
-      const feedStyle = config.style || {};
       contentSections.push(
         renderSectionCard(
           'Content',
@@ -905,68 +992,7 @@ export function renderModuleEditorContent({
         `
         )
       );
-      contentSections.push(
-        renderSectionCard(
-          'Appearance',
-          'Color Styling',
-          'Tune headings, buttons, feed items, and the outer frame.',
-          `
-          <details class="pb-editor-accordion">
-            <summary class="pb-editor-accordion-toggle">Color Options</summary>
-            <div class="pb-editor-accordion-content">
-              <div class="pb-style-group">
-                <div class="pb-style-group-title">Heading & Author</div>
-                <div class="pb-editor-field pb-editor-field--row">
-                  <label class="pb-editor-label">Heading Background</label>
-                  <input type="color" class="pb-promo-style-color" data-style-key="headingBgColor" value="${feedStyle.headingBgColor || '#ffed00'}">
-                </div>
-                <div class="pb-editor-field pb-editor-field--row">
-                  <label class="pb-editor-label">Heading Text</label>
-                  <input type="color" class="pb-promo-style-color" data-style-key="headingTextColor" value="${feedStyle.headingTextColor || '#0a0a12'}">
-                </div>
-                <div class="pb-editor-field pb-editor-field--row">
-                  <label class="pb-editor-label">Author Color</label>
-                  <input type="color" class="pb-promo-style-color" data-style-key="authorColor" value="${feedStyle.authorColor || '#7ef5e3'}">
-                </div>
-              </div>
-              <div class="pb-style-group">
-                <div class="pb-style-group-title">Buttons</div>
-                <div class="pb-editor-field pb-editor-field--row">
-                  <label class="pb-editor-label">Button Background</label>
-                  <input type="color" class="pb-promo-style-color" data-style-key="buttonBgColor" value="${feedStyle.buttonBgColor || '#00d9ff'}">
-                </div>
-                <div class="pb-editor-field pb-editor-field--row">
-                  <label class="pb-editor-label">Button Text</label>
-                  <input type="color" class="pb-promo-style-color" data-style-key="buttonTextColor" value="${feedStyle.buttonTextColor || '#0a0a12'}">
-                </div>
-              </div>
-              <div class="pb-style-group">
-                <div class="pb-style-group-title">Feed Items</div>
-                <div class="pb-editor-field pb-editor-field--row">
-                  <label class="pb-editor-label">Item Title</label>
-                  <input type="color" class="pb-promo-style-color" data-style-key="itemTitleColor" value="${feedStyle.itemTitleColor || '#ffed00'}">
-                </div>
-                <div class="pb-editor-field pb-editor-field--row">
-                  <label class="pb-editor-label">Item Date</label>
-                  <input type="color" class="pb-promo-style-color" data-style-key="itemDateColor" value="${feedStyle.itemDateColor || '#00d9ff'}">
-                </div>
-                <div class="pb-editor-field pb-editor-field--row">
-                  <label class="pb-editor-label">Item Border</label>
-                  <input type="color" class="pb-promo-style-color" data-style-key="itemBorderColor" value="${feedStyle.itemBorderColor || '#00d9ff'}">
-                </div>
-              </div>
-              <div class="pb-style-group">
-                <div class="pb-style-group-title">Container</div>
-                <div class="pb-editor-field pb-editor-field--row">
-                  <label class="pb-editor-label">Border Color</label>
-                  <input type="color" class="pb-promo-style-color" data-style-key="borderColor" value="${feedStyle.borderColor || '#ffed00'}">
-                </div>
-              </div>
-            </div>
-          </details>
-        `
-        )
-      );
+      contentSections.push(renderFeedStyleSection(config.style || {}));
       break;
     }
 
@@ -1020,6 +1046,128 @@ export function renderModuleEditorContent({
   }
 
   return contentSections.join('');
+}
+
+function renderStyleManagerEmpty(title, copy) {
+  return `
+    <div class="pb-editor-empty">
+      <div class="pb-editor-empty-card">
+        <span class="pb-editor-empty-kicker">Styles</span>
+        <h4>${escapeHtml(title)}</h4>
+        <p>${escapeHtml(copy)}</p>
+      </div>
+    </div>
+  `;
+}
+
+export function renderModuleStyleEditorContent({
+  currentPage,
+  selectedModuleId,
+  draftConfig = null,
+  pages = [],
+  activeDeviceId = 'desktop',
+  responsiveEditScope = 'global',
+}) {
+  if (!selectedModuleId) {
+    return renderStyleManagerEmpty(
+      'Choose a module',
+      'Select a module with supported sanitized style controls to edit its appearance.'
+    );
+  }
+
+  const selectedModule = findSelectedModule(currentPage, selectedModuleId);
+  if (!selectedModule) {
+    return renderStyleManagerEmpty(
+      'Module not found',
+      'The selected module is no longer available. Pick another module on the canvas to continue.'
+    );
+  }
+
+  const moduleType = selectedModule.moduleType;
+  const styleSectors = getModuleStyleSectors(moduleType);
+  if (!styleSectors.length) {
+    return renderStyleManagerEmpty(
+      'No style controls',
+      'This module does not expose sanitized style sectors in the builder style manager.'
+    );
+  }
+
+  const baseConfig = draftConfig || selectedModule.config || {};
+  const styleScope =
+    moduleType === 'buttons' && responsiveEditScope === 'device' ? 'device' : 'global';
+  const config =
+    styleScope === 'device'
+      ? getEffectiveModuleConfig(
+          { ...selectedModule, config: baseConfig },
+          { builderEditing: true, deviceId: activeDeviceId }
+        )
+      : baseConfig;
+  const sections = [];
+
+  if (moduleType === 'buttons') {
+    sections.push(renderStyleScopeCard({ activeDeviceId, responsiveEditScope: styleScope }));
+    sections.push(
+      renderButtonsEditor(config, pages, {
+        deviceOnly: styleScope === 'device',
+        styleOnly: true,
+      })
+    );
+  } else if (moduleType === 'email-signup') {
+    sections.push(renderEmailSignupStyleSection(config.style || {}));
+  } else if (moduleType === 'feed') {
+    sections.push(renderFeedStyleSection(config.style || {}));
+  }
+
+  return sections.length
+    ? sections.join('')
+    : renderStyleManagerEmpty(
+        'No style controls',
+        'This module does not expose sanitized style sectors in the builder style manager.'
+      );
+}
+
+export function bindModuleStyleEditorEvents({
+  el,
+  currentPage,
+  selectedModuleId,
+  draftConfig,
+  setDraftConfig,
+  markDirty,
+  renderEditorPanel,
+  pages = [],
+  activeDeviceId = 'desktop',
+  responsiveEditScope = 'global',
+}) {
+  const selectedModule = findSelectedModule(currentPage, selectedModuleId);
+  if (!selectedModule) return;
+
+  if (selectedModule.moduleType === 'buttons') {
+    const styleScope = responsiveEditScope === 'device' ? 'device' : 'global';
+    bindButtonsEditorEvents({
+      el,
+      draftConfig,
+      setDraftConfig,
+      renderEditorPanel,
+      markDirty,
+      pages,
+      activeDeviceId,
+      responsiveEditScope: styleScope,
+      styleOnly: true,
+    });
+    return;
+  }
+
+  if (getModuleStyleSectors(selectedModule.moduleType).length) {
+    bindGenericModuleDraftEvents({
+      el,
+      selectedModule,
+      draftConfig,
+      setDraftConfig,
+      markDirty,
+      activeDeviceId,
+      responsiveEditScope: 'global',
+    });
+  }
 }
 
 export function bindModuleEditorEvents({

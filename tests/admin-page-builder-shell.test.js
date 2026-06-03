@@ -302,7 +302,7 @@ describe('admin page-builder shell', () => {
     expect(document.getElementById('pbCanvasOverlay')).not.toBeNull();
     expect(
       Array.from(document.querySelectorAll('.pb-sidebar-tab')).map((tab) => tab.textContent?.trim())
-    ).toEqual(['Pages', 'Modules', 'Layers', 'Settings', 'Styles']);
+    ).toEqual(['Pages', 'Blocks', 'Layers', 'Settings', 'Styles']);
     expect(document.getElementById('pbAddPage')?.closest('#pbBuilderToolbar')).not.toBeNull();
     expect(document.getElementById('pbSaveDraft')?.closest('#pbBuilderToolbar')).not.toBeNull();
     expect(document.getElementById('pbPublish')?.closest('#pbBuilderToolbar')).not.toBeNull();
@@ -343,6 +343,132 @@ describe('admin page-builder shell', () => {
     } finally {
       vi.unstubAllGlobals();
     }
+  });
+
+  it('renders descriptor-backed blocks grouped by category', async () => {
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[]],
+      viewportWidth: 1600,
+    });
+
+    await manager.showPageBuilderSection();
+
+    document
+      .querySelector('.pb-sidebar-tab[data-tab="blocks"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    const blockContent = document.querySelector('[data-content="blocks"]');
+    expect(blockContent?.hidden).toBe(false);
+    expect(
+      Array.from(document.querySelectorAll('.pb-block-group-title')).map((node) =>
+        node.textContent?.trim()
+      )
+    ).toEqual(['Content', 'Media', 'Engagement', 'Navigation', 'Layout', 'Special', 'Advanced']);
+    expect(document.querySelector('.pb-module-type[data-module-type="header"]')).toBeNull();
+    expect(document.querySelector('.pb-module-type[data-module-type="feed"]')).not.toBeNull();
+    expect(document.querySelector('.pb-module-type[data-module-type="html"]')).not.toBeNull();
+  });
+
+  it('renders page layers with columns and keeps layer selection in sync', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const feedModule = selectedPage.sections[1].modules.find(
+      (module) => module.moduleType === 'feed'
+    );
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+
+    document
+      .querySelector('.pb-sidebar-tab[data-tab="layers"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    expect(document.querySelectorAll('.pb-layer-item--section')).toHaveLength(2);
+    expect(
+      document.querySelector(
+        `.pb-layer-column[data-section-id="${selectedPage.sections[1].id}"][data-column-index="1"]`
+      )
+    ).not.toBeNull();
+
+    document
+      .querySelector(`.pb-layer-item--module[data-module-id="${feedModule.id}"]`)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Feed Module');
+    expect(
+      document.querySelector(`.pb-layer-item--module.active[data-module-id="${feedModule.id}"]`)
+    ).not.toBeNull();
+
+    document
+      .querySelector('.pb-sidebar-tab[data-tab="layers"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+    expect(
+      document.querySelector(`.pb-layer-item--module.active[data-module-id="${feedModule.id}"]`)
+    ).not.toBeNull();
+  });
+
+  it('shows constrained module style sectors without content controls or raw CSS', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const feedModule = selectedPage.sections[1].modules.find(
+      (module) => module.moduleType === 'feed'
+    );
+    const textModule = selectedPage.sections[1].modules.find(
+      (module) => module.moduleType === 'text'
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+
+    document
+      .querySelector(`.pb-module[data-module-id="${textModule.id}"]`)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    document
+      .querySelector('.pb-sidebar-tab[data-tab="styles"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    expect(document.querySelector('.pb-editor-empty')?.textContent).toContain('No style controls');
+    expect(document.querySelector('[data-key="_raw"]')).toBeNull();
+
+    document
+      .querySelector(`.pb-module[data-module-id="${feedModule.id}"]`)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    document
+      .querySelector('.pb-sidebar-tab[data-tab="styles"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Feed Styles');
+    expect(document.querySelector('[data-style-key="headingBgColor"]')).not.toBeNull();
+    expect(document.querySelector('[data-key="heading"]')).toBeNull();
+    expect(document.querySelector('[data-key="_raw"]')).toBeNull();
+
+    const headingColorInput = document.querySelector('[data-style-key="headingBgColor"]');
+    headingColorInput.value = '#123456';
+    headingColorInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAdminUi(1);
+
+    document
+      .getElementById('pbSaveModule')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    const savedConfig = mocks.updateModule.mock.calls.at(-1)?.[1]?.config;
+    expect(savedConfig.heading).toBe(feedModule.config.heading);
+    expect(savedConfig.style.headingBgColor).toBe('#123456');
   });
 
   it('keeps normal admin header and nav hidden while the full-page builder is active', async () => {

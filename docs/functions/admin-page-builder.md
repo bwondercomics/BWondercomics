@@ -78,7 +78,7 @@ Modules currently own: `moduleType`, `columnIndex`, `sortIndex`, and `config`.
 3. The active page detail is loaded with `fetchPage(...)`.
 4. The full-page shell hides normal admin chrome and renders the top toolbar plus unified side
    panel.
-5. The side panel is rendered by `sidebar-panel.js` and exposes Pages, Modules, Layers, Settings,
+5. The side panel is rendered by `sidebar-panel.js` and exposes Pages, Blocks, Layers, Settings,
    and Styles.
 6. The default canvas is the live iframe preview rendered by `preview-manager.js` with
    `builderEditing: true`, so the reader iframe can emit admin-only target markers and live target
@@ -340,9 +340,9 @@ This file renders the unified side panel. Current responsibilities:
 
 - page list rendering and selection
 - page drag/drop reorder
-- module palette rendering (palette excludes `header`)
-- layer tree rendering for page settings, page header, sections, and modules
-- Pages, Modules, Layers, Settings, and Styles tab switching
+- descriptor-backed block rendering (blocks exclude non-insertable descriptors such as `header`)
+- layer tree rendering for page settings, page header, sections, columns, and modules
+- Pages, Blocks, Layers, Settings, and Styles tab switching
 - routing Settings and Styles tabs into the existing `editor-panel.js` inspector shell
 
 ## 🖌️ Canvas Renderer (canvas-renderer.js)

@@ -1,4 +1,8 @@
-import { MODULE_TYPES } from './constants.js';
+import {
+  getModuleDefaultConfig,
+  getModuleDescriptor,
+  getModulePreviewText,
+} from './module-descriptors.js';
 
 export function normalizeFit(value) {
   const raw = String(value || '')
@@ -64,124 +68,15 @@ export function cloneValue(value) {
 }
 
 export function getDefaultConfig(moduleType) {
-  switch (moduleType) {
-    case 'header':
-      return { title: 'Page Title', subtitle: '' };
-    case 'text':
-      return { content: '<p>Enter your text here...</p>', alignment: 'left' };
-    case 'image':
-      return { src: '', alt: '', caption: '' };
-    case 'gallery':
-      return { images: [], columns: 3 };
-    case 'video':
-      return { url: '', autoplay: false };
-    case 'social':
-      return { buttons: [] };
-    case 'email-signup':
-      return {
-        heading: 'Join the List',
-        subtext: '',
-        placeholder: 'your@email.com',
-        buttonText: 'Subscribe',
-        style: {
-          headingFont: 'display',
-          headingColor: '#ffffff',
-          headingGlow: false,
-          inputStyle: 'bubble',
-          buttonColor: '#00d9ff',
-          buttonGlow: true,
-        },
-      };
-    case 'promo':
-      return {
-        items: [],
-        autoRotate: true,
-        interval: 5000,
-        showNavigation: true,
-        showIndicators: true,
-        height: 400,
-        transition: 'fade',
-      };
-    case 'buttons':
-      return { buttons: [] };
-    case 'spacer':
-      return { height: 40 };
-    case 'divider':
-      return { style: 'solid', color: '' };
-    case 'reader':
-      return { showPanels: true, showComments: true };
-    case 'entry-gallery':
-      return { columns: 3, showLabels: true };
-    case 'feed':
-      return {
-        limit: 5,
-        heading: 'BWC FEED',
-        author: 'DOYLE MELVILLE II',
-        showAuthor: true,
-        showDropdown: true,
-        feedLabel: 'Open feed',
-        feedHref: 'feed.html',
-        showMediaButton: true,
-        mediaLabel: 'Media',
-        mediaHref: 'media.html',
-        style: {
-          headingBgColor: '#ffed00',
-          headingTextColor: '#0a0a12',
-          authorColor: '#7ef5e3',
-          buttonBgColor: '#00d9ff',
-          buttonTextColor: '#0a0a12',
-          itemTitleColor: '#ffed00',
-          itemDateColor: '#00d9ff',
-          itemBorderColor: '#00d9ff',
-          borderColor: '#ffed00',
-        },
-      };
-    case 'html':
-      return { code: '' };
-    default:
-      return {};
-  }
+  return getModuleDefaultConfig(moduleType);
 }
 
 export function getModuleLabel(moduleType) {
-  const match = MODULE_TYPES.find((item) => item.type === moduleType);
-  if (match?.label) return match.label;
-  return String(moduleType || 'module')
-    .replace(/-/g, ' ')
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+  return getModuleDescriptor(moduleType).label;
 }
 
 export function getModulePreview(moduleType, config) {
-  switch (moduleType) {
-    case 'header':
-      return config.title || 'Untitled';
-    case 'text':
-      return config.content?.replace(/<[^>]*>/g, '').slice(0, 50) || 'Empty text';
-    case 'image':
-      return config.src ? config.src.split('/').pop() : 'No image';
-    case 'html':
-      return config.code?.slice(0, 30) || 'Empty HTML';
-    case 'promo': {
-      const promoCount = config.items?.length || 0;
-      return promoCount === 0 ? 'No promos' : `${promoCount} promo${promoCount > 1 ? 's' : ''}`;
-    }
-    case 'feed':
-      return `Feed (limit ${config.limit || 0})`;
-    case 'gallery': {
-      const galleryCount = config.images?.length || 0;
-      return galleryCount === 0
-        ? 'No images'
-        : `${galleryCount} image${galleryCount > 1 ? 's' : ''}`;
-    }
-    case 'video':
-      return config.url || 'No video URL';
-    case 'divider':
-      return `${config.style === 'dashed' || config.style === 'dotted' ? config.style.charAt(0).toUpperCase() + config.style.slice(1) : 'Solid'} line`;
-    case 'entry-gallery':
-      return `Series entries (${config.columns || 3} cols)`;
-    default:
-      return moduleType;
-  }
+  return getModulePreviewText(moduleType, config || {});
 }
 
 export function getPageDisplayTitle(page) {

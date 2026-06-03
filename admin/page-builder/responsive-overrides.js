@@ -1,4 +1,5 @@
 import { BUILDER_DEVICE_ORDER, getBuilderDevice, isBuilderDeviceId } from './preview-contract.js';
+import { getModuleResponsiveOverrides } from './module-descriptors.js';
 
 export const SECTION_RESPONSIVE_FIELDS = Object.freeze([
   'layout',
@@ -9,16 +10,6 @@ export const SECTION_RESPONSIVE_FIELDS = Object.freeze([
   'paddingBottom',
   'backgroundColor',
 ]);
-
-const MODULE_RESPONSIVE_FIELDS = Object.freeze({
-  text: Object.freeze(['alignment']),
-  gallery: Object.freeze(['columns']),
-  'entry-gallery': Object.freeze(['columns']),
-  spacer: Object.freeze(['height']),
-  buttons: Object.freeze(['defaults', 'buttons']),
-});
-
-const ALL_MODULE_RESPONSIVE_FIELDS = Object.freeze(['hidden']);
 
 function isPlainObject(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return false;
@@ -76,8 +67,7 @@ export function getResponsiveBranch(source, deviceId) {
 }
 
 export function getModuleResponsiveFields(moduleType) {
-  const typeFields = MODULE_RESPONSIVE_FIELDS[String(moduleType || '')] || [];
-  return Object.freeze([...ALL_MODULE_RESPONSIVE_FIELDS, ...typeFields]);
+  return Object.freeze(getModuleResponsiveOverrides(moduleType));
 }
 
 export function isModuleResponsiveField(moduleType, key) {

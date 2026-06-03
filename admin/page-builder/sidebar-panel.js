@@ -1,7 +1,7 @@
-import { MODULE_TYPES } from './constants.js';
+import { getInsertableModuleDescriptors } from './module-descriptors.js';
 import { escapeHtml } from './helpers.js';
 
-const INSERTABLE_MODULE_TYPES = MODULE_TYPES.filter((module) => module.type !== 'header');
+const INSERTABLE_MODULE_TYPES = getInsertableModuleDescriptors();
 
 let draggedSidebarPageId = null;
 
@@ -17,6 +17,26 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
       }
       return (a.sortIndex ?? 0) - (b.sortIndex ?? 0);
     });
+  }
+
+  function formatCategoryLabel(category = '') {
+    return String(category || 'other').replace(/^\w/, (char) => char.toUpperCase());
+  }
+
+  function getLayoutColumnCount(layout = '1') {
+    return String(layout || '1')
+      .split('-')
+      .filter(Boolean).length;
+  }
+
+  function getLayerColumnIndices(section) {
+    const layoutColumnCount = getLayoutColumnCount(section?.layout || '1');
+    const moduleColumnMax = Math.max(
+      -1,
+      ...(section?.modules || []).map((module) => Number(module.columnIndex) || 0)
+    );
+    const columnCount = Math.max(layoutColumnCount, moduleColumnMax + 1);
+    return Array.from({ length: columnCount }, (_, index) => index);
   }
 
   function renderPageList() {
@@ -134,14 +154,31 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
   function renderModulePalette() {
     if (!el.pbModulePalette) return;
 
-    el.pbModulePalette.innerHTML = INSERTABLE_MODULE_TYPES.map(
-      (module) => `
-        <div class="pb-module-type" draggable="true" data-module-type="${module.type}">
-          <span class="pb-module-type-icon">${module.icon}</span>
-          <span class="pb-module-type-label">${module.label}</span>
-        </div>
-      `
-    ).join('');
+    const categories = Array.from(
+      new Set(INSERTABLE_MODULE_TYPES.map((module) => module.category))
+    );
+    el.pbModulePalette.innerHTML = categories
+      .map((category) => {
+        const modules = INSERTABLE_MODULE_TYPES.filter((module) => module.category === category);
+        return `
+          <div class="pb-block-group" data-block-category="${category}">
+            <div class="pb-block-group-title">${escapeHtml(formatCategoryLabel(category))}</div>
+            <div class="pb-block-group-grid">
+              ${modules
+                .map(
+                  (module) => `
+                    <div class="pb-module-type" draggable="true" data-module-type="${module.type}">
+                      <span class="pb-module-type-icon">${module.icon}</span>
+                      <span class="pb-module-type-label">${escapeHtml(module.label)}</span>
+                    </div>
+                  `
+                )
+                .join('')}
+            </div>
+          </div>
+        `;
+      })
+      .join('');
 
     el.pbModulePalette.querySelectorAll('.pb-module-type').forEach((item) => {
       item.addEventListener('dragstart', (event) => {
@@ -155,7 +192,7 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
   function renderLayerTree() {
     if (!el.pbLayerTree) return;
 
-    const { currentPage, selectedCanvasSurface, selectedModuleId } = getState();
+    const { activeSectionId, currentPage, selectedCanvasSurface, selectedModuleId } = getState();
     if (!currentPage) {
       el.pbLayerTree.innerHTML = `
         <div class="pb-layer-empty">
@@ -169,28 +206,58 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
     const sectionsHtml = sections.length
       ? sections
           .map((section, sectionIndex) => {
-            const modules = sortModules(section.modules || []);
-            const modulesHtml = modules.length
-              ? modules
-                  .map(
-                    (module) => `
-                      <button
-                        type="button"
-                        class="pb-layer-item pb-layer-item--module ${selectedModuleId === module.id ? 'active' : ''}"
-                        data-layer-action="select-module"
-                        data-module-id="${escapeHtml(module.id || '')}"
-                      >
-                        <span class="pb-layer-item-label">${escapeHtml(helpers.getModuleLabel(module.moduleType))}</span>
-                        <span class="pb-layer-item-meta">Column ${(module.columnIndex ?? 0) + 1}</span>
-                      </button>
-                    `
-                  )
-                  .join('')
-              : '<div class="pb-layer-empty pb-layer-empty--nested">Empty section</div>';
+            const columnIndices = getLayerColumnIndices(section);
+            const columnsHtml = columnIndices
+              .map((columnIndex) => {
+                const modules = sortModules(section.modules || []).filter(
+                  (module) => (Number(module.columnIndex) || 0) === columnIndex
+                );
+                const modulesHtml = modules.length
+                  ? modules
+                      .map(
+                        (module) => `
+                          <button
+                            type="button"
+                            class="pb-layer-item pb-layer-item--module ${selectedModuleId === module.id ? 'active' : ''}"
+                            data-layer-action="select-module"
+                            data-module-id="${escapeHtml(module.id || '')}"
+                          >
+                            <span class="pb-layer-item-label">${escapeHtml(helpers.getModuleLabel(module.moduleType))}</span>
+                            <span class="pb-layer-item-meta">Module</span>
+                          </button>
+                        `
+                      )
+                      .join('')
+                  : '<div class="pb-layer-empty pb-layer-empty--nested">Empty column</div>';
+                return `
+                  <div class="pb-layer-column" data-section-id="${escapeHtml(section.id || '')}" data-column-index="${columnIndex}">
+                    <button
+                      type="button"
+                      class="pb-layer-item pb-layer-item--column ${selectedCanvasSurface === 'section' && activeSectionId === section.id ? 'active' : ''}"
+                      data-layer-action="select-column"
+                      data-section-id="${escapeHtml(section.id || '')}"
+                      data-column-index="${columnIndex}"
+                    >
+                      <span class="pb-layer-item-label">Column ${columnIndex + 1}</span>
+                      <span class="pb-layer-item-meta">${modules.length} module${modules.length === 1 ? '' : 's'}</span>
+                    </button>
+                    <div class="pb-layer-section-modules">${modulesHtml}</div>
+                  </div>
+                `;
+              })
+              .join('');
             return `
               <div class="pb-layer-section">
-                <div class="pb-layer-section-title">Section ${sectionIndex + 1} · ${escapeHtml(section.layout || '1')}</div>
-                <div class="pb-layer-section-modules">${modulesHtml}</div>
+                <button
+                  type="button"
+                  class="pb-layer-item pb-layer-item--section ${selectedCanvasSurface === 'section' && activeSectionId === section.id ? 'active' : ''}"
+                  data-layer-action="select-section"
+                  data-section-id="${escapeHtml(section.id || '')}"
+                >
+                  <span class="pb-layer-item-label">Section ${sectionIndex + 1}</span>
+                  <span class="pb-layer-item-meta">${escapeHtml(section.layout || '1')}</span>
+                </button>
+                <div class="pb-layer-columns">${columnsHtml}</div>
               </div>
             `;
           })
@@ -234,6 +301,16 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
         actions.selectModule(item.dataset.moduleId);
       })
     );
+    el.pbLayerTree.querySelectorAll('[data-layer-action="select-section"]').forEach((item) =>
+      item.addEventListener('click', () => {
+        actions.selectSection(item.dataset.sectionId);
+      })
+    );
+    el.pbLayerTree.querySelectorAll('[data-layer-action="select-column"]').forEach((item) =>
+      item.addEventListener('click', () => {
+        actions.selectColumn(item.dataset.sectionId, Number(item.dataset.columnIndex) || 0);
+      })
+    );
   }
 
   function bindSidebarTabs() {
@@ -247,6 +324,7 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
           const nextInspectorTab = target === 'styles' ? 'theme' : 'modules';
           if (!actions.selectInspectorTab(nextInspectorTab)) return;
         }
+        actions.setActiveSidePanelTab(target);
 
         sidebar
           .querySelectorAll('.pb-sidebar-tab')

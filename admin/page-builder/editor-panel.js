@@ -1,6 +1,11 @@
 import { escapeAttr, escapeHtml } from './helpers.js';
 import { bindHeaderEditorEvents, renderHeaderEditorContent } from './header-editor.js';
-import { bindModuleEditorEvents, renderModuleEditorContent } from './module-editor.js';
+import {
+  bindModuleEditorEvents,
+  bindModuleStyleEditorEvents,
+  renderModuleEditorContent,
+  renderModuleStyleEditorContent,
+} from './module-editor.js';
 import {
   getBuilderDeviceLabel,
   getEffectiveSectionLayout,
@@ -156,7 +161,7 @@ function renderTabs(activeEditorTab, disableTabs = false) {
         aria-selected="${String(activeEditorTab === 'modules')}"
         ${disableTabs ? 'disabled' : ''}
       >
-        Modules
+        Settings
       </button>
       <button
         class="pb-editor-tab ${activeEditorTab === 'theme' ? 'active' : ''}"
@@ -165,7 +170,7 @@ function renderTabs(activeEditorTab, disableTabs = false) {
         aria-selected="${String(activeEditorTab === 'theme')}"
         ${disableTabs ? 'disabled' : ''}
       >
-        Theme
+        Styles
       </button>
     </div>
   `;
@@ -176,6 +181,18 @@ function renderFooter({ scope, actionsHtml = '' }) {
     <div class="pb-editor-footer" data-scope="${scope}">
       <div class="pb-editor-footer-status" data-editor-status></div>
       <div class="pb-editor-footer-actions">${actionsHtml}</div>
+    </div>
+  `;
+}
+
+function renderStylesEmptyContent(title, copy) {
+  return `
+    <div class="pb-editor-empty">
+      <div class="pb-editor-empty-card">
+        <span class="pb-editor-empty-kicker">Styles</span>
+        <h4>${escapeHtml(title)}</h4>
+        <p>${escapeHtml(copy)}</p>
+      </div>
     </div>
   `;
 }
@@ -299,18 +316,65 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
     let subtitle = `Adjust structure and visual polish for ${pageTitle}.`;
 
     if (state.activeEditorTab === 'theme') {
-      contentHtml = renderThemeEditorContent(state.currentPage, state.activeThemeDraft);
-      kicker = 'Theme Studio';
-      title = 'Page Theme';
-      subtitle = `Tune presets, palette, panel backgrounds, and spacing for ${pageTitle}.`;
-      footerHtml = renderFooter({
-        scope: 'theme',
-        actionsHtml: `
-          <button class="btn-secondary" id="pbDiscardTheme" data-action="discard-current" type="button">Discard</button>
-          <button class="btn-secondary" id="pbResetTheme" data-action="reset-theme" type="button">Reset to Default</button>
-          <button class="btn-primary" id="pbSaveTheme" data-action="save-current" type="button">Save Theme</button>
-        `,
-      });
+      if (state.selectedCanvasSurface === 'page-header') {
+        contentHtml = renderHeaderEditorContent({
+          draftState: state.activeHeaderDraft,
+          pages: state.pages,
+          activeDeviceId: state.activeDeviceId,
+          responsiveEditScope: state.responsiveEditScope,
+          mode: 'styles',
+        });
+        kicker = 'Header Styles';
+        title = 'Header Appearance';
+        subtitle = `Tune sanitized header appearance for ${pageTitle}.`;
+        footerHtml = renderFooter({
+          scope: 'header',
+          actionsHtml: `
+            <button class="btn-secondary" id="pbDiscardHeader" data-action="discard-current" type="button">Discard</button>
+            <button class="btn-primary" id="pbSaveHeader" data-action="save-current" type="button">Save Header</button>
+          `,
+        });
+      } else if (selectedModuleRecord) {
+        contentHtml = renderModuleStyleEditorContent({
+          currentPage: state.currentPage,
+          selectedModuleId: state.selectedModuleId,
+          draftConfig: state.activeModuleDraft,
+          pages: state.pages,
+          activeDeviceId: state.activeDeviceId,
+          responsiveEditScope: state.responsiveEditScope,
+        });
+        kicker = 'Module Styles';
+        title = `${helpers.getModuleLabel(selectedModuleRecord.moduleType)} Styles`;
+        subtitle = 'Edit only supported sanitized appearance sectors for the selected module.';
+        footerHtml = renderFooter({
+          scope: 'module',
+          actionsHtml: `
+            <button class="btn-secondary" id="pbDiscardModule" data-action="discard-current" type="button">Discard</button>
+            <button class="btn-primary" id="pbSaveModule" data-action="save-current" type="button">Save</button>
+          `,
+        });
+      } else if (state.selectedCanvasSurface === 'section') {
+        contentHtml = renderStylesEmptyContent(
+          'No section style controls',
+          'This section does not expose sanitized style sectors in the builder style manager.'
+        );
+        kicker = 'Section Styles';
+        title = 'Section Appearance';
+        subtitle = 'Select a page, header, or supported module to edit constrained style controls.';
+      } else {
+        contentHtml = renderThemeEditorContent(state.currentPage, state.activeThemeDraft);
+        kicker = 'Theme Studio';
+        title = 'Page Theme';
+        subtitle = `Tune presets, palette, panel backgrounds, and spacing for ${pageTitle}.`;
+        footerHtml = renderFooter({
+          scope: 'theme',
+          actionsHtml: `
+            <button class="btn-secondary" id="pbDiscardTheme" data-action="discard-current" type="button">Discard</button>
+            <button class="btn-secondary" id="pbResetTheme" data-action="reset-theme" type="button">Reset to Default</button>
+            <button class="btn-primary" id="pbSaveTheme" data-action="save-current" type="button">Save Theme</button>
+          `,
+        });
+      }
     } else if (state.selectedCanvasSurface === 'page-header') {
       contentHtml = renderHeaderEditorContent({
         draftState: state.activeHeaderDraft,
@@ -434,7 +498,48 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       });
     });
 
-    if (state.activeEditorTab === 'theme') {
+    if (state.activeEditorTab === 'theme' && state.selectedCanvasSurface === 'page-header') {
+      bindHeaderEditorEvents({
+        el,
+        draftState: state.activeHeaderDraft,
+        setDraftState: actions.setActiveHeaderDraft,
+        markDirty: actions.markDirty,
+        renderEditorPanel,
+        renderCanvas: actions.renderCanvas,
+        activeDeviceId: state.activeDeviceId,
+        responsiveEditScope: state.responsiveEditScope,
+      });
+
+      document.getElementById('pbSaveHeader')?.addEventListener('click', async () => {
+        await actions.saveActiveHeaderDraft();
+      });
+      document.getElementById('pbDiscardHeader')?.addEventListener('click', () => {
+        actions.discardActiveHeaderDraft();
+      });
+    } else if (state.activeEditorTab === 'theme' && selectedModuleRecord) {
+      bindModuleStyleEditorEvents({
+        el,
+        currentPage: state.currentPage,
+        selectedModuleId: state.selectedModuleId,
+        draftConfig: state.activeModuleDraft,
+        setDraftConfig: (nextDraft) => {
+          actions.setActiveModuleDraftId(getState().selectedModuleId);
+          actions.setActiveModuleDraft(nextDraft);
+        },
+        markDirty: actions.markDirty,
+        renderEditorPanel,
+        pages: state.pages,
+        activeDeviceId: state.activeDeviceId,
+        responsiveEditScope: state.responsiveEditScope,
+      });
+
+      document.getElementById('pbSaveModule')?.addEventListener('click', async () => {
+        await actions.saveActiveModuleDraft();
+      });
+      document.getElementById('pbDiscardModule')?.addEventListener('click', () => {
+        actions.discardActiveModuleDraft();
+      });
+    } else if (state.activeEditorTab === 'theme') {
       bindThemeEditorEvents({
         el,
         draftMeta: state.activeThemeDraft,

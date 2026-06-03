@@ -1,6 +1,7 @@
-import { LAYOUT_OPTIONS, MODULE_TYPES } from './constants.js';
+import { LAYOUT_OPTIONS } from './constants.js';
 import { appearanceToInlineStyle } from './appearance-utils.js';
 import { escapeAttr, escapeHtml } from './helpers.js';
+import { getInsertableModuleDescriptors } from './module-descriptors.js';
 import {
   HEADER_BLOCK_DEFS,
   HEADER_REGION_ORDER,
@@ -12,7 +13,7 @@ import {
 } from './header-config.js';
 import { normalizeHeaderNavItems } from './link-utils.js';
 
-const INSERTABLE_MODULE_TYPES = MODULE_TYPES.filter((module) => module.type !== 'header');
+const INSERTABLE_MODULE_TYPES = getInsertableModuleDescriptors();
 
 function formatRegionLabel(region) {
   return String(region || '').replace(/^\w/, (char) => char.toUpperCase());

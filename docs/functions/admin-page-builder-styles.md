@@ -57,14 +57,14 @@ The `layout.css` module defines the top-level shell. It uses a **Data-Attribute 
 
 ## 📂 Sidebar (sidebar.css)
 
-Manages the persistent left-side panel for page navigation and the module library.
+Manages the persistent left-side panel for page navigation and the block/module library.
 
 ### Principal Components
 
 - **Collapsed Mode**: When the shell has `[data-sidebar-mode='collapsed']`, the main body hides and `.pb-sidebar-collapsed-copy` displays its rotated `writing-mode: vertical-rl` text.
-- **Tabs**: `.pb-sidebar-tabs` and `.pb-sidebar-tab` toggle between Pages and Modules, utilizing gradient lighting and a box shadow for the active state.
+- **Tabs**: `.pb-sidebar-tabs` and `.pb-sidebar-tab` toggle between Pages, Blocks, Layers, Settings, and Styles, utilizing gradient lighting and a box shadow for the active state.
 - **Page List**: Features `.pb-page-item` blocks containing structural badges (`.pb-page-status`) reflecting `published`, `draft`, or `homepage` routing states.
-- **Palette**: The `.pb-module-palette` grid formats `.pb-module-type` draggable buttons that react to `:hover` and `:active` cursor changes (`grab` and `grabbing`).
+- **Blocks**: The `.pb-module-palette` container groups descriptor-backed `.pb-module-type` draggable buttons by category; block buttons react to `:hover` and `:active` cursor changes (`grab` and `grabbing`).
 
 ---
 

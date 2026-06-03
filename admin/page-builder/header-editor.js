@@ -398,6 +398,48 @@ function renderDeviceAppearanceEditor(appearance = {}, activeDeviceId = 'desktop
   });
 }
 
+function renderHeaderStyleEditor(header, responsiveAppearance, activeDeviceId, scope) {
+  if (scope === 'device') {
+    return renderDeviceAppearanceEditor(responsiveAppearance || {}, activeDeviceId);
+  }
+  const hasAppearance = !!(
+    header.appearance?.top ||
+    header.appearance?.scrolled ||
+    header.appearance?.navItemDefaults
+  );
+  return renderInspectorSection({
+    kicker: 'Styling',
+    title: 'Header Styling',
+    summary: hasAppearance ? 'Custom' : 'Default',
+    copy: 'Control sanitized header shell and navigation defaults.',
+    body: `
+      <div class="pb-appearance-stack">
+        ${renderAppearanceControls(
+          header.appearance?.top,
+          'shell-top',
+          null,
+          'Normal Header',
+          'Styles used before the reader scrolls.'
+        )}
+        ${renderAppearanceControls(
+          header.appearance?.scrolled,
+          'shell-scrolled',
+          null,
+          'After Page Scroll',
+          'Styles used once the sticky header has scrolled.'
+        )}
+        ${renderAppearanceControls(
+          header.appearance?.navItemDefaults,
+          'nav-defaults',
+          null,
+          'Header Nav Defaults',
+          'Set sparse defaults that author-created header buttons inherit.'
+        )}
+      </div>
+    `,
+  });
+}
+
 function renderSourceBanner(source) {
   if (source === 'legacy-import') {
     return `
@@ -423,6 +465,7 @@ export function renderHeaderEditorContent({
   pages = [],
   activeDeviceId = 'desktop',
   responsiveEditScope = 'global',
+  mode = 'settings',
 }) {
   const normalizedDeviceId = normalizeBuilderDeviceId(activeDeviceId);
   const scope = responsiveEditScope === 'device' ? 'device' : 'global';
@@ -430,6 +473,17 @@ export function renderHeaderEditorContent({
   const copy = normalizeHeaderCopy(draftState?.copy);
   const responsiveAppearance = getResponsiveBranch(draftState || {}, normalizedDeviceId)?.header
     ?.appearance;
+
+  if (mode === 'styles') {
+    return [
+      renderSourceBanner(draftState?.source),
+      renderResponsiveScopeControl({
+        activeDeviceId: normalizedDeviceId,
+        responsiveEditScope: scope,
+      }),
+      renderHeaderStyleEditor(header, responsiveAppearance, normalizedDeviceId, scope),
+    ].join('');
+  }
 
   if (scope === 'device') {
     return [

@@ -937,7 +937,35 @@ Assumptions:
   editing; those stay in later phases.
 - Phase 5 does not add new styling fields unless all three contracts exist: frontend normalizer,
   backend sanitizer, and shared renderer support.
-- Because Phases 1-4 have not started yet, this plan describes the final integration points and
-  should be implemented after those prerequisites or adapted if their contracts change.
+- Phase 5 is implemented after the Phase 1-4 completion contracts; future adaptations should keep
+  current runtime behavior and completion notes authoritative over older planning assumptions.
+
+Completion note (`2026-06-03`): Phase 5 is implemented after the completed Phase 1-4 contracts.
+Module metadata now comes from a descriptor-backed registry that drives compatibility module types,
+labels, icons, categories, insertability, default configs, editor dispatch, responsive override
+fields, and constrained style sectors. The side panel now exposes Blocks instead of the old module
+palette label, groups insertable descriptors by category, excludes non-insertable header blocks, and
+keeps existing insert/default-config behavior descriptor-backed. Layers now render page/header,
+sections, columns, and modules, including overflow columns needed for builder selection, and layer
+selection stays synchronized with the live-canvas/module inspector selection.
+
+Settings continue to use the existing page/header/section/module draft and save flows, but module
+settings dispatch through descriptor editor kinds. Styles now route by selected target: page styles
+use the existing theme editor, header styles reuse sanitized shell/nav-default appearance controls,
+supported module style sectors expose only constrained style controls, and unsupported sections or
+modules show an empty state instead of raw CSS or global-only content controls. No backend schema,
+saved record contract, reader public behavior, preview message contract, GrapesJS dependency, live
+drag/drop movement, inline toolbar, undo/redo, or inline editing changes were added.
+
+Verification passed:
+
+- `node --check` on touched admin builder JS files and updated tests.
+- `npm test -- tests/module-descriptors.test.js tests/admin-page-builder-shell.test.js
+tests/admin-page-builder-preview.test.js tests/appearance-utils.test.js
+tests/shared-renderers-parity.test.js tests/responsive-overrides.test.js`
+- `npm test`
+- `npm run test:backend`
+- `npm run build`
+- `npm run test:visual`
 
 Continue in [Part 2 - Phases 6-12, risks, and implementation order](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md).

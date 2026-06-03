@@ -1,20 +1,11 @@
-export const MODULE_TYPES = [
-  { type: 'header', label: 'Header', icon: '\u{1F4F0}', category: 'content' },
-  { type: 'text', label: 'Text', icon: '\u{1F4DD}', category: 'content' },
-  { type: 'image', label: 'Image', icon: '\u{1F5BC}', category: 'media' },
-  { type: 'gallery', label: 'Gallery', icon: '\u{1F3B4}', category: 'media' },
-  { type: 'video', label: 'Video', icon: '\u{1F3AC}', category: 'media' },
-  { type: 'social', label: 'Social', icon: '\u{1F517}', category: 'engagement' },
-  { type: 'email-signup', label: 'Email', icon: '\u{1F4E7}', category: 'engagement' },
-  { type: 'promo', label: 'Promo', icon: '\u{1F3AF}', category: 'engagement' },
-  { type: 'buttons', label: 'Buttons', icon: '\u{1F518}', category: 'navigation' },
-  { type: 'spacer', label: 'Spacer', icon: '\u2195', category: 'layout' },
-  { type: 'divider', label: 'Divider', icon: '\u2796', category: 'layout' },
-  { type: 'reader', label: 'Reader', icon: '\u{1F4D6}', category: 'special' },
-  { type: 'entry-gallery', label: 'Entries', icon: '\u{1F4DA}', category: 'special' },
-  { type: 'feed', label: 'Feed', icon: '\u{1F4F0}', category: 'special' },
-  { type: 'html', label: 'HTML', icon: '\u{1F4BB}', category: 'advanced' },
-];
+import { getModuleDescriptors } from './module-descriptors.js';
+
+export const MODULE_TYPES = getModuleDescriptors().map(({ type, label, icon, category }) => ({
+  type,
+  label,
+  icon,
+  category,
+}));
 
 export const LAYOUT_OPTIONS = [
   { value: '1', label: '1 col' },
