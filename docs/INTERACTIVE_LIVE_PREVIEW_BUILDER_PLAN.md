@@ -1,8 +1,10 @@
 # Full-Page Live Builder Plan, Part 1 of 2
 
-Status: In progress - Phase 4 complete
-Plan state: Phases 1, 2, 3, and 4 have completion notes below. All later phases remain planned until
-future completion notes say otherwise.
+Status: Part 1 complete - Phases 1-5 implemented
+Plan state: This file is complete for its scoped phases. Phases 1, 2, 3, 4, and 5 have dated
+completion notes below and should be treated as current Part 1 behavior unless a later corrective
+note says otherwise. Part 2 phases 6-12 remain planned until their own completion notes say
+otherwise.
 Scope of this file: shared direction, references, target model, and Phases 1-5.
 Companion file: [Part 2 - Phases 6-12, risks, and implementation order](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md)
 Reference source: `docs/website-references/grapesjs-dev`
@@ -20,7 +22,7 @@ Part 1 contains:
 - [Product Direction](#product-direction)
 - [Trusted References](#trusted-references)
 - [Reference Conclusions](#reference-conclusions)
-- [Target Experience](#target-experience)
+- [Target Experience and Current State](#target-experience-and-current-state)
 - [Page and Module Model Direction](#page-and-module-model-direction)
 - [Phase 1 - Full-Page Builder Shell](#phase-1---full-page-builder-shell)
 - [Phase 2 - Live Canvas as the Editor](#phase-2---live-canvas-as-the-editor)
@@ -42,12 +44,15 @@ Part 2 contains:
 
 ## Developer and LLM Notes
 
-- Treat both files as one plan. Do not infer that Part 1 is a complete implementation plan by
-  itself.
-- Treat phases without completion notes as future work. The test plans and acceptance criteria
-  describe gates for future implementation, not current evidence.
-- Start at Phase 1 unless a user explicitly asks for a later exploratory spike. Later phases assume
-  the shell, live iframe canvas, target markers, overlays, and device contracts from earlier phases.
+- Treat both files as one plan. Do not infer that completing Part 1 completes the full feature;
+  Part 2 remains the active plan for Phases 6-12.
+- Treat phases without completion notes as future work. In this file, every scoped phase now has a
+  completion note; in Part 2, the test plans and acceptance criteria still describe gates for future
+  implementation, not current evidence.
+- For new implementation after this file, start with Part 2 Phase 6 unless the user explicitly asks
+  for an audit or corrective patch to an earlier completed phase. Later phases assume the shell, live
+  iframe canvas, target markers, overlays, device contracts, and descriptor-backed side panel from
+  Phases 1-5.
 - Keep the saved builder records as the source of truth. Browser DOM, iframe output, and overlays
   are views or editing affordances only.
 - When closing a phase, add concrete completion notes and verification results instead of replacing
@@ -56,12 +61,13 @@ Part 2 contains:
 ## Purpose
 
 This plan adapts the useful parts of GrapesJS into the BWonderComics builder as a full-page live
-editor. The live page canvas becomes the primary and eventually only authoring surface. The builder
-opens as a full-page workspace with a top toolbar and side panel, and authors edit the rendered page
-directly instead of switching between a structural builder and a separate preview.
+editor. The completed Part 1 work establishes the live page canvas as the primary authoring surface:
+the builder opens as a full-page workspace with a top toolbar and side panel, and authors select and
+inspect the rendered page directly instead of relying on a separate preview panel.
 
-Preview becomes a chrome-free display of the page. In preview mode, the side panel and top toolbar
-are hidden, and a small top-left restore button brings the editor menus back.
+Part 2 continues the transition. The remaining planned work moves structural insertion/movement onto
+the live canvas, collapses editor chrome for preview mode, and adds commands, undo, and inline
+editing.
 
 The plan keeps BWonderComics' custom CMS behavior. Modules such as reader, feed, entry picker, and
 media gallery must continue to connect to the entry-management system, series data, protected media,
@@ -70,23 +76,30 @@ available as modules that can be placed inside normal builder pages.
 
 ## Product Direction
 
-The target editor is closer to GrapesJS than the current builder shell:
+Through Phase 5, the editor is closer to GrapesJS than the original builder shell:
 
 - the builder takes over the whole admin page when opened
-- the top toolbar owns page actions, device mode, preview toggle, save/publish, undo/redo when
-  implemented, and menu visibility
-- the side panel owns pages, blocks/modules, layers, settings, styles, and selected-module controls
-- the center canvas is the real page render and supports direct selection, hover, toolbar actions,
-  drag/drop insertion, and eventually inline editing
+- the top toolbar owns page actions, device mode, live/structure toggle, save/publish, and menu
+  visibility
+- the side panel owns pages, descriptor-backed blocks, layers, settings, styles, and selected-target
+  controls
+- the center canvas is the real page render and supports direct hover/selection overlays, target
+  synchronization, and selected-target toolbar chrome
 - desktop, tablet, and phone display modes are first-class editing targets
 - each display mode can have element-level overrides where the data contract supports them
-- preview mode shows the page without editor chrome, with only a small restore-menu button
 
-The target content model is also broader than the current series-scoped page model:
+Part 2 keeps these target behaviors planned, but not yet implemented:
+
+- live drag/drop insertion and module movement on the iframe canvas
+- preview mode that hides editor chrome and restores it with a small menu button
+- centralized commands, keymaps, undo/redo, and inline editing
+
+The target content model remains broader than the current series-scoped page model:
 
 - every series still has an attached reader page
 - site pages can exist outside a specific series
-- comic/reader, feed, and media gallery become structured modules that can be placed inside pages
+- comic/reader, feed, and media gallery behaviors are structured modules that can be placed inside
+  pages where the module catalog supports them
 - authors can still create dedicated reader, feed, or gallery pages by building a page around the
   corresponding module
 
@@ -108,9 +121,9 @@ Local GrapesJS reference:
   inside the canvas frame, recalculates geometry on scroll/resize/update, and separates local hover
   tools from selected-component tools.
 - `docs/website-references/grapesjs-dev/docs/modules/Blocks.md` - Blocks are reusable component
-  templates. The BWonderComics module palette should act as the block manager.
+  templates. The BWonderComics descriptor-backed module palette now acts as the block manager.
 - `docs/website-references/grapesjs-dev/docs/modules/Traits.md` - Traits are selected-component
-  settings. BWonderComics' existing module editors should become the selected-module settings panel.
+  settings. BWonderComics' existing module editors now act as selected-module settings panels.
 - `docs/website-references/grapesjs-dev/docs/modules/Style-manager.md` - Style sectors and
   properties provide a reference for constrained appearance controls.
 - `docs/website-references/grapesjs-dev/docs/modules/Commands.md`,
@@ -125,7 +138,8 @@ Local GrapesJS reference:
 Current BWonderComics reference:
 
 - `docs/functions/admin-page-builder.md` - Current builder architecture, explicit draft lifecycle,
-  preview handshake, shared renderers, and module catalog.
+  preview handshake, live target overlays, shared renderers, responsive overrides, descriptor-backed
+  blocks, layers, settings, styles, and module catalog.
 - `docs/BUILDER_PLAN.md` - Current implementation snapshot: pages are series-scoped, preview uses a
   same-origin reader iframe, and the builder recognizes `reader`, `entry-gallery`, and `feed`
   modules.
@@ -140,28 +154,31 @@ Current BWonderComics reference:
 
 1. Use GrapesJS as an architecture reference, not as a runtime dependency for the canonical page
    model.
-2. Do not preserve the current structural canvas as the long-term editor. It can remain as a
-   temporary fallback during migration, but the live canvas is the target editor.
+2. Do not preserve the structural canvas as the long-term editor. It remains as a temporary fallback
+   for structural flows until Phase 6, but the live canvas is now the primary editor.
 3. Keep BWonderComics modules structured and backend-sanitized. The page is still built from typed
    modules, not arbitrary DOM saved from the browser.
-4. Promote Desktop, Tablet, and Phone from preview-only viewports into editable device contexts.
+4. Desktop, Tablet, and Phone have been promoted from preview-only viewports into editable device
+   contexts.
 5. Do not flatten custom comic behavior into static pages. Reader, feed, entry picker, and gallery
    modules must remain connected to series entries, media, permissions, and existing feed logic.
 6. Change the page model deliberately. Moving from series-scoped pages to site pages plus
    series-attached reader pages requires backend schema, routing, admin UX, and migration work.
 
-## Target Experience
+## Target Experience and Current State
 
-When the builder opens:
+Current Part 1 behavior when the builder opens:
 
 - the admin shell gives the builder the full page
 - a top toolbar remains fixed above the canvas
-- a side panel can switch between pages, modules, layers, settings, styles, and selected target
+- a side panel can switch between Pages, Blocks, Layers, Settings, and Styles
 - the canvas shows the live page render at the selected device size
-- modules can be dragged from the side panel onto the canvas
 - clicking a rendered element selects it and opens its controls in the side panel
-- selected elements show GrapesJS-style hover/selection outlines and a compact inline toolbar
+- selected elements show GrapesJS-style hover/selection outlines and compact selected-target toolbar
+  chrome
 - Save/Publish remains explicit unless a later autosave policy is intentionally designed
+- **Structure Debug** remains as the fallback surface for structural insertion, ordering, and delete
+  flows that Phase 6 moves onto the live canvas
 
 Device editing:
 
@@ -175,10 +192,10 @@ Device editing:
 
 Preview:
 
-- preview hides the top toolbar and side panel
-- preview uses the same page canvas without editor overlays
-- a small top-left button restores the menus
-- preview still supports Desktop, Tablet, and Phone display modes when useful
+- the current live canvas stays inside editor chrome and uses the same reader iframe path as the
+  saved page output
+- editor overlays appear only while `builderEditing` is active
+- chrome-free preview collapse and the restore-menu button remain Part 2 Phase 7 work
 - preview side effects remain disabled in builder preview sessions
 
 ## Page and Module Model Direction
@@ -208,7 +225,8 @@ Proposed page fields:
 
 ### Special Modules
 
-Comic page, feed page, and media gallery page should become modules:
+Reader, feed, and entry-gallery are already structured builder modules. Part 2 keeps the broader CMS
+module work planned for comic page, feed page, media gallery page, and page-scope routing:
 
 - `comic-reader` or current `reader` module: renders the comic reading experience for a selected
   or active series
@@ -276,7 +294,7 @@ Important public interface/type changes:
 Key changes:
 
 - Update the shell markup so `pbBuilderToolbar` owns page title/status, Add Page, device controls,
-  Preview/Live toggle, Save Draft, Publish, side-panel toggle, and an Exit/Back control.
+  Live/Structure Debug toggle, Save Draft, Publish, side-panel toggle, and an Exit/Back control.
 - Change `showPageBuilderSection()` so it activates full-shell state by default:
   - keep `admin-page-builder-open` as the shell class
   - hide normal admin header/nav via CSS while active
@@ -288,7 +306,7 @@ Key changes:
 - Keep the structural canvas behind a small `Structure Debug` fallback affordance only.
 - Replace the old left-sidebar/right-inspector split with one side panel:
   - Pages uses the existing page list renderer
-  - Modules uses the existing module palette
+  - Blocks uses the module palette; after Phase 5 this is descriptor-backed and grouped by category
   - Layers renders a simple current-page tree from sections/modules and can select a module, header,
     or page settings
   - Settings renders the existing selected target editor
@@ -303,7 +321,7 @@ Test plan:
 - Update builder shell tests to cover:
   - builder route opens full-page and hides admin header/nav
   - toolbar contains page actions, status, save/publish, view/device controls
-  - side-panel tabs expose Pages, Modules, Layers, Settings, Styles
+  - side-panel tabs expose Pages, Blocks, Layers, Settings, Styles
   - structural canvas is not default and only appears through fallback
   - live preview iframe remains same-origin with existing `builderPreview=1` behavior
 - Add responsive assertions for desktop and narrow viewport side-panel collapse.
@@ -324,11 +342,11 @@ Completion note (`2026-05-30`):
 Phase 1 is implemented for the full-page builder shell. The admin page builder now opens with
 normal admin header/nav hidden behind `admin-page-builder-open`, renders a top toolbar with page
 status/actions, save/publish, live/structure toggle, exact device controls, side-panel toggle, and an
-Exit action, and uses a single side panel for Pages, Modules, Layers, Settings, and Styles. The live
+Exit action, and uses a single side panel for Pages, Blocks, Layers, Settings, and Styles. The live
 same-origin iframe preview is now the default canvas using the existing `builderPreview=1` /
 `previewSession` path; the structural canvas remains available through `Structure Debug` and is kept
-as a hidden fallback surface while live mode is active so current module/section editing remains
-reachable until later direct-canvas phases land. `pbBuilderToolbar`, `pbBuilderSidePanel`,
+as a hidden fallback surface while live mode is active so structural insertion, ordering, and delete
+flows remain reachable until Phase 6 moves them onto the live canvas. `pbBuilderToolbar`,
 `pbCanvasViewport`, and `pbCanvasOverlay` are present as planned shell anchors. No backend API,
 database schema, public route, or saved builder-record contract changed.
 
@@ -642,6 +660,26 @@ tests/reader-app.test.js tests/admin-page-builder-shell.test.js` - passed (`4` f
 - `npm run lint` - passed.
 - `npm run format:check` - passed.
 - `git diff --check` - passed.
+
+Corrective patch note (`2026-06-02`): Phase 3 live target safeguards were tightened after audit.
+`reader/preview-bridge.js` now blocks reader keyboard shortcuts and activation keys while the
+builder-editing target bridge is active, so iframe navigation, zoom, help, Escape, Enter, and Space
+cannot bypass the live canvas interaction guard. `admin/page-builder/preview-manager.js` now starts a
+target freshness timeout after same-session builder-editing preview refreshes and clears stale hover,
+selected, toolbar, insert-guide, target-count, hovered-key, and selected-key state if newer target
+geometry never arrives.
+
+Additional verification passed for the corrective patch:
+
+- `node --check reader/preview-bridge.js`
+- `node --check admin/page-builder/preview-manager.js`
+- `npm test -- tests/reader-preview-bridge.test.js tests/admin-page-builder-shell.test.js`
+- `npm test`
+- `npm run test:visual`
+- `npm run format:check`
+- `npm run lint`
+- `npm run build`
+- `git diff --check`
 
 ## Phase 4 - Device Modes and Per-Device Overrides
 
@@ -963,9 +1001,14 @@ Verification passed:
 - `npm test -- tests/module-descriptors.test.js tests/admin-page-builder-shell.test.js
 tests/admin-page-builder-preview.test.js tests/appearance-utils.test.js
 tests/shared-renderers-parity.test.js tests/responsive-overrides.test.js`
+- `npm run format:check`
+- `npm run lint`
 - `npm test`
+- `npm run format:py:check`
+- `npm run lint:py`
 - `npm run test:backend`
 - `npm run build`
 - `npm run test:visual`
+- `git diff --check`
 
 Continue in [Part 2 - Phases 6-12, risks, and implementation order](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md).

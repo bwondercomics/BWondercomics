@@ -31,6 +31,10 @@ import { normalizeHeaderNavItems } from './page-builder/link-utils.js';
 import { createPageActions } from './page-builder/page-actions.js';
 import { createPreviewManager } from './page-builder/preview-manager.js';
 import { createSidebarPanel } from './page-builder/sidebar-panel.js';
+import {
+  BUILDER_STRUCTURAL_COMMANDS,
+  createStructuralCommandAdapter,
+} from './page-builder/structural-commands.js';
 import { BUILDER_DEVICE_ORDER } from './page-builder/preview-contract.js';
 import {
   isSectionResponsiveField,
@@ -85,6 +89,7 @@ function createPageBuilder({
   let activeInsertTarget = null;
   let draggedModuleId = null;
   let draggedSectionId = null;
+  let liveDragState = null;
   /** @type {'edit'|'preview'} */
   let canvasMode = 'preview';
   /** @type {'desktop'|'tablet'|'mobile'} */
@@ -95,6 +100,12 @@ function createPageBuilder({
   let activeEntrypoint = 'builder';
   /** @type {''|'header'} */
   let activeDesignerSurface = '';
+  let structuralCommands = null;
+
+  function runStructuralCommand(commandId, payload = {}) {
+    if (!structuralCommands) return { ok: false, status: 'Structural commands unavailable.' };
+    return structuralCommands.runCommand(commandId, payload);
+  }
 
   const draftManager = createDraftManager({
     getState: () => ({
@@ -278,8 +289,15 @@ function createPageBuilder({
       draggedSectionId,
     }),
     actions: {
-      insertSectionAt: canvasMutations.insertSectionAt,
-      reorderSectionToIndex: canvasMutations.reorderSectionToIndex,
+      insertSectionAt: (insertIndex) =>
+        runStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.INSERT_SECTION, {
+          sectionIndex: insertIndex,
+        }),
+      reorderSectionToIndex: (sectionId, insertIndex) =>
+        runStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.MOVE_SECTION, {
+          sectionId,
+          placement: { sectionIndex: insertIndex },
+        }),
       setDraggedSectionId: (sectionId) => {
         draggedSectionId = sectionId;
       },
@@ -291,8 +309,16 @@ function createPageBuilder({
       setDraggedModuleId: (moduleId) => {
         draggedModuleId = moduleId;
       },
-      moveModuleToTarget: canvasMutations.moveModuleToTarget,
-      insertModuleAt: canvasMutations.insertModuleAt,
+      moveModuleToTarget: (moduleId, sectionId, columnIndex, insertIndex) =>
+        runStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.MOVE, {
+          moduleId,
+          placement: { sectionId, columnIndex, insertIndex },
+        }),
+      insertModuleAt: (sectionId, columnIndex, insertIndex, moduleType) =>
+        runStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.INSERT, {
+          moduleType,
+          placement: { sectionId, columnIndex, insertIndex },
+        }),
       toggleModulePicker,
       selectPageHeaderFromCanvas,
       selectPageSettingsFromCanvas,
@@ -305,8 +331,14 @@ function createPageBuilder({
       },
       saveActivePageSettingsDraft: draftManager.saveActivePageSettingsDraft,
       discardActivePageSettingsDraft: draftManager.discardActivePageSettingsDraft,
-      deleteModuleFromCanvas,
-      deleteSectionFromCanvas,
+      deleteModuleFromCanvas: (moduleId) =>
+        runStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.DELETE_SELECTED, {
+          target: { kind: 'module', moduleId },
+        }),
+      deleteSectionFromCanvas: (sectionId) =>
+        runStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.DELETE_SELECTED, {
+          target: { kind: 'section', sectionId },
+        }),
     },
   });
 
@@ -320,6 +352,8 @@ function createPageBuilder({
         selectedCanvasSurface,
         selectedModuleId,
         selectedTarget: getSelectedTarget(),
+        activeInsertTarget,
+        liveDragState,
       }),
       actions: {
         selectPage: (pageId) => pageActions.selectPage(pageId),
@@ -328,6 +362,7 @@ function createPageBuilder({
         setDraggedModuleId: (moduleId) => {
           draggedModuleId = moduleId;
         },
+        runStructuralCommand,
         selectPageHeader: () => {
           selectPageHeaderFromCanvas();
           showSidePanelTab('settings');
@@ -431,6 +466,7 @@ function createPageBuilder({
       activeSectionDraft,
       activeDeviceId,
       previewWidth: activeDeviceId,
+      liveDragState,
     }),
     actions: {
       buildNormalizedPageMeta,
@@ -443,9 +479,50 @@ function createPageBuilder({
       },
       selectCanvasTarget,
       renderEditorPanel: () => renderEditorPanel(),
+      runStructuralCommand,
     },
     deps: {
       getSeriesId,
+    },
+  });
+
+  structuralCommands = createStructuralCommandAdapter({
+    getState: () => ({
+      currentPage,
+      selectedTarget: getSelectedTarget(),
+      activeInsertTarget,
+      liveDragState,
+    }),
+    actions: {
+      ensureCleanWorkspace,
+      setLiveDragState: (nextState) => {
+        liveDragState = nextState ? cloneValue(nextState) : null;
+        previewManager.renderTargetOverlay?.();
+      },
+      clearLiveDragState: () => {
+        liveDragState = null;
+        previewManager.renderTargetOverlay?.();
+      },
+      setActiveInsertTarget: (target) => {
+        activeInsertTarget = target ? cloneValue(target) : null;
+      },
+      createPendingInsertTarget,
+      setCanvasStatus,
+      insertModuleAt: canvasMutations.insertModuleAt,
+      moveModuleToTarget: canvasMutations.moveModuleToTarget,
+      insertSectionAt: canvasMutations.insertSectionAt,
+      reorderSectionToIndex: canvasMutations.reorderSectionToIndex,
+      deleteModuleFromCanvas,
+      deleteSectionFromCanvas,
+      hideModuleOnCurrentDevice,
+      selectModule,
+      selectSection: selectSectionFromCanvas,
+      showSidePanelTab,
+      requestFreshTargets: () => previewManager.requestTargetRefresh?.(),
+    },
+    helpers: {
+      getModuleLabel,
+      getSectionCount: () => sortSections(currentPage?.sections || []).length,
     },
   });
 
@@ -679,6 +756,7 @@ function createPageBuilder({
     activeInsertTarget = null;
     draggedModuleId = null;
     draggedSectionId = null;
+    liveDragState = null;
   }
 
   function getDefaultDesignerPage(pageSlug = '') {
@@ -727,6 +805,65 @@ function createPageBuilder({
 
   function sortSections(sections = []) {
     return sections.slice().sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0));
+  }
+
+  function sortModulesForColumn(section, columnIndex) {
+    return (section?.modules || [])
+      .filter(
+        (module) =>
+          module.moduleType !== 'header' && (Number(module.columnIndex) || 0) === columnIndex
+      )
+      .slice()
+      .sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0));
+  }
+
+  function getModuleLocation(moduleId) {
+    for (const section of currentPage?.sections || []) {
+      const module = (section.modules || []).find((item) => item.id === moduleId);
+      if (module) return { section, module };
+    }
+    return null;
+  }
+
+  function createPendingInsertTarget(target, position = 'after') {
+    if (target?.kind !== 'module' || !target.moduleId) return null;
+    const location = getModuleLocation(target.moduleId);
+    if (!location) return null;
+    const columnIndex = Number(location.module.columnIndex) || 0;
+    const modules = sortModulesForColumn(location.section, columnIndex);
+    const moduleIndex = modules.findIndex((module) => module.id === target.moduleId);
+    if (moduleIndex < 0) return null;
+    return {
+      sectionId: location.section.id,
+      columnIndex,
+      insertIndex: moduleIndex + (position === 'before' ? 0 : 1),
+      placement: position === 'before' ? 'before' : 'after',
+    };
+  }
+
+  async function hideModuleOnCurrentDevice(moduleId) {
+    const module = getSelectedModuleRecord(moduleId);
+    if (!module) return false;
+    const nextConfig = cloneValue(module.config || {}) || {};
+    setResponsiveOverrideValue(nextConfig, activeDeviceId, 'hidden', true);
+    nextConfig.responsive = pruneEmptyResponsiveOverrides(nextConfig.responsive);
+    if (!Object.keys(nextConfig.responsive || {}).length) {
+      delete nextConfig.responsive;
+    }
+    const updated = await updateModule(moduleId, { config: nextConfig });
+    if (!updated) {
+      setCanvasStatus('Failed to hide module for this device.', 'danger');
+      renderCanvas();
+      return false;
+    }
+    module.config = updated.config || nextConfig;
+    if (selectedModuleId === moduleId) {
+      draftManager.initializeModuleDraft(moduleId);
+    }
+    setCanvasStatus('Module hidden on current device.', 'success');
+    renderCanvas();
+    renderEditorPanel();
+    return true;
   }
 
   function applyEditorMode() {
@@ -1047,7 +1184,7 @@ function createPageBuilder({
   }
 
   async function deleteModuleFromCanvas(moduleId) {
-    if (!confirm('Delete this module? This cannot be undone.')) return;
+    if (!confirm('Delete this module? This cannot be undone.')) return false;
     if (selectedModuleId === moduleId && dirtyScope === 'module') {
       clearDirty('module');
     }
@@ -1060,11 +1197,13 @@ function createPageBuilder({
       setCanvasStatus('Module deleted.', 'success');
       renderCanvas();
       renderEditorPanel();
+      return true;
     }
+    return false;
   }
 
   async function deleteSectionFromCanvas(sectionId) {
-    if (!confirm('Delete this section and all its modules?')) return;
+    if (!confirm('Delete this section and all its modules?')) return false;
 
     if (await deleteSection(sectionId)) {
       removeSectionFromCurrentPage(sectionId);
@@ -1078,7 +1217,9 @@ function createPageBuilder({
       setCanvasStatus('Section deleted.', 'success');
       renderCanvas();
       renderEditorPanel();
+      return true;
     }
+    return false;
   }
 
   function renderCanvas() {

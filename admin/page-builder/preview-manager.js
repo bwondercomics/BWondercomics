@@ -3,8 +3,10 @@ import {
   BUILDER_PREVIEW_MESSAGE_TYPES,
   BUILDER_PREVIEW_SNAPSHOT_VERSION,
   BUILDER_PREVIEW_SOURCES,
+  BUILDER_PREVIEW_TARGET_ACTIONS,
   DEFAULT_BUILDER_PREVIEW_SIDE_EFFECTS,
   buildPreviewSnapshotMessage,
+  buildPreviewTargetMessage,
   getBuilderDevice,
   getPreviewStatusCopy,
   getPreviewViewport,
@@ -51,6 +53,93 @@ function getTargetStyle(targetGeometry) {
   ].join('; ');
 }
 
+function getPlacementGuideStyle(placement, geometry) {
+  const rect = geometry?.rect || {};
+  const top = Math.max(
+    0,
+    ['after', 'end', 'section-after', 'page-end'].includes(placement?.placement)
+      ? Number(rect.bottom) || 0
+      : Number(rect.top) || 0
+  );
+  return [
+    `top: ${top}px`,
+    `left: ${Math.max(0, Number(rect.left) || 0)}px`,
+    `width: ${Math.max(24, Number(rect.width) || 0)}px`,
+  ].join('; ');
+}
+
+function getFallbackPlacementGeometry(frame, placement) {
+  if (!frame || placement?.placement !== 'page-end') return null;
+  const frameWidth = Number(frame.dataset.viewportWidth) || frame.clientWidth || 0;
+  const frameHeight = Number(frame.dataset.viewportHeight) || frame.clientHeight || 0;
+  const left = 8;
+  const width = Math.max(24, frameWidth - left * 2);
+  const top = Math.max(0, frameHeight - 8);
+  return {
+    target: placement.target || { kind: 'page' },
+    visible: true,
+    rect: {
+      top,
+      left,
+      right: left + width,
+      bottom: top,
+      width,
+      height: 0,
+    },
+  };
+}
+
+function getFramePoint(frame, event) {
+  const rect = frame.getBoundingClientRect();
+  return {
+    x: Number(event.clientX) - rect.left,
+    y: Number(event.clientY) - rect.top,
+  };
+}
+
+function getToolbarActions(target) {
+  if (target?.kind === 'module') {
+    return [
+      ['settings', 'Settings'],
+      ['move', 'Move'],
+      ['insert-before', 'Insert Before'],
+      ['insert-after', 'Insert After'],
+      ['hide-device', 'Hide Device'],
+      ['delete', 'Delete'],
+      ['duplicate', 'Duplicate'],
+    ];
+  }
+  if (target?.kind === 'section') {
+    return [
+      ['settings', 'Settings'],
+      ['move', 'Move'],
+      ['insert-section-before', 'Section Before'],
+      ['insert-section-after', 'Section After'],
+      ['delete', 'Delete'],
+    ];
+  }
+  if (target?.kind === 'page') {
+    return [['insert-section-end', 'Add Section']];
+  }
+  return [['settings', 'Settings']];
+}
+
+function getSectionInsertIndex(target, action, targets = []) {
+  const explicitIndex = Number(target?.sectionIndex);
+  if (Number.isSafeInteger(explicitIndex)) {
+    return explicitIndex + (action === 'insert-section-after' ? 1 : 0);
+  }
+
+  const sectionTargets = targets.filter((item) => item?.target?.kind === 'section');
+  const sectionIndex = sectionTargets.findIndex(
+    (item) => item.target.sectionId === target?.sectionId
+  );
+  if (sectionIndex >= 0) {
+    return sectionIndex + (action === 'insert-section-after' ? 1 : 0);
+  }
+  return sectionTargets.length;
+}
+
 export function createPreviewManager({ el, getState, actions, deps }) {
   let previewSession = '';
   let previewIdentity = '';
@@ -94,6 +183,27 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     if (!iframe?.contentWindow || !latestPreviewSnapshot || !previewSession) return;
     iframe.contentWindow.postMessage(
       buildPreviewSnapshotMessage(latestPreviewSnapshot, previewSession),
+      window.location.origin
+    );
+  }
+
+  function postTargetAction(action, target = null) {
+    const iframe = /** @type {HTMLIFrameElement|null} */ (
+      el.pbCanvas?.querySelector('.pb-preview-iframe')
+    );
+    if (!iframe?.contentWindow || !latestPreviewSnapshot || !previewSession) return;
+    iframe.contentWindow.postMessage(
+      buildPreviewTargetMessage(
+        BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_ACTION,
+        { action, target, sequence: Math.max(0, latestTargetSequence) },
+        {
+          previewSession,
+          snapshotVersion: latestPreviewSnapshot.snapshotVersion,
+          seriesId: latestPreviewSnapshot.seriesId,
+          pageId: latestPreviewSnapshot.pageId,
+          pageSlug: latestPreviewSnapshot.pageSlug,
+        }
+      ),
       window.location.origin
     );
   }
@@ -200,20 +310,101 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     if (!overlay) {
       overlay = document.createElement('div');
       overlay.className = 'pb-preview-target-overlay';
-      overlay.setAttribute('aria-hidden', 'true');
+      overlay.setAttribute('aria-hidden', 'false');
       frame.appendChild(overlay);
     }
     return overlay;
   }
 
   function bindPreviewTargetOverlayControls(overlay) {
-    overlay
-      .querySelector('[data-preview-target-action="settings"]')
-      ?.addEventListener('click', () => {
+    overlay.querySelectorAll('[data-preview-target-action]').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const action = button.dataset.previewTargetAction;
         const selectedGeometry = findTargetGeometry(selectedTargetKey);
-        if (!selectedGeometry?.target) return;
-        actions.selectCanvasTarget?.(selectedGeometry.target);
+        const target = selectedGeometry?.target;
+        if (!target || button.disabled) return;
+        if (action === 'settings') {
+          actions.selectCanvasTarget?.(target);
+          return;
+        }
+        if (action === 'insert-before' || action === 'insert-after') {
+          await actions.runStructuralCommand?.('builder:insert', {
+            target,
+            position: action === 'insert-before' ? 'before' : 'after',
+          });
+          return;
+        }
+        if (action === 'insert-section-before' || action === 'insert-section-after') {
+          const placement = {
+            sectionIndex: getSectionInsertIndex(target, action, latestPreviewTargets),
+          };
+          await actions.runStructuralCommand?.('builder:insert-section', placement);
+          return;
+        }
+        if (action === 'insert-section-end') {
+          await actions.runStructuralCommand?.('builder:insert-section', {});
+          return;
+        }
+        if (action === 'hide-device') {
+          await actions.runStructuralCommand?.('builder:hide-on-device', { target });
+          return;
+        }
+        if (action === 'delete') {
+          await actions.runStructuralCommand?.('builder:delete-selected', { target });
+        }
       });
+    });
+
+    overlay.querySelectorAll('[data-preview-target-action="move"]').forEach((button) => {
+      button.addEventListener('dragstart', (event) => {
+        const selectedGeometry = findTargetGeometry(selectedTargetKey);
+        const target = selectedGeometry?.target;
+        if (!target) return;
+        const result = actions.runStructuralCommand?.('builder:drag-start', {
+          source: target.kind,
+          moduleId: target.moduleId,
+          sectionId: target.sectionId,
+          originTarget: target,
+        });
+        if (result?.ok === false) {
+          event.preventDefault();
+          return;
+        }
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', target.moduleId || target.sectionId || '');
+        }
+        renderPreviewTargetOverlay();
+      });
+      button.addEventListener('dragend', () => {
+        actions.runStructuralCommand?.('builder:drag-end');
+        renderPreviewTargetOverlay();
+      });
+    });
+
+    overlay.addEventListener('dragover', (event) => {
+      if (!getState().liveDragState) return;
+      event.preventDefault();
+      const frame = overlay.closest('.pb-preview-frame');
+      const result = actions.runStructuralCommand?.('builder:drag-over', {
+        point: getFramePoint(frame, event),
+        targets: latestPreviewTargets,
+      });
+      if (result?.ok || getState().liveDragState) {
+        renderPreviewTargetOverlay(frame);
+      }
+    });
+
+    overlay.addEventListener('drop', async (event) => {
+      if (!getState().liveDragState) return;
+      event.preventDefault();
+      const frame = overlay.closest('.pb-preview-frame');
+      await actions.runStructuralCommand?.('builder:drop', {
+        point: getFramePoint(frame, event),
+        targets: latestPreviewTargets,
+      });
+      renderPreviewTargetOverlay(frame);
+    });
   }
 
   function renderPreviewTargetOverlay(frame = el.pbCanvas?.querySelector('.pb-preview-frame')) {
@@ -228,9 +419,14 @@ export function createPreviewManager({ el, getState, actions, deps }) {
 
     const hoverGeometry = findTargetGeometry(hoveredTargetKey);
     const selectedGeometry = findTargetGeometry(selectedTargetKey);
+    const liveDragState = getState().liveDragState || null;
+    const dragPlacement = liveDragState?.currentPlacement || null;
     const frameWidth = Number(frame.dataset.viewportWidth) || frame.clientWidth || 0;
+    const dragGeometry =
+      (dragPlacement?.target?.key ? findTargetGeometry(dragPlacement.target.key) : null) ||
+      getFallbackPlacementGeometry(frame, dragPlacement);
     const selectedRect = selectedGeometry?.rect || null;
-    const toolbarWidth = 180;
+    const toolbarWidth = 360;
     const toolbarLeft = selectedRect
       ? clampNumber(selectedRect.left, 4, Math.max(4, frameWidth - toolbarWidth - 4))
       : 4;
@@ -253,6 +449,10 @@ export function createPreviewManager({ el, getState, actions, deps }) {
         <div class="pb-preview-insert-guide pb-preview-insert-guide--after" style="top: ${escapeAttr(String(Math.max(0, selectedRect.bottom)))}px; left: ${escapeAttr(String(Math.max(0, selectedRect.left)))}px; width: ${escapeAttr(String(Math.max(0, selectedRect.width)))}px;"></div>
       `
       : '';
+    const dragGuideHtml =
+      liveDragState && dragPlacement && dragGeometry?.visible
+        ? `<div class="pb-preview-drop-guide pb-preview-drop-guide--${escapeAttr(dragPlacement.placement)}" style="${escapeAttr(getPlacementGuideStyle(dragPlacement, dragGeometry))}"></div>`
+        : '';
     const toolbarHtml = selectedGeometry?.visible
       ? `
         <div
@@ -260,17 +460,27 @@ export function createPreviewManager({ el, getState, actions, deps }) {
           style="top: ${escapeAttr(String(toolbarTop))}px; left: ${escapeAttr(String(toolbarLeft))}px;"
         >
           <span class="pb-preview-target-toolbar-label">${escapeHtml(selectedGeometry.label || 'Selected')}</span>
-          <button type="button" class="btn-small btn-secondary" data-preview-target-action="settings">Settings</button>
+          ${getToolbarActions(selectedGeometry.target)
+            .map(([action, label]) => {
+              const disabled = action === 'duplicate';
+              const draggable = action === 'move' ? ' draggable="true"' : '';
+              return `<button type="button" class="btn-small btn-secondary" data-preview-target-action="${escapeAttr(action)}"${draggable}${disabled ? ' disabled aria-disabled="true"' : ''}>${escapeHtml(label)}</button>`;
+            })
+            .join('')}
         </div>
       `
       : '';
 
-    overlay.innerHTML = `${hoverHtml}${selectedHtml}${guideHtml}${toolbarHtml}`;
+    overlay.classList.toggle('is-live-dragging', !!liveDragState);
+    overlay.innerHTML = `${hoverHtml}${selectedHtml}${guideHtml}${dragGuideHtml}${toolbarHtml}`;
     bindPreviewTargetOverlayControls(overlay);
   }
 
   function resetPreviewTargets(options = {}) {
     clearTargetStaleTimeout();
+    if (getState().liveDragState) {
+      actions.runStructuralCommand?.('builder:drag-end');
+    }
     const previousSequence = latestTargetSequence;
     latestPreviewTargets = [];
     latestTargetSequence = options.preserveSequence ? previousSequence : -1;
@@ -617,9 +827,19 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     return latestPreviewSnapshot;
   }
 
+  function renderTargetOverlay() {
+    renderPreviewTargetOverlay();
+  }
+
+  function requestTargetRefresh(target = null) {
+    postTargetAction(BUILDER_PREVIEW_TARGET_ACTIONS.REFRESH_TARGETS, target);
+  }
+
   return {
     bindMessageHandler,
     getSnapshot,
+    requestTargetRefresh,
+    renderTargetOverlay,
     renderPreview,
     resetSession,
     setViewport,

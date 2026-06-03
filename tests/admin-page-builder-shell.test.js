@@ -32,7 +32,23 @@ function createDragLikeEvent(type, dataTransfer, init = {}) {
       configurable: true,
     });
   }
+  if (typeof init.clientX === 'number') {
+    Object.defineProperty(event, 'clientX', {
+      value: init.clientX,
+      configurable: true,
+    });
+  }
   return event;
+}
+
+function createDataTransfer() {
+  const data = new Map();
+  return {
+    effectAllowed: '',
+    dropEffect: '',
+    setData: vi.fn((key, value) => data.set(key, value)),
+    getData: vi.fn((key) => data.get(key) || ''),
+  };
 }
 
 function readCss(path) {
@@ -55,6 +71,8 @@ async function setupPageBuilder({
   updateSectionResult = null,
   deleteSectionResult = false,
   deleteModuleResult = false,
+  reorderModulesResult = true,
+  reorderSectionsResult = true,
   updatePageResult = null,
   useRealEditors = false,
   viewportWidth = 1600,
@@ -89,7 +107,11 @@ async function setupPageBuilder({
     modules: [],
     settings: {},
   }));
-  const reorderSections = vi.fn(async () => true);
+  const reorderSections = vi.fn(async (...args) =>
+    typeof reorderSectionsResult === 'function'
+      ? reorderSectionsResult(...args)
+      : reorderSectionsResult
+  );
   const addModule = vi.fn(async (_sectionId, moduleType, columnIndex, config, _sortIndex) => ({
     id: 'new-module-id',
     moduleType,
@@ -108,7 +130,11 @@ async function setupPageBuilder({
     sortIndex,
     config: {},
   }));
-  const reorderModules = vi.fn(async () => true);
+  const reorderModules = vi.fn(async (...args) =>
+    typeof reorderModulesResult === 'function'
+      ? reorderModulesResult(...args)
+      : reorderModulesResult
+  );
   const updateSection = vi.fn(async () => updateSectionResult);
   const deleteSection = vi.fn(async () => deleteSectionResult);
   const deleteModule = vi.fn(async () => deleteModuleResult);
@@ -240,6 +266,38 @@ function dispatchPreviewMessageFromIframe(message, iframeWindow) {
       origin: window.location.origin,
       source: iframeWindow,
     })
+  );
+}
+
+function sendPreviewTargets({ frame, iframeWindow, page, targets, sequence = 3 }) {
+  dispatchPreviewMessageFromIframe(
+    buildPreviewTargetMessage(
+      BUILDER_PREVIEW_MESSAGE_TYPES.TARGETS,
+      { sequence, targets },
+      {
+        previewSession: frame.dataset.previewSession,
+        seriesId: 'battle-bros',
+        pageId: page.id,
+        pageSlug: page.slug,
+      }
+    ),
+    iframeWindow
+  );
+}
+
+function sendPreviewTargetSelect({ frame, iframeWindow, page, target, sequence = 3 }) {
+  dispatchPreviewMessageFromIframe(
+    buildPreviewTargetMessage(
+      BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT,
+      { sequence, target },
+      {
+        previewSession: frame.dataset.previewSession,
+        seriesId: 'battle-bros',
+        pageId: page.id,
+        pageSlug: page.slug,
+      }
+    ),
+    iframeWindow
   );
 }
 
@@ -2122,6 +2180,702 @@ describe('admin page-builder shell', () => {
     expect(frame.dataset.selectedTargetKey).toBe(pageTarget.key);
     expect(frame.querySelector('.pb-preview-target-box--selected')).not.toBeNull();
     expect(frame.querySelector('.pb-preview-target-toolbar')).not.toBeNull();
+  });
+
+  it('creates a section and module when dragging a block onto an empty live canvas', async () => {
+    const selectedPage = buildContractFixture('builderPage', {
+      sections: [],
+    });
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    frame.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      right: 1280,
+      bottom: 900,
+      width: 1280,
+      height: 900,
+    });
+    const overlay = frame.querySelector('.pb-preview-target-overlay');
+    const block = document.querySelector('.pb-module-type[data-module-type="text"]');
+    const dataTransfer = createDataTransfer();
+
+    block.dispatchEvent(createDragLikeEvent('dragstart', dataTransfer));
+    expect(overlay.classList.contains('is-live-dragging')).toBe(true);
+
+    overlay.dispatchEvent(
+      createDragLikeEvent('dragover', dataTransfer, { clientX: 120, clientY: 120 })
+    );
+    const dropGuide = frame.querySelector('.pb-preview-drop-guide--page-end');
+    expect(dropGuide).not.toBeNull();
+    expect(dropGuide?.getAttribute('style')).toContain('width:');
+
+    overlay.dispatchEvent(
+      createDragLikeEvent('drop', dataTransfer, { clientX: 120, clientY: 120 })
+    );
+    await flushAdminUi(6);
+
+    expect(mocks.addSection).toHaveBeenCalledWith(selectedPage.id);
+    expect(mocks.addModule).toHaveBeenCalledWith(
+      'new-section-id',
+      'text',
+      0,
+      expect.objectContaining({ content: expect.stringContaining('Enter your text') }),
+      null
+    );
+    expect(mocks.reorderModules).toHaveBeenCalledWith('new-section-id', 0, ['new-module-id']);
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Text Module');
+  });
+
+  it('does not continue a page-end block drop when new-section ordering fails', async () => {
+    const selectedPage = buildContractFixture('builderPage', {
+      sections: [],
+    });
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      reorderSectionsResult: false,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    frame.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      right: 1280,
+      bottom: 900,
+      width: 1280,
+      height: 900,
+    });
+    const overlay = frame.querySelector('.pb-preview-target-overlay');
+    const block = document.querySelector('.pb-module-type[data-module-type="text"]');
+    const dataTransfer = createDataTransfer();
+
+    block.dispatchEvent(createDragLikeEvent('dragstart', dataTransfer));
+    overlay.dispatchEvent(
+      createDragLikeEvent('dragover', dataTransfer, { clientX: 120, clientY: 120 })
+    );
+    overlay.dispatchEvent(
+      createDragLikeEvent('drop', dataTransfer, { clientX: 120, clientY: 120 })
+    );
+    await flushAdminUi(6);
+
+    expect(mocks.addSection).toHaveBeenCalledWith(selectedPage.id);
+    expect(mocks.reorderSections).toHaveBeenCalledWith(selectedPage.id, ['new-section-id']);
+    expect(mocks.addModule).not.toHaveBeenCalled();
+    expect(document.getElementById('pbEditorTitle')?.textContent).not.toContain('Text Module');
+    expect(
+      frame.querySelector('.pb-preview-target-overlay')?.classList.contains('is-live-dragging')
+    ).toBe(false);
+    expect(document.querySelector('.pb-live-canvas-status')?.textContent).toContain(
+      'Failed to add section.'
+    );
+  });
+
+  it('uses toolbar Insert Before to create a pending target completed by a block click', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const textSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === textModule.id)
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const target = {
+      kind: 'module',
+      key: `module:${textModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: textSection.id,
+      columnIndex: textModule.columnIndex,
+      moduleId: textModule.id,
+      moduleType: textModule.moduleType,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target,
+          rect: { top: 40, left: 30, right: 230, bottom: 140, width: 200, height: 100 },
+          visible: true,
+          order: 0,
+          label: 'Text module',
+        },
+      ],
+    });
+    sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
+    await flushAdminUi(2);
+
+    frame
+      .querySelector('[data-preview-target-action="insert-before"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    expect(document.querySelector('[data-content="blocks"]')?.hidden).toBe(false);
+
+    document
+      .querySelector('.pb-module-type[data-module-type="spacer"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(6);
+
+    expect(mocks.addModule).toHaveBeenCalledWith(
+      textSection.id,
+      'spacer',
+      0,
+      expect.objectContaining({ height: 40 }),
+      null
+    );
+    expect(mocks.reorderModules).toHaveBeenCalledWith(
+      textSection.id,
+      0,
+      expect.arrayContaining(['new-module-id', textModule.id])
+    );
+  });
+
+  it('does not report live insert success when module ordering fails', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const textSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === textModule.id)
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      reorderModulesResult: false,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const target = {
+      kind: 'module',
+      key: `module:${textModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: textSection.id,
+      columnIndex: textModule.columnIndex,
+      moduleId: textModule.id,
+      moduleType: textModule.moduleType,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target,
+          rect: { top: 40, left: 30, right: 230, bottom: 140, width: 200, height: 100 },
+          visible: true,
+          order: 0,
+          label: 'Text module',
+        },
+      ],
+    });
+    sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
+    await flushAdminUi(2);
+
+    frame
+      .querySelector('[data-preview-target-action="insert-before"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+    document
+      .querySelector('.pb-module-type[data-module-type="divider"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(6);
+
+    expect(mocks.addModule).toHaveBeenCalledWith(
+      textSection.id,
+      'divider',
+      0,
+      expect.objectContaining({ style: 'solid' }),
+      null
+    );
+    expect(mocks.reorderModules).toHaveBeenCalled();
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Text Module');
+    expect(document.getElementById('pbEditorTitle')?.textContent).not.toContain('Divider Module');
+    expect(document.querySelector('.pb-live-canvas-status')?.textContent).toContain(
+      'Failed to add Divider module.'
+    );
+  });
+
+  it('moves a module from Layers to a live canvas column target', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const textSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === textModule.id)
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    frame.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      right: 1280,
+      bottom: 900,
+      width: 1280,
+      height: 900,
+    });
+    const iframeWindow = attachPreviewIframeWindow();
+    const columnTarget = {
+      kind: 'column',
+      key: `column:${textSection.id}:1`,
+      pageId: selectedPage.id,
+      sectionId: textSection.id,
+      columnIndex: 1,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target: columnTarget,
+          rect: { top: 20, left: 260, right: 520, bottom: 260, width: 260, height: 240 },
+          visible: true,
+          order: 0,
+          label: 'Column 2',
+        },
+      ],
+    });
+
+    const overlay = frame.querySelector('.pb-preview-target-overlay');
+    const layerRow = document.querySelector(
+      `[data-layer-action="select-module"][data-module-id="${textModule.id}"]`
+    );
+    const dataTransfer = createDataTransfer();
+    layerRow.dispatchEvent(createDragLikeEvent('dragstart', dataTransfer));
+    overlay.dispatchEvent(
+      createDragLikeEvent('dragover', dataTransfer, { clientX: 300, clientY: 30 })
+    );
+    overlay.dispatchEvent(createDragLikeEvent('drop', dataTransfer, { clientX: 300, clientY: 30 }));
+    await flushAdminUi(6);
+
+    expect(mocks.moveModule).toHaveBeenCalledWith(textModule.id, textSection.id, 1, 0);
+    expect(mocks.reorderModules).toHaveBeenCalledWith(
+      textSection.id,
+      1,
+      expect.arrayContaining([textModule.id])
+    );
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Text Module');
+  });
+
+  it('does not report live move success when module ordering fails', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const textSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === textModule.id)
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      reorderModulesResult: false,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    frame.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      right: 1280,
+      bottom: 900,
+      width: 1280,
+      height: 900,
+    });
+    const iframeWindow = attachPreviewIframeWindow();
+    const columnTarget = {
+      kind: 'column',
+      key: `column:${textSection.id}:1`,
+      pageId: selectedPage.id,
+      sectionId: textSection.id,
+      columnIndex: 1,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target: columnTarget,
+          rect: { top: 20, left: 260, right: 520, bottom: 260, width: 260, height: 240 },
+          visible: true,
+          order: 0,
+          label: 'Column 2',
+        },
+      ],
+    });
+
+    const overlay = frame.querySelector('.pb-preview-target-overlay');
+    const layerRow = document.querySelector(
+      `[data-layer-action="select-module"][data-module-id="${textModule.id}"]`
+    );
+    const dataTransfer = createDataTransfer();
+    layerRow.dispatchEvent(createDragLikeEvent('dragstart', dataTransfer));
+    overlay.dispatchEvent(
+      createDragLikeEvent('dragover', dataTransfer, { clientX: 300, clientY: 30 })
+    );
+    overlay.dispatchEvent(createDragLikeEvent('drop', dataTransfer, { clientX: 300, clientY: 30 }));
+    await flushAdminUi(6);
+
+    expect(mocks.moveModule).toHaveBeenCalledWith(textModule.id, textSection.id, 1, 0);
+    expect(mocks.reorderModules).toHaveBeenCalled();
+    expect(document.getElementById('pbEditorTitle')?.textContent).not.toContain('Text Module');
+    expect(
+      frame.querySelector('.pb-preview-target-overlay')?.classList.contains('is-live-dragging')
+    ).toBe(false);
+    expect(document.querySelector('.pb-live-canvas-status')?.textContent).toContain(
+      'Failed to move module.'
+    );
+  });
+
+  it('moves a section from Layers using live section target geometry', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const [firstSection, secondSection] = selectedPage.sections;
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    frame.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      right: 1280,
+      bottom: 900,
+      width: 1280,
+      height: 900,
+    });
+    const iframeWindow = attachPreviewIframeWindow();
+    const sectionTarget = {
+      kind: 'section',
+      key: `section:${firstSection.id}`,
+      pageId: selectedPage.id,
+      sectionId: firstSection.id,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target: sectionTarget,
+          rect: { top: 20, left: 30, right: 530, bottom: 220, width: 500, height: 200 },
+          visible: true,
+          order: 0,
+          label: 'Section 1',
+        },
+      ],
+    });
+
+    const overlay = frame.querySelector('.pb-preview-target-overlay');
+    const layerRow = document.querySelector(
+      `[data-layer-action="select-section"][data-section-id="${secondSection.id}"]`
+    );
+    const dataTransfer = createDataTransfer();
+    layerRow.dispatchEvent(createDragLikeEvent('dragstart', dataTransfer));
+    overlay.dispatchEvent(
+      createDragLikeEvent('dragover', dataTransfer, { clientX: 80, clientY: 30 })
+    );
+    overlay.dispatchEvent(createDragLikeEvent('drop', dataTransfer, { clientX: 80, clientY: 30 }));
+    await flushAdminUi(6);
+
+    expect(mocks.reorderSections).toHaveBeenCalledWith(selectedPage.id, [
+      secondSection.id,
+      firstSection.id,
+    ]);
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Section');
+  });
+
+  it('does not report live section move success when section ordering fails', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const [firstSection, secondSection] = selectedPage.sections;
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      reorderSectionsResult: false,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    frame.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      right: 1280,
+      bottom: 900,
+      width: 1280,
+      height: 900,
+    });
+    const iframeWindow = attachPreviewIframeWindow();
+    const sectionTarget = {
+      kind: 'section',
+      key: `section:${firstSection.id}`,
+      pageId: selectedPage.id,
+      sectionId: firstSection.id,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target: sectionTarget,
+          rect: { top: 20, left: 30, right: 530, bottom: 220, width: 500, height: 200 },
+          visible: true,
+          order: 0,
+          label: 'Section 1',
+        },
+      ],
+    });
+
+    const overlay = frame.querySelector('.pb-preview-target-overlay');
+    const layerRow = document.querySelector(
+      `[data-layer-action="select-section"][data-section-id="${secondSection.id}"]`
+    );
+    const dataTransfer = createDataTransfer();
+    layerRow.dispatchEvent(createDragLikeEvent('dragstart', dataTransfer));
+    overlay.dispatchEvent(
+      createDragLikeEvent('dragover', dataTransfer, { clientX: 80, clientY: 30 })
+    );
+    overlay.dispatchEvent(createDragLikeEvent('drop', dataTransfer, { clientX: 80, clientY: 30 }));
+    await flushAdminUi(6);
+
+    expect(mocks.reorderSections).toHaveBeenCalledWith(selectedPage.id, [
+      secondSection.id,
+      firstSection.id,
+    ]);
+    expect(document.getElementById('pbEditorTitle')?.textContent).not.toContain('Section');
+    expect(
+      frame.querySelector('.pb-preview-target-overlay')?.classList.contains('is-live-dragging')
+    ).toBe(false);
+    expect(document.querySelector('.pb-live-canvas-status')?.textContent).toContain(
+      'Failed to reorder section.'
+    );
+  });
+
+  it('hides the selected module on the current device without mutating global config', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const textSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === textModule.id)
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const target = {
+      kind: 'module',
+      key: `module:${textModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: textSection.id,
+      columnIndex: textModule.columnIndex,
+      moduleId: textModule.id,
+      moduleType: textModule.moduleType,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target,
+          rect: { top: 40, left: 30, right: 230, bottom: 140, width: 200, height: 100 },
+          visible: true,
+          order: 0,
+          label: 'Text module',
+        },
+      ],
+    });
+    sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
+    await flushAdminUi(2);
+
+    frame
+      .querySelector('[data-preview-target-action="hide-device"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(6);
+
+    expect(mocks.updateModule).toHaveBeenCalledWith(
+      textModule.id,
+      expect.objectContaining({
+        config: expect.objectContaining({
+          responsive: { desktop: { hidden: true } },
+        }),
+      })
+    );
+    expect(textModule.config.hidden).toBeUndefined();
+  });
+
+  it('keeps Duplicate disabled and routes toolbar Delete through the existing confirmation flow', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const textSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === textModule.id)
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      deleteModuleResult: true,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const target = {
+      kind: 'module',
+      key: `module:${textModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: textSection.id,
+      columnIndex: textModule.columnIndex,
+      moduleId: textModule.id,
+      moduleType: textModule.moduleType,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target,
+          rect: { top: 40, left: 30, right: 230, bottom: 140, width: 200, height: 100 },
+          visible: true,
+          order: 0,
+          label: 'Text module',
+        },
+      ],
+    });
+    sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
+    await flushAdminUi(2);
+
+    const duplicateButton = frame.querySelector('[data-preview-target-action="duplicate"]');
+    expect(duplicateButton?.disabled).toBe(true);
+    duplicateButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(mocks.deleteModule).not.toHaveBeenCalled();
+    expect(mocks.addModule).not.toHaveBeenCalled();
+    expect(mocks.updateModule).not.toHaveBeenCalled();
+
+    frame
+      .querySelector('[data-preview-target-action="delete"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(6);
+
+    expect(mocks.deleteModule).toHaveBeenCalledWith(textModule.id);
+  });
+
+  it('blocks live toolbar structural commands while a module draft is dirty', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const textSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === textModule.id)
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const target = {
+      kind: 'module',
+      key: `module:${textModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: textSection.id,
+      columnIndex: textModule.columnIndex,
+      moduleId: textModule.id,
+      moduleType: textModule.moduleType,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target,
+          rect: { top: 40, left: 30, right: 230, bottom: 140, width: 200, height: 100 },
+          visible: true,
+          order: 0,
+          label: 'Text module',
+        },
+      ],
+    });
+    sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
+    await flushAdminUi(2);
+
+    const contentInput = document.querySelector('[data-key="content"]');
+    contentInput.value = '<p>Unsaved edit</p>';
+    contentInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAdminUi(2);
+
+    frame
+      .querySelector('[data-preview-target-action="insert-before"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(document.querySelector('[data-content="blocks"]')?.hidden).toBe(true);
+
+    frame
+      .querySelector('[data-preview-target-action="hide-device"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.updateModule).not.toHaveBeenCalled();
+    expect(document.querySelector('.pb-editor-footer-status')?.textContent).toContain('unsaved');
   });
 
   it('ignores stale target geometry and blocks dirty target selection switches', async () => {

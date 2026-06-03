@@ -76,6 +76,12 @@ export function createCanvasMutations({ getState, actions, deps, helpers }) {
     return (section?.modules || []).filter((module) => module.moduleType !== 'header').length;
   }
 
+  function failStructuralMutation(message) {
+    actions.setCanvasStatus(message, 'danger');
+    actions.renderCanvas();
+    return null;
+  }
+
   async function insertModuleAt(sectionId, columnIndex, insertIndex, moduleType) {
     const { currentPage } = getState();
     if (!currentPage) return;
@@ -85,20 +91,23 @@ export function createCanvasMutations({ getState, actions, deps, helpers }) {
     const newModule = await addModuleWithDefault(sectionId, moduleType, columnIndex);
     if (!newModule) return;
 
-    section.modules = section.modules || [];
-    section.modules.push(newModule);
-
     const visibleOrderedIds = sortCanvasModulesForColumn(section, columnIndex)
       .map((module) => module.id)
       .filter((id) => id !== newModule.id);
     visibleOrderedIds.splice(insertIndex, 0, newModule.id);
     const orderedIds = buildColumnOrder(section, columnIndex, visibleOrderedIds);
 
-    await deps.reorderModules(sectionId, columnIndex, orderedIds);
+    if (!(await deps.reorderModules(sectionId, columnIndex, orderedIds))) {
+      return failStructuralMutation(`Failed to add ${helpers.getModuleLabel(moduleType)} module.`);
+    }
+
+    section.modules = section.modules || [];
+    section.modules.push(newModule);
     applyModuleOrderLocally(sectionId, columnIndex, orderedIds);
     actions.setActiveInsertTarget(null);
     actions.setCanvasStatus(`${helpers.getModuleLabel(moduleType)} module added.`, 'success');
     actions.renderCanvas();
+    return newModule;
   }
 
   async function moveModuleToTarget(moduleId, targetSectionId, targetColumnIndex, insertIndex) {
@@ -118,10 +127,12 @@ export function createCanvasMutations({ getState, actions, deps, helpers }) {
     const targetOrderedIds = buildColumnOrder(targetSection, targetColumnIndex, targetVisibleIds);
 
     if (sourceSection.id === targetSectionId && sourceColumnIndex === targetColumnIndex) {
-      await deps.reorderModules(targetSectionId, targetColumnIndex, targetOrderedIds);
+      if (!(await deps.reorderModules(targetSectionId, targetColumnIndex, targetOrderedIds))) {
+        return failStructuralMutation('Failed to move module.');
+      }
       applyModuleOrderLocally(targetSectionId, targetColumnIndex, targetOrderedIds);
       actions.renderCanvas();
-      return;
+      return sourceModule;
     }
 
     const movedModule = await deps.moveModule(
@@ -132,28 +143,37 @@ export function createCanvasMutations({ getState, actions, deps, helpers }) {
     );
     if (!movedModule) return;
 
+    const nextModule = {
+      ...location.module,
+      ...movedModule,
+      id: moduleId,
+    };
+    const sourceVisibleIds = sortCanvasModulesForColumn(sourceSection, sourceColumnIndex)
+      .map((module) => module.id)
+      .filter((id) => id !== moduleId);
+    const sourceOrderedIds = buildColumnOrder(sourceSection, sourceColumnIndex, sourceVisibleIds);
+    if (sourceOrderedIds.length > 0) {
+      if (!(await deps.reorderModules(sourceSection.id, sourceColumnIndex, sourceOrderedIds))) {
+        return failStructuralMutation('Failed to move module.');
+      }
+    }
+
+    if (!(await deps.reorderModules(targetSectionId, targetColumnIndex, targetOrderedIds))) {
+      return failStructuralMutation('Failed to move module.');
+    }
+
     sourceSection.modules = (sourceSection.modules || []).filter(
       (module) => module.id !== moduleId
     );
     targetSection.modules = targetSection.modules || [];
-    targetSection.modules.push({
-      ...location.module,
-      ...movedModule,
-    });
-
-    const sourceVisibleIds = sortCanvasModulesForColumn(sourceSection, sourceColumnIndex).map(
-      (module) => module.id
-    );
-    const sourceOrderedIds = buildColumnOrder(sourceSection, sourceColumnIndex, sourceVisibleIds);
+    targetSection.modules.push(nextModule);
     if (sourceOrderedIds.length > 0) {
-      await deps.reorderModules(sourceSection.id, sourceColumnIndex, sourceOrderedIds);
       applyModuleOrderLocally(sourceSection.id, sourceColumnIndex, sourceOrderedIds);
     }
-
-    await deps.reorderModules(targetSectionId, targetColumnIndex, targetOrderedIds);
     applyModuleOrderLocally(targetSectionId, targetColumnIndex, targetOrderedIds);
     actions.setCanvasStatus('Module moved.', 'success');
     actions.renderCanvas();
+    return nextModule;
   }
 
   async function insertSectionAt(index) {
@@ -162,16 +182,20 @@ export function createCanvasMutations({ getState, actions, deps, helpers }) {
     const newSection = await deps.addSection(currentPage.id);
     if (!newSection) return;
 
-    currentPage.sections = currentPage.sections || [];
-    currentPage.sections.push(newSection);
-    const sectionIds = currentPage.sections
+    const sectionIds = (currentPage.sections || [])
       .map((section) => section.id)
       .filter((id) => id !== newSection.id);
     sectionIds.splice(index, 0, newSection.id);
-    await deps.reorderSections(currentPage.id, sectionIds);
+    if (!(await deps.reorderSections(currentPage.id, sectionIds))) {
+      return failStructuralMutation('Failed to add section.');
+    }
+
+    currentPage.sections = currentPage.sections || [];
+    currentPage.sections.push(newSection);
     applySectionOrderLocally(sectionIds);
     actions.setCanvasStatus('Section added.', 'success');
     actions.renderCanvas();
+    return newSection;
   }
 
   async function reorderSectionToIndex(sectionId, insertIndex) {
@@ -182,10 +206,13 @@ export function createCanvasMutations({ getState, actions, deps, helpers }) {
       .map((section) => section.id)
       .filter((id) => id !== sectionId);
     sectionIds.splice(insertIndex, 0, sectionId);
-    await deps.reorderSections(currentPage.id, sectionIds);
+    if (!(await deps.reorderSections(currentPage.id, sectionIds))) {
+      return failStructuralMutation('Failed to reorder section.');
+    }
     applySectionOrderLocally(sectionIds);
     actions.setCanvasStatus('Section reordered.', 'success');
     actions.renderCanvas();
+    return getSectionRecord(sectionId);
   }
 
   async function changeSectionLayout(sectionId, layout) {

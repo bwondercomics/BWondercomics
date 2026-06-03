@@ -12,6 +12,8 @@ This document describes the current builder runtime under `admin/page-builder/` 
 - [📝 Draft Manager (draft-manager.js)](#-draft-manager-draft-managerjs)
 - [🚚 Page Actions (page-actions.js)](#-page-actions-page-actionsjs)
 - [🧱 Canvas Mutations (canvas-mutations.js)](#-canvas-mutations-canvas-mutationsjs)
+- [🕹️ Structural Commands (structural-commands.js)](#️-structural-commands-structural-commandsjs)
+- [📍 Live Drop Placement (live-drop-placement.js)](#-live-drop-placement-live-drop-placementjs)
 - [👁️ Preview Manager (preview-manager.js)](#️-preview-manager-preview-managerjs)
 - [💾 Data API (data.js)](#-data-api-datajs)
 - [🏗️ Header Configuration (header-config.js)](#️-header-configuration-header-configjs)
@@ -83,11 +85,15 @@ Modules currently own: `moduleType`, `columnIndex`, `sortIndex`, and `config`.
 6. The default canvas is the live iframe preview rendered by `preview-manager.js` with
    `builderEditing: true`, so the reader iframe can emit admin-only target markers and live target
    geometry.
-7. The structural canvas is still rendered by `canvas-renderer.js` as the temporary
-   **Structure Debug** fallback.
-8. User actions call `data.js` mutators, update local state, then rerender affected surfaces.
+7. Live structural actions from Blocks, Layers, the selected-target toolbar, and Structure Debug
+   route through `structural-commands.js`.
+8. Live drops rank iframe target geometry through `live-drop-placement.js`, then call
+   `canvas-mutations.js` and the existing data-layer mutators.
+9. The structural canvas is still rendered by `canvas-renderer.js` as the **Structure Debug**
+   fallback.
+10. User actions call `data.js` mutators, update local state, then rerender affected surfaces.
 
-There is no separate long-lived client-side draft store in `data.js`. `admin/page-builder.js` still owns the top-level mutable builder state and composition root, while focused factories now own specific workflows: `draft-manager.js` handles draft normalization/save-discard flows, `page-actions.js` handles page lifecycle actions, `canvas-mutations.js` handles structural section/module mutations, and `preview-manager.js` handles the iframe preview handshake/render path.
+There is no separate long-lived client-side draft store in `data.js`. `admin/page-builder.js` still owns the top-level mutable builder state and composition root, while focused factories now own specific workflows: `draft-manager.js` handles draft normalization/save-discard flows, `page-actions.js` handles page lifecycle actions, `canvas-mutations.js` handles structural section/module mutations, `structural-commands.js` routes live structural intent, and `preview-manager.js` handles the iframe preview handshake/render path.
 
 Fallback-retirement readiness is a separate developer workflow, not part of the normal editor boot path: the page list from `fetchPages(...)` is intentionally summary-only, so any runtime-fallback audit must hydrate each page with `fetchPage(...)` or use `loadFallbackRetirementGate(...)` before calling `auditPagesFallbacks(...)`.
 
@@ -100,9 +106,11 @@ Its responsibilities include:
 - keeping the current series and selected page in sync with the route
 - tracking selected surface, selected module, active section, and insertion targets
 - storing the builder-wide state consumed by the extracted factories, including current page, selection state, dirty scope, canvas mode, and active preview width
-- instantiating `createDraftManager(...)`, `createPageActions(...)`, `createCanvasMutations(...)`, and `createPreviewManager(...)`
+- instantiating `createDraftManager(...)`, `createPageActions(...)`, `createCanvasMutations(...)`,
+  `createStructuralCommandAdapter(...)`, and `createPreviewManager(...)`
 - `normalizeHeaderDraft` resolves normal headers with `pageConfig: null` and tags a `source` field (`page-meta-v3`, `page-meta-stale`, `legacy-import`) so migration-only badges can flag non-canonical header records
-- delegating draft saves/discards, publish/page actions, structural mutations, and preview synchronization to those focused factories
+- delegating draft saves/discards, publish/page actions, structural commands/mutations, and preview
+  synchronization to those focused factories
 - rerendering the side panel, live canvas, structure-debug fallback, and inspector after state
   changes
 - rendering status badges and reader-preview links
@@ -119,8 +127,9 @@ The top-level coordinator now owns the canonical designer-entry behavior in addi
   header/nav through CSS, and uses the top builder toolbar plus one side panel as the only editor
   chrome.
 - **Canvas Default**: The live iframe preview is the default canvas. The structural renderer remains
-  available through **Structure Debug** and is also kept as a hidden fallback surface so existing
-  insertion/reorder flows remain reachable until direct live-canvas drag/drop lands.
+  available through **Structure Debug**, but Blocks drags, layer moves/deletes, selected-target
+  toolbar actions, and Structure Debug insert/move/delete controls now route through the same live
+  structural command adapter.
 - **Builder Editing Markers**: Live builder snapshots set `options.builderEditing: true`. The
   reader iframe applies that flag through `applyBuilderPageToDOM(...)`, shared renderers, and
   header layout code to emit `data-builder-*` markers for page, section, column, module, and
@@ -129,6 +138,9 @@ The top-level coordinator now owns the canonical designer-entry behavior in addi
   messages through the preview contract, and lets the admin frame render hover/selected overlays
   above the iframe while routing clicks through existing module/header/page/section selection and
   dirty-guard flows.
+- **Live Structural Commands**: The builder owns `liveDragState` and translates block, module, and
+  section drags into existing section/module mutations. The iframe never receives structural
+  mutation commands; it only supplies target geometry and refreshes target measurements.
 - **Default Page Resolution**: Designer mode resolves pages in this order: requested slug, `reader`, homepage, then first page in sort order.
 - **Normal Builder Landing Surface**: Outside designer mode, opening or creating a page now defaults to the `page-settings` surface so slug, title, page type, publish state, and homepage assignment are immediately editable without an extra click.
 - **`onSeriesChange()`**: Re-opens the visible builder shell after a series switch and preserves designer-mode routing when applicable.
@@ -188,6 +200,41 @@ Current responsibilities:
 - insert and reorder sections
 - update section layout
 - apply local order updates after backend reorder calls so the canvas can rerender from the latest in-memory shape
+- return the created or moved module/section record so live-canvas commands can select the affected
+  target after a successful mutation
+
+## 🕹️ Structural Commands (structural-commands.js)
+
+This factory is the Phase 6 internal command adapter for live structural editing. It is intentionally
+small and does not replace the broader Phase 10 command/keymap/undo work.
+
+Current responsibilities:
+
+- own the supported structural command IDs: drag start/over/drop/end, insert, move,
+  insert-section, move-section, delete-selected, hide-on-device, and disabled duplicate-selected
+- guard structural commands with the existing dirty-workspace checks before changing selection or
+  mutating structure
+- translate block/module/section drag state into `canvas-mutations.js` calls
+- create pending insert targets when toolbar Insert Before/After is clicked, then let a Blocks card
+  click complete the insertion
+- select the inserted or moved target, switch the side panel back to Settings, request fresh iframe
+  target geometry, and clear live drag state after successful commands
+- keep Duplicate visible but disabled until an actual duplicate mutation exists
+
+## 📍 Live Drop Placement (live-drop-placement.js)
+
+This pure helper ranks Phase 3 iframe target geometry into structural placements.
+
+Current responsibilities:
+
+- accept block descriptors and reject non-insertable modules such as `header`
+- rank targets by specificity and proximity: module edge, column, section, then page
+- resolve placements for module before/after, column start/end, empty column, section before/after,
+  and page end
+- use the global saved section layout and actual module `columnIndex` for structural validity rather
+  than device-collapsed layout
+- exclude the dragged module or section from placement index calculations so moves land at the
+  expected canonical sort position
 
 ## 👁️ Preview Manager (preview-manager.js)
 
@@ -208,6 +255,10 @@ Current responsibilities:
 - render the admin-side preview debug overlay when metrics are present and debug mode is enabled
 - store live target geometry on `.pb-preview-frame.dataset`, render hover/selected outlines,
   compact selected-target toolbar chrome, and insert guide lines above the iframe
+- render the active live drop guide while dragging and make the admin overlay catch drag/drop events
+  only for the duration of a live drag
+- route selected-target toolbar actions through the structural command adapter while leaving iframe
+  `TARGET_ACTION` messages for non-mutating requests such as target refresh
 - clear stale target geometry on iframe reload, page identity changes, preview session reset, and
   device switches until fresh target messages arrive
 - update `.pb-preview-frame` dataset attributes and `.pb-preview-status` copy
@@ -342,6 +393,8 @@ This file renders the unified side panel. Current responsibilities:
 - page drag/drop reorder
 - descriptor-backed block rendering (blocks exclude non-insertable descriptors such as `header`)
 - layer tree rendering for page settings, page header, sections, columns, and modules
+- live block drag starts from descriptor data, and block clicks complete pending toolbar insertions
+- layer module/section drags and delete buttons route through the structural command adapter
 - Pages, Blocks, Layers, Settings, and Styles tab switching
 - routing Settings and Styles tabs into the existing `editor-panel.js` inspector shell
 
@@ -357,16 +410,18 @@ Responsible for the **Structure Debug** fallback and the interactive admin-only 
 - **Insert Zones**: Manages the placement of `renderModuleInsertBar`, `renderSectionInsertBar`, and the module picker grid.
 
 The structural canvas is no longer the default authoring surface. Live mode uses the real reader
-iframe with admin-only target overlays for hover and selection. Structure Debug keeps existing
-insertion and reorder workflows reachable until later drag/drop phases move those interactions onto
-the live canvas.
+iframe with admin-only target overlays for hover, selection, inline toolbar actions, and live drop
+guides. Structure Debug remains available for diagnostic fallback and older visual workflows, but
+its structural insert/move/delete actions route through the same command adapter as the live canvas.
 
 ## 🖱️ Canvas Events (canvas-events.js)
 
 Coordinates all user interactions within the `#pbCanvas` through a factory pattern.
 
 - **`createCanvasEventBinder`**: Returns a `bindCanvasEvents` function. Detaches business logic from DOM events by delegating operations.
-- **Section/Module Management**: Handles drag & drop reordering, layout changes, module selection clicks, target deletion.
+- **Section/Module Management**: Handles Structure Debug drag & drop reordering, layout changes,
+  module selection clicks, and target deletion while routing structural mutations through the
+  command adapter.
 - **Global Selection**: Hooks up buttons for selecting the Page Header and Page Settings from the canvas.
 
 ## 🧩 Base Module Editor (module-editor.js)
@@ -444,7 +499,9 @@ Key exports:
 - `PREVIEW_MEDIA_QUERIES` — named responsive `matchMedia(...)` probes used for parity metrics (`aspectMax7By5`, `aspectMax5By7`, `maxWidth768`, `maxWidth480`)
 - `BUILDER_PREVIEW_SNAPSHOT_VERSION` — version marker for builder preview payloads
 - `BUILDER_PREVIEW_SOURCES` — `saved` for hydrated API pages and `working` for cloned snapshots that include an active local draft
-- `BUILDER_PREVIEW_MESSAGE_TYPES` — `REQUEST_SNAPSHOT`, `SNAPSHOT`, `ACK`, `ERROR`, `METRICS`; the full `postMessage` type registry shared by sender and receiver
+- `BUILDER_PREVIEW_MESSAGE_TYPES` — `REQUEST_SNAPSHOT`, `SNAPSHOT`, `ACK`, `ERROR`,
+  `METRICS`, `TARGETS`, `TARGET_HOVER`, `TARGET_SELECT`, and `TARGET_ACTION`; the full
+  `postMessage` type registry shared by sender and receiver
 - `DEFAULT_BUILDER_PREVIEW_SIDE_EFFECTS` — default preview policy for disabling or stubbing mutating reader behavior
 - `getPreviewViewport(...)`, `isPreviewViewportId(...)`, `isPreviewSource(...)`, `isPreviewMessageType(...)`, and `getPreviewStatusCopy(...)` — small validation/copy helpers
 - `buildPreviewSnapshotMessage(snapshot, previewSession)` — constructs the typed `SNAPSHOT` envelope sent from the admin to the iframe

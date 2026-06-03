@@ -1,4 +1,5 @@
 import { getInsertableModuleDescriptors } from './module-descriptors.js';
+import { BUILDER_STRUCTURAL_COMMANDS } from './structural-commands.js';
 import { escapeHtml } from './helpers.js';
 
 const INSERTABLE_MODULE_TYPES = getInsertableModuleDescriptors();
@@ -89,7 +90,9 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
 
       item.addEventListener('dragstart', (event) => {
         draggedSidebarPageId = item.dataset.pageId;
-        event.dataTransfer.effectAllowed = 'move';
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed = 'move';
+        }
         item.style.opacity = '0.5';
       });
 
@@ -183,8 +186,30 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
     el.pbModulePalette.querySelectorAll('.pb-module-type').forEach((item) => {
       item.addEventListener('dragstart', (event) => {
         actions.setDraggedModuleId(null);
-        event.dataTransfer.setData('text/plain', item.dataset.moduleType);
-        event.dataTransfer.effectAllowed = 'copy';
+        const result = actions.runStructuralCommand?.(BUILDER_STRUCTURAL_COMMANDS.DRAG_START, {
+          source: 'block',
+          moduleType: item.dataset.moduleType,
+        });
+        if (result?.ok === false) {
+          event.preventDefault();
+          return;
+        }
+        if (event.dataTransfer) {
+          event.dataTransfer.setData('text/plain', item.dataset.moduleType);
+          event.dataTransfer.setData('application/x-bw-builder-block', item.dataset.moduleType);
+          event.dataTransfer.effectAllowed = 'copy';
+        }
+      });
+      item.addEventListener('dragend', () => {
+        actions.runStructuralCommand?.(BUILDER_STRUCTURAL_COMMANDS.DRAG_END);
+      });
+      item.addEventListener('click', async () => {
+        const { activeInsertTarget } = getState();
+        if (!activeInsertTarget) return;
+        await actions.runStructuralCommand?.(BUILDER_STRUCTURAL_COMMANDS.INSERT, {
+          moduleType: item.dataset.moduleType,
+          placement: activeInsertTarget,
+        });
       });
     });
   }
@@ -216,15 +241,27 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
                   ? modules
                       .map(
                         (module) => `
-                          <button
-                            type="button"
-                            class="pb-layer-item pb-layer-item--module ${selectedModuleId === module.id ? 'active' : ''}"
-                            data-layer-action="select-module"
-                            data-module-id="${escapeHtml(module.id || '')}"
-                          >
-                            <span class="pb-layer-item-label">${escapeHtml(helpers.getModuleLabel(module.moduleType))}</span>
-                            <span class="pb-layer-item-meta">Module</span>
-                          </button>
+                          <div class="pb-layer-row pb-layer-row--module">
+                            <button
+                              type="button"
+                              class="pb-layer-item pb-layer-item--module ${selectedModuleId === module.id ? 'active' : ''}"
+                              data-layer-action="select-module"
+                              data-layer-drag-source="module"
+                              data-module-id="${escapeHtml(module.id || '')}"
+                              draggable="true"
+                            >
+                              <span class="pb-layer-item-label">${escapeHtml(helpers.getModuleLabel(module.moduleType))}</span>
+                              <span class="pb-layer-item-meta">Module</span>
+                            </button>
+                            <button
+                              type="button"
+                              class="pb-layer-row-action"
+                              data-layer-action="delete-module"
+                              data-module-id="${escapeHtml(module.id || '')}"
+                            >
+                              Delete
+                            </button>
+                          </div>
                         `
                       )
                       .join('')
@@ -248,15 +285,27 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
               .join('');
             return `
               <div class="pb-layer-section">
-                <button
-                  type="button"
-                  class="pb-layer-item pb-layer-item--section ${selectedCanvasSurface === 'section' && activeSectionId === section.id ? 'active' : ''}"
-                  data-layer-action="select-section"
-                  data-section-id="${escapeHtml(section.id || '')}"
-                >
-                  <span class="pb-layer-item-label">Section ${sectionIndex + 1}</span>
-                  <span class="pb-layer-item-meta">${escapeHtml(section.layout || '1')}</span>
-                </button>
+                <div class="pb-layer-row pb-layer-row--section">
+                  <button
+                    type="button"
+                    class="pb-layer-item pb-layer-item--section ${selectedCanvasSurface === 'section' && activeSectionId === section.id ? 'active' : ''}"
+                    data-layer-action="select-section"
+                    data-layer-drag-source="section"
+                    data-section-id="${escapeHtml(section.id || '')}"
+                    draggable="true"
+                  >
+                    <span class="pb-layer-item-label">Section ${sectionIndex + 1}</span>
+                    <span class="pb-layer-item-meta">${escapeHtml(section.layout || '1')}</span>
+                  </button>
+                  <button
+                    type="button"
+                    class="pb-layer-row-action"
+                    data-layer-action="delete-section"
+                    data-section-id="${escapeHtml(section.id || '')}"
+                  >
+                    Delete
+                  </button>
+                </div>
                 <div class="pb-layer-columns">${columnsHtml}</div>
               </div>
             `;
@@ -309,6 +358,46 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
     el.pbLayerTree.querySelectorAll('[data-layer-action="select-column"]').forEach((item) =>
       item.addEventListener('click', () => {
         actions.selectColumn(item.dataset.sectionId, Number(item.dataset.columnIndex) || 0);
+      })
+    );
+    el.pbLayerTree.querySelectorAll('[data-layer-drag-source]').forEach((item) => {
+      item.addEventListener('dragstart', (event) => {
+        const source = item.dataset.layerDragSource;
+        const payload =
+          source === 'section'
+            ? { source, sectionId: item.dataset.sectionId }
+            : { source, moduleId: item.dataset.moduleId };
+        const result = actions.runStructuralCommand?.(
+          BUILDER_STRUCTURAL_COMMANDS.DRAG_START,
+          payload
+        );
+        if (result?.ok === false) {
+          event.preventDefault();
+          return;
+        }
+        if (event.dataTransfer) {
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', item.dataset.moduleId || item.dataset.sectionId);
+        }
+      });
+      item.addEventListener('dragend', () => {
+        actions.runStructuralCommand?.(BUILDER_STRUCTURAL_COMMANDS.DRAG_END);
+      });
+    });
+    el.pbLayerTree.querySelectorAll('[data-layer-action="delete-module"]').forEach((item) =>
+      item.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        await actions.runStructuralCommand?.(BUILDER_STRUCTURAL_COMMANDS.DELETE_SELECTED, {
+          target: { kind: 'module', moduleId: item.dataset.moduleId },
+        });
+      })
+    );
+    el.pbLayerTree.querySelectorAll('[data-layer-action="delete-section"]').forEach((item) =>
+      item.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        await actions.runStructuralCommand?.(BUILDER_STRUCTURAL_COMMANDS.DELETE_SELECTED, {
+          target: { kind: 'section', sectionId: item.dataset.sectionId },
+        });
       })
     );
   }

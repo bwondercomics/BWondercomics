@@ -1,8 +1,8 @@
 # Full-Page Live Builder Plan, Part 2 of 2
 
-Status: Planned - not started
-Plan state: Continuation of [Part 1](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md). No phase in this
-plan should be treated as implemented until future completion notes say so explicitly.
+Status: In progress - Phase 6 implemented; Phases 7-12 planned
+Plan state: Continuation of [Part 1](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md). Phases without
+completion notes should be treated as planned future work.
 Scope of this file: Phases 6-12, risks, guardrails, and suggested implementation order.
 Start here only after reading Part 1, because these phases depend on the shell, iframe canvas,
 target marker, overlay, device, and side-panel contracts defined there.
@@ -20,7 +20,7 @@ Part 1 contains:
 - [Product Direction](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md#product-direction)
 - [Trusted References](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md#trusted-references)
 - [Reference Conclusions](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md#reference-conclusions)
-- [Target Experience](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md#target-experience)
+- [Target Experience](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md#target-experience-and-current-state)
 - [Page and Module Model Direction](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md#page-and-module-model-direction)
 - [Phase 1 - Full-Page Builder Shell](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md#phase-1---full-page-builder-shell)
 - [Phase 2 - Live Canvas as the Editor](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md#phase-2---live-canvas-as-the-editor)
@@ -43,8 +43,8 @@ Part 2 contains:
 ## Developer and LLM Notes
 
 - Treat both files as one plan. Do not implement Part 2 in isolation from the Part 1 contracts.
-- Treat every phase as future work. The release gate in Phase 12 is a planned verification order,
-  not evidence that the feature has already passed those checks.
+- Treat phases without completion notes as future work. The release gate in Phase 12 is a planned
+  verification order, not evidence that the feature has already passed those checks.
 - Phase dependencies are cumulative. If earlier phases change during implementation, revisit later
   phases before coding against stale assumptions.
 - Preserve custom CMS behavior while generalizing pages. Reader, feed, entry picker, media gallery,
@@ -177,6 +177,47 @@ Assumptions:
 - Phase 6 does not implement freeform absolute positioning, arbitrary DOM dragging, per-device
   module order, or broad undo/redo.
 - Browser DOM order is never accepted as canonical saved state.
+
+Completion note (`2026-06-03`): Phase 6 is implemented as a corrective live-canvas structural pass
+on top of the completed Part 1 contracts. The builder now owns a small internal structural command
+adapter for live drag/drop, insert, move, section insertion/reorder, delete, current-device hide,
+and disabled duplicate actions. Blocks and layer rows can start live drags; the selected-target
+toolbar exposes Settings, Move, Insert, Hide on Current Device, Delete, and disabled Duplicate
+where applicable. The admin overlay becomes the drop surface only while a live drag is active,
+ranks Phase 3 target geometry through `live-drop-placement.js`, renders one active drop guide, and
+translates accepted placements into existing `canvas-mutations.js` section/module mutation flows.
+Page-end and section-edge module drops create a new one-column section before inserting or moving
+the module into column `0`. Structure Debug remains available, but its insert/move/delete actions
+now route through the same command adapter.
+
+Phase 6 deliberately did not add backend schema changes, public reader behavior changes, saved
+record contract changes, preview message contract changes, freeform DOM positioning, per-device
+module order, or a Phase 10 undo/command registry. Duplicate remains visible but disabled until a
+real duplicate mutation exists.
+
+Corrective patch note (`2026-06-03`): The Phase 6 audit follow-up tightened structural mutation
+success reporting so failed module/section reorder calls no longer select targets or show success,
+added admin-overlay fallback geometry so page-end/no-target drops render a visible drop guide, and
+expanded shell coverage for failed reorder paths, page-end guides, toolbar Delete, and disabled
+Duplicate.
+
+Verification refreshed for this phase:
+
+- `node --check admin/page-builder/live-drop-placement.js`
+- `node --check admin/page-builder/structural-commands.js`
+- `node --check admin/page-builder/preview-manager.js`
+- `node --check admin/page-builder.js`
+- `node --check admin/page-builder/sidebar-panel.js`
+- `node --check admin/page-builder/canvas-mutations.js`
+- `node --check tests/live-drop-placement.test.js`
+- `node --check tests/admin-page-builder-shell.test.js`
+- `npm test -- tests/live-drop-placement.test.js tests/admin-page-builder-shell.test.js`
+- `npm test -- tests/live-drop-placement.test.js tests/admin-page-builder-shell.test.js tests/module-descriptors.test.js tests/responsive-overrides.test.js tests/admin-page-builder-preview-contract.test.js`
+- `npm test`
+- `npm run test:backend`
+- `npm run build`
+- `npm run test:visual`
+- `git diff --check`
 
 ## Phase 7 - Preview Chrome Collapse
 
