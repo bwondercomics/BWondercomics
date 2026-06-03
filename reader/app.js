@@ -15,6 +15,13 @@ import { prevPage, nextPage, restartEntry, hideEndOfEntry } from './controls.js'
 import { fitToScreen, zoomIn, zoomOut, resetView } from './transform.js';
 import { initPointerHandlers } from './pointer.js';
 import {
+  toggleFullscreen,
+  onFullscreenChange,
+  showControlsBar,
+  handleMouseEnterControls,
+  handleMouseLeaveControls,
+} from './fullscreen.js';
+import {
   toggleShortcutsOverlay,
   closeShortcutsOverlay,
   goToNextEntry,
@@ -23,7 +30,6 @@ import {
 
 // Code splitting: lazy load heavier modules on demand.
 let galleryModule = null;
-let fullscreenModule = null;
 let previewBridgeModule = null;
 
 async function loadGalleryModule() {
@@ -31,13 +37,6 @@ async function loadGalleryModule() {
     galleryModule = await import('./gallery.js');
   }
   return galleryModule;
-}
-
-async function loadFullscreenModule() {
-  if (!fullscreenModule) {
-    fullscreenModule = await import('./fullscreen.js');
-  }
-  return fullscreenModule;
 }
 
 async function loadPreviewBridgeModule() {
@@ -56,31 +55,6 @@ async function renderGallery(...args) {
 async function attachGalleryButton() {
   const mod = await loadGalleryModule();
   return mod.attachGalleryButton();
-}
-
-async function toggleFullscreen() {
-  const mod = await loadFullscreenModule();
-  return mod.toggleFullscreen();
-}
-
-async function onFullscreenChange(...args) {
-  const mod = await loadFullscreenModule();
-  return mod.onFullscreenChange(...args);
-}
-
-async function showControlsBar() {
-  const mod = await loadFullscreenModule();
-  return mod.showControlsBar();
-}
-
-async function handleMouseEnterControls() {
-  const mod = await loadFullscreenModule();
-  return mod.handleMouseEnterControls();
-}
-
-async function handleMouseLeaveControls() {
-  const mod = await loadFullscreenModule();
-  return mod.handleMouseLeaveControls();
 }
 
 function emitPreviewMetrics(reason) {

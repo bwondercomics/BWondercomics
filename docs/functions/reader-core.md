@@ -79,7 +79,7 @@ The reader is split into three layers:
 
 ## 🔌 Main Entry Point (app.js)
 
-The composition root. Loads runtime data, applies premium gating, initializes DOM bindings, coordinates boot-state handoff, lazy-loads `gallery.js`, `fullscreen.js`, and the preview bridge, and reacts to session changes. In builder preview mode (`?builderPreview=1`) the normal data-fetch path is bypassed; the reader instead waits for a validated snapshot from the admin frame via `preview-bridge.js`. A `previewMode` flag propagates through `init(...)` and `attachEventHandlers(...)` to suppress fullscreen, mouse-edge controls, topbar hover handlers, navigation links, store-entry redirects, and analytics initialization. Preview mode also emits responsive metrics after snapshot application and after the debounced resize `render()` path completes.
+The composition root. Loads runtime data, applies premium gating, initializes DOM bindings, coordinates boot-state handoff, statically imports fullscreen controls, lazy-loads `gallery.js` and the preview bridge, and reacts to session changes. In builder preview mode (`?builderPreview=1`) the normal data-fetch path is bypassed; the reader instead waits for a validated snapshot from the admin frame via `preview-bridge.js`. A `previewMode` flag propagates through `init(...)` and `attachEventHandlers(...)` to suppress fullscreen, mouse-edge controls, topbar hover handlers, navigation links, store-entry redirects, and analytics initialization. Preview mode also emits responsive metrics after snapshot application and after the debounced resize `render()` path completes.
 
 ## 💾 Data Hydration (data.js)
 
