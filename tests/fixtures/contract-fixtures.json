@@ -401,6 +401,25 @@
         }
       }
     },
+    "media-gallery": {
+      "id": "fffffff1-ffff-4fff-8fff-ffffffffff10",
+      "moduleType": "media-gallery",
+      "columnIndex": 0,
+      "sortIndex": 9,
+      "config": {
+        "source": {
+          "mode": "site",
+          "filters": {
+            "access": "all"
+          },
+          "sort": "path"
+        },
+        "columns": 3,
+        "limit": 12,
+        "showCaptions": true,
+        "includePremium": true
+      }
+    },
     "html": {
       "id": "fffffff1-ffff-4fff-8fff-ffffffffff0f",
       "moduleType": "html",

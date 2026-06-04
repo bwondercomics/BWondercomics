@@ -67,6 +67,9 @@ describe('reader page renderer', () => {
       feed: (wrapper) => {
         expect(wrapper.querySelector('.pb-feed-module')?.dataset.feedLimit).toBe('3');
       },
+      'media-gallery': (wrapper) => {
+        expect(wrapper.querySelector('.pb-media-gallery-mount')?.dataset.limit).toBe('12');
+      },
       html: (wrapper) => {
         expect(wrapper.querySelector('.custom-widget')?.textContent).toBe('Builder HTML');
       },
@@ -268,6 +271,34 @@ describe('reader page renderer', () => {
     expect(social.querySelector('.pb-social-btn')?.getAttribute('href')).toBe('#');
     expect(feed.querySelector('.pb-feed-link')?.getAttribute('href')).toBe('feed.html');
     expect(feed.querySelector('.pb-feed-media')?.getAttribute('href')).toBe('media.html');
+  });
+
+  it('renders CMS source metadata for special modules', () => {
+    const reader = parseModuleHtml(
+      renderModule({
+        moduleType: 'reader',
+        config: { source: { mode: 'specific-series', seriesId: 'battle-bros' } },
+      })
+    );
+    const entryGallery = parseModuleHtml(
+      renderModule({
+        moduleType: 'entry-gallery',
+        config: { source: { mode: 'all-series', filters: { access: 'public' } } },
+      })
+    );
+    const mediaGallery = parseModuleHtml(
+      renderModule({
+        moduleType: 'media-gallery',
+        config: { source: { mode: 'site', filters: { access: 'all' } } },
+      })
+    );
+
+    expect(reader.querySelector('.pb-reader-mount')?.dataset.sourceMode).toBe('specific-series');
+    expect(reader.querySelector('.pb-reader-mount')?.dataset.sourceSeriesId).toBe('battle-bros');
+    expect(entryGallery.querySelector('.pb-entry-gallery-mount')?.dataset.sourceMode).toBe(
+      'all-series'
+    );
+    expect(mediaGallery.querySelector('.pb-media-gallery-mount')?.dataset.sourceMode).toBe('site');
   });
 
   it('renders page sections with current layout and spacing styles', () => {

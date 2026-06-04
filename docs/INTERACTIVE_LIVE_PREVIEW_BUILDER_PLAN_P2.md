@@ -519,6 +519,8 @@ Implementation:
   - choose a specific series
   - all series where allowed
   - filter by entry label, status, tag, date, or access where supported
+- For Phase 9, keep feed and media-gallery site-wide over the existing post/media data until a
+  future content ownership phase adds series assignment.
 - Ensure modules continue to use existing entry-management and media-access systems.
 - Add page templates that create dedicated pages around these modules:
   - reader page template
@@ -570,9 +572,10 @@ Important interface/type changes:
   `specific-series`, or `all-series`.
 - Define allowed modes per module:
   - `reader`: active page series or specific series; all-series is not valid.
-  - `feed`: active page series, specific series, or all-series where public feed permissions allow.
+  - `feed`: site-wide only over existing post/feed data in Phase 9.
   - `entry-gallery`: active page series, specific series, or all-series where entry filters allow.
-  - `media-gallery`: active page series, specific series, or all media where media access allows.
+  - `media-gallery`: site-wide only over existing `/media.json` data in Phase 9, with private
+    media filtered from public output.
 - Extend backend sanitizers and frontend normalizers so unsupported source/filter fields are dropped
   per module.
 - Add template definitions that create normal pages with sections and modules. Templates do not
@@ -619,6 +622,36 @@ Assumptions:
   records.
 - Templates are authoring conveniences only and must not create separate rendering paths.
 - Entry/media access checks remain owned by the existing CMS systems.
+
+Completion note (`2026-06-04`): Phase 9 is implemented with descriptor-backed `reader`, `feed`,
+`entry-gallery`, and `media-gallery` modules. CMS modules now persist a sanitized optional
+`config.source` branch; legacy configs remain valid and normalize on read/save. Reader modules
+support active-page-series or specific-series sources and the reader shell resolves that source
+before initializing visible entry state. Entry-gallery supports active/specific/all series source
+modes, and feed/media-gallery remain site-wide over existing `/api/posts` and `/media.json` data.
+The new `media-gallery` module renders through shared builder/reader markup and reader-side mount
+code that filters private media and preserves protected media URLs. Add Page now offers Blank,
+Reader, Feed, Media Gallery, and Entry Gallery templates that create normal page, section, and
+module records; the Reader template is series-only and auto-binds the series reader role only when
+no reader binding exists. No backend schema, public route, or GrapesJS dependency was added.
+
+Corrective note (`2026-06-04`): Phase 9 audit fixes made Entry Gallery template modules render
+through the live reader shell, tightened reader module source authoring and backend normalization so
+series pages always use their own series while global reader pages use a selected series, and
+refreshed live preview snapshot handling so reader source changes reload entry data before the
+snapshot is applied. No schema, saved record shape, public route, or preview message contract
+changed.
+
+Verification (`2026-06-04`): `node --check` on touched admin/reader/test JS passed;
+`python3 -m py_compile backend/app/page_store.py backend/app/builder_security.py
+backend/tests/test_page_builder_routes.py` passed; targeted frontend suites passed
+(`tests/reader-data-builder.test.js`, `tests/reader-app.test.js`,
+`tests/admin-page-builder-preview.test.js`, `tests/admin-page-builder-shell.test.js`,
+`tests/reader-cms-modules.test.js`, `tests/reader-page-renderer.test.js`);
+`./.venv/bin/python -m unittest backend.tests.test_page_builder_routes -v` passed; `npm run
+format:check` passed; `npm test` passed (`49` files, `411` passed, `1` skipped); `npm run
+test:backend` passed (`71` tests); `npm run build` passed; `npm run test:visual` passed (`3`
+tests); `git diff --check` passed.
 
 ## Phase 10 - Command, Keymap, and Undo Foundation
 

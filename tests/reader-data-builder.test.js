@@ -6,6 +6,7 @@ import {
   extractSubtitlesFromBuilderPage,
   loadHomepageBuilderPage,
   loadPageConfigWithFallback,
+  resolveBuilderPageReaderSeriesId,
 } from '../reader/data.js';
 import { resolvePageHeaderState } from '../admin/page-builder/header-config.js';
 import { buildContractFixture, getContractFixture } from './helpers/contracts.js';
@@ -95,6 +96,40 @@ describe('reader builder presentation loading', () => {
       'Lunch Break Justice',
     ]);
     expect(console.log).not.toHaveBeenCalled();
+  });
+
+  it('resolves reader module source by page scope without allowing all-series readers', () => {
+    const page = buildContractFixture('builderPage', {
+      seriesId: 'battle-bros',
+      sections: [
+        {
+          id: 'reader-section',
+          layout: '1',
+          modules: [
+            {
+              id: 'reader-module',
+              moduleType: 'reader',
+              columnIndex: 0,
+              sortIndex: 0,
+              config: { source: { mode: 'specific-series', seriesId: 'other-series' } },
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(resolveBuilderPageReaderSeriesId(page, 'battle-bros')).toBe('battle-bros');
+    page.sections[0].modules[0].config.source = { mode: 'all-series', seriesId: 'bad-series' };
+    expect(resolveBuilderPageReaderSeriesId(page, 'battle-bros')).toBe('battle-bros');
+    page.sections[0].modules[0].config.source = { mode: 'active-page-series' };
+    expect(resolveBuilderPageReaderSeriesId(page, 'fallback-series')).toBe('battle-bros');
+    page.scope = 'global';
+    page.seriesId = null;
+    page.sections[0].modules[0].config.source = {
+      mode: 'specific-series',
+      seriesId: 'other-series',
+    };
+    expect(resolveBuilderPageReaderSeriesId(page, 'battle-bros')).toBe('other-series');
   });
 
   it('loads a published custom builder page by slug without falling back to legacy config', async () => {
@@ -358,6 +393,51 @@ describe('reader builder presentation loading', () => {
     expect(leftBuilder?.querySelector('.pb-module--promo')).not.toBeNull();
     expect(rightBuilder?.querySelector('.pb-module--feed')).not.toBeNull();
     expect(rightBuilder?.querySelector('.latest-name')?.textContent).toBe('Issue 10 Released');
+  });
+
+  it('renders entry-gallery modules through the reader shell panel stack', async () => {
+    const entryGallery = getContractFixture('builderModules')['entry-gallery'];
+    const builderPage = buildContractFixture('builderPage', {
+      sections: [
+        {
+          id: 'entry-gallery-section',
+          sectionType: 'row',
+          layout: '1',
+          sortIndex: 0,
+          settings: {},
+          modules: [
+            {
+              ...entryGallery,
+              config: {
+                ...entryGallery.config,
+                source: { mode: 'active-page-series' },
+                showLabels: true,
+              },
+            },
+          ],
+        },
+      ],
+    });
+    const fetchMock = vi.fn(async (url) => {
+      if (url === 'data.json') {
+        return jsonResponse({
+          entries: { Issue: ['media/issue.jpg'] },
+          entryMeta: { Issue: { displayNumber: 1, showInGallery: true } },
+          unitLabelSingular: 'Issue',
+        });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    applyBuilderPageToDOM(builderPage, { seriesId: 'battle-bros' });
+    await flushReaderUi(4);
+
+    const leftBuilder = document.querySelector('#leftPanel .panel-builder--left');
+    expect(leftBuilder?.querySelector('.pb-module--entry-gallery')).not.toBeNull();
+    expect(leftBuilder?.querySelector('.pb-entry-gallery-item')?.textContent).toContain(
+      'Issue 1 - Issue'
+    );
   });
 
   it('mounts the reader shell contract used by preview and runtime page application', () => {

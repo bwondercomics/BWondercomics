@@ -70,8 +70,9 @@ Current page-level fields include: `scope` (`series` or `global`), nullable `ser
 Current page-level `meta` ownership: `meta.header`, `meta.theme`, `meta.panelBackgrounds`, and `meta.panelSpacing`.
 
 Series route roles are stored in `BuilderPageBinding`; Phase 8 requires the `reader` role for each
-series, and reader bindings must point at a same-series page. `feed`/`gallery` roles are reserved
-for later CMS module work.
+series, and reader bindings must point at a same-series page. Feed and media/gallery pages are now
+normal builder pages composed from CMS modules, while `feed`/`gallery` binding roles remain reserved
+for later routing work.
 
 ### Section
 
@@ -79,7 +80,9 @@ Sections currently own: `layout`, `sortIndex`, and `settings`.
 
 ### Module
 
-Modules currently own: `moduleType`, `columnIndex`, `sortIndex`, and `config`.
+Modules currently own: `moduleType`, `columnIndex`, `sortIndex`, and `config`. CMS-backed modules
+may include a sanitized optional `config.source` branch with `{ mode, seriesId?, filters?, limit?,
+sort? }`.
 
 ## ⚙️ Current Builder Flow
 
@@ -595,7 +598,20 @@ A shared utility library for manipulating and normalizing links across the build
 ## 📖 Current Module Catalog
 
 The builder currently recognizes these module types:
-`header`, `text`, `image`, `gallery`, `video`, `social`, `email-signup`, `promo`, `buttons`, `spacer`, `divider`, `reader`, `entry-gallery`, `feed`, `html`.
+`header`, `text`, `image`, `gallery`, `video`, `social`, `email-signup`, `promo`, `buttons`, `spacer`, `divider`, `reader`, `entry-gallery`, `feed`, `media-gallery`, `html`.
+
+CMS-backed modules:
+
+- `reader`: comic reader mount; source can be the active page series or a specific series.
+- `entry-gallery`: entry thumbnail grid; source can be active page series, a specific series, or all
+  public series data.
+- `feed`: site-wide post/feed module using existing `/api/posts` behavior.
+- `media-gallery`: site-wide media-library grid using `/media.json`; private media is filtered out
+  client-side and protected media URLs keep the existing protected access route.
+
+The Add Page modal provides Blank, Reader, Feed, Media Gallery, and Entry Gallery templates. These
+templates create ordinary page, section, and module records; the Reader template is series-only and
+only assigns the reader binding when the active series does not already have one.
 
 Again: `header` is compatibility-only in the catalog and is not part of the normal insertable palette.
 

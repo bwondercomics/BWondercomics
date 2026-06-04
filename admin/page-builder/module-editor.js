@@ -18,6 +18,7 @@ import { renderInspectorSection } from './inspector-sections.js';
 import {
   getModuleDescriptor,
   getModuleEditorKind,
+  getModuleSourceModes,
   getModuleStyleSectors,
 } from './module-descriptors.js';
 import {
@@ -29,6 +30,83 @@ import {
 } from './responsive-overrides.js';
 function cloneConfig(config = {}) {
   return JSON.parse(JSON.stringify(config || {}));
+}
+
+const SOURCE_MODE_LABELS = Object.freeze({
+  'active-page-series': 'Active Page Series',
+  'specific-series': 'Specific Series',
+  'all-series': 'All Series',
+  site: 'Site-wide',
+});
+
+function normalizeSourceMode(moduleType, source = {}, pageScope = 'series') {
+  const modes = getEffectiveSourceModes(moduleType, pageScope);
+  if (!modes.length) return '';
+  const requested = String(source?.mode || '').trim();
+  if (modes.includes(requested)) return requested;
+  if (moduleType === 'reader' && pageScope === 'global' && modes.includes('specific-series')) {
+    return 'specific-series';
+  }
+  if (
+    moduleType === 'entry-gallery' &&
+    pageScope === 'global' &&
+    modes.includes('specific-series')
+  ) {
+    return 'specific-series';
+  }
+  if (modes.includes('active-page-series') && pageScope !== 'global') return 'active-page-series';
+  return modes[0];
+}
+
+function getEffectiveSourceModes(moduleType, pageScope = 'series') {
+  const modes = getModuleSourceModes(moduleType);
+  if (moduleType === 'reader') {
+    return modes.filter((mode) =>
+      pageScope === 'global' ? mode === 'specific-series' : mode === 'active-page-series'
+    );
+  }
+  return modes.filter((mode) => {
+    if (mode === 'active-page-series' && pageScope === 'global') return false;
+    return true;
+  });
+}
+
+function normalizeSourceConfig(moduleType, config = {}, currentPage = null) {
+  const pageScope = currentPage?.scope === 'global' ? 'global' : 'series';
+  const source = config?.source && typeof config.source === 'object' ? config.source : {};
+  const mode = normalizeSourceMode(moduleType, source, pageScope);
+  if (!mode) return {};
+  const nextSource = {
+    ...cloneConfig(source),
+    mode,
+  };
+  if (mode === 'specific-series') {
+    nextSource.seriesId =
+      String(nextSource.seriesId || currentPage?.seriesId || '').trim() ||
+      (pageScope === 'global' ? '' : String(currentPage?.seriesId || '').trim());
+  } else {
+    delete nextSource.seriesId;
+  }
+  if (moduleType === 'feed') {
+    nextSource.mode = 'site';
+    delete nextSource.seriesId;
+  }
+  if (moduleType === 'media-gallery') {
+    nextSource.mode = 'site';
+    delete nextSource.seriesId;
+  }
+  return nextSource;
+}
+
+function getKnownSeriesIds(currentPage = null, pages = []) {
+  const ids = new Set();
+  const collect = (page) => {
+    const id = String(page?.seriesId || '').trim();
+    if (id) ids.add(id);
+  };
+  collect(currentPage);
+  (pages || []).forEach(collect);
+  return [...ids].sort();
 }
 
 function findSelectedModule(currentPage, selectedModuleId) {
@@ -118,6 +196,30 @@ function collectGenericModuleDraft(root, baseConfig = {}, options = {}) {
     }
   });
 
+  const sourceFields = Array.from(root.querySelectorAll('[data-source-key]'));
+  if (sourceFields.length > 0 && responsiveEditScope !== 'device') {
+    const source = cloneConfig(nextConfig.source || {});
+    sourceFields.forEach((input) => {
+      const key = input.dataset.sourceKey;
+      if (!key) return;
+      if (input.type === 'checkbox') {
+        source[key] = input.checked;
+      } else if (input.type === 'number') {
+        source[key] = parseInt(input.value, 10) || 0;
+      } else {
+        source[key] = input.value;
+      }
+    });
+    if (source.mode !== 'specific-series') {
+      delete source.seriesId;
+    }
+    nextConfig.source = normalizeSourceConfig(
+      moduleType,
+      { ...nextConfig, source },
+      options.currentPage || null
+    );
+  }
+
   const styleFields = root.querySelectorAll('[data-style-key]');
   if (styleFields.length > 0 && responsiveEditScope !== 'device') {
     nextConfig.style = nextConfig.style || {};
@@ -135,6 +237,58 @@ function collectGenericModuleDraft(root, baseConfig = {}, options = {}) {
   }
 
   return nextConfig;
+}
+
+function renderCmsSourceCard(moduleType, config = {}, currentPage = null, pages = []) {
+  const pageScope = currentPage?.scope === 'global' ? 'global' : 'series';
+  const modes = getEffectiveSourceModes(moduleType, pageScope);
+  if (!modes.length) return '';
+  const source = normalizeSourceConfig(moduleType, config, currentPage);
+  const modeOptions = modes
+    .map(
+      (mode) =>
+        `<option value="${escapeAttr(mode)}" ${source.mode === mode ? 'selected' : ''}>${escapeHtml(SOURCE_MODE_LABELS[mode] || mode)}</option>`
+    )
+    .join('');
+  const knownSeriesIds = getKnownSeriesIds(currentPage, pages);
+  const seriesOptions = knownSeriesIds
+    .map(
+      (id) =>
+        `<option value="${escapeAttr(id)}" ${source.seriesId === id ? 'selected' : ''}>${escapeHtml(id)}</option>`
+    )
+    .join('');
+  const seriesControl =
+    source.mode === 'specific-series'
+      ? knownSeriesIds.length
+        ? `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Series</label>
+        <select class="pb-editor-select" data-source-key="seriesId">
+          ${seriesOptions}
+        </select>
+      </div>
+    `
+        : `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Series ID</label>
+        <input type="text" class="pb-editor-input" data-source-key="seriesId" value="${escapeAttr(source.seriesId || '')}">
+      </div>
+    `
+      : '';
+  return renderSectionCard(
+    'Source',
+    'Content Source',
+    SOURCE_MODE_LABELS[source.mode] || source.mode,
+    `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Source</label>
+        <select class="pb-editor-select" data-source-key="mode" ${modes.length <= 1 ? 'disabled' : ''}>
+          ${modeOptions}
+        </select>
+      </div>
+      ${seriesControl}
+    `
+  );
 }
 
 function renderTextAlignmentCard(config = {}) {
@@ -182,6 +336,21 @@ function renderDeviceModuleOverrideSections(moduleType, config, pages) {
   }
   if (moduleType === 'entry-gallery' && responsiveFields.includes('columns')) {
     return [renderEntryGalleryEditor(config, { deviceOnly: true })];
+  }
+  if (moduleType === 'media-gallery' && responsiveFields.includes('columns')) {
+    return [
+      renderSectionCard(
+        'Appearance',
+        'Media Gallery Settings',
+        'Configure the grid columns for this device.',
+        `
+        <div class="pb-editor-field">
+          <label class="pb-editor-label">Columns</label>
+          <input type="number" class="pb-editor-input" data-key="columns" min="1" max="6" value="${config.columns || 3}">
+        </div>
+      `
+      ),
+    ];
   }
   if (moduleType === 'buttons' && responsiveFields.includes('defaults')) {
     return [renderButtonsEditor(config, pages, { deviceOnly: true })];
@@ -600,28 +769,37 @@ function bindSocialDraftEvents({
 
 function bindGenericModuleDraftEvents({
   el,
+  currentPage,
   selectedModule,
   draftConfig,
   setDraftConfig,
   markDirty,
   activeDeviceId,
   responsiveEditScope,
+  renderEditorPanel,
 }) {
-  const syncDraft = () => {
+  const syncDraft = (event = null) => {
     setDraftConfig(
       collectGenericModuleDraft(el.pbModuleEditor, draftConfig || selectedModule.config || {}, {
         activeDeviceId,
+        currentPage,
         moduleType: selectedModule.moduleType,
         responsiveEditScope,
       })
     );
     markDirty('module');
+    if (event?.target?.dataset?.sourceKey === 'mode') {
+      renderEditorPanel?.();
+    }
   };
 
-  el.pbModuleEditor.querySelectorAll('[data-key], [data-style-key]').forEach((input) => {
-    const eventName = input.type === 'checkbox' || input.tagName === 'SELECT' ? 'change' : 'input';
-    input.addEventListener(eventName, syncDraft);
-  });
+  el.pbModuleEditor
+    .querySelectorAll('[data-key], [data-style-key], [data-source-key]')
+    .forEach((input) => {
+      const eventName =
+        input.type === 'checkbox' || input.tagName === 'SELECT' ? 'change' : 'input';
+      input.addEventListener(eventName, syncDraft);
+    });
 }
 
 function renderEmailSignupStyleSection(emailStyle = {}) {
@@ -897,6 +1075,7 @@ export function renderModuleEditorContent({
     }
 
     case 'reader':
+      contentSections.push(renderCmsSourceCard(moduleType, config, currentPage, pages));
       contentSections.push(
         renderSectionCard(
           'Behavior',
@@ -931,6 +1110,7 @@ export function renderModuleEditorContent({
       break;
 
     case 'feed': {
+      contentSections.push(renderCmsSourceCard(moduleType, config, currentPage, pages));
       contentSections.push(
         renderSectionCard(
           'Content',
@@ -996,6 +1176,37 @@ export function renderModuleEditorContent({
       break;
     }
 
+    case 'media-gallery':
+      contentSections.push(renderCmsSourceCard(moduleType, config, currentPage, pages));
+      contentSections.push(
+        renderSectionCard(
+          'Content',
+          'Media Gallery Settings',
+          'Display public and premium media-library items from the site media index.',
+          `
+          <div class="pb-editor-field">
+            <label class="pb-editor-label">Columns</label>
+            <input type="number" class="pb-editor-input" data-key="columns" min="1" max="6" value="${config.columns || 3}">
+          </div>
+          <div class="pb-editor-field">
+            <label class="pb-editor-label">Limit</label>
+            <input type="number" class="pb-editor-input" data-key="limit" min="1" max="100" value="${config.limit || 24}">
+          </div>
+          <div class="pb-editor-field">
+            <label class="pb-editor-label">
+              <input type="checkbox" data-key="showCaptions" ${config.showCaptions !== false ? 'checked' : ''}> Show Captions
+            </label>
+          </div>
+          <div class="pb-editor-field">
+            <label class="pb-editor-label">
+              <input type="checkbox" data-key="includePremium" ${config.includePremium !== false ? 'checked' : ''}> Include Premium Items
+            </label>
+          </div>
+        `
+        )
+      );
+      break;
+
     case 'gallery':
       contentSections.push(renderGalleryEditor(config));
       break;
@@ -1009,6 +1220,7 @@ export function renderModuleEditorContent({
       break;
 
     case 'entry-gallery':
+      contentSections.push(renderCmsSourceCard(moduleType, config, currentPage, pages));
       contentSections.push(renderEntryGalleryEditor(config));
       break;
 
@@ -1160,12 +1372,14 @@ export function bindModuleStyleEditorEvents({
   if (getModuleStyleSectors(selectedModule.moduleType).length) {
     bindGenericModuleDraftEvents({
       el,
+      currentPage,
       selectedModule,
       draftConfig,
       setDraftConfig,
       markDirty,
       activeDeviceId,
       responsiveEditScope: 'global',
+      renderEditorPanel,
     });
   }
 }
@@ -1240,12 +1454,14 @@ export function bindModuleEditorEvents({
     if (selectedModule.moduleType === 'text' || selectedModule.moduleType === 'spacer') {
       bindGenericModuleDraftEvents({
         el,
+        currentPage,
         selectedModule,
         draftConfig,
         setDraftConfig,
         markDirty,
         activeDeviceId,
         responsiveEditScope,
+        renderEditorPanel,
       });
     }
     return;
@@ -1319,6 +1535,7 @@ export function bindModuleEditorEvents({
       markDirty,
       activeDeviceId,
       responsiveEditScope,
+      renderEditorPanel,
     });
     return;
   }
@@ -1341,17 +1558,20 @@ export function bindModuleEditorEvents({
       markDirty,
       activeDeviceId,
       responsiveEditScope,
+      renderEditorPanel,
     });
     return;
   }
 
   bindGenericModuleDraftEvents({
     el,
+    currentPage,
     selectedModule,
     draftConfig,
     setDraftConfig,
     markDirty,
     activeDeviceId,
     responsiveEditScope,
+    renderEditorPanel,
   });
 }

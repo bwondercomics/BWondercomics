@@ -11,6 +11,8 @@ import { getActiveSeriesId } from './series.js';
 import { logger } from './logger.js';
 import { createRenderers } from '../admin/page-builder/shared-renderers.js';
 import { escapeHtml } from '../admin/page-builder/helpers.js';
+import { initEntryGalleryModules } from './entry-gallery-module.js';
+import { initMediaGalleryModules } from './media-gallery-module.js';
 
 function resolveReaderImageUrl(raw) {
   if (!raw) return '';
@@ -97,6 +99,8 @@ export async function mountPage(container, slug, seriesId = null, options = {}) 
   // Initialize interactive modules
   initEmailForms(container, { previewMode: !!options.previewMode });
   initPromoCarousels(container);
+  initEntryGalleryModules(container);
+  initMediaGalleryModules(container);
 }
 
 /**

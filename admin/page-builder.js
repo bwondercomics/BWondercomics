@@ -70,6 +70,14 @@ const BUILDER_CHROME_COMMANDS = Object.freeze({
   EXIT_PREVIEW: 'builder:exit-preview',
 });
 
+const PAGE_TEMPLATE_DEFS = Object.freeze({
+  blank: { pageType: 'custom' },
+  reader: { pageType: 'reader', moduleType: 'reader', seriesOnly: true },
+  feed: { pageType: 'feed', moduleType: 'feed' },
+  'media-gallery': { pageType: 'gallery', moduleType: 'media-gallery' },
+  'entry-gallery': { pageType: 'gallery', moduleType: 'entry-gallery' },
+});
+
 function createPageBuilder({
   sanitizeSeriesId,
   getActiveSeriesId,
@@ -302,6 +310,7 @@ function createPageBuilder({
     helpers: {
       getDefaultConfig,
       getModuleLabel,
+      getSeriesId,
       sortSections,
     },
   });
@@ -583,6 +592,62 @@ function createPageBuilder({
 
   function getSeriesId() {
     return sanitizeSeriesId(getActiveSeriesId()) || DEFAULT_SERIES_ID;
+  }
+
+  function getTemplateDefaultConfig(moduleType) {
+    const config = cloneValue(getDefaultConfig(moduleType));
+    if (moduleType === 'reader' || moduleType === 'entry-gallery') {
+      if (activePageScope === 'global') {
+        config.source = {
+          ...(config.source && typeof config.source === 'object' ? config.source : {}),
+          mode: 'specific-series',
+          seriesId: getSeriesId(),
+        };
+      } else {
+        config.source = {
+          ...(config.source && typeof config.source === 'object' ? config.source : {}),
+          mode: 'active-page-series',
+        };
+        delete config.source.seriesId;
+      }
+    }
+    return config;
+  }
+
+  async function applyPageTemplate(page, templateId) {
+    const template = PAGE_TEMPLATE_DEFS[templateId] || PAGE_TEMPLATE_DEFS.blank;
+    if (!page?.id || !template.moduleType) {
+      if (page?.id && template.pageType && template.pageType !== (page.pageType || 'custom')) {
+        await updatePage(page.id, { pageType: template.pageType });
+      }
+      return;
+    }
+    if (template.seriesOnly && activePageScope === 'global') {
+      setEditorStatus('Reader templates can only be created in Series Pages.', 'danger');
+      return;
+    }
+
+    const pageType = template.pageType || page.pageType || 'custom';
+    if (pageType !== (page.pageType || 'custom')) {
+      await updatePage(page.id, { pageType });
+    }
+
+    const section = await addSection(page.id, 'row', '1');
+    if (!section?.id) {
+      setEditorStatus('Page created, but the template section could not be added.', 'danger');
+      return;
+    }
+    await addModule(
+      section.id,
+      template.moduleType,
+      0,
+      getTemplateDefaultConfig(template.moduleType)
+    );
+
+    const readerBinding = pageBindings?.bindings?.reader?.pageId;
+    if (templateId === 'reader' && activePageScope === 'series' && !readerBinding) {
+      await updateReaderBinding(page.id);
+    }
   }
 
   function isDesignerMode() {
@@ -1647,6 +1712,9 @@ function createPageBuilder({
     const addPageTitleInput = /** @type {HTMLInputElement|null} */ (
       document.getElementById('pbPageTitleInput')
     );
+    const addPageTemplateSelect = /** @type {HTMLSelectElement|null} */ (
+      document.getElementById('pbPageTemplateSelect')
+    );
 
     if (addPageSlugInput && addPageTitleInput) {
       addPageSlugInput.addEventListener('input', () => {
@@ -1660,6 +1728,16 @@ function createPageBuilder({
         addPageTitleInput.dataset.manual = 'true';
       });
     }
+
+    const syncAddPageTemplateOptions = () => {
+      const readerOption = addPageTemplateSelect?.querySelector('option[value="reader"]');
+      if (readerOption) {
+        readerOption.disabled = activePageScope === 'global';
+      }
+      if (activePageScope === 'global' && addPageTemplateSelect?.value === 'reader') {
+        addPageTemplateSelect.value = 'blank';
+      }
+    };
 
     const closeAddPageModal = () => {
       if (addPageModal) {
@@ -1679,6 +1757,7 @@ function createPageBuilder({
       if (addPageForm) {
         addPageForm.reset();
         addPageTitleInput?.removeAttribute('data-manual');
+        syncAddPageTemplateOptions();
       }
       if (addPageModal) {
         addPageModal.classList.add('active');
@@ -1690,6 +1769,7 @@ function createPageBuilder({
       e.preventDefault();
       const slug = addPageSlugInput?.value.toLowerCase().trim();
       const title = addPageTitleInput?.value.trim();
+      const templateId = addPageTemplateSelect?.value || 'blank';
       if (!slug || !title) return;
 
       const submitBtn = /** @type {HTMLButtonElement|null} */ (
@@ -1703,6 +1783,7 @@ function createPageBuilder({
       const newPage = await pageActions.createPageForActiveScope(slug, title);
       try {
         if (newPage) {
+          await applyPageTemplate(newPage, templateId);
           closeAddPageModal();
           await pageActions.loadPages();
           await pageActions.activatePage(newPage.id, {

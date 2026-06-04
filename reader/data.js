@@ -9,11 +9,14 @@ import {
   getSeriesPageConfigPath,
   getActiveSeriesId,
   getRequestedPageScope,
+  sanitizeSeriesId,
   sanitizePageSlug,
 } from './series.js';
 import { logger } from './logger.js';
 import { renderModule, initEmailForms, initPromoCarousels } from './page-renderer.js';
 import { initFeedModules } from './feed-panel.js';
+import { initEntryGalleryModules } from './entry-gallery-module.js';
+import { initMediaGalleryModules } from './media-gallery-module.js';
 import { applySharedHeaderLayout } from './header-layout.js';
 import {
   createEffectivePageHeader,
@@ -303,6 +306,32 @@ export function extractSubtitlesFromBuilderPage(page, pageConfig = null) {
   return header?.copy?.subtitle ? [header.copy.subtitle] : [];
 }
 
+export function resolveBuilderPageReaderSeriesId(page, fallbackSeriesId = getActiveSeriesId()) {
+  const fallback = sanitizeSeriesId(fallbackSeriesId) || getActiveSeriesId();
+  if (!page || !Array.isArray(page.sections)) return fallback;
+  const pageScope = page.scope === 'global' ? 'global' : 'series';
+  for (const section of page.sections) {
+    for (const module of section.modules || []) {
+      if (module?.moduleType !== 'reader') continue;
+      const source =
+        module.config?.source && typeof module.config.source === 'object'
+          ? module.config.source
+          : {};
+      if (pageScope !== 'global') {
+        return sanitizeSeriesId(page.seriesId || '') || fallback;
+      }
+      if (source.mode === 'specific-series') {
+        return sanitizeSeriesId(source.seriesId || '') || fallback;
+      }
+      if (source.mode === 'active-page-series') {
+        return sanitizeSeriesId(page.seriesId || '') || fallback;
+      }
+      return fallback;
+    }
+  }
+  return fallback;
+}
+
 /**
  * Apply page-level theme colors from page builder.
  * Sets CSS custom properties on the document root.
@@ -493,6 +522,8 @@ export function applyBuilderPageToDOM(page, options = {}) {
     'spacer',
     'promo',
     'feed',
+    'entry-gallery',
+    'media-gallery',
     'gallery',
     'video',
   ]);
@@ -645,7 +676,9 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
     : modules.map(({ module }) => renderModule(module)).join('');
   initEmailForms(container, { previewMode: !!options.previewMode });
   initPromoCarousels(container);
+  initEntryGalleryModules(container);
   initFeedModules(container);
+  initMediaGalleryModules(container);
 }
 
 /**

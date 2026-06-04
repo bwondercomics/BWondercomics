@@ -24,8 +24,14 @@ ALLOWED_MODULE_TYPES = {
     "reader",
     "entry-gallery",
     "feed",
+    "media-gallery",
     "html",
 }
+
+CMS_SOURCE_ACTIVE_PAGE_SERIES = "active-page-series"
+CMS_SOURCE_SPECIFIC_SERIES = "specific-series"
+CMS_SOURCE_ALL_SERIES = "all-series"
+CMS_SOURCE_SITE = "site"
 
 ALLOWED_LAYOUTS = {"1", "1-1", "1-2", "2-1", "1-1-1", "1-3-1"}
 LAYOUT_COLUMN_COUNTS = {layout: len(layout.split("-")) for layout in ALLOWED_LAYOUTS}
@@ -792,7 +798,7 @@ def sanitize_module_responsive(module_type: str, raw: Any) -> dict[str, Any]:
             alignment = str(branch.get("alignment") or "").strip().lower()
             if alignment in {"left", "center", "right"}:
                 branch_payload["alignment"] = alignment
-        elif module_type in {"gallery", "entry-gallery"}:
+        elif module_type in {"gallery", "entry-gallery", "media-gallery"}:
             if "columns" in branch:
                 branch_payload["columns"] = _clamp_int(branch.get("columns"), 3, 1, 6)
         elif module_type == "spacer":
@@ -949,6 +955,83 @@ def sanitize_feed_style(raw_style: Any) -> dict[str, Any]:
         "borderColor": "#ffed00",
     }
     return {key: sanitize_color(style.get(key), default) for key, default in defaults.items()}
+
+
+def sanitize_cms_source(module_type: str, raw_source: Any) -> dict[str, Any]:
+    source = raw_source if isinstance(raw_source, dict) else {}
+    raw_mode = str(source.get("mode") or "").strip()
+    allowed_modes: set[str]
+    default_mode: str
+    if module_type == "reader":
+        allowed_modes = {CMS_SOURCE_ACTIVE_PAGE_SERIES, CMS_SOURCE_SPECIFIC_SERIES}
+        default_mode = CMS_SOURCE_ACTIVE_PAGE_SERIES
+    elif module_type == "entry-gallery":
+        allowed_modes = {
+            CMS_SOURCE_ACTIVE_PAGE_SERIES,
+            CMS_SOURCE_SPECIFIC_SERIES,
+            CMS_SOURCE_ALL_SERIES,
+        }
+        default_mode = CMS_SOURCE_ACTIVE_PAGE_SERIES
+    elif module_type in {"feed", "media-gallery"}:
+        allowed_modes = {CMS_SOURCE_SITE, CMS_SOURCE_ALL_SERIES}
+        default_mode = CMS_SOURCE_SITE
+    else:
+        allowed_modes = set()
+        default_mode = ""
+
+    mode = raw_mode if raw_mode in allowed_modes else default_mode
+    sanitized: dict[str, Any] = {"mode": mode}
+    if mode == CMS_SOURCE_SPECIFIC_SERIES:
+        series_id = _sanitize_id_like(source.get("seriesId"))
+        if series_id:
+            sanitized["seriesId"] = series_id
+
+    raw_filters = source.get("filters") if isinstance(source.get("filters"), dict) else {}
+    filters: dict[str, Any] = {}
+    if module_type == "entry-gallery":
+        label = _sanitize_id_like(raw_filters.get("labelId") or raw_filters.get("entryLabelId"))
+        if label:
+            filters["labelId"] = label
+        status = str(raw_filters.get("status") or "").strip().lower()
+        if status in {"published", "draft", "scheduled"}:
+            filters["status"] = status
+        access = str(raw_filters.get("access") or "").strip().lower()
+        if access in {"all", "public", "premium"}:
+            filters["access"] = access
+        if "showInGallery" in raw_filters:
+            filters["showInGallery"] = _coerce_bool(raw_filters.get("showInGallery"), True)
+    elif module_type == "media-gallery":
+        access = str(raw_filters.get("access") or "").strip().lower()
+        if access in {"public", "premium", "all"}:
+            filters["access"] = access
+        raw_tags = raw_filters.get("tags")
+        if isinstance(raw_tags, list):
+            tags = [_coerce_string(tag, "", 80) for tag in raw_tags[:12]]
+            tags = [tag for tag in tags if tag]
+            if tags:
+                filters["tags"] = tags
+        elif isinstance(raw_tags, str):
+            tags = [_coerce_string(tag, "", 80) for tag in raw_tags.split(",")[:12]]
+            tags = [tag for tag in tags if tag]
+            if tags:
+                filters["tags"] = tags
+
+    if filters:
+        sanitized["filters"] = filters
+
+    if module_type in {"entry-gallery", "media-gallery"}:
+        sort = str(source.get("sort") or "").strip().lower()
+        allowed_sorts = (
+            {"sort-index", "title", "newest"}
+            if module_type == "entry-gallery"
+            else {"path", "newest"}
+        )
+        if sort in allowed_sorts:
+            sanitized["sort"] = sort
+    if "limit" in source and module_type in {"entry-gallery", "feed", "media-gallery"}:
+        sanitized["limit"] = _clamp_int(source.get("limit"), 24, 1, 200)
+
+    return sanitized
 
 
 def sanitize_promo_item_style(raw_style: Any) -> dict[str, Any]:
@@ -1136,6 +1219,7 @@ def sanitize_module_config(module_type: str, raw_config: Any) -> dict[str, Any]:
     if module_type == "reader":
         return with_responsive(
             {
+                "source": sanitize_cms_source(module_type, config.get("source")),
                 "showPanels": _coerce_bool(config.get("showPanels"), True),
                 "showComments": _coerce_bool(config.get("showComments"), True),
             }
@@ -1144,6 +1228,7 @@ def sanitize_module_config(module_type: str, raw_config: Any) -> dict[str, Any]:
     if module_type == "entry-gallery":
         return with_responsive(
             {
+                "source": sanitize_cms_source(module_type, config.get("source")),
                 "columns": _clamp_int(config.get("columns"), 3, 1, 6),
                 "showLabels": _coerce_bool(config.get("showLabels"), True),
             }
@@ -1152,6 +1237,7 @@ def sanitize_module_config(module_type: str, raw_config: Any) -> dict[str, Any]:
     if module_type == "feed":
         return with_responsive(
             {
+                "source": sanitize_cms_source(module_type, config.get("source")),
                 "limit": _clamp_int(config.get("limit"), 5, 1, 25),
                 "heading": _coerce_string(config.get("heading"), "BWC FEED", 120),
                 "author": _coerce_string(config.get("author"), "", 120),
@@ -1163,6 +1249,17 @@ def sanitize_module_config(module_type: str, raw_config: Any) -> dict[str, Any]:
                 "mediaLabel": _coerce_string(config.get("mediaLabel"), "Media", 120),
                 "mediaHref": sanitize_hyperlink(config.get("mediaHref")) or "media.html",
                 "style": sanitize_feed_style(config.get("style")),
+            }
+        )
+
+    if module_type == "media-gallery":
+        return with_responsive(
+            {
+                "source": sanitize_cms_source(module_type, config.get("source")),
+                "columns": _clamp_int(config.get("columns"), 3, 1, 6),
+                "limit": _clamp_int(config.get("limit"), 24, 1, 100),
+                "showCaptions": _coerce_bool(config.get("showCaptions"), True),
+                "includePremium": _coerce_bool(config.get("includePremium"), True),
             }
         )
 

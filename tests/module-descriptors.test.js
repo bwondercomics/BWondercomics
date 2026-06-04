@@ -12,6 +12,7 @@ import {
   getModuleDescriptor,
   getModuleDescriptors,
   getModuleResponsiveOverrides,
+  getModuleSourceModes,
   getModuleStyleSectors,
 } from '../admin/page-builder/module-descriptors.js';
 import { getModuleResponsiveFields } from '../admin/page-builder/responsive-overrides.js';
@@ -29,18 +30,26 @@ describe('page-builder module descriptors', () => {
       icon: '\u{1F4F0}',
       category: 'special',
     });
+    expect(MODULE_TYPES.find((module) => module.type === 'media-gallery')).toEqual({
+      type: 'media-gallery',
+      label: 'Media Gallery',
+      icon: '\u{1F5BC}',
+      category: 'special',
+    });
   });
 
   it('drives insertable blocks and default configs from descriptors', () => {
     const insertableTypes = getInsertableModuleDescriptors().map((descriptor) => descriptor.type);
     expect(insertableTypes).toContain('text');
     expect(insertableTypes).toContain('feed');
+    expect(insertableTypes).toContain('media-gallery');
     expect(insertableTypes).not.toContain('header');
 
     const feedConfig = getDefaultConfig('feed');
     expect(feedConfig).toEqual(
       expect.objectContaining({
         limit: 5,
+        source: { mode: 'site' },
         showMediaButton: true,
         style: expect.objectContaining({
           headingBgColor: '#ffed00',
@@ -58,6 +67,14 @@ describe('page-builder module descriptors', () => {
     expect(getModulePreview('text', { content: '<p>Hello Builder</p>' })).toBe('Hello Builder');
     expect(getModuleResponsiveFields('buttons')).toEqual(['hidden', 'defaults', 'buttons']);
     expect(getModuleResponsiveOverrides('text')).toEqual(['hidden', 'alignment']);
+    expect(getModuleResponsiveOverrides('media-gallery')).toEqual(['hidden', 'columns']);
+    expect(getModuleSourceModes('reader')).toEqual(['active-page-series', 'specific-series']);
+    expect(getModuleSourceModes('entry-gallery')).toEqual([
+      'active-page-series',
+      'specific-series',
+      'all-series',
+    ]);
+    expect(getModuleSourceModes('media-gallery')).toEqual(['site']);
     expect(getModuleStyleSectors('buttons')).toEqual(['button-defaults', 'button-overrides']);
     expect(getModuleStyleSectors('html')).toEqual([]);
   });

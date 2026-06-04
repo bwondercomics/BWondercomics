@@ -4,6 +4,7 @@ import { setResponsiveOverrideValue } from './responsive-overrides.js';
 function normalizeEntryGalleryConfig(config = {}) {
   return {
     ...JSON.parse(JSON.stringify(config || {})),
+    source: config.source && typeof config.source === 'object' ? { ...config.source } : {},
     columns: config.columns || 3,
     showLabels: config.showLabels !== false,
   };
@@ -45,6 +46,7 @@ export function bindEntryGalleryEditorEvents({
   markDirty,
   activeDeviceId = 'desktop',
   responsiveEditScope = 'global',
+  renderEditorPanel,
 }) {
   let config = normalizeEntryGalleryConfig(draftConfig);
 
@@ -70,6 +72,26 @@ export function bindEntryGalleryEditorEvents({
         nextConfig[key] = input.checked;
       }
       commit(nextConfig);
+    });
+  });
+
+  el.pbModuleEditor.querySelectorAll('[data-source-key]').forEach((input) => {
+    const eventName = input.tagName === 'SELECT' ? 'change' : 'input';
+    input.addEventListener(eventName, () => {
+      if (responsiveEditScope === 'device') return;
+      const key = input.dataset.sourceKey;
+      if (!key) return;
+      const nextConfig = normalizeEntryGalleryConfig(config);
+      nextConfig.source =
+        nextConfig.source && typeof nextConfig.source === 'object' ? nextConfig.source : {};
+      nextConfig.source[key] = input.value;
+      if (nextConfig.source.mode !== 'specific-series') {
+        delete nextConfig.source.seriesId;
+      }
+      commit(nextConfig);
+      if (key === 'mode') {
+        renderEditorPanel?.();
+      }
     });
   });
 }

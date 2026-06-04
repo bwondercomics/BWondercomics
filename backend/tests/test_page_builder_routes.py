@@ -7,6 +7,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///tmp/bw-quality-route-t
 
 from sqlalchemy import select
 
+from backend.app.builder_security import sanitize_module_config
 from backend.app.routes import page_builder
 from backend.app.models import BuilderModule, BuilderPage, BuilderPageBinding
 
@@ -420,6 +421,145 @@ class PageBuilderRouteTests(BackendRouteTestCase):
 
         self.assertEqual(deleted_module, {"status": "success"})
         self.assertEqual(deleted_section, {"status": "success"})
+
+    def test_cms_module_source_config_sanitization(self):
+        reader = sanitize_module_config(
+            "reader",
+            {
+                "source": {"mode": "all-series", "seriesId": "wrong"},
+                "showPanels": True,
+                "showComments": False,
+            },
+        )
+        entry_gallery = sanitize_module_config(
+            "entry-gallery",
+            {
+                "source": {
+                    "mode": "specific-series",
+                    "seriesId": "battle-bros",
+                    "filters": {
+                        "labelId": "issues",
+                        "status": "published",
+                        "access": "premium",
+                        "unsupported": "<script>",
+                    },
+                    "sort": "title",
+                    "limit": 500,
+                },
+                "columns": 8,
+            },
+        )
+        media_gallery = sanitize_module_config(
+            "media-gallery",
+            {
+                "source": {
+                    "mode": "specific-series",
+                    "seriesId": "ignored-series",
+                    "filters": {"access": "private", "tags": ["covers", "<bad>"]},
+                    "sort": "newest",
+                },
+                "columns": 2,
+                "limit": 12,
+                "includePremium": False,
+                "responsive": {"mobile": {"columns": 2}},
+            },
+        )
+        feed = sanitize_module_config("feed", {"source": {"mode": "specific-series"}})
+
+        self.assertEqual(reader["source"], {"mode": "active-page-series"})
+        self.assertEqual(entry_gallery["source"]["mode"], "specific-series")
+        self.assertEqual(entry_gallery["source"]["seriesId"], "battle-bros")
+        self.assertEqual(entry_gallery["source"]["filters"]["access"], "premium")
+        self.assertEqual(entry_gallery["source"]["sort"], "title")
+        self.assertEqual(entry_gallery["source"]["limit"], 200)
+        self.assertEqual(entry_gallery["columns"], 6)
+        self.assertEqual(media_gallery["source"]["mode"], "site")
+        self.assertNotIn("seriesId", media_gallery["source"])
+        self.assertNotIn("access", media_gallery["source"].get("filters", {}))
+        self.assertEqual(media_gallery["source"]["filters"]["tags"], ["covers", "<bad>"])
+        self.assertEqual(media_gallery["responsive"]["mobile"]["columns"], 2)
+        self.assertFalse(media_gallery["includePremium"])
+        self.assertEqual(feed["source"], {"mode": "site"})
+
+    def test_reader_module_source_normalizes_by_page_scope(self):
+        self.seed_contract_series()
+        series_page = page_builder.api_create_series_page(
+            "battle-bros",
+            page_builder.CreatePageRequest(slug="reader-source", title="Reader Source"),
+            self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
+            self.db,
+        )["page"]
+        series_section = page_builder.api_add_section(
+            series_page["id"],
+            page_builder.CreateSectionRequest(sectionType="row", layout="1"),
+            self.admin_request(f"/api/admin/pages/{series_page['id']}/sections", "POST"),
+            self.db,
+        )["section"]
+        series_reader = page_builder.api_add_module(
+            series_section["id"],
+            page_builder.CreateModuleRequest(
+                moduleType="reader",
+                columnIndex=0,
+                config={"source": {"mode": "specific-series", "seriesId": "other-series"}},
+            ),
+            self.admin_request(f"/api/admin/sections/{series_section['id']}/modules", "POST"),
+            self.db,
+        )["module"]
+        self.assertEqual(series_reader["config"]["source"], {"mode": "active-page-series"})
+
+        updated_series_reader = page_builder.api_update_module(
+            series_reader["id"],
+            page_builder.UpdateModuleRequest(
+                config={"source": {"mode": "specific-series", "seriesId": "other-series"}}
+            ),
+            self.admin_request(f"/api/admin/modules/{series_reader['id']}", "PUT"),
+            self.db,
+        )["module"]
+        self.assertEqual(updated_series_reader["config"]["source"], {"mode": "active-page-series"})
+
+        serialized_series = page_builder.api_get_page(
+            series_page["id"],
+            self.admin_request(f"/api/admin/pages/{series_page['id']}"),
+            self.db,
+        )["page"]
+        serialized_series_reader = serialized_series["sections"][0]["modules"][0]
+        self.assertEqual(serialized_series_reader["config"]["source"], {"mode": "active-page-series"})
+
+        global_page = page_builder.api_create_global_page(
+            page_builder.CreatePageRequest(slug="global-reader-source", title="Global Reader"),
+            self.admin_request("/api/admin/pages/global", "POST"),
+            self.db,
+        )["page"]
+        global_section = page_builder.api_add_section(
+            global_page["id"],
+            page_builder.CreateSectionRequest(sectionType="row", layout="1"),
+            self.admin_request(f"/api/admin/pages/{global_page['id']}/sections", "POST"),
+            self.db,
+        )["section"]
+        global_reader = page_builder.api_add_module(
+            global_section["id"],
+            page_builder.CreateModuleRequest(
+                moduleType="reader",
+                columnIndex=0,
+                config={"source": {"mode": "active-page-series"}},
+            ),
+            self.admin_request(f"/api/admin/sections/{global_section['id']}/modules", "POST"),
+            self.db,
+        )["module"]
+        self.assertEqual(global_reader["config"]["source"], {"mode": "specific-series"})
+
+        updated_global_reader = page_builder.api_update_module(
+            global_reader["id"],
+            page_builder.UpdateModuleRequest(
+                config={"source": {"mode": "specific-series", "seriesId": "other-series"}}
+            ),
+            self.admin_request(f"/api/admin/modules/{global_reader['id']}", "PUT"),
+            self.db,
+        )["module"]
+        self.assertEqual(
+            updated_global_reader["config"]["source"],
+            {"mode": "specific-series", "seriesId": "other-series"},
+        )
 
     def test_public_page_endpoint_only_returns_published_pages(self):
         self.seed_builder_page("builderPage")

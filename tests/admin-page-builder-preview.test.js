@@ -10,7 +10,7 @@ import {
   renderPreviewModule,
   renderPreviewPage,
 } from '../admin/page-builder/preview-renderers.js';
-import { getContractFixture } from './helpers/contracts.js';
+import { buildContractFixture, getContractFixture } from './helpers/contracts.js';
 
 describe('admin page-builder editor and preview renderers', () => {
   afterEach(() => {
@@ -150,6 +150,158 @@ describe('admin page-builder editor and preview renderers', () => {
     );
     expect(markDirty).toHaveBeenCalledWith('module');
     expect(renderEditorPanel).not.toHaveBeenCalled();
+  });
+
+  it('renders and binds CMS source controls by page scope', () => {
+    const modules = getContractFixture('builderModules');
+    const currentPage = {
+      scope: 'global',
+      seriesId: null,
+      sections: [
+        {
+          id: 'section-1',
+          modules: [
+            {
+              ...modules.reader,
+              config: { showPanels: true, showComments: true },
+            },
+            modules.feed,
+            modules['media-gallery'],
+          ],
+        },
+      ],
+    };
+    const pages = [
+      buildContractFixture('builderPage', {
+        id: 'series-page-1',
+        seriesId: 'battle-bros',
+        scope: 'series',
+      }),
+      buildContractFixture('builderPage', {
+        id: 'series-page-2',
+        seriesId: 'other-series',
+        scope: 'series',
+      }),
+    ];
+
+    const readerWrapper = document.createElement('div');
+    readerWrapper.innerHTML = renderModuleEditorContent({
+      currentPage,
+      selectedModuleId: modules.reader.id,
+      draftConfig: { showPanels: true, showComments: true },
+      pages,
+    });
+    const sourceMode = readerWrapper.querySelector('[data-source-key="mode"]');
+    const sourceSeries = readerWrapper.querySelector('[data-source-key="seriesId"]');
+    expect(sourceMode?.value).toBe('specific-series');
+    expect([...sourceMode.querySelectorAll('option')].map((option) => option.value)).toEqual([
+      'specific-series',
+    ]);
+    expect([...sourceSeries.querySelectorAll('option')].map((option) => option.value)).toEqual([
+      'battle-bros',
+      'other-series',
+    ]);
+
+    const setDraftConfig = vi.fn();
+    const markDirty = vi.fn();
+    bindModuleEditorEvents({
+      el: { pbModuleEditor: readerWrapper },
+      currentPage,
+      selectedModuleId: modules.reader.id,
+      draftConfig: { showPanels: true, showComments: true },
+      setDraftConfig,
+      markDirty,
+      renderEditorPanel: vi.fn(),
+      pages,
+      openImagePicker: vi.fn(),
+      fetchAssets: vi.fn(async () => []),
+      uploadAssetFile: vi.fn(async () => ({})),
+    });
+    sourceSeries.value = 'other-series';
+    sourceSeries.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(setDraftConfig).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        source: {
+          mode: 'specific-series',
+          seriesId: 'other-series',
+        },
+      })
+    );
+    expect(markDirty).toHaveBeenCalledWith('module');
+
+    const seriesPage = {
+      scope: 'series',
+      seriesId: 'battle-bros',
+      sections: [
+        {
+          id: 'section-1',
+          modules: [
+            {
+              ...modules.reader,
+              config: {
+                showPanels: true,
+                showComments: true,
+                source: { mode: 'specific-series', seriesId: 'other-series' },
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const seriesReaderWrapper = document.createElement('div');
+    seriesReaderWrapper.innerHTML = renderModuleEditorContent({
+      currentPage: seriesPage,
+      selectedModuleId: modules.reader.id,
+      draftConfig: seriesPage.sections[0].modules[0].config,
+      pages,
+    });
+    const seriesSourceMode = seriesReaderWrapper.querySelector('[data-source-key="mode"]');
+    expect(seriesSourceMode?.value).toBe('active-page-series');
+    expect([...seriesSourceMode.querySelectorAll('option')].map((option) => option.value)).toEqual([
+      'active-page-series',
+    ]);
+    expect(seriesReaderWrapper.querySelector('[data-source-key="seriesId"]')).toBeNull();
+
+    const setSeriesDraftConfig = vi.fn();
+    bindModuleEditorEvents({
+      el: { pbModuleEditor: seriesReaderWrapper },
+      currentPage: seriesPage,
+      selectedModuleId: modules.reader.id,
+      draftConfig: seriesPage.sections[0].modules[0].config,
+      setDraftConfig: setSeriesDraftConfig,
+      markDirty: vi.fn(),
+      renderEditorPanel: vi.fn(),
+      pages,
+      openImagePicker: vi.fn(),
+      fetchAssets: vi.fn(async () => []),
+      uploadAssetFile: vi.fn(async () => ({})),
+    });
+    const showPanels = seriesReaderWrapper.querySelector('[data-key="showPanels"]');
+    showPanels.checked = false;
+    showPanels.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(setSeriesDraftConfig).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        showPanels: false,
+        source: { mode: 'active-page-series' },
+      })
+    );
+
+    const feedWrapper = document.createElement('div');
+    feedWrapper.innerHTML = renderModuleEditorContent({
+      currentPage,
+      selectedModuleId: modules.feed.id,
+      pages,
+    });
+    const mediaWrapper = document.createElement('div');
+    mediaWrapper.innerHTML = renderModuleEditorContent({
+      currentPage,
+      selectedModuleId: modules['media-gallery'].id,
+      pages,
+    });
+    expect(feedWrapper.querySelector('[data-source-key="mode"]')?.value).toBe('site');
+    expect(mediaWrapper.querySelector('[data-source-key="mode"]')?.value).toBe('site');
+    expect(mediaWrapper.querySelector('[data-source-key="seriesId"]')).toBeNull();
+    expect(mediaWrapper.textContent).toContain('Media Gallery Settings');
   });
 
   it('renders structured buttons controls and normalizes builder-page link targets', async () => {

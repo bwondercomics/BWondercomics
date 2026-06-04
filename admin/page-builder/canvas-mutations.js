@@ -17,6 +17,27 @@ function findModuleLocation(currentPage, moduleId) {
 }
 
 export function createCanvasMutations({ getState, actions, deps, helpers }) {
+  function normalizeDefaultModuleConfig(moduleType, config) {
+    const currentPage = getState().currentPage;
+    const nextConfig = JSON.parse(JSON.stringify(config || {}));
+    if (moduleType === 'reader' || moduleType === 'entry-gallery') {
+      if (currentPage?.scope === 'global') {
+        nextConfig.source = {
+          ...(nextConfig.source && typeof nextConfig.source === 'object' ? nextConfig.source : {}),
+          mode: 'specific-series',
+          seriesId: helpers.getSeriesId?.() || currentPage?.seriesId || '',
+        };
+      } else {
+        nextConfig.source = {
+          ...(nextConfig.source && typeof nextConfig.source === 'object' ? nextConfig.source : {}),
+          mode: 'active-page-series',
+        };
+        delete nextConfig.source.seriesId;
+      }
+    }
+    return nextConfig;
+  }
+
   function getSectionRecord(sectionId) {
     return (
       (getState().currentPage?.sections || []).find((section) => section.id === sectionId) || null
@@ -24,7 +45,7 @@ export function createCanvasMutations({ getState, actions, deps, helpers }) {
   }
 
   async function addModuleWithDefault(sectionId, moduleType, columnIndex = 0, sortIndex = null) {
-    const config = helpers.getDefaultConfig(moduleType);
+    const config = normalizeDefaultModuleConfig(moduleType, helpers.getDefaultConfig(moduleType));
     return deps.addModule(sectionId, moduleType, columnIndex, config, sortIndex);
   }
 

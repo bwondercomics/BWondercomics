@@ -15,6 +15,17 @@ function formatTypeLabel(moduleType) {
 const DEFAULT_QUICK_ACTIONS = Object.freeze(['settings', 'delete']);
 const DEFAULT_ALLOWED_PARENTS = Object.freeze(['section-column']);
 const HIDDEN_ONLY_RESPONSIVE_FIELDS = Object.freeze(['hidden']);
+const SOURCE_ACTIVE_PAGE_SERIES = 'active-page-series';
+const SOURCE_SPECIFIC_SERIES = 'specific-series';
+const SOURCE_ALL_SERIES = 'all-series';
+const SOURCE_SITE = 'site';
+
+function createSourceConfig(mode, extras = {}) {
+  return {
+    mode,
+    ...extras,
+  };
+}
 
 const MODULE_DESCRIPTOR_DEFS = [
   {
@@ -168,25 +179,35 @@ const MODULE_DESCRIPTOR_DEFS = [
   },
   {
     type: 'reader',
-    label: 'Reader',
+    label: 'Comic Reader',
     icon: '\u{1F4D6}',
     category: 'special',
-    defaultConfig: { showPanels: true, showComments: true },
+    defaultConfig: {
+      source: createSourceConfig(SOURCE_ACTIVE_PAGE_SERIES),
+      showPanels: true,
+      showComments: true,
+    },
     editorKind: 'reader',
     responsiveOverrides: HIDDEN_ONLY_RESPONSIVE_FIELDS,
     appearanceSectors: [],
-    requiredContext: ['series'],
+    requiredContext: [],
+    sourceModes: [SOURCE_ACTIVE_PAGE_SERIES, SOURCE_SPECIFIC_SERIES],
   },
   {
     type: 'entry-gallery',
     label: 'Entries',
     icon: '\u{1F4DA}',
     category: 'special',
-    defaultConfig: { columns: 3, showLabels: true },
+    defaultConfig: {
+      source: createSourceConfig(SOURCE_ACTIVE_PAGE_SERIES, { filters: {}, sort: 'sort-index' }),
+      columns: 3,
+      showLabels: true,
+    },
     editorKind: 'entry-gallery',
     responsiveOverrides: ['hidden', 'columns'],
     appearanceSectors: [],
-    requiredContext: ['series'],
+    requiredContext: [],
+    sourceModes: [SOURCE_ACTIVE_PAGE_SERIES, SOURCE_SPECIFIC_SERIES, SOURCE_ALL_SERIES],
     preview: (config = {}) => `Series entries (${config.columns || 3} cols)`,
   },
   {
@@ -195,6 +216,7 @@ const MODULE_DESCRIPTOR_DEFS = [
     icon: '\u{1F4F0}',
     category: 'special',
     defaultConfig: {
+      source: createSourceConfig(SOURCE_SITE),
       limit: 5,
       heading: 'BWC FEED',
       author: 'DOYLE MELVILLE II',
@@ -220,7 +242,26 @@ const MODULE_DESCRIPTOR_DEFS = [
     editorKind: 'feed',
     responsiveOverrides: HIDDEN_ONLY_RESPONSIVE_FIELDS,
     appearanceSectors: ['feed-style'],
+    sourceModes: [SOURCE_SITE],
     preview: (config = {}) => `Feed (limit ${config.limit || 0})`,
+  },
+  {
+    type: 'media-gallery',
+    label: 'Media Gallery',
+    icon: '\u{1F5BC}',
+    category: 'special',
+    defaultConfig: {
+      source: createSourceConfig(SOURCE_SITE, { filters: {}, sort: 'path' }),
+      columns: 3,
+      limit: 24,
+      showCaptions: true,
+      includePremium: true,
+    },
+    editorKind: 'media-gallery',
+    responsiveOverrides: ['hidden', 'columns'],
+    appearanceSectors: [],
+    sourceModes: [SOURCE_SITE],
+    preview: (config = {}) => `Media gallery (${config.columns || 3} cols)`,
   },
   {
     type: 'html',
@@ -244,6 +285,7 @@ function normalizeDescriptor(definition) {
     responsiveOverrides: Object.freeze([...(definition.responsiveOverrides || [])]),
     appearanceSectors: Object.freeze([...(definition.appearanceSectors || [])]),
     requiredContext: Object.freeze([...(definition.requiredContext || [])]),
+    sourceModes: Object.freeze([...(definition.sourceModes || [])]),
   });
 }
 
@@ -267,6 +309,7 @@ function getFallbackDescriptor(moduleType) {
     responsiveOverrides: Object.freeze([]),
     appearanceSectors: Object.freeze([]),
     requiredContext: Object.freeze([]),
+    sourceModes: Object.freeze([]),
     preview: () => type,
   });
 }
@@ -293,6 +336,10 @@ export function getModuleResponsiveOverrides(moduleType) {
 
 export function getModuleStyleSectors(moduleType) {
   return [...(getModuleDescriptor(moduleType).appearanceSectors || [])];
+}
+
+export function getModuleSourceModes(moduleType) {
+  return [...(getModuleDescriptor(moduleType).sourceModes || [])];
 }
 
 export function getModuleEditorKind(moduleType) {

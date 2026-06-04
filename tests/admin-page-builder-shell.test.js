@@ -775,6 +775,189 @@ describe('admin page-builder shell', () => {
     expect(document.getElementById('pbPageTitle')?.textContent).toContain('Reader Builder');
   });
 
+  it('creates reader template pages and auto-binds only when the series binding is missing', async () => {
+    const page = buildContractFixture('builderPage', {
+      id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeee91',
+      slug: 'reader-template',
+      title: 'Reader Template',
+      pageType: 'custom',
+      sections: [],
+    });
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[], [page]],
+      createPageResult: page,
+      fetchPageBindingsResult: { bindings: {}, warnings: [] },
+    });
+
+    await manager.showPageBuilderSection();
+    document.getElementById('pbAddPage')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    document.getElementById('pbPageSlugInput').value = 'reader-template';
+    document.getElementById('pbPageTitleInput').value = 'Reader Template';
+    document.getElementById('pbPageTemplateSelect').value = 'reader';
+    document
+      .getElementById('pbAddPageForm')
+      ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await flushAdminUi(4);
+
+    expect(mocks.createScopedPage).toHaveBeenCalledWith(
+      'series',
+      'battle-bros',
+      'reader-template',
+      'Reader Template'
+    );
+    expect(mocks.updatePage).toHaveBeenCalledWith(page.id, { pageType: 'reader' });
+    expect(mocks.addSection).toHaveBeenCalledWith(page.id, 'row', '1');
+    expect(mocks.addModule).toHaveBeenCalledWith(
+      'new-section-id',
+      'reader',
+      0,
+      expect.objectContaining({
+        source: { mode: 'active-page-series' },
+      })
+    );
+    expect(mocks.updatePageBindings).toHaveBeenCalledWith('battle-bros', { reader: page.id });
+  });
+
+  it('does not overwrite an existing reader binding when using the reader template', async () => {
+    const page = buildContractFixture('builderPage', {
+      id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeee93',
+      slug: 'new-reader-template',
+      title: 'New Reader Template',
+      pageType: 'custom',
+      sections: [],
+    });
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[], [page]],
+      createPageResult: page,
+      fetchPageBindingsResult: {
+        bindings: {
+          reader: { pageId: 'existing-reader-page', slug: 'reader' },
+        },
+        warnings: [],
+      },
+    });
+
+    await manager.showPageBuilderSection();
+    document.getElementById('pbAddPage')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    document.getElementById('pbPageSlugInput').value = 'new-reader-template';
+    document.getElementById('pbPageTitleInput').value = 'New Reader Template';
+    document.getElementById('pbPageTemplateSelect').value = 'reader';
+    document
+      .getElementById('pbAddPageForm')
+      ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await flushAdminUi(4);
+
+    expect(mocks.addModule).toHaveBeenCalledWith(
+      'new-section-id',
+      'reader',
+      0,
+      expect.objectContaining({
+        source: { mode: 'active-page-series' },
+      })
+    );
+    expect(mocks.updatePageBindings).not.toHaveBeenCalled();
+  });
+
+  it('creates global CMS template pages without reader bindings', async () => {
+    const page = buildContractFixture('builderPageDraft', {
+      id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeee92',
+      scope: 'global',
+      seriesId: null,
+      slug: 'media',
+      title: 'Media',
+      pageType: 'custom',
+      sections: [],
+    });
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[]],
+      fetchGlobalPagesResults: [[], [page]],
+      createPageResult: page,
+      fetchPageBindingsResult: {
+        bindings: {
+          reader: { pageId: 'existing-reader-page', slug: 'reader' },
+        },
+        warnings: [],
+      },
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-scope-toggle[data-page-scope="global"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document.getElementById('pbAddPage')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    const templateSelect = document.getElementById('pbPageTemplateSelect');
+    expect(templateSelect.querySelector('option[value="reader"]')?.disabled).toBe(true);
+    templateSelect.value = 'media-gallery';
+    document.getElementById('pbPageSlugInput').value = 'media';
+    document.getElementById('pbPageTitleInput').value = 'Media';
+    document
+      .getElementById('pbAddPageForm')
+      ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await flushAdminUi(4);
+
+    expect(mocks.createScopedPage).toHaveBeenCalledWith('global', 'battle-bros', 'media', 'Media');
+    expect(mocks.updatePage).toHaveBeenCalledWith(page.id, { pageType: 'gallery' });
+    expect(mocks.addModule).toHaveBeenCalledWith(
+      'new-section-id',
+      'media-gallery',
+      0,
+      expect.objectContaining({
+        source: { mode: 'site', filters: {}, sort: 'path' },
+        columns: 3,
+        limit: 24,
+      })
+    );
+    expect(mocks.updatePageBindings).not.toHaveBeenCalled();
+  });
+
+  it('creates entry gallery template pages with a renderable entry-gallery module', async () => {
+    const page = buildContractFixture('builderPage', {
+      id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeee94',
+      slug: 'entries',
+      title: 'Entries',
+      pageType: 'custom',
+      sections: [],
+    });
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[], [page]],
+      createPageResult: page,
+      fetchPageBindingsResult: { bindings: {}, warnings: [] },
+    });
+
+    await manager.showPageBuilderSection();
+    document.getElementById('pbAddPage')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    document.getElementById('pbPageSlugInput').value = 'entries';
+    document.getElementById('pbPageTitleInput').value = 'Entries';
+    document.getElementById('pbPageTemplateSelect').value = 'entry-gallery';
+    document
+      .getElementById('pbAddPageForm')
+      ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await flushAdminUi(4);
+
+    expect(mocks.updatePage).toHaveBeenCalledWith(page.id, { pageType: 'gallery' });
+    expect(mocks.addModule).toHaveBeenCalledWith(
+      'new-section-id',
+      'entry-gallery',
+      0,
+      expect.objectContaining({
+        source: { mode: 'active-page-series', filters: {}, sort: 'sort-index' },
+        columns: 3,
+        showLabels: true,
+      })
+    );
+    expect(mocks.updatePageBindings).not.toHaveBeenCalled();
+  });
+
   it('switches page scopes and updates the series reader binding', async () => {
     const seriesPage = getContractFixture('builderPage');
     const globalPage = buildContractFixture('builderPageDraft', {

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { STORAGE } from '../reader/constants.js';
-import { getContractFixture } from './helpers/contracts.js';
+import { buildContractFixture, getContractFixture } from './helpers/contracts.js';
 import { flushReaderUi, mountReaderDom, stubReaderGlobals } from './helpers/reader-fixture.js';
 
 function buildReaderEntryData() {
@@ -36,6 +36,7 @@ async function bootReaderApp({
   sessionKey = 'guest',
   savedProgress = null,
   builderPreview = false,
+  resolvedReaderSeriesId = '',
 } = {}) {
   vi.resetModules();
   mountReaderDom();
@@ -59,6 +60,9 @@ async function bootReaderApp({
   }));
   const loadLatestPost = vi.fn(async () => getContractFixture('latestPost'));
   const applyBuilderPageToDOM = vi.fn();
+  const resolveBuilderPageReaderSeriesId = vi.fn(
+    (_page, fallbackSeriesId) => resolvedReaderSeriesId || fallbackSeriesId
+  );
   const previewSnapshot = {
     seriesId: 'battle-bros',
     pageId: 'fixture-builder-page',
@@ -111,6 +115,7 @@ async function bootReaderApp({
     loadPageConfigWithFallback,
     loadLatestPost,
     applyBuilderPageToDOM,
+    resolveBuilderPageReaderSeriesId,
   }));
   vi.doMock('../reader/preview-bridge.js', () => ({
     requestPreviewSnapshot,
@@ -193,6 +198,7 @@ async function bootReaderApp({
       loadEntryData,
       loadLatestPost,
       loadPageConfigWithFallback,
+      resolveBuilderPageReaderSeriesId,
       loggerLog,
       nextPage,
       prevPage,
@@ -293,6 +299,76 @@ describe('reader app bootstrap', () => {
       }
     );
     expect(document.body.dataset.readerPageSource).toBe('builder');
+  });
+
+  it('refreshes reader entry data before applying preview snapshot updates', async () => {
+    const { mocks } = await bootReaderApp({ builderPreview: true });
+    const snapshotHandler = mocks.subscribePreviewSnapshots.mock.calls[0]?.[0];
+    const nextPage = buildContractFixture('builderPage', { id: 'next-builder-page' });
+    mocks.resolveBuilderPageReaderSeriesId.mockImplementation((page, fallbackSeriesId) =>
+      page?.id === 'next-builder-page' ? 'other-series' : fallbackSeriesId
+    );
+
+    snapshotHandler({
+      source: 'builder',
+      page: nextPage,
+      previewMode: true,
+      builderEditing: true,
+      snapshot: {
+        seriesId: 'battle-bros',
+        pageId: 'fixture-builder-page',
+        pageSlug: 'reader',
+        page: nextPage,
+        options: { builderEditing: true, deviceId: 'mobile' },
+      },
+      deviceId: 'mobile',
+    });
+    await flushReaderUi(4);
+
+    expect(mocks.loadEntryData).toHaveBeenCalledWith('other-series');
+    expect(mocks.renderGallery).toHaveBeenLastCalledWith(
+      expect.any(Array),
+      expect.any(Object),
+      expect.objectContaining({ seriesId: 'other-series' })
+    );
+    expect(mocks.applyBuilderPageToDOM).toHaveBeenLastCalledWith(nextPage, {
+      seriesId: 'other-series',
+      previewMode: true,
+      builderEditing: true,
+      deviceId: 'mobile',
+    });
+    expect(mocks.startPreviewTargetBridge).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        pageId: 'fixture-builder-page',
+        options: expect.objectContaining({ builderEditing: true }),
+      }),
+      {
+        seriesId: 'other-series',
+        pageId: 'fixture-builder-page',
+        pageSlug: 'reader',
+      }
+    );
+  });
+
+  it('loads the reader module specific-series source before initializing visible reader state', async () => {
+    const { mocks } = await bootReaderApp({ resolvedReaderSeriesId: 'other-series' });
+
+    expect(mocks.resolveBuilderPageReaderSeriesId).toHaveBeenCalledWith(
+      getContractFixture('builderPage'),
+      'battle-bros'
+    );
+    expect(mocks.loadEntryData).toHaveBeenNthCalledWith(1, 'battle-bros');
+    expect(mocks.loadEntryData).toHaveBeenNthCalledWith(2, 'other-series');
+    expect(mocks.applyBuilderPageToDOM).toHaveBeenCalledWith(getContractFixture('builderPage'), {
+      seriesId: 'other-series',
+    });
+    expect(mocks.renderGallery).toHaveBeenLastCalledWith(
+      expect.any(Array),
+      expect.any(Object),
+      expect.objectContaining({
+        seriesId: 'other-series',
+      })
+    );
   });
 
   it('opens store entries externally and restores the active entry selection', async () => {

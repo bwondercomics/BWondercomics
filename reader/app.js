@@ -7,6 +7,7 @@ import {
   loadPageConfigWithFallback,
   loadLatestPost,
   applyBuilderPageToDOM,
+  resolveBuilderPageReaderSeriesId,
 } from './data.js';
 import { el, initElements } from './dom.js';
 import { renderStatusPanel, render } from './render.js';
@@ -174,6 +175,7 @@ import {
   let fullStatusMessage = '';
   let fullPremiumOnly = false;
   let currentLockedEntries = [];
+  let activeReaderSeriesId = getActiveSeriesId();
 
   function getUnitLabels() {
     const singular = String(unitLabelSingular || '').trim() || 'Entry';
@@ -243,6 +245,58 @@ import {
     return { lockedEntries, isPremiumUser };
   }
 
+  function applyLoadedEntryData(data, seriesId) {
+    if (!data) return;
+    activeReaderSeriesId = seriesId || getActiveSeriesId();
+    entries = data.entries;
+    entryOrder = data.entryOrder;
+    statusMessage = data.statusMessage;
+    entryMeta = data.entryMeta || {};
+    fullEntries = entries && typeof entries === 'object' ? entries : {};
+    fullEntryOrder = Array.isArray(entryOrder) ? [...entryOrder] : [];
+    fullEntryMeta = entryMeta && typeof entryMeta === 'object' ? entryMeta : {};
+    fullStatusMessage = statusMessage;
+    fullPremiumOnly = !!data.premiumOnly;
+    entryLabels = Array.isArray(data.entryLabels) ? data.entryLabels : [];
+    entryLabelsById = entryLabels.reduce((acc, label) => {
+      if (label && label.id) acc[label.id] = label;
+      return acc;
+    }, {});
+    premiumOnly = fullPremiumOnly;
+    unitLabelSingular = data.unitLabelSingular || 'Entry';
+    unitLabelPlural = data.unitLabelPlural || 'Entries';
+    applyUnitLabels();
+    logger.log(`Entry data loaded for series: ${activeReaderSeriesId}`);
+  }
+
+  async function ensureReaderSeriesData(page, fallbackSeriesId, options = {}) {
+    const targetSeriesId = resolveBuilderPageReaderSeriesId(page, fallbackSeriesId);
+    if (targetSeriesId && targetSeriesId !== activeReaderSeriesId) {
+      const data = await loadEntryData(targetSeriesId);
+      if (typeof options.isCurrent === 'function' && !options.isCurrent()) {
+        return targetSeriesId;
+      }
+      applyLoadedEntryData(data, targetSeriesId);
+    }
+    return targetSeriesId || activeReaderSeriesId;
+  }
+
+  async function refreshReaderSeriesView(page, fallbackSeriesId, sessionUser, options = {}) {
+    const seriesId = await ensureReaderSeriesData(page, fallbackSeriesId, options);
+    if (typeof options.isCurrent === 'function' && !options.isCurrent()) {
+      return { seriesId, stale: true };
+    }
+    const { lockedEntries } = applyPremiumGating(sessionUser);
+    currentLockedEntries = lockedEntries;
+    await renderGallery(entryOrder, entries, {
+      lockedEntries,
+      entryMeta: fullEntryMeta,
+      unitLabelSingular,
+      seriesId,
+    });
+    return { seriesId, stale: false };
+  }
+
   function refreshEntriesForSession(user) {
     const { lockedEntries } = applyPremiumGating(user);
     currentLockedEntries = lockedEntries;
@@ -272,7 +326,7 @@ import {
       lockedEntries,
       entryMeta: fullEntryMeta,
       unitLabelSingular,
-      seriesId: getActiveSeriesId(),
+      seriesId: activeReaderSeriesId || getActiveSeriesId(),
     });
   }
 
@@ -703,7 +757,9 @@ import {
     // Help button
     const helpBtn = document.getElementById('helpBtn');
     if (helpBtn) helpBtn.addEventListener('click', toggleShortcutsOverlay);
-    attachGalleryButton();
+    attachGalleryButton().catch((err) => {
+      logger.warn('Gallery button setup failed:', err);
+    });
 
     if (el.edgeLeftBtn) {
       el.edgeLeftBtn.addEventListener('click', (e) => {
@@ -989,34 +1045,15 @@ import {
   // ==================== START ====================
 
   async function start() {
-    const seriesId = getActiveSeriesId();
+    let seriesId = getActiveSeriesId();
+    activeReaderSeriesId = seriesId;
     const explicitPageSlug = getExplicitPageSlug();
     const pageScope = getRequestedPageScope();
     const previewMode = isBuilderPreviewRequested();
 
     try {
       const data = await loadEntryData(seriesId);
-      if (data) {
-        entries = data.entries;
-        entryOrder = data.entryOrder;
-        statusMessage = data.statusMessage;
-        entryMeta = data.entryMeta || {};
-        fullEntries = entries && typeof entries === 'object' ? entries : {};
-        fullEntryOrder = Array.isArray(entryOrder) ? [...entryOrder] : [];
-        fullEntryMeta = entryMeta && typeof entryMeta === 'object' ? entryMeta : {};
-        fullStatusMessage = statusMessage;
-        fullPremiumOnly = !!data.premiumOnly;
-        entryLabels = Array.isArray(data.entryLabels) ? data.entryLabels : [];
-        entryLabelsById = entryLabels.reduce((acc, label) => {
-          if (label && label.id) acc[label.id] = label;
-          return acc;
-        }, {});
-        premiumOnly = fullPremiumOnly;
-        unitLabelSingular = data.unitLabelSingular || 'Entry';
-        unitLabelPlural = data.unitLabelPlural || 'Entries';
-        applyUnitLabels();
-        logger.log(`Entry data loaded for series: ${seriesId}`);
-      }
+      applyLoadedEntryData(data, seriesId);
     } catch (err) {
       handleDataLoadError(err);
       return;
@@ -1037,26 +1074,20 @@ import {
     updatePatronWelcome(sessionUser);
 
     const role = (sessionUser?.role || '').toString().toLowerCase();
-    const { lockedEntries } = applyPremiumGating(sessionUser);
-    currentLockedEntries = lockedEntries;
     const adminNavLink = document.getElementById('adminNavLink');
     if (adminNavLink) {
       adminNavLink.style.display = role === 'admin' ? 'inline-flex' : 'none';
     }
 
-    renderGallery(entryOrder, entries, {
-      lockedEntries,
-      entryMeta: fullEntryMeta,
-      unitLabelSingular,
-      seriesId,
-    });
+    let pageResult = null;
     if (previewMode) {
       try {
         const previewBridge = await loadPreviewBridgeModule();
-        const pageResult = await previewBridge.requestPreviewSnapshot({
+        pageResult = await previewBridge.requestPreviewSnapshot({
           seriesId,
           pageSlug: explicitPageSlug || 'reader',
         });
+        ({ seriesId } = await refreshReaderSeriesView(pageResult.page, seriesId, sessionUser));
         readerBootState.resolvePageConfig(pageResult);
         loadLatestUpdate();
         init(pageResult.source, { previewMode: true });
@@ -1077,27 +1108,47 @@ import {
           pageId: pageResult.snapshot?.pageId,
           pageSlug: pageResult.snapshot?.pageSlug || explicitPageSlug || 'reader',
         });
+        let previewApplyVersion = 0;
         previewBridge.subscribePreviewSnapshots?.(
           (nextPageResult) => {
-            applyBuilderPageToDOM(nextPageResult.page, {
-              seriesId,
-              previewMode: true,
-              builderEditing: nextPageResult.builderEditing === true,
-              deviceId: nextPageResult.deviceId || nextPageResult.snapshot?.options?.deviceId,
-            });
-            previewBridge.emitPreviewMetrics?.('snapshot-updated');
-            if (nextPageResult.builderEditing === true) {
-              previewBridge.startPreviewTargetBridge?.(nextPageResult.snapshot, {
-                seriesId,
-                pageId: nextPageResult.snapshot?.pageId,
-                pageSlug: nextPageResult.snapshot?.pageSlug || explicitPageSlug || 'reader',
+            const applyVersion = ++previewApplyVersion;
+            Promise.resolve()
+              .then(async () => {
+                const refresh = await refreshReaderSeriesView(
+                  nextPageResult.page,
+                  seriesId,
+                  sessionUser,
+                  {
+                    isCurrent: () => applyVersion === previewApplyVersion,
+                  }
+                );
+                if (refresh.stale) return;
+                seriesId = refresh.seriesId;
+                applyBuilderPageToDOM(nextPageResult.page, {
+                  seriesId,
+                  previewMode: true,
+                  builderEditing: nextPageResult.builderEditing === true,
+                  deviceId: nextPageResult.deviceId || nextPageResult.snapshot?.options?.deviceId,
+                });
+                previewBridge.emitPreviewMetrics?.('snapshot-updated');
+                if (nextPageResult.builderEditing === true) {
+                  previewBridge.startPreviewTargetBridge?.(nextPageResult.snapshot, {
+                    seriesId,
+                    pageId: nextPageResult.snapshot?.pageId,
+                    pageSlug: nextPageResult.snapshot?.pageSlug || explicitPageSlug || 'reader',
+                  });
+                } else {
+                  previewBridge.stopPreviewTargetBridge?.();
+                }
+              })
+              .catch((error) => {
+                if (applyVersion === previewApplyVersion) {
+                  handlePreviewLoadError(error);
+                }
               });
-            } else {
-              previewBridge.stopPreviewTargetBridge?.();
-            }
           },
           {
-            seriesId,
+            seriesId: pageResult.snapshot?.seriesId || getActiveSeriesId(),
             pageId: pageResult.snapshot?.pageId,
             pageSlug: pageResult.snapshot?.pageSlug || explicitPageSlug || 'reader',
           }
@@ -1108,11 +1159,17 @@ import {
       return;
     }
 
-    const pageResult = await loadPageConfigWithFallback(setSubtitles, seriesId, {
+    pageResult = await loadPageConfigWithFallback(setSubtitles, seriesId, {
       pageSlug: explicitPageSlug,
       pageScope,
       draft: role === 'admin' && isDraftPageRequested(),
     });
+    try {
+      ({ seriesId } = await refreshReaderSeriesView(pageResult.page, seriesId, sessionUser));
+    } catch (err) {
+      handleDataLoadError(err);
+      return;
+    }
     readerBootState.resolvePageConfig(pageResult);
     loadLatestUpdate();
     init(pageResult.source);

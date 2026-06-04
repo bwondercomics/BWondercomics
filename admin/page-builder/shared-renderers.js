@@ -71,6 +71,25 @@ export function createRenderers({
     return resolveImageUrl(raw);
   }
 
+  function normalizeSourceConfig(config = {}) {
+    const source = config?.source && typeof config.source === 'object' ? config.source : {};
+    const mode = String(source.mode || '').trim();
+    const safeSource = {
+      mode,
+    };
+    if (source.seriesId) safeSource.seriesId = String(source.seriesId || '').trim();
+    if (source.filters && typeof source.filters === 'object') safeSource.filters = source.filters;
+    if (source.sort) safeSource.sort = String(source.sort || '').trim();
+    if (source.limit !== undefined) safeSource.limit = source.limit;
+    return safeSource;
+  }
+
+  function sourceAttrs(config = {}) {
+    const source = normalizeSourceConfig(config);
+    const json = escapeHtml(JSON.stringify(source));
+    return ` data-source-mode="${escapeHtml(source.mode || '')}" data-source-series-id="${escapeHtml(source.seriesId || '')}" data-source-config="${json}"`;
+  }
+
   const MODULE_RENDERERS = {
     header: (config) => {
       const title = escapeHtml(config.title || '');
@@ -282,7 +301,7 @@ export function createRenderers({
       return `
         <div class="pb-reader-mount"
              data-show-panels="${showPanels}"
-             data-show-comments="${showComments}">
+             data-show-comments="${showComments}"${sourceAttrs(config)}>
           ${inner}
         </div>
       `;
@@ -297,7 +316,7 @@ export function createRenderers({
       return `
         <div class="pb-entry-gallery-mount"
              data-columns="${columns}"
-             data-show-labels="${showLabels}">
+             data-show-labels="${showLabels}"${sourceAttrs(config)}>
           ${inner}
         </div>
       `;
@@ -348,7 +367,7 @@ export function createRenderers({
              data-feed-label="${feedLabel}"
              data-media-href="${mediaHref}"
              data-media-label="${mediaLabel}"
-             data-feed-style="${escapeHtml(JSON.stringify(safeStyle))}">
+             data-feed-style="${escapeHtml(JSON.stringify(safeStyle))}"${sourceAttrs(config)}>
           <div class="right-panel-feed-bar pb-feed-bar" aria-hidden="true">
             <button class="feed-exit-btn pb-feed-exit" type="button" aria-label="Close feed">\u00D7</button>
             <div class="latest-actions">
@@ -373,6 +392,26 @@ export function createRenderers({
               <div class="latest-loading">${loadingText}</div>
             </div>
           </div>
+        </div>
+      `;
+    },
+
+    'media-gallery': (config) => {
+      const columns = sanitizeNumber(config.columns, 3, 1, 6);
+      const limit = sanitizeNumber(config.limit, 24, 1, 100);
+      const showCaptions = config.showCaptions !== false;
+      const includePremium = config.includePremium !== false;
+      const inner = showMountPlaceholders
+        ? '<div class="pb-mount-placeholder">Media Gallery (renders on live page)</div>'
+        : '<!-- Media gallery will be mounted here -->';
+      return `
+        <div class="pb-media-gallery-mount"
+             style="--media-gallery-columns: ${columns};"
+             data-columns="${columns}"
+             data-limit="${limit}"
+             data-show-captions="${showCaptions}"
+             data-include-premium="${includePremium}"${sourceAttrs(config)}>
+          ${inner}
         </div>
       `;
     },

@@ -11,6 +11,8 @@ from sqlalchemy.orm import Session, selectinload
 
 from .builder_security import (
     ALLOWED_MODULE_TYPES,
+    CMS_SOURCE_ACTIVE_PAGE_SERIES,
+    CMS_SOURCE_SPECIFIC_SERIES,
     sanitize_module_config,
     sanitize_page_meta,
     sanitize_section_settings,
@@ -48,7 +50,32 @@ def sanitize_binding_role(raw: str | None) -> str:
     return role
 
 
-def _serialize_module(module: BuilderModule) -> dict[str, Any]:
+def _sanitize_module_config_for_page(
+    page: BuilderPage | None, module_type: str, raw_config: Any
+) -> dict[str, Any]:
+    config = sanitize_module_config(module_type, raw_config)
+    if module_type != "reader" or not isinstance(config, dict):
+        return config
+
+    scope = (
+        sanitize_page_scope(getattr(page, "scope", PAGE_SCOPE_SERIES))
+        if page
+        else PAGE_SCOPE_SERIES
+    )
+    next_config = dict(config)
+    if scope == PAGE_SCOPE_GLOBAL:
+        source = next_config.get("source") if isinstance(next_config.get("source"), dict) else {}
+        next_source = {"mode": CMS_SOURCE_SPECIFIC_SERIES}
+        series_id = str(source.get("seriesId") or "").strip()
+        if series_id:
+            next_source["seriesId"] = series_id
+        next_config["source"] = next_source
+    else:
+        next_config["source"] = {"mode": CMS_SOURCE_ACTIVE_PAGE_SERIES}
+    return next_config
+
+
+def _serialize_module(module: BuilderModule, page: BuilderPage | None = None) -> dict[str, Any]:
     try:
         module_type = validate_module_type(module.module_type)
     except ValueError:
@@ -58,13 +85,13 @@ def _serialize_module(module: BuilderModule) -> dict[str, Any]:
         "moduleType": module_type,
         "columnIndex": max(0, int(module.column_index or 0)),
         "sortIndex": max(0, int(module.sort_index or 0)),
-        "config": sanitize_module_config(module_type, module.config)
+        "config": _sanitize_module_config_for_page(page, module_type, module.config)
         if module_type in ALLOWED_MODULE_TYPES
         else {},
     }
 
 
-def _serialize_section(section: BuilderSection) -> dict[str, Any]:
+def _serialize_section(section: BuilderSection, page: BuilderPage | None = None) -> dict[str, Any]:
     try:
         layout = validate_layout(section.layout)
     except ValueError:
@@ -79,7 +106,7 @@ def _serialize_section(section: BuilderSection) -> dict[str, Any]:
             validate_column_index(module.column_index, layout)
         except ValueError:
             continue
-        modules.append(_serialize_module(module))
+        modules.append(_serialize_module(module, page))
     return {
         "id": str(section.id),
         "sectionType": section_type,
@@ -148,7 +175,8 @@ def _serialize_page_with_sections(
 ) -> dict[str, Any]:
     payload = _serialize_page(page, include_sort_index=include_sort_index)
     payload["sections"] = [
-        _serialize_section(section) for section in sorted(page.sections, key=lambda s: s.sort_index)
+        _serialize_section(section, page)
+        for section in sorted(page.sections, key=lambda s: s.sort_index)
     ]
     return payload
 
@@ -727,6 +755,7 @@ def add_module(db: Session, section_id: str, data: dict[str, Any]) -> dict[str, 
     section = db.get(BuilderSection, sid)
     if not section:
         return None
+    page = db.get(BuilderPage, section.page_id)
 
     now = _now()
     layout = validate_layout(section.layout)
@@ -748,19 +777,18 @@ def add_module(db: Session, section_id: str, data: dict[str, Any]) -> dict[str, 
         module_type=module_type,
         column_index=column_index,
         sort_index=sort_index,
-        config=sanitize_module_config(module_type, data.get("config") or {}),
+        config=_sanitize_module_config_for_page(page, module_type, data.get("config") or {}),
         created_at=now,
         updated_at=now,
     )
     db.add(module)
 
-    page = db.get(BuilderPage, section.page_id)
     if page:
         page.updated_at = now
 
     db.commit()
 
-    return _serialize_module(module)
+    return _serialize_module(module, page)
 
 
 def update_module(db: Session, module_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
@@ -777,6 +805,7 @@ def update_module(db: Session, module_id: str, data: dict[str, Any]) -> dict[str
     now = _now()
 
     section = db.get(BuilderSection, module.section_id)
+    page = db.get(BuilderPage, section.page_id) if section else None
     layout = validate_layout(section.layout) if section else "1"
     next_type = (
         validate_module_type(data["moduleType"])
@@ -790,18 +819,16 @@ def update_module(db: Session, module_id: str, data: dict[str, Any]) -> dict[str
     if "sortIndex" in data:
         module.sort_index = validate_sort_index(data["sortIndex"])
     if "config" in data and isinstance(data["config"], dict):
-        module.config = sanitize_module_config(next_type, data["config"])
+        module.config = _sanitize_module_config_for_page(page, next_type, data["config"])
 
     module.updated_at = now
 
-    if section:
-        page = db.get(BuilderPage, section.page_id)
-        if page:
-            page.updated_at = now
+    if page:
+        page.updated_at = now
 
     db.commit()
 
-    return _serialize_module(module)
+    return _serialize_module(module, page)
 
 
 def delete_module(db: Session, module_id: str) -> bool:
