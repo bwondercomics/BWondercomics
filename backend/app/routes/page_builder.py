@@ -12,22 +12,32 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..models import User
 from ..page_store import (
+    PAGE_SCOPE_GLOBAL,
+    PAGE_SCOPE_SERIES,
     add_module,
     add_section,
     create_page,
+    create_scoped_page,
     delete_module,
     delete_page,
     delete_section,
+    get_global_page_by_slug,
     get_homepage_page,
     get_page,
+    get_page_bindings,
     get_page_by_slug,
+    get_scoped_page_by_slug,
+    list_global_pages,
     list_pages,
+    list_series_pages,
     move_module,
     reorder_modules,
     reorder_pages,
+    reorder_scoped_pages,
     reorder_sections,
     update_module,
     update_page,
+    update_page_bindings,
     update_section,
 )
 from ..security import get_current_user
@@ -74,6 +84,12 @@ class ReorderPagesRequest(BaseModel):
     page_ids: list[str] = Field(alias="pageIds")
 
 
+class PageBindingsRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    bindings: dict[str, str | None] = Field(default_factory=dict)
+
+
 @router.get("/api/admin/pages")
 def api_list_pages(
     request: Request,
@@ -86,6 +102,180 @@ def api_list_pages(
 
     pages = list_pages(db, series_id)
     return {"pages": pages}
+
+
+@router.get("/api/admin/pages/global")
+def api_list_global_pages(request: Request, db: Session = Depends(get_db)):
+    """List global pages."""
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    return {"pages": list_global_pages(db)}
+
+
+@router.post("/api/admin/pages/global")
+def api_create_global_page(
+    payload: CreatePageRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Create a global page."""
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    try:
+        page = create_scoped_page(
+            db,
+            PAGE_SCOPE_GLOBAL,
+            None,
+            payload.model_dump(by_alias=True, exclude_none=True),
+        )
+        return {"page": page}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+
+
+@router.get("/api/admin/pages/global/by-slug/{slug}")
+def api_get_global_page_by_slug_admin(
+    slug: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Get a global page by slug for admin preview and draft viewing."""
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    page = get_global_page_by_slug(db, slug)
+    if not page:
+        return JSONResponse(status_code=404, content={"error": "Page not found"})
+    return {"page": page}
+
+
+@router.post("/api/admin/pages/global/reorder")
+def api_reorder_global_pages(
+    payload: ReorderPagesRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Reorder global pages."""
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    try:
+        reorder_scoped_pages(db, PAGE_SCOPE_GLOBAL, None, payload.page_ids)
+        return {"status": "success"}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+
+
+@router.get("/api/admin/pages/series/{series_id}")
+def api_list_series_pages(
+    series_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """List pages for a series."""
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    try:
+        return {"pages": list_series_pages(db, series_id)}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+
+
+@router.post("/api/admin/pages/series/{series_id}")
+def api_create_series_page(
+    series_id: str,
+    payload: CreatePageRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Create a page for a series."""
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    try:
+        page = create_scoped_page(
+            db,
+            PAGE_SCOPE_SERIES,
+            series_id,
+            payload.model_dump(by_alias=True, exclude_none=True),
+        )
+        return {"page": page}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+
+
+@router.get("/api/admin/pages/series/{series_id}/by-slug/{slug}")
+def api_get_series_page_by_slug_admin(
+    series_id: str,
+    slug: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Get a series page by slug for admin preview and draft viewing."""
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    try:
+        page = get_scoped_page_by_slug(db, PAGE_SCOPE_SERIES, series_id, slug)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+    if not page:
+        return JSONResponse(status_code=404, content={"error": "Page not found"})
+    return {"page": page}
+
+
+@router.post("/api/admin/pages/series/{series_id}/reorder")
+def api_reorder_series_pages(
+    series_id: str,
+    payload: ReorderPagesRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Reorder pages for a series."""
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    try:
+        reorder_scoped_pages(db, PAGE_SCOPE_SERIES, series_id, payload.page_ids)
+        return {"status": "success"}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+
+
+@router.get("/api/admin/page-bindings/{series_id}")
+def api_get_page_bindings(
+    series_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Get page route-role bindings for a series."""
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    try:
+        return get_page_bindings(db, series_id)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
+
+
+@router.put("/api/admin/page-bindings/{series_id}")
+def api_update_page_bindings(
+    series_id: str,
+    payload: PageBindingsRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Update page route-role bindings for a series."""
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    try:
+        return update_page_bindings(db, series_id, payload.bindings)
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
 
 
 @router.get("/api/admin/pages/{page_id}")
@@ -196,8 +386,11 @@ def api_reorder_pages(
     if not _require_admin(request, db):
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    reorder_pages(db, series_id, payload.page_ids)
-    return {"status": "success"}
+    try:
+        reorder_pages(db, series_id, payload.page_ids)
+        return {"status": "success"}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
 
 
 # Section endpoints
@@ -430,6 +623,16 @@ def api_public_homepage(series_id: str, db: Session = Depends(get_db)):
     """Get the effective published homepage page for public rendering."""
     page = get_homepage_page(db, series_id, published_only=True)
     if not page:
+        return JSONResponse(status_code=404, content={"error": "Page not found"})
+
+    return {"page": page}
+
+
+@router.get("/api/pages/global/by-slug/{slug}")
+def api_public_global_page(slug: str, db: Session = Depends(get_db)):
+    """Get a published global page for public rendering."""
+    page = get_global_page_by_slug(db, slug)
+    if not page or not page.get("isPublished"):
         return JSONResponse(status_code=404, content={"error": "Page not found"})
 
     return {"page": page}

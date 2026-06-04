@@ -44,7 +44,10 @@ This document describes the current builder runtime under `admin/page-builder/` 
 
 ## 💡 Scope & Canonical Entry
 
-The builder is the admin authoring surface for series-scoped pages backed by `BuilderPage`, `BuilderSection`, and `BuilderModule`. It is not a freeform visual editor. The builder works with explicit page, section, and module records plus page-level metadata in `page.meta`.
+The builder is the admin authoring surface for scoped builder pages backed by `BuilderPage`,
+`BuilderSection`, `BuilderModule`, and series route-role `BuilderPageBinding` records. It is not a
+freeform visual editor. The builder works with explicit page, section, and module records plus
+page-level metadata in `page.meta`.
 
 ### Canonical Entry
 
@@ -62,8 +65,13 @@ Current routing behavior:
 
 ### Page
 
-Current page-level fields include: `slug`, `title`, `pageType`, `isPublished`, `isHomepage`, `sortIndex`, and `meta`.
+Current page-level fields include: `scope` (`series` or `global`), nullable `seriesId`, `slug`,
+`title`, `pageType`, `isPublished`, `isHomepage`, `sortIndex`, and `meta`.
 Current page-level `meta` ownership: `meta.header`, `meta.theme`, `meta.panelBackgrounds`, and `meta.panelSpacing`.
+
+Series route roles are stored in `BuilderPageBinding`; Phase 8 requires the `reader` role for each
+series, and reader bindings must point at a same-series page. `feed`/`gallery` roles are reserved
+for later CMS module work.
 
 ### Section
 
@@ -75,13 +83,15 @@ Modules currently own: `moduleType`, `columnIndex`, `sortIndex`, and `config`.
 
 ## ⚙️ Current Builder Flow
 
-1. `admin/page-builder.js` loads the page list for the active series with `fetchPages(...)`.
-2. The selected page is resolved from the route or first available page.
+1. `admin/page-builder.js` loads either global pages or active-series pages through explicit scoped
+   endpoints.
+2. The selected page is resolved from the route, active scope, or first available scoped page.
 3. The active page detail is loaded with `fetchPage(...)`.
 4. The full-page shell hides normal admin chrome and renders the top toolbar plus unified side
    panel.
 5. The side panel is rendered by `sidebar-panel.js` and exposes Pages, Blocks, Layers, Settings,
-   and Styles.
+   and Styles. The Pages panel switches between Global Pages and Series Pages and shows reader
+   binding warnings for the active series.
 6. The default canvas is the live iframe preview rendered by `preview-manager.js` with
    `builderEditing: true`, so the reader iframe can emit admin-only target markers and live target
    geometry.
@@ -278,12 +288,16 @@ snapshot so previewing unsaved changes does not mutate `currentPage`.
 This is the backend API layer for builder records. Current fetchers and mutators include:
 
 - `fetchPages(seriesId)`, `fetchPage(pageId)`
-- `createPage`, `deletePage`, `reorderPages`, `updatePage`
+- `fetchSeriesPages(seriesId)`, `fetchGlobalPages()`, `fetchPage(pageId)`
+- `createScopedPage(scope, seriesId, slug, title)`, `deletePage`, `reorderScopedPages`,
+  `updatePage`
+- `fetchPageBindings(seriesId)`, `updatePageBindings(seriesId, bindings)`
 - `addSection`, `updateSection`, `deleteSection`, `reorderSections`
 - `addModule`, `updateModule`, `moveModule`, `reorderModules`, `deleteModule`
 - `fetchAssets`, `uploadAsset`
 
-Because `fetchPages(seriesId)` returns page summaries without hydrated `sections`/`modules`, it is not sufficient input for `auditPagesFallbacks(...)` when validating runtime-fallback retirement.
+Because page-list fetchers return page summaries without hydrated `sections`/`modules`, they are not
+sufficient input for `auditPagesFallbacks(...)` when validating runtime-fallback retirement.
 
 ## 🚦 Fallback Retirement Gate (fallback-retirement-gate.js)
 
@@ -570,7 +584,10 @@ Backend parity note:
 A shared utility library for manipulating and normalizing links across the builder. Key exports:
 
 - `normalizeLinkTarget` — canonicalizes `builder-page`, `url`, and `anchor` link targets; sanitizes unsafe URLs
-- `resolveLinkTargetHref`, `shouldOpenLinkInNewTab`, `buildReaderPageHref` — routing / href resolution
+- `resolveLinkTargetHref`, `shouldOpenLinkInNewTab`, `buildReaderPageHref`,
+  `buildGlobalPageHref` — routing / href resolution
+- Builder-page link targets use `pageScope`; series targets preserve `seriesId` when known, while
+  legacy series targets without `seriesId` resolve against the active/default series.
 - `normalizeButtonItem` — normalizes a `buttons` module item, including `style: 'primary' | 'secondary'` plus optional shared `appearance`
 - `normalizeHeaderNavItem` / `normalizeHeaderNavItems` — normalizes a header nav item; includes `style: 'primary' | 'secondary'` plus optional shared `appearance`, making header nav items structurally compatible with the button module's variant + appearance model
 - `normalizeButtonsConfig` — normalizes a full `buttons` module config, including `defaults.appearance` while preserving unrelated config fields

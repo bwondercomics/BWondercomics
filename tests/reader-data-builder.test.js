@@ -121,6 +121,32 @@ describe('reader builder presentation loading', () => {
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/pages/battle-bros/about']);
   });
 
+  it('loads global builder pages through the global public route', async () => {
+    const globalPage = buildContractFixture('builderPageDraft', {
+      scope: 'global',
+      seriesId: null,
+      slug: 'about',
+      title: 'Global About',
+      isPublished: true,
+    });
+    const setSubtitles = vi.fn();
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/pages/global/by-slug/about') {
+        return jsonResponse({ page: globalPage });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await loadPageConfigWithFallback(setSubtitles, 'battle-bros', {
+      pageSlug: 'about',
+      pageScope: 'global',
+    });
+
+    expect(result).toEqual({ source: 'builder', page: globalPage });
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/pages/global/by-slug/about']);
+  });
+
   it('loads unpublished draft pages through the admin slug endpoint', async () => {
     const draftPage = buildContractFixture('builderPage', {
       slug: 'about',
@@ -129,7 +155,7 @@ describe('reader builder presentation loading', () => {
     });
     const setSubtitles = vi.fn();
     const fetchMock = vi.fn(async (url) => {
-      if (url === '/api/admin/pages/by-slug/battle-bros/about') {
+      if (url === '/api/admin/pages/series/battle-bros/by-slug/about') {
         return jsonResponse({ page: draftPage });
       }
       throw new Error(`Unexpected fetch: ${url}`);
@@ -144,7 +170,7 @@ describe('reader builder presentation loading', () => {
     expect(result).toEqual({ source: 'builder', page: draftPage });
     expect(setSubtitles).toHaveBeenCalledWith(['Hero Time', 'Lunch Break Justice']);
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
-      '/api/admin/pages/by-slug/battle-bros/about',
+      '/api/admin/pages/series/battle-bros/by-slug/about',
     ]);
   });
 
@@ -282,7 +308,7 @@ describe('reader builder presentation loading', () => {
 
   it('returns null when a draft page request is denied', async () => {
     const fetchMock = vi.fn(async (url) => {
-      if (url === '/api/admin/pages/by-slug/battle-bros/about') {
+      if (url === '/api/admin/pages/series/battle-bros/by-slug/about') {
         return jsonResponse({}, { ok: false, status: 403, statusText: 'Forbidden' });
       }
       throw new Error(`Unexpected fetch: ${url}`);

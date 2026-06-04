@@ -4,14 +4,20 @@ import {
   addModule,
   addSection,
   createPage,
+  createScopedPage,
   deleteModule,
   deletePage,
   deleteSection,
+  fetchGlobalPages,
   fetchPage,
   fetchPages,
+  fetchPageBindings,
+  fetchSeriesPages,
   moveModule,
   reorderModules,
   reorderSections,
+  reorderScopedPages,
+  updatePageBindings,
   updateModule,
   updatePage,
   updateSection,
@@ -37,7 +43,7 @@ describe('admin page-builder data layer', () => {
       isPublished: false,
     });
     const fetchMock = vi.fn(async (url, options = {}) => {
-      if (url === '/api/admin/pages?series_id=battle-bros') {
+      if (url === '/api/admin/pages/series/battle-bros') {
         if (options.method === 'POST') {
           return jsonResponse({ page });
         }
@@ -63,7 +69,7 @@ describe('admin page-builder data layer', () => {
     expect(await deletePage(page.id)).toBe(true);
 
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/admin/pages?series_id=battle-bros',
+      '/api/admin/pages/series/battle-bros',
       expect.objectContaining({
         cache: 'no-store',
         credentials: 'same-origin',
@@ -77,10 +83,71 @@ describe('admin page-builder data layer', () => {
       })
     );
     expect(fetchMock).toHaveBeenCalledWith(
-      '/api/admin/pages?series_id=battle-bros',
+      '/api/admin/pages/series/battle-bros',
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ slug: 'reader', title: 'Reader' }),
+      })
+    );
+  });
+
+  it('uses explicit scope endpoints for global pages and page bindings', async () => {
+    const seriesPage = getContractFixture('builderPage');
+    const globalPage = buildContractFixture('builderPageDraft', {
+      id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeee99',
+      scope: 'global',
+      seriesId: null,
+      slug: 'about',
+      title: 'About',
+      isPublished: true,
+    });
+    const bindings = {
+      seriesId: 'battle-bros',
+      bindings: { reader: { role: 'reader', pageId: seriesPage.id, page: seriesPage } },
+      warnings: [],
+    };
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (url === '/api/admin/pages/global') {
+        if (options.method === 'POST') return jsonResponse({ page: globalPage });
+        return jsonResponse({ pages: [globalPage] });
+      }
+      if (url === '/api/admin/pages/series/battle-bros') {
+        return jsonResponse({ pages: [seriesPage] });
+      }
+      if (url === '/api/admin/pages/global/reorder' && options.method === 'POST') {
+        return jsonResponse({ status: 'success' });
+      }
+      if (url === '/api/admin/pages/series/battle-bros/reorder' && options.method === 'POST') {
+        return jsonResponse({ status: 'success' });
+      }
+      if (url === '/api/admin/page-bindings/battle-bros') {
+        if (options.method === 'PUT') return jsonResponse(bindings);
+        return jsonResponse(bindings);
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await fetchSeriesPages('battle-bros')).toEqual([seriesPage]);
+    expect(await fetchGlobalPages()).toEqual([globalPage]);
+    expect(await createScopedPage('global', 'battle-bros', 'about', 'About')).toEqual(globalPage);
+    expect(await reorderScopedPages('global', 'battle-bros', [globalPage.id])).toBe(true);
+    expect(await reorderScopedPages('series', 'battle-bros', [seriesPage.id])).toBe(true);
+    expect(await fetchPageBindings('battle-bros')).toEqual(bindings);
+    expect(await updatePageBindings('battle-bros', { reader: seriesPage.id })).toEqual(bindings);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/admin/pages/global',
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify({ slug: 'about', title: 'About' }),
+      })
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/admin/page-bindings/battle-bros',
+      expect.objectContaining({
+        method: 'PUT',
+        body: JSON.stringify({ bindings: { reader: seriesPage.id } }),
       })
     );
   });
@@ -92,7 +159,7 @@ describe('admin page-builder data layer', () => {
     const updatedSection = { ...section, settings: { moduleGap: 18 } };
     const updatedModule = { ...module, config: { limit: 8 } };
     const fetchMock = vi.fn(async (url, options = {}) => {
-      if (url === '/api/admin/pages?series_id=battle-bros' && options.method === 'POST') {
+      if (url === '/api/admin/pages/series/battle-bros' && options.method === 'POST') {
         return jsonResponse(
           { error: 'Duplicate slug' },
           { status: 400, statusText: 'Bad Request' }

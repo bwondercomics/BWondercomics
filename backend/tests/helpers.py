@@ -22,9 +22,10 @@ from backend.app.db import Base, get_db
 from backend.app.models import (
     BuilderModule,
     BuilderPage,
+    BuilderPageBinding,
     BuilderSection,
-    CommentLimit,
     Comment,
+    CommentLimit,
     EmailSubscriber,
     Entry,
     EntryLabel,
@@ -39,7 +40,6 @@ from backend.app.models import (
 )
 from backend.app.security import hash_password, issue_session_token
 from backend.app.settings import settings as app_settings
-
 
 FIXTURE_PATH = Path(__file__).resolve().parents[2] / "tests" / "fixtures" / "contract-fixtures.json"
 
@@ -280,6 +280,7 @@ class BackendRouteTestCase(unittest.TestCase):
         now = parse_iso_z(self.contracts["seriesData"]["lastUpdated"]) or datetime.now(timezone.utc)
         page = BuilderPage(
             id=UUID(payload["id"]),
+            scope=payload.get("scope") or "series",
             series_id=series_id,
             slug=payload["slug"],
             title=payload["title"],
@@ -292,6 +293,22 @@ class BackendRouteTestCase(unittest.TestCase):
             updated_at=now,
         )
         self.db.add(page)
+        existing_reader_binding = self.db.scalar(
+            select(BuilderPageBinding).where(
+                BuilderPageBinding.series_id == series_id,
+                BuilderPageBinding.role == "reader",
+            )
+        )
+        if (page.slug == "reader" or page.page_type == "reader") and not existing_reader_binding:
+            self.db.add(
+                BuilderPageBinding(
+                    series_id=series_id,
+                    role="reader",
+                    page_id=page.id,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
 
         sections: list[BuilderSection] = []
         modules: list[BuilderModule] = []

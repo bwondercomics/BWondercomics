@@ -20,12 +20,32 @@ from .builder_security import (
     validate_section_type,
     validate_sort_index,
 )
-from .models import BuilderModule, BuilderPage, BuilderSection
+from .models import BuilderModule, BuilderPage, BuilderPageBinding, BuilderSection
 from .series_store import DEFAULT_SERIES_ID, sanitize_series_id
+
+PAGE_SCOPE_SERIES = "series"
+PAGE_SCOPE_GLOBAL = "global"
+PAGE_SCOPES = {PAGE_SCOPE_SERIES, PAGE_SCOPE_GLOBAL}
+BINDING_ROLE_READER = "reader"
+BINDING_ROLES = {BINDING_ROLE_READER, "feed", "gallery"}
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def sanitize_page_scope(raw: str | None) -> str:
+    scope = str(raw or PAGE_SCOPE_SERIES).strip().lower()
+    if scope not in PAGE_SCOPES:
+        raise ValueError("Page scope must be 'series' or 'global'")
+    return scope
+
+
+def sanitize_binding_role(raw: str | None) -> str:
+    role = str(raw or "").strip().lower()
+    if role not in BINDING_ROLES:
+        raise ValueError("Binding role must be reader, feed, or gallery")
+    return role
 
 
 def _serialize_module(module: BuilderModule) -> dict[str, Any]:
@@ -71,8 +91,10 @@ def _serialize_section(section: BuilderSection) -> dict[str, Any]:
 
 
 def _serialize_page(page: BuilderPage, include_sort_index: bool = True) -> dict[str, Any]:
+    scope = sanitize_page_scope(page.scope)
     payload = {
         "id": str(page.id),
+        "scope": scope,
         "seriesId": page.series_id,
         "slug": page.slug,
         "title": page.title,
@@ -91,15 +113,141 @@ def _serialize_page(page: BuilderPage, include_sort_index: bool = True) -> dict[
 # Page operations
 
 
-def list_pages(db: Session, series_id: str | None) -> list[dict[str, Any]]:
-    """List all pages for a series."""
-    sid = sanitize_series_id(series_id) if series_id else DEFAULT_SERIES_ID
+def _normalize_slug(raw: str | None) -> str:
+    slug = str(raw or "").strip().lower()[:100]
+    if not slug:
+        raise ValueError("Page slug is required")
+    return slug
+
+
+def _require_series_id(series_id: str | None) -> str:
+    if not series_id:
+        raise ValueError("Series pages require a series id")
+    return sanitize_series_id(series_id)
+
+
+def _scope_filters(scope: str, series_id: str | None = None) -> list[Any]:
+    if scope == PAGE_SCOPE_GLOBAL:
+        return [BuilderPage.scope == PAGE_SCOPE_GLOBAL, BuilderPage.series_id.is_(None)]
+    return [
+        BuilderPage.scope == PAGE_SCOPE_SERIES,
+        BuilderPage.series_id == _require_series_id(series_id),
+    ]
+
+
+def _load_page_with_content(db: Session, *filters: Any) -> BuilderPage | None:
+    return db.scalar(
+        select(BuilderPage)
+        .where(*filters)
+        .options(selectinload(BuilderPage.sections).selectinload(BuilderSection.modules))
+    )
+
+
+def _serialize_page_with_sections(
+    page: BuilderPage, include_sort_index: bool = True
+) -> dict[str, Any]:
+    payload = _serialize_page(page, include_sort_index=include_sort_index)
+    payload["sections"] = [
+        _serialize_section(section) for section in sorted(page.sections, key=lambda s: s.sort_index)
+    ]
+    return payload
+
+
+def _find_page_by_slug(
+    db: Session,
+    scope: str,
+    series_id: str | None,
+    slug: str,
+    exclude_page_id: uuid.UUID | None = None,
+) -> BuilderPage | None:
+    filters = [*_scope_filters(scope, series_id), BuilderPage.slug == slug]
+    if exclude_page_id:
+        filters.append(BuilderPage.id != exclude_page_id)
+    return db.scalar(select(BuilderPage).where(*filters))
+
+
+def _unset_homepages(
+    db: Session, scope: str, series_id: str | None, exclude_page_id: uuid.UUID | None = None
+) -> None:
+    filters = [*_scope_filters(scope, series_id), BuilderPage.is_homepage == True]  # noqa: E712
+    if exclude_page_id:
+        filters.append(BuilderPage.id != exclude_page_id)
+    db.execute(BuilderPage.__table__.update().where(*filters).values(is_homepage=False))
+
+
+def _next_sort_index(db: Session, scope: str, series_id: str | None) -> int:
+    return (
+        db.scalar(
+            select(BuilderPage.sort_index)
+            .where(*_scope_filters(scope, series_id))
+            .order_by(BuilderPage.sort_index.desc())
+        )
+        or 0
+    ) + 1
+
+
+def _page_can_bind_to_series(page: BuilderPage, series_id: str, role: str | None = None) -> bool:
+    scope = sanitize_page_scope(page.scope)
+    if role == BINDING_ROLE_READER:
+        return scope == PAGE_SCOPE_SERIES and page.series_id == series_id
+    return scope == PAGE_SCOPE_GLOBAL or (
+        scope == PAGE_SCOPE_SERIES and page.series_id == series_id
+    )
+
+
+def _ensure_reader_binding_for_page(db: Session, page: BuilderPage) -> None:
+    if sanitize_page_scope(page.scope) != PAGE_SCOPE_SERIES or not page.series_id:
+        return
+    if page.slug != "reader" and page.page_type != "reader":
+        return
+    existing = db.scalar(
+        select(BuilderPageBinding).where(
+            BuilderPageBinding.series_id == page.series_id,
+            BuilderPageBinding.role == BINDING_ROLE_READER,
+        )
+    )
+    if existing:
+        return
+    now = _now()
+    db.add(
+        BuilderPageBinding(
+            series_id=page.series_id,
+            role=BINDING_ROLE_READER,
+            page_id=page.id,
+            created_at=now,
+            updated_at=now,
+        )
+    )
+
+
+def list_scoped_pages(
+    db: Session,
+    scope: str,
+    series_id: str | None = None,
+) -> list[dict[str, Any]]:
+    """List all pages for a page scope."""
+    safe_scope = sanitize_page_scope(scope)
     pages = db.scalars(
         select(BuilderPage)
-        .where(BuilderPage.series_id == sid)
+        .where(*_scope_filters(safe_scope, series_id))
         .order_by(BuilderPage.sort_index.asc(), BuilderPage.created_at.asc())
     ).all()
     return [_serialize_page(page) for page in pages]
+
+
+def list_pages(db: Session, series_id: str | None) -> list[dict[str, Any]]:
+    """Compatibility list for series pages."""
+    return list_scoped_pages(db, PAGE_SCOPE_SERIES, series_id or DEFAULT_SERIES_ID)
+
+
+def list_global_pages(db: Session) -> list[dict[str, Any]]:
+    """List global pages."""
+    return list_scoped_pages(db, PAGE_SCOPE_GLOBAL)
+
+
+def list_series_pages(db: Session, series_id: str | None) -> list[dict[str, Any]]:
+    """List series pages."""
+    return list_scoped_pages(db, PAGE_SCOPE_SERIES, series_id)
 
 
 def get_page(db: Session, page_id: str) -> dict[str, Any] | None:
@@ -117,30 +265,60 @@ def get_page(db: Session, page_id: str) -> dict[str, Any] | None:
     if not page:
         return None
 
-    payload = _serialize_page(page)
-    payload["sections"] = [
-        _serialize_section(section) for section in sorted(page.sections, key=lambda s: s.sort_index)
-    ]
-    return payload
+    return _serialize_page_with_sections(page)
 
 
-def get_page_by_slug(db: Session, series_id: str | None, slug: str) -> dict[str, Any] | None:
-    """Get a page by series and slug (for public rendering)."""
-    sid = sanitize_series_id(series_id) if series_id else DEFAULT_SERIES_ID
-
-    page = db.scalar(
-        select(BuilderPage)
-        .where(BuilderPage.series_id == sid, BuilderPage.slug == slug)
-        .options(selectinload(BuilderPage.sections).selectinload(BuilderSection.modules))
+def get_scoped_page_by_slug(
+    db: Session,
+    scope: str,
+    series_id: str | None,
+    slug: str,
+) -> dict[str, Any] | None:
+    """Get a page by explicit scope and slug."""
+    safe_scope = sanitize_page_scope(scope)
+    page = _load_page_with_content(
+        db, *_scope_filters(safe_scope, series_id), BuilderPage.slug == slug
     )
     if not page:
         return None
+    return _serialize_page_with_sections(page, include_sort_index=False)
 
-    payload = _serialize_page(page, include_sort_index=False)
-    payload["sections"] = [
-        _serialize_section(section) for section in sorted(page.sections, key=lambda s: s.sort_index)
+
+def get_page_by_slug(db: Session, series_id: str | None, slug: str) -> dict[str, Any] | None:
+    """Compatibility series page lookup by slug."""
+    return get_scoped_page_by_slug(db, PAGE_SCOPE_SERIES, series_id or DEFAULT_SERIES_ID, slug)
+
+
+def get_global_page_by_slug(db: Session, slug: str) -> dict[str, Any] | None:
+    """Get a global page by slug."""
+    return get_scoped_page_by_slug(db, PAGE_SCOPE_GLOBAL, None, slug)
+
+
+def get_bound_page(
+    db: Session,
+    series_id: str | None,
+    role: str,
+    *,
+    published_only: bool = False,
+) -> BuilderPage | None:
+    """Load the page bound to a series route role."""
+    sid = _require_series_id(series_id)
+    safe_role = sanitize_binding_role(role)
+    filters: list[Any] = [
+        BuilderPageBinding.series_id == sid,
+        BuilderPageBinding.role == safe_role,
     ]
-    return payload
+    if published_only:
+        filters.append(BuilderPage.is_published == True)  # noqa: E712
+    page = db.scalar(
+        select(BuilderPage)
+        .join(BuilderPageBinding, BuilderPageBinding.page_id == BuilderPage.id)
+        .where(*filters)
+        .options(selectinload(BuilderPage.sections).selectinload(BuilderSection.modules))
+    )
+    if not page or not _page_can_bind_to_series(page, sid, safe_role):
+        return None
+    return page
 
 
 def get_homepage_page(
@@ -149,47 +327,39 @@ def get_homepage_page(
     *,
     published_only: bool = False,
 ) -> dict[str, Any] | None:
-    """Resolve the homepage page for a series, falling back to the reader page."""
-    sid = sanitize_series_id(series_id) if series_id else DEFAULT_SERIES_ID
+    """Resolve the homepage page for a series, falling back to the reader binding."""
+    sid = _require_series_id(series_id or DEFAULT_SERIES_ID)
 
-    def load_page(*filters: Any) -> BuilderPage | None:
-        return db.scalar(
-            select(BuilderPage)
-            .where(BuilderPage.series_id == sid, *filters)
-            .options(selectinload(BuilderPage.sections).selectinload(BuilderSection.modules))
-        )
-
-    visibility_filters: list[Any] = []
+    filters: list[Any] = [
+        *_scope_filters(PAGE_SCOPE_SERIES, sid),
+        BuilderPage.is_homepage == True,  # noqa: E712
+    ]
     if published_only:
-        visibility_filters.append(BuilderPage.is_published == True)  # noqa: E712
+        filters.append(BuilderPage.is_published == True)  # noqa: E712
 
-    page = load_page(BuilderPage.is_homepage == True, *visibility_filters)  # noqa: E712
+    page = _load_page_with_content(db, *filters)
     if not page:
-        page = load_page(BuilderPage.slug == "reader", *visibility_filters)
+        page = get_bound_page(db, sid, BINDING_ROLE_READER, published_only=published_only)
     if not page:
         return None
 
-    payload = _serialize_page(page, include_sort_index=False)
-    payload["sections"] = [
-        _serialize_section(section) for section in sorted(page.sections, key=lambda s: s.sort_index)
-    ]
-    return payload
+    return _serialize_page_with_sections(page, include_sort_index=False)
 
 
-def create_page(db: Session, series_id: str | None, data: dict[str, Any]) -> dict[str, Any]:
-    """Create a new page."""
-    sid = sanitize_series_id(series_id) if series_id else DEFAULT_SERIES_ID
+def create_scoped_page(
+    db: Session,
+    scope: str,
+    series_id: str | None,
+    data: dict[str, Any],
+) -> dict[str, Any]:
+    """Create a new page in an explicit scope."""
+    safe_scope = sanitize_page_scope(scope)
+    sid = _require_series_id(series_id) if safe_scope == PAGE_SCOPE_SERIES else None
     now = _now()
 
-    slug = str(data.get("slug") or "").strip().lower()
-    if not slug:
-        raise ValueError("Page slug is required")
-    slug = slug[:100]
+    slug = _normalize_slug(data.get("slug"))
 
-    existing = db.scalar(
-        select(BuilderPage).where(BuilderPage.series_id == sid, BuilderPage.slug == slug)
-    )
-    if existing:
+    if _find_page_by_slug(db, safe_scope, sid, slug):
         raise ValueError(f"Page with slug '{slug}' already exists")
 
     title = str(data.get("title") or slug.replace("-", " ").title()).strip()[:200]
@@ -197,37 +367,32 @@ def create_page(db: Session, series_id: str | None, data: dict[str, Any]) -> dic
     is_homepage = bool(data.get("isHomepage", False))
 
     if is_homepage:
-        db.execute(
-            BuilderPage.__table__.update()
-            .where(BuilderPage.series_id == sid, BuilderPage.is_homepage == True)  # noqa: E712
-            .values(is_homepage=False)
-        )
-
-    max_sort = (
-        db.scalar(
-            select(BuilderPage.sort_index)
-            .where(BuilderPage.series_id == sid)
-            .order_by(BuilderPage.sort_index.desc())
-        )
-        or 0
-    )
+        _unset_homepages(db, safe_scope, sid)
 
     page = BuilderPage(
+        scope=safe_scope,
         series_id=sid,
         slug=slug,
         title=title,
         page_type=page_type,
         is_published=bool(data.get("isPublished", False)),
         is_homepage=is_homepage,
-        sort_index=max_sort + 1,
+        sort_index=_next_sort_index(db, safe_scope, sid),
         meta=sanitize_page_meta(data.get("meta") or {}),
         created_at=now,
         updated_at=now,
     )
     db.add(page)
+    db.flush()
+    _ensure_reader_binding_for_page(db, page)
     db.commit()
 
     return get_page(db, str(page.id)) or {}
+
+
+def create_page(db: Session, series_id: str | None, data: dict[str, Any]) -> dict[str, Any]:
+    """Compatibility create for series pages."""
+    return create_scoped_page(db, PAGE_SCOPE_SERIES, series_id or DEFAULT_SERIES_ID, data)
 
 
 def update_page(db: Session, page_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
@@ -242,20 +407,14 @@ def update_page(db: Session, page_id: str, data: dict[str, Any]) -> dict[str, An
         return None
 
     now = _now()
+    scope = sanitize_page_scope(page.scope)
 
     if "title" in data:
         page.title = str(data["title"]).strip()[:200]
     if "slug" in data:
-        new_slug = str(data["slug"]).strip().lower()[:100]
+        new_slug = _normalize_slug(data["slug"])
         if new_slug and new_slug != page.slug:
-            existing = db.scalar(
-                select(BuilderPage).where(
-                    BuilderPage.series_id == page.series_id,
-                    BuilderPage.slug == new_slug,
-                    BuilderPage.id != pid,
-                )
-            )
-            if existing:
+            if _find_page_by_slug(db, scope, page.series_id, new_slug, exclude_page_id=pid):
                 raise ValueError(f"Page with slug '{new_slug}' already exists")
             page.slug = new_slug
     if "pageType" in data:
@@ -264,16 +423,13 @@ def update_page(db: Session, page_id: str, data: dict[str, Any]) -> dict[str, An
         page.is_published = bool(data["isPublished"])
     if "isHomepage" in data:
         if data["isHomepage"] and not page.is_homepage:
-            db.execute(
-                BuilderPage.__table__.update()
-                .where(BuilderPage.series_id == page.series_id, BuilderPage.is_homepage == True)  # noqa: E712
-                .values(is_homepage=False)
-            )
+            _unset_homepages(db, scope, page.series_id, exclude_page_id=pid)
         page.is_homepage = bool(data["isHomepage"])
     if "meta" in data and isinstance(data["meta"], dict):
         page.meta = sanitize_page_meta(data["meta"])
 
     page.updated_at = now
+    _ensure_reader_binding_for_page(db, page)
     db.commit()
 
     return get_page(db, page_id)
@@ -290,26 +446,144 @@ def delete_page(db: Session, page_id: str) -> bool:
     if not page:
         return False
 
+    db.query(BuilderPageBinding).filter(BuilderPageBinding.page_id == pid).delete()
     db.delete(page)
     db.commit()
     return True
 
 
-def reorder_pages(db: Session, series_id: str | None, page_ids: list[str]) -> bool:
-    """Reorder pages by updating sort_index."""
-    sid = sanitize_series_id(series_id) if series_id else DEFAULT_SERIES_ID
+def reorder_scoped_pages(
+    db: Session,
+    scope: str,
+    series_id: str | None,
+    page_ids: list[str],
+) -> bool:
+    """Reorder pages inside one page scope."""
+    safe_scope = sanitize_page_scope(scope)
+    sid = _require_series_id(series_id) if safe_scope == PAGE_SCOPE_SERIES else None
 
-    for index, page_id in enumerate(page_ids):
+    parsed_ids: list[uuid.UUID] = []
+    seen_ids: set[uuid.UUID] = set()
+    for page_id in page_ids:
         try:
             pid = uuid.UUID(page_id)
-        except ValueError:
-            continue
-        page = db.get(BuilderPage, pid)
-        if page and page.series_id == sid:
-            page.sort_index = index
+        except ValueError as exc:
+            raise ValueError("Page reorder contains an invalid page id") from exc
+        if pid in seen_ids:
+            raise ValueError("Page reorder contains duplicate page ids")
+        seen_ids.add(pid)
+        parsed_ids.append(pid)
+
+    pages = db.scalars(select(BuilderPage).where(*_scope_filters(safe_scope, sid))).all()
+    pages_by_id = {page.id: page for page in pages}
+    if set(parsed_ids) != set(pages_by_id):
+        raise ValueError("Page reorder must include exactly the active scope pages")
+
+    for index, pid in enumerate(parsed_ids):
+        pages_by_id[pid].sort_index = index
 
     db.commit()
     return True
+
+
+def reorder_pages(db: Session, series_id: str | None, page_ids: list[str]) -> bool:
+    """Compatibility reorder for series pages."""
+    return reorder_scoped_pages(db, PAGE_SCOPE_SERIES, series_id or DEFAULT_SERIES_ID, page_ids)
+
+
+def get_page_bindings(db: Session, series_id: str | None) -> dict[str, Any]:
+    """Return route-role page bindings and setup warnings for a series."""
+    sid = _require_series_id(series_id)
+    binding_rows = db.scalars(
+        select(BuilderPageBinding)
+        .where(BuilderPageBinding.series_id == sid)
+        .options(selectinload(BuilderPageBinding.page))
+        .order_by(BuilderPageBinding.role.asc())
+    ).all()
+
+    bindings: dict[str, Any] = {}
+    warnings: list[dict[str, str]] = []
+    for binding in binding_rows:
+        role = sanitize_binding_role(binding.role)
+        page = binding.page
+        if not page or not _page_can_bind_to_series(page, sid, role):
+            warnings.append(
+                {
+                    "role": role,
+                    "code": f"{role}_binding_invalid",
+                    "message": f"The {role} page binding points to an invalid page.",
+                }
+            )
+            continue
+        bindings[role] = {
+            "role": role,
+            "pageId": str(page.id),
+            "page": _serialize_page(page, include_sort_index=False),
+        }
+        if role == BINDING_ROLE_READER and not page.is_published:
+            warnings.append(
+                {
+                    "role": role,
+                    "code": "reader_page_unpublished",
+                    "message": "The bound reader page is not published.",
+                }
+            )
+
+    if BINDING_ROLE_READER not in bindings:
+        warnings.append(
+            {
+                "role": BINDING_ROLE_READER,
+                "code": "missing_reader_binding",
+                "message": "This series is missing a reader page binding.",
+            }
+        )
+
+    return {"seriesId": sid, "bindings": bindings, "warnings": warnings}
+
+
+def update_page_bindings(
+    db: Session,
+    series_id: str | None,
+    bindings: dict[str, str | None],
+) -> dict[str, Any]:
+    """Update page bindings for one series."""
+    sid = _require_series_id(series_id)
+    now = _now()
+    for raw_role, raw_page_id in (bindings or {}).items():
+        role = sanitize_binding_role(raw_role)
+        existing = db.scalar(
+            select(BuilderPageBinding).where(
+                BuilderPageBinding.series_id == sid,
+                BuilderPageBinding.role == role,
+            )
+        )
+        if raw_page_id in (None, ""):
+            if existing:
+                db.delete(existing)
+            continue
+        try:
+            pid = uuid.UUID(str(raw_page_id))
+        except ValueError as exc:
+            raise ValueError(f"Invalid page id for {role} binding") from exc
+        page = db.get(BuilderPage, pid)
+        if not page or not _page_can_bind_to_series(page, sid, role):
+            raise ValueError(f"Page cannot be used for {role} binding")
+        if existing:
+            existing.page_id = page.id
+            existing.updated_at = now
+        else:
+            db.add(
+                BuilderPageBinding(
+                    series_id=sid,
+                    role=role,
+                    page_id=page.id,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
+
+    db.commit()
+    return get_page_bindings(db, sid)
 
 
 # Section operations

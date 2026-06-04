@@ -19,8 +19,9 @@ function mountButtonsEditor({
     ],
   },
   pages = [
-    { slug: 'about', title: 'About' },
-    { slug: 'reader', title: 'Reader' },
+    { scope: 'series', seriesId: 'battle-bros', slug: 'about', title: 'About' },
+    { scope: 'series', seriesId: 'battle-bros', slug: 'reader', title: 'Reader' },
+    { scope: 'global', seriesId: null, slug: 'about', title: 'Global About' },
   ],
 } = {}) {
   const wrapper = document.createElement('div');
@@ -210,6 +211,7 @@ describe('button editor', () => {
             link: expect.objectContaining({
               kind: 'builder-page',
               pageSlug: 'reader',
+              seriesId: 'battle-bros',
             }),
           }),
         ],
@@ -217,5 +219,25 @@ describe('button editor', () => {
     );
     expect(markDirty).toHaveBeenCalledWith('module');
     expect(renderEditorPanel).not.toHaveBeenCalled();
+
+    const pageScopeSelect = wrapper.querySelector('[data-item-key="pageScope"]');
+    pageScopeSelect.value = 'global';
+    pageScopeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(setDraftConfig).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        buttons: [
+          expect.objectContaining({
+            link: expect.objectContaining({
+              kind: 'builder-page',
+              pageScope: 'global',
+              pageSlug: '',
+              seriesId: '',
+            }),
+          }),
+        ],
+      })
+    );
+    expect(renderEditorPanel).toHaveBeenCalled();
   });
 });

@@ -233,6 +233,7 @@ describe('reader app bootstrap', () => {
       'battle-bros',
       {
         draft: false,
+        pageScope: 'series',
         pageSlug: '',
       }
     );

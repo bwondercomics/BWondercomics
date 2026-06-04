@@ -1,6 +1,10 @@
 export async function fetchPages(seriesId) {
+  return fetchSeriesPages(seriesId);
+}
+
+export async function fetchSeriesPages(seriesId) {
   try {
-    const res = await fetch(`/api/admin/pages?series_id=${encodeURIComponent(seriesId)}`, {
+    const res = await fetch(`/api/admin/pages/series/${encodeURIComponent(seriesId)}`, {
       cache: 'no-store',
       credentials: 'same-origin',
     });
@@ -9,6 +13,21 @@ export async function fetchPages(seriesId) {
     return data.pages || [];
   } catch (err) {
     console.error('fetchPages error:', err);
+    return [];
+  }
+}
+
+export async function fetchGlobalPages() {
+  try {
+    const res = await fetch('/api/admin/pages/global', {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
+    if (!res.ok) throw new Error('Failed to fetch global pages');
+    const data = await res.json();
+    return data.pages || [];
+  } catch (err) {
+    console.error('fetchGlobalPages error:', err);
     return [];
   }
 }
@@ -29,8 +48,17 @@ export async function fetchPage(pageId) {
 }
 
 export async function createPage(seriesId, slug, title) {
+  return createScopedPage('series', seriesId, slug, title);
+}
+
+export async function createScopedPage(scope, seriesId, slug, title) {
   try {
-    const res = await fetch(`/api/admin/pages?series_id=${encodeURIComponent(seriesId)}`, {
+    const safeScope = scope === 'global' ? 'global' : 'series';
+    const url =
+      safeScope === 'global'
+        ? '/api/admin/pages/global'
+        : `/api/admin/pages/series/${encodeURIComponent(seriesId)}`;
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ slug, title }),
@@ -42,7 +70,7 @@ export async function createPage(seriesId, slug, title) {
     const data = await res.json();
     return data.page;
   } catch (err) {
-    console.error('createPage error:', err);
+    console.error('createScopedPage error:', err);
     alert(err.message || 'Failed to create page');
     return null;
   }
@@ -59,16 +87,57 @@ export async function deletePage(pageId) {
 }
 
 export async function reorderPages(seriesId, pageIds) {
+  return reorderScopedPages('series', seriesId, pageIds);
+}
+
+export async function reorderScopedPages(scope, seriesId, pageIds) {
   try {
-    const res = await fetch(`/api/admin/pages/reorder?series_id=${encodeURIComponent(seriesId)}`, {
+    const safeScope = scope === 'global' ? 'global' : 'series';
+    const url =
+      safeScope === 'global'
+        ? '/api/admin/pages/global/reorder'
+        : `/api/admin/pages/series/${encodeURIComponent(seriesId)}/reorder`;
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ page_ids: pageIds }),
     });
     return res.ok;
   } catch (err) {
-    console.error('reorderPages error:', err);
+    console.error('reorderScopedPages error:', err);
     return false;
+  }
+}
+
+export async function fetchPageBindings(seriesId) {
+  try {
+    const res = await fetch(`/api/admin/page-bindings/${encodeURIComponent(seriesId)}`, {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
+    if (!res.ok) throw new Error('Failed to fetch page bindings');
+    return await res.json();
+  } catch (err) {
+    console.error('fetchPageBindings error:', err);
+    return { seriesId, bindings: {}, warnings: [] };
+  }
+}
+
+export async function updatePageBindings(seriesId, bindings) {
+  try {
+    const res = await fetch(`/api/admin/page-bindings/${encodeURIComponent(seriesId)}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bindings }),
+      credentials: 'same-origin',
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Failed to update page bindings');
+    return data;
+  } catch (err) {
+    console.error('updatePageBindings error:', err);
+    alert(err.message || 'Failed to update page bindings');
+    return null;
   }
 }
 

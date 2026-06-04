@@ -164,6 +164,9 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     if (snapshot.draftMode === 'draft') {
       params.set('draft', '1');
     }
+    if (snapshot.page?.scope === 'global') {
+      params.set('pageScope', 'global');
+    }
     return new URL(`/index.html?${params.toString()}`, window.location.origin).toString();
   }
 

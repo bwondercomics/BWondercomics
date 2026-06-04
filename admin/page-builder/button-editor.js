@@ -51,11 +51,17 @@ function normalizeButtonsDraftConfig(rawConfig = {}) {
 function renderLinkFields(button, index, pages) {
   const link = normalizeLinkTarget(button.link, '');
   const isMissingPage = isBuilderPageTargetMissing(link, pages);
+  const pageScope = link.pageScope === 'global' ? 'global' : 'series';
   const options = pages
+    .filter((page) => (page?.scope === 'global' ? 'global' : 'series') === pageScope)
     .map((page) => {
       const slug = String(page?.slug || '').trim();
       const label = page?.title || slug || 'Untitled page';
-      return `<option value="${escapeAttr(slug)}" ${link.pageSlug === slug ? 'selected' : ''}>${escapeHtml(label)} (${escapeHtml(slug)})</option>`;
+      const seriesId = pageScope === 'series' ? String(page?.seriesId || '').trim() : '';
+      const selected =
+        link.pageSlug === slug &&
+        (pageScope === 'global' || !link.seriesId || link.seriesId === seriesId);
+      return `<option value="${escapeAttr(slug)}" data-series-id="${escapeAttr(seriesId)}" ${selected ? 'selected' : ''}>${escapeHtml(label)} (${escapeHtml(slug)})</option>`;
     })
     .join('');
 
@@ -72,6 +78,13 @@ function renderLinkFields(button, index, pages) {
       link.kind === 'builder-page'
         ? `
       <div class="pb-editor-field">
+        <label class="pb-editor-label">Page Scope</label>
+        <select class="pb-editor-select pb-button-input" data-item-index="${index}" data-item-key="pageScope">
+          <option value="series" ${pageScope === 'series' ? 'selected' : ''}>Series Pages</option>
+          <option value="global" ${pageScope === 'global' ? 'selected' : ''}>Global Pages</option>
+        </select>
+      </div>
+      <div class="pb-editor-field">
         <label class="pb-editor-label">Builder Page</label>
         <select class="pb-editor-select pb-button-input" data-item-index="${index}" data-item-key="pageSlug">
           <option value="">Select a page</option>
@@ -79,7 +92,7 @@ function renderLinkFields(button, index, pages) {
         </select>
         ${
           isMissingPage
-            ? '<p class="pb-editor-help" data-status="warning">Saved page slug is not in the current series.</p>'
+            ? '<p class="pb-editor-help" data-status="warning">Saved page slug is not available in this scope.</p>'
             : ''
         }
       </div>
@@ -223,12 +236,25 @@ export function renderButtonsEditor(config = {}, pages = [], options = {}) {
 
 function setLinkValue(button, key, input) {
   const nextLink = normalizeLinkTarget(button.link, '');
+  const selectedOption =
+    input.selectedOptions?.[0] ||
+    (Number.isInteger(input.selectedIndex) ? input.options?.[input.selectedIndex] : null);
   if (key === 'kind') {
     nextLink.kind = input.value;
+    nextLink.pageScope = 'series';
+    nextLink.seriesId = '';
     nextLink.pageSlug = '';
     nextLink.url = '';
     nextLink.hash = '';
     nextLink.openInNewTab = false;
+  } else if (key === 'pageScope') {
+    nextLink.pageScope = input.value === 'global' ? 'global' : 'series';
+    nextLink.seriesId = '';
+    nextLink.pageSlug = '';
+  } else if (key === 'pageSlug') {
+    nextLink.pageSlug = input.value;
+    nextLink.seriesId =
+      nextLink.pageScope === 'series' ? selectedOption?.dataset?.seriesId || '' : '';
   } else if (key === 'openInNewTab') {
     nextLink.openInNewTab = input.checked;
   } else {
@@ -381,9 +407,9 @@ export function bindButtonsEditorEvents({
         const nextConfig = normalizeButtonsConfig(config);
         const button = nextConfig.buttons[index];
         if (!button || !key) return;
-        if (['kind', 'pageSlug', 'url', 'hash', 'openInNewTab'].includes(key)) {
+        if (['kind', 'pageScope', 'pageSlug', 'url', 'hash', 'openInNewTab'].includes(key)) {
           setLinkValue(button, key, input);
-          commit(nextConfig, key === 'kind');
+          commit(nextConfig, key === 'kind' || key === 'pageScope');
           return;
         }
         if (input.type === 'checkbox') {

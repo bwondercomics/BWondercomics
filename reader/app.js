@@ -68,6 +68,7 @@ import { initEmailSignupForm } from './email.js';
 import {
   getActiveSeriesId,
   getExplicitPageSlug,
+  getRequestedPageScope,
   isBuilderPreviewRequested,
   isDraftPageRequested,
 } from './series.js';
@@ -990,6 +991,7 @@ import {
   async function start() {
     const seriesId = getActiveSeriesId();
     const explicitPageSlug = getExplicitPageSlug();
+    const pageScope = getRequestedPageScope();
     const previewMode = isBuilderPreviewRequested();
 
     try {
@@ -1108,6 +1110,7 @@ import {
 
     const pageResult = await loadPageConfigWithFallback(setSubtitles, seriesId, {
       pageSlug: explicitPageSlug,
+      pageScope,
       draft: role === 'admin' && isDraftPageRequested(),
     });
     readerBootState.resolvePageConfig(pageResult);

@@ -137,8 +137,29 @@ async function installVisualRoutes(page) {
       return;
     }
 
+    if (pathname === '/api/admin/pages/series/battle-bros') {
+      await route.fulfill(json({ pages: [visualPage] }));
+      return;
+    }
+
+    if (pathname === '/api/admin/pages/global') {
+      await route.fulfill(json({ pages: [] }));
+      return;
+    }
+
     if (pathname === '/api/admin/pages' && url.searchParams.get('series_id') === 'battle-bros') {
       await route.fulfill(json({ pages: [visualPage] }));
+      return;
+    }
+
+    if (pathname === '/api/admin/page-bindings/battle-bros') {
+      await route.fulfill(
+        json({
+          seriesId: 'battle-bros',
+          bindings: { reader: visualPage.id },
+          warnings: [],
+        })
+      );
       return;
     }
 

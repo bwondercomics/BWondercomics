@@ -272,6 +272,16 @@ describe('shared renderer parity', () => {
       config: {
         buttons: [
           { text: 'About', style: 'primary', link: { kind: 'builder-page', pageSlug: 'about' } },
+          {
+            text: 'Space About',
+            style: 'primary',
+            link: {
+              kind: 'builder-page',
+              pageScope: 'series',
+              seriesId: 'space-saga',
+              pageSlug: 'about',
+            },
+          },
         ],
       },
     };
@@ -287,6 +297,35 @@ describe('shared renderer parity', () => {
       'series=battle-bros'
     );
     expect(previewEl.querySelector('.pb-btn')?.getAttribute('href')).toContain('page=about');
+    expect(readerEl.querySelectorAll('.pb-btn')[1]?.getAttribute('href')).toContain(
+      'series=space-saga'
+    );
+    expect(previewEl.querySelectorAll('.pb-btn')[1]?.getAttribute('href')).toContain(
+      'series=space-saga'
+    );
+  });
+
+  it('renders global builder page links without a series query', () => {
+    const mod = {
+      moduleType: 'buttons',
+      config: {
+        buttons: [
+          {
+            text: 'Global About',
+            style: 'primary',
+            link: { kind: 'builder-page', pageScope: 'global', pageSlug: 'about' },
+          },
+        ],
+      },
+    };
+
+    const readerEl = document.createElement('div');
+    readerEl.innerHTML = makeReaderRenderers().renderModule(mod);
+
+    const href = readerEl.querySelector('.pb-btn')?.getAttribute('href') || '';
+    expect(href).toContain('pageScope=global');
+    expect(href).toContain('page=about');
+    expect(href).not.toContain('series=');
   });
 
   it('applies button defaults and per-button appearance overrides with reader/preview parity', () => {

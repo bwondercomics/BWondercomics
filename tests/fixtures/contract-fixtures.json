@@ -413,6 +413,7 @@
   },
   "builderPage": {
     "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeee01",
+    "scope": "series",
     "seriesId": "battle-bros",
     "slug": "reader",
     "title": "Reader",
@@ -688,6 +689,7 @@
   },
   "builderPageDraft": {
     "id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeee02",
+    "scope": "series",
     "seriesId": "battle-bros",
     "slug": "about",
     "title": "About",

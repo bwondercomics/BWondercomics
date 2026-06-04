@@ -40,8 +40,9 @@ function mountHeaderEditor({
     },
   },
   pages = [
-    { slug: 'about', title: 'About' },
-    { slug: 'reader', title: 'Reader' },
+    { scope: 'series', seriesId: 'battle-bros', slug: 'about', title: 'About' },
+    { scope: 'series', seriesId: 'battle-bros', slug: 'reader', title: 'Reader' },
+    { scope: 'global', seriesId: null, slug: 'about', title: 'Global About' },
   ],
 } = {}) {
   const wrapper = document.createElement('div');
@@ -565,8 +566,8 @@ describe('header appearance', () => {
         },
       },
       pages: [
-        { slug: 'about', title: 'About' },
-        { slug: 'reader', title: 'Reader' },
+        { scope: 'series', seriesId: 'battle-bros', slug: 'about', title: 'About' },
+        { scope: 'series', seriesId: 'battle-bros', slug: 'reader', title: 'Reader' },
       ],
     });
 
@@ -574,6 +575,7 @@ describe('header appearance', () => {
     pageSelect.value = 'reader';
     pageSelect.dispatchEvent(new Event('change', { bubbles: true }));
     expect(setDraftState.mock.lastCall[0].header.nav.items[0].link.pageSlug).toBe('reader');
+    expect(setDraftState.mock.lastCall[0].header.nav.items[0].link.seriesId).toBe('battle-bros');
 
     wrapper
       .querySelector('.pb-header-nav-item[data-item-index="0"] [data-action="move-down"]')
@@ -586,6 +588,37 @@ describe('header appearance', () => {
     expect(setDraftState.mock.lastCall[0].header.layoutRows.top.center).toContain('brand');
     expect(setDraftState.mock.lastCall[0].header.regions.center).toContain('brand');
     expect(renderEditorPanel).toHaveBeenCalledTimes(2);
+  });
+
+  it('saves and clears seriesId for header builder-page link targets', () => {
+    const { wrapper, setDraftState, renderEditorPanel } = mountHeaderEditor();
+
+    const pageSelect = wrapper.querySelector('.pb-header-nav-input[data-item-key="pageSlug"]');
+    pageSelect.value = 'reader';
+    pageSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(setDraftState.mock.lastCall[0].header.nav.items[0].link).toEqual(
+      expect.objectContaining({
+        kind: 'builder-page',
+        pageScope: 'series',
+        pageSlug: 'reader',
+        seriesId: 'battle-bros',
+      })
+    );
+
+    const scopeSelect = wrapper.querySelector('.pb-header-nav-input[data-item-key="pageScope"]');
+    scopeSelect.value = 'global';
+    scopeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(setDraftState.mock.lastCall[0].header.nav.items[0].link).toEqual(
+      expect.objectContaining({
+        kind: 'builder-page',
+        pageScope: 'global',
+        pageSlug: '',
+        seriesId: '',
+      })
+    );
+    expect(renderEditorPanel).toHaveBeenCalled();
   });
 
   it('moves a header block down into an empty row without requiring another block above it', () => {

@@ -8,7 +8,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///tmp/bw-quality-route-t
 from sqlalchemy import select
 
 from backend.app.routes import page_builder
-from backend.app.models import BuilderModule, BuilderPage
+from backend.app.models import BuilderModule, BuilderPage, BuilderPageBinding
 
 from backend.tests.helpers import BackendRouteTestCase, build_request, json_body
 
@@ -70,6 +70,16 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         )
 
         self.assertTrue(updated_first["page"]["isHomepage"])
+        self.assertEqual(updated_first["page"]["scope"], "series")
+        self.assertEqual(updated_first["page"]["seriesId"], "battle-bros")
+        reader_binding = self.db.scalar(
+            select(BuilderPageBinding).where(
+                BuilderPageBinding.series_id == "battle-bros",
+                BuilderPageBinding.role == "reader",
+            )
+        )
+        self.assertIsNotNone(reader_binding)
+        self.assertEqual(str(reader_binding.page_id), first["page"]["id"])
         about_page = next(page for page in listed["pages"] if page["id"] == second["page"]["id"])
         reader_page = next(page for page in listed["pages"] if page["id"] == first["page"]["id"])
         self.assertFalse(about_page["isHomepage"])
@@ -96,6 +106,201 @@ class PageBuilderRouteTests(BackendRouteTestCase):
             self.db,
         )
         self.assertEqual(deleted, {"status": "success"})
+
+    def test_page_scopes_global_routes_and_reader_bindings(self):
+        self.seed_contract_series()
+
+        series_about = page_builder.api_create_series_page(
+            "battle-bros",
+            page_builder.CreatePageRequest(slug="about", title="Series About"),
+            self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
+            self.db,
+        )["page"]
+        global_about = page_builder.api_create_global_page(
+            page_builder.CreatePageRequest(slug="about", title="Global About", isPublished=True),
+            self.admin_request("/api/admin/pages/global", "POST"),
+            self.db,
+        )["page"]
+        duplicate_global = page_builder.api_create_global_page(
+            page_builder.CreatePageRequest(slug="about", title="Duplicate"),
+            self.admin_request("/api/admin/pages/global", "POST"),
+            self.db,
+        )
+
+        self.assertEqual(series_about["scope"], "series")
+        self.assertEqual(series_about["seriesId"], "battle-bros")
+        self.assertEqual(global_about["scope"], "global")
+        self.assertIsNone(global_about["seriesId"])
+        self.assertEqual(duplicate_global.status_code, 400)
+        self.assertEqual(
+            json_body(duplicate_global)["error"], "Page with slug 'about' already exists"
+        )
+
+        global_list = page_builder.api_list_global_pages(
+            self.admin_request("/api/admin/pages/global"),
+            self.db,
+        )
+        series_list = page_builder.api_list_series_pages(
+            "battle-bros",
+            self.admin_request("/api/admin/pages/series/battle-bros"),
+            self.db,
+        )
+        self.assertEqual([page["id"] for page in global_list["pages"]], [global_about["id"]])
+        self.assertEqual([page["id"] for page in series_list["pages"]], [series_about["id"]])
+
+        public_global = page_builder.api_public_global_page("about", self.db)
+        public_series = page_builder.api_public_page("battle-bros", "about", self.db)
+        self.assertEqual(public_global["page"]["id"], global_about["id"])
+        self.assertEqual(public_series.status_code, 404)
+
+        missing_bindings = page_builder.api_get_page_bindings(
+            "battle-bros",
+            self.admin_request("/api/admin/page-bindings/battle-bros"),
+            self.db,
+        )
+        self.assertEqual(missing_bindings["warnings"][0]["code"], "missing_reader_binding")
+
+        global_binding = page_builder.api_update_page_bindings(
+            "battle-bros",
+            page_builder.PageBindingsRequest(bindings={"reader": global_about["id"]}),
+            self.admin_request("/api/admin/page-bindings/battle-bros", "PUT"),
+            self.db,
+        )
+        self.assertEqual(global_binding.status_code, 400)
+        self.assertEqual(json_body(global_binding)["error"], "Page cannot be used for reader binding")
+
+        self.db.add(
+            BuilderPageBinding(
+                series_id="battle-bros",
+                role="reader",
+                page_id=UUID(global_about["id"]),
+            )
+        )
+        self.db.commit()
+
+        invalid_binding_home = page_builder.api_public_homepage("battle-bros", self.db)
+        invalid_bindings = page_builder.api_get_page_bindings(
+            "battle-bros",
+            self.admin_request("/api/admin/page-bindings/battle-bros"),
+            self.db,
+        )
+        self.assertEqual(invalid_binding_home.status_code, 404)
+        self.assertEqual(invalid_bindings["warnings"][0]["code"], "reader_binding_invalid")
+        self.assertEqual(invalid_bindings["warnings"][1]["code"], "missing_reader_binding")
+
+        self.db.query(BuilderPageBinding).filter(
+            BuilderPageBinding.series_id == "battle-bros",
+            BuilderPageBinding.role == "reader",
+        ).delete()
+        self.db.commit()
+
+        series_reader = page_builder.api_create_series_page(
+            "battle-bros",
+            page_builder.CreatePageRequest(
+                slug="reader",
+                title="Series Reader",
+                pageType="reader",
+                isPublished=True,
+            ),
+            self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
+            self.db,
+        )["page"]
+        other_reader = page_builder.api_create_series_page(
+            "other-series",
+            page_builder.CreatePageRequest(slug="reader", title="Other Reader", pageType="reader"),
+            self.admin_request("/api/admin/pages/series/other-series", "POST"),
+            self.db,
+        )["page"]
+        wrong_series_binding = page_builder.api_update_page_bindings(
+            "battle-bros",
+            page_builder.PageBindingsRequest(bindings={"reader": other_reader["id"]}),
+            self.admin_request("/api/admin/page-bindings/battle-bros", "PUT"),
+            self.db,
+        )
+        updated_bindings = page_builder.api_update_page_bindings(
+            "battle-bros",
+            page_builder.PageBindingsRequest(bindings={"reader": series_reader["id"]}),
+            self.admin_request("/api/admin/page-bindings/battle-bros", "PUT"),
+            self.db,
+        )
+
+        self.assertEqual(wrong_series_binding.status_code, 400)
+        self.assertEqual(updated_bindings["bindings"]["reader"]["pageId"], series_reader["id"])
+        self.assertFalse(updated_bindings["warnings"])
+
+    def test_page_reorder_rejects_invalid_stale_or_wrong_scope_lists(self):
+        self.seed_contract_series()
+        first = page_builder.api_create_series_page(
+            "battle-bros",
+            page_builder.CreatePageRequest(slug="reader", title="Reader"),
+            self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
+            self.db,
+        )["page"]
+        second = page_builder.api_create_series_page(
+            "battle-bros",
+            page_builder.CreatePageRequest(slug="about", title="About"),
+            self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
+            self.db,
+        )["page"]
+        global_page = page_builder.api_create_global_page(
+            page_builder.CreatePageRequest(slug="about", title="Global About"),
+            self.admin_request("/api/admin/pages/global", "POST"),
+            self.db,
+        )["page"]
+        other_page = page_builder.api_create_series_page(
+            "other-series",
+            page_builder.CreatePageRequest(slug="reader", title="Other Reader"),
+            self.admin_request("/api/admin/pages/series/other-series", "POST"),
+            self.db,
+        )["page"]
+
+        def listed_ids():
+            return [
+                page["id"]
+                for page in page_builder.api_list_series_pages(
+                    "battle-bros",
+                    self.admin_request("/api/admin/pages/series/battle-bros"),
+                    self.db,
+                )["pages"]
+            ]
+
+        original_order = [first["id"], second["id"]]
+        self.assertEqual(listed_ids(), original_order)
+
+        invalid_requests = [
+            page_builder.ReorderPagesRequest(pageIds=["not-a-uuid", second["id"]]),
+            page_builder.ReorderPagesRequest(pageIds=[first["id"], first["id"]]),
+            page_builder.ReorderPagesRequest(pageIds=[first["id"]]),
+            page_builder.ReorderPagesRequest(pageIds=[global_page["id"], first["id"]]),
+            page_builder.ReorderPagesRequest(pageIds=[other_page["id"], first["id"]]),
+        ]
+        for payload in invalid_requests:
+            response = page_builder.api_reorder_series_pages(
+                "battle-bros",
+                payload,
+                self.admin_request("/api/admin/pages/series/battle-bros/reorder", "POST"),
+                self.db,
+            )
+            self.assertEqual(response.status_code, 400)
+            self.assertEqual(listed_ids(), original_order)
+
+        legacy_response = page_builder.api_reorder_pages(
+            page_builder.ReorderPagesRequest(pageIds=[first["id"]]),
+            self.admin_request("/api/admin/pages/reorder", "POST"),
+            "battle-bros",
+            self.db,
+        )
+        self.assertEqual(legacy_response.status_code, 400)
+        self.assertEqual(listed_ids(), original_order)
+
+        success = page_builder.api_reorder_series_pages(
+            "battle-bros",
+            page_builder.ReorderPagesRequest(pageIds=[second["id"], first["id"]]),
+            self.admin_request("/api/admin/pages/series/battle-bros/reorder", "POST"),
+            self.db,
+        )
+        self.assertEqual(success, {"status": "success"})
+        self.assertEqual(listed_ids(), [second["id"], first["id"]])
 
     def test_admin_section_and_module_endpoints_cover_crud_move_and_reorder(self):
         self.seed_contract_series()
@@ -288,6 +493,16 @@ class PageBuilderRouteTests(BackendRouteTestCase):
 
         self.assertEqual(public_fallback["page"]["slug"], "reader")
         self.assertEqual(admin_draft_home["page"]["slug"], "about")
+
+        self.db.query(BuilderPageBinding).filter(
+            BuilderPageBinding.series_id == "battle-bros",
+            BuilderPageBinding.role == "reader",
+        ).delete()
+        draft_homepage.is_homepage = False
+        self.db.commit()
+
+        missing_binding_home = page_builder.api_public_homepage("battle-bros", self.db)
+        self.assertEqual(missing_binding_home.status_code, 404)
 
     def test_builder_security_sanitizes_saved_builder_payloads(self):
         self.seed_contract_series()
@@ -540,15 +755,9 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.assertEqual(
             buttons_module["config"]["defaults"]["appearance"]["background"]["opacity"], 1.0
         )
-        self.assertEqual(
-            buttons_module["config"]["defaults"]["appearance"]["border"]["radius"], 16
-        )
-        self.assertEqual(
-            buttons_module["config"]["buttons"][0]["appearance"]["border"]["width"], 0
-        )
-        self.assertIsNone(
-            buttons_module["config"]["buttons"][0]["appearance"]["border"]["style"]
-        )
+        self.assertEqual(buttons_module["config"]["defaults"]["appearance"]["border"]["radius"], 16)
+        self.assertEqual(buttons_module["config"]["buttons"][0]["appearance"]["border"]["width"], 0)
+        self.assertIsNone(buttons_module["config"]["buttons"][0]["appearance"]["border"]["style"])
         self.assertEqual(
             buttons_module["config"]["buttons"][0]["appearance"]["border"]["color"], "#ff00ff"
         )
@@ -667,9 +876,7 @@ class PageBuilderRouteTests(BackendRouteTestCase):
                     "responsive": {
                         "mobile": {
                             "defaults": {
-                                "appearance": {
-                                    "background": {"color": "#202020", "opacity": 2}
-                                }
+                                "appearance": {"background": {"color": "#202020", "opacity": 2}}
                             },
                             "buttons": [
                                 {
@@ -727,9 +934,7 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.assertEqual(
             button_responsive["defaults"]["appearance"]["background"]["color"], "#202020"
         )
-        self.assertEqual(
-            button_responsive["defaults"]["appearance"]["background"]["opacity"], 1.0
-        )
+        self.assertEqual(button_responsive["defaults"]["appearance"]["background"]["opacity"], 1.0)
         self.assertEqual(button_responsive["buttons"][0]["id"], "read-now")
         self.assertEqual(button_responsive["buttons"][0]["appearance"]["text"]["color"], "#ffffff")
         self.assertNotIn("text", button_responsive["buttons"][0])

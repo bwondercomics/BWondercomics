@@ -4,7 +4,18 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    CheckConstraint,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
@@ -252,6 +263,10 @@ class Series(Base):
         back_populates="series",
         cascade="all, delete-orphan",
     )
+    builder_page_bindings: Mapped[list["BuilderPageBinding"]] = relationship(
+        back_populates="series",
+        cascade="all, delete-orphan",
+    )
 
 
 class EntryLabel(Base):
@@ -469,10 +484,35 @@ class BuilderPage(Base):
     """A customizable page within a series (e.g., reader, about, gallery)."""
 
     __tablename__ = "builder_pages"
+    __table_args__ = (
+        CheckConstraint("scope IN ('series', 'global')", name="ck_builder_pages_scope"),
+        CheckConstraint(
+            "(scope = 'global' AND series_id IS NULL) OR (scope = 'series' AND series_id IS NOT NULL)",
+            name="ck_builder_pages_scope_series_id",
+        ),
+        Index(
+            "ux_builder_pages_series_scope_slug",
+            "scope",
+            "series_id",
+            "slug",
+            unique=True,
+            sqlite_where=text("scope = 'series'"),
+            postgresql_where=text("scope = 'series'"),
+        ),
+        Index(
+            "ux_builder_pages_global_slug",
+            "scope",
+            "slug",
+            unique=True,
+            sqlite_where=text("scope = 'global'"),
+            postgresql_where=text("scope = 'global'"),
+        ),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    series_id: Mapped[str] = mapped_column(
-        String(64), ForeignKey("series.id"), nullable=False, index=True
+    scope: Mapped[str] = mapped_column(String(20), nullable=False, default="series", index=True)
+    series_id: Mapped[str | None] = mapped_column(
+        String(64), ForeignKey("series.id"), nullable=True, index=True
     )
     slug: Mapped[str] = mapped_column(String(100), nullable=False)
     title: Mapped[str] = mapped_column(String(200), nullable=False)
@@ -489,10 +529,46 @@ class BuilderPage(Base):
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
 
-    series: Mapped[Series] = relationship(back_populates="builder_pages")
+    series: Mapped[Series | None] = relationship(back_populates="builder_pages")
     sections: Mapped[list["BuilderSection"]] = relationship(
         back_populates="page", cascade="all, delete-orphan", order_by="BuilderSection.sort_index"
     )
+    bindings: Mapped[list["BuilderPageBinding"]] = relationship(
+        back_populates="page", cascade="all, delete-orphan"
+    )
+
+
+class BuilderPageBinding(Base):
+    """Series route-role binding for a builder page."""
+
+    __tablename__ = "builder_page_bindings"
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('reader', 'feed', 'gallery')", name="ck_builder_page_bindings_role"
+        ),
+        Index("ux_builder_page_bindings_series_role", "series_id", "role", unique=True),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    series_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("series.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    role: Mapped[str] = mapped_column(String(30), nullable=False)
+    page_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("builder_pages.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    series: Mapped[Series] = relationship(back_populates="builder_page_bindings")
+    page: Mapped[BuilderPage] = relationship(back_populates="bindings")
 
 
 class BuilderSection(Base):

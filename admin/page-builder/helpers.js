@@ -95,12 +95,20 @@ export function renderPageStatusBadges(page) {
 }
 
 export function getReaderLinkLabel(page) {
+  if (page?.scope === 'global') {
+    return page?.isPublished === false ? 'Open Draft Preview' : 'Open Page';
+  }
   return page?.isPublished === false ? 'Open Draft Preview' : 'Open Reader';
 }
 
 export function getReaderPreviewNote(page) {
   if (page?.isPublished === false) {
-    return 'Draft page. Open Reader loads the draft preview until you publish changes.';
+    return page?.scope === 'global'
+      ? 'Draft global page. Open Draft Preview loads the working page until you publish changes.'
+      : 'Draft page. Open Reader loads the draft preview until you publish changes.';
+  }
+  if (page?.scope === 'global') {
+    return 'Published global page. Open Page matches the public page.';
   }
   return 'Published page. Open Reader matches the public reader.';
 }

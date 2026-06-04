@@ -471,6 +471,38 @@ Assumptions:
 - This phase may require a coordinated DB migration and deployment window because public routing and
   persisted page identity are affected.
 
+Completion note (`2026-06-03`): Phase 8 is implemented with explicit `series` and `global` page
+scopes, nullable global `seriesId`, and normalized `builder_page_bindings` route-role records.
+Existing compatibility routes remain series-only, while new explicit admin endpoints cover global
+pages, series pages, scoped reordering, and page bindings. The public global route is
+`/api/pages/global/by-slug/<slug>`, and existing public series routes keep resolving only series
+pages. Series homepage fallback now uses the explicit `reader` binding instead of silently selecting
+an arbitrary `reader` slug. The admin builder sidebar exposes Global Pages and Series Pages,
+shows reader-binding warnings, and can bind a series reader page with the normal dirty-workspace
+guard. Builder-page links now carry `pageScope` and render global URLs as
+`index.html?pageScope=global&page=<slug>` while legacy links default to series scope. No GrapesJS
+dependency was added.
+
+Corrective note (`2026-06-04`): Phase 8 audit fixes tightened reader bindings so the `reader`
+role only accepts same-series pages, preserved `seriesId` when authoring series builder-page links
+from button/header editors, and made scoped page reorders reject invalid, stale, duplicate, or
+wrong-scope page ID lists before mutating sort order.
+
+Verification refreshed for this phase:
+
+- `node --check admin/page-builder.js admin/page-builder/data.js admin/page-builder/sidebar-panel.js admin/page-builder/link-utils.js admin/page-builder/button-editor.js admin/page-builder/header-editor.js reader/app.js reader/data.js reader/page-renderer.js reader/series.js tests/admin-page-builder-data.test.js tests/admin-page-builder-shell.test.js tests/reader-data-builder.test.js tests/shared-renderers-parity.test.js tests/button-editor.test.js tests/visual/builder-preview-parity.spec.js`
+- `python3 -m py_compile backend/app/models.py backend/app/page_store.py backend/app/routes/page_builder.py backend/alembic/versions/0017_page_scope_bindings.py backend/tests/helpers.py backend/tests/test_page_builder_routes.py`
+- `npm run format:check`
+- `npm run lint`
+- `npm run format:py:check`
+- `npm run lint:py`
+- `npm test -- tests/admin-page-builder-data.test.js tests/admin-page-builder-shell.test.js tests/reader-data-builder.test.js tests/shared-renderers-parity.test.js tests/button-editor.test.js`
+- `npm run test:backend`
+- `npm test`
+- `npm run build`
+- `npm run test:visual`
+- `git diff --check`
+
 ## Phase 9 - Special CMS Modules
 
 Goal: Convert comic/reader, feed, and media gallery page behavior into reusable modules.

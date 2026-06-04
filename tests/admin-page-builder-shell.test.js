@@ -63,6 +63,8 @@ function getCssRule(css, selector) {
 
 async function setupPageBuilder({
   fetchPagesResults = [],
+  fetchGlobalPagesResults = [[]],
+  fetchPageBindingsResult = { bindings: {}, warnings: [] },
   fetchPageResult = null,
   createPageResult = null,
   deletePageResult = true,
@@ -86,14 +88,22 @@ async function setupPageBuilder({
   setViewportWidth(viewportWidth);
 
   const fetchPages = vi.fn();
+  fetchPages.mockResolvedValue(fetchPagesResults.at(-1) || []);
   fetchPagesResults.forEach((result) => fetchPages.mockResolvedValueOnce(result));
-  if (!fetchPages.mock.calls.length && fetchPagesResults.length === 0) {
-    fetchPages.mockResolvedValue([]);
-  }
+  const fetchSeriesPages = vi.fn();
+  fetchSeriesPages.mockResolvedValue(fetchPagesResults.at(-1) || []);
+  fetchPagesResults.forEach((result) => fetchSeriesPages.mockResolvedValueOnce(result));
+  const fetchGlobalPages = vi.fn();
+  fetchGlobalPages.mockResolvedValue(fetchGlobalPagesResults.at(-1) || []);
+  fetchGlobalPagesResults.forEach((result) => fetchGlobalPages.mockResolvedValueOnce(result));
   const fetchPage = vi.fn(async () => fetchPageResult);
   const createPage = vi.fn(async () => createPageResult);
+  const createScopedPage = vi.fn(async () => createPageResult);
   const deletePage = vi.fn(async () => deletePageResult);
   const reorderPages = vi.fn(async () => reorderPagesResult);
+  const reorderScopedPages = vi.fn(async () => reorderPagesResult);
+  const fetchPageBindings = vi.fn(async () => fetchPageBindingsResult);
+  const updatePageBindings = vi.fn(async () => fetchPageBindingsResult);
   const updatePage = vi.fn(
     async (_pageId, data) =>
       updatePageResult || {
@@ -141,11 +151,17 @@ async function setupPageBuilder({
 
   vi.doMock('../admin/page-builder/data.js', () => ({
     fetchPages,
+    fetchSeriesPages,
+    fetchGlobalPages,
     fetchPage,
     createPage,
+    createScopedPage,
     deletePage,
     reorderPages,
+    reorderScopedPages,
     updatePage,
+    fetchPageBindings,
+    updatePageBindings,
     fetchAssets: vi.fn(async () => []),
     uploadAsset: vi.fn(async () => ({})),
     addSection,
@@ -199,16 +215,22 @@ async function setupPageBuilder({
       addModule,
       addSection,
       createPage,
+      createScopedPage,
       deletePage,
       fetchPage,
       fetchPages,
+      fetchSeriesPages,
+      fetchGlobalPages,
+      fetchPageBindings,
       moveModule,
       reorderPages,
+      reorderScopedPages,
       reorderModules,
       reorderSections,
       updateSection,
       updateModule,
       updatePage,
+      updatePageBindings,
       deleteSection,
       deleteModule,
       hideAllSections,
@@ -727,7 +749,7 @@ describe('admin page-builder shell', () => {
     });
 
     await manager.showPageBuilderSection();
-    expect(document.getElementById('pbPageList')?.textContent).toContain('No pages yet');
+    expect(document.getElementById('pbPageList')?.textContent).toContain('No series pages yet');
 
     document.getElementById('pbAddPage')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await flushAdminUi(1);
@@ -741,11 +763,88 @@ describe('admin page-builder shell', () => {
     submitBtn.click();
     await flushAdminUi(3);
 
-    expect(mocks.createPage).toHaveBeenCalledWith('battle-bros', 'reader', 'Reader Builder');
+    expect(mocks.createScopedPage).toHaveBeenCalledWith(
+      'series',
+      'battle-bros',
+      'reader',
+      'Reader Builder'
+    );
     expect(document.querySelector('.pb-page-item.active .pb-page-item-title')?.textContent).toBe(
       'Reader Builder'
     );
     expect(document.getElementById('pbPageTitle')?.textContent).toContain('Reader Builder');
+  });
+
+  it('switches page scopes and updates the series reader binding', async () => {
+    const seriesPage = getContractFixture('builderPage');
+    const globalPage = buildContractFixture('builderPageDraft', {
+      id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeee98',
+      scope: 'global',
+      seriesId: null,
+      slug: 'about',
+      title: 'Global About',
+      isPublished: true,
+    });
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[seriesPage]],
+      fetchGlobalPagesResults: [[globalPage]],
+      fetchPageBindingsResult: {
+        seriesId: 'battle-bros',
+        bindings: {},
+        warnings: [
+          {
+            role: 'reader',
+            code: 'missing_reader_binding',
+            message: 'This series is missing a reader page binding.',
+          },
+        ],
+      },
+    });
+
+    await manager.showPageBuilderSection();
+
+    expect(document.querySelector('.pb-page-scope-toggle.active')?.textContent).toContain(
+      'Series Pages'
+    );
+    expect(document.getElementById('pbPageList')?.textContent).toContain('Reader');
+    expect(document.getElementById('pbPageList')?.textContent).toContain(
+      'missing a reader page binding'
+    );
+
+    document
+      .querySelector('.pb-page-action.reader')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    expect(mocks.updatePageBindings).toHaveBeenCalledWith('battle-bros', {
+      reader: seriesPage.id,
+    });
+
+    document
+      .querySelector('.pb-page-scope-toggle[data-page-scope="global"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(document.querySelector('.pb-page-scope-toggle.active')?.textContent).toContain(
+      'Global Pages'
+    );
+    expect(document.getElementById('pbPageList')?.textContent).toContain('Global About');
+    expect(mocks.fetchGlobalPages).toHaveBeenCalled();
+
+    document.getElementById('pbAddPage')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+    document.getElementById('pbPageSlugInput').value = 'contact';
+    document.getElementById('pbPageTitleInput').value = 'Contact';
+    document
+      .getElementById('pbAddPageForm')
+      ?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    await flushAdminUi(2);
+
+    expect(mocks.createScopedPage).toHaveBeenCalledWith(
+      'global',
+      'battle-bros',
+      'contact',
+      'Contact'
+    );
   });
 
   it('opens page settings, edits fields, and saves the draft', async () => {
@@ -824,7 +923,7 @@ describe('admin page-builder shell', () => {
       reorderPagesResult: true,
     });
 
-    mocks.reorderPages.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
+    mocks.reorderScopedPages.mockResolvedValueOnce(true).mockResolvedValueOnce(false);
 
     await manager.showPageBuilderSection();
     await flushAdminUi(3);
@@ -843,7 +942,10 @@ describe('admin page-builder shell', () => {
 
     items = document.getElementById('pbPageList').querySelectorAll('.pb-page-item');
     expect(items[0].querySelector('.pb-page-item-title').textContent).toBe('Page 2');
-    expect(mocks.reorderPages).toHaveBeenNthCalledWith(1, 'battle-bros', ['page-2', 'page-1']);
+    expect(mocks.reorderScopedPages).toHaveBeenNthCalledWith(1, 'series', 'battle-bros', [
+      'page-2',
+      'page-1',
+    ]);
 
     items[1].getBoundingClientRect = () => ({ top: 40, height: 40 });
     items[0].dispatchEvent(createDragLikeEvent('dragstart', dataTransfer));
@@ -854,7 +956,10 @@ describe('admin page-builder shell', () => {
     items = document.getElementById('pbPageList').querySelectorAll('.pb-page-item');
     expect(items[0].querySelector('.pb-page-item-title').textContent).toBe('Page 2');
     expect(items[1].querySelector('.pb-page-item-title').textContent).toBe('Page 1');
-    expect(mocks.reorderPages).toHaveBeenNthCalledWith(2, 'battle-bros', ['page-1', 'page-2']);
+    expect(mocks.reorderScopedPages).toHaveBeenNthCalledWith(2, 'series', 'battle-bros', [
+      'page-1',
+      'page-2',
+    ]);
   });
 
   it('supports page selection, page deletion, and default module config wiring', async () => {

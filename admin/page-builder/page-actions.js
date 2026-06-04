@@ -70,8 +70,8 @@ export function createPageActions({ el, getState, actions, deps }) {
       actions.renderEditorPanel();
       actions.setEditorStatus(
         isPublished
-          ? 'Page published. Open Reader now matches the public page.'
-          : 'Draft saved. Open Reader now uses the draft preview until you publish.',
+          ? 'Page published. The public page now matches the saved builder page.'
+          : 'Draft saved. Preview uses the draft until you publish.',
         isPublished ? 'success' : 'warning'
       );
       releaseButtons(activeButton, isPublished ? 'Published' : 'Draft Saved');
@@ -87,13 +87,23 @@ export function createPageActions({ el, getState, actions, deps }) {
   }
 
   async function loadPages() {
-    const pages = await deps.fetchPages(actions.getSeriesId());
+    const { activePageScope } = getState();
+    const pages = await deps.fetchPages(activePageScope, actions.getSeriesId());
     actions.setPages(pages);
+    const linkPages = await deps.fetchLinkPages?.(actions.getSeriesId());
+    actions.setLinkPages?.(linkPages || pages);
+    if (activePageScope === 'series') {
+      const bindings = await deps.fetchPageBindings?.(actions.getSeriesId());
+      actions.setPageBindings?.(bindings || { bindings: {}, warnings: [] });
+    } else {
+      actions.setPageBindings?.({ bindings: {}, warnings: [] });
+    }
     return pages;
   }
 
-  async function createPageForSeries(slug, title) {
-    return deps.createPage(actions.getSeriesId(), slug, title);
+  async function createPageForActiveScope(slug, title) {
+    const { activePageScope } = getState();
+    return deps.createPage(activePageScope, actions.getSeriesId(), slug, title);
   }
 
   async function uploadAssetFile(file) {
@@ -101,14 +111,14 @@ export function createPageActions({ el, getState, actions, deps }) {
   }
 
   async function reorderSidebarPages(pageIdArray) {
-    const { pages } = getState();
+    const { activePageScope, pages } = getState();
     const originalPages = [...pages];
     actions.setPages(
       pages.slice().sort((a, b) => pageIdArray.indexOf(a.id) - pageIdArray.indexOf(b.id))
     );
     actions.renderPageList();
 
-    const success = await deps.reorderPages(actions.getSeriesId(), pageIdArray);
+    const success = await deps.reorderPages(activePageScope, actions.getSeriesId(), pageIdArray);
     if (!success) {
       actions.setPages(originalPages);
       actions.setEditorStatus('Failed to reorder pages.', 'danger');
@@ -193,7 +203,7 @@ export function createPageActions({ el, getState, actions, deps }) {
 
   return {
     activatePage,
-    createPageForSeries,
+    createPageForActiveScope,
     deletePageFromSidebar,
     loadPages,
     reorderSidebarPages,

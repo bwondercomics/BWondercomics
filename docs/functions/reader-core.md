@@ -54,10 +54,11 @@ The reader is split into three layers:
 ### Canonical Data Sources
 
 - `data.json` or `/series/<seriesId>/data.json`: entry pages, entry metadata, status message, premium flags, unit labels, and entry labels.
-- `/api/pages/home/<seriesId>`: effective published homepage page for the series root; resolves the page marked homepage and falls back to the published `reader` page when no homepage is set.
+- `/api/pages/home/<seriesId>`: effective published homepage page for the series root; resolves the page marked homepage and falls back to the same-series bound published `reader` page when no homepage is set.
 - `/api/admin/pages/home/<seriesId>`: admin-only draft/homepage resolver used when `draft=1` is requested without an explicit page slug.
 - `/api/pages/<seriesId>/<slug>`: published builder pages for reader pages.
-- `/api/admin/pages/by-slug/<seriesId>/<slug>`: draft builder pages when `draft=1` is requested by an admin.
+- `/api/pages/global/by-slug/<slug>`: published global builder pages requested with `?pageScope=global&page=<slug>`.
+- `/api/admin/pages/series/<seriesId>/by-slug/<slug>` and `/api/admin/pages/global/by-slug/<slug>`: draft builder pages when `draft=1` is requested by an admin.
 - `page-config.json` or `/series/<seriesId>/page-config.json`: legacy config data retained for standalone helpers/admin surfaces; normal reader startup no longer uses it. `reader/safe-mode.js` intentionally still reads `/page-config.json` for recovery redirects.
 - `/api/posts/latest` and `/api/posts`: latest update widget and feed content.
 - `localStorage`: reading progress, reader analytics opt-out, visitor id, and some UI preferences.
@@ -70,8 +71,8 @@ The reader is split into three layers:
    - page config via `loadPageConfigWithFallback()`
    - latest post data via `loadLatestPost()`
 3. `loadPageConfigWithFallback()` resolves builder content from two paths:
-   - when the URL has an explicit `?page=<slug>`, it loads `/api/pages/<seriesId>/<slug>` or the admin by-slug draft endpoint
-   - when no explicit page slug is present, it loads `/api/pages/home/<seriesId>` or the admin homepage draft endpoint so the series root follows homepage assignment instead of hard-coding `reader`
+   - when the URL has an explicit `?page=<slug>`, it loads `/api/pages/<seriesId>/<slug>` or, when `?pageScope=global` is present, `/api/pages/global/by-slug/<slug>`
+   - when no explicit page slug is present, it loads `/api/pages/home/<seriesId>` or the admin homepage draft endpoint so the series root follows homepage assignment and same-series reader binding instead of hard-coding `reader`
 4. **Builder preview mode** (`?builderPreview=1`): when the URL carries this flag, `app.js` skips `loadPageConfigWithFallback()` entirely, lazy-imports `reader/preview-bridge.js`, and calls `requestPreviewSnapshot(...)`. The bridge sends a `REQUEST_SNAPSHOT` message to the parent admin frame, validates the `SNAPSHOT` reply, and returns a resolved page result. That result is applied via `applyBuilderPageToDOM(...)` with `previewMode: true` so all side-effect hooks are suppressed. After the snapshot is applied, the bridge stores preview identity context, emits a validated `METRICS` payload back to the admin frame, and, when `builderEditing` is true, starts a target bridge that reports marked target geometry plus hover/select events. It stays subscribed for follow-up `SNAPSHOT` updates from the builder. If the request times out or the snapshot is invalid, `handlePreviewLoadError()` surfaces an inline error and releases bootstrap state with `source: 'error'`.
 5. Missing builder pages resolve to `source: 'none'`; normal startup does not fetch legacy `page-config.json`.
 6. After the first render or error state is ready, `app.js` releases bootstrap hiding and exposes `window.BattleBros` subtitle helpers.

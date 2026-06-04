@@ -35,6 +35,15 @@ export function getExplicitPageSlug() {
   return sanitizePageSlug(params.get('page') || '');
 }
 
+export function getRequestedPageScope() {
+  const params = new URLSearchParams(window.location.search);
+  return String(params.get('pageScope') || '')
+    .trim()
+    .toLowerCase() === 'global'
+    ? 'global'
+    : 'series';
+}
+
 export function isDraftPageRequested() {
   const params = new URLSearchParams(window.location.search);
   const raw = String(params.get('draft') || '')

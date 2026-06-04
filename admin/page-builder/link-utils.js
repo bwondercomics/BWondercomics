@@ -38,20 +38,16 @@ function normalizeLinkTarget(rawTarget = null, legacyUrl = '') {
   const fallbackUrl = String(legacyUrl || target.url || '').trim();
   const rawKind = target.kind || (fallbackUrl.startsWith('#') ? 'anchor' : 'url');
   const kind = ['builder-page', 'url', 'anchor'].includes(rawKind) ? rawKind : 'url';
+  const pageScope = target.pageScope === 'global' ? 'global' : 'series';
+  const seriesId =
+    pageScope === 'series' && target.seriesId ? normalizeSeriesId(target.seriesId) : '';
   const safeUrl = kind === 'url' ? sanitizeHref(fallbackUrl) : '';
   const safeHash = kind === 'anchor' ? sanitizeHash(target.hash || fallbackUrl) : '';
   const pageSlug = kind === 'builder-page' ? sanitizePageSlug(target.pageSlug) : '';
-  if (kind === 'builder-page' && !pageSlug) {
-    return {
-      kind: 'url',
-      pageSlug: '',
-      url: safeUrl || '#',
-      hash: '',
-      openInNewTab: target.openInNewTab === true && isExternalUrl(safeUrl),
-    };
-  }
   return {
     kind,
+    pageScope: kind === 'builder-page' ? pageScope : 'series',
+    seriesId: kind === 'builder-page' ? seriesId : '',
     pageSlug,
     url: kind === 'url' ? safeUrl || '#' : '',
     hash: kind === 'anchor' ? safeHash || '#' : '',
@@ -108,14 +104,26 @@ function buildReaderPageHref(pageSlug, seriesId = DEFAULT_SERIES_ID) {
   return `index.html?${params.toString()}`;
 }
 
+function buildGlobalPageHref(pageSlug) {
+  const params = new URLSearchParams({
+    pageScope: 'global',
+    page: sanitizePageSlug(pageSlug) || 'reader',
+  });
+  return `index.html?${params.toString()}`;
+}
+
 function isExternalUrl(raw = '') {
   return /^https?:\/\//i.test(String(raw || '').trim());
 }
 
 function resolveLinkTargetHref(target, options = {}) {
-  const seriesId = normalizeSeriesId(options.seriesId || DEFAULT_SERIES_ID);
   const link = normalizeLinkTarget(target);
   if (link.kind === 'builder-page') {
+    if (!link.pageSlug) return '#';
+    if (link.pageScope === 'global') {
+      return buildGlobalPageHref(link.pageSlug);
+    }
+    const seriesId = normalizeSeriesId(link.seriesId || options.seriesId || DEFAULT_SERIES_ID);
     return buildReaderPageHref(link.pageSlug, seriesId);
   }
   if (link.kind === 'anchor') {
@@ -132,10 +140,18 @@ function shouldOpenLinkInNewTab(target) {
 function isBuilderPageTargetMissing(target, pages = []) {
   const link = normalizeLinkTarget(target);
   if (link.kind !== 'builder-page' || !link.pageSlug) return false;
-  return !pages.some((page) => sanitizePageSlug(page?.slug) === link.pageSlug);
+  return !pages.some((page) => {
+    const pageScope = page?.scope === 'global' ? 'global' : 'series';
+    if (pageScope !== link.pageScope || sanitizePageSlug(page?.slug) !== link.pageSlug) {
+      return false;
+    }
+    if (link.pageScope !== 'series' || !link.seriesId) return true;
+    return normalizeSeriesId(page?.seriesId || '') === link.seriesId;
+  });
 }
 
 export {
+  buildGlobalPageHref,
   buildReaderPageHref,
   isBuilderPageTargetMissing,
   normalizeButtonItem,

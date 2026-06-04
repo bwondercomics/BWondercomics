@@ -8,6 +8,7 @@ import {
   getSeriesDataPath,
   getSeriesPageConfigPath,
   getActiveSeriesId,
+  getRequestedPageScope,
   sanitizePageSlug,
 } from './series.js';
 import { logger } from './logger.js';
@@ -205,16 +206,23 @@ export async function loadLatestPost() {
  * Loads a page from the page builder API.
  * @param {string} slug - The page slug (e.g., "reader")
  * @param {string} [seriesId] - Optional series ID override
- * @param {{draft?: boolean}} [options] - Load unpublished pages through the admin API when enabled
+ * @param {{draft?: boolean, pageScope?: 'series'|'global'}} [options] - Load unpublished pages
+ * through the admin API when enabled
  * @returns {Promise<Object|null>} The page data or null if not found
  */
 export async function loadBuilderPage(slug, seriesId = null, options = {}) {
   const sid = seriesId || getActiveSeriesId();
   const pageSlug = sanitizePageSlug(slug) || 'reader';
   const useDraft = !!options?.draft;
-  const requestUrl = useDraft
-    ? `/api/admin/pages/by-slug/${encodeURIComponent(sid)}/${encodeURIComponent(pageSlug)}`
-    : `/api/pages/${encodeURIComponent(sid)}/${encodeURIComponent(pageSlug)}`;
+  const pageScope = options?.pageScope === 'global' ? 'global' : 'series';
+  const requestUrl =
+    pageScope === 'global'
+      ? useDraft
+        ? `/api/admin/pages/global/by-slug/${encodeURIComponent(pageSlug)}`
+        : `/api/pages/global/by-slug/${encodeURIComponent(pageSlug)}`
+      : useDraft
+        ? `/api/admin/pages/series/${encodeURIComponent(sid)}/by-slug/${encodeURIComponent(pageSlug)}`
+        : `/api/pages/${encodeURIComponent(sid)}/${encodeURIComponent(pageSlug)}`;
   try {
     const res = await fetch(requestUrl, {
       cache: 'no-store',
@@ -655,20 +663,22 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
  *
  * @param {Function} setSubtitlesFn - Callback to set subtitles
  * @param {string} [seriesId] - Optional series ID override
- * @param {{pageSlug?: string, draft?: boolean}} [options] - Page selection and draft mode
+ * @param {{pageSlug?: string, pageScope?: 'series'|'global', draft?: boolean}} [options] - Page
+ * selection and draft mode
  * @returns {Promise<{source: 'builder' | 'none', page?: Object}>} Result with source indicator
  */
 export async function loadPageConfigWithFallback(setSubtitlesFn, seriesId = null, options = {}) {
   const sid = seriesId || getActiveSeriesId();
   const requestedPageSlug = sanitizePageSlug(options?.pageSlug || '');
   const pageSlug = requestedPageSlug || 'reader';
-  const useHomepageResolver = !requestedPageSlug;
+  const pageScope = options?.pageScope || getRequestedPageScope();
+  const useHomepageResolver = pageScope !== 'global' && !requestedPageSlug;
   const useDraft = !!options?.draft;
 
   // Try page builder first
   const builderPage = useHomepageResolver
     ? await loadHomepageBuilderPage(sid, { draft: useDraft })
-    : await loadBuilderPage(pageSlug, sid, { draft: useDraft });
+    : await loadBuilderPage(pageSlug, sid, { draft: useDraft, pageScope });
   if (builderPage) {
     const subtitles = extractSubtitlesFromBuilderPage(builderPage, null);
     if (subtitles.length > 0) {

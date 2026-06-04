@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  isBuilderPageTargetMissing,
   normalizeButtonItem,
   normalizeButtonsConfig,
   normalizeLinkTarget,
@@ -19,6 +20,8 @@ describe('admin page-builder link utilities', () => {
 
     expect(normalized).toEqual({
       kind: 'url',
+      pageScope: 'series',
+      seriesId: '',
       pageSlug: '',
       url: '#',
       hash: '',
@@ -38,9 +41,12 @@ describe('admin page-builder link utilities', () => {
       normalizeLinkTarget({
         kind: 'builder-page',
         pageSlug: ' About Us!! ',
+        seriesId: ' Space Saga ',
       })
     ).toEqual({
       kind: 'builder-page',
+      pageScope: 'series',
+      seriesId: 'space-saga',
       pageSlug: 'about-us',
       url: '',
       hash: '',
@@ -51,6 +57,27 @@ describe('admin page-builder link utilities', () => {
       '#hero-section'
     );
     expect(normalizeLinkTarget({ kind: 'anchor', hash: '"><script>' }).hash).toBe('#');
+  });
+
+  it('uses seriesId when resolving and validating series builder-page targets', () => {
+    const link = {
+      kind: 'builder-page',
+      pageScope: 'series',
+      seriesId: 'space-saga',
+      pageSlug: 'about',
+    };
+
+    expect(resolveLinkTargetHref(link)).toBe('index.html?series=space-saga&page=about');
+    expect(
+      isBuilderPageTargetMissing(link, [
+        { scope: 'series', seriesId: 'battle-bros', slug: 'about' },
+        { scope: 'global', seriesId: null, slug: 'about' },
+      ])
+    ).toBe(true);
+    expect(
+      isBuilderPageTargetMissing(link, [{ scope: 'series', seriesId: 'space-saga', slug: 'about' }])
+    ).toBe(false);
+    expect(isBuilderPageTargetMissing({ kind: 'builder-page', pageSlug: 'about' }, [])).toBe(true);
   });
 
   it('normalizeHeaderNavItem carries a style field defaulting to primary', () => {

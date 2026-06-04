@@ -24,6 +24,31 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
     return String(category || 'other').replace(/^\w/, (char) => char.toUpperCase());
   }
 
+  function getPageScopeLabel(page) {
+    return page?.scope === 'global' ? 'Global' : 'Series';
+  }
+
+  function isReaderBinding(page, pageBindings) {
+    return page?.id && pageBindings?.bindings?.reader?.pageId === page.id;
+  }
+
+  function renderScopeControls(activePageScope, pageBindings) {
+    const warnings = Array.isArray(pageBindings?.warnings) ? pageBindings.warnings : [];
+    const warningHtml =
+      activePageScope === 'series' && warnings.length
+        ? `<div class="pb-page-scope-warning">${warnings
+            .map((warning) => escapeHtml(warning.message || 'Page binding needs attention.'))
+            .join(' ')}</div>`
+        : '';
+    return `
+      <div class="pb-page-scope-controls" role="group" aria-label="Page scope">
+        <button type="button" class="pb-page-scope-toggle ${activePageScope === 'series' ? 'active' : ''}" data-page-scope="series">Series Pages</button>
+        <button type="button" class="pb-page-scope-toggle ${activePageScope === 'global' ? 'active' : ''}" data-page-scope="global">Global Pages</button>
+      </div>
+      ${warningHtml}
+    `;
+  }
+
   function getLayoutColumnCount(layout = '1') {
     return String(layout || '1')
       .split('-')
@@ -43,34 +68,47 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
   function renderPageList() {
     if (!el.pbPageList) return;
 
-    const { currentPage, pages } = getState();
+    const { activePageScope = 'series', currentPage, pageBindings, pages } = getState();
+
+    const controlsHtml = renderScopeControls(activePageScope, pageBindings);
 
     if (pages.length === 0) {
       el.pbPageList.innerHTML = `
+        ${controlsHtml}
         <div class="pb-page-list-empty" style="color: rgba(255,255,255,0.5); font-size: 0.85rem; padding: 10px;">
-          No pages yet. Create one to get started.
+          No ${activePageScope === 'global' ? 'global' : 'series'} pages yet. Create one to get started.
         </div>
       `;
+      bindPageScopeControls();
       return;
     }
 
-    el.pbPageList.innerHTML = pages
-      .map(
-        (page) => `
+    el.pbPageList.innerHTML =
+      controlsHtml +
+      pages
+        .map(
+          (page) => `
           <div class="pb-page-item ${currentPage?.id === page.id ? 'active' : ''}" data-page-id="${page.id}" draggable="true">
             <div class="pb-page-item-main">
               <button type="button" class="pb-page-drag-handle" title="Move page" style="background:none;border:none;color:currentColor;cursor:grab;padding:0 8px 0 0;font-size:1.1rem;opacity:0.3;">\u22EE</button>
               <span class="pb-page-item-title">${escapeHtml(helpers.getPageDisplayTitle(page))}</span>
-              <span class="pb-page-item-meta">${escapeHtml(page.slug || 'reader')} · ${escapeHtml(page.pageType || 'custom')}</span>
+              <span class="pb-page-item-meta">${escapeHtml(page.slug || 'reader')} · ${escapeHtml(page.pageType || 'custom')} · ${escapeHtml(getPageScopeLabel(page))}</span>
             </div>
             <span class="pb-page-item-badges">${helpers.renderPageStatusBadges(page)}</span>
             <span class="pb-page-item-actions">
+              ${
+                activePageScope === 'series'
+                  ? `<button class="pb-page-action reader" data-action="reader" title="Set as reader page" ${isReaderBinding(page, pageBindings) ? 'disabled' : ''}>Reader</button>`
+                  : ''
+              }
               <button class="pb-page-action delete" data-action="delete" title="Delete page">\u00D7</button>
             </span>
           </div>
         `
-      )
-      .join('');
+        )
+        .join('');
+
+    bindPageScopeControls();
 
     el.pbPageList.querySelectorAll('.pb-page-item').forEach((item) => {
       item.addEventListener('click', async (event) => {
@@ -86,6 +124,11 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
       item.querySelector('.pb-page-action.delete')?.addEventListener('click', async (event) => {
         event.stopPropagation();
         await actions.deletePage(item.dataset.pageId);
+      });
+
+      item.querySelector('.pb-page-action.reader')?.addEventListener('click', async (event) => {
+        event.stopPropagation();
+        await actions.updateReaderBinding?.(item.dataset.pageId);
       });
 
       item.addEventListener('dragstart', (event) => {
@@ -150,6 +193,14 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
 
         draggedSidebarPageId = null;
         await actions.reorderSidebarPages(pageIds);
+      });
+    });
+  }
+
+  function bindPageScopeControls() {
+    el.pbPageList?.querySelectorAll('.pb-page-scope-toggle').forEach((button) => {
+      button.addEventListener('click', async () => {
+        await actions.switchPageScope?.(button.dataset.pageScope);
       });
     });
   }

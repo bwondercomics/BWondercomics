@@ -52,10 +52,14 @@ export function renderPage(page, options = {}) {
 /**
  * Fetch a page by slug from the API.
  */
-export async function fetchPage(slug, seriesId = null) {
+export async function fetchPage(slug, seriesId = null, options = {}) {
   const sid = seriesId || getActiveSeriesId();
+  const url =
+    options?.pageScope === 'global'
+      ? `/api/pages/global/by-slug/${encodeURIComponent(slug)}`
+      : `/api/pages/${encodeURIComponent(sid)}/${encodeURIComponent(slug)}`;
   try {
-    const res = await fetch(`/api/pages/${encodeURIComponent(sid)}/${encodeURIComponent(slug)}`);
+    const res = await fetch(url);
     if (!res.ok) {
       if (res.status === 404) {
         logger.log(`Page "${slug}" not found for series "${sid}"`);
@@ -82,7 +86,7 @@ export async function mountPage(container, slug, seriesId = null, options = {}) 
 
   container.innerHTML = '<div class="pb-loading">Loading...</div>';
 
-  const page = await fetchPage(slug, seriesId);
+  const page = await fetchPage(slug, seriesId, options);
   if (!page) {
     container.innerHTML = '<div class="pb-error">Page not found.</div>';
     return;

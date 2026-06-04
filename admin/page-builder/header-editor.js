@@ -76,11 +76,17 @@ function renderCopyEditor(copy) {
 function renderLinkFields(item, index, pages) {
   const link = normalizeLinkTarget(item.link, '');
   const isMissingPage = isBuilderPageTargetMissing(link, pages);
+  const pageScope = link.pageScope === 'global' ? 'global' : 'series';
   const pageOptions = pages
+    .filter((page) => (page?.scope === 'global' ? 'global' : 'series') === pageScope)
     .map((page) => {
       const slug = String(page?.slug || '').trim();
       const title = page?.title || slug || 'Untitled page';
-      return `<option value="${escapeAttr(slug)}" ${link.pageSlug === slug ? 'selected' : ''}>${escapeHtml(title)} (${escapeHtml(slug)})</option>`;
+      const seriesId = pageScope === 'series' ? String(page?.seriesId || '').trim() : '';
+      const selected =
+        link.pageSlug === slug &&
+        (pageScope === 'global' || !link.seriesId || link.seriesId === seriesId);
+      return `<option value="${escapeAttr(slug)}" data-series-id="${escapeAttr(seriesId)}" ${selected ? 'selected' : ''}>${escapeHtml(title)} (${escapeHtml(slug)})</option>`;
     })
     .join('');
   const isExternalUrl = /^https?:\/\//i.test(link.url || '');
@@ -89,7 +95,7 @@ function renderLinkFields(item, index, pages) {
     <div class="pb-editor-field">
       <label class="pb-editor-label">Destination Type</label>
       <select class="pb-editor-select pb-header-nav-input" data-item-index="${index}" data-item-key="kind">
-        <option value="builder-page" ${link.kind === 'builder-page' ? 'selected' : ''}>Page in This Series</option>
+        <option value="builder-page" ${link.kind === 'builder-page' ? 'selected' : ''}>Builder Page</option>
         <option value="url" ${link.kind === 'url' ? 'selected' : ''}>URL</option>
         <option value="anchor" ${link.kind === 'anchor' ? 'selected' : ''}>Jump to Section</option>
       </select>
@@ -98,6 +104,13 @@ function renderLinkFields(item, index, pages) {
       link.kind === 'builder-page'
         ? `
       <div class="pb-editor-field">
+        <label class="pb-editor-label">Page Scope</label>
+        <select class="pb-editor-select pb-header-nav-input" data-item-index="${index}" data-item-key="pageScope">
+          <option value="series" ${pageScope === 'series' ? 'selected' : ''}>Series Pages</option>
+          <option value="global" ${pageScope === 'global' ? 'selected' : ''}>Global Pages</option>
+        </select>
+      </div>
+      <div class="pb-editor-field">
         <label class="pb-editor-label">Page</label>
         <select class="pb-editor-select pb-header-nav-input" data-item-index="${index}" data-item-key="pageSlug">
           <option value="">Select a page</option>
@@ -105,8 +118,8 @@ function renderLinkFields(item, index, pages) {
         </select>
         ${
           isMissingPage
-            ? '<p class="pb-editor-help" data-status="warning">This saved page slug is not in the current series.</p>'
-            : '<p class="pb-editor-help">Links to another builder page in this series.</p>'
+            ? '<p class="pb-editor-help" data-status="warning">This saved page slug is not available in this scope.</p>'
+            : '<p class="pb-editor-help">Links to another builder page.</p>'
         }
       </div>
     `
@@ -567,12 +580,25 @@ function setCopyValue(state, key, value) {
 
 function updateNavItemLink(item, key, input) {
   const nextLink = normalizeLinkTarget(item.link, '');
+  const selectedOption =
+    input.selectedOptions?.[0] ||
+    (Number.isInteger(input.selectedIndex) ? input.options?.[input.selectedIndex] : null);
   if (key === 'kind') {
     nextLink.kind = input.value;
+    nextLink.pageScope = 'series';
+    nextLink.seriesId = '';
     nextLink.pageSlug = '';
     nextLink.url = '';
     nextLink.hash = '';
     nextLink.openInNewTab = false;
+  } else if (key === 'pageScope') {
+    nextLink.pageScope = input.value === 'global' ? 'global' : 'series';
+    nextLink.seriesId = '';
+    nextLink.pageSlug = '';
+  } else if (key === 'pageSlug') {
+    nextLink.pageSlug = input.value;
+    nextLink.seriesId =
+      nextLink.pageScope === 'series' ? selectedOption?.dataset?.seriesId || '' : '';
   } else if (key === 'openInNewTab') {
     nextLink.openInNewTab = input.checked;
   } else {
@@ -888,10 +914,10 @@ export function bindHeaderEditorEvents({
       const nextState = cloneValue(state);
       const item = nextState.header.nav.items[index];
       if (!item || !key) return;
-      if (['kind', 'pageSlug', 'url', 'hash', 'openInNewTab'].includes(key)) {
+      if (['kind', 'pageScope', 'pageSlug', 'url', 'hash', 'openInNewTab'].includes(key)) {
         updateNavItemLink(item, key, input);
         commit(nextState, {
-          rerenderEditor: key === 'kind' || key === 'url',
+          rerenderEditor: key === 'kind' || key === 'pageScope' || key === 'url',
           rerenderCanvas: true,
         });
         return;

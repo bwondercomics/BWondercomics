@@ -42,11 +42,14 @@ import {
   setResponsiveOverrideValue,
 } from './page-builder/responsive-overrides.js';
 import {
-  fetchPages,
+  fetchSeriesPages,
+  fetchGlobalPages,
   fetchPage,
-  createPage,
+  createScopedPage,
   deletePage,
   updatePage,
+  fetchPageBindings,
+  updatePageBindings,
   fetchAssets,
   uploadAsset,
   addSection,
@@ -58,7 +61,7 @@ import {
   moveModule,
   reorderModules,
   deleteModule,
-  reorderPages,
+  reorderScopedPages,
 } from './page-builder/data.js';
 
 const BUILDER_CHROME_COMMANDS = Object.freeze({
@@ -76,7 +79,11 @@ function createPageBuilder({
   onExitBuilder,
 }) {
   let pages = [];
+  let linkPages = [];
   let currentPage = null;
+  /** @type {'series'|'global'} */
+  let activePageScope = 'series';
+  let pageBindings = { bindings: {}, warnings: [] };
   let selectedModuleId = null;
   let selectedCanvasSurface = null;
   let activeEditorTab = 'modules';
@@ -187,7 +194,7 @@ function createPageBuilder({
     el,
     getState: () => ({
       currentPage,
-      pages,
+      pages: linkPages.length ? linkPages : pages,
       activeEditorTab,
       activeSidePanelTab,
       selectedCanvasSurface,
@@ -372,6 +379,8 @@ function createPageBuilder({
       getState: () => ({
         currentPage,
         pages,
+        activePageScope,
+        pageBindings,
         activeSectionId,
         selectedCanvasSurface,
         selectedModuleId,
@@ -381,6 +390,8 @@ function createPageBuilder({
       }),
       actions: {
         selectPage: (pageId) => pageActions.selectPage(pageId),
+        switchPageScope: async (nextScope) => switchPageScope(nextScope),
+        updateReaderBinding: async (pageId) => updateReaderBinding(pageId),
         deletePage: (pageId) => pageActions.deletePageFromSidebar(pageId),
         reorderSidebarPages: (pageIds) => pageActions.reorderSidebarPages(pageIds),
         setDraggedModuleId: (moduleId) => {
@@ -425,6 +436,7 @@ function createPageBuilder({
     getState: () => ({
       currentPage,
       pages,
+      activePageScope,
       activeDesignerSurface,
     }),
     actions: {
@@ -441,6 +453,15 @@ function createPageBuilder({
       initializePageSettingsDraft: draftManager.initializePageSettingsDraft,
       setPages: (nextPages) => {
         pages = nextPages;
+      },
+      setLinkPages: (nextPages) => {
+        linkPages = Array.isArray(nextPages) ? nextPages : [];
+      },
+      setPageBindings: (nextBindings) => {
+        pageBindings =
+          nextBindings && typeof nextBindings === 'object'
+            ? nextBindings
+            : { bindings: {}, warnings: [] };
       },
       setCurrentPage: (nextPage) => {
         currentPage = nextPage;
@@ -464,13 +485,23 @@ function createPageBuilder({
       syncDesignerRoute: (mode) => syncDesignerRoute(mode),
     },
     deps: {
-      fetchPages,
+      fetchPages: (scope, seriesId) =>
+        scope === 'global' ? fetchGlobalPages() : fetchSeriesPages(seriesId),
+      fetchLinkPages: async (seriesId) => {
+        const [seriesPages, globalPages] = await Promise.all([
+          fetchSeriesPages(seriesId),
+          fetchGlobalPages(),
+        ]);
+        return [...seriesPages, ...globalPages];
+      },
       fetchPage,
-      createPage,
+      createPage: (scope, seriesId, slug, title) => createScopedPage(scope, seriesId, slug, title),
       deletePage,
       updatePage,
+      fetchPageBindings,
+      updatePageBindings,
       uploadAsset,
-      reorderPages,
+      reorderPages: (scope, seriesId, pageIds) => reorderScopedPages(scope, seriesId, pageIds),
       readFileAsBase64,
     },
   });
@@ -825,6 +856,35 @@ function createPageBuilder({
     previewChromeRestoreState = null;
   }
 
+  async function switchPageScope(nextScope) {
+    const safeScope = nextScope === 'global' ? 'global' : 'series';
+    if (safeScope === activePageScope) return;
+    if (
+      !ensureCleanWorkspace('Save or discard your current changes before switching page scopes.')
+    ) {
+      return;
+    }
+    activePageScope = safeScope;
+    currentPage = null;
+    resetBuilderState();
+    await pageActions.loadPages();
+    renderPageList();
+    renderCanvas();
+    renderEditorPanel();
+    renderLayerTree();
+  }
+
+  async function updateReaderBinding(pageId) {
+    if (!ensureCleanWorkspace('Save or discard your current changes before changing bindings.')) {
+      return;
+    }
+    const nextBindings = await updatePageBindings(getSeriesId(), { reader: pageId });
+    if (!nextBindings) return;
+    pageBindings = nextBindings;
+    setEditorStatus('Reader page binding updated.', 'success');
+    renderPageList();
+  }
+
   function getDefaultDesignerPage(pageSlug = '') {
     const requestedSlug = String(pageSlug || '')
       .trim()
@@ -857,6 +917,7 @@ function createPageBuilder({
   function syncPageSummary(page) {
     if (!page?.id) return;
     pages = pages.map((item) => (item.id === page.id ? { ...item, ...page } : item));
+    linkPages = linkPages.map((item) => (item.id === page.id ? { ...item, ...page } : item));
     if (currentPage?.id === page.id) {
       currentPage = {
         ...currentPage,
@@ -1039,10 +1100,16 @@ function createPageBuilder({
   }
 
   function getReaderUrl(page) {
-    const params = new URLSearchParams({
-      series: getSeriesId(),
-      page: String(page?.slug || '').trim() || 'reader',
-    });
+    const params =
+      page?.scope === 'global'
+        ? new URLSearchParams({
+            pageScope: 'global',
+            page: String(page?.slug || '').trim() || 'reader',
+          })
+        : new URLSearchParams({
+            series: page?.seriesId || getSeriesId(),
+            page: String(page?.slug || '').trim() || 'reader',
+          });
     if (page?.isPublished === false) {
       params.set('draft', '1');
     }
@@ -1491,6 +1558,9 @@ function createPageBuilder({
 
     activeEntrypoint = entrypoint;
     activeDesignerSurface = requestedSurface;
+    if (activeEntrypoint === 'designer') {
+      activePageScope = 'series';
+    }
     canvasMode = 'preview';
     editorChromeMode = 'edit';
     preChromeCanvasMode = null;
@@ -1630,7 +1700,7 @@ function createPageBuilder({
         submitBtn.textContent = 'Creating...';
       }
 
-      const newPage = await pageActions.createPageForSeries(slug, title);
+      const newPage = await pageActions.createPageForActiveScope(slug, title);
       try {
         if (newPage) {
           closeAddPageModal();
