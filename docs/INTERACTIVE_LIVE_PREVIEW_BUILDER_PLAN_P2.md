@@ -767,6 +767,25 @@ Assumptions:
 - Undo/redo UI remains scoped to what is actually implemented and tested.
 - Keymaps are additive and must never make normal typing, media picking, or inline editing risky.
 
+Completion notes:
+
+- 2026-06-05: Phase 10 implemented the internal builder command registry, guarded admin keymaps,
+  and local draft undo/redo for explicit-save module, header, theme, page-settings, and section
+  drafts. Existing Phase 6 structural commands and Phase 7 chrome-preview commands now route
+  through the registry, while structural/delete undo and persisted transaction history remain out of
+  scope.
+- 2026-06-05: Corrective Phase 10 patch allows `Escape` to exit chrome preview while the restore
+  button has focus, keys draft undo history by responsive edit scope/device for module, header, and
+  section drafts, and propagates failed draft saves through `builder:save-draft`. Verification:
+  `node --check` passed for touched admin builder modules and updated tests; `npm test --
+tests/admin-page-builder-keymaps.test.js tests/admin-page-builder-commands.test.js
+tests/admin-page-builder-undo-stack.test.js tests/admin-page-builder-draft-manager.test.js
+tests/admin-page-builder-shell.test.js tests/live-drop-placement.test.js
+tests/responsive-overrides.test.js tests/admin-page-builder-preview-contract.test.js` passed (`8`
+  files, `120` tests); `npm test` passed (`53` files, `437` passed, `1` skipped); `npm run
+test:backend` passed (`71` tests); `npm run build` passed; `npm run test:visual` passed (`3`
+  tests); `npm run format:check` passed after formatting; `git diff --check` passed.
+
 ## Phase 11 - Inline Editing
 
 Goal: Edit text-like content directly in the live canvas when the module data model supports it.

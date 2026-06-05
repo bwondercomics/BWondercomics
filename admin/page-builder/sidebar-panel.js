@@ -7,6 +7,10 @@ const INSERTABLE_MODULE_TYPES = getInsertableModuleDescriptors();
 let draggedSidebarPageId = null;
 
 export function createSidebarPanel({ el, getState, actions, helpers }) {
+  function runBuilderCommand(id, payload = {}) {
+    return actions.runCommand?.(id, payload) ?? actions.runStructuralCommand?.(id, payload);
+  }
+
   function sortSections(sections = []) {
     return sections.slice().sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0));
   }
@@ -237,7 +241,7 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
     el.pbModulePalette.querySelectorAll('.pb-module-type').forEach((item) => {
       item.addEventListener('dragstart', (event) => {
         actions.setDraggedModuleId(null);
-        const result = actions.runStructuralCommand?.(BUILDER_STRUCTURAL_COMMANDS.DRAG_START, {
+        const result = runBuilderCommand(BUILDER_STRUCTURAL_COMMANDS.DRAG_START, {
           source: 'block',
           moduleType: item.dataset.moduleType,
         });
@@ -252,12 +256,12 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
         }
       });
       item.addEventListener('dragend', () => {
-        actions.runStructuralCommand?.(BUILDER_STRUCTURAL_COMMANDS.DRAG_END);
+        runBuilderCommand(BUILDER_STRUCTURAL_COMMANDS.DRAG_END);
       });
       item.addEventListener('click', async () => {
         const { activeInsertTarget } = getState();
         if (!activeInsertTarget) return;
-        await actions.runStructuralCommand?.(BUILDER_STRUCTURAL_COMMANDS.INSERT, {
+        await runBuilderCommand(BUILDER_STRUCTURAL_COMMANDS.INSERT, {
           moduleType: item.dataset.moduleType,
           placement: activeInsertTarget,
         });
@@ -418,10 +422,7 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
           source === 'section'
             ? { source, sectionId: item.dataset.sectionId }
             : { source, moduleId: item.dataset.moduleId };
-        const result = actions.runStructuralCommand?.(
-          BUILDER_STRUCTURAL_COMMANDS.DRAG_START,
-          payload
-        );
+        const result = runBuilderCommand(BUILDER_STRUCTURAL_COMMANDS.DRAG_START, payload);
         if (result?.ok === false) {
           event.preventDefault();
           return;
@@ -432,13 +433,13 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
         }
       });
       item.addEventListener('dragend', () => {
-        actions.runStructuralCommand?.(BUILDER_STRUCTURAL_COMMANDS.DRAG_END);
+        runBuilderCommand(BUILDER_STRUCTURAL_COMMANDS.DRAG_END);
       });
     });
     el.pbLayerTree.querySelectorAll('[data-layer-action="delete-module"]').forEach((item) =>
       item.addEventListener('click', async (event) => {
         event.stopPropagation();
-        await actions.runStructuralCommand?.(BUILDER_STRUCTURAL_COMMANDS.DELETE_SELECTED, {
+        await runBuilderCommand(BUILDER_STRUCTURAL_COMMANDS.DELETE_SELECTED, {
           target: { kind: 'module', moduleId: item.dataset.moduleId },
         });
       })
@@ -446,7 +447,7 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
     el.pbLayerTree.querySelectorAll('[data-layer-action="delete-section"]').forEach((item) =>
       item.addEventListener('click', async (event) => {
         event.stopPropagation();
-        await actions.runStructuralCommand?.(BUILDER_STRUCTURAL_COMMANDS.DELETE_SELECTED, {
+        await runBuilderCommand(BUILDER_STRUCTURAL_COMMANDS.DELETE_SELECTED, {
           target: { kind: 'section', sectionId: item.dataset.sectionId },
         });
       })

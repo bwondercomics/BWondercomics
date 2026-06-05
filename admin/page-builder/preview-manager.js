@@ -153,6 +153,10 @@ export function createPreviewManager({ el, getState, actions, deps }) {
   let previewMessageBound = false;
   let targetStaleTimeoutId = null;
 
+  function runBuilderCommand(id, payload = {}) {
+    return actions.runCommand?.(id, payload) ?? actions.runStructuralCommand?.(id, payload);
+  }
+
   function getPreviewIframeUrl(snapshot, session) {
     const params = new URLSearchParams({
       series: snapshot.seriesId || deps.getSeriesId(),
@@ -352,7 +356,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
           return;
         }
         if (action === 'insert-before' || action === 'insert-after') {
-          await actions.runStructuralCommand?.('builder:insert', {
+          await runBuilderCommand('builder:insert', {
             target,
             position: action === 'insert-before' ? 'before' : 'after',
           });
@@ -362,19 +366,19 @@ export function createPreviewManager({ el, getState, actions, deps }) {
           const placement = {
             sectionIndex: getSectionInsertIndex(target, action, latestPreviewTargets),
           };
-          await actions.runStructuralCommand?.('builder:insert-section', placement);
+          await runBuilderCommand('builder:insert-section', placement);
           return;
         }
         if (action === 'insert-section-end') {
-          await actions.runStructuralCommand?.('builder:insert-section', {});
+          await runBuilderCommand('builder:insert-section', {});
           return;
         }
         if (action === 'hide-device') {
-          await actions.runStructuralCommand?.('builder:hide-on-device', { target });
+          await runBuilderCommand('builder:hide-on-device', { target });
           return;
         }
         if (action === 'delete') {
-          await actions.runStructuralCommand?.('builder:delete-selected', { target });
+          await runBuilderCommand('builder:delete-selected', { target });
         }
       });
     });
@@ -384,7 +388,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
         const selectedGeometry = findTargetGeometry(selectedTargetKey);
         const target = selectedGeometry?.target;
         if (!target) return;
-        const result = actions.runStructuralCommand?.('builder:drag-start', {
+        const result = runBuilderCommand('builder:drag-start', {
           source: target.kind,
           moduleId: target.moduleId,
           sectionId: target.sectionId,
@@ -401,7 +405,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
         renderPreviewTargetOverlay();
       });
       button.addEventListener('dragend', () => {
-        actions.runStructuralCommand?.('builder:drag-end');
+        runBuilderCommand('builder:drag-end');
         renderPreviewTargetOverlay();
       });
     });
@@ -410,7 +414,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
       if (!getState().liveDragState) return;
       event.preventDefault();
       const frame = overlay.closest('.pb-preview-frame');
-      const result = actions.runStructuralCommand?.('builder:drag-over', {
+      const result = runBuilderCommand('builder:drag-over', {
         point: getFramePoint(frame, event),
         targets: latestPreviewTargets,
       });
@@ -423,7 +427,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
       if (!getState().liveDragState) return;
       event.preventDefault();
       const frame = overlay.closest('.pb-preview-frame');
-      await actions.runStructuralCommand?.('builder:drop', {
+      await runBuilderCommand('builder:drop', {
         point: getFramePoint(frame, event),
         targets: latestPreviewTargets,
       });
@@ -503,7 +507,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
   function resetPreviewTargets(options = {}) {
     clearTargetStaleTimeout();
     if (getState().liveDragState) {
-      actions.runStructuralCommand?.('builder:drag-end');
+      runBuilderCommand('builder:drag-end');
     }
     const previousSequence = latestTargetSequence;
     latestPreviewTargets = [];

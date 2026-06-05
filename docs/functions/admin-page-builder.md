@@ -98,15 +98,18 @@ sort? }`.
 6. The default canvas is the live iframe preview rendered by `preview-manager.js` with
    `builderEditing: true`, so the reader iframe can emit admin-only target markers and live target
    geometry.
-7. Live structural actions from Blocks, Layers, the selected-target toolbar, and Structure Debug
-   route through `structural-commands.js`.
+7. Editor intent first routes through the Phase 10 command registry, then delegates to focused
+   managers such as `structural-commands.js`, `draft-manager.js`, and `preview-manager.js`.
 8. Live drops rank iframe target geometry through `live-drop-placement.js`, then call
    `canvas-mutations.js` and the existing data-layer mutators.
 9. The structural canvas is still rendered by `canvas-renderer.js` as the **Structure Debug**
    fallback.
-10. User actions call `data.js` mutators, update local state, then rerender affected surfaces.
+10. Guarded builder keymaps call the same command IDs as toolbar and panel controls. `Escape`
+    exits chrome preview even when the restore button owns focus, while destructive keys stay
+    suppressed inside editing controls.
+11. User actions call `data.js` mutators, update local state, then rerender affected surfaces.
 
-There is no separate long-lived client-side draft store in `data.js`. `admin/page-builder.js` still owns the top-level mutable builder state and composition root, while focused factories now own specific workflows: `draft-manager.js` handles draft normalization/save-discard flows, `page-actions.js` handles page lifecycle actions, `canvas-mutations.js` handles structural section/module mutations, `structural-commands.js` routes live structural intent, and `preview-manager.js` handles the iframe preview handshake/render path.
+There is no separate long-lived client-side draft store in `data.js`. `admin/page-builder.js` still owns the top-level mutable builder state and composition root, while focused factories now own specific workflows: `commands.js` centralizes editor intent and availability checks, `keymaps.js` guards admin-only shortcuts, `undo-stack.js` tracks local unsaved draft snapshots keyed by draft target plus responsive edit scope/device where applicable, `draft-manager.js` handles draft normalization/save-discard flows, `page-actions.js` handles page lifecycle actions, `canvas-mutations.js` handles structural section/module mutations, `structural-commands.js` routes live structural intent, and `preview-manager.js` handles the iframe preview handshake/render path.
 
 Fallback-retirement readiness is a separate developer workflow, not part of the normal editor boot path: the page list from `fetchPages(...)` is intentionally summary-only, so any runtime-fallback audit must hydrate each page with `fetchPage(...)` or use `loadFallbackRetirementGate(...)` before calling `auditPagesFallbacks(...)`.
 
@@ -120,10 +123,11 @@ Its responsibilities include:
 - tracking selected surface, selected module, active section, and insertion targets
 - storing the builder-wide state consumed by the extracted factories, including current page, selection state, dirty scope, canvas mode, and active preview width
 - instantiating `createDraftManager(...)`, `createPageActions(...)`, `createCanvasMutations(...)`,
-  `createStructuralCommandAdapter(...)`, and `createPreviewManager(...)`
+  `createStructuralCommandAdapter(...)`, `createBuilderCommandRegistry(...)`,
+  `createBuilderKeymapManager(...)`, `createDraftUndoStack(...)`, and `createPreviewManager(...)`
 - `normalizeHeaderDraft` resolves normal headers with `pageConfig: null` and tags a `source` field (`page-meta-v3`, `page-meta-stale`, `legacy-import`) so migration-only badges can flag non-canonical header records
-- delegating draft saves/discards, publish/page actions, structural commands/mutations, and preview
-  synchronization to those focused factories
+- delegating draft saves/discards, publish/page actions, command/keymap handling, structural
+  commands/mutations, and preview synchronization to those focused factories
 - rerendering the side panel, live canvas, structure-debug fallback, and inspector after state
   changes
 - rendering status badges and reader-preview links
@@ -181,8 +185,10 @@ Current responsibilities:
 - normalize theme and header draft state from the active page
 - initialize drafts for modules, theme, header, page settings, and section settings
 - clear selected module / active section draft state when selection changes
-- save and discard module drafts through `updateModule(...)`
-- save and discard theme, header, and page-settings drafts through `updatePage(...)`
+- save and discard module drafts through `updateModule(...)`, returning truthful success/failure
+  results to the command layer
+- save and discard theme, header, and page-settings drafts through `updatePage(...)`, returning
+  truthful success/failure results to the command layer
 - reset theme drafts back to the default theme token set
 
 The draft manager does not own the canonical source of truth for builder state; it receives state and setters from `admin/page-builder.js` and mutates them through the injected action contract.

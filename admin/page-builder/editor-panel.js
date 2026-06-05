@@ -1,4 +1,6 @@
 import { escapeAttr, escapeHtml } from './helpers.js';
+import { BUILDER_COMMANDS } from './commands.js';
+import { BUILDER_STRUCTURAL_COMMANDS } from './structural-commands.js';
 import { bindHeaderEditorEvents, renderHeaderEditorContent } from './header-editor.js';
 import {
   bindModuleEditorEvents,
@@ -180,7 +182,11 @@ function renderFooter({ scope, actionsHtml = '' }) {
   return `
     <div class="pb-editor-footer" data-scope="${scope}">
       <div class="pb-editor-footer-status" data-editor-status></div>
-      <div class="pb-editor-footer-actions">${actionsHtml}</div>
+      <div class="pb-editor-footer-actions">
+        <button class="btn-secondary" data-action="undo-current" type="button" disabled>Undo</button>
+        <button class="btn-secondary" data-action="redo-current" type="button" disabled>Redo</button>
+        ${actionsHtml}
+      </div>
     </div>
   `;
 }
@@ -498,6 +504,17 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       });
     });
 
+    el.pbModuleEditor
+      .querySelector('[data-action="undo-current"]')
+      ?.addEventListener('click', () => {
+        actions.runCommand?.(BUILDER_COMMANDS.UNDO_DRAFT);
+      });
+    el.pbModuleEditor
+      .querySelector('[data-action="redo-current"]')
+      ?.addEventListener('click', () => {
+        actions.runCommand?.(BUILDER_COMMANDS.REDO_DRAFT);
+      });
+
     if (state.activeEditorTab === 'theme' && state.selectedCanvasSurface === 'page-header') {
       bindHeaderEditorEvents({
         el,
@@ -511,10 +528,10 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       });
 
       document.getElementById('pbSaveHeader')?.addEventListener('click', async () => {
-        await actions.saveActiveHeaderDraft();
+        await actions.runCommand?.(BUILDER_COMMANDS.SAVE_DRAFT);
       });
       document.getElementById('pbDiscardHeader')?.addEventListener('click', () => {
-        actions.discardActiveHeaderDraft();
+        actions.runCommand?.(BUILDER_COMMANDS.DISCARD_DRAFT);
       });
     } else if (state.activeEditorTab === 'theme' && selectedModuleRecord) {
       bindModuleStyleEditorEvents({
@@ -534,10 +551,10 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       });
 
       document.getElementById('pbSaveModule')?.addEventListener('click', async () => {
-        await actions.saveActiveModuleDraft();
+        await actions.runCommand?.(BUILDER_COMMANDS.SAVE_DRAFT);
       });
       document.getElementById('pbDiscardModule')?.addEventListener('click', () => {
-        actions.discardActiveModuleDraft();
+        actions.runCommand?.(BUILDER_COMMANDS.DISCARD_DRAFT);
       });
     } else if (state.activeEditorTab === 'theme') {
       bindThemeEditorEvents({
@@ -552,10 +569,10 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       });
 
       document.getElementById('pbSaveTheme')?.addEventListener('click', async () => {
-        await actions.saveActiveThemeDraft();
+        await actions.runCommand?.(BUILDER_COMMANDS.SAVE_DRAFT);
       });
       document.getElementById('pbDiscardTheme')?.addEventListener('click', () => {
-        actions.discardActiveThemeDraft();
+        actions.runCommand?.(BUILDER_COMMANDS.DISCARD_DRAFT);
       });
       document.getElementById('pbResetTheme')?.addEventListener('click', () => {
         actions.resetActiveThemeDraft();
@@ -573,10 +590,10 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       });
 
       document.getElementById('pbSaveHeader')?.addEventListener('click', async () => {
-        await actions.saveActiveHeaderDraft();
+        await actions.runCommand?.(BUILDER_COMMANDS.SAVE_DRAFT);
       });
       document.getElementById('pbDiscardHeader')?.addEventListener('click', () => {
-        actions.discardActiveHeaderDraft();
+        actions.runCommand?.(BUILDER_COMMANDS.DISCARD_DRAFT);
       });
     } else if (state.selectedCanvasSurface === 'page-settings') {
       document.getElementById('pbEditPageSlug')?.addEventListener('input', (e) => {
@@ -605,10 +622,10 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       });
 
       document.getElementById('pbSavePageSettings')?.addEventListener('click', async () => {
-        await actions.saveActivePageSettingsDraft();
+        await actions.runCommand?.(BUILDER_COMMANDS.SAVE_DRAFT);
       });
       document.getElementById('pbDiscardPageSettings')?.addEventListener('click', () => {
-        actions.discardActivePageSettingsDraft();
+        actions.runCommand?.(BUILDER_COMMANDS.DISCARD_DRAFT);
       });
     } else if (state.selectedCanvasSurface === 'section') {
       el.pbModuleEditor.querySelectorAll('[data-section-setting]').forEach((input) => {
@@ -621,10 +638,10 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       });
 
       document.getElementById('pbSaveSectionSettings')?.addEventListener('click', async () => {
-        await actions.saveSectionSettings();
+        await actions.runCommand?.(BUILDER_COMMANDS.SAVE_DRAFT);
       });
       document.getElementById('pbDiscardSectionSettings')?.addEventListener('click', () => {
-        actions.discardSectionSettings();
+        actions.runCommand?.(BUILDER_COMMANDS.DISCARD_DRAFT);
       });
     } else if (selectedModuleRecord) {
       bindModuleEditorEvents({
@@ -647,23 +664,18 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       });
 
       document.getElementById('pbSaveModule')?.addEventListener('click', async () => {
-        await actions.saveActiveModuleDraft();
+        await actions.runCommand?.(BUILDER_COMMANDS.SAVE_DRAFT);
       });
       document.getElementById('pbDiscardModule')?.addEventListener('click', () => {
-        actions.discardActiveModuleDraft();
+        actions.runCommand?.(BUILDER_COMMANDS.DISCARD_DRAFT);
       });
       document.getElementById('pbDeleteModule')?.addEventListener('click', async () => {
         const { selectedModuleId } = getState();
         if (!selectedModuleId) return;
-        if (!confirm('Delete this module? This cannot be undone.')) return;
-        if (await deps.deleteModule(selectedModuleId)) {
-          actions.removeModuleFromCurrentPage(selectedModuleId);
-          actions.clearSelectedModuleState();
-          actions.clearDirty('module');
-          actions.setEditorStatus('Module deleted.', 'success');
-          actions.renderCanvas();
-          renderEditorPanel();
-        } else {
+        const result = await actions.runCommand?.(BUILDER_STRUCTURAL_COMMANDS.DELETE_SELECTED, {
+          target: { kind: 'module', moduleId: selectedModuleId },
+        });
+        if (result?.ok === false) {
           actions.setEditorStatus('Failed to delete module.', 'danger');
           renderEditorPanel();
         }

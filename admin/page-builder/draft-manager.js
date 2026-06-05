@@ -49,6 +49,7 @@ export function createDraftManager({ getState, actions, deps }) {
     const module = actions.getSelectedModuleRecord(moduleId);
     actions.setActiveModuleDraftId(module?.id || null);
     actions.setActiveModuleDraft(module ? cloneValue(module.config || {}) : null);
+    actions.resetDraftHistory?.('module');
   }
 
   function initializeThemeDraft() {
@@ -56,6 +57,7 @@ export function createDraftManager({ getState, actions, deps }) {
     actions.setActiveThemeDraft(
       currentPage ? normalizeThemeDraft(currentPage) : getDefaultThemeDraft()
     );
+    actions.resetDraftHistory?.('theme');
   }
 
   function initializeHeaderDraft() {
@@ -70,6 +72,7 @@ export function createDraftManager({ getState, actions, deps }) {
             responsive: {},
           }
     );
+    actions.resetDraftHistory?.('header');
   }
 
   function initializePageSettingsDraft() {
@@ -84,6 +87,7 @@ export function createDraftManager({ getState, actions, deps }) {
           }
         : null
     );
+    actions.resetDraftHistory?.('page-settings');
   }
 
   function initializeSectionDraft(sectionId) {
@@ -97,12 +101,14 @@ export function createDraftManager({ getState, actions, deps }) {
       columnGap: settings.columnGap ?? '',
       sectionGap: settings.sectionGap ?? '',
     });
+    actions.resetDraftHistory?.('section');
   }
 
   function clearSelectedModuleState() {
     actions.setSelectedModuleId(null);
     actions.setActiveModuleDraftId(null);
     actions.setActiveModuleDraft(null);
+    actions.resetDraftHistory?.('module');
   }
 
   function clearActiveSectionState() {
@@ -114,14 +120,14 @@ export function createDraftManager({ getState, actions, deps }) {
   async function saveActiveModuleDraft() {
     const { activeModuleDraft } = getState();
     const selectedModule = actions.getSelectedModuleRecord();
-    if (!selectedModule || !activeModuleDraft) return;
+    if (!selectedModule || !activeModuleDraft) return false;
     const updated = await deps.updateModule(selectedModule.id, {
       config: cloneValue(activeModuleDraft),
     });
     if (!updated) {
       actions.setEditorStatus('Failed to save module.', 'danger');
       actions.renderEditorPanel();
-      return;
+      return false;
     }
     selectedModule.config = updated.config;
     actions.setActiveModuleDraftId(selectedModule.id);
@@ -130,6 +136,7 @@ export function createDraftManager({ getState, actions, deps }) {
     actions.setEditorStatus('Module saved.', 'success');
     actions.renderCanvas();
     actions.renderEditorPanel();
+    return true;
   }
 
   function discardActiveModuleDraft() {
@@ -144,7 +151,7 @@ export function createDraftManager({ getState, actions, deps }) {
 
   async function saveActiveThemeDraft() {
     const { currentPage, activeThemeDraft } = getState();
-    if (!currentPage || !activeThemeDraft) return;
+    if (!currentPage || !activeThemeDraft) return false;
     const nextMeta = {
       ...(currentPage.meta || {}),
       theme: cloneValue(activeThemeDraft.theme),
@@ -155,7 +162,7 @@ export function createDraftManager({ getState, actions, deps }) {
     if (!updated) {
       actions.setEditorStatus('Failed to save theme.', 'danger');
       actions.renderEditorPanel();
-      return;
+      return false;
     }
     actions.syncPageSummary(updated);
     actions.setActiveThemeDraft(normalizeThemeDraft(getState().currentPage));
@@ -163,6 +170,7 @@ export function createDraftManager({ getState, actions, deps }) {
     actions.setEditorStatus('Theme saved.', 'success');
     actions.renderCanvas();
     actions.renderEditorPanel();
+    return true;
   }
 
   function discardActiveThemeDraft() {
@@ -180,7 +188,7 @@ export function createDraftManager({ getState, actions, deps }) {
 
   async function saveActiveHeaderDraft() {
     const { currentPage, activeHeaderDraft } = getState();
-    if (!currentPage || !activeHeaderDraft) return;
+    if (!currentPage || !activeHeaderDraft) return false;
 
     try {
       const nextMeta = actions.buildNormalizedPageMeta(currentPage, activeHeaderDraft);
@@ -189,7 +197,7 @@ export function createDraftManager({ getState, actions, deps }) {
       if (!updatedPage) {
         actions.setEditorStatus('Failed to save the page header.', 'danger');
         actions.renderEditorPanel();
-        return;
+        return false;
       }
 
       actions.syncPageSummary(updatedPage);
@@ -198,10 +206,12 @@ export function createDraftManager({ getState, actions, deps }) {
       actions.setEditorStatus('Page header saved.', 'success');
       actions.renderCanvas();
       actions.renderEditorPanel();
+      return true;
     } catch (error) {
       console.error('saveActiveHeaderDraft error:', error);
       actions.setEditorStatus('Failed to save the page header.', 'danger');
       actions.renderEditorPanel();
+      return false;
     }
   }
 
@@ -215,7 +225,7 @@ export function createDraftManager({ getState, actions, deps }) {
 
   async function saveActivePageSettingsDraft() {
     const { currentPage, activePageSettingsDraft } = getState();
-    if (!currentPage || !activePageSettingsDraft) return;
+    if (!currentPage || !activePageSettingsDraft) return false;
     try {
       const updatedPage = await deps.updatePage(currentPage.id, {
         slug: activePageSettingsDraft.slug,
@@ -227,7 +237,7 @@ export function createDraftManager({ getState, actions, deps }) {
       if (!updatedPage) {
         actions.setEditorStatus('Failed to save page settings.', 'danger');
         actions.renderEditorPanel();
-        return;
+        return false;
       }
 
       actions.syncPageSummary(updatedPage);
@@ -238,10 +248,12 @@ export function createDraftManager({ getState, actions, deps }) {
       actions.renderCanvas();
       actions.renderEditorPanel();
       actions.syncDesignerRoute('replace');
+      return true;
     } catch (error) {
       console.error('saveActivePageSettingsDraft error:', error);
       actions.setEditorStatus('Failed to save page settings.', 'danger');
       actions.renderEditorPanel();
+      return false;
     }
   }
 
