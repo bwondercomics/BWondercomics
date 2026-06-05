@@ -15,6 +15,10 @@ export const BUILDER_COMMANDS = Object.freeze({
   DISCARD_DRAFT: 'builder:discard-draft',
   UNDO_DRAFT: 'builder:undo-draft',
   REDO_DRAFT: 'builder:redo-draft',
+  INLINE_EDIT_START: 'builder:inline-edit-start',
+  INLINE_EDIT_CHANGE: 'builder:inline-edit-change',
+  INLINE_EDIT_COMMIT: 'builder:inline-edit-commit',
+  INLINE_EDIT_CANCEL: 'builder:inline-edit-cancel',
 });
 
 function result(ok, details = {}) {
@@ -153,6 +157,34 @@ function createDefaultCommands() {
       id: BUILDER_COMMANDS.REDO_DRAFT,
       enabled: ({ actions }) => actions.canRedoDraft?.() === true,
       run: ({ actions }) => actions.redoDraft?.(),
+    },
+    {
+      id: BUILDER_COMMANDS.INLINE_EDIT_START,
+      enabled: ({ state, payload }) =>
+        state.editorChromeMode !== 'preview' &&
+        payload?.target?.kind === 'module' &&
+        payload?.target?.moduleType === 'text' &&
+        payload?.field === 'content',
+      run: ({ payload, actions }) => actions.startInlineEdit?.(payload),
+    },
+    {
+      id: BUILDER_COMMANDS.INLINE_EDIT_CHANGE,
+      enabled: ({ state, payload }) =>
+        state.editorChromeMode !== 'preview' &&
+        payload?.target?.kind === 'module' &&
+        payload?.target?.moduleType === 'text' &&
+        payload?.field === 'content',
+      run: ({ payload, actions }) => actions.changeInlineEdit?.(payload),
+    },
+    {
+      id: BUILDER_COMMANDS.INLINE_EDIT_COMMIT,
+      enabled: ({ state }) => state.editorChromeMode !== 'preview',
+      run: ({ payload, actions }) => actions.commitInlineEdit?.(payload),
+    },
+    {
+      id: BUILDER_COMMANDS.INLINE_EDIT_CANCEL,
+      enabled: ({ state }) => state.editorChromeMode !== 'preview',
+      run: ({ payload, actions }) => actions.cancelInlineEdit?.(payload),
     },
   ];
 }

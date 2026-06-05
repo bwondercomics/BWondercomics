@@ -44,6 +44,7 @@ import {
   pruneEmptyResponsiveOverrides,
   setResponsiveOverrideValue,
 } from './page-builder/responsive-overrides.js';
+import { sanitizeBuilderHtml } from './page-builder/sanitize.js';
 import {
   fetchSeriesPages,
   fetchGlobalPages,
@@ -101,6 +102,7 @@ function createPageBuilder({
   let activePageSettingsDraft = null;
   let activeSectionId = null;
   let activeSectionDraft = null;
+  let inlineEditState = null;
   let dirtyScope = null;
   let editorStatus = { type: 'neutral', message: '' };
   let canvasStatus = { type: 'neutral', message: '' };
@@ -540,6 +542,7 @@ function createPageBuilder({
       activePageSettingsDraft,
       activeSectionId,
       activeSectionDraft,
+      inlineEditState,
       activeDeviceId,
       previewWidth: activeDeviceId,
       liveDragState,
@@ -626,6 +629,10 @@ function createPageBuilder({
       selectCanvasTarget,
       selectRelativeTarget,
       setDevice: setBuilderDevice,
+      startInlineEdit,
+      changeInlineEdit,
+      commitInlineEdit,
+      cancelInlineEdit,
       toggleMenus: toggleSidebarMode,
       undoDraft,
     },
@@ -966,6 +973,13 @@ function createPageBuilder({
         meta.dirty ? 'warning' : 'neutral'
       );
     }
+    if (scope === 'module' && inlineEditState) {
+      inlineEditState = {
+        ...inlineEditState,
+        draftValue: String(snapshot?.content || ''),
+      };
+      syncInlineEditDraftToPreview(meta.reason || 'draft-history');
+    }
     renderCanvas();
     renderEditorPanel();
   }
@@ -981,6 +995,9 @@ function createPageBuilder({
   async function saveCurrentDraft() {
     const scope = dirtyScope;
     if (!canSaveCurrentDraft()) return { ok: false, status: 'No dirty draft to save.' };
+    if (scope === 'module' && inlineEditState) {
+      clearInlineEditView('save', 'commit');
+    }
     let saved = false;
     if (scope === 'module') saved = await draftManager.saveActiveModuleDraft();
     else if (scope === 'header') saved = await draftManager.saveActiveHeaderDraft();
@@ -993,6 +1010,9 @@ function createPageBuilder({
   function discardCurrentDraft() {
     const scope = dirtyScope;
     if (!canDiscardCurrentDraft()) return { ok: false, status: 'No dirty draft to discard.' };
+    if (scope === 'module' && inlineEditState) {
+      clearInlineEditView('discard', 'cancel');
+    }
     if (scope === 'module') draftManager.discardActiveModuleDraft();
     else if (scope === 'header') draftManager.discardActiveHeaderDraft();
     else if (scope === 'theme') draftManager.discardActiveThemeDraft();
@@ -1051,7 +1071,212 @@ function createPageBuilder({
       draftUndoStack?.record(scope);
     }
     updateEditorFooterUi();
+    if (
+      scope === 'module' &&
+      inlineEditState?.moduleId === (activeModuleDraftId || selectedModuleId)
+    ) {
+      syncInlineEditDraftToPreview('side-panel');
+      previewManager.refreshPreviewSnapshotState?.({ builderEditing: editorChromeMode === 'edit' });
+      return;
+    }
     refreshLiveCanvasForDraftChange();
+  }
+
+  function isInlineEditableTextPayload(payload = {}) {
+    const target = payload.target || {};
+    return (
+      target.kind === 'module' &&
+      target.moduleType === 'text' &&
+      !!target.moduleId &&
+      payload.field === 'content'
+    );
+  }
+
+  function sanitizeInlineTextContent(value) {
+    return sanitizeBuilderHtml(String(value ?? ''), 'text');
+  }
+
+  function getInlineEditTarget(target = null) {
+    if (target?.kind === 'module' && target.moduleId) return cloneValue(target);
+    if (inlineEditState?.target) return cloneValue(inlineEditState.target);
+    if (!selectedModuleId || !currentPage?.id) return null;
+    const location = getModuleLocation(selectedModuleId);
+    if (!location?.module || location.module.moduleType !== 'text') return null;
+    return {
+      kind: 'module',
+      key: `module:${selectedModuleId}`,
+      pageId: currentPage.id,
+      sectionId: location.section.id,
+      columnIndex: Number(location.module.columnIndex) || 0,
+      moduleId: selectedModuleId,
+      moduleType: 'text',
+    };
+  }
+
+  function getInlineDraftValue() {
+    return sanitizeInlineTextContent(activeModuleDraft?.content || '');
+  }
+
+  function syncInlineEditDraftToPreview(reason = 'admin-sync') {
+    if (!inlineEditState || inlineEditState.field !== 'content') return;
+    const target = getInlineEditTarget(inlineEditState.target);
+    if (!target) return;
+    const draftValue = getInlineDraftValue();
+    inlineEditState = {
+      ...inlineEditState,
+      target,
+      draftValue,
+      status: 'editing',
+    };
+    previewManager.syncInlineEditDraft?.(target, draftValue, reason);
+  }
+
+  function clearInlineEditView(reason = 'admin-cancel', mode = 'cancel', notify = true) {
+    if (!inlineEditState) return false;
+    const target = getInlineEditTarget(inlineEditState.target);
+    if (notify && target) {
+      if (mode === 'commit') {
+        previewManager.commitInlineEdit?.(target, getInlineDraftValue(), reason);
+      } else {
+        previewManager.cancelInlineEdit?.(target, reason);
+      }
+    }
+    inlineEditState = null;
+    return true;
+  }
+
+  function isStaleInlineIframePayload(moduleId, nextContent) {
+    if (!inlineEditState || inlineEditState.moduleId !== moduleId) return false;
+    if (inlineEditState.lastIframeValue === undefined) return false;
+    return (
+      nextContent === inlineEditState.lastIframeValue &&
+      String(inlineEditState.draftValue ?? '') !== nextContent
+    );
+  }
+
+  function markInlineModuleDraftDirty() {
+    dirtyScope = 'module';
+    setEditorStatus('Unsaved module changes. Save or discard before switching.', 'warning');
+    draftUndoStack?.record('module');
+    updateEditorFooterUi();
+    previewManager.refreshPreviewSnapshotState?.({ builderEditing: editorChromeMode === 'edit' });
+  }
+
+  function startInlineEdit(payload = {}) {
+    if (!isInlineEditableTextPayload(payload)) {
+      return { ok: false, status: 'Inline editing is only available for text content.' };
+    }
+    const moduleId = payload.target.moduleId;
+    const module = getSelectedModuleRecord(moduleId);
+    if (!module || module.moduleType !== 'text') {
+      return { ok: false, status: 'Text module not found.' };
+    }
+    if (selectModule(moduleId, { renderCanvas: false }) === false) {
+      return { ok: false, status: 'Save or discard your current changes before editing text.' };
+    }
+    if (!activeModuleDraft || activeModuleDraftId !== moduleId) {
+      activeModuleDraftId = moduleId;
+      activeModuleDraft = cloneValue(module.config || {}) || {};
+    }
+    inlineEditState = {
+      moduleId,
+      target: getInlineEditTarget(payload.target),
+      field: 'content',
+      initialValue: String(activeModuleDraft.content || ''),
+      draftValue: sanitizeInlineTextContent(activeModuleDraft.content || ''),
+      lastIframeValue:
+        payload.value !== undefined ? sanitizeInlineTextContent(payload.value) : undefined,
+      status: 'editing',
+    };
+    showSidePanelTab('settings');
+    renderEditorPanel();
+    updateEditorFooterUi();
+    return { ok: true, value: String(activeModuleDraft.content || '') };
+  }
+
+  function changeInlineEdit(payload = {}) {
+    if (!isInlineEditableTextPayload(payload)) {
+      return { ok: false, status: 'Inline edit change is unsupported.' };
+    }
+    const moduleId = payload.target.moduleId;
+    const module = getSelectedModuleRecord(moduleId);
+    if (!module || module.moduleType !== 'text') {
+      return { ok: false, status: 'Text module not found.' };
+    }
+    if (
+      selectedModuleId !== moduleId &&
+      selectModule(moduleId, { renderCanvas: false }) === false
+    ) {
+      return { ok: false, status: 'Save or discard your current changes before editing text.' };
+    }
+    if (!activeModuleDraft || activeModuleDraftId !== moduleId) {
+      activeModuleDraftId = moduleId;
+      activeModuleDraft = cloneValue(module.config || {}) || {};
+    }
+    const nextContent = sanitizeInlineTextContent(payload.value);
+    const target = getInlineEditTarget(payload.target);
+    if (String(activeModuleDraft.content || '') !== nextContent) {
+      activeModuleDraft = {
+        ...(activeModuleDraft || {}),
+        content: nextContent,
+      };
+      markInlineModuleDraftDirty();
+      renderEditorPanel();
+    }
+    inlineEditState = {
+      ...(inlineEditState || {
+        moduleId,
+        target,
+        field: 'content',
+        initialValue: String(module.config?.content || ''),
+      }),
+      moduleId,
+      target,
+      field: 'content',
+      draftValue: nextContent,
+      lastIframeValue: nextContent,
+      status: 'editing',
+    };
+    return { ok: true, value: nextContent };
+  }
+
+  function commitInlineEdit(payload = {}) {
+    let result = { ok: true };
+    if (payload.value !== undefined) {
+      const moduleId = payload.target?.moduleId;
+      const nextContent = sanitizeInlineTextContent(payload.value);
+      if (moduleId && isStaleInlineIframePayload(moduleId, nextContent)) {
+        clearInlineEditView('stale-iframe-commit', 'commit', false);
+        refreshLiveCanvasForDraftChange();
+        renderEditorPanel();
+        return { ok: true, status: 'Ignored stale inline edit commit.' };
+      }
+      result = changeInlineEdit(payload);
+      if (result?.ok === false) return result;
+    }
+    clearInlineEditView(payload.reason || 'iframe-commit', 'commit', false);
+    refreshLiveCanvasForDraftChange();
+    renderEditorPanel();
+    return { ok: true };
+  }
+
+  function cancelInlineEdit(payload = {}) {
+    if (payload.value !== undefined) {
+      const moduleId = payload.target?.moduleId;
+      const nextContent = sanitizeInlineTextContent(payload.value);
+      if (moduleId && isStaleInlineIframePayload(moduleId, nextContent)) {
+        clearInlineEditView('stale-iframe-cancel', 'cancel', false);
+        refreshLiveCanvasForDraftChange();
+        renderEditorPanel();
+        return { ok: true, status: 'Ignored stale inline edit cancel.' };
+      }
+      const result = changeInlineEdit(payload);
+      if (result?.ok === false) return result;
+    }
+    clearInlineEditView(payload.reason || 'iframe-cancel', 'cancel', false);
+    refreshLiveCanvasForDraftChange();
+    renderEditorPanel();
+    return { ok: true };
   }
 
   function refreshLiveCanvasForDraftChange() {
@@ -1149,6 +1374,7 @@ function createPageBuilder({
     draggedModuleId = null;
     draggedSectionId = null;
     liveDragState = null;
+    clearInlineEditView('state-reset', 'cancel');
     editorChromeMode = 'edit';
     preChromeCanvasMode = null;
     previewChromeRestoreState = null;
@@ -1413,6 +1639,11 @@ function createPageBuilder({
   }
 
   function setBuilderDevice(deviceId) {
+    const shouldCleanupInlineEdit =
+      BUILDER_DEVICE_ORDER.includes(deviceId) && deviceId !== activeDeviceId;
+    if (shouldCleanupInlineEdit) {
+      clearInlineEditView('device-switch', 'cancel');
+    }
     const changed = previewManager.setViewport(deviceId);
     if (changed !== false) {
       resetVisibleResponsiveDraftHistory();
@@ -1429,6 +1660,9 @@ function createPageBuilder({
     }
     if (liveDragState) {
       runCommand(BUILDER_STRUCTURAL_COMMANDS.DRAG_END);
+      changed = true;
+    }
+    if (clearInlineEditView('transient-cancel', 'cancel')) {
       changed = true;
     }
     if (changed) {
@@ -1454,6 +1688,7 @@ function createPageBuilder({
     if (liveDragState) {
       runStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.DRAG_END);
     }
+    clearInlineEditView('chrome-preview', 'cancel');
     editorChromeMode = 'preview';
     canvasMode = 'preview';
     renderCanvas();
@@ -1684,7 +1919,7 @@ function createPageBuilder({
     return true;
   }
 
-  function selectModule(moduleId) {
+  function selectModule(moduleId, options = {}) {
     if (selectedModuleId === moduleId) return true;
     if (!getSelectedModuleRecord(moduleId)) return false;
     if (
@@ -1703,12 +1938,17 @@ function createPageBuilder({
     }
 
     selectedModuleId = moduleId;
+    if (inlineEditState?.moduleId !== moduleId) {
+      clearInlineEditView('target-switch', 'cancel');
+    }
     selectedCanvasSurface = null;
     draftManager.clearActiveSectionState();
     activeEditorTab = 'modules';
     draftManager.initializeModuleDraft(moduleId);
     setEditorStatus('', 'neutral');
-    renderCanvas();
+    if (options.renderCanvas !== false) {
+      renderCanvas();
+    }
     renderEditorPanel();
     return true;
   }
@@ -1752,19 +1992,23 @@ function createPageBuilder({
       return accepted;
     }
     if (target.kind === 'header') {
+      clearInlineEditView('target-switch', 'cancel');
       const accepted = selectPageHeaderFromCanvas();
       if (accepted) showSidePanelTab('settings');
       return accepted;
     }
     if (target.kind === 'page') {
+      clearInlineEditView('target-switch', 'cancel');
       const accepted = selectPageSettingsFromCanvas();
       if (accepted) showSidePanelTab('settings');
       return accepted;
     }
     if (target.kind === 'section') {
+      clearInlineEditView('target-switch', 'cancel');
       return selectSectionFromCanvas(target.sectionId);
     }
     if (target.kind === 'column' && target.sectionId) {
+      clearInlineEditView('target-switch', 'cancel');
       return selectSectionFromCanvas(target.sectionId);
     }
     return false;

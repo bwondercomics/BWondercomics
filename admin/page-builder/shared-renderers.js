@@ -102,10 +102,14 @@ export function createRenderers({
       `;
     },
 
-    text: (config) => {
+    text: (config, _mod, renderOptions = {}) => {
       const content = sanitizeBuilderHtml(config.content || '', 'text');
       const alignment = sanitizeKeyword(config.alignment, ['left', 'center', 'right'], 'left');
-      return `<div class="pb-text" style="text-align: ${alignment};">${content}</div>`;
+      const editAttrs = builderMarkerAttrs(
+        { 'data-builder-edit-field': 'content' },
+        isBuilderEditingEnabled(renderOptions)
+      );
+      return `<div class="pb-text"${editAttrs} style="text-align: ${alignment};">${content}</div>`;
     },
 
     image: (config) => {
@@ -458,7 +462,7 @@ export function createRenderers({
     const hiddenClass = hiddenOnDevice ? ' pb-module--hidden-device' : '';
     const content = hiddenOnDevice
       ? '<div class="pb-module-hidden-placeholder">Hidden on this device</div>'
-      : renderer(config, mod);
+      : renderer(config, mod, { ...renderOptions, builderEditing: emitMarkers });
     return `<div class="pb-module pb-module--${safeType}${hiddenClass}"${moduleIdAttr}${markerAttrs}>${content}</div>`;
   }
 

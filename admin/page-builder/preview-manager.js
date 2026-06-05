@@ -5,6 +5,7 @@ import {
   BUILDER_PREVIEW_SOURCES,
   BUILDER_PREVIEW_TARGET_ACTIONS,
   DEFAULT_BUILDER_PREVIEW_SIDE_EFFECTS,
+  buildPreviewInlineEditMessage,
   buildPreviewSnapshotMessage,
   buildPreviewTargetMessage,
   getBuilderDevice,
@@ -99,7 +100,7 @@ function getFramePoint(frame, event) {
 
 function getToolbarActions(target) {
   if (target?.kind === 'module') {
-    return [
+    const actions = [
       ['settings', 'Settings'],
       ['move', 'Move'],
       ['insert-before', 'Insert Before'],
@@ -108,6 +109,10 @@ function getToolbarActions(target) {
       ['delete', 'Delete'],
       ['duplicate', 'Duplicate'],
     ];
+    if (target.moduleType === 'text') {
+      actions.splice(1, 0, ['edit-text', 'Edit Text']);
+    }
+    return actions;
   }
   if (target?.kind === 'section') {
     return [
@@ -204,6 +209,31 @@ export function createPreviewManager({ el, getState, actions, deps }) {
       buildPreviewTargetMessage(
         BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_ACTION,
         { action, target, sequence: Math.max(0, latestTargetSequence) },
+        {
+          previewSession,
+          snapshotVersion: latestPreviewSnapshot.snapshotVersion,
+          seriesId: latestPreviewSnapshot.seriesId,
+          pageId: latestPreviewSnapshot.pageId,
+          pageSlug: latestPreviewSnapshot.pageSlug,
+        }
+      ),
+      window.location.origin
+    );
+  }
+
+  function postInlineEditMessage(type, payload = {}) {
+    const iframe = /** @type {HTMLIFrameElement|null} */ (
+      el.pbCanvas?.querySelector('.pb-preview-iframe')
+    );
+    if (!iframe?.contentWindow || !latestPreviewSnapshot || !previewSession) return;
+    iframe.contentWindow.postMessage(
+      buildPreviewInlineEditMessage(
+        type,
+        {
+          sequence: Math.max(0, latestTargetSequence),
+          field: 'content',
+          ...payload,
+        },
         {
           previewSession,
           snapshotVersion: latestPreviewSnapshot.snapshotVersion,
@@ -353,6 +383,21 @@ export function createPreviewManager({ el, getState, actions, deps }) {
         if (!target || button.disabled) return;
         if (action === 'settings') {
           actions.selectCanvasTarget?.(target);
+          return;
+        }
+        if (action === 'edit-text') {
+          const result = await runBuilderCommand('builder:inline-edit-start', {
+            target,
+            field: 'content',
+            reason: 'toolbar',
+          });
+          if (result?.ok === false) return;
+          postInlineEditMessage(BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_START, {
+            target,
+            field: 'content',
+            value: result?.value,
+            reason: 'toolbar',
+          });
           return;
         }
         if (action === 'insert-before' || action === 'insert-after') {
@@ -567,6 +612,33 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     renderPreviewTargetOverlay(frame);
   }
 
+  function handleInlineEditMessage(frame, message) {
+    if (latestPreviewSnapshot?.options?.builderEditing !== true) return;
+    if (!frame || (latestTargetSequence >= 0 && message.sequence < latestTargetSequence)) return;
+    const commandByType = {
+      [BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_START]: 'builder:inline-edit-start',
+      [BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE]: 'builder:inline-edit-change',
+      [BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_COMMIT]: 'builder:inline-edit-commit',
+      [BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CANCEL]: 'builder:inline-edit-cancel',
+    };
+    const commandId = commandByType[message.type];
+    if (!commandId) return;
+    const result = runBuilderCommand(commandId, {
+      target: message.target,
+      field: message.field,
+      value: message.value,
+      reason: message.reason,
+      sequence: message.sequence,
+    });
+    if (result?.ok === false) return;
+    const targetKey = getTargetKey(message.target);
+    if (targetKey) {
+      selectedTargetKey = targetKey;
+      frame.dataset.selectedTargetKey = selectedTargetKey;
+    }
+    renderPreviewTargetOverlay(frame);
+  }
+
   function storePreviewMetrics(frame, metrics) {
     if (!frame || !metrics) return;
     latestPreviewMetrics = metrics;
@@ -614,6 +686,15 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     if (event.data.type === BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT) {
       if (latestPreviewSnapshot?.options?.builderEditing !== true) return;
       handleTargetSelect(frame, event.data);
+      return;
+    }
+    if (
+      event.data.type === BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_START ||
+      event.data.type === BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE ||
+      event.data.type === BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_COMMIT ||
+      event.data.type === BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CANCEL
+    ) {
+      handleInlineEditMessage(frame, event.data);
       return;
     }
     if (event.data.type === BUILDER_PREVIEW_MESSAGE_TYPES.METRICS) {
@@ -823,6 +904,28 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     postPreviewSnapshot();
   }
 
+  function refreshPreviewSnapshotState(options = {}) {
+    if (!el.pbCanvas) return null;
+    const builderEditing =
+      options.builderEditing ?? latestPreviewSnapshot?.options?.builderEditing === true;
+    const snapshot = createPreviewPageSnapshot({ builderEditing });
+    if (!snapshot) return null;
+    latestPreviewSnapshot = snapshot;
+    const viewport = snapshot.options?.viewport || getPreviewViewport(snapshot.options?.deviceId);
+    const status = /** @type {HTMLElement|null} */ (
+      el.pbCanvas.querySelector('.pb-preview-status')
+    );
+    if (status) {
+      status.dataset.status =
+        snapshot.source === BUILDER_PREVIEW_SOURCES.WORKING ? 'warning' : 'neutral';
+      status.dataset.previewSource = snapshot.source || '';
+      status.textContent = getPreviewStatusCopy(snapshot.source);
+    }
+    const frame = /** @type {HTMLElement|null} */ (el.pbCanvas.querySelector('.pb-preview-frame'));
+    updatePreviewFrameDataset(frame, snapshot, viewport);
+    return snapshot;
+  }
+
   function setViewport(nextWidth) {
     if (!isBuilderDeviceId(nextWidth)) return false;
     const { activeDeviceId, previewWidth } = getState();
@@ -882,6 +985,32 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     postTargetAction(BUILDER_PREVIEW_TARGET_ACTIONS.REFRESH_TARGETS, target);
   }
 
+  function syncInlineEditDraft(target = null, value = '', reason = 'admin-sync') {
+    if (!target) return;
+    postInlineEditMessage(BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE, {
+      target,
+      value,
+      reason,
+    });
+  }
+
+  function commitInlineEdit(target = null, value = '', reason = 'admin-commit') {
+    if (!target) return;
+    postInlineEditMessage(BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_COMMIT, {
+      target,
+      value,
+      reason,
+    });
+  }
+
+  function cancelInlineEdit(target = null, reason = 'admin-cancel') {
+    if (!target) return;
+    postInlineEditMessage(BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CANCEL, {
+      target,
+      reason,
+    });
+  }
+
   function restoreSelectedTarget(targetOrKey = null) {
     pendingRestoreTargetKey = getRestoreTargetKey(targetOrKey);
     hoveredTargetKey = '';
@@ -899,12 +1028,16 @@ export function createPreviewManager({ el, getState, actions, deps }) {
 
   return {
     bindMessageHandler,
+    cancelInlineEdit,
+    commitInlineEdit,
     getSnapshot,
     requestTargetRefresh,
     restoreSelectedTarget,
     renderTargetOverlay,
     renderPreview,
+    refreshPreviewSnapshotState,
     resetSession,
     setViewport,
+    syncInlineEditDraft,
   };
 }

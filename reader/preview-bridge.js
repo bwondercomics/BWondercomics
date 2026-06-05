@@ -5,12 +5,14 @@ import {
   BUILDER_PREVIEW_TARGET_KINDS,
   PREVIEW_MEDIA_QUERIES,
   buildPreviewControlMessage,
+  buildPreviewInlineEditMessage,
   buildPreviewMetricsMessage,
   buildPreviewTargetMessage,
   getPreviewViewport,
   isPreviewViewportId,
   validatePreviewEnvelope,
 } from '../admin/page-builder/preview-contract.js';
+import { sanitizeBuilderHtml, sanitizeHref } from '../admin/page-builder/sanitize.js';
 import { CONFIG } from './config.js';
 import {
   getActiveSeriesId,
@@ -330,6 +332,20 @@ function findElementForTarget(target) {
   return null;
 }
 
+function isInlineEditableTextTarget(target) {
+  return (
+    target?.kind === BUILDER_PREVIEW_TARGET_KINDS.MODULE &&
+    target.moduleType === 'text' &&
+    !!target.moduleId
+  );
+}
+
+function findEditableElementForTarget(target, field = 'content') {
+  if (!isInlineEditableTextTarget(target) || field !== 'content') return null;
+  const moduleElement = findElementForTarget(target);
+  return moduleElement?.querySelector?.('[data-builder-edit-field="content"]') || null;
+}
+
 function requestFrame(callback) {
   if (typeof window.requestAnimationFrame === 'function') {
     return window.requestAnimationFrame(callback);
@@ -469,9 +485,26 @@ export function startPreviewTargetBridge(
   let hoveredTargetKey = '';
   let scheduledFrame = null;
   let observer = null;
+  let activeInlineEdit = null;
+  let inlineChangeFrame = null;
+  let inlineToolbar = null;
 
   const postTargetMessage = (type, payload = {}) => {
     postToParent(buildPreviewTargetMessage(type, payload, expected));
+  };
+
+  const postInlineEditMessage = (type, payload = {}) => {
+    postToParent(
+      buildPreviewInlineEditMessage(
+        type,
+        {
+          sequence: targetSequence,
+          field: 'content',
+          ...payload,
+        },
+        expected
+      )
+    );
   };
 
   const emitTargets = (reason = 'manual') => {
@@ -505,13 +538,259 @@ export function startPreviewTargetBridge(
     event.stopImmediatePropagation?.();
   };
 
+  const sanitizeInlineHtml = (value = '') => sanitizeBuilderHtml(String(value || ''), 'text');
+
+  const getInlineEditValue = () =>
+    activeInlineEdit?.element ? sanitizeInlineHtml(activeInlineEdit.element.innerHTML || '') : '';
+
+  const replaceElementHtml = (element, value = undefined) => {
+    if (!element) return '';
+    const safeHtml = sanitizeInlineHtml(value === undefined ? element.innerHTML || '' : value);
+    if (String(element.innerHTML || '') !== safeHtml) {
+      element.innerHTML = safeHtml;
+    }
+    return safeHtml;
+  };
+
+  const sanitizeActiveInlineElement = () =>
+    activeInlineEdit?.element ? replaceElementHtml(activeInlineEdit.element) : '';
+
+  const insertInlineHtml = (html = '') => {
+    if (!activeInlineEdit?.element) return;
+    const safeHtml = sanitizeInlineHtml(html);
+    try {
+      if (document.execCommand?.('insertHTML', false, safeHtml)) return;
+    } catch {
+      // Fall back to direct range insertion below.
+    }
+    const template = document.createElement('template');
+    template.innerHTML = safeHtml;
+    const fragment = template.content;
+    const selection = window.getSelection?.();
+    if (selection?.rangeCount) {
+      const range = selection.getRangeAt(0);
+      range.deleteContents();
+      range.insertNode(fragment);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      return;
+    }
+    activeInlineEdit.element.appendChild(fragment);
+  };
+
+  const removeInlineToolbar = () => {
+    inlineToolbar?.remove?.();
+    inlineToolbar = null;
+  };
+
+  const scheduleInlineChange = (reason = 'input') => {
+    if (!activeInlineEdit || inlineChangeFrame) return;
+    inlineChangeFrame = requestFrame(() => {
+      inlineChangeFrame = null;
+      if (!activeInlineEdit) return;
+      const value = sanitizeActiveInlineElement();
+      postInlineEditMessage(BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE, {
+        target: activeInlineEdit.target,
+        value,
+        reason,
+      });
+    });
+  };
+
+  const stopInlineEdit = (reason = 'commit', mode = 'commit', notify = true) => {
+    if (!activeInlineEdit) return;
+    const edit = activeInlineEdit;
+    if (inlineChangeFrame) {
+      cancelFrame(inlineChangeFrame);
+      inlineChangeFrame = null;
+    }
+    const value = replaceElementHtml(edit.element);
+    if (notify && mode === 'cancel') {
+      postInlineEditMessage(BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE, {
+        target: edit.target,
+        value,
+        reason,
+      });
+    }
+    edit.element.removeEventListener('input', edit.handleInput);
+    edit.element.removeEventListener('paste', edit.handlePaste);
+    edit.element.removeEventListener('blur', edit.handleBlur);
+    edit.element.removeAttribute('contenteditable');
+    edit.element.removeAttribute('role');
+    edit.element.removeAttribute('aria-label');
+    edit.element.classList.remove('builder-inline-editing');
+    removeInlineToolbar();
+    activeInlineEdit = null;
+    if (notify) {
+      postInlineEditMessage(
+        mode === 'cancel'
+          ? BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CANCEL
+          : BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_COMMIT,
+        {
+          target: edit.target,
+          value,
+          reason,
+        }
+      );
+    }
+    scheduleTargets(mode === 'cancel' ? 'inline-edit-cancel' : 'inline-edit-commit');
+  };
+
+  const applyInlineFormat = (command, value = null) => {
+    if (!activeInlineEdit) return;
+    activeInlineEdit.element.focus();
+    try {
+      document.execCommand?.(command, false, value);
+    } catch {
+      return;
+    }
+    sanitizeActiveInlineElement();
+    scheduleInlineChange(`format-${command}`);
+  };
+
+  const promptInlineLink = () => {
+    const url = window.prompt?.('Link URL') || '';
+    if (!url.trim()) return;
+    const safeUrl = sanitizeHref(url);
+    if (!safeUrl) return;
+    applyInlineFormat('createLink', safeUrl);
+  };
+
+  const createInlineToolbar = () => {
+    removeInlineToolbar();
+    inlineToolbar = document.createElement('div');
+    inlineToolbar.className = 'builder-inline-edit-toolbar';
+    inlineToolbar.setAttribute('aria-label', 'Text editing tools');
+    inlineToolbar.style.cssText = [
+      'position:fixed',
+      'z-index:2147483647',
+      'top:10px',
+      'left:10px',
+      'display:flex',
+      'gap:4px',
+      'padding:6px',
+      'background:#111827',
+      'border:1px solid rgba(255,255,255,0.18)',
+      'border-radius:6px',
+      'box-shadow:0 8px 24px rgba(0,0,0,0.28)',
+    ].join(';');
+    const buttons = [
+      ['B', 'Bold', () => applyInlineFormat('bold')],
+      ['I', 'Italic', () => applyInlineFormat('italic')],
+      ['Link', 'Link', promptInlineLink],
+      [
+        'Clear',
+        'Clear formatting',
+        () => {
+          applyInlineFormat('removeFormat');
+          applyInlineFormat('unlink');
+        },
+      ],
+      ['Done', 'Done', () => stopInlineEdit('toolbar-done', 'commit')],
+      ['Cancel', 'Cancel', () => stopInlineEdit('toolbar-cancel', 'cancel')],
+    ];
+    buttons.forEach(([label, title, action]) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = label;
+      button.title = title;
+      button.style.cssText =
+        'font:600 12px/1 system-ui,sans-serif;color:#fff;background:#1f2937;border:1px solid rgba(255,255,255,0.18);border-radius:4px;padding:5px 7px;cursor:pointer;';
+      button.addEventListener('mousedown', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      });
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        action();
+      });
+      inlineToolbar.appendChild(button);
+    });
+    document.body?.appendChild(inlineToolbar);
+  };
+
+  const startInlineEdit = (target, field = 'content', reason = 'start') => {
+    if (!isInlineEditableTextTarget(target) || field !== 'content') return false;
+    const element = findEditableElementForTarget(target, field);
+    if (!element) return false;
+    if (activeInlineEdit?.target?.key === target.key) {
+      activeInlineEdit.element.focus();
+      return true;
+    }
+    stopInlineEdit('switch-inline-edit', 'commit');
+
+    const handleInput = () => {
+      sanitizeActiveInlineElement();
+      scheduleInlineChange('input');
+    };
+    const handlePaste = (event) => {
+      const html =
+        event.clipboardData?.getData?.('text/html') ||
+        event.clipboardData?.getData?.('text/plain') ||
+        '';
+      if (!html) {
+        requestFrame(() => {
+          sanitizeActiveInlineElement();
+          scheduleInlineChange('paste');
+        });
+        return;
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      insertInlineHtml(html);
+      sanitizeActiveInlineElement();
+      scheduleInlineChange('paste');
+    };
+    const handleBlur = () => {
+      window.setTimeout(() => {
+        if (!activeInlineEdit || document.activeElement === inlineToolbar) return;
+        stopInlineEdit('blur', 'commit');
+      }, 0);
+    };
+
+    activeInlineEdit = {
+      target,
+      field,
+      element,
+      initialValue: replaceElementHtml(element),
+      handleInput,
+      handlePaste,
+      handleBlur,
+    };
+    element.setAttribute('contenteditable', 'true');
+    element.setAttribute('role', 'textbox');
+    element.setAttribute('aria-label', 'Edit text content');
+    element.classList.add('builder-inline-editing');
+    element.addEventListener('input', handleInput);
+    element.addEventListener('paste', handlePaste);
+    element.addEventListener('blur', handleBlur);
+    createInlineToolbar();
+    element.focus();
+    postInlineEditMessage(BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_START, {
+      target,
+      field,
+      value: getInlineEditValue(),
+      reason,
+    });
+    return true;
+  };
+
   const handleKeyDown = (event) => {
+    if (activeInlineEdit) {
+      if (event.key === 'Escape') {
+        blockInteractiveEvent(event);
+        stopInlineEdit('escape', 'cancel');
+      }
+      return;
+    }
     if (BUILDER_EDITING_BLOCKED_KEYS.has(event.key)) {
       blockInteractiveEvent(event);
     }
   };
 
   const handlePointerMove = (event) => {
+    if (activeInlineEdit) return;
     const target = findTargetFromEventTarget(event.target, snapshot);
     const key = getTargetKey(target);
     if (key === hoveredTargetKey) return;
@@ -520,6 +799,21 @@ export function startPreviewTargetBridge(
   };
 
   const handleClick = (event) => {
+    if (activeInlineEdit && inlineToolbar?.contains?.(event.target)) {
+      return;
+    }
+    if (activeInlineEdit?.element?.contains?.(event.target)) {
+      const anchor = event.target?.closest?.('a[href]');
+      if (anchor && activeInlineEdit.element.contains(anchor)) {
+        event.preventDefault();
+      }
+      event.stopPropagation();
+      event.stopImmediatePropagation?.();
+      return;
+    }
+    if (activeInlineEdit) {
+      stopInlineEdit('outside-click', 'commit');
+    }
     const target = findTargetFromEventTarget(event.target, snapshot);
     blockInteractiveEvent(event);
     if (!target) return;
@@ -530,12 +824,54 @@ export function startPreviewTargetBridge(
     });
   };
 
+  const handleDoubleClick = (event) => {
+    const target = findTargetFromEventTarget(event.target, snapshot);
+    if (!isInlineEditableTextTarget(target)) return;
+    const editElement = findEditableElementForTarget(target);
+    if (!editElement?.contains?.(event.target)) return;
+    blockInteractiveEvent(event);
+    startInlineEdit(target, 'content', 'double-click');
+  };
+
   const handleActionMessage = (event) => {
     if (!isExpectedSource(event)) return;
     const message = event.data;
-    if (!message || message.type !== BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_ACTION) return;
+    if (
+      !message ||
+      (message.type !== BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_ACTION &&
+        message.type !== BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_START &&
+        message.type !== BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE &&
+        message.type !== BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_COMMIT &&
+        message.type !== BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CANCEL)
+    ) {
+      return;
+    }
     const validation = validatePreviewEnvelope(message, expected);
     if (!validation.valid) return;
+
+    if (message.type === BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_START) {
+      startInlineEdit(message.target, message.field, message.reason || 'toolbar');
+      return;
+    }
+    if (message.type === BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE) {
+      if (
+        activeInlineEdit &&
+        message.field === activeInlineEdit.field &&
+        message.target?.key === activeInlineEdit.target?.key
+      ) {
+        replaceElementHtml(activeInlineEdit.element, message.value);
+        scheduleTargets(message.reason || 'inline-edit-sync');
+      }
+      return;
+    }
+    if (message.type === BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_COMMIT) {
+      stopInlineEdit(message.reason || 'admin-commit', 'commit', false);
+      return;
+    }
+    if (message.type === BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CANCEL) {
+      stopInlineEdit(message.reason || 'admin-cancel', 'cancel', false);
+      return;
+    }
 
     if (message.action === BUILDER_PREVIEW_TARGET_ACTIONS.REFRESH_TARGETS) {
       scheduleTargets('target-action');
@@ -558,6 +894,7 @@ export function startPreviewTargetBridge(
 
   document.addEventListener('pointermove', handlePointerMove, true);
   document.addEventListener('click', handleClick, true);
+  document.addEventListener('dblclick', handleDoubleClick, true);
   document.addEventListener('submit', blockInteractiveEvent, true);
   document.addEventListener('change', blockInteractiveEvent, true);
   document.addEventListener('keydown', handleKeyDown, true);
@@ -592,9 +929,11 @@ export function startPreviewTargetBridge(
       cancelFrame(scheduledFrame);
       scheduledFrame = null;
     }
+    stopInlineEdit('bridge-cleanup', 'cancel', false);
     observer?.disconnect();
     document.removeEventListener('pointermove', handlePointerMove, true);
     document.removeEventListener('click', handleClick, true);
+    document.removeEventListener('dblclick', handleDoubleClick, true);
     document.removeEventListener('submit', blockInteractiveEvent, true);
     document.removeEventListener('change', blockInteractiveEvent, true);
     document.removeEventListener('keydown', handleKeyDown, true);

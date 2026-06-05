@@ -26,6 +26,10 @@ export const BUILDER_PREVIEW_MESSAGE_TYPES = Object.freeze({
   TARGET_HOVER: 'builder-preview:target-hover',
   TARGET_SELECT: 'builder-preview:target-select',
   TARGET_ACTION: 'builder-preview:target-action',
+  INLINE_EDIT_START: 'builder-preview:inline-edit-start',
+  INLINE_EDIT_CHANGE: 'builder-preview:inline-edit-change',
+  INLINE_EDIT_COMMIT: 'builder-preview:inline-edit-commit',
+  INLINE_EDIT_CANCEL: 'builder-preview:inline-edit-cancel',
 });
 
 export const BUILDER_PREVIEW_TARGET_KINDS = Object.freeze({
@@ -152,10 +156,18 @@ const TARGET_MESSAGE_TYPES = new Set([
   BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT,
   BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_ACTION,
 ]);
+const INLINE_EDIT_MESSAGE_TYPES = new Set([
+  BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_START,
+  BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE,
+  BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_COMMIT,
+  BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CANCEL,
+]);
 const MAX_TARGET_ITEMS = 500;
 const MAX_TARGET_STRING_LENGTH = 180;
 const MAX_TARGET_LABEL_LENGTH = 120;
+const MAX_INLINE_EDIT_VALUE_LENGTH = 50000;
 const MAX_RECT_ABS_VALUE = 1000000;
+const INLINE_EDIT_FIELDS = new Set(['content']);
 
 export function isPreviewViewportId(id) {
   return Object.prototype.hasOwnProperty.call(PREVIEW_VIEWPORTS, String(id || ''));
@@ -262,6 +274,30 @@ export function buildPreviewTargetMessage(type, payload = {}, details = {}) {
   }
 
   message.target = payload.target ?? null;
+  return message;
+}
+
+export function buildPreviewInlineEditMessage(type, payload = {}, details = {}) {
+  const message = {
+    type,
+    previewSession: normalizeIdentity(details.previewSession),
+    snapshotVersion:
+      details.snapshotVersion ?? payload.snapshotVersion ?? BUILDER_PREVIEW_SNAPSHOT_VERSION,
+    seriesId: normalizeIdentity(details.seriesId),
+    pageId: normalizeIdentity(details.pageId),
+    pageSlug: normalizeIdentity(details.pageSlug),
+    sequence: Number.isSafeInteger(payload.sequence) ? payload.sequence : 0,
+    target: payload.target ?? null,
+    field: String(payload.field || ''),
+  };
+
+  if (payload.value !== undefined) {
+    message.value = String(payload.value).slice(0, MAX_INLINE_EDIT_VALUE_LENGTH);
+  }
+  if (payload.reason) {
+    message.reason = String(payload.reason).slice(0, MAX_TARGET_LABEL_LENGTH);
+  }
+
   return message;
 }
 
@@ -546,6 +582,52 @@ export function validatePreviewTargetActionPayload(message) {
   return validationResult(true);
 }
 
+export function validatePreviewInlineEditPayload(message) {
+  if (!isPlainObject(message)) {
+    return validationResult(false, 'Inline edit message must be an object.');
+  }
+  if (!INLINE_EDIT_MESSAGE_TYPES.has(message.type)) {
+    return validationResult(false, 'Inline edit message type is unsupported.');
+  }
+  if (!isSafeNonNegativeInteger(message.sequence)) {
+    return validationResult(false, 'Inline edit sequence is invalid.');
+  }
+  const targetValidation = validatePreviewTargetRef(message.target);
+  if (!targetValidation.valid) return targetValidation;
+  if (message.target.kind !== BUILDER_PREVIEW_TARGET_KINDS.MODULE) {
+    return validationResult(false, 'Inline edit target must be a module.');
+  }
+  if (message.target.moduleType !== 'text') {
+    return validationResult(false, 'Inline edit target module type is unsupported.');
+  }
+  if (!INLINE_EDIT_FIELDS.has(message.field)) {
+    return validationResult(false, 'Inline edit field is unsupported.');
+  }
+  if (
+    message.type === BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE ||
+    message.type === BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_COMMIT
+  ) {
+    if (typeof message.value !== 'string') {
+      return validationResult(false, 'Inline edit value is required.');
+    }
+    if (message.value.length > MAX_INLINE_EDIT_VALUE_LENGTH) {
+      return validationResult(false, 'Inline edit value is too long.');
+    }
+  } else if (
+    message.value !== undefined &&
+    (typeof message.value !== 'string' || message.value.length > MAX_INLINE_EDIT_VALUE_LENGTH)
+  ) {
+    return validationResult(false, 'Inline edit value is invalid.');
+  }
+  if (
+    message.reason !== undefined &&
+    !isBoundedString(message.reason, MAX_TARGET_LABEL_LENGTH, true)
+  ) {
+    return validationResult(false, 'Inline edit reason is invalid.');
+  }
+  return validationResult(true);
+}
+
 export function validatePreviewEnvelope(message, expected = {}) {
   if (!message || typeof message !== 'object') {
     return validationResult(false, 'Preview message must be an object.');
@@ -578,7 +660,7 @@ export function validatePreviewEnvelope(message, expected = {}) {
     return validatePreviewMetricsPayload(message.metrics, expected);
   }
   if (
-    TARGET_MESSAGE_TYPES.has(message.type) &&
+    (TARGET_MESSAGE_TYPES.has(message.type) || INLINE_EDIT_MESSAGE_TYPES.has(message.type)) &&
     message.snapshotVersion !== BUILDER_PREVIEW_SNAPSHOT_VERSION
   ) {
     return validationResult(false, 'Unsupported snapshot version.');
@@ -611,6 +693,9 @@ export function validatePreviewEnvelope(message, expected = {}) {
       return validatePreviewTargetStatePayload(message);
     }
     return validatePreviewTargetActionPayload(message);
+  }
+  if (INLINE_EDIT_MESSAGE_TYPES.has(message.type)) {
+    return validatePreviewInlineEditPayload(message);
   }
   return validationResult(true);
 }

@@ -10,6 +10,7 @@ import {
   PREVIEW_VIEWPORT_ORDER,
   PREVIEW_VIEWPORTS,
   buildPreviewControlMessage,
+  buildPreviewInlineEditMessage,
   buildPreviewMetricsMessage,
   buildPreviewSnapshotMessage,
   buildPreviewTargetMessage,
@@ -25,6 +26,7 @@ import {
   validatePreviewSnapshotPayload,
   validatePreviewTargetGeometry,
   validatePreviewTargetRef,
+  validatePreviewInlineEditPayload,
 } from '../admin/page-builder/preview-contract.js';
 
 describe('admin page-builder preview contract', () => {
@@ -93,6 +95,10 @@ describe('admin page-builder preview contract', () => {
     expect(isPreviewMessageType(BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_HOVER)).toBe(true);
     expect(isPreviewMessageType(BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT)).toBe(true);
     expect(isPreviewMessageType(BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_ACTION)).toBe(true);
+    expect(isPreviewMessageType(BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_START)).toBe(true);
+    expect(isPreviewMessageType(BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE)).toBe(true);
+    expect(isPreviewMessageType(BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_COMMIT)).toBe(true);
+    expect(isPreviewMessageType(BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CANCEL)).toBe(true);
     expect(isPreviewMessageType('builder-preview:other')).toBe(false);
 
     expect(validatePreviewSnapshotPayload(snapshot, expected)).toEqual({ valid: true, reason: '' });
@@ -312,6 +318,106 @@ describe('admin page-builder preview contract', () => {
           BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT,
           { sequence: 1, target },
           { ...expected, pageSlug: 'about' }
+        ),
+        expected
+      ).valid
+    ).toBe(false);
+  });
+
+  it('builds and validates inline edit messages for text content only', () => {
+    const expected = {
+      previewSession: 'session-1',
+      seriesId: 'battle-bros',
+      pageId: 'page-1',
+      pageSlug: 'reader',
+    };
+    const target = {
+      kind: 'module',
+      key: 'module:module-1',
+      pageId: 'page-1',
+      sectionId: 'section-1',
+      columnIndex: 0,
+      moduleId: 'module-1',
+      moduleType: 'text',
+    };
+    const change = buildPreviewInlineEditMessage(
+      BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE,
+      {
+        sequence: 4,
+        target,
+        field: 'content',
+        value: '<p><strong>Updated</strong> text</p>',
+      },
+      expected
+    );
+
+    expect(validatePreviewInlineEditPayload(change)).toEqual({ valid: true, reason: '' });
+    expect(validatePreviewEnvelope(change, expected)).toEqual({ valid: true, reason: '' });
+    expect(
+      validatePreviewEnvelope(
+        buildPreviewInlineEditMessage(
+          BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_START,
+          { sequence: 4, target, field: 'content' },
+          expected
+        ),
+        expected
+      )
+    ).toEqual({ valid: true, reason: '' });
+    expect(
+      validatePreviewEnvelope(
+        buildPreviewInlineEditMessage(
+          BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CANCEL,
+          { sequence: 4, target, field: 'content', reason: 'escape' },
+          expected
+        ),
+        expected
+      )
+    ).toEqual({ valid: true, reason: '' });
+
+    expect(
+      validatePreviewEnvelope(
+        buildPreviewInlineEditMessage(
+          BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE,
+          {
+            sequence: 4,
+            target: { ...target, moduleType: 'buttons' },
+            field: 'content',
+            value: 'x',
+          },
+          expected
+        ),
+        expected
+      ).valid
+    ).toBe(false);
+    expect(
+      validatePreviewEnvelope(
+        buildPreviewInlineEditMessage(
+          BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE,
+          { sequence: 4, target, field: 'style', value: 'x' },
+          expected
+        ),
+        expected
+      ).valid
+    ).toBe(false);
+    expect(
+      validatePreviewEnvelope(
+        {
+          ...buildPreviewInlineEditMessage(
+            BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE,
+            { sequence: 4, target, field: 'content', value: 'x' },
+            expected
+          ),
+          value: 'x'.repeat(50001),
+        },
+        expected
+      ).valid
+    ).toBe(false);
+    expect(
+      validatePreviewEnvelope(
+        buildPreviewInlineEditMessage(
+          BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE,
+          { sequence: 4, target, field: 'content', value: 'x' },
+          { ...expected, pageId: 'wrong-page' }
         ),
         expected
       ).valid

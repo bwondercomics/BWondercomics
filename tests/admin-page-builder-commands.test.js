@@ -87,4 +87,59 @@ describe('admin page-builder command registry', () => {
     expect(enterChromePreview).toHaveBeenCalledTimes(1);
     expect(saveCurrentDraft).toHaveBeenCalledTimes(1);
   });
+
+  it('routes inline text edit commands through injected actions', () => {
+    const startInlineEdit = vi.fn(() => ({ ok: true, value: '<p>Copy</p>' }));
+    const changeInlineEdit = vi.fn(() => ({ ok: true }));
+    const target = {
+      kind: 'module',
+      key: 'module:text-1',
+      pageId: 'page-1',
+      moduleId: 'text-1',
+      moduleType: 'text',
+    };
+    const registry = createBuilderCommandRegistry({
+      getState: () => ({ editorChromeMode: 'edit' }),
+      actions: {
+        startInlineEdit,
+        changeInlineEdit,
+      },
+    });
+
+    expect(
+      registry.runCommand(BUILDER_COMMANDS.INLINE_EDIT_START, { target, field: 'content' })
+    ).toEqual({ ok: true, value: '<p>Copy</p>' });
+    expect(
+      registry.runCommand(BUILDER_COMMANDS.INLINE_EDIT_CHANGE, {
+        target,
+        field: 'content',
+        value: '<p>Updated</p>',
+      })
+    ).toEqual({ ok: true });
+    expect(startInlineEdit).toHaveBeenCalledWith({ target, field: 'content' });
+    expect(changeInlineEdit).toHaveBeenCalledWith({
+      target,
+      field: 'content',
+      value: '<p>Updated</p>',
+    });
+  });
+
+  it('disables inline edit commands outside text content editing', () => {
+    const registry = createBuilderCommandRegistry({
+      getState: () => ({ editorChromeMode: 'preview' }),
+    });
+
+    expect(
+      registry.canRunCommand(BUILDER_COMMANDS.INLINE_EDIT_START, {
+        target: { kind: 'module', moduleType: 'text', moduleId: 'm1' },
+        field: 'content',
+      })
+    ).toBe(false);
+    expect(
+      registry.canRunCommand(BUILDER_COMMANDS.INLINE_EDIT_START, {
+        target: { kind: 'module', moduleType: 'buttons', moduleId: 'm1' },
+        field: 'content',
+      })
+    ).toBe(false);
+  });
 });

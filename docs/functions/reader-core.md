@@ -271,6 +271,14 @@ Also exports:
   changes, posts `TARGET_HOVER`/`TARGET_SELECT` for pointer movement and clicks, prevents iframe
   link/form/control side effects while editing, and accepts validated non-mutating `TARGET_ACTION`
   requests such as `refresh-targets`, `clear-hover`, and `scroll-into-view`.
+- Text-module inline editing is enabled only while `builderEditing` is true. The bridge can start a
+  temporary `contenteditable` view on a marked `.pb-text[data-builder-edit-field="content"]`
+  element from double-click or a parent toolbar request, posts validated `INLINE_EDIT_START`,
+  `INLINE_EDIT_CHANGE`, `INLINE_EDIT_COMMIT`, and `INLINE_EDIT_CANCEL` messages, and removes the
+  editable state on commit, cancel, cleanup, or non-editing snapshots. It accepts parent-origin
+  `INLINE_EDIT_CHANGE` sync messages for the active text target without echoing them back, sanitizes
+  inline DOM on input/paste/formatting, rejects unsafe toolbar links, and blocks editable anchor
+  activation. The iframe DOM remains an editing view; admin module drafts remain canonical.
 - `validatePreviewMessageEvent(event, expected)` — validates a raw `MessageEvent` from the parent frame, checking origin and source before delegating to `validatePreviewEnvelope(...)`.
 
 Preview side-effect stubs are intentionally distributed through the reader modules they protect:

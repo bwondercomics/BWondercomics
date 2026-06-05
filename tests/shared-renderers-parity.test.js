@@ -102,6 +102,7 @@ describe('shared renderer parity', () => {
     expect(wrapper.querySelector('[data-builder-column-index]')).toBeNull();
     expect(wrapper.querySelector('[data-builder-module-id]')).toBeNull();
     expect(wrapper.querySelector('[data-builder-module-type]')).toBeNull();
+    expect(wrapper.querySelector('[data-builder-edit-field]')).toBeNull();
   });
 
   it('emits stable builder target markers only when builder editing is enabled', () => {
@@ -122,6 +123,25 @@ describe('shared renderer parity', () => {
     expect(wrapper.querySelector('.pb-module')?.dataset.builderModuleType).toBe(
       firstModule.moduleType
     );
+  });
+
+  it('emits text inline edit markers only in builder editing mode', () => {
+    const textModule = {
+      id: 'module-text-inline',
+      moduleType: 'text',
+      config: { content: '<p>Edit me</p>' },
+    };
+    const renderer = makeReaderRenderers();
+
+    const publicWrapper = document.createElement('div');
+    publicWrapper.innerHTML = renderer.renderModule(textModule);
+    expect(publicWrapper.querySelector('.pb-text')?.hasAttribute('data-builder-edit-field')).toBe(
+      false
+    );
+
+    const builderWrapper = document.createElement('div');
+    builderWrapper.innerHTML = renderer.renderModule(textModule, { builderEditing: true });
+    expect(builderWrapper.querySelector('.pb-text')?.dataset.builderEditField).toBe('content');
   });
 
   it('emits module markers for unknown modules in builder editing mode', () => {

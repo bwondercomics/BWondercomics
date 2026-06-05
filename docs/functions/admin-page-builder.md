@@ -107,7 +107,9 @@ sort? }`.
 10. Guarded builder keymaps call the same command IDs as toolbar and panel controls. `Escape`
     exits chrome preview even when the restore button owns focus, while destructive keys stay
     suppressed inside editing controls.
-11. User actions call `data.js` mutators, update local state, then rerender affected surfaces.
+11. Text-module inline editing treats the reader iframe as an editing view. Inline messages update
+    the active module draft, sync the side panel, and persist only through the normal Save command.
+12. User actions call `data.js` mutators, update local state, then rerender affected surfaces.
 
 There is no separate long-lived client-side draft store in `data.js`. `admin/page-builder.js` still owns the top-level mutable builder state and composition root, while focused factories now own specific workflows: `commands.js` centralizes editor intent and availability checks, `keymaps.js` guards admin-only shortcuts, `undo-stack.js` tracks local unsaved draft snapshots keyed by draft target plus responsive edit scope/device where applicable, `draft-manager.js` handles draft normalization/save-discard flows, `page-actions.js` handles page lifecycle actions, `canvas-mutations.js` handles structural section/module mutations, `structural-commands.js` routes live structural intent, and `preview-manager.js` handles the iframe preview handshake/render path.
 
@@ -158,6 +160,12 @@ The top-level coordinator now owns the canonical designer-entry behavior in addi
 - **Live Structural Commands**: The builder owns `liveDragState` and translates block, module, and
   section drags into existing section/module mutations. The iframe never receives structural
   mutation commands; it only supplies target geometry and refreshes target measurements.
+- **Text Inline Editing**: Text modules can enter a preview-local `contenteditable` mode in live
+  builder editing. `admin/page-builder.js` owns `inlineEditState` and routes
+  `builder:inline-edit-*` commands into `activeModuleDraft.content`; the iframe DOM is never
+  canonical, side-panel edits sync sanitized draft HTML back to the active iframe edit view, stale
+  iframe commits cannot overwrite a newer admin draft, and `updateModule(...)` is called only by the
+  existing Save flow.
 - **Default Page Resolution**: Designer mode resolves pages in this order: requested slug, `reader`, homepage, then first page in sort order.
 - **Normal Builder Landing Surface**: Outside designer mode, opening or creating a page now defaults to the `page-settings` surface so slug, title, page type, publish state, and homepage assignment are immediately editable without an extra click.
 - **`onSeriesChange()`**: Re-opens the visible builder shell after a series switch and preserves designer-mode routing when applicable.
@@ -268,7 +276,7 @@ Current responsibilities:
 - set `snapshot.options.builderEditing` when the live builder canvas is rendering an editable iframe
 - send `SNAPSHOT` messages to the reader iframe and answer `REQUEST_SNAPSHOT`
 - validate inbound `ACK`, `ERROR`, `METRICS`, `TARGETS`, `TARGET_HOVER`, and `TARGET_SELECT`
-  messages through `validatePreviewEnvelope(...)`
+  messages plus text-module `INLINE_EDIT_*` messages through `validatePreviewEnvelope(...)`
 - apply exact preset width/height styles to both `.pb-preview-frame` and `.pb-preview-iframe`
 - store responsive metrics on `.pb-preview-frame.dataset`, including inner dimensions, branch flags, and overflow offenders
 - render the admin-side preview debug overlay when metrics are present and debug mode is enabled
@@ -278,11 +286,15 @@ Current responsibilities:
   only for the duration of a live drag
 - route selected-target toolbar actions through the structural command adapter while leaving iframe
   `TARGET_ACTION` messages for non-mutating requests such as target refresh
+- route selected text-module toolbar Edit Text through the command registry and post an internal
+  inline-edit start request to the same live iframe session
 - clear live target geometry and send `builderEditing: false` snapshots when the builder enters
   chrome-collapsed Preview over the same iframe
 - clear stale target geometry on iframe reload, page identity changes, preview session reset, and
   device switches until fresh target messages arrive
 - update `.pb-preview-frame` dataset attributes and `.pb-preview-status` copy
+- refresh preview source/status metadata for inline draft typing without posting a new iframe
+  snapshot on every keystroke
 - render the default live canvas and rerender the preview frame whenever live mode, dirty draft, or
   viewport state changes
 

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   BUILDER_PREVIEW_MESSAGE_TYPES,
   BUILDER_PREVIEW_SNAPSHOT_VERSION,
+  buildPreviewInlineEditMessage,
   buildPreviewSnapshotMessage,
 } from '../admin/page-builder/preview-contract.js';
 
@@ -315,6 +316,391 @@ describe('reader preview bridge', () => {
     });
     document.dispatchEvent(keydown);
     expect(keydown.defaultPrevented).toBe(false);
+  });
+
+  it('starts text inline editing from double-click and emits draft messages', async () => {
+    setPreviewUrl();
+    vi.stubGlobal('requestAnimationFrame', (callback) => {
+      callback();
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    document.body.innerHTML = `
+      <div class="viewerWrap" data-builder-page-id="page-1">
+        <section data-builder-section-id="section-1">
+          <div data-builder-column-index="0">
+            <article data-builder-module-id="module-1" data-builder-module-type="text">
+              <div class="pb-text" data-builder-edit-field="content"><p>Original</p></div>
+            </article>
+          </div>
+        </section>
+      </div>
+    `;
+    document
+      .querySelectorAll(
+        '[data-builder-page-id], [data-builder-section-id], [data-builder-column-index], [data-builder-module-id]'
+      )
+      .forEach((element, index) => {
+        element.getBoundingClientRect = () => ({
+          top: index * 10,
+          left: index * 10,
+          right: index * 10 + 100,
+          bottom: index * 10 + 40,
+          width: 100,
+          height: 40,
+        });
+      });
+    const postMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => {});
+    const { startPreviewTargetBridge } = await import('../reader/preview-bridge.js');
+
+    const cleanup = startPreviewTargetBridge(buildSnapshot({ options: { builderEditing: true } }));
+    const editable = document.querySelector('.pb-text');
+    const dblclick = new MouseEvent('dblclick', { bubbles: true, cancelable: true });
+    editable.dispatchEvent(dblclick);
+
+    expect(dblclick.defaultPrevented).toBe(true);
+    expect(editable.getAttribute('contenteditable')).toBe('true');
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_START,
+        target: expect.objectContaining({ moduleId: 'module-1', moduleType: 'text' }),
+        field: 'content',
+        value: '<p>Original</p>',
+      }),
+      window.location.origin
+    );
+
+    editable.innerHTML = '<p><strong>Inline</strong> draft</p>';
+    editable.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText' }));
+
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE,
+        target: expect.objectContaining({ moduleId: 'module-1' }),
+        field: 'content',
+        value: '<p><strong>Inline</strong> draft</p>',
+      }),
+      window.location.origin
+    );
+
+    const arrow = new KeyboardEvent('keydown', {
+      key: 'ArrowRight',
+      bubbles: true,
+      cancelable: true,
+    });
+    editable.dispatchEvent(arrow);
+    expect(arrow.defaultPrevented).toBe(false);
+
+    const escape = new KeyboardEvent('keydown', {
+      key: 'Escape',
+      bubbles: true,
+      cancelable: true,
+    });
+    editable.dispatchEvent(escape);
+
+    expect(escape.defaultPrevented).toBe(true);
+    expect(editable.hasAttribute('contenteditable')).toBe(false);
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CANCEL,
+        target: expect.objectContaining({ moduleId: 'module-1' }),
+        field: 'content',
+      }),
+      window.location.origin
+    );
+    cleanup();
+  });
+
+  it('can start text inline editing from a validated parent toolbar message', async () => {
+    setPreviewUrl();
+    vi.stubGlobal('requestAnimationFrame', (callback) => {
+      callback();
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    document.body.innerHTML = `
+      <article data-builder-page-id="page-1" data-builder-module-id="module-1" data-builder-module-type="text">
+        <div class="pb-text" data-builder-edit-field="content"><p>Original</p></div>
+      </article>
+    `;
+    const target = document.querySelector('[data-builder-module-id]');
+    target.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      right: 100,
+      bottom: 40,
+      width: 100,
+      height: 40,
+    });
+    const postMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => {});
+    const { startPreviewTargetBridge } = await import('../reader/preview-bridge.js');
+
+    const cleanup = startPreviewTargetBridge(buildSnapshot({ options: { builderEditing: true } }));
+    dispatchPreviewMessage(
+      buildPreviewInlineEditMessage(
+        BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_START,
+        {
+          sequence: 1,
+          target: {
+            kind: 'module',
+            key: 'module:module-1',
+            pageId: 'page-1',
+            moduleId: 'module-1',
+            moduleType: 'text',
+          },
+          field: 'content',
+          reason: 'toolbar',
+        },
+        {
+          previewSession: 'session-1',
+          seriesId: 'battle-bros',
+          pageId: 'page-1',
+          pageSlug: 'reader',
+        }
+      )
+    );
+
+    expect(document.querySelector('.pb-text').getAttribute('contenteditable')).toBe('true');
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_START,
+        reason: 'toolbar',
+      }),
+      window.location.origin
+    );
+    cleanup();
+  });
+
+  it('applies parent inline edit changes without echoing a change back to admin', async () => {
+    setPreviewUrl();
+    vi.stubGlobal('requestAnimationFrame', (callback) => {
+      callback();
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    document.body.innerHTML = `
+      <article data-builder-page-id="page-1" data-builder-module-id="module-1" data-builder-module-type="text">
+        <div class="pb-text" data-builder-edit-field="content"><p>Original</p></div>
+      </article>
+    `;
+    const targetEl = document.querySelector('[data-builder-module-id]');
+    targetEl.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      right: 100,
+      bottom: 40,
+      width: 100,
+      height: 40,
+    });
+    const postMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => {});
+    const { startPreviewTargetBridge } = await import('../reader/preview-bridge.js');
+    const cleanup = startPreviewTargetBridge(buildSnapshot({ options: { builderEditing: true } }));
+    const target = {
+      kind: 'module',
+      key: 'module:module-1',
+      pageId: 'page-1',
+      moduleId: 'module-1',
+      moduleType: 'text',
+    };
+
+    document
+      .querySelector('.pb-text')
+      .dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+    postMessage.mockClear();
+
+    dispatchPreviewMessage(
+      buildPreviewInlineEditMessage(
+        BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE,
+        {
+          sequence: 1,
+          target,
+          field: 'content',
+          value: '<p onclick="evil()">Panel</p><script>bad()</script><img src=x>',
+          reason: 'side-panel',
+        },
+        {
+          previewSession: 'session-1',
+          seriesId: 'battle-bros',
+          pageId: 'page-1',
+          pageSlug: 'reader',
+        }
+      )
+    );
+
+    expect(document.querySelector('.pb-text').innerHTML).toBe('<p>Panel</p>');
+    expect(
+      postMessage.mock.calls.some(
+        ([message]) => message.type === BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE
+      )
+    ).toBe(false);
+    cleanup();
+  });
+
+  it('sanitizes unsafe typed inline HTML before posting changes', async () => {
+    setPreviewUrl();
+    vi.stubGlobal('requestAnimationFrame', (callback) => {
+      callback();
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    document.body.innerHTML = `
+      <article data-builder-page-id="page-1" data-builder-module-id="module-1" data-builder-module-type="text">
+        <div class="pb-text" data-builder-edit-field="content"><p>Original</p></div>
+      </article>
+    `;
+    const target = document.querySelector('[data-builder-module-id]');
+    target.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      right: 100,
+      bottom: 40,
+      width: 100,
+      height: 40,
+    });
+    const postMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => {});
+    const { startPreviewTargetBridge } = await import('../reader/preview-bridge.js');
+    const cleanup = startPreviewTargetBridge(buildSnapshot({ options: { builderEditing: true } }));
+    const editable = document.querySelector('.pb-text');
+
+    editable.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+    postMessage.mockClear();
+    editable.innerHTML =
+      '<p onclick="evil()"><a href="javascript:alert(1)">Bad</a><strong>Ok</strong><img src=x><iframe></iframe></p>';
+    editable.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertHTML' }));
+
+    expect(editable.innerHTML).toBe('<p><a>Bad</a><strong>Ok</strong></p>');
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE,
+        value: '<p><a>Bad</a><strong>Ok</strong></p>',
+      }),
+      window.location.origin
+    );
+
+    cleanup();
+  });
+
+  it('sanitizes pasted inline HTML before posting changes', async () => {
+    setPreviewUrl();
+    vi.stubGlobal('requestAnimationFrame', (callback) => {
+      callback();
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    document.body.innerHTML = `
+      <article data-builder-page-id="page-1" data-builder-module-id="module-1" data-builder-module-type="text">
+        <div class="pb-text" data-builder-edit-field="content"><p>Original</p></div>
+      </article>
+    `;
+    const target = document.querySelector('[data-builder-module-id]');
+    target.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      right: 100,
+      bottom: 40,
+      width: 100,
+      height: 40,
+    });
+    const postMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => {});
+    const { startPreviewTargetBridge } = await import('../reader/preview-bridge.js');
+    const cleanup = startPreviewTargetBridge(buildSnapshot({ options: { builderEditing: true } }));
+    const editable = document.querySelector('.pb-text');
+
+    editable.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+    postMessage.mockClear();
+    editable.innerHTML = '';
+    const paste = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(paste, 'clipboardData', {
+      value: {
+        getData: vi.fn((type) =>
+          type === 'text/html'
+            ? '<div><script>bad()</script><em onmouseover="evil()">Pasted</em><form></form></div>'
+            : ''
+        ),
+      },
+    });
+    editable.dispatchEvent(paste);
+
+    expect(paste.defaultPrevented).toBe(true);
+    expect(editable.innerHTML).toBe('<em>Pasted</em>');
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: BUILDER_PREVIEW_MESSAGE_TYPES.INLINE_EDIT_CHANGE,
+        value: '<em>Pasted</em>',
+        reason: 'paste',
+      }),
+      window.location.origin
+    );
+    cleanup();
+  });
+
+  it('sanitizes inline link toolbar URLs and blocks active editable anchor clicks', async () => {
+    setPreviewUrl();
+    vi.stubGlobal('requestAnimationFrame', (callback) => {
+      callback();
+      return 1;
+    });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
+    document.body.innerHTML = `
+      <article data-builder-page-id="page-1" data-builder-module-id="module-1" data-builder-module-type="text">
+        <div class="pb-text" data-builder-edit-field="content"><p><a href="https://example.com">Original</a></p></div>
+      </article>
+    `;
+    const target = document.querySelector('[data-builder-module-id]');
+    target.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      right: 100,
+      bottom: 40,
+      width: 100,
+      height: 40,
+    });
+    const postMessage = vi.spyOn(window.parent, 'postMessage').mockImplementation(() => {});
+    const execCommand = vi.fn(() => true);
+    Object.defineProperty(document, 'execCommand', {
+      configurable: true,
+      value: execCommand,
+    });
+    const prompt = vi.spyOn(window, 'prompt');
+    const { startPreviewTargetBridge } = await import('../reader/preview-bridge.js');
+    const cleanup = startPreviewTargetBridge(buildSnapshot({ options: { builderEditing: true } }));
+    const editable = document.querySelector('.pb-text');
+
+    editable.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }));
+    const linkButton = document.querySelector('.builder-inline-edit-toolbar button[title="Link"]');
+    const clickToolbarButton = () => {
+      linkButton.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+      linkButton.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
+    };
+
+    prompt.mockReturnValueOnce('javascript:alert(1)');
+    clickToolbarButton();
+    expect(execCommand).not.toHaveBeenCalledWith('createLink', false, expect.anything());
+
+    const safeUrls = [
+      'https://example.com',
+      'mailto:test@example.com',
+      '/reader',
+      'relative',
+      '#top',
+    ];
+    safeUrls.forEach((url) => {
+      execCommand.mockClear();
+      prompt.mockReturnValueOnce(url);
+      clickToolbarButton();
+      expect(execCommand).toHaveBeenCalledWith('createLink', false, url);
+    });
+
+    postMessage.mockClear();
+    const click = new MouseEvent('click', { bubbles: true, cancelable: true });
+    editable.querySelector('a').dispatchEvent(click);
+    expect(click.defaultPrevented).toBe(true);
+    expect(
+      postMessage.mock.calls.some(
+        ([message]) => message.type === BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT
+      )
+    ).toBe(false);
+    cleanup();
   });
 
   it('stops an active target bridge when a follow-up snapshot disables builder editing', async () => {

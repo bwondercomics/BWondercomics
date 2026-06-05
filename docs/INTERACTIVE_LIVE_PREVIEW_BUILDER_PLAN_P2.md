@@ -893,6 +893,38 @@ Assumptions:
 - Rich text styling remains constrained; broad visual style controls belong in the Phase 5 style
   manager and Phase 4 responsive override contracts.
 
+Completion note:
+
+- 2026-06-05: Phase 11 implemented text-module inline editing over the live reader iframe without
+  making iframe DOM canonical. Shared renderers now emit `data-builder-edit-field="content"` only
+  for builder-editing text modules; the preview contract validates internal `INLINE_EDIT_START`,
+  `INLINE_EDIT_CHANGE`, `INLINE_EDIT_COMMIT`, and `INLINE_EDIT_CANCEL` messages; the reader bridge
+  starts temporary `contenteditable` editing from double-click or admin toolbar requests, posts
+  inline draft messages, and keeps normal typing/selection available while blocking reader
+  shortcuts. The admin builder routes inline edit commands through the Phase 10 command registry,
+  updates `activeModuleDraft.content`, synchronizes the side panel, records local draft undo/redo,
+  refreshes preview source metadata without iframe rerenders on each input, and persists only
+  through the existing module Save flow. No backend schema, saved record shape, public reader route,
+  or public reader rendering contract changed.
+- Verification: `node --check` passed for touched admin/reader JS and updated tests; `npm test --
+tests/admin-page-builder-preview-contract.test.js tests/reader-preview-bridge.test.js
+tests/admin-page-builder-commands.test.js tests/admin-page-builder-shell.test.js
+tests/reader-page-renderer.test.js tests/shared-renderers-parity.test.js` passed (`6` files,
+  `131` tests); `npm run format:check` passed; `npm run lint` passed; `npm test` passed (`53`
+  files, `444` passed, `1` skipped); `npm run test:backend` passed (`71` tests); `npm run build`
+  passed; `npm run test:visual` passed (`3` tests); `git diff --check` passed.
+- 2026-06-05 corrective patch: inline editing now keeps the admin module draft canonical during
+  side-panel/iframe races by syncing sanitized side-panel content back into the active iframe edit
+  view and ignoring stale iframe commit/cancel payloads. The reader bridge sanitizes active inline
+  DOM on input, paste, and formatting, rejects unsafe inline toolbar links, prevents editable anchor
+  activation, and lets its own toolbar receive clicks without triggering target selection. Save,
+  Discard, device switches, chrome-preview entry, and transient cancel now send deterministic iframe
+  cleanup messages before or with preview refreshes.
+- Corrective verification: `node --check` passed for touched admin/reader JS and updated tests;
+  `npm test -- tests/reader-preview-bridge.test.js tests/admin-page-builder-shell.test.js
+tests/admin-page-builder-preview-contract.test.js tests/shared-renderers-parity.test.js` passed
+  (`4` files, `121` tests).
+
 ## Phase 12 - Testing and Release Gates
 
 Unit and integration coverage:
