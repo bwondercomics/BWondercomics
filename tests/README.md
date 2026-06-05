@@ -2,10 +2,11 @@
 
 ## Overview
 
-This repo uses two test runners:
+This repo uses three test runners:
 
 - Frontend/admin tests: `Vitest` with `happy-dom`
 - Backend tests: Python `unittest`
+- Browser visual/workflow tests: `Playwright`
 
 The frontend suite covers reader helpers, interaction flows, builder-driven presentation, DOM/render regressions, and focused admin manager flows. The backend suite covers diagnostics/ops, branding, and the core auth/comment/file/post/series/page-builder/tracking/user route contracts.
 
@@ -33,6 +34,13 @@ Run coverage for the frontend suite:
 
 ```bash
 npm run test:coverage
+```
+
+Run browser visual parity and Phase 12 authoring workflow coverage:
+
+```bash
+npx playwright install chromium
+npm run test:visual
 ```
 
 ## Setup
@@ -80,6 +88,8 @@ Install backend dev dependencies into the repo virtualenv:
 - `tests/diagnostics-snapshot.test.js`: diagnostics snapshot rendering and fallbacks
 - `tests/ops-app.test.js`: ops UI rendering states
 - `tests/helpers/contracts.js` + `tests/fixtures/contract-fixtures.json`: shared frontend contract fixtures for series, builder pages/modules, feed/latest payloads, tracking, and user-state contracts
+- `tests/visual/builder-preview-parity.spec.js`: Playwright screenshot parity and iframe metric coverage for the live builder preview against the public reader at Desktop, Tablet, and Mobile
+- `tests/visual/builder-authoring-workflows.spec.js`: Playwright Phase 12 browser workflow coverage for exact iframe dimensions, series reader bindings, chrome preview collapse/restore, side-panel save/reload, current-device override persistence, inline text Save/Discard, live block drag/drop persistence, and global Feed template page creation
 - `backend/tests/helpers.py`: shared backend route harness and contract seed helpers for series, builder pages, comments, premium codes, and visitor sessions
 - `backend/tests/test_*.py`: backend diagnostics/ops, branding, and core route contract behavior including page-builder, tracking, user flows, and page-header backfill/readiness coverage
 
@@ -90,4 +100,4 @@ Install backend dev dependencies into the repo virtualenv:
 - Coverage is informational in this repo right now; CI should run it and publish the report, but it is not a percentage gate.
 - The shared contract layer in `tests/fixtures/contract-fixtures.json` and `backend/tests/helpers.py` is authoritative for reader/admin/backend wire-shape assertions.
 - Backend payload changes should update that contract layer and at least one frontend test plus one backend test.
-- CI uses the same local commands via `.github/workflows/tests.yml`: `npm test`, `npm run test:coverage`, and `npm run test:backend`.
+- CI uses the same fast local commands via `.github/workflows/tests.yml`: `npm test`, `npm run test:coverage`, and `npm run test:backend`. The full release gate remains manual/local and adds formatting, linting, build, and `npm run test:visual`.

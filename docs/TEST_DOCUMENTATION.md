@@ -2,7 +2,7 @@
 
 ## Overview
 
-This repo has two active test surfaces:
+This repo has three active test surfaces:
 
 - Frontend/admin tests via `Vitest` in `tests/`
 - Browser visual parity tests via `Playwright` in `tests/visual/`
@@ -36,7 +36,7 @@ Run both:
 npm run test:all
 ```
 
-Browser visual parity:
+Browser visual and workflow gates:
 
 ```bash
 npx playwright install chromium
@@ -44,9 +44,9 @@ npm run test:visual
 ```
 
 `npm run test:visual` is intentionally separate from `npm run test:all` because screenshot
-baselines and browser installation are release-gate concerns, not the default unit/backend loop.
-The Playwright server uses strict local Vite port `127.0.0.1:3107`; override it with
-`PLAYWRIGHT_VISUAL_PORT` only when that port is unavailable.
+baselines, browser installation, and browser-level release workflow assertions are release-gate
+concerns, not the default unit/backend loop. The Playwright server uses strict local Vite port
+`127.0.0.1:3107`; override it with `PLAYWRIGHT_VISUAL_PORT` only when that port is unavailable.
 On Linux hosts that are missing Chromium runtime libraries such as `libasound.so.2`, run
 `npx playwright install-deps chromium` with system package privileges before running the visual
 suite.
@@ -119,6 +119,7 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - `tests/reader-preview-bridge.test.js`: `reader/preview-bridge.js` handshake protocol — `requestPreviewSnapshot(...)` resolves on valid `SNAPSHOT`, rejects on timeout or invalid envelope, and sends correct `ACK`/`ERROR` control messages; `validatePreviewMessageEvent(...)` rejects cross-origin and cross-source events
 - `tests/reader-preview-side-effects.test.js`: end-to-end reader preview side-effect guards — verifies that `?builderPreview=1` suppresses analytics initialization, live tracking, email form submission, comment mutations, chat SSO, safe-mode redirect, user-settings overlay, fullscreen, and external navigation links while leaving read-only reader shell behavior intact
 - `tests/visual/builder-preview-parity.spec.js`: Playwright visual parity coverage for the admin builder preview iframe against the public reader route at Desktop, Tablet, and Mobile. It uses seeded contract fixtures, mocked reader/admin endpoints, deterministic media placeholders, frozen visual timing, iframe width/metrics/overflow assertions, and committed screenshot baselines.
+- `tests/visual/builder-authoring-workflows.spec.js`: Phase 12 Playwright authoring workflow coverage for the full-page builder shell. It uses stateful mocked builder/page endpoints and DOM/layout assertions for exact Desktop/Tablet/Phone iframe dimensions, bound series reader pages, chrome collapse/restore, side-panel save/reload, current-device override persistence, inline text Save/Discard, live block drag/drop persistence, and global Feed template page creation.
 
 ## Backend Test Files
 
@@ -150,4 +151,4 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - Reuse the shared contract fixture layer for reader/admin/backend contract assertions instead of hand-copying payload shapes.
 - Treat `tests/fixtures/contract-fixtures.json` and `backend/tests/helpers.py` as the canonical contract layer; backend payload changes should update those fixtures and at least one frontend plus one backend assertion.
 - Frontend coverage is informational, not a percentage gate. CI should still run `npm run test:coverage` and publish the report artifact.
-- GitHub Actions enforcement should use the same local commands already documented here: `npm test`, `npm run test:coverage`, and `npm run test:backend`.
+- GitHub Actions enforcement should use the same fast local commands already documented here: `npm test`, `npm run test:coverage`, and `npm run test:backend`. The complete release gate remains manual/local and adds formatting, linting, build, and Playwright visual/workflow verification.

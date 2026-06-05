@@ -1028,7 +1028,7 @@ Test plan:
   5. `git diff --check`
 - If Playwright creates `test-results/`, clean it after evidence is captured unless the user asks
   to inspect artifacts.
-- For this documentation-only expansion, the required verification is `git diff --check`.
+- For documentation-only updates to this section, the minimum verification is `git diff --check`.
 
 Assumptions:
 
@@ -1038,6 +1038,25 @@ Assumptions:
   evidence.
 - Visual parity means the live builder preview and public reader continue through the shared
   `applyBuilderPageToDOM(...)` path and exact iframe viewport dimensions.
+
+Completion note:
+
+- 2026-06-05: Phase 12 added browser-level release workflow coverage in
+  `tests/visual/builder-authoring-workflows.spec.js` alongside the existing visual parity
+  screenshots. The new Playwright workflow uses stateful local builder/page route mocks to verify
+  full-page builder entry, bound series reader loading, exact Desktop/Tablet/Phone iframe
+  dimensions, chrome-preview collapse/restore, side-panel text save and reload, current-device text
+  override persistence, inline text Save/Discard behavior, live block drag/drop persistence, and
+  global Feed template page creation. During the release-hardening pass, the live target overlay was
+  patched so overlay redraws do not register duplicate drag/drop listeners on the same drop surface.
+  Testing docs now document the Phase 12 workflow spec, keep frontend coverage percentages
+  informational, and record that full release verification remains manual/local while CI continues
+  running the existing faster frontend coverage and backend gates.
+- Verification: syntax checks passed for `admin/page-builder/preview-manager.js` and
+  `tests/visual/builder-authoring-workflows.spec.js`; the targeted Phase 12 Playwright workflow
+  passed (`3` tests). Final release-gate results: `git diff --check`, `npm run format:check`,
+  `npm run lint`, `npm run format:py:check`, `npm run lint:py`, `npm test`,
+  `npm run test:backend`, `npm run build`, and `npm run test:visual` passed.
 
 ## Risks and Guardrails
 

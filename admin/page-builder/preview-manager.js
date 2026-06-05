@@ -455,29 +455,32 @@ export function createPreviewManager({ el, getState, actions, deps }) {
       });
     });
 
-    overlay.addEventListener('dragover', (event) => {
-      if (!getState().liveDragState) return;
-      event.preventDefault();
-      const frame = overlay.closest('.pb-preview-frame');
-      const result = runBuilderCommand('builder:drag-over', {
-        point: getFramePoint(frame, event),
-        targets: latestPreviewTargets,
+    if (overlay.dataset.liveDropEventsBound !== 'true') {
+      overlay.dataset.liveDropEventsBound = 'true';
+      overlay.addEventListener('dragover', (event) => {
+        if (!getState().liveDragState) return;
+        event.preventDefault();
+        const frame = overlay.closest('.pb-preview-frame');
+        const result = runBuilderCommand('builder:drag-over', {
+          point: getFramePoint(frame, event),
+          targets: latestPreviewTargets,
+        });
+        if (result?.ok || getState().liveDragState) {
+          renderPreviewTargetOverlay(frame);
+        }
       });
-      if (result?.ok || getState().liveDragState) {
-        renderPreviewTargetOverlay(frame);
-      }
-    });
 
-    overlay.addEventListener('drop', async (event) => {
-      if (!getState().liveDragState) return;
-      event.preventDefault();
-      const frame = overlay.closest('.pb-preview-frame');
-      await runBuilderCommand('builder:drop', {
-        point: getFramePoint(frame, event),
-        targets: latestPreviewTargets,
+      overlay.addEventListener('drop', async (event) => {
+        if (!getState().liveDragState) return;
+        event.preventDefault();
+        const frame = overlay.closest('.pb-preview-frame');
+        await runBuilderCommand('builder:drop', {
+          point: getFramePoint(frame, event),
+          targets: latestPreviewTargets,
+        });
+        renderPreviewTargetOverlay(frame);
       });
-      renderPreviewTargetOverlay(frame);
-    });
+    }
   }
 
   function renderPreviewTargetOverlay(frame = el.pbCanvas?.querySelector('.pb-preview-frame')) {
