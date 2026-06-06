@@ -46,11 +46,11 @@ Results:
 
 ## Viewport Matrix
 
-| Viewport |         Size | Reader route                                 | Builder preview route                                                           | Evidence                                                                  | Result |
-| -------- | -----------: | -------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------ |
-| Desktop  | `1280 x 900` | `/index.html?series=battle-bros&page=reader` | `/admin/index.html?view=designer&series=battle-bros&page=reader&surface=header` | Screenshot parity and shell/module selectors                              | Pass   |
-| Tablet   | `768 x 1024` | `/index.html?series=battle-bros&page=reader` | same builder route, Tablet preset                                               | Screenshot parity and media-query branch metrics                          | Pass   |
-| Mobile   |  `375 x 812` | `/index.html?series=battle-bros&page=reader` | same builder route, Mobile preset                                               | Screenshot parity, iframe `window.innerWidth === 375`, no mobile overflow | Pass   |
+| Viewport |          Size | Reader route                                 | Builder preview route                                                           | Evidence                                                                  | Result |
+| -------- | ------------: | -------------------------------------------- | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ------ |
+| Desktop  | `1920 x 1080` | `/index.html?series=battle-bros&page=reader` | `/admin/index.html?view=designer&series=battle-bros&page=reader&surface=header` | Screenshot parity and shell/module selectors                              | Pass   |
+| Tablet   |  `768 x 1024` | `/index.html?series=battle-bros&page=reader` | same builder route, Tablet preset                                               | Screenshot parity and media-query branch metrics                          | Pass   |
+| Mobile   |   `375 x 812` | `/index.html?series=battle-bros&page=reader` | same builder route, Mobile preset                                               | Screenshot parity, iframe `window.innerWidth === 375`, no mobile overflow | Pass   |
 
 ## Checklist Results
 

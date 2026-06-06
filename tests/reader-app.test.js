@@ -73,7 +73,7 @@ async function bootReaderApp({
     page: getContractFixture('builderPage'),
     options: {
       builderEditing: true,
-      viewport: { id: 'desktop', label: 'Desktop', width: 1280, height: 900 },
+      viewport: { id: 'desktop', label: 'Desktop', width: 1920, height: 1080 },
     },
   };
   const requestPreviewSnapshot = vi.fn(async () => ({

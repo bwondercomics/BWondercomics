@@ -289,6 +289,10 @@ function getPreviewFrame() {
   return document.getElementById('pbCanvas')?.querySelector('.pb-preview-frame');
 }
 
+function getPreviewScaleShell() {
+  return document.getElementById('pbCanvas')?.querySelector('.pb-preview-scale-shell');
+}
+
 function getPreviewIframe() {
   return document.getElementById('pbCanvas')?.querySelector('.pb-preview-iframe');
 }
@@ -733,6 +737,7 @@ describe('admin page-builder shell', () => {
     const editorContentRule = getCssRule(inspectorCss, '.pb-editor-content');
     const sectionRule = getCssRule(inspectorCss, '.pb-inspector-section');
     const sectionBodyRule = getCssRule(inspectorCss, '.pb-inspector-section-body');
+    const scaleShellRule = getCssRule(canvasCss, '.pb-preview-scale-shell');
     const targetOverlayRule = getCssRule(canvasCss, '.pb-preview-target-overlay');
     const targetToolbarRule = getCssRule(canvasCss, '.pb-preview-target-toolbar');
 
@@ -748,7 +753,11 @@ describe('admin page-builder shell', () => {
     expect(layoutCss).toContain(".page-builder[data-chrome-mode='preview']");
     expect(layoutCss).toContain(".page-builder[data-chrome-mode='preview'] .pb-builder-toolbar");
     expect(layoutCss).toContain(".page-builder[data-chrome-mode='preview'] .page-builder-sidebar");
+    expect(layoutCss).toContain(
+      ".page-builder-layout[data-canvas-mode='structure'] .pb-preview-scale-shell"
+    );
     expect(layoutCss).toContain('.pb-preview-restore');
+    expect(scaleShellRule).toContain('position: relative');
     expect(targetOverlayRule).toContain('pointer-events: none');
     expect(targetToolbarRule).toContain('pointer-events: auto');
   });
@@ -1887,11 +1896,24 @@ describe('admin page-builder shell', () => {
     expect(initialSrc).toContain('builderPreview=1');
     expect(canvas?.dataset.mode).toBe('preview');
     expect(canvas?.querySelector('.pb-preview-container')).toBeNull();
-    expect(initialFrame?.parentElement).toBe(canvas);
-    expect(initialFrame?.style.width).toBe('1280px');
-    expect(initialFrame?.style.height).toBe('900px');
-    expect(initialIframe?.style.width).toBe('1280px');
-    expect(initialIframe?.style.height).toBe('900px');
+    expect(initialFrame?.parentElement).toBe(getPreviewScaleShell());
+    expect(initialFrame?.style.width).toBe('1920px');
+    expect(initialFrame?.style.height).toBe('1080px');
+    expect(initialIframe?.style.width).toBe('1920px');
+    expect(initialIframe?.style.height).toBe('1080px');
+    expect(initialFrame?.dataset.previewScale).toBe('1');
+    expect(getPreviewScaleShell()?.dataset.previewScale).toBe('1');
+    expect(getPreviewScaleShell()?.style.width).toBe('1920px');
+    expect(getPreviewScaleShell()?.style.height).toBe('1080px');
+
+    Object.defineProperty(canvas, 'clientWidth', { configurable: true, value: 960 });
+    Object.defineProperty(canvas, 'clientHeight', { configurable: true, value: 540 });
+    canvas.style.padding = '0';
+    window.dispatchEvent(new Event('resize'));
+    expect(initialFrame?.dataset.previewScale).toBe('0.5');
+    expect(initialFrame?.style.transform).toBe('scale(0.5)');
+    expect(getPreviewScaleShell()?.style.width).toBe('960px');
+    expect(getPreviewScaleShell()?.style.height).toBe('540px');
 
     // Switch to tablet
     widthToggles
@@ -1941,8 +1963,8 @@ describe('admin page-builder shell', () => {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(canvas?.querySelector('.pb-preview-frame')?.dataset.width).toBe('desktop');
     expect(canvas?.querySelector('.pb-preview-frame')?.dataset.deviceId).toBe('desktop');
-    expect(getPreviewFrame()?.style.width).toBe('1280px');
-    expect(getPreviewFrame()?.style.height).toBe('900px');
+    expect(getPreviewFrame()?.style.width).toBe('1920px');
+    expect(getPreviewFrame()?.style.height).toBe('1080px');
 
     const invalidWidth = document.createElement('button');
     invalidWidth.dataset.width = 'wide';
@@ -2197,8 +2219,8 @@ describe('admin page-builder shell', () => {
     expect(getPreviewFrame()?.dataset.draftMode).toBe('published');
     expect(getPreviewFrame()?.dataset.snapshotVersion).toBe('1');
     expect(getPreviewFrame()?.dataset.builderEditing).toBe('true');
-    expect(getPreviewFrame()?.dataset.viewportWidth).toBe('1280');
-    expect(getPreviewFrame()?.dataset.viewportHeight).toBe('900');
+    expect(getPreviewFrame()?.dataset.viewportWidth).toBe('1920');
+    expect(getPreviewFrame()?.dataset.viewportHeight).toBe('1080');
     expect(getPreviewFrame()?.dataset.previewSession).toBeTruthy();
     expect(getPreviewIframe()?.getAttribute('src')).toContain('builderPreview=1');
     expect(getPreviewIframe()?.getAttribute('src')).toContain(
@@ -3250,10 +3272,10 @@ describe('admin page-builder shell', () => {
     frame.getBoundingClientRect = () => ({
       top: 0,
       left: 0,
-      right: 1280,
-      bottom: 900,
-      width: 1280,
-      height: 900,
+      right: 1920,
+      bottom: 1080,
+      width: 1920,
+      height: 1080,
     });
     const overlay = frame.querySelector('.pb-preview-target-overlay');
     const block = document.querySelector('.pb-module-type[data-module-type="text"]');
@@ -3303,10 +3325,10 @@ describe('admin page-builder shell', () => {
     frame.getBoundingClientRect = () => ({
       top: 0,
       left: 0,
-      right: 1280,
-      bottom: 900,
-      width: 1280,
-      height: 900,
+      right: 1920,
+      bottom: 1080,
+      width: 1920,
+      height: 1080,
     });
     const overlay = frame.querySelector('.pb-preview-target-overlay');
     const block = document.querySelector('.pb-module-type[data-module-type="text"]');
@@ -3472,7 +3494,7 @@ describe('admin page-builder shell', () => {
     );
   });
 
-  it('moves a module from Layers to a live canvas column target', async () => {
+  it('moves a module from Layers to a scaled live canvas column target', async () => {
     const selectedPage = getContractFixture('builderPage');
     const textModule = selectedPage.sections
       .flatMap((section) => section.modules || [])
@@ -3489,13 +3511,15 @@ describe('admin page-builder shell', () => {
     enterPreviewMode();
 
     const frame = getPreviewFrame();
+    frame.dataset.previewScale = '0.5';
+    getPreviewScaleShell().dataset.previewScale = '0.5';
     frame.getBoundingClientRect = () => ({
       top: 0,
       left: 0,
-      right: 1280,
-      bottom: 900,
-      width: 1280,
-      height: 900,
+      right: 960,
+      bottom: 540,
+      width: 960,
+      height: 540,
     });
     const iframeWindow = attachPreviewIframeWindow();
     const columnTarget = {
@@ -3527,9 +3551,9 @@ describe('admin page-builder shell', () => {
     const dataTransfer = createDataTransfer();
     layerRow.dispatchEvent(createDragLikeEvent('dragstart', dataTransfer));
     overlay.dispatchEvent(
-      createDragLikeEvent('dragover', dataTransfer, { clientX: 300, clientY: 30 })
+      createDragLikeEvent('dragover', dataTransfer, { clientX: 150, clientY: 15 })
     );
-    overlay.dispatchEvent(createDragLikeEvent('drop', dataTransfer, { clientX: 300, clientY: 30 }));
+    overlay.dispatchEvent(createDragLikeEvent('drop', dataTransfer, { clientX: 150, clientY: 15 }));
     await flushAdminUi(6);
 
     expect(mocks.moveModule).toHaveBeenCalledWith(textModule.id, textSection.id, 1, 0);
@@ -3562,10 +3586,10 @@ describe('admin page-builder shell', () => {
     frame.getBoundingClientRect = () => ({
       top: 0,
       left: 0,
-      right: 1280,
-      bottom: 900,
-      width: 1280,
-      height: 900,
+      right: 1920,
+      bottom: 1080,
+      width: 1920,
+      height: 1080,
     });
     const iframeWindow = attachPreviewIframeWindow();
     const columnTarget = {
@@ -3628,10 +3652,10 @@ describe('admin page-builder shell', () => {
     frame.getBoundingClientRect = () => ({
       top: 0,
       left: 0,
-      right: 1280,
-      bottom: 900,
-      width: 1280,
-      height: 900,
+      right: 1920,
+      bottom: 1080,
+      width: 1920,
+      height: 1080,
     });
     const iframeWindow = attachPreviewIframeWindow();
     const sectionTarget = {
@@ -3690,10 +3714,10 @@ describe('admin page-builder shell', () => {
     frame.getBoundingClientRect = () => ({
       top: 0,
       left: 0,
-      right: 1280,
-      bottom: 900,
-      width: 1280,
-      height: 900,
+      right: 1920,
+      bottom: 1080,
+      width: 1920,
+      height: 1080,
     });
     const iframeWindow = attachPreviewIframeWindow();
     const sectionTarget = {

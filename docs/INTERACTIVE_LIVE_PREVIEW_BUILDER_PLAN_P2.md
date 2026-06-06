@@ -1057,6 +1057,11 @@ Completion note:
   passed (`3` tests). Final release-gate results: `git diff --check`, `npm run format:check`,
   `npm run lint`, `npm run format:py:check`, `npm run lint:py`, `npm test`,
   `npm run test:backend`, `npm run build`, and `npm run test:visual` passed.
+- 2026-06-06 follow-up: Desktop live preview now uses an exact `1920x1080`
+  full-HD iframe preset with an admin-only scale shell so it fits the editor
+  without changing iframe CSS pixels. Tablet (`768x1024`) and Phone
+  (`375x812`) remain unchanged, and exact iframe pixels remain authoritative
+  for preview parity and builder workflow coverage.
 
 ## Risks and Guardrails
 

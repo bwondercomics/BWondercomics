@@ -209,6 +209,7 @@
   display: none;
 }
 
+.page-builder-layout[data-canvas-mode='structure'] .pb-preview-scale-shell,
 .page-builder-layout[data-canvas-mode='structure'] .pb-preview-frame,
 .page-builder-layout[data-canvas-mode='structure'] .pb-preview-status {
   display: none;

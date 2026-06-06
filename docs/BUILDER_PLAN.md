@@ -426,7 +426,7 @@ Deliberately not in this phase:
   `reader/preview-bridge.js`.
 - Added Desktop, Tablet, and Mobile preview presets. The first pass used a clamped builder frame;
   the active implementation uses exact iframe dimensions from `PREVIEW_VIEWPORTS`
-  (`1280x900`, `768x1024`, `375x812`) and lets the admin preview canvas scroll when needed.
+  (`1920x1080`, `768x1024`, `375x812`) and scales the admin presentation to fit the editor while preserving exact iframe pixels.
 - Preview mode still uses `data-canvas-mode='preview'` to give the preview surface room by hiding
   builder side panels, but responsive behavior now comes from the iframe viewport rather than admin
   CSS approximations.
@@ -434,7 +434,7 @@ Deliberately not in this phase:
 
 **Contract addendum (2026-05-10):**
 
-- Added `admin/page-builder/preview-contract.js` with the versioned preview snapshot contract, source labels, side-effect policy, and iframe-ready viewport dimensions: Desktop `1280x900`, Tablet `768x1024`, and Mobile `375x812`.
+- Added `admin/page-builder/preview-contract.js` with the versioned preview snapshot contract, source labels, side-effect policy, and iframe-ready viewport dimensions: Desktop `1920x1080`, Tablet `768x1024`, and Mobile `375x812`.
 - Preview mode now labels whether it is rendering the saved hydrated page or an unsaved working snapshot.
 - When the active dirty scope is `module`, `theme`, `header`, `page-settings`, or `section`, preview merges that local draft into a cloned page snapshot without mutating `currentPage`.
 - At that point the preview still used a clamped `.pb-preview-frame`; later Phase 3-5 parity work replaced that path with the current reader iframe, exact preset sizing, and preview metrics instrumentation tracked in `docs/BUILDER_PREVIEW_PARITY_PLAN.md`.

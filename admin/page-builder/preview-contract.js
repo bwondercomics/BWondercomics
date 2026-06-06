@@ -1,7 +1,7 @@
 export const PREVIEW_VIEWPORT_ORDER = Object.freeze(['desktop', 'tablet', 'mobile']);
 
 export const PREVIEW_VIEWPORTS = Object.freeze({
-  desktop: Object.freeze({ id: 'desktop', label: 'Desktop', width: 1280, height: 900 }),
+  desktop: Object.freeze({ id: 'desktop', label: 'Desktop', width: 1920, height: 1080 }),
   tablet: Object.freeze({ id: 'tablet', label: 'Tablet', width: 768, height: 1024 }),
   mobile: Object.freeze({ id: 'mobile', label: 'Mobile', width: 375, height: 812 }),
 });

@@ -33,7 +33,7 @@ describe('admin page-builder preview contract', () => {
   it('defines ordered viewport presets with iframe dimensions', () => {
     expect(PREVIEW_VIEWPORT_ORDER).toEqual(['desktop', 'tablet', 'mobile']);
     expect(BUILDER_DEVICE_ORDER).toEqual(['desktop', 'tablet', 'mobile']);
-    expect(PREVIEW_VIEWPORTS.desktop).toMatchObject({ width: 1280, height: 900 });
+    expect(PREVIEW_VIEWPORTS.desktop).toMatchObject({ width: 1920, height: 1080 });
     expect(PREVIEW_VIEWPORTS.tablet).toMatchObject({ width: 768, height: 1024 });
     expect(PREVIEW_VIEWPORTS.mobile).toMatchObject({ width: 375, height: 812 });
     expect(PREVIEW_VIEWPORTS.mobile.label).toBe('Mobile');

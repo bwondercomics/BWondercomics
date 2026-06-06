@@ -532,7 +532,7 @@ Defines the shared contract for the builder's iframe-based reader preview. `admi
 
 Key exports:
 
-- `PREVIEW_VIEWPORTS` and `PREVIEW_VIEWPORT_ORDER` — canonical Desktop, Tablet, and Mobile presets with exact iframe dimensions (`1280x900`, `768x1024`, `375x812`)
+- `PREVIEW_VIEWPORTS` and `PREVIEW_VIEWPORT_ORDER` — canonical Desktop, Tablet, and Mobile presets with exact iframe dimensions (`1920x1080`, `768x1024`, `375x812`). Desktop is full-HD and may be visually scaled by `.pb-preview-scale-shell` in the admin canvas without changing iframe pixels.
 - `PREVIEW_MEDIA_QUERIES` — named responsive `matchMedia(...)` probes used for parity metrics (`aspectMax7By5`, `aspectMax5By7`, `maxWidth768`, `maxWidth480`)
 - `BUILDER_PREVIEW_SNAPSHOT_VERSION` — version marker for builder preview payloads
 - `BUILDER_PREVIEW_SOURCES` — `saved` for hydrated API pages and `working` for cloned snapshots that include an active local draft
@@ -640,7 +640,7 @@ Again: `header` is compatibility-only in the catalog and is not part of the norm
 - The admin canvas is an editing surface with builder chrome. Live mode and chrome-collapsed Preview both render through the same real reader iframe (`index.html?builderPreview=1`) for full reader-shell parity, not through a constrained div or the direct `preview-renderers.js` path.
 - Shared renderer parity exists at the module/section/page HTML level through `shared-renderers.js`. The iframe preview approach means real viewport dimensions, real media queries, and real reader-side JavaScript all run in preview.
 - The iframe preview bridge (`reader/preview-bridge.js`) and the `postMessage` protocol defined in `preview-contract.js` are implemented. The snapshot merge path covers module config, theme metadata, normalized header metadata, page settings, and section spacing without mutating `currentPage`. Validated live-builder snapshots can opt into `builderEditing` markers; public reader output keeps admin-only `data-builder-*` attributes absent. In builder editing mode, target messages drive admin-only hover/selection overlays and block iframe links/forms before reader side effects can fire. Chrome-collapsed Preview deliberately sends `builderEditing: false`, so target messages stop while the reader stays in builder preview side-effect-suppressed mode.
-- Phase 5 responsive parity instrumentation is also implemented: the iframe now keeps exact preset dimensions, the admin preview canvas scrolls instead of shrinking those presets, and preview metrics now verify breakpoint branches, two-page mode expectations, and horizontal overflow risks.
+- Phase 5 responsive parity instrumentation is also implemented: the iframe keeps exact preset dimensions, the admin preview scale shell can shrink the visible presentation without changing iframe pixels, and preview metrics verify breakpoint branches, two-page mode expectations, and horizontal overflow risks.
 - Legacy `page-config` and legacy `header` module content still exist as migration/backfill inputs. Normal reader startup and page-builder header editing resolve V3 page headers with `pageConfig: null`; stored legacy `header` modules are later cleanup debt once V3 metadata exists.
 
 ## 📚 Related Docs

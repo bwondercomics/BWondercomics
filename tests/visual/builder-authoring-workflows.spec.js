@@ -676,9 +676,24 @@ test.describe('builder Phase 12 authoring workflows', () => {
       expect(innerWidth).toBe(viewport.width);
       expect(innerHeight).toBe(viewport.height);
 
+      const frameScale = await page.locator('.pb-preview-frame').evaluate((frame) => ({
+        scale: Number(frame.dataset.previewScale || '1'),
+        viewportWidth: Number(frame.dataset.viewportWidth || '0'),
+        viewportHeight: Number(frame.dataset.viewportHeight || '0'),
+      }));
+      expect(frameScale.viewportWidth).toBe(viewport.width);
+      expect(frameScale.viewportHeight).toBe(viewport.height);
+      if (viewportId === 'desktop') {
+        expect(frameScale.scale).toBeGreaterThan(0);
+        expect(frameScale.scale).toBeLessThan(1);
+      }
       const iframeBox = await page.locator('.pb-preview-iframe').boundingBox();
-      expect(Math.round(iframeBox?.width || 0)).toBe(viewport.width);
-      expect(Math.round(iframeBox?.height || 0)).toBe(viewport.height);
+      expect(
+        Math.abs((iframeBox?.width || 0) - viewport.width * frameScale.scale)
+      ).toBeLessThanOrEqual(2);
+      expect(
+        Math.abs((iframeBox?.height || 0) - viewport.height * frameScale.scale)
+      ).toBeLessThanOrEqual(2);
     }
 
     await selectTextModule(page);
@@ -809,9 +824,10 @@ test.describe('builder Phase 12 authoring workflows', () => {
       if (!iframe || !target) return { clientX: 120, clientY: 120 };
       const frameRect = frame.getBoundingClientRect();
       const targetRect = target.getBoundingClientRect();
+      const scale = Number(frame.dataset.previewScale || '1') || 1;
       return {
-        clientX: frameRect.left + targetRect.left + targetRect.width / 2,
-        clientY: frameRect.top + targetRect.bottom + 4,
+        clientX: frameRect.left + (targetRect.left + targetRect.width / 2) * scale,
+        clientY: frameRect.top + (targetRect.bottom + 4) * scale,
       };
     }, TEXT_MODULE_ID);
     await page.locator('.pb-preview-target-overlay').dispatchEvent('dragover', {

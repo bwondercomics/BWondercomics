@@ -16,6 +16,7 @@ import {
 } from './preview-contract.js';
 
 const TARGET_STALE_TIMEOUT_MS = 1500;
+const PREVIEW_SCALE_PRECISION = 4;
 
 function createPreviewSessionToken() {
   if (window.crypto && typeof window.crypto.randomUUID === 'function') {
@@ -90,11 +91,26 @@ function getFallbackPlacementGeometry(frame, placement) {
   };
 }
 
+function formatScaleValue(value) {
+  const scale = Number(value);
+  if (!Number.isFinite(scale) || scale <= 0) return '1';
+  return String(Number(scale.toFixed(PREVIEW_SCALE_PRECISION)));
+}
+
+function getPreviewScale(frame) {
+  const rawScale = Number(
+    frame?.dataset.previewScale || frame?.closest?.('.pb-preview-scale-shell')?.dataset.previewScale
+  );
+  return Number.isFinite(rawScale) && rawScale > 0 ? rawScale : 1;
+}
+
 function getFramePoint(frame, event) {
+  if (!frame) return { x: 0, y: 0 };
   const rect = frame.getBoundingClientRect();
+  const scale = getPreviewScale(frame);
   return {
-    x: Number(event.clientX) - rect.left,
-    y: Number(event.clientY) - rect.top,
+    x: (Number(event.clientX) - rect.left) / scale,
+    y: (Number(event.clientY) - rect.top) / scale,
   };
 }
 
@@ -156,6 +172,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
   let selectedTargetKey = '';
   let pendingRestoreTargetKey = '';
   let previewMessageBound = false;
+  let previewResizeBound = false;
   let targetStaleTimeoutId = null;
 
   function runBuilderCommand(id, payload = {}) {
@@ -261,6 +278,91 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     frame.dataset.previewSession = previewSession;
     frame.style.width = `${viewport.width}px`;
     frame.style.height = `${viewport.height}px`;
+    applyPreviewFrameScale(frame, viewport);
+  }
+
+  function getPreviewScaleShell(frame) {
+    const shell = frame?.closest?.('.pb-preview-scale-shell');
+    return shell instanceof HTMLElement ? shell : null;
+  }
+
+  function getCanvasAvailablePreviewSize() {
+    const canvas = el.pbCanvas;
+    if (!canvas) return { width: 0, height: 0 };
+    const style =
+      typeof window.getComputedStyle === 'function' ? window.getComputedStyle(canvas) : null;
+    const paddingX =
+      (Number.parseFloat(style?.paddingLeft || '0') || 0) +
+      (Number.parseFloat(style?.paddingRight || '0') || 0);
+    const paddingY =
+      (Number.parseFloat(style?.paddingTop || '0') || 0) +
+      (Number.parseFloat(style?.paddingBottom || '0') || 0);
+    const status = /** @type {HTMLElement|null} */ (canvas.querySelector('.pb-preview-status'));
+    const statusStyle =
+      status && typeof window.getComputedStyle === 'function'
+        ? window.getComputedStyle(status)
+        : null;
+    const statusRect = status?.getBoundingClientRect?.();
+    const statusVisible =
+      status && statusStyle?.display !== 'none' && statusStyle?.visibility !== 'hidden';
+    const statusHeight = statusVisible
+      ? (statusRect?.height || status.offsetHeight || 0) +
+        (Number.parseFloat(statusStyle?.marginTop || '0') || 0) +
+        (Number.parseFloat(statusStyle?.marginBottom || '0') || 0)
+      : 0;
+
+    return {
+      width: Math.max(0, (canvas.clientWidth || 0) - paddingX),
+      height: Math.max(0, (canvas.clientHeight || 0) - paddingY - statusHeight),
+    };
+  }
+
+  function calculatePreviewScale(viewport) {
+    const width = Number(viewport?.width) || 0;
+    const height = Number(viewport?.height) || 0;
+    if (!width || !height) return 1;
+    const available = getCanvasAvailablePreviewSize();
+    const widthScale = available.width > 0 ? available.width / width : 1;
+    const heightScale = available.height > 0 ? available.height / height : 1;
+    return Math.min(1, widthScale, heightScale);
+  }
+
+  function applyPreviewFrameScale(frame, viewport) {
+    if (!frame || !viewport) return 1;
+    const width = Number(viewport.width) || 0;
+    const height = Number(viewport.height) || 0;
+    const scale = calculatePreviewScale(viewport);
+    const scaleText = formatScaleValue(scale);
+    const scaledWidth = Math.max(0, width * scale);
+    const scaledHeight = Math.max(0, height * scale);
+    const shell = getPreviewScaleShell(frame);
+
+    frame.dataset.previewScale = scaleText;
+    frame.style.width = `${width}px`;
+    frame.style.height = `${height}px`;
+    frame.style.transform = scale === 1 ? '' : `scale(${scaleText})`;
+    frame.style.transformOrigin = 'top left';
+
+    if (shell) {
+      shell.dataset.width = viewport.id || '';
+      shell.dataset.viewportWidth = String(width);
+      shell.dataset.viewportHeight = String(height);
+      shell.dataset.previewScale = scaleText;
+      shell.style.width = `${scaledWidth}px`;
+      shell.style.height = `${scaledHeight}px`;
+    }
+    return scale;
+  }
+
+  function reflowPreviewScale() {
+    const frame = /** @type {HTMLElement|null} */ (el.pbCanvas?.querySelector('.pb-preview-frame'));
+    if (!frame) return 1;
+    const viewport = {
+      id: frame.dataset.width || '',
+      width: Number(frame.dataset.viewportWidth) || frame.clientWidth || 0,
+      height: Number(frame.dataset.viewportHeight) || frame.clientHeight || 0,
+    };
+    return applyPreviewFrameScale(frame, viewport);
   }
 
   function applyPreviewIframeSize(iframe, viewport) {
@@ -851,36 +953,48 @@ export function createPreviewManager({ el, getState, actions, deps }) {
       const iframeUrl = getPreviewIframeUrl(snapshot, previewSession);
       el.pbCanvas.innerHTML = `
         ${statusHtml}
-        <div class="pb-preview-frame"
+        <div class="pb-preview-scale-shell"
              data-width="${escapeAttr(viewport.id)}"
-             data-device-id="${escapeAttr(snapshot.options?.deviceId || viewport.id)}"
-             data-preview-source="${escapeAttr(snapshot.source || '')}"
-             data-page-id="${escapeAttr(snapshot.pageId || '')}"
-             data-page-slug="${escapeAttr(snapshot.pageSlug || '')}"
-             data-draft-mode="${escapeAttr(snapshot.draftMode || '')}"
-             data-snapshot-version="${escapeAttr(String(snapshot.snapshotVersion || ''))}"
-             data-builder-editing="${snapshot.options?.builderEditing === true ? 'true' : 'false'}"
              data-viewport-width="${escapeAttr(String(viewport.width))}"
              data-viewport-height="${escapeAttr(String(viewport.height))}"
-             data-preview-session="${escapeAttr(previewSession)}"
+             data-preview-scale="1"
              style="width: ${escapeAttr(String(viewport.width))}px; height: ${escapeAttr(String(viewport.height))}px;">
-          <iframe
-            class="pb-preview-iframe"
-            title="Reader preview"
-            src="${escapeAttr(iframeUrl)}"
-            width="${escapeAttr(String(viewport.width))}"
-            height="${escapeAttr(String(viewport.height))}"
-            style="width: ${escapeAttr(String(viewport.width))}px; height: ${escapeAttr(String(viewport.height))}px;"
-            loading="eager"
-            referrerpolicy="same-origin">
-          </iframe>
+          <div class="pb-preview-frame"
+               data-width="${escapeAttr(viewport.id)}"
+               data-device-id="${escapeAttr(snapshot.options?.deviceId || viewport.id)}"
+               data-preview-source="${escapeAttr(snapshot.source || '')}"
+               data-page-id="${escapeAttr(snapshot.pageId || '')}"
+               data-page-slug="${escapeAttr(snapshot.pageSlug || '')}"
+               data-draft-mode="${escapeAttr(snapshot.draftMode || '')}"
+               data-snapshot-version="${escapeAttr(String(snapshot.snapshotVersion || ''))}"
+               data-builder-editing="${snapshot.options?.builderEditing === true ? 'true' : 'false'}"
+               data-viewport-width="${escapeAttr(String(viewport.width))}"
+               data-viewport-height="${escapeAttr(String(viewport.height))}"
+               data-preview-session="${escapeAttr(previewSession)}"
+               data-preview-scale="1"
+               style="width: ${escapeAttr(String(viewport.width))}px; height: ${escapeAttr(String(viewport.height))}px;">
+            <iframe
+              class="pb-preview-iframe"
+              title="Reader preview"
+              src="${escapeAttr(iframeUrl)}"
+              width="${escapeAttr(String(viewport.width))}"
+              height="${escapeAttr(String(viewport.height))}"
+              style="width: ${escapeAttr(String(viewport.width))}px; height: ${escapeAttr(String(viewport.height))}px;"
+              loading="eager"
+              referrerpolicy="same-origin">
+            </iframe>
+          </div>
         </div>
       `;
+      const frame = /** @type {HTMLElement|null} */ (
+        el.pbCanvas.querySelector('.pb-preview-frame')
+      );
       const iframe = /** @type {HTMLIFrameElement|null} */ (
         el.pbCanvas.querySelector('.pb-preview-iframe')
       );
+      applyPreviewFrameScale(frame, viewport);
       iframe?.addEventListener('load', postPreviewSnapshot);
-      renderPreviewTargetOverlay(el.pbCanvas.querySelector('.pb-preview-frame'));
+      renderPreviewTargetOverlay(frame);
       return;
     }
 
@@ -926,6 +1040,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     }
     const frame = /** @type {HTMLElement|null} */ (el.pbCanvas.querySelector('.pb-preview-frame'));
     updatePreviewFrameDataset(frame, snapshot, viewport);
+    applyPreviewFrameScale(frame, viewport);
     return snapshot;
   }
 
@@ -948,6 +1063,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
       frame.dataset.viewportHeight = String(viewport.height);
       frame.style.width = `${viewport.width}px`;
       frame.style.height = `${viewport.height}px`;
+      applyPreviewFrameScale(frame, viewport);
       renderPreviewDebugOverlay(frame);
     }
     if (iframe) {
@@ -971,9 +1087,14 @@ export function createPreviewManager({ el, getState, actions, deps }) {
   }
 
   function bindMessageHandler() {
-    if (previewMessageBound) return;
-    window.addEventListener('message', handlePreviewMessage);
-    previewMessageBound = true;
+    if (!previewMessageBound) {
+      window.addEventListener('message', handlePreviewMessage);
+      previewMessageBound = true;
+    }
+    if (!previewResizeBound) {
+      window.addEventListener('resize', reflowPreviewScale);
+      previewResizeBound = true;
+    }
   }
 
   function getSnapshot() {
@@ -1039,6 +1160,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     renderTargetOverlay,
     renderPreview,
     refreshPreviewSnapshotState,
+    reflowPreviewScale,
     resetSession,
     setViewport,
     syncInlineEditDraft,

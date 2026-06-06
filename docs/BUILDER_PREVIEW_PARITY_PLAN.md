@@ -128,7 +128,7 @@ Rejected primary approaches:
 
 Define viewport presets in one shared registry, not scattered literals:
 
-- Desktop: `1280 x 900`
+- Desktop: `1920 x 1080`
 - Tablet: `768 x 1024`
 - Mobile: `375 x 812`
 
@@ -200,7 +200,7 @@ Phase 1 contract addendum:
 
 - The implementation contract lives in `admin/page-builder/preview-contract.js`.
 - `PREVIEW_VIEWPORTS` defines the first iframe-ready presets:
-  - Desktop: `1280 x 900`
+  - Desktop: `1920 x 1080`
   - Tablet: `768 x 1024`
   - Mobile: `375 x 812`
 - `PREVIEW_VIEWPORT_ORDER` is `desktop`, `tablet`, `mobile`; at this Phase 1 checkpoint, the

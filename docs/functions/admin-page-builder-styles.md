@@ -83,8 +83,9 @@ rendered.
 - **Section Grid Layout**: `.pb-section-columns` drives horizontal layout via `data-layout` attributes (e.g. `1-1`, `1-2`, `1-3-1`) determining how CSS Grid distributes `.pb-column` children.
 - **Target Selections**: `.pb-section` and `.pb-module` use `.selected` classes to render cyan highlight borders when targeted by the right-hand Inspector.
 - **Preview Host**: `.pb-preview-frame` and `.pb-preview-iframe` receive exact dimensions from the
-  shared `PREVIEW_VIEWPORTS` contract (`desktop`, `tablet`, or `mobile`). The admin canvas scrolls
-  around those dimensions instead of using max-width restraints to approximate responsive behavior.
+  shared `PREVIEW_VIEWPORTS` contract (`desktop`, `tablet`, or `mobile`), while
+  `.pb-preview-scale-shell` owns the admin-visible scaled footprint when a preset is larger than the
+  available editor viewport.
 
 ---
 

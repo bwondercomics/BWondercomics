@@ -469,12 +469,13 @@ async function assertSelectedOverlayAlignment(page) {
     const frameRect = frame.getBoundingClientRect();
     const targetRect = target.getBoundingClientRect();
     const selectedRect = selected.getBoundingClientRect();
+    const scale = Number(frame.dataset.previewScale || '1') || 1;
     return {
       ready: true,
-      top: Math.abs(selectedRect.top - (frameRect.top + targetRect.top)),
-      left: Math.abs(selectedRect.left - (frameRect.left + targetRect.left)),
-      width: Math.abs(selectedRect.width - targetRect.width),
-      height: Math.abs(selectedRect.height - targetRect.height),
+      top: Math.abs(selectedRect.top - (frameRect.top + targetRect.top * scale)),
+      left: Math.abs(selectedRect.left - (frameRect.left + targetRect.left * scale)),
+      width: Math.abs(selectedRect.width - targetRect.width * scale),
+      height: Math.abs(selectedRect.height - targetRect.height * scale),
     };
   });
   expect(alignment.ready).toBe(true);

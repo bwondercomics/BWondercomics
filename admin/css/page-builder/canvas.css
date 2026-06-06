@@ -693,11 +693,21 @@
 
 /* ==================== PREVIEW FRAME ==================== */
 
-.pb-preview-frame {
+.pb-preview-scale-shell {
   margin: 0 auto;
   overflow: visible;
   padding: 0;
   position: relative;
+}
+
+.pb-preview-frame {
+  left: 0;
+  margin: 0;
+  overflow: visible;
+  padding: 0;
+  position: absolute;
+  top: 0;
+  transform-origin: top left;
 }
 
 .pb-preview-iframe {

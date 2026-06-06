@@ -1629,6 +1629,7 @@ function createPageBuilder({
       el.pbToggleSidebar.dataset.viewportBand = band;
     }
     syncChromeModeUi();
+    previewManager.reflowPreviewScale?.();
   }
 
   function toggleSidebarMode() {
