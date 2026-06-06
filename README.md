@@ -1,16 +1,18 @@
-# BWonderComics 0.8.1 - Builder Preview Parity Lock
+# BWonderComics 0.8.2 - Live Builder Authoring Lock
 
 BWonderComics is a plain HTML/CSS/JS comic reader and admin panel built with Vite, backed by a FastAPI/Postgres service for dynamic site behavior: auth, comments, posts, RSS, uploads, premium access, DB-backed series and entries, the page builder, diagnostics, ops, and the analytics proxy.
 
 ## Current shape
 
-- The reader is builder-first. It loads DB-backed series/entry JSON plus the canonical builder page from `/api/pages/home/<seriesId>` or `/api/pages/<seriesId>/<slug>`. Legacy `page-config.json` startup behavior is fallback-only and is no longer part of normal reader boot.
-- The page builder owns per-series landing/custom pages, homepage selection, draft/publish state, page-scoped V3 headers in `page.meta.header`, theme/panel shell state, sections, and modules.
-- Builder preview now renders through the real reader shell in a same-origin iframe. `admin/page-builder/preview-manager.js` coordinates the iframe and `reader/preview-bridge.js` applies validated snapshots inside `/index.html?...&builderPreview=1`.
-- Desktop, Tablet, and Mobile preview presets use exact iframe viewport dimensions from the shared preview contract: `1280x900`, `768x1024`, and `375x812`.
-- Preview snapshots, control messages, and responsive metrics are validated through `admin/page-builder/preview-contract.js`. Unsaved module, theme, header, page-settings, and section drafts are merged into cloned working snapshots for preview without mutating the saved page.
+- The reader is builder-first. It loads DB-backed series/entry JSON plus the canonical builder page from `/api/pages/home/<seriesId>`, `/api/pages/<seriesId>/<slug>`, or `/api/pages/global/by-slug/<slug>` when `pageScope=global` is requested. Legacy `page-config.json` startup behavior is fallback-only and is no longer part of normal reader boot.
+- The page builder owns global and per-series pages, homepage selection, same-series reader bindings, draft/publish state, page-scoped V3 headers in `page.meta.header`, theme/panel shell state, sections, modules, and templates for Reader, Feed, Media Gallery, and Entry Gallery pages.
+- The builder now opens as a full-page authoring shell. The live canvas is the real reader route in a same-origin iframe, with blocks, layers, settings, styles, selected-target overlays, live drag/drop, chrome-collapsed Preview, guarded keymaps, local draft undo/redo, and text-module inline editing.
+- Builder preview is coordinated by `admin/page-builder/preview-manager.js` and `reader/preview-bridge.js`. Snapshots, control messages, target geometry, inline-edit messages, and responsive metrics are validated through `admin/page-builder/preview-contract.js`.
+- Desktop, Tablet, and Phone preview presets use exact iframe viewport dimensions from the shared preview contract: `1920x1080`, `768x1024`, and `375x812`. The full-HD Desktop iframe is visually scaled in the admin canvas without changing iframe CSS pixels.
+- Unsaved module, theme, header, page-settings, and section drafts are merged into cloned working snapshots for preview without mutating the saved page.
 - Preview mode suppresses reader side effects that should not fire from an admin iframe, including analytics/tracking writes, email submission, comment mutations, chat SSO, safe-mode redirects, fullscreen changes, and external navigation clicks.
 - Header buttons and `buttons` modules share the same normalized link target model for builder pages, anchors, and external URLs. Header shell, navigation, panel buttons, and builder modules share structured appearance contracts between admin canvas, preview, and public reader.
+- CMS-backed builder modules are structured: `reader`, `entry-gallery`, `feed`, and `media-gallery` persist sanitized source config, while feed/media-gallery use existing site-wide post/media data and reader/entry modules remain series-aware.
 - Posts, media, series, entries, users, comments, page configs, and builder pages are DB-backed. Entry and media files live on disk under public or protected roots, with premium/private access enforced by the backend.
 - Media supports `public`, `premium`, and `private` access. Premium blur previews in `media/previews/` and public post image copies in `media/post-assets/` are derived output.
 - Public HTML shells and `manifest.json` can use admin-selected public media for the site OG image and favicon. FastAPI serves branded responses for the main public routes.
@@ -68,6 +70,8 @@ Public pages are served from `dist/`.
 - Architecture: `docs/ARCHITECTURE.md`
 - Admin panel + page builder: `docs/admin-overview.md`
 - Builder preview parity: `docs/BUILDER_PREVIEW_PARITY_PLAN.md`
+- Live builder implementation plan: `docs/INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md` and `docs/INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md`
+- Reader block + layout customization plan: `docs/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md`
 - Operations: `docs/OPERATIONS.md`
 - Deployment: `deploy/README.md`
 - Release roadmap: `docs/ROADMAP.md`

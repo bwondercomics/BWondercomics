@@ -21,7 +21,7 @@ Out of scope for `1.0.0`:
 - Advanced analytics such as cohort, funnel, or retention features
 - Vertical-comic support unless it directly fixes the current architecture
 
-Last updated: 2026-04-04
+Last updated: 2026-06-06
 
 ## `0.7.9` Release Baseline
 
@@ -43,6 +43,19 @@ Worksheet: `docs/READER_BUILDER_QA.md`
 - [ ] Audit daily-use reader flows end to end: saved progress, entry switching, store entries, premium gating, comments, gallery, latest update, and analytics tracking.
 - [ ] Update builder-facing docs to remove stale “future feature” language where the behavior already exists.
 - [x] Keep current reader/admin/backend contracts stable unless a regression forces a contract fix.
+
+## `0.8.2` Live Builder Authoring Lock
+
+Goal: make the full-page live builder the canonical authoring surface.
+
+- [x] Replace the old builder-only preview with a same-origin reader iframe canvas.
+- [x] Support live target selection, selected-target toolbar actions, drag/drop insertion/move, and chrome-collapsed Preview.
+- [x] Add explicit global/series page scopes, same-series reader bindings, and builder-page link targets.
+- [x] Add structured CMS modules and page templates for Reader, Feed, Media Gallery, and Entry Gallery.
+- [x] Add command/keymap plumbing, local draft undo/redo, and text-module inline editing.
+- [x] Lock Desktop/Tablet/Phone preview dimensions at `1920x1080`, `768x1024`, and `375x812`, with admin-only scaling for Desktop.
+- [x] Add Phase 12 browser workflow coverage and keep full release verification manual/local.
+- [ ] Implement the next reader-as-block/layout customization plan in `docs/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md`.
 
 ## `0.8.5` UX and Terminology Pass
 

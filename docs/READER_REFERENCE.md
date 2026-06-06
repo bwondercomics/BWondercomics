@@ -5,7 +5,11 @@ This summarizes the reader runtime after modularization: what each file does, ke
 ## Data sources
 
 - `data.json`: entries map, order, statusMessage.
-- `/api/pages/<seriesId>/<slug>`: preferred builder-page source for reader chrome and panel content.
+- `/api/pages/home/<seriesId>`: effective published homepage for a series root, falling back to the
+  same-series bound reader page when needed.
+- `/api/pages/<seriesId>/<slug>`: published series-scoped builder page source.
+- `/api/pages/global/by-slug/<slug>`: published global builder page source when the URL requests
+  `?pageScope=global&page=<slug>`.
 - `page-config.json`: no longer part of normal reader startup; still used by standalone legacy helpers and `reader/safe-mode.js` recovery redirect behavior.
 - `/api/posts/latest`: latest update widget (DB-backed; published-only + scheduling support).
 - `localStorage` key `battleBros_progress`: saved entry/page.
@@ -37,7 +41,11 @@ This summarizes the reader runtime after modularization: what each file does, ke
 2. `app.start()`:
    - `loadEntryData()` → sets entries/order/statusMessage.
 
-- `loadPageConfigWithFallback()` → resolves the startup builder page through the effective-homepage or explicit-slug API and returns `source: 'builder'` or `source: 'none'`. It no longer fetches legacy `page-config.json` during normal startup; `createEffectivePageHeader(page, null)` is the V3 reader header contract after a clean fallback-retirement audit.
+- `loadPageConfigWithFallback()` → resolves the startup builder page through the effective-homepage,
+  explicit series-slug, or explicit global-slug API and returns `source: 'builder'` or
+  `source: 'none'`. It no longer fetches legacy `page-config.json` during normal startup;
+  `createEffectivePageHeader(page, null)` is the V3 reader header contract after a clean
+  fallback-retirement audit.
 - `loadLatestPost()` → fetches `/api/posts/latest`, passes to `renderLatestUpdate`.
 - Initializes elements, entry select, status panel, email form, pointer/fullscreen/nav handlers, then releases the bootstrap-loading state once the initial render or error UI is ready.
 - Restores saved progress if present; renders current pages and applies the desktop on-page frame when eligible.

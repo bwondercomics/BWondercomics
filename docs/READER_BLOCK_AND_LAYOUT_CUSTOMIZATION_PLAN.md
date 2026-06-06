@@ -1,0 +1,336 @@
+# Reader Block and Layout Customization Plan
+
+Status: Planned post-Phase-12 work
+Created: 2026-06-06
+
+## Purpose
+
+Turn the comic reader into an authorable page-builder block instead of a permanent fixture on every
+builder page. A canonical series reader page still needs one active reader block, but ordinary
+series pages and global pages should be able to omit the reader entirely, place content above or
+below it, or build custom pages without forced reader chrome.
+
+This plan also covers two related authoring gaps:
+
+- Reader customization: control reader display mode, controls styling/size, stage behavior, panels,
+  and comments from the reader module.
+- Layout customization: control section column count and per-column/panel styling through structured,
+  sanitized builder data.
+
+## Current Source Of Truth
+
+- `docs/functions/reader-core.md` describes the current reader runtime, preview side-effect policy,
+  builder-page loading, and reader bridge behavior.
+- `docs/admin-overview.md` and `docs/functions/admin-page-builder.md` describe the full-page builder,
+  live iframe preview, module ownership, commands, and explicit draft workflow.
+- `admin/page-builder/module-descriptors.js` defines the current `reader` descriptor. Today it only
+  stores source, `showPanels`, and `showComments`.
+- `admin/page-builder/shared-renderers.js` is the shared renderer factory used by public reader output
+  and admin preview. Its current `reader` renderer emits a `.pb-reader-mount`.
+- `admin/page-builder/module-editor.js` owns the reader module editor controls.
+- `reader/data.js` currently applies builder pages to the existing static reader shell and routes
+  non-reader modules into left/right panels from section columns.
+- `reader/render.js`, `reader/controls.js`, and `reader/transform.js` own paged image rendering,
+  page navigation, zoom/pan, fullscreen fitting, and dynamic frame sizing.
+- `backend/app/builder_security.py` and `backend/app/page_store.py` own allowed module types,
+  layout validation, column validation, reader source normalization, and sanitization.
+
+## Product Model
+
+- The `reader` module becomes the only source of visible reader stage, page images, reader controls,
+  comments, and reader side panels on builder pages.
+- Pages without a `reader` module render normal builder content without forcing `.viewerWrap`,
+  `.stageWrap`, `.controls`, comments, or side panels into view.
+- A bound series reader page must contain exactly one active, non-hidden `reader` module. Missing,
+  duplicate, or hidden reader modules should produce admin warnings and block publish or binding
+  updates where practical.
+- Global pages may contain a reader module that targets a specific series, but they are not valid
+  `reader` bindings for a series.
+- The reader DOM remains a view. Saved builder page/section/module records remain canonical.
+
+## Proposed Data Contracts
+
+### Reader Module Config
+
+Extend `reader` module config with a structured, sparse contract:
+
+```json
+{
+  "source": { "mode": "active-page-series", "seriesId": "" },
+  "displayMode": "paged",
+  "showPanels": true,
+  "showComments": true,
+  "controls": {
+    "placement": "below",
+    "size": "medium",
+    "style": {
+      "defaults": { "appearance": null },
+      "primary": { "appearance": null }
+    }
+  },
+  "stage": {
+    "fit": "dynamic-frame",
+    "pageGap": 8,
+    "frameBorder": true,
+    "maxWidth": null
+  },
+  "panels": {
+    "left": { "enabled": true },
+    "right": { "enabled": true }
+  },
+  "responsive": {}
+}
+```
+
+Rules:
+
+- `displayMode` is `paged` or `vertical-scroll`.
+- `paged` keeps current one-page/two-page spread behavior.
+- `vertical-scroll` renders all pages for the selected entry in a continuous vertical strip.
+- Reader controls use structured options and existing appearance sanitizers. Do not add arbitrary
+  CSS, raw HTML, or style strings.
+- Series pages force `source.mode = "active-page-series"` for reader modules. Global reader modules
+  use `specific-series`.
+- Device overrides may expose only safe reader settings: visibility, display mode, controls size,
+  controls placement, panel visibility, comments visibility, page gap, and fit behavior.
+
+### Section And Column Layout Config
+
+Evolve section layout from fixed preset strings into an authorable but sanitized column contract.
+Keep the existing `layout` string for compatibility during migration.
+
+```json
+{
+  "layout": "1-1",
+  "settings": {
+    "columnGap": 24,
+    "moduleGap": 16,
+    "columns": [
+      {
+        "index": 0,
+        "width": 1,
+        "appearance": null,
+        "padding": { "top": 0, "right": 0, "bottom": 0, "left": 0 },
+        "alignment": "stretch",
+        "hidden": false
+      }
+    ]
+  }
+}
+```
+
+Rules:
+
+- Support 1-6 columns.
+- Preserve legacy layouts (`1`, `1-1`, `1-2`, `2-1`, `1-1-1`, `1-3-1`) by mapping them to column
+  width ratios.
+- Validate module `columnIndex` against the effective column count before save, move, reorder, and
+  render.
+- Per-column styling uses sanitized appearance, spacing, width ratio, alignment, and visibility
+  fields only.
+- Panel-specific styling remains structured. Reuse or migrate `meta.panelBackgrounds` and
+  `meta.panelSpacing` where it represents side-panel surfaces, but do not overload it for generic
+  content columns.
+
+## Phase 1 - Audit And Decouple Permanent Reader Shell
+
+Goal: Make generic builder pages render without forced reader chrome.
+
+Implementation:
+
+- Audit `index.html`, `reader/app.js`, `reader/data.js`, `reader/render.js`, `reader/controls.js`,
+  `reader/transform.js`, comments, fullscreen, pointer handlers, and preview bridge assumptions
+  about static `.viewerWrap`, `.stageWrap`, `.controls`, side panels, and comments.
+- Add a reader-shell state resolver that detects whether the active builder page has an effective
+  reader module.
+- When no reader module exists, hide or detach reader-only chrome deterministically after builder
+  page application and avoid initializing reader-only side effects.
+- Preserve header rendering, normal builder sections/modules, links, feed/media/entry-gallery
+  modules, preview metrics, and admin target markers for non-reader pages.
+- Keep same-origin builder preview and public reader route behavior aligned.
+
+Acceptance criteria:
+
+- A global or series custom page with no reader module shows only authored builder content.
+- Reader controls, comments, stage, side panels, pointer handlers, fullscreen controls, and page
+  navigation do not appear or run on no-reader pages.
+- The public reader and admin live preview remain in parity.
+
+## Phase 2 - Reader Module Lifecycle And Binding Rules
+
+Goal: Make the reader block authoritative while preserving series reader guarantees.
+
+Implementation:
+
+- Update descriptors and template behavior so the reader is a normal insertable block where allowed,
+  not a permanent page fixture.
+- Add admin validation/warnings for bound series reader pages:
+  - missing reader module
+  - duplicate reader modules
+  - reader module hidden on the active default device
+  - reader module targeting the wrong source
+- Block publish or reader-binding save for invalid bound reader pages where the backend can enforce
+  it safely.
+- Keep ordinary pages free to add or remove reader modules.
+- Make delete/hide flows warn when they would invalidate the bound series reader page.
+- Ensure reader template creation inserts one reader module and binds only when no reader binding
+  exists, matching the current template principle.
+
+Acceptance criteria:
+
+- Authors can remove the reader from non-bound pages.
+- Bound series reader pages cannot silently lose their only active reader module.
+- Existing series reader routes keep working after migration.
+
+## Phase 3 - Reader Module Customization
+
+Goal: Expose reader display and controls settings through the module editor.
+
+Implementation:
+
+- Extend the reader module descriptor default config and backend sanitizer with `displayMode`,
+  `controls`, `stage`, and `panels`.
+- Add structured reader editor controls:
+  - display mode: paged or vertical scroll
+  - controls placement: above, below, overlay, hidden
+  - controls size: compact, medium, large
+  - controls button appearance using the existing appearance contract
+  - stage fit: dynamic frame, width, height, natural
+  - page gap and frame border
+  - side panel visibility and comments visibility
+- Render these settings through shared renderer data attributes so admin preview and public reader
+  runtime consume the same contract.
+- Add device-scope overrides for the safe reader fields listed above.
+- Keep save/discard/undo behavior on the existing explicit module draft path.
+
+Acceptance criteria:
+
+- Reader controls can be restyled and resized without custom CSS.
+- Paged reader behavior remains unchanged when new config is absent.
+- Device overrides affect preview and public runtime consistently.
+
+## Phase 4 - Vertical Comic Mode
+
+Goal: Add Webtoon-style vertical scrolling as a reader display mode.
+
+Implementation:
+
+- Add a reader runtime branch for `displayMode: "vertical-scroll"`.
+- Render all accessible pages for the current entry in document order inside the reader module mount.
+- Disable one-page/two-page spread layout, pan transforms, and page-turn slide animations in vertical
+  mode.
+- Adapt controls to entry-level navigation, jump-to-page, restart, next entry, previous entry, and
+  optional compact progress.
+- Use scroll position and page visibility to update progress, analytics, comments target, and
+  reading position.
+- Preserve premium gating, scheduled/empty entry states, preload behavior, safe-mode redirects, and
+  preview side-effect suppression.
+- Decide fullscreen behavior explicitly: either disable fullscreen in vertical mode for v1 or enter a
+  scroll-focused fullscreen container without pan/zoom.
+
+Acceptance criteria:
+
+- Vertical mode scrolls all pages naturally on desktop, tablet, and phone.
+- Progress resumes near the saved page/scroll position.
+- Analytics still records visible pages and entry completion accurately enough for reader
+  engagement reporting.
+- Paged mode remains regression-free.
+
+## Phase 5 - Section, Column, And Panel Styling
+
+Goal: Let authors control page columns and individual column/panel styling.
+
+Implementation:
+
+- Add a layout editor that supports selecting 1-6 columns and width ratios.
+- Migrate fixed layout presets into the new column settings model while still serializing compatible
+  `layout` strings until all consumers are updated.
+- Add per-column controls for background, text color where applicable, border, radius, padding,
+  alignment, minimum height, hidden state, and responsive overrides.
+- Update shared renderers to emit column styles from sanitized column settings.
+- Update live drop placement, module move validation, layers, overlays, and target geometry so they
+  use the effective column count and stable column identities.
+- Keep panel styling distinct from generic section columns. If side panels remain reader surfaces,
+  style them through reader module `panels` settings or page-level panel settings with explicit
+  precedence.
+
+Acceptance criteria:
+
+- Authors can create and style layouts with 1-6 columns.
+- Modules can be inserted above and below reader modules like any other block.
+- Existing pages with fixed layout strings render the same after migration.
+- Per-device layout changes do not corrupt global module placement.
+
+## Phase 6 - Regression And Release Gates
+
+Goal: Prove the reader-block and layout contracts work across backend, admin, reader runtime, and
+visual parity.
+
+Required tests:
+
+- Backend tests:
+  - reader module config sanitizer accepts valid `displayMode`, controls, stage, panels, and
+    responsive overrides
+  - invalid reader configs are pruned or rejected
+  - bound series reader pages require exactly one active reader module
+  - global pages cannot become series reader bindings
+  - section layout validation accepts new column contracts and rejects invalid column indexes
+  - per-column styles are sanitized
+
+- Frontend builder tests:
+  - authors can add/remove reader blocks on non-bound pages
+  - bound reader page delete/hide/remove flows warn or block correctly
+  - reader template creates one reader module and binding behavior stays stable
+  - reader customization controls save through module drafts and respect dirty guards
+  - column count and per-column styles save/discard/undo correctly
+  - live drag/drop can place blocks above and below reader modules
+
+- Reader/runtime tests:
+  - pages without reader modules do not initialize or show reader chrome
+  - paged reader pages still mount stage, controls, panels, comments, entry select, fullscreen, and
+    navigation
+  - vertical mode renders all entry pages in order
+  - vertical mode updates progress, comments target, and analytics
+  - premium, scheduled, private, and empty entry states remain safe
+  - preview mode keeps side-effect suppression
+
+- Shared renderer/parity tests:
+  - admin preview and public reader render the same reader mount attributes
+  - per-column styles render identically in shared renderer output
+  - responsive overrides apply consistently to reader and columns
+
+- Playwright visual coverage:
+  - no-reader custom page
+  - paged reader page
+  - vertical-scroll reader page
+  - blocks above and below a reader module
+  - styled 1, 2, 3, and 4+ column layouts
+  - desktop 1920x1080, tablet 768x1024, and phone 375x812 admin preview parity
+
+Final gate:
+
+- `git diff --check`
+- `npm run format:check`
+- `npm run lint`
+- `npm test`
+- `npm run test:backend`
+- `npm run build`
+- `npm run test:visual`
+
+## Migration And Compatibility Notes
+
+- Existing pages keep working because missing reader config defaults to current paged behavior.
+- Existing fixed section layouts remain supported during the transition.
+- No arbitrary CSS editor is introduced.
+- If a backend migration is needed, it should be additive and backfill only normalized defaults.
+- The implementation should not delete legacy static reader DOM until the no-reader page path,
+  paged reader path, vertical reader path, and builder preview path all pass release gates.
+
+## Open Product Decisions Before Implementation
+
+- Whether fullscreen is disabled or adapted in vertical-scroll mode.
+- Whether controls placement `overlay` ships in v1 or waits until paged/vertical basics are stable.
+- Whether bound reader page validation blocks publish immediately or starts as warnings before
+  becoming strict.
+- Whether side panels remain global page surfaces, reader-owned surfaces, or both with documented
+  precedence.

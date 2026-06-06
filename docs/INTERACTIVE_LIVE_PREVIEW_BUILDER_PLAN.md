@@ -1,10 +1,10 @@
 # Full-Page Live Builder Plan, Part 1 of 2
 
-Status: Part 1 complete - Phases 1-5 implemented
+Status: Complete - Phases 1-5 implemented; companion Part 2 Phases 6-12 are also complete
 Plan state: This file is complete for its scoped phases. Phases 1, 2, 3, 4, and 5 have dated
 completion notes below and should be treated as current Part 1 behavior unless a later corrective
-note says otherwise. Part 2 phases 6-12 remain planned until their own completion notes say
-otherwise.
+note says otherwise. Part 2 phases 6-12 also have dated completion/corrective notes and should be
+treated as the shipped continuation of this plan.
 Scope of this file: shared direction, references, target model, and Phases 1-5.
 Companion file: [Part 2 - Phases 6-12, risks, and implementation order](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md)
 Reference source: `docs/website-references/grapesjs-dev`
@@ -44,15 +44,15 @@ Part 2 contains:
 
 ## Developer and LLM Notes
 
-- Treat both files as one plan. Do not infer that completing Part 1 completes the full feature;
-  Part 2 remains the active plan for Phases 6-12.
-- Treat phases without completion notes as future work. In this file, every scoped phase now has a
-  completion note; in Part 2, the test plans and acceptance criteria still describe gates for future
-  implementation, not current evidence.
-- For new implementation after this file, start with Part 2 Phase 6 unless the user explicitly asks
-  for an audit or corrective patch to an earlier completed phase. Later phases assume the shell, live
-  iframe canvas, target markers, overlays, device contracts, and descriptor-backed side panel from
-  Phases 1-5.
+- Treat both files as one completed implementation history for the full-page live builder. Part 1
+  defines the foundation; Part 2 records the later authoring, routing, command, inline-editing, and
+  release-gate work.
+- Treat historical phase bodies as the original plan and dated completion/corrective notes plus
+  current source as the behavior record. Test plans and acceptance criteria in old phase bodies are
+  implementation history, not proof that a gate passed on a later date.
+- For new implementation after the completed split plan, start from the current source and the
+  relevant follow-up plan, such as `docs/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md`, unless the
+  user explicitly asks for an audit or corrective patch to an earlier phase.
 - Keep the saved builder records as the source of truth. Browser DOM, iframe output, and overlays
   are views or editing affordances only.
 - When closing a phase, add concrete completion notes and verification results instead of replacing
@@ -65,9 +65,10 @@ editor. The completed Part 1 work establishes the live page canvas as the primar
 the builder opens as a full-page workspace with a top toolbar and side panel, and authors select and
 inspect the rendered page directly instead of relying on a separate preview panel.
 
-Part 2 continues the transition. The remaining planned work moves structural insertion/movement onto
-the live canvas, collapses editor chrome for preview mode, and adds commands, undo, and inline
-editing.
+Part 2 completed the transition. Structural insertion/movement now happens on the live canvas,
+editor chrome can collapse for preview mode, explicit page scopes and CMS modules exist, and command
+routing, guarded keymaps, local draft undo, release gates, and text-module inline editing are in
+place.
 
 The plan keeps BWonderComics' custom CMS behavior. Modules such as reader, feed, entry picker, and
 media gallery must continue to connect to the entry-management system, series data, protected media,

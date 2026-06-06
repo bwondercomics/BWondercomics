@@ -1,8 +1,9 @@
 # Full-Page Live Builder Plan, Part 2 of 2
 
-Status: In progress - Phase 6 implemented; Phases 7-12 planned
-Plan state: Continuation of [Part 1](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md). Phases without
-completion notes should be treated as planned future work.
+Status: Complete - Phases 6-12 implemented, audited, corrected, and release-gated
+Plan state: Completed continuation of [Part 1](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md). All
+scoped phases have dated completion or corrective notes; current source plus those notes are the
+behavior record.
 Scope of this file: Phases 6-12, risks, guardrails, and suggested implementation order.
 Start here only after reading Part 1, because these phases depend on the shell, iframe canvas,
 target marker, overlay, device, and side-panel contracts defined there.
@@ -42,15 +43,15 @@ Part 2 contains:
 
 ## Developer and LLM Notes
 
-- Treat both files as one plan. Do not implement Part 2 in isolation from the Part 1 contracts.
-- Treat phases without completion notes as future work. The release gate in Phase 12 is a planned
-  verification order, not evidence that the feature has already passed those checks.
-- Phase dependencies are cumulative. If earlier phases change during implementation, revisit later
-  phases before coding against stale assumptions.
+- Treat both files as one completed implementation history. Do not interpret a historical phase body
+  without checking its dated completion/corrective notes and the current source.
+- Phase dependencies are cumulative. If an earlier behavior changes during follow-up work, revisit
+  later contracts before coding against stale assumptions.
 - Preserve custom CMS behavior while generalizing pages. Reader, feed, entry picker, media gallery,
   series bindings, permissions, and protected media behavior remain first-class requirements.
-- When closing a phase, add concrete completion notes and verification results instead of replacing
-  the phase history.
+- New post-0.8.2 reader/layout work belongs in the follow-up plan at
+  `docs/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md` unless the user explicitly asks for a
+  corrective patch to this completed plan.
 
 ## Phase 6 - Drag, Drop, Move, and Inline Toolbar Actions
 

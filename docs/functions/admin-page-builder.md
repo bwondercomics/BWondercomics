@@ -532,7 +532,7 @@ Defines the shared contract for the builder's iframe-based reader preview. `admi
 
 Key exports:
 
-- `PREVIEW_VIEWPORTS` and `PREVIEW_VIEWPORT_ORDER` — canonical Desktop, Tablet, and Mobile presets with exact iframe dimensions (`1920x1080`, `768x1024`, `375x812`). Desktop is full-HD and may be visually scaled by `.pb-preview-scale-shell` in the admin canvas without changing iframe pixels.
+- `PREVIEW_VIEWPORTS` and `PREVIEW_VIEWPORT_ORDER` — internal Desktop, Tablet, and Mobile viewport registry with exact iframe dimensions (`1920x1080`, `768x1024`, `375x812`). `BUILDER_DEVICES` keeps the same ids and relabels `mobile` as `Phone` for the builder UI. Desktop is full-HD and may be visually scaled by `.pb-preview-scale-shell` in the admin canvas without changing iframe pixels.
 - `PREVIEW_MEDIA_QUERIES` — named responsive `matchMedia(...)` probes used for parity metrics (`aspectMax7By5`, `aspectMax5By7`, `maxWidth768`, `maxWidth480`)
 - `BUILDER_PREVIEW_SNAPSHOT_VERSION` — version marker for builder preview payloads
 - `BUILDER_PREVIEW_SOURCES` — `saved` for hydrated API pages and `working` for cloned snapshots that include an active local draft

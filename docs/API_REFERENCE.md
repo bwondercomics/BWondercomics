@@ -10,7 +10,8 @@ This document provides an overview of all public APIs available in the BWonderCo
 2. [Constants](#constants)
 3. [Authentication](#authentication)
 4. [API Utilities](#api-utilities)
-5. [State Management](#state-management)
+5. [Builder Page APIs](#builder-page-apis)
+6. [State Management](#state-management)
 
 ---
 
@@ -284,6 +285,41 @@ Save data to server.
 
 ---
 
+## Builder Page APIs
+
+Reader startup resolves structured builder pages through scoped page routes. Series routes and
+global routes are intentionally separate so global pages never shadow series pages.
+
+### Public Reader Routes
+
+#### `GET /api/pages/home/{seriesId}`
+
+Resolve the effective published page for a series root. The resolver prefers the series homepage
+page and falls back to the same-series `reader` binding when needed.
+
+#### `GET /api/pages/{seriesId}/{slug}`
+
+Fetch a published series-scoped builder page.
+
+#### `GET /api/pages/global/by-slug/{slug}`
+
+Fetch a published global builder page requested with `?pageScope=global&page=<slug>`.
+
+### Admin Page Builder Routes
+
+- `GET/POST /api/admin/pages/series/{seriesId}` - list or create series pages.
+- `GET/POST /api/admin/pages/global` - list or create global pages.
+- `GET/PUT/DELETE /api/admin/pages/{pageId}` - read, update, or delete a page record.
+- `POST /api/admin/pages/series/{seriesId}/reorder` and
+  `POST /api/admin/pages/global/reorder` - reorder pages within one scope.
+- `GET/PUT /api/admin/page-bindings/{seriesId}` - read/update series route-role bindings. Reader
+  bindings must target a same-series page.
+- `POST /api/admin/pages/{pageId}/sections`, `POST /api/admin/pages/{pageId}/sections/reorder`,
+  `POST /api/admin/sections/{sectionId}/modules`, and related `/api/admin/sections/*` /
+  `/api/admin/modules/*` routes - mutate builder sections and modules.
+
+---
+
 ## State Management
 
 **Module**: `reader/state.js`
@@ -434,4 +470,4 @@ The project includes `jsconfig.json` for better IDE support. VSCode will provide
 
 ---
 
-**Last Updated**: December 18, 2025
+**Last Updated**: June 6, 2026

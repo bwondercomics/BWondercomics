@@ -1,6 +1,9 @@
 # Builder Plan
 
-Status note (`2026-04`): this document replaces large parts of the older "unified modules" plan. The builder has shipped materially since that draft, and several earlier assumptions are now incorrect.
+Status note (`2026-06-06`): this remains a historical builder architecture plan, but the current
+project lock is `0.8.2` live builder authoring. For the shipped full-page builder behavior, read
+this alongside `docs/functions/admin-page-builder.md` and the completed interactive live preview
+builder plan.
 
 ## Product direction
 
@@ -38,12 +41,14 @@ The current backend model is stable and already useful:
 - `BuilderPage`
 - `BuilderSection`
 - `BuilderModule`
+- `BuilderPageBinding`
 
 Current page-level fields and behavior:
 
-- pages are scoped per series
-- each page has `slug`, `title`, `pageType`, `isPublished`, `isHomepage`, `sortIndex`, `meta`
-- one homepage per series is enforced by the backend
+- pages have explicit `scope` (`series` or `global`) plus nullable `seriesId`
+- each page has `slug`, `title`, `pageType`, `isPublished`, `isHomepage`, `sortIndex`, and `meta`
+- one homepage per series scope is enforced by the backend
+- series reader routes use same-series `reader` bindings instead of hard-coded reader slugs
 
 Current page-level `meta` ownership:
 
@@ -104,11 +109,11 @@ The builder currently recognizes these module types:
 
 Shipped behavior in the admin builder:
 
-- page list by series
-- module palette
-- section insertion
-- section drag/drop reorder
-- module drag/drop reorder
+- scoped page lists for Series Pages and Global Pages
+- same-series reader binding warnings
+- descriptor-backed Blocks, Layers, Settings, and Styles side-panel tabs
+- live section/module insertion and drag/drop
+- section/module reorder and move operations
 - section layout switching
 - section spacing settings
 - page-scoped header editor
@@ -117,23 +122,26 @@ Shipped behavior in the admin builder:
 - explicit `Save Draft` and `Publish Changes`
 - page status badges in the page list and page header
 - "Open Reader" / draft preview link
-- Edit/Preview mode toggle with Desktop, Tablet, and Mobile iframe presets
+- full-page live reader iframe canvas with Desktop, Tablet, and Phone presets
+- chrome-collapsed Preview over the same iframe
+- guarded command/keymap routing, local draft undo/redo, and text-module inline editing
 
-The current edit canvas is an authoring surface, not the live page render.
-Preview mode is the full reader-shell preview path.
+The current live canvas is the real reader route rendered in a same-origin iframe. Structure Debug
+keeps the older structural renderer available as a diagnostic fallback, but normal composition
+happens on the live canvas.
 
-What the edit canvas currently does well:
+What the live canvas currently does well:
 
-- shows page structure
-- shows section layout
-- shows module ordering
-- supports insertion and reordering efficiently
+- shows reader-shell output through the same renderer path as public pages
+- reports target geometry for hover/selection overlays and drag/drop placement
+- supports live section/module insertion, movement, hide-on-device, and deletion flows
+- supports text-module inline editing as a view over the explicit-save module draft
 
 What preview mode now covers:
 
 - loads the real reader shell in a same-origin iframe
 - renders through the reader-side `applyBuilderPageToDOM(...)` path
-- uses exact Desktop, Tablet, and Mobile iframe dimensions from `PREVIEW_VIEWPORTS`
+- uses exact Desktop, Tablet, and Phone iframe dimensions from `PREVIEW_VIEWPORTS`
 - includes unsaved local drafts in a clearly labeled working snapshot
 
 ### Current editor coverage
@@ -151,30 +159,34 @@ Structured editors exist today for:
 - `spacer`
 - `reader`
 - `feed`
-- `html` via dedicated code textarea
-
-Common modules still missing good first-class editors:
-
 - `gallery`
 - `video`
 - `divider`
 - `entry-gallery`
+- `media-gallery`
+- `html` via dedicated code textarea
 
-Those still fall back to raw JSON-oriented editing instead of a polished control surface.
+CMS-backed modules persist sanitized `config.source` settings where applicable. Reader modules are
+series-aware, entry galleries can target active/specific/all series, and feed/media-gallery remain
+site-wide in the current content ownership model.
 
 ### Current rendering behavior
 
 Current runtime behavior:
 
-- public reader pages are served from `/api/pages/{series_id}/{slug}`
-- admin draft pages are available through `/api/admin/pages/by-slug/{series_id}/{slug}`
+- public series pages are served from `/api/pages/{series_id}/{slug}`
+- public global pages are served from `/api/pages/global/by-slug/{slug}`
+- effective series reader/home pages resolve through `/api/pages/home/{series_id}`
+- admin draft pages are available through scoped series/global admin page routes
 - the reader can load draft pages when the user is an admin
 - the public reader is served from `dist/`, so source edits do not change live runtime behavior until the frontend bundle is rebuilt
 
 Important current reality:
 
-- the reader still contains legacy fallback behavior through `page-config` loading for some flows
-- the earlier "no fallback UI in dev" goal has not actually been fully achieved
+- normal reader startup no longer fetches legacy `page-config.json`; that file remains available for
+  standalone helpers, admin branding, and safe-mode recovery behavior
+- builder preview now runs through the same-origin reader iframe with validated snapshots rather
+  than a separate approximation renderer
 
 Release-discipline rule for builder work:
 
@@ -197,7 +209,7 @@ hidden-panel state from a previous page snapshot. Phase 5 responsive parity inst
 removed the old `max-width` clamp behavior: the preview frame and iframe now take exact preset CSS
 pixel dimensions, the preview canvas scrolls when the preset is larger than the admin viewport,
 and the reader bridge reports validated responsive metrics back to the admin frame for Desktop,
-Tablet, and Mobile verification.
+Tablet, and Phone verification.
 
 ### Current page and button model
 
@@ -321,11 +333,13 @@ loads the real reader route in an iframe.
 
 The dedicated parity work in `docs/BUILDER_PREVIEW_PARITY_PLAN.md` closed the earlier shell and
 viewport gaps: preview uses `builderPreview=1`, validated `postMessage` snapshots, exact iframe
-dimensions, reader-side side-effect guards, and responsive metrics for Desktop, Tablet, and Mobile.
+dimensions, reader-side side-effect guards, and responsive metrics for Desktop, Tablet, and Phone.
 
-## Updated priorities
+## Historical priorities
 
-The priorities below are intentionally biased toward lightweight, secure, and useful.
+The priorities below are retained as implementation history. The completed live-builder plan
+supersedes the structural-canvas-first items while keeping the same lightweight, secure, and useful
+direction.
 
 ### P0 - Secure and stabilize what already exists
 
@@ -350,10 +364,11 @@ These are still the highest-value priorities, but the first security pass is now
 ### P1 - Make the builder more useful without making it heavy
 
 1. Maintain the iframe-based reader preview mode inside the builder.
-2. Keep the current structural canvas for drag/drop and page assembly.
+2. Keep Structure Debug available as a fallback while normal drag/drop and page assembly happen on
+   the live canvas.
 3. Keep the preview approach lightweight:
    - real reader-shell iframe output
-   - Desktop, Tablet, and Mobile viewport presets
+   - Desktop, Tablet, and Phone viewport presets
    - no full freeform WYSIWYG canvas
 4. Replace `prompt()` page creation with a proper modal or form.
 5. Add UI for:

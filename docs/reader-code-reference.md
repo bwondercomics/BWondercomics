@@ -7,7 +7,7 @@ This guide maps the reader-side modules, their responsibilities, and how they co
 - `reader/app.js` — Composition root; coordinates the reader bootstrap, keeps the static shell hidden until the initial page source is known, kicks off render, and binds global events.
 - `reader/config.js` — Constants for storage keys, debounce timings, UI thresholds (e.g., two-page breakpoints), and default options.
 - `reader/dom.js` — Centralized DOM lookups; a single source of element references used across modules, including `#mainContent` for on-page frame sizing.
-- `reader/data.js` — Fetches `/data.json` (or `/series/<id>/data.json`), the builder page API, optional standalone legacy page-config helpers, and `/api/posts/latest`; normalizes entry metadata, effective page-header state, and maps `protected/*` asset paths to `/api/protected/*`.
+- `reader/data.js` — Fetches `/data.json` (or `/series/<id>/data.json`), scoped builder page APIs, optional standalone legacy page-config helpers, and `/api/posts/latest`; normalizes entry metadata, effective page-header state, and maps `protected/*` asset paths to `/api/protected/*`.
 - `reader/header-layout.js` — Applies the effective header layout to the existing topbar DOM, repositions stable header blocks into left/center/right regions, and rebuilds configurable nav links while preserving the runtime admin link.
 - `reader/state.js` — Single state container: current entry/page, zoom, fit mode, progress persistence (localStorage), cached natural page metrics, and derived helpers (e.g., `isTwoPageMode`).
 - `reader/render.js` — Renders pages into the stage, caches natural page dimensions as images preload/load, reapplies non-fullscreen frame fitting, and updates UI labels/buttons.
@@ -92,7 +92,11 @@ flowchart TD
 
 - `data.json` — Entries, entryFolders, statusMessage.
 - `/api/posts/latest` — DB-backed latest blog post for the “Latest update” widget.
-- `/api/pages/<seriesId>/<slug>` — Preferred page-builder source for reader chrome and panel content.
+- `/api/pages/home/<seriesId>` — Effective published homepage for a series root, falling back to
+  the same-series bound reader page when needed.
+- `/api/pages/<seriesId>/<slug>` — Published series-scoped builder page source.
+- `/api/pages/global/by-slug/<slug>` — Published global builder page source when the URL requests
+  `?pageScope=global&page=<slug>`.
 - Builder page metadata (`page.meta.header`) — Preferred source for page-level header copy, layout, visible blocks, and nav items.
 - `/page-config.json` (and `/series/<id>/page-config.json`) — Legacy config helpers and admin branding data; not used by normal reader startup. `reader/safe-mode.js` still reads `/page-config.json` for recovery redirect behavior.
 - `localStorage` — Reading progress (`battleBros_progress` via `config`).

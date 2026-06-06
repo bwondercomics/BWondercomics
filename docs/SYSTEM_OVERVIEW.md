@@ -1,6 +1,6 @@
 # System overview (how it fits together)
 
-This repo serves a plain HTML/CSS/JS frontend, with a FastAPI backend adding dynamic pieces (auth, comments, admin write APIs, scheduling + RSS, premium gating, analytics proxy).
+This repo serves a plain HTML/CSS/JS frontend, with a FastAPI backend adding dynamic pieces (auth, comments, admin write APIs, scheduling + RSS, premium gating, page-builder persistence, analytics proxy).
 
 ## What runs where
 
@@ -8,7 +8,7 @@ This repo serves a plain HTML/CSS/JS frontend, with a FastAPI backend adding dyn
 - **Static assets** (site chrome): `assets/` (icons, banners, UI images referenced by HTML and page configs).
 - **Reverse proxy + file server**: Caddy (see `deploy/Caddyfile`) serves static assets/files and proxies `/api/*`, DB-backed JSON endpoints, and exact public page routes used for dynamic branding to the API.
 - **Backend app**: `backend/app/main.py` primarily serves API routes and JSON views. It also serves branded HTML responses for `/`, `/index.html`, `/feed.html`, `/comics.html`, `/media.html`, plus `/manifest.json`, so crawlers receive the configured OG image and favicon.
-- **Database**: Postgres (Docker Compose recommended) stores users/comments, posts, series, and entries.
+- **Database**: Postgres (Docker Compose recommended) stores users/comments, posts, series, entries, media, builder pages, and page bindings.
 
 ## Core data model
 
@@ -18,6 +18,7 @@ This repo serves a plain HTML/CSS/JS frontend, with a FastAPI backend adding dyn
 - **Posts**: feed/blog updates (draft/scheduled/published + optional share flag for RSS/social).
 - **Users + comments**: accounts + comment threads (with roles for admin/premium).
 - **Media library**: Postgres table for the media index + files under `media/` (public) or `protected/media/` (premium/private). Access is tracked via `media_items.access` (`public`/`premium`/`private`) and `media_items.premium_visibility` (`blur`/`hidden`).
+- **Builder pages**: Postgres-backed structured pages with `global` or `series` scope, sections, modules, page header metadata, theme/panel state, and reader bindings for series reader routes.
 - **Post assets**: when a post uses premium/private media, the API copies it into `media/post-assets/` so public feeds still show the image.
 - **Premium blur previews**: when a media item is `premium + blur`, the API generates a real blurred JPEG in `media/previews/` for the public gallery (derived output).
 - **Site branding config**: the default `page_configs` record now also carries optional `site.ogImagePath` and `site.faviconPath` values for global branding. These must point to public assets.
@@ -42,6 +43,14 @@ The admin “save JSON” flow is also kept, but is intercepted and written to P
 - `POST /api/save` with `filename=admin/series.json` → updates series in DB
 - `POST /api/save` with `filename=admin/data.json` or `admin/series/<id>/data.json` → updates entries in DB
 
+Builder pages use explicit page-builder APIs rather than the legacy save-JSON path:
+
+- Public series pages: `/api/pages/<seriesId>/<slug>`
+- Public global pages: `/api/pages/global/by-slug/<slug>`
+- Effective series root/home page: `/api/pages/home/<seriesId>`, falling back to the same-series reader binding when needed
+- Admin scoped lists and creates: `/api/admin/pages/series/<seriesId>` and `/api/admin/pages/global`
+- Admin page records, sections, modules, reorders, moves, and reader bindings: `/api/admin/pages/*`, `/api/admin/sections/*`, `/api/admin/modules/*`, and `/api/admin/page-bindings/<seriesId>`
+
 ## Key user flows
 
 ### 1) Reading comics
@@ -51,7 +60,7 @@ The admin “save JSON” flow is also kept, but is intercepted and written to P
 3. Reader fetches:
    - `series.json` (series list + labels)
    - `data.json` or `series/<id>/data.json` (entries + page paths + status + labels)
-   - `GET /api/pages/home/<seriesId>` or `GET /api/pages/<seriesId>/<slug>` (builder-page reader shell/content)
+   - `GET /api/pages/home/<seriesId>`, `GET /api/pages/<seriesId>/<slug>`, or `GET /api/pages/global/by-slug/<slug>` when `pageScope=global` is requested
    - `GET /api/posts/latest` (latest update widget)
 4. Reader renders pages from the paths in the data JSON.
    - If a page path starts with `protected/`, the reader requests it via `/api/protected/<path>`.
@@ -72,6 +81,15 @@ The admin “save JSON” flow is also kept, but is intercepted and written to P
 3. `Set as favicon` writes `site.faviconPath` on the default page config.
 4. The `Site Branding` panel shows current assignments and lets the admin reset either value to the built-in defaults.
 5. If the configured media is deleted or moved off `public`, the admin clears the affected branding field automatically before the media save finishes.
+
+### 2b) Managing builder pages
+
+1. Admin opens the full-page builder from `/admin/`.
+2. The builder loads either active-series pages or global pages through scoped page APIs.
+3. The live canvas renders the real reader route in a same-origin iframe using `builderPreview=1`.
+4. Unsaved module/header/theme/page/section drafts are merged into cloned preview snapshots without mutating saved records.
+5. Blocks, layers, selected-target overlays, live drag/drop, text inline editing, commands/keymaps, and local draft undo all operate on canonical builder records through the page-builder API.
+6. Desktop, Tablet, and Phone preview contexts use exact iframe pixels (`1920x1080`, `768x1024`, `375x812`); the admin canvas can visually scale Desktop without changing reader viewport behavior.
 
 ### 3) Posts + RSS
 
@@ -96,5 +114,6 @@ The admin “save JSON” flow is also kept, but is intercepted and written to P
 - Backend runtime + routing: `backend/app/main.py`
 - Dynamic site-branding helpers/routes: `backend/app/site_branding.py`, `backend/app/routes/site_branding.py`
 - Series/entry JSON views and DB save logic: `backend/app/series_store.py`, `backend/app/routes/series_json.py`, `backend/app/routes/files.py`
+- Builder-page persistence and validation: `backend/app/page_store.py`, `backend/app/builder_security.py`, and page-builder routes in `backend/app/routes/`
 - Reader boot + behavior: `reader/app.js`, `reader/data.js`, `reader/series.js`
-- Admin boot + behavior: `admin/app.js`, `admin/entries.js`, `admin/media.js`, `admin/page-config.js`
+- Admin boot + behavior: `admin/app.js`, `admin/entries.js`, `admin/media.js`, `admin/page-config.js`, `admin/page-builder.js`, and `admin/page-builder/`

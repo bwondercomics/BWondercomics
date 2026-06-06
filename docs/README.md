@@ -1,13 +1,19 @@
-# Docs Index - 0.8.0 Reader + Builder Appearance Lock
+# Docs Index - 0.8.2 Live Builder Authoring Lock
 
-Last updated: 2026-05-10
+Last updated: 2026-06-06
 
 Current release focus:
 
-- `0.8.0` locks the reader-first and builder-first architecture that should carry into `1.0.0`.
-- Page-scoped header editing is canonical and persists through `page.meta.header.version = 3`; legacy page-config/header-module behavior is fallback-only.
-- Header navigation and `buttons` modules now share link and structured appearance contracts, with parity between the admin canvas/preview and the public reader.
-- Use `docs/READER_BUILDER_QA.md` as the manual lock-pass worksheet before moving on to UX, ops, and final release hardening.
+- `0.8.2` locks the full-page live builder authoring architecture that should carry into `1.0.0`.
+- The live builder canvas is the real reader route in a same-origin iframe with validated snapshots,
+  target overlays, live drag/drop, chrome-collapsed Preview, device modes, guarded commands/keymaps,
+  local draft undo/redo, and text-module inline editing.
+- Page scopes are explicit: global pages are site-level, series pages stay attached to a series, and
+  reader bindings remain same-series guarantees.
+- CMS-backed modules (`reader`, `entry-gallery`, `feed`, `media-gallery`) and page templates are
+  structured builder records with shared preview/public rendering.
+- Desktop/Tablet/Phone preview dimensions are exact iframe CSS pixels (`1920x1080`, `768x1024`,
+  `375x812`), with admin-only scaling for full-HD Desktop.
 
 Recommended starting points:
 
@@ -17,6 +23,8 @@ Recommended starting points:
 - `docs/READER_BUILDER_QA.md` - `0.8.0` manual QA worksheet for reader + page-builder lock.
 - `docs/BUILDER_PLAN.md` - current page-builder architecture, shipped header workflow, appearance contract, and remaining builder risks.
 - `docs/BUILDER_PREVIEW_PARITY_PLAN.md` - dedicated plan for making the builder preview match the reader at desktop, tablet, and mobile viewport sizes.
+- `docs/INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md` and `docs/INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md` - completed full-page live builder phase plan.
+- `docs/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md` - post-0.8.2 plan for making the reader a removable/customizable block and expanding column styling.
 - `docs/admin-overview.md` - admin panel and page-builder behavior.
 - `docs/reader-overview.md` - reader runtime behavior and builder-page loading.
 - `docs/API_REFERENCE.md` - backend route reference.

@@ -143,17 +143,25 @@ sudo ufw delete allow from 10.0.0.0/24 to any port 5173 proto tcp
 Vite proxies these to the API (so data.json/series.json work):
 `/api`, `/data.json`, `/series.json`, `/page-config.json`, `/media.json`, `/series/*`, `/analytics.js`.
 
-## Recent Builder / Promo Changes (updated 2026-05-14)
+## Recent Builder Changes (updated 2026-06-06)
 
-- Page Builder has an **Edit/Preview** toggle. Edit mode is the structural canvas; Preview mode
-  loads the real reader shell in a same-origin iframe using `builderPreview=1`,
-  `previewSession`, and exact Desktop/Tablet/Mobile viewport presets.
-- Builder header toggles removed: **Disable Fallback** and **Published** are no longer in UI.
-- Header canvas and editor only show provenance badges for migration states (`legacy-import`, `page-meta-stale`, etc); normal V3 header editing resolves with `pageConfig: null`.
-- Promo image picker is **simple select/upload** (no crop/focus/zoom editor).
-- Promo slides support per‑item **Image Fit**:
-  - `Fill (cover)` or `Fit (contain)`; defaults to cover.
-- DB migration head currently at `0015_post_image_fit`.
+- Current project version is `0.8.2`, the live builder authoring lock.
+- Page Builder is a full-page admin shell. The default canvas is the real reader route in a
+  same-origin iframe using `builderPreview=1`, `previewSession`, and exact Desktop/Tablet/Phone
+  iframe presets: `1920x1080`, `768x1024`, and `375x812`. Desktop may be visually scaled by the
+  admin canvas without changing iframe pixels.
+- The builder side panel owns Pages, Blocks, Layers, Settings, and Styles. Live target overlays,
+  selected-target toolbars, block drag/drop, chrome-collapsed Preview, command/keymap handling,
+  local draft undo/redo, and text-module inline editing are implemented.
+- Builder pages have explicit `global` or `series` scope. Series reader bindings must point to a
+  same-series page; global pages are site-level and do not shadow series routes.
+- Add Page templates create Blank, Reader, Feed, Media Gallery, and Entry Gallery pages. The Reader
+  template is series-only and only assigns the reader binding when one is missing.
+- CMS modules are structured: `reader`, `entry-gallery`, `feed`, and `media-gallery` persist
+  sanitized source config. Feed/media-gallery remain site-wide; reader/entry modules remain
+  series-aware.
+- Header canvas and editor only show provenance badges for migration states (`legacy-import`,
+  `page-meta-stale`, etc); normal V3 header editing resolves with `pageConfig: null`.
 
 ## Caddy Routing (deploy/Caddyfile)
 
