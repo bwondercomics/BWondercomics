@@ -37,11 +37,14 @@ This document describes the current reader runtime under `reader/`. It replaces 
 - [📧 Email Signup form (email.js)](#-email-signup-form-emailjs)
 - [🚀 Latest Posts Widget (latest.js)](#-latest-posts-widget-latestjs)
 - [📰 Feed Panel (feed-panel.js)](#-feed-panel-feed-paneljs)
+- [📚 Entry Gallery Module (entry-gallery-module.js)](#-entry-gallery-module-entry-gallery-modulejs)
+- [🖼️ Media Gallery Module (media-gallery-module.js)](#️-media-gallery-module-media-gallery-modulejs)
 - [💬 Chat SSO Integration (chat-sso.js)](#-chat-sso-integration-chat-ssojs)
 - [🛡️ Safe Mode Guard (safe-mode.js)](#️-safe-mode-guard-safe-modejs)
 - [🌉 Builder Preview Bridge (preview-bridge.js)](#-builder-preview-bridge-preview-bridgejs)
 - [📜 Current Behavioral Contracts](#-current-behavioral-contracts)
 - [⚠️ Deprecated Or Easy-To-Misstate Areas](#️-deprecated-or-easy-to-misstate-areas)
+- [🧭 Maintenance Rule](#-maintenance-rule)
 
 ## 💡 Scope & Canonical Data Sources
 
@@ -49,7 +52,7 @@ The reader is split into three layers:
 
 - **Core reading runtime**: boot, data loading, state, render, controls, transforms, fullscreen, and overlays.
 - **Builder-page runtime**: page fetching/rendering plus shared header/layout integration.
-- **Support surfaces**: analytics, comments, auth/API helpers, feed/latest widgets, safe-mode redirect, and user settings.
+- **Support surfaces**: analytics, comments, auth/API helpers, feed/latest widgets, CMS gallery mounts, safe-mode redirect, and user settings.
 
 ### Canonical Data Sources
 
@@ -61,6 +64,8 @@ The reader is split into three layers:
 - `/api/admin/pages/series/<seriesId>/by-slug/<slug>` and `/api/admin/pages/global/by-slug/<slug>`: draft builder pages when `draft=1` is requested by an admin.
 - `page-config.json` or `/series/<seriesId>/page-config.json`: legacy config data retained for standalone helpers/admin surfaces; normal reader startup no longer uses it. `reader/safe-mode.js` intentionally still reads `/page-config.json` for recovery redirects.
 - `/api/posts/latest` and `/api/posts`: latest update widget and feed content.
+- `/series.json`, per-series `data.json`, and `/media.json`: reader-side CMS modules for entry
+  gallery and media gallery mounts rendered from builder pages.
 - `localStorage`: reading progress, reader analytics opt-out, visitor id, and some UI preferences.
 
 ## ⚙️ Boot And Runtime Flow
@@ -84,7 +89,7 @@ The composition root. Loads runtime data, applies premium gating, initializes DO
 
 ## 💾 Data Hydration (data.js)
 
-Fetches entry data, builder pages, latest posts, and standalone legacy page config when explicitly requested by helper callers. Applies builder-page DOM, theme, panel backgrounds, feed modules, promo carousels, and shared header layout.
+Fetches entry data, builder pages, latest posts, and standalone legacy page config when explicitly requested by helper callers. Applies builder-page DOM, theme, panel backgrounds, feed modules, promo carousels, entry/media gallery mounts, and shared header layout.
 
 Important current behavior:
 
@@ -164,7 +169,7 @@ Debug logging facade used across reader modules.
 
 ## 📄 Builder Page Renderer (page-renderer.js)
 
-Reader-side page renderer built on the shared builder renderers. Exports `renderPage`, `renderModule`, `fetchPage`, `mountPage`, `initEmailForms`, and `initPromoCarousels`.
+Reader-side page renderer built on the shared builder renderers. Exports `renderPage`, `renderModule`, `fetchPage`, `mountPage`, `initEmailForms`, and `initPromoCarousels`. Mounted pages also initialize reader-owned entry gallery and media gallery modules after the shared HTML is inserted.
 
 `mountPage(container, slug, seriesId, options)` and `initEmailForms(container, options)` both accept a `previewMode` option that shows a stub confirmation message instead of submitting to the API.
 
@@ -242,6 +247,33 @@ Renders the latest-update widget and generates safe preview HTML.
 
 Powers the right-panel feed surface and builder feed modules. It loads `/api/posts`, sanitizes post content, renders preview cards, and toggles feed mode.
 
+## 📚 Entry Gallery Module (entry-gallery-module.js)
+
+Initializes builder `entry-gallery` mounts after reader page rendering. It reads the module's
+serialized source config, loads the active series, a specific series, or every public series through
+`/series.json` plus per-series `data.json`, then renders cover-card grids from sanitized entry data.
+
+Current behavior:
+
+- protected entry asset paths are resolved through `/api/protected/...`
+- filters cover status, access, label id, and `showInGallery`
+- sort modes include stored order, newest, and title
+- cards can hide labels and clamp their column count from module data attributes
+
+## 🖼️ Media Gallery Module (media-gallery-module.js)
+
+Initializes builder `media-gallery` mounts after reader page rendering. It loads `/media.json`
+once per page mount, filters out private media, optionally excludes premium items, applies tag/access
+filters from the module source config, and renders public or protected thumbnail URLs into the shared
+gallery card styling.
+
+Current behavior:
+
+- gallery labels prefer media tags and fall back to a cleaned filename
+- sort modes include path and newest
+- missing images fall back to `/assets/image-missing.png`
+- captions and column count are controlled by module data attributes
+
 ## 💬 Chat SSO Integration (chat-sso.js)
 
 Chat/community handoff support. In builder preview mode (`?builderPreview=1`) the module exits immediately at startup, so no SSO handoff or redirect flow is initiated.
@@ -303,6 +335,11 @@ success message, and navigation clicks are suppressed by the preview-mode event 
 - Exact builder preview is not controlled by an `exact-preview` URL flag. Use `builderPreview=1`
   with the preview bridge query parameters described above.
 - Comments, auth, and API helpers exist as separate modules, but not every reader surface is consolidated onto those abstractions yet.
+
+## 🧭 Maintenance Rule
+
+Update this document when reader modules are added or removed, exported APIs change, builder page
+rendering gains a new side-effect module, or the reader boot/data-source flow changes.
 
 ## Related Docs
 

@@ -4,14 +4,29 @@ This document provides a highly detailed map of the foundational CSS architectur
 
 ## Table of Contents
 
+- [📦 Source Import Manifest](#-source-import-manifest)
 - [🎨 Core Aesthetics & Properties](#-core-aesthetics--properties)
 - [🏗️ Layout & Responsiveness](#️-layout--responsiveness)
 - [🪟 Modals & Global Overlays](#-modals--global-overlays)
 - [📊 Feature Workspaces](#-feature-workspaces)
 - [🖼️ Dedicated Components](#️-dedicated-components)
 - [🔗 Page Builder Bridges](#-page-builder-bridges)
+- [🧭 Maintenance Rule](#-maintenance-rule)
 
 ---
+
+## 📦 Source Import Manifest
+
+`admin/admin.css` is the source-of-truth manifest for this stylesheet group. Current imports:
+
+`admin.core.css`, `admin.layout.css`, `admin.dashboard-cards.css`, `admin.social.css`,
+`admin.moderation.css`, `admin.entries.css`, `admin.media.css`, `admin.editor-modal.css`,
+`admin.image-picker.css`, `admin.preview.css`, `admin.designer.css`, `admin.image-upload.css`,
+`admin.unsaved.css`, `admin.confirmation.css`, `admin.responsive.css`,
+`admin.page-builder.css`, and `admin.promo-editor.css`.
+
+`admin.page-builder.css` is documented here only as the bridge import; the dedicated files it imports
+from `admin/css/page-builder/` are covered in `admin-page-builder-styles.md`.
 
 ## 🎨 Core Aesthetics & Properties
 
@@ -171,3 +186,9 @@ Small overrides ensuring modal configurations (like inserting a new Builder Page
 ### 🎠 Promo Editor Config (`admin.promo-editor.css`)
 
 Specifically houses the legacy styles used to represent Carousel Slide rows inside the standard Editor shell, retaining CSS layout rules for Promo Module data management decoupled from the V3 inline canvas builder logic.
+
+## 🧭 Maintenance Rule
+
+Update this document when `admin/admin.css` imports change, a non-page-builder stylesheet under
+`admin/css/` is added or removed, a stylesheet takes ownership of a new admin workspace/component,
+or shared visual tokens/layout conventions move between files.

@@ -9,21 +9,28 @@ This document describes the current builder runtime under `admin/page-builder/` 
 - [⚙️ Current Builder Flow](#️-current-builder-flow)
 - [🔌 Builder Orchestrator (admin/page-builder.js)](#-builder-orchestrator-adminpage-builderjs)
 - [📐 Layout Utilities (layout.js)](#-layout-utilities-layoutjs)
+- [📱 Responsive Overrides (responsive-overrides.js)](#-responsive-overrides-responsive-overridesjs)
 - [📝 Draft Manager (draft-manager.js)](#-draft-manager-draft-managerjs)
+- [⌨️ Command Registry (commands.js)](#️-command-registry-commandsjs)
+- [⌨️ Builder Keymaps (keymaps.js)](#️-builder-keymaps-keymapsjs)
+- [↩️ Draft Undo Stack (undo-stack.js)](#️-draft-undo-stack-undo-stackjs)
 - [🚚 Page Actions (page-actions.js)](#-page-actions-page-actionsjs)
 - [🧱 Canvas Mutations (canvas-mutations.js)](#-canvas-mutations-canvas-mutationsjs)
 - [🕹️ Structural Commands (structural-commands.js)](#️-structural-commands-structural-commandsjs)
 - [📍 Live Drop Placement (live-drop-placement.js)](#-live-drop-placement-live-drop-placementjs)
 - [👁️ Preview Manager (preview-manager.js)](#️-preview-manager-preview-managerjs)
 - [💾 Data API (data.js)](#-data-api-datajs)
+- [🚦 Fallback Retirement Gate (fallback-retirement-gate.js)](#-fallback-retirement-gate-fallback-retirement-gatejs)
 - [🏗️ Header Configuration (header-config.js)](#️-header-configuration-header-configjs)
 - [📝 Header Editor (header-editor.js)](#-header-editor-header-editorjs)
 - [🎨 Theme Editor (theme-editor.js)](#-theme-editor-theme-editorjs)
 - [🎛️ Inspector Shell (editor-panel.js)](#️-inspector-shell-editor-paneljs)
+- [🧾 Inspector Sections (inspector-sections.js)](#-inspector-sections-inspector-sectionsjs)
 - [📂 Sidebar Rail (sidebar-panel.js)](#-sidebar-rail-sidebar-paneljs)
 - [🖌️ Canvas Renderer (canvas-renderer.js)](#️-canvas-renderer-canvas-rendererjs)
 - [🖱️ Canvas Events (canvas-events.js)](#️-canvas-events-canvas-eventsjs)
 - [🧩 Base Module Editor (module-editor.js)](#-base-module-editor-module-editorjs)
+- [🧾 Appearance Editor (appearance-editor.js)](#-appearance-editor-appearance-editorjs)
 - [🔘 Button Editor (button-editor.js)](#-button-editor-button-editorjs)
 - [➖ Divider Editor (divider-editor.js)](#-divider-editor-divider-editorjs)
 - [🖼️ Gallery Editor (gallery-editor.js)](#️-gallery-editor-gallery-editorjs)
@@ -33,13 +40,16 @@ This document describes the current builder runtime under `admin/page-builder/` 
 - [🎠 Promo Editor (promo-editor.js)](#-promo-editor-promo-editorjs)
 - [🏭 Shared Renderers (shared-renderers.js)](#-shared-renderers-shared-renderersjs)
 - [👁️ Preview Renderers (preview-renderers.js)](#️-preview-renderers-preview-renderersjs)
+- [🧾 Preview Contract (preview-contract.js)](#-preview-contract-preview-contractjs)
 - [🎡 Promo Renderer (promo-renderer.js)](#-promo-renderer-promo-rendererjs)
+- [🧩 Module Descriptors (module-descriptors.js)](#-module-descriptors-module-descriptorsjs)
 - [🔢 Constants Registry (constants.js)](#-constants-registry-constantsjs)
 - [🛠️ Shared Helpers (helpers.js)](#️-shared-helpers-helpersjs)
 - [🛡️ Sanitization Layer (sanitize.js)](#️-sanitization-layer-sanitizejs)
 - [🔗 Link Utilities (link-utils.js)](#-link-utilities-link-utilsjs)
 - [📖 Current Module Catalog](#-current-module-catalog)
 - [📜 Important Accuracy Notes](#-important-accuracy-notes)
+- [🧭 Maintenance Rule](#-maintenance-rule)
 - [📚 Related Docs](#-related-docs)
 
 ## 💡 Scope & Canonical Entry
@@ -98,7 +108,7 @@ sort? }`.
 6. The default canvas is the live iframe preview rendered by `preview-manager.js` with
    `builderEditing: true`, so the reader iframe can emit admin-only target markers and live target
    geometry.
-7. Editor intent first routes through the Phase 10 command registry, then delegates to focused
+7. Editor intent first routes through the shared command registry, then delegates to focused
    managers such as `structural-commands.js`, `draft-manager.js`, and `preview-manager.js`.
 8. Live drops rank iframe target geometry through `live-drop-placement.js`, then call
    `canvas-mutations.js` and the existing data-layer mutators.
@@ -184,6 +194,24 @@ Current responsibilities:
 
 `admin/page-builder.js` still owns the DOM mutations that apply those derived values, but the breakpoint and width math now lives in `layout.js`.
 
+## 📱 Responsive Overrides (responsive-overrides.js)
+
+This helper owns the builder-editing responsive override contract. It normalizes device ids from the
+preview contract, prunes empty responsive branches, exposes the per-module responsive field list from
+`module-descriptors.js`, and resolves the effective section/module config used while the iframe is
+rendering a specific builder device.
+
+Current responsibilities:
+
+- `SECTION_RESPONSIVE_FIELDS` defines editable section-level overrides such as layout, gaps,
+  padding, and background color
+- `setResponsiveOverrideValue(...)` writes sparse per-device branches and removes empty values
+- `getEffectiveSectionLayout(...)` and `getEffectiveSectionSettings(...)` merge section overrides
+  only while `builderEditing` is true
+- `getEffectiveModuleConfig(...)` applies descriptor-backed module overrides, including nested
+  button defaults and per-button responsive appearance overrides
+- `isModuleHiddenForDevice(...)` gates builder-editing render output for device-hidden modules
+
 ## 📝 Draft Manager (draft-manager.js)
 
 This factory owns the explicit local-draft lifecycle for builder surfaces that save intentionally rather than immediately.
@@ -200,6 +228,46 @@ Current responsibilities:
 - reset theme drafts back to the default theme token set
 
 The draft manager does not own the canonical source of truth for builder state; it receives state and setters from `admin/page-builder.js` and mutates them through the injected action contract.
+
+## ⌨️ Command Registry (commands.js)
+
+This module centralizes named builder intent. Toolbar buttons, keymaps, live target toolbar actions,
+and side-panel controls all resolve to command ids before a mutation runs.
+
+Current responsibilities:
+
+- define `BUILDER_COMMANDS` for draft save/discard, preview toggles, navigation, selection, undo,
+  redo, and cancel/exit behavior
+- adapt structural command ids from `structural-commands.js` into the same registry
+- expose `createBuilderCommandRegistry(...)`, which normalizes command results, checks visibility
+  and enabled state, and delegates execution to injected actions/managers
+- provide command metadata so UI controls can ask whether an action can run before wiring it
+
+## ⌨️ Builder Keymaps (keymaps.js)
+
+This module maps guarded keyboard shortcuts to command ids. It suppresses global shortcuts inside
+text inputs, editable surfaces, active modals, and unsafe focus contexts.
+
+Current shortcuts include:
+
+- `Ctrl/Cmd+S`: save the active draft
+- `Ctrl/Cmd+Z` and `Ctrl/Cmd+Shift+Z` / `Ctrl/Cmd+Y`: undo and redo the active draft scope
+- `Escape`: exit preview or cancel transient builder state
+- `Delete` / `Backspace`: delete the selected structural target when focus is safe
+- `Alt+Arrow*` and `Alt+P`: selection traversal and preview toggle helpers
+
+## ↩️ Draft Undo Stack (undo-stack.js)
+
+This module stores local undo/redo history for explicit-save drafts. Histories are scoped by draft
+target so module, header, theme, page settings, section settings, and responsive-device edits do not
+overwrite each other.
+
+Current responsibilities:
+
+- stable-serialize snapshots to avoid duplicate history entries
+- enforce a bounded history size
+- expose `push`, `undo`, `redo`, `reset`, `canUndo`, `canRedo`, and `getState`
+- keep undo state local to the current dirty draft until the normal Save/Discard flow resolves it
 
 ## 🚚 Page Actions (page-actions.js)
 
@@ -232,8 +300,8 @@ Current responsibilities:
 
 ## 🕹️ Structural Commands (structural-commands.js)
 
-This factory is the Phase 6 internal command adapter for live structural editing. It is intentionally
-small and does not replace the broader Phase 10 command/keymap/undo work.
+This factory is the internal command adapter for live structural editing. It stays focused on
+structural mutations while the broader command/keymap/undo layers coordinate editor intent.
 
 Current responsibilities:
 
@@ -250,7 +318,7 @@ Current responsibilities:
 
 ## 📍 Live Drop Placement (live-drop-placement.js)
 
-This pure helper ranks Phase 3 iframe target geometry into structural placements.
+This pure helper ranks iframe target geometry into structural placements.
 
 Current responsibilities:
 
@@ -422,6 +490,13 @@ Important behavior:
 - it delegates module-specific content to `module-editor.js`
 - it invokes delete actions for the currently selected module when appropriate
 
+## 🧾 Inspector Sections (inspector-sections.js)
+
+Small HTML helper for repeated inspector cards. It renders the `<details>` shell used by module,
+theme, header, gallery, video, divider, social, and entry-gallery editors. Keeping this wrapper in
+one helper makes section cards share the same kicker/title/summary/body structure without each
+editor copying the markup.
+
 ## 📂 Sidebar Rail (sidebar-panel.js)
 
 This file renders the unified side panel. Current responsibilities:
@@ -463,7 +538,27 @@ Coordinates all user interactions within the `#pbCanvas` through a factory patte
 
 ## 🧩 Base Module Editor (module-editor.js)
 
-This is the shared module inspector renderer and binder. Generic field rendering exists for modules that do not have a dedicated editor, and dedicated editors are delegated based on the config. A raw JSON config card exists as a fallback.
+This is the shared module inspector renderer and binder. Generic field rendering exists for modules that do not have a dedicated editor, and dedicated editors are delegated based on the descriptor `editorKind`. A raw JSON config card exists as a fallback.
+
+The module editor also owns CMS source controls, responsive edit-scope cards, responsive module
+override controls, style-manager views for descriptor `appearanceSectors`, and draft event binding
+for text, image, spacer, HTML, email signup, feed, media gallery, entry gallery, promo, social,
+buttons, divider, gallery, and video modules.
+
+## 🧾 Appearance Editor (appearance-editor.js)
+
+Shared inspector control helper for sparse appearance editing. It renders checkbox-gated background,
+text, and border controls for callers such as the buttons and header editors, synchronizes paired
+color picker / hex text inputs, and converts normalized appearance state back to sparse storage.
+
+Current responsibilities:
+
+- render reusable appearance input groups for background color/gradient, text color, and border
+  width/style/color/opacity/radius
+- keep disabled controls from writing fake placeholder values
+- validate hex text input and mirror valid picker/text values
+- expose low-level helpers such as `setAppearanceLeaf(...)`, `removeAppearanceLeaf(...)`,
+  `toSparseAppearance(...)`, and `syncAppearanceColorInputs(...)`
 
 ## 🔘 Button Editor (button-editor.js)
 
@@ -566,9 +661,27 @@ identity change to prevent stale message acceptance.
 
 The specialized renderer for the Promo module. Converts complex slide drafts into high-performance, CSS-driven HTML. Features a neon styling engine (hex to rgba), dynamic slide layouts, and defensive clamps on transition timing constraints.
 
+## 🧩 Module Descriptors (module-descriptors.js)
+
+The descriptor registry is the canonical client-side catalog for builder modules. It defines module
+labels, icons, palette category, default config, editor kind, insertability, allowed parents, quick
+actions, responsive fields, appearance/style sectors, source modes, and preview text.
+
+Current exports:
+
+- `getModuleDescriptors()` and `getModuleDescriptor(type)` expose normalized descriptors
+- `getInsertableModuleDescriptors()` feeds the Blocks palette and excludes compatibility-only
+  descriptors such as `header`
+- `getModuleDefaultConfig(type)` supplies cloned default config for insertions
+- `getModuleResponsiveOverrides(type)` and `getModuleStyleSectors(type)` drive responsive and style
+  inspector surfaces
+- `getModuleSourceModes(type)` and `getModuleEditorKind(type)` decide CMS source UI and
+  module-specific editor routing
+- `getModulePreviewText(type, config)` renders compact list/layer summaries
+
 ## 🔢 Constants Registry (constants.js)
 
-Registries include `MODULE_TYPES`, `LAYOUT_OPTIONS`, and theme tokens like `THEME_COLORS`. `MODULE_TYPES` is consumed by the picker palette.
+Registries include `MODULE_TYPES`, `LAYOUT_OPTIONS`, and theme tokens like `THEME_COLORS`. `MODULE_TYPES` is derived from `module-descriptors.js` and keeps older consumers aligned with the descriptor catalog.
 
 ## 🛠️ Shared Helpers (helpers.js)
 
@@ -640,8 +753,15 @@ Again: `header` is compatibility-only in the catalog and is not part of the norm
 - The admin canvas is an editing surface with builder chrome. Live mode and chrome-collapsed Preview both render through the same real reader iframe (`index.html?builderPreview=1`) for full reader-shell parity, not through a constrained div or the direct `preview-renderers.js` path.
 - Shared renderer parity exists at the module/section/page HTML level through `shared-renderers.js`. The iframe preview approach means real viewport dimensions, real media queries, and real reader-side JavaScript all run in preview.
 - The iframe preview bridge (`reader/preview-bridge.js`) and the `postMessage` protocol defined in `preview-contract.js` are implemented. The snapshot merge path covers module config, theme metadata, normalized header metadata, page settings, and section spacing without mutating `currentPage`. Validated live-builder snapshots can opt into `builderEditing` markers; public reader output keeps admin-only `data-builder-*` attributes absent. In builder editing mode, target messages drive admin-only hover/selection overlays and block iframe links/forms before reader side effects can fire. Chrome-collapsed Preview deliberately sends `builderEditing: false`, so target messages stop while the reader stays in builder preview side-effect-suppressed mode.
-- Phase 5 responsive parity instrumentation is also implemented: the iframe keeps exact preset dimensions, the admin preview scale shell can shrink the visible presentation without changing iframe pixels, and preview metrics verify breakpoint branches, two-page mode expectations, and horizontal overflow risks.
+- Responsive parity instrumentation is also implemented: the iframe keeps exact preset dimensions, the admin preview scale shell can shrink the visible presentation without changing iframe pixels, and preview metrics verify breakpoint branches, two-page mode expectations, and horizontal overflow risks.
 - Legacy `page-config` and legacy `header` module content still exist as migration/backfill inputs. Normal reader startup and page-builder header editing resolve V3 page headers with `pageConfig: null`; stored legacy `header` modules are later cleanup debt once V3 metadata exists.
+
+## 🧭 Maintenance Rule
+
+Update this document when `admin/page-builder.js` changes orchestration ownership, a
+`admin/page-builder/*.js` module is added or removed, the descriptor catalog changes, the preview
+message contract changes, responsive override semantics change, or a builder module gains/removes
+public rendering, editing, source, style, or persistence behavior.
 
 ## 📚 Related Docs
 

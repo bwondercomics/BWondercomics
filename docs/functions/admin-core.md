@@ -36,6 +36,7 @@ This document provides a comprehensive map of the internal functions, orchestrat
 - [☁️ Upload Manager (uploads.js)](#️-upload-manager-uploadsjs)
 - [👥 User Manager (users.js)](#-user-manager-usersjs)
 - [🧰 Shared Utilities (utils.js)](#-shared-utilities-utilsjs)
+- [🧭 Maintenance Rule](#-maintenance-rule)
 
 ## 💡 Core Concepts
 
@@ -55,12 +56,18 @@ Truth flows through a strictly managed pipeline: **Server JSON → `state.js` �
 - **Resilience**: Modules like `diagnostics.js` and `entries.js` implement "Self-healing" logic, capable of reconstructing logical schemas from legacy endpoints or physical disk folder scans if primary APIs are unavailable.
 - **Draft Persistence**: `localStorage` is used as a secondary "Safety Buffer" (e.g., in `posts.js`) to ensure authoring work is never lost to session drops.
 
-### 3. Registry-First UI Policy
+### 3. Shared DOM Registry Convention
 
-To maximize performance and maintain a "Source of Truth" for the UI, the suite enforces a **Registry Pattern** via `dom.js`.
+The suite keeps stable admin-shell and shared workspace handles in `dom.js` so cross-module routing
+and persistent controls have one vocabulary.
 
-- **Policy**: Sub-managers are forbidden from using ad-hoc `document.getElementById` calls.
-- **Benefit**: This centralizes the UI manifest, prevents memory leaks from dangling DOM references, and ensures a shared vocabulary for all interactive elements.
+- **Shared handles**: Long-lived shell IDs, navigation controls, persistent panels, and common form
+  fields are exposed through the `el` object.
+- **Local handles**: Dynamic or ephemeral controls generated inside a manager can use scoped
+  `querySelector(...)`/`getElementById(...)` lookups when keeping them in `dom.js` would make the
+  global registry noisy or misleading.
+- **Benefit**: Stable cross-module UI contracts remain centralized without pretending every transient
+  editor row or modal control is a global singleton.
 
 ### 4. Multi-Layer Security Firewall
 
@@ -79,22 +86,22 @@ The panel operates as a multi-project orchestrator. Changing the "Active Series"
 
 ## 🖼️ DOM Registry (dom.js)
 
-The foundational registry for the Admin UI. It centralizes all DOM element lookups into a single exported `el` object, maximizing performance by eliminating redundant `document.getElementById` calls across the application.
+The foundational registry for stable Admin UI handles. It centralizes long-lived DOM lookups into a single exported `el` object, keeping shared shell controls and workspace roots consistent across managers.
 
 ### Public API (🔌)
 
 #### The `el` Object
 
-The master registry. Every interactive element in the Admin shell is available as a property on this object (e.g., `el.adminDashboard`, `el.btnSave`).
+The shared registry. Stable interactive elements in the Admin shell are available as properties on this object (e.g., `el.adminDashboard`, `el.btnSave`).
 
 ### Internal Orchestration (🔒)
 
-#### Automated Hydration
+#### Manual Registry
 
-The module uses a high-performance **ID-to-Property** loop. It iterates through a master array of string constants (IDs matching the `id` attributes in `admin/index.html`) and automatically populates the `el` object.
+The module exports a hand-written object whose properties directly call `document.getElementById(...)`. This keeps the public property names explicit and allows targeted JSDoc annotations for inputs, buttons, and other frequently used handles.
 
-- **Null-Safety**: Properties for missing elements are initialized as `null` to prevent crashes while providing predictable accessors.
-- **Type Hinting**: Extensive JSDoc `@type` annotations are included for each group of elements to provide IDE completions and type-safety for developers.
+- **Null-Safety**: Missing elements resolve to `null`, and consumers are expected to null-check optional surfaces.
+- **Type Hinting**: JSDoc `@type` annotations are used on handles where input/button-specific APIs matter.
 
 ### Element Categories
 
@@ -103,17 +110,20 @@ The registry is logically grouped into functional categories:
 - **Global Shell**: Main containers (`adminDashboard`, `adminHeader`), splash screens, and navigation rails.
 - **Authentication**: Login inputs, error feedback spans, and submit buttons.
 - **Dashboard Sections**: Individual stat cards (`dashViews24h`), activity lists, and the todo engine.
-- **Manager Workspaces**: Full registry for **Chapters**, **Media**, **Blog**, **Subscribers**, **Premium Codes**, and **Banned IPs**.
+- **Manager Workspaces**: Shared registry handles for **Entries**, **Media**, **Blog**, **Analytics**, **Users**, moderation, diagnostics, and Page Builder roots.
 
 > [!IMPORTANT]
-> To maintain the performance of the Admin SPA, **NEVER** use `document.getElementById` or `document.querySelector` within sub-managers. Always add the ID to the `dom.js` registry and access it via the `el` object.
+> Add stable cross-module shell IDs to `dom.js`. Dynamic rows, generated modals, editor internals,
+> and manager-local controls can use scoped DOM queries when the handle is not a shared global
+> contract.
 
 ### Principal Registries
 
 - **Functional Sections**: References to the top-level containers (`dashboardSection`, `chaptersSection`, `analyticsSection`) used by the route switcher in `app.js`.
 - **Primary Nav**: Every sidebar button and toggle (`btnAnalytics`, `adminNavToggle`, `stickyHeaderToggle`).
-- **Data Modals**: Master references for the multi-purpose `editModal` and `seriesModal`.
-- **Surface Canvas**: Handles for the high-performance drawing surfaces (`pbCanvas`, `liveVisitorsChart`).
+- **Data Modals**: Shared references for durable modal roots such as `editModal` and `seriesModal`.
+- **Surface Canvas**: Handles for durable drawing/editor surfaces such as `pbCanvas`,
+  `liveVisitorsChart`, and `readsOverTimeCanvas`.
 - **Interactive Forms**: Direct mapping for all inputs in the entry editor, post manager, and media upload flows.
 
 > [!IMPORTANT]
@@ -679,7 +689,8 @@ A persistent sidebar that houses the global navigation triggers.
 
 - **CSS Stack**: `admin.css` (Core), `diagnostics.css` (Health), and `main.core.18-page-builder.css` (V3 Builder).
 - **Fonts**: Righteous and Bebas Neue via Google Fonts.
-- **Registry**: Every `id` attribute in this file serves as a binding point for the `dom.js` registry.
+- **Registry**: Stable shell and workspace `id` attributes are candidates for `dom.js`; local
+  generated controls may remain scoped to their owning manager.
 
 ## 🖼️ Media Manager (media.js)
 
@@ -1068,3 +1079,9 @@ A centralized set of stateless helpers used across the administrative SPA.
 - **`sortPagesByFilename`**: Numeric sorting for comic pages (e.g. `page10` comes after `page2`).
 - **`inferFolderFromPages`**: Core pathing engine that derives the structural `chapterFolder` from analyzing the prefix of current pages, enabling the "Self-Healing" directory features.
 - **`generateMediaId`**: Uses a deterministic FNV-1a hash to create stable identifiers from file paths.
+
+## 🧭 Maintenance Rule
+
+Update this document when `admin/*.js` modules are added or removed, a manager's factory/public API
+changes, shared shell DOM ownership changes, or `admin/index.html` changes a durable workspace,
+navigation, modal, diagnostics, analytics, or page-builder root.
