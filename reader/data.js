@@ -13,11 +13,12 @@ import {
   sanitizePageSlug,
 } from './series.js';
 import { logger } from './logger.js';
-import { renderModule, initEmailForms, initPromoCarousels } from './page-renderer.js';
+import { renderPage, renderModule, initEmailForms, initPromoCarousels } from './page-renderer.js';
 import { initFeedModules } from './feed-panel.js';
 import { initEntryGalleryModules } from './entry-gallery-module.js';
 import { initMediaGalleryModules } from './media-gallery-module.js';
 import { applySharedHeaderLayout } from './header-layout.js';
+import { publishReaderShellState, resolveReaderShellState } from './shell-state.js';
 import {
   createEffectivePageHeader,
   resolvePageHeaderState,
@@ -398,8 +399,12 @@ function resetPanelVisibility() {
   if (rightPanel) rightPanel.style.display = '';
 }
 
-function syncReaderShellBuilderMarkers(page, builderEditing) {
-  const pageTargets = [document.body, document.querySelector('.viewerWrap')].filter(Boolean);
+function syncReaderShellBuilderMarkers(page, builderEditing, options = {}) {
+  const shellActive = options.shellActive !== false;
+  const pageTargets = [
+    document.body,
+    shellActive ? document.querySelector('.viewerWrap') : null,
+  ].filter(Boolean);
   pageTargets.forEach((target) => {
     if (builderEditing && page?.id) {
       target.setAttribute('data-builder-page-id', String(page.id));
@@ -407,11 +412,104 @@ function syncReaderShellBuilderMarkers(page, builderEditing) {
     }
     target.removeAttribute('data-builder-page-id');
   });
+  if (!shellActive) {
+    document.querySelector('.viewerWrap')?.removeAttribute('data-builder-page-id');
+  }
   if (!builderEditing) {
     const topbar = document.querySelector('header.topbar#topbar');
     topbar?.removeAttribute('data-builder-page-id');
     topbar?.removeAttribute('data-builder-surface');
   }
+}
+
+function ensureBuilderPageContent() {
+  let container = document.getElementById('builderPageContent');
+  if (container) return container;
+
+  container = document.createElement('div');
+  container.id = 'builderPageContent';
+  container.className = 'builder-page-content';
+  container.hidden = true;
+
+  const main = document.querySelector('main') || document.body;
+  main?.appendChild(container);
+  return container;
+}
+
+function setHiddenState(element, hidden) {
+  if (!element) return;
+  element.hidden = hidden;
+  if (hidden) {
+    element.setAttribute('aria-hidden', 'true');
+    if ('inert' in element) element.inert = true;
+    return;
+  }
+  element.removeAttribute('aria-hidden');
+  if ('inert' in element) element.inert = false;
+}
+
+function clearReaderShellBuilderTargets() {
+  document.querySelector('.viewerWrap')?.removeAttribute('data-builder-page-id');
+  document.querySelectorAll('.viewerWrap [data-builder-module-id]').forEach((element) => {
+    element.removeAttribute('data-builder-module-id');
+    element.removeAttribute('data-builder-module-type');
+  });
+  document.querySelectorAll('.viewerWrap [data-builder-section-id]').forEach((element) => {
+    element.removeAttribute('data-builder-section-id');
+    element.removeAttribute('data-builder-section-index');
+    element.removeAttribute('data-builder-layout');
+  });
+  document.querySelectorAll('.viewerWrap [data-builder-column-index]').forEach((element) => {
+    element.removeAttribute('data-builder-column-index');
+  });
+}
+
+function applyReaderShellDomState(shellState) {
+  const active = shellState?.active === true;
+  const builderContent = ensureBuilderPageContent();
+  setHiddenState(builderContent, active);
+
+  [
+    document.querySelector('.viewerWrap'),
+    document.getElementById('leftPanel'),
+    document.getElementById('rightPanel'),
+    document.getElementById('stageWrap'),
+    document.getElementById('controls'),
+    document.getElementById('edgeLeft'),
+    document.getElementById('edgeRight'),
+    document.getElementById('comicCommentsSection'),
+    document.getElementById('entryCoverGallery'),
+    document.getElementById('shortcutsOverlay'),
+    document.getElementById('entryEndOverlay'),
+  ].forEach((element) => setHiddenState(element, !active));
+
+  if (active) {
+    builderContent.innerHTML = '';
+  } else {
+    clearReaderShellBuilderTargets();
+  }
+}
+
+function applyReaderHeaderChromeState(shellState) {
+  const active = shellState?.active === true;
+  [
+    document.querySelector('.entry-controls'),
+    document.getElementById('entry'),
+    document.getElementById('statusPanel'),
+  ].forEach((element) => setHiddenState(element, !active));
+}
+
+function renderBuilderPageContent(page, options = {}) {
+  const container = ensureBuilderPageContent();
+  container.innerHTML = renderPage(page, {
+    builderEditing: options.builderEditing === true,
+    deviceId: options.deviceId,
+  });
+  initEmailForms(container, { previewMode: !!options.previewMode });
+  initPromoCarousels(container);
+  initEntryGalleryModules(container);
+  initFeedModules(container);
+  initMediaGalleryModules(container);
 }
 
 function builderMarkerAttrs(attrs = {}, enabled = false) {
@@ -488,11 +586,18 @@ function renderPanelBuilderEditingStack(side, modules, options = {}) {
 export function applyBuilderPageToDOM(page, options = {}) {
   const builderEditing = options.builderEditing === true;
   const deviceId = options.deviceId;
+  const shellState = publishReaderShellState(
+    resolveReaderShellState(page, { builderEditing, deviceId })
+  );
+  applyReaderShellDomState(shellState);
+
   if (!page || !page.sections) {
-    syncReaderShellBuilderMarkers(null, false);
-    return;
+    syncReaderShellBuilderMarkers(null, false, { shellActive: false });
+    applyReaderHeaderChromeState(shellState);
+    renderBuilderPageContent(null, options);
+    return shellState;
   }
-  syncReaderShellBuilderMarkers(page, builderEditing);
+  syncReaderShellBuilderMarkers(page, builderEditing, { shellActive: shellState.active });
   const headerPage = resolveHeaderPageForDevice(page, { builderEditing, deviceId });
   const headerState = resolvePageHeaderState({
     page: headerPage,
@@ -505,10 +610,33 @@ export function applyBuilderPageToDOM(page, options = {}) {
     headerState,
     builderEditing,
   });
+  applyReaderHeaderChromeState(shellState);
 
   // Apply theme first
   applyPageTheme(page);
   applyPanelBackgrounds(page);
+
+  // Apply effective page header copy.
+  const titleEl = document.querySelector('.topbar .title h1');
+  if (titleEl && effectiveHeader.copy?.title) {
+    titleEl.textContent = effectiveHeader.copy.title;
+  }
+  const subtitleEl = document.getElementById('subtitle');
+  const subtitleText = effectiveHeader.copy?.subtitle || effectiveHeader.copy?.subtitles?.[0] || '';
+  if (subtitleEl) {
+    subtitleEl.textContent = subtitleText;
+  }
+  if (window.BattleBros?.setSubtitles) {
+    const subtitles = extractSubtitlesFromBuilderPage(page, options.pageConfig || null);
+    window.BattleBros.setSubtitles(subtitles);
+  }
+
+  if (!shellState.active) {
+    renderBuilderPageContent(page, options);
+    logger.log('✓ Applied no-reader builder page to DOM');
+    return shellState;
+  }
+
   const panelSpacing = page?.meta?.panelSpacing || {};
   const panelBackgrounds = page?.meta?.panelBackgrounds || {};
 
@@ -551,21 +679,6 @@ export function applyBuilderPageToDOM(page, options = {}) {
     return results;
   };
 
-  // Apply effective page header copy.
-  const titleEl = document.querySelector('.topbar .title h1');
-  if (titleEl && effectiveHeader.copy?.title) {
-    titleEl.textContent = effectiveHeader.copy.title;
-  }
-  const subtitleEl = document.getElementById('subtitle');
-  const subtitleText = effectiveHeader.copy?.subtitle || effectiveHeader.copy?.subtitles?.[0] || '';
-  if (subtitleEl) {
-    subtitleEl.textContent = subtitleText;
-  }
-  if (window.BattleBros?.setSubtitles) {
-    const subtitles = extractSubtitlesFromBuilderPage(page, options.pageConfig || null);
-    window.BattleBros.setSubtitles(subtitles);
-  }
-
   // Apply left/right panel content based on columns
   const leftModules = findPanelModules('left');
   const rightModules = findPanelModules('right');
@@ -601,6 +714,7 @@ export function applyBuilderPageToDOM(page, options = {}) {
   }
 
   logger.log('✓ Applied page builder config to DOM');
+  return shellState;
 }
 
 /**

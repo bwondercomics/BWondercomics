@@ -32,11 +32,40 @@ function buildReaderEntryData() {
   };
 }
 
+function buildReaderShellPage(overrides = {}) {
+  const page = buildContractFixture('builderPage', overrides);
+  const readerModule = getContractFixture('builderModules').reader;
+  page.sections = [
+    {
+      id: 'reader-shell-section',
+      sectionType: 'row',
+      layout: '1',
+      sortIndex: -1,
+      settings: {},
+      modules: [
+        {
+          ...readerModule,
+          id: 'reader-shell-module',
+          columnIndex: 0,
+          sortIndex: 0,
+          config: {
+            ...readerModule.config,
+            source: { mode: 'active-page-series' },
+          },
+        },
+      ],
+    },
+    ...(Array.isArray(page.sections) ? page.sections : []),
+  ];
+  return page;
+}
+
 async function bootReaderApp({
   sessionKey = 'guest',
   savedProgress = null,
   builderPreview = false,
   resolvedReaderSeriesId = '',
+  builderPage = buildReaderShellPage(),
 } = {}) {
   vi.resetModules();
   mountReaderDom();
@@ -56,7 +85,7 @@ async function bootReaderApp({
   const loadEntryData = vi.fn(async () => buildReaderEntryData());
   const loadPageConfigWithFallback = vi.fn(async () => ({
     source: 'builder',
-    page: getContractFixture('builderPage'),
+    page: builderPage,
   }));
   const loadLatestPost = vi.fn(async () => getContractFixture('latestPost'));
   const applyBuilderPageToDOM = vi.fn();
@@ -70,7 +99,7 @@ async function bootReaderApp({
     draftMode: 'published',
     snapshotVersion: 1,
     source: 'saved',
-    page: getContractFixture('builderPage'),
+    page: builderPage,
     options: {
       builderEditing: true,
       viewport: { id: 'desktop', label: 'Desktop', width: 1920, height: 1080 },
@@ -183,6 +212,7 @@ async function bootReaderApp({
   const { state } = await import('../reader/state.js');
 
   return {
+    builderPage,
     events,
     fetchMock,
     mocks: {
@@ -231,7 +261,7 @@ describe('reader app bootstrap', () => {
 
   it('boots the reader against the live markup contract and restores saved progress', async () => {
     const savedProgress = { chapter: 'Issue 10', page: 1, timestamp: Date.now() };
-    const { state, events, mocks } = await bootReaderApp({ savedProgress });
+    const { builderPage, state, events, mocks } = await bootReaderApp({ savedProgress });
 
     expect(mocks.loadEntryData).toHaveBeenCalledWith('battle-bros');
     expect(mocks.loadPageConfigWithFallback).toHaveBeenCalledWith(
@@ -243,7 +273,7 @@ describe('reader app bootstrap', () => {
         pageSlug: '',
       }
     );
-    expect(mocks.applyBuilderPageToDOM).toHaveBeenCalledWith(getContractFixture('builderPage'), {
+    expect(mocks.applyBuilderPageToDOM).toHaveBeenCalledWith(builderPage, {
       seriesId: 'battle-bros',
     });
     expect(mocks.renderStatusPanel.mock.invocationCallOrder[0]).toBeLessThan(
@@ -271,8 +301,46 @@ describe('reader app bootstrap', () => {
     expect(events.length).toBeGreaterThan(0);
   });
 
+  it('boots no-reader builder pages without starting reader-only runtime work', async () => {
+    const builderPage = buildContractFixture('builderPage', {
+      slug: 'about',
+      title: 'About',
+      pageType: 'custom',
+    });
+    const { events, mocks } = await bootReaderApp({ builderPage });
+
+    expect(mocks.loadPageConfigWithFallback).toHaveBeenCalledWith(
+      expect.any(Function),
+      'battle-bros',
+      {
+        draft: false,
+        pageScope: 'series',
+        pageSlug: '',
+      }
+    );
+    expect(mocks.applyBuilderPageToDOM).toHaveBeenCalledWith(builderPage, {
+      seriesId: 'battle-bros',
+    });
+    expect(mocks.loadEntryData).not.toHaveBeenCalled();
+    expect(mocks.resolveBuilderPageReaderSeriesId).not.toHaveBeenCalled();
+    expect(mocks.initReaderAnalytics).not.toHaveBeenCalled();
+    expect(mocks.initPointerHandlers).not.toHaveBeenCalled();
+    expect(mocks.initRightPanelFeed).not.toHaveBeenCalled();
+    expect(mocks.initEmailSignupForm).not.toHaveBeenCalled();
+    expect(mocks.attachGalleryButton).not.toHaveBeenCalled();
+    expect(mocks.renderGallery).not.toHaveBeenCalled();
+    expect(mocks.renderLatestUpdate).not.toHaveBeenCalled();
+    expect(mocks.renderStatusPanel).not.toHaveBeenCalled();
+    expect(mocks.render).not.toHaveBeenCalled();
+    expect(document.body.dataset.readerPageSource).toBe('builder');
+    expect(events).toHaveLength(0);
+
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(mocks.nextPage).not.toHaveBeenCalled();
+  });
+
   it('boots builder preview from the parent snapshot instead of the page API', async () => {
-    const { mocks } = await bootReaderApp({ builderPreview: true });
+    const { builderPage, mocks } = await bootReaderApp({ builderPreview: true });
 
     expect(mocks.loadEntryData).toHaveBeenCalledWith('battle-bros');
     expect(mocks.loadPageConfigWithFallback).not.toHaveBeenCalled();
@@ -282,7 +350,7 @@ describe('reader app bootstrap', () => {
     });
     expect(mocks.initReaderAnalytics).not.toHaveBeenCalled();
     expect(mocks.initEmailSignupForm).toHaveBeenCalledWith({ previewMode: true });
-    expect(mocks.applyBuilderPageToDOM).toHaveBeenCalledWith(getContractFixture('builderPage'), {
+    expect(mocks.applyBuilderPageToDOM).toHaveBeenCalledWith(builderPage, {
       seriesId: 'battle-bros',
       previewMode: true,
       builderEditing: true,
@@ -304,7 +372,7 @@ describe('reader app bootstrap', () => {
   it('refreshes reader entry data before applying preview snapshot updates', async () => {
     const { mocks } = await bootReaderApp({ builderPreview: true });
     const snapshotHandler = mocks.subscribePreviewSnapshots.mock.calls[0]?.[0];
-    const nextPage = buildContractFixture('builderPage', { id: 'next-builder-page' });
+    const nextPage = buildReaderShellPage({ id: 'next-builder-page' });
     mocks.resolveBuilderPageReaderSeriesId.mockImplementation((page, fallbackSeriesId) =>
       page?.id === 'next-builder-page' ? 'other-series' : fallbackSeriesId
     );
@@ -350,16 +418,197 @@ describe('reader app bootstrap', () => {
     );
   });
 
-  it('loads the reader module specific-series source before initializing visible reader state', async () => {
-    const { mocks } = await bootReaderApp({ resolvedReaderSeriesId: 'other-series' });
+  it('recalculates shell state for no-reader preview snapshot updates', async () => {
+    const { mocks } = await bootReaderApp({ builderPreview: true });
+    const snapshotHandler = mocks.subscribePreviewSnapshots.mock.calls[0]?.[0];
+    const noReaderPage = buildContractFixture('builderPage', {
+      id: 'no-reader-page',
+      slug: 'about',
+      pageType: 'custom',
+    });
+    mocks.loadEntryData.mockClear();
 
-    expect(mocks.resolveBuilderPageReaderSeriesId).toHaveBeenCalledWith(
-      getContractFixture('builderPage'),
-      'battle-bros'
+    snapshotHandler({
+      source: 'builder',
+      page: noReaderPage,
+      previewMode: true,
+      builderEditing: true,
+      snapshot: {
+        seriesId: 'battle-bros',
+        pageId: 'fixture-builder-page',
+        pageSlug: 'about',
+        page: noReaderPage,
+        options: { builderEditing: true, deviceId: 'mobile' },
+      },
+      deviceId: 'mobile',
+    });
+    await flushReaderUi(4);
+
+    expect(mocks.loadEntryData).not.toHaveBeenCalled();
+    expect(mocks.applyBuilderPageToDOM).toHaveBeenLastCalledWith(noReaderPage, {
+      seriesId: 'battle-bros',
+      previewMode: true,
+      builderEditing: true,
+      deviceId: 'mobile',
+    });
+    expect(mocks.emitPreviewMetrics).toHaveBeenLastCalledWith('snapshot-updated');
+    expect(mocks.startPreviewTargetBridge).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        pageSlug: 'about',
+        options: expect.objectContaining({ builderEditing: true }),
+      }),
+      {
+        seriesId: 'battle-bros',
+        pageId: 'fixture-builder-page',
+        pageSlug: 'about',
+      }
     );
-    expect(mocks.loadEntryData).toHaveBeenNthCalledWith(1, 'battle-bros');
-    expect(mocks.loadEntryData).toHaveBeenNthCalledWith(2, 'other-series');
-    expect(mocks.applyBuilderPageToDOM).toHaveBeenCalledWith(getContractFixture('builderPage'), {
+  });
+
+  it('keeps existing reader handlers inert after an active preview updates to no-reader', async () => {
+    vi.useFakeTimers();
+    const { mocks } = await bootReaderApp({ builderPreview: true });
+    const snapshotHandler = mocks.subscribePreviewSnapshots.mock.calls[0]?.[0];
+    const noReaderPage = buildContractFixture('builderPage', {
+      id: 'no-reader-page',
+      slug: 'about',
+      pageType: 'custom',
+    });
+
+    snapshotHandler({
+      source: 'builder',
+      page: noReaderPage,
+      previewMode: true,
+      builderEditing: true,
+      snapshot: {
+        seriesId: 'battle-bros',
+        pageId: 'fixture-builder-page',
+        pageSlug: 'about',
+        page: noReaderPage,
+        options: { builderEditing: true, deviceId: 'mobile' },
+      },
+      deviceId: 'mobile',
+    });
+    await vi.runAllTimersAsync();
+
+    const counts = {
+      prevPage: mocks.prevPage.mock.calls.length,
+      nextPage: mocks.nextPage.mock.calls.length,
+      zoomIn: mocks.zoomIn.mock.calls.length,
+      zoomOut: mocks.zoomOut.mock.calls.length,
+      fitToScreen: mocks.fitToScreen.mock.calls.length,
+      resetView: mocks.resetView.mock.calls.length,
+      toggleShortcutsOverlay: mocks.toggleShortcutsOverlay.mock.calls.length,
+      closeShortcutsOverlay: mocks.closeShortcutsOverlay.mock.calls.length,
+      hideEndOfEntry: mocks.hideEndOfEntry.mock.calls.length,
+      render: mocks.render.mock.calls.length,
+    };
+    expect(document.body.dataset.readerShell).toBe('inactive');
+
+    const dispatchKey = (key) => {
+      const event = new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true });
+      document.body.dispatchEvent(event);
+      return event;
+    };
+    const arrowEvent = dispatchKey('ArrowRight');
+    dispatchKey('ArrowLeft');
+    dispatchKey('+');
+    dispatchKey('-');
+    dispatchKey('0');
+    dispatchKey('?');
+    dispatchKey('Escape');
+    document.getElementById('prevBtn')?.click();
+    document.getElementById('nextBtn')?.click();
+    document.getElementById('zoomIn')?.click();
+    document.getElementById('zoomOut')?.click();
+    document.getElementById('fitBtn')?.click();
+    document.getElementById('helpBtn')?.click();
+    document.getElementById('edgeLeftBtn')?.click();
+    document.getElementById('edgeRightBtn')?.click();
+    const select = document.getElementById('entry');
+    select.value = 'Issue 10';
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+    window.dispatchEvent(new Event('resize'));
+    vi.advanceTimersByTime(200);
+
+    expect(arrowEvent.defaultPrevented).toBe(false);
+    expect(mocks.prevPage).toHaveBeenCalledTimes(counts.prevPage);
+    expect(mocks.nextPage).toHaveBeenCalledTimes(counts.nextPage);
+    expect(mocks.zoomIn).toHaveBeenCalledTimes(counts.zoomIn);
+    expect(mocks.zoomOut).toHaveBeenCalledTimes(counts.zoomOut);
+    expect(mocks.fitToScreen).toHaveBeenCalledTimes(counts.fitToScreen);
+    expect(mocks.resetView).toHaveBeenCalledTimes(counts.resetView);
+    expect(mocks.toggleShortcutsOverlay).toHaveBeenCalledTimes(counts.toggleShortcutsOverlay);
+    expect(mocks.closeShortcutsOverlay).toHaveBeenCalledTimes(counts.closeShortcutsOverlay);
+    expect(mocks.hideEndOfEntry).toHaveBeenCalledTimes(counts.hideEndOfEntry);
+    expect(mocks.render).toHaveBeenCalledTimes(counts.render);
+  });
+
+  it('reactivates preview reader handlers once when a no-reader snapshot returns to reader', async () => {
+    vi.useFakeTimers();
+    const { mocks } = await bootReaderApp({ builderPreview: true });
+    const snapshotHandler = mocks.subscribePreviewSnapshots.mock.calls[0]?.[0];
+    const noReaderPage = buildContractFixture('builderPage', {
+      id: 'no-reader-page',
+      slug: 'about',
+      pageType: 'custom',
+    });
+    const activePage = buildReaderShellPage({ id: 'reactivated-reader-page' });
+
+    snapshotHandler({
+      source: 'builder',
+      page: noReaderPage,
+      previewMode: true,
+      builderEditing: true,
+      snapshot: {
+        seriesId: 'battle-bros',
+        pageId: 'fixture-builder-page',
+        pageSlug: 'about',
+        page: noReaderPage,
+        options: { builderEditing: true, deviceId: 'mobile' },
+      },
+      deviceId: 'mobile',
+    });
+    await vi.runAllTimersAsync();
+    expect(document.body.dataset.readerShell).toBe('inactive');
+
+    mocks.nextPage.mockClear();
+    mocks.render.mockClear();
+    snapshotHandler({
+      source: 'builder',
+      page: activePage,
+      previewMode: true,
+      builderEditing: true,
+      snapshot: {
+        seriesId: 'battle-bros',
+        pageId: 'fixture-builder-page',
+        pageSlug: 'reader',
+        page: activePage,
+        options: { builderEditing: true, deviceId: 'mobile' },
+      },
+      deviceId: 'mobile',
+    });
+    await vi.runAllTimersAsync();
+    expect(document.body.dataset.readerShell).toBe('active');
+
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    expect(mocks.nextPage).toHaveBeenCalledTimes(1);
+
+    document.getElementById('nextBtn')?.click();
+    expect(mocks.nextPage).toHaveBeenCalledTimes(2);
+
+    window.dispatchEvent(new Event('resize'));
+    vi.advanceTimersByTime(150);
+    expect(mocks.render).toHaveBeenCalledTimes(1);
+  });
+
+  it('loads the reader module specific-series source before initializing visible reader state', async () => {
+    const { builderPage, mocks } = await bootReaderApp({ resolvedReaderSeriesId: 'other-series' });
+
+    expect(mocks.resolveBuilderPageReaderSeriesId).toHaveBeenCalledWith(builderPage, 'battle-bros');
+    expect(mocks.loadEntryData).toHaveBeenCalledTimes(1);
+    expect(mocks.loadEntryData).toHaveBeenCalledWith('other-series');
+    expect(mocks.applyBuilderPageToDOM).toHaveBeenCalledWith(builderPage, {
       seriesId: 'other-series',
     });
     expect(mocks.renderGallery).toHaveBeenLastCalledWith(

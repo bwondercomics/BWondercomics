@@ -55,6 +55,8 @@ async function bootCommentsModule({ previewMode = false } = {}) {
   }));
   vi.stubGlobal('fetch', fetchMock);
 
+  const { publishReaderShellState } = await import('../reader/shell-state.js');
+  publishReaderShellState({ active: true, reason: 'reader-module' });
   await import('../reader/comic-comments.js');
   await flushReaderUi(4);
 

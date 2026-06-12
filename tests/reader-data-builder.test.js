@@ -24,6 +24,7 @@ function jsonResponse(body, options = {}) {
 
 function buildPanelSnapshot({ meta = {}, sectionSettings = {} } = {}) {
   const page = getContractFixture('builderPage');
+  const readerModule = getContractFixture('builderModules').reader;
   page.sections = [
     {
       id: 'panel-row',
@@ -32,6 +33,16 @@ function buildPanelSnapshot({ meta = {}, sectionSettings = {} } = {}) {
       sortIndex: 0,
       settings: { ...sectionSettings },
       modules: [
+        {
+          ...readerModule,
+          id: 'reader-shell-module',
+          columnIndex: 0,
+          sortIndex: -1,
+          config: {
+            ...readerModule.config,
+            source: { mode: 'active-page-series' },
+          },
+        },
         {
           id: 'left-panel-text',
           moduleType: 'text',
@@ -57,6 +68,34 @@ function buildPanelSnapshot({ meta = {}, sectionSettings = {} } = {}) {
     header: page.meta.header,
     ...meta,
   };
+  return page;
+}
+
+function buildReaderShellPage(overrides = {}) {
+  const page = buildContractFixture('builderPage', overrides);
+  const readerModule = getContractFixture('builderModules').reader;
+  page.sections = [
+    {
+      id: 'reader-shell-section',
+      sectionType: 'row',
+      layout: '1',
+      sortIndex: -1,
+      settings: {},
+      modules: [
+        {
+          ...readerModule,
+          id: 'reader-shell-module',
+          columnIndex: 0,
+          sortIndex: 0,
+          config: {
+            ...readerModule.config,
+            source: { mode: 'active-page-series' },
+          },
+        },
+      ],
+    },
+    ...(Array.isArray(page.sections) ? page.sections : []),
+  ];
   return page;
 }
 
@@ -323,6 +362,111 @@ describe('reader builder presentation loading', () => {
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/pages/battle-bros/about']);
   });
 
+  it('renders series pages without reader modules as normal builder content', async () => {
+    const builderPage = buildContractFixture('builderPage', {
+      slug: 'about',
+      title: 'About',
+      pageType: 'custom',
+    });
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/posts') {
+        return jsonResponse({ posts: getContractFixture('feedPosts') });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const shellState = applyBuilderPageToDOM(builderPage, { seriesId: 'battle-bros' });
+    await flushReaderUi(4);
+
+    const builderContent = document.getElementById('builderPageContent');
+    expect(shellState).toEqual({ active: false, reason: 'no-reader-module' });
+    expect(document.body.dataset.readerShell).toBe('inactive');
+    expect(builderContent?.hidden).toBe(false);
+    expect(builderContent?.querySelector('.pb-page')).not.toBeNull();
+    expect(builderContent?.querySelector('.pb-module--text')).not.toBeNull();
+    expect(document.querySelector('.viewerWrap')?.hidden).toBe(true);
+    expect(document.getElementById('controls')?.hidden).toBe(true);
+    expect(document.getElementById('leftPanel')?.hidden).toBe(true);
+    expect(document.getElementById('rightPanel')?.hidden).toBe(true);
+    expect(document.getElementById('comicCommentsSection')?.hidden).toBe(true);
+    expect(document.querySelector('.entry-controls')?.hidden).toBe(true);
+    expect(document.querySelector('.entry-controls')?.getAttribute('aria-hidden')).toBe('true');
+    expect(document.getElementById('entry')?.hidden).toBe(true);
+    expect(document.getElementById('statusPanel')?.hidden).toBe(true);
+    expect(document.querySelector('.brand')?.hidden).toBe(false);
+    expect(document.querySelector('.nav-links')?.hidden).toBe(false);
+    expect(document.getElementById('patronWelcome')?.hidden).toBe(false);
+    expect(document.querySelector('#leftPanel .panel-builder--left')).toBeNull();
+    expect(document.querySelector('#rightPanel .panel-builder--right')).toBeNull();
+  });
+
+  it('renders global pages without reader modules with builder editing markers', () => {
+    const globalPage = buildContractFixture('builderPageDraft', {
+      id: 'global-about-page',
+      scope: 'global',
+      seriesId: null,
+      slug: 'about',
+      pageType: 'custom',
+    });
+
+    const shellState = applyBuilderPageToDOM(globalPage, {
+      previewMode: true,
+      builderEditing: true,
+      deviceId: 'mobile',
+    });
+
+    const builderContent = document.getElementById('builderPageContent');
+    expect(shellState).toEqual({ active: false, reason: 'no-reader-module' });
+    expect(builderContent?.hidden).toBe(false);
+    expect(builderContent?.querySelector('.pb-page')?.dataset.builderPageId).toBe(
+      'global-about-page'
+    );
+    expect(builderContent?.querySelector('[data-builder-section-id]')).not.toBeNull();
+    expect(builderContent?.querySelector('[data-builder-column-index]')).not.toBeNull();
+    expect(builderContent?.querySelector('[data-builder-module-id]')).not.toBeNull();
+    expect(document.querySelector('.viewerWrap')?.dataset.builderPageId).toBeUndefined();
+  });
+
+  it('treats reader modules hidden on the active builder device as inactive', () => {
+    const readerModule = getContractFixture('builderModules').reader;
+    const page = buildContractFixture('builderPage', {
+      sections: [
+        {
+          id: 'hidden-reader-section',
+          sectionType: 'row',
+          layout: '1',
+          sortIndex: 0,
+          settings: {},
+          modules: [
+            {
+              ...readerModule,
+              config: {
+                ...readerModule.config,
+                responsive: {
+                  mobile: {
+                    hidden: true,
+                  },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const shellState = applyBuilderPageToDOM(page, {
+      previewMode: true,
+      builderEditing: true,
+      deviceId: 'mobile',
+    });
+
+    expect(shellState).toEqual({ active: false, reason: 'no-reader-module' });
+    expect(document.body.dataset.readerShell).toBe('inactive');
+    expect(document.getElementById('builderPageContent')?.hidden).toBe(false);
+    expect(document.querySelector('.viewerWrap')?.hidden).toBe(true);
+  });
+
   it('ignores stale pb-no-fallback state when the builder page is missing', async () => {
     localStorage.setItem('pb-no-fallback', '1');
     const setSubtitles = vi.fn();
@@ -357,7 +501,7 @@ describe('reader builder presentation loading', () => {
   });
 
   it('applies the builder page contract to the live reader DOM', async () => {
-    const builderPage = getContractFixture('builderPage');
+    const builderPage = buildReaderShellPage();
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/posts/latest') {
         return jsonResponse({ post: getContractFixture('latestPost') });
@@ -374,6 +518,9 @@ describe('reader builder presentation loading', () => {
 
     expect(document.querySelector('.topbar .title h1')?.textContent).toBe('Battle Bros');
     expect(document.getElementById('subtitle')?.textContent).toBe('Hero Time');
+    expect(document.querySelector('.entry-controls')?.hidden).toBe(false);
+    expect(document.getElementById('entry')?.hidden).toBe(false);
+    expect(document.getElementById('statusPanel')?.hidden).toBe(false);
     expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#ffcc00');
     expect(document.documentElement.style.getPropertyValue('--bg-panel')).toBe('#151a33');
 
@@ -395,10 +542,50 @@ describe('reader builder presentation loading', () => {
     expect(rightBuilder?.querySelector('.latest-name')?.textContent).toBe('Issue 10 Released');
   });
 
+  it('restores reader-owned header chrome when an active reader page follows a no-reader page', () => {
+    const noReaderPage = buildContractFixture('builderPageDraft', {
+      slug: 'about',
+      title: 'About',
+      pageType: 'custom',
+    });
+    applyBuilderPageToDOM(noReaderPage, { seriesId: 'battle-bros' });
+
+    expect(document.querySelector('.entry-controls')?.hidden).toBe(true);
+    expect(document.getElementById('entry')?.hidden).toBe(true);
+    expect(document.getElementById('statusPanel')?.hidden).toBe(true);
+
+    applyBuilderPageToDOM(buildReaderShellPage({ sections: [] }), { seriesId: 'battle-bros' });
+
+    expect(document.body.dataset.readerShell).toBe('active');
+    expect(document.querySelector('.entry-controls')?.hidden).toBe(false);
+    expect(document.getElementById('entry')?.hidden).toBe(false);
+    expect(document.getElementById('statusPanel')?.hidden).toBe(false);
+  });
+
   it('renders entry-gallery modules through the reader shell panel stack', async () => {
     const entryGallery = getContractFixture('builderModules')['entry-gallery'];
+    const readerModule = getContractFixture('builderModules').reader;
     const builderPage = buildContractFixture('builderPage', {
       sections: [
+        {
+          id: 'reader-shell-section',
+          sectionType: 'row',
+          layout: '1',
+          sortIndex: -1,
+          settings: {},
+          modules: [
+            {
+              ...readerModule,
+              id: 'reader-shell-module',
+              columnIndex: 0,
+              sortIndex: 0,
+              config: {
+                ...readerModule.config,
+                source: { mode: 'active-page-series' },
+              },
+            },
+          ],
+        },
         {
           id: 'entry-gallery-section',
           sectionType: 'row',
@@ -968,9 +1155,8 @@ describe('reader builder presentation loading', () => {
   });
 
   it('uses the current empty-panel behavior and hideEmptyText contract', () => {
-    const basePage = getContractFixture('builderPage');
-    const emptyPage = buildContractFixture('builderPage', {
-      sections: [basePage.sections[0]],
+    const emptyPage = buildReaderShellPage({
+      sections: [],
       meta: {
         panelBackgrounds: {
           right: {

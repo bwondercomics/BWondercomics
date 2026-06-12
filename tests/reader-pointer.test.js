@@ -27,6 +27,7 @@ describe('reader pointer interactions', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     document.body.innerHTML = '';
+    document.body.dataset.readerShell = 'active';
     el.stage = document.createElement('div');
     el.viewport = document.createElement('div');
     el.edgeLeft = document.createElement('div');
@@ -146,5 +147,32 @@ describe('reader pointer interactions', () => {
 
     expect(state.pan).toEqual({ x: 80, y: 90 });
     expect(applyTransform).toHaveBeenCalledTimes(1);
+  });
+
+  it('ignores pointer interactions when the reader shell is inactive', () => {
+    initPointerHandlers();
+    document.body.dataset.readerShell = 'inactive';
+
+    el.stage.dispatchEvent(
+      createPointerEvent('pointerdown', {
+        pointerId: 4,
+        pointerType: 'touch',
+        clientX: 300,
+        clientY: 120,
+      })
+    );
+    window.dispatchEvent(
+      createPointerEvent('pointerup', {
+        pointerId: 4,
+        pointerType: 'touch',
+        clientX: 180,
+        clientY: 126,
+      })
+    );
+    updateEdgeZones(20, 100);
+
+    expect(nextPage).not.toHaveBeenCalled();
+    expect(el.edgeLeft.classList.contains('active')).toBe(false);
+    expect(el.viewport.style.cursor).toBe('');
   });
 });

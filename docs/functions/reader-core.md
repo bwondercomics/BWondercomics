@@ -71,21 +71,20 @@ The reader is split into three layers:
 ## ⚙️ Boot And Runtime Flow
 
 1. `index.html` loads `reader/app.js` and `reader/customization.js`.
-2. `reader/app.js` creates a shared boot-state object on `window`, keeps the static shell hidden with `reader-bootstrap-loading`, and loads:
-   - series entry data via `loadEntryData()`
-   - page config via `loadPageConfigWithFallback()`
-   - latest post data via `loadLatestPost()`
+2. `reader/app.js` creates shared boot-state and reader-shell-state objects on `window`, keeps the static shell hidden with `reader-bootstrap-loading`, and resolves the builder page before starting reader-only work.
 3. `loadPageConfigWithFallback()` resolves builder content from two paths:
    - when the URL has an explicit `?page=<slug>`, it loads `/api/pages/<seriesId>/<slug>` or, when `?pageScope=global` is present, `/api/pages/global/by-slug/<slug>`
    - when no explicit page slug is present, it loads `/api/pages/home/<seriesId>` or the admin homepage draft endpoint so the series root follows homepage assignment and same-series reader binding instead of hard-coding `reader`
-4. **Builder preview mode** (`?builderPreview=1`): when the URL carries this flag, `app.js` skips `loadPageConfigWithFallback()` entirely, lazy-imports `reader/preview-bridge.js`, and calls `requestPreviewSnapshot(...)`. The bridge sends a `REQUEST_SNAPSHOT` message to the parent admin frame, validates the `SNAPSHOT` reply, and returns a resolved page result. That result is applied via `applyBuilderPageToDOM(...)` with `previewMode: true` so all side-effect hooks are suppressed. After the snapshot is applied, the bridge stores preview identity context, emits a validated `METRICS` payload back to the admin frame, and, when `builderEditing` is true, starts a target bridge that reports marked target geometry plus hover/select events. It stays subscribed for follow-up `SNAPSHOT` updates from the builder. If the request times out or the snapshot is invalid, `handlePreviewLoadError()` surfaces an inline error and releases bootstrap state with `source: 'error'`.
-5. Missing builder pages resolve to `source: 'none'`; normal startup does not fetch legacy `page-config.json`.
-6. After the first render or error state is ready, `app.js` releases bootstrap hiding and exposes `window.BattleBros` subtitle helpers.
-7. `reader/customization.js` waits for the boot result and remains a no-op so `source: 'none'` cannot repaint the legacy shell.
+4. `reader/shell-state.js` resolves whether the page has an effective `reader` module. Pages without one publish `body[data-reader-shell="inactive"]`, render the full builder page into `#builderPageContent`, hide reader-owned shell and topbar controls, and skip entry-data loading, reader analytics, gallery/latest panel setup, pointer/fullscreen handlers, comments, and live tracking.
+5. Pages with an effective `reader` module publish `body[data-reader-shell="active"]`, load the reader module's target series data via `loadEntryData()`, apply premium gating, load latest posts, and initialize the static reader shell.
+6. **Builder preview mode** (`?builderPreview=1`): when the URL carries this flag, `app.js` skips `loadPageConfigWithFallback()` entirely, lazy-imports `reader/preview-bridge.js`, and calls `requestPreviewSnapshot(...)`. The bridge sends a `REQUEST_SNAPSHOT` message to the parent admin frame, validates the `SNAPSHOT` reply, and returns a resolved page result. Each snapshot is applied via `applyBuilderPageToDOM(...)` with `previewMode: true`; no-reader snapshots still emit responsive metrics and builder target geometry from `#builderPageContent`, while active reader snapshots keep reader side effects suppressed for preview. Reader handlers that were attached by an earlier active preview state check the current shell state and no-op after an active-to-inactive snapshot transition. If the request times out or the snapshot is invalid, `handlePreviewLoadError()` surfaces an inline error and releases bootstrap state with `source: 'error'`.
+7. Missing builder pages resolve to `source: 'none'`; normal startup does not fetch legacy `page-config.json` or force the static reader shell back into view.
+8. After the first render, no-reader builder-page application, or error state is ready, `app.js` releases bootstrap hiding and exposes `window.BattleBros` subtitle helpers.
+9. `reader/customization.js` waits for the boot result and remains a no-op so `source: 'none'` cannot repaint the legacy shell.
 
 ## 🔌 Main Entry Point (app.js)
 
-The composition root. Loads runtime data, applies premium gating, initializes DOM bindings, coordinates boot-state handoff, statically imports fullscreen controls, lazy-loads `gallery.js` and the preview bridge, and reacts to session changes. In builder preview mode (`?builderPreview=1`) the normal data-fetch path is bypassed; the reader instead waits for a validated snapshot from the admin frame via `preview-bridge.js`. A `previewMode` flag propagates through `init(...)` and `attachEventHandlers(...)` to suppress fullscreen, mouse-edge controls, topbar hover handlers, navigation links, store-entry redirects, and analytics initialization. Preview mode also emits responsive metrics after snapshot application and after the debounced resize `render()` path completes.
+The composition root. Resolves the builder page, checks reader-shell state, loads runtime data only for active reader pages, applies premium gating, initializes DOM bindings, coordinates boot-state handoff, statically imports fullscreen controls, lazy-loads `gallery.js` and the preview bridge, and reacts to session changes. In builder preview mode (`?builderPreview=1`) the normal data-fetch path is bypassed; the reader instead waits for a validated snapshot from the admin frame via `preview-bridge.js`. A `previewMode` flag propagates through `init(...)` and `attachEventHandlers(...)` to suppress fullscreen, mouse-edge controls, topbar hover handlers, navigation links, store-entry redirects, and analytics initialization. Attached reader navigation, zoom, pointer, entry, and resize handlers also guard against `body[data-reader-shell="inactive"]` so preview shell-state transitions cannot keep reader actions live on no-reader pages. Preview mode also emits responsive metrics after snapshot application and after the debounced resize `render()` path completes.
 
 ## 💾 Data Hydration (data.js)
 
@@ -96,6 +95,7 @@ Important current behavior:
 - `loadHomepageBuilderPage()` is the root-path loader used when no explicit page slug is requested
 - root-path builder loading now follows the effective homepage resolver instead of always requesting the `reader` slug directly
 - `applyBuilderPageToDOM()` resolves header state once and reuses that same state for both visible copy and shared topbar layout
+- `applyBuilderPageToDOM()` publishes reader-shell state. Active pages use the existing static shell/panel path; no-reader pages render a normal `.pb-page` into `#builderPageContent` and hide reader-only shell chrome plus reader-owned topbar controls.
 - `applyBuilderPageToDOM()` accepts a `previewMode` option that propagates to `renderPanelStack(...)` and `initEmailForms(...)` so email signup forms show a preview stub instead of submitting
 - normal startup resolves V3 page headers with `pageConfig: null`; optional legacy config remains accepted only for migration/safety helper calls
 
@@ -201,7 +201,7 @@ Analytics and live tracking are separate systems. `analytics.js` handles reader 
 
 ## 📡 Live Tracker (live-tracking.js)
 
-Maintains a lightweight visitor heartbeat to `/api/track/visitor` with visitor id, path, series id, entry label, and page number. It handles active-visitor presence tracking. In builder preview mode (`?builderPreview=1`) `initLiveTracking()` exits immediately without starting the heartbeat, so no tracking events fire from preview.
+Maintains a lightweight visitor heartbeat to `/api/track/visitor` with visitor id, path, series id, entry label, and page number. It handles active-visitor presence tracking. `initLiveTracking()` waits for the published reader-shell state and starts only for active, non-preview reader pages. In builder preview mode (`?builderPreview=1`) or on pages without a reader module, it exits without starting the heartbeat.
 
 ## 🎯 Comment Targets (comment-targets.js)
 
@@ -210,6 +210,8 @@ Builds stable target ids such as `battle-bros:entry-5` and post target ids.
 ## 🗣️ Comments Engine (comic-comments.js)
 
 Self-contained reader comments UI. It handles session checks, sign-in/register/sign-out, comment posting, admin moderation calls, entry-target changes, and comment-panel collapse/expand behavior. It also requests `fitOnPageFrame()` after comment layout changes.
+
+The module waits for the published reader-shell state before initialization. Pages without a reader module do not initialize comments, fetch session state, or load comment threads.
 
 In builder preview mode (`?builderPreview=1`) the comment UI enters a read-only state: the auth form is hidden, the comment form is disabled with an explanatory hint, and all mutating API calls (`login`, `register`, `postComment`, `moderateComment`) throw immediately without a network request. `logout()` is silently ignored.
 

@@ -10,6 +10,21 @@ import { throttle, cachedMeasure } from './utils.js';
 // Cached viewport measurement to avoid layout thrashing
 let getViewportRect = null;
 
+function isReaderShellActive() {
+  return document.body?.dataset.readerShell === 'active';
+}
+
+function clearPointerInteractionState() {
+  state.pointers.clear();
+  state.isDragging = false;
+  state.touchStart = null;
+  state.pinchDistance = null;
+  state.pinchCenter = null;
+  if (el.edgeLeft) el.edgeLeft.classList.remove('active');
+  if (el.edgeRight) el.edgeRight.classList.remove('active');
+  if (el.viewport) el.viewport.style.cursor = '';
+}
+
 function getDistance(a, b) {
   const dx = a.x - b.x;
   const dy = a.y - b.y;
@@ -53,6 +68,10 @@ export function initPointerHandlers() {
 
 function onPointerDown(e) {
   // Track pointers for drag/pinch interactions and taps.
+  if (!isReaderShellActive()) {
+    clearPointerInteractionState();
+    return;
+  }
   try {
     e.target.setPointerCapture(e.pointerId);
   } catch {
@@ -100,6 +119,10 @@ function onPointerDown(e) {
 
 function onPointerMove(e) {
   // Apply pan/zoom transforms based on pointer count.
+  if (!isReaderShellActive()) {
+    clearPointerInteractionState();
+    return;
+  }
   if (!state.pointers.has(e.pointerId)) return;
 
   state.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -140,6 +163,10 @@ function onPointerMove(e) {
 
 function onPointerUp(e) {
   // Finish gestures, handle swipes, reset pointer state.
+  if (!isReaderShellActive()) {
+    clearPointerInteractionState();
+    return;
+  }
   try {
     e.target.releasePointerCapture(e.pointerId);
   } catch {
@@ -199,6 +226,7 @@ function onPointerUp(e) {
 }
 
 function onWheel(e) {
+  if (!isReaderShellActive()) return;
   if (e.ctrlKey) {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.1 : 0.1;
@@ -210,6 +238,10 @@ function onWheel(e) {
 
 export function updateEdgeZones(x, _y) {
   if (!el.viewport) return;
+  if (!isReaderShellActive()) {
+    clearPointerInteractionState();
+    return;
+  }
 
   if (state.isDragging || state.pointers.size > 0) {
     if (el.edgeLeft) el.edgeLeft.classList.remove('active');

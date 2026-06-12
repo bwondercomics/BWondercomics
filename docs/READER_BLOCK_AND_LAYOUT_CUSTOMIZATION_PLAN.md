@@ -162,6 +162,28 @@ Acceptance criteria:
   navigation do not appear or run on no-reader pages.
 - The public reader and admin live preview remain in parity.
 
+Completion note (`2026-06-12`): Phase 1 is implemented. `reader/shell-state.js` now publishes the
+active/inactive reader-shell contract from effective `reader` modules only, and `reader/data.js`
+renders no-reader pages into `#builderPageContent` while hiding the static reader shell. `reader/app.js`
+resolves builder pages before loading entry data so no-reader pages skip reader analytics, gallery,
+latest-panel, pointer, fullscreen, keyboard navigation, and render startup. Standalone live tracking,
+comments, and inline comment toggles now wait for or check the shell state before running. Coverage
+was added for no-reader DOM rendering, builder target markers, app boot, side-effect suppression, and
+public/admin preview browser behavior. Verification passed: `git diff --check`,
+`npm run format:check`, `npm run lint`, `npm test` (`459` passed, `1` skipped),
+`npm run build`, and `npm run test:visual` (`7` passed). Backend gates were not run because this
+phase did not change backend code or API payload contracts.
+
+Fix addendum (`2026-06-12`): Phase 1 audit findings are fixed. Inactive no-reader pages now also
+hide/inert reader-owned topbar controls (`.entry-controls`, `#entry`, and `#statusPanel`) while
+preserving normal header brand/nav/auth surfaces. Reader navigation, zoom, pointer, entry, and resize
+handlers now check the current shell state so active-to-inactive preview snapshots cannot keep reader
+actions live. Comments subscribe to shell-state changes and initialize once when a later preview
+snapshot becomes active. Verification passed: `git diff --check`, `npm run format:check`,
+`npm run lint`, `npm test` (`465` passed, `1` skipped), `npm run build`, and
+`npm run test:visual` (`7` passed). Backend gates were not run because this fix did not change backend
+code or API payload contracts.
+
 ## Phase 2 - Reader Module Lifecycle And Binding Rules
 
 Goal: Make the reader block authoritative while preserving series reader guarantees.

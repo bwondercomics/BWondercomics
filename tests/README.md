@@ -62,13 +62,13 @@ Install backend dev dependencies into the repo virtualenv:
 - `tests/entries.test.js`: entry parsing, sorting, and normalization
 - `tests/state.test.js`: reader progress persistence
 - `tests/data.test.js`: reader data/page-config loading
-- `tests/reader-data-builder.test.js`: builder-first page loading, fallback retirement (`source: 'builder'` / `source: 'none'` only), no legacy `page-config.json` startup fetch, backfilled V3 header parity, and DOM application
+- `tests/reader-data-builder.test.js`: builder-first page loading, fallback retirement (`source: 'builder'` / `source: 'none'` only), no legacy `page-config.json` startup fetch, backfilled V3 header parity, reader-shell/no-reader DOM application, and builder target markers
 - `tests/reader-page-renderer.test.js`: reader page-builder module rendering contracts
 - `tests/reader-feed-panel.test.js`: feed/latest rendering, sanitization, and feed-mode behavior
 - `tests/reader-controls.test.js`: reader next/prev/restart behavior
 - `tests/reader-fullscreen.test.js`: fullscreen enter/exit and controls timing
 - `tests/reader-pointer.test.js`: swipe, drag, double-tap, and edge-zone behavior
-- `tests/reader-app.test.js`: reader boot against the live `index.html` contract
+- `tests/reader-app.test.js`: reader and no-reader boot against the live `index.html` contract
 - `tests/reader-customization.test.js`: reader boot/customization coordination so the legacy customization entrypoint stays a no-op compatibility layer
 - `tests/admin-smoke.test.js`: admin app boot against the live markup contract
 - `tests/admin-auth.test.js`: admin session/login/logout contract handling
@@ -88,7 +88,7 @@ Install backend dev dependencies into the repo virtualenv:
 - `tests/diagnostics-snapshot.test.js`: diagnostics snapshot rendering and fallbacks
 - `tests/ops-app.test.js`: ops UI rendering states
 - `tests/helpers/contracts.js` + `tests/fixtures/contract-fixtures.json`: shared frontend contract fixtures for series, builder pages/modules, feed/latest payloads, tracking, and user-state contracts
-- `tests/visual/builder-preview-parity.spec.js`: Playwright screenshot parity and iframe metric coverage for the live builder preview against the public reader at Desktop, Tablet, and Mobile
+- `tests/visual/builder-preview-parity.spec.js`: Playwright screenshot parity and iframe metric coverage for the live builder preview against the public reader at Desktop, Tablet, and Mobile, plus no-reader custom page shell suppression
 - `tests/visual/builder-authoring-workflows.spec.js`: Playwright Phase 12 browser workflow coverage for exact iframe dimensions, series reader bindings, chrome preview collapse/restore, side-panel save/reload, current-device override persistence, inline text Save/Discard, live block drag/drop persistence, and global Feed template page creation
 - `backend/tests/helpers.py`: shared backend route harness and contract seed helpers for series, builder pages, comments, premium codes, and visitor sessions
 - `backend/tests/test_*.py`: backend diagnostics/ops, branding, and core route contract behavior including page-builder, tracking, user flows, and page-header backfill/readiness coverage

@@ -22,8 +22,7 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-function buildVisualPage() {
-  const page = clone(fixtures.builderPage);
+function stabilizeVisualPage(page) {
   for (const section of page.sections || []) {
     for (const mod of section.modules || []) {
       if (mod.moduleType === 'promo' && mod.config) {
@@ -33,6 +32,43 @@ function buildVisualPage() {
     }
   }
   return page;
+}
+
+function buildVisualPage() {
+  const page = stabilizeVisualPage(clone(fixtures.builderPage));
+  const readerModule = clone(fixtures.builderModules.reader);
+  page.sections.unshift({
+    id: 'visual-reader-shell-section',
+    sectionType: 'row',
+    layout: '1',
+    sortIndex: -1,
+    settings: {},
+    modules: [
+      {
+        ...readerModule,
+        id: 'visual-reader-shell-module',
+        columnIndex: 0,
+        sortIndex: 0,
+        config: {
+          ...readerModule.config,
+          source: { mode: 'active-page-series' },
+        },
+      },
+    ],
+  });
+  return page;
+}
+
+function buildNoReaderVisualPage() {
+  return stabilizeVisualPage(
+    Object.assign(clone(fixtures.builderPage), {
+      id: 'visual-about-page',
+      slug: 'about',
+      title: 'About Battle Bros',
+      pageType: 'custom',
+      isHomepage: false,
+    })
+  );
 }
 
 function json(body) {
@@ -78,6 +114,7 @@ async function gotoAppPage(page, path) {
 
 async function installVisualRoutes(page) {
   const visualPage = buildVisualPage();
+  const noReaderPage = buildNoReaderVisualPage();
   const adminPosts = Object.values(fixtures.posts || {});
 
   await page.route('**/*', async (route) => {
@@ -137,8 +174,13 @@ async function installVisualRoutes(page) {
       return;
     }
 
+    if (pathname === '/api/pages/battle-bros/about') {
+      await route.fulfill(json({ page: noReaderPage }));
+      return;
+    }
+
     if (pathname === '/api/admin/pages/series/battle-bros') {
-      await route.fulfill(json({ pages: [visualPage] }));
+      await route.fulfill(json({ pages: [visualPage, noReaderPage] }));
       return;
     }
 
@@ -148,7 +190,7 @@ async function installVisualRoutes(page) {
     }
 
     if (pathname === '/api/admin/pages' && url.searchParams.get('series_id') === 'battle-bros') {
-      await route.fulfill(json({ pages: [visualPage] }));
+      await route.fulfill(json({ pages: [visualPage, noReaderPage] }));
       return;
     }
 
@@ -165,6 +207,11 @@ async function installVisualRoutes(page) {
 
     if (pathname === `/api/admin/pages/${visualPage.id}`) {
       await route.fulfill(json({ page: visualPage }));
+      return;
+    }
+
+    if (pathname === `/api/admin/pages/${noReaderPage.id}`) {
+      await route.fulfill(json({ page: noReaderPage }));
       return;
     }
 
@@ -452,6 +499,24 @@ async function assertPreviewShell(frame) {
   await expect(frame.locator('header.topbar .nav-link').filter({ hasText: 'About' })).toBeVisible();
 }
 
+async function assertNoReaderBuilderPage(target) {
+  await expect(target.locator('body')).toHaveAttribute('data-reader-shell', 'inactive');
+  await expect(target.locator('header.topbar')).toBeVisible();
+  await expect(target.locator('.viewerWrap')).toBeHidden();
+  await expect(target.locator('#leftPanel')).toBeHidden();
+  await expect(target.locator('#rightPanel')).toBeHidden();
+  await expect(target.locator('#controls')).toBeHidden();
+  await expect(target.locator('#comicCommentsSection')).toBeHidden();
+  await expect(target.locator('.entry-controls')).toBeHidden();
+  await expect(target.locator('#entry')).toBeHidden();
+  await expect(target.locator('#entryCoverGalleryBtn')).toBeHidden();
+  await expect(target.locator('#statusPanel')).toBeHidden();
+  await expect(target.locator('#builderPageContent')).toBeVisible();
+  await expect(target.locator('#builderPageContent .pb-page')).toBeVisible();
+  await expect(target.locator('#builderPageContent .pb-module--text').first()).toBeVisible();
+  await expect(target.locator('.pb-reader-mount')).toHaveCount(0);
+}
+
 async function collectPreviewMetricsDataset(page) {
   return page.locator('.pb-preview-frame').evaluate((frame) => ({
     ...frame.dataset,
@@ -486,6 +551,56 @@ async function assertSelectedOverlayAlignment(page) {
 }
 
 test.describe('builder preview visual parity', () => {
+  test('no-reader custom pages render authored content without reader shell chrome', async ({
+    browser,
+  }) => {
+    const viewport = PREVIEW_VIEWPORTS.desktop;
+    const readerContext = await browser.newContext({
+      baseURL: VISUAL_BASE_URL,
+      viewport: { width: viewport.width, height: viewport.height },
+      deviceScaleFactor: 1,
+      locale: 'en-US',
+      timezoneId: 'UTC',
+    });
+    const readerPage = await readerContext.newPage();
+    await preparePage(readerPage, viewport);
+    await gotoAppPage(readerPage, '/index.html?series=battle-bros&page=about');
+    await readerPage.waitForSelector('html:not(.reader-bootstrap-loading)');
+    await assertNoReaderBuilderPage(readerPage);
+
+    const adminContext = await browser.newContext({
+      baseURL: VISUAL_BASE_URL,
+      viewport: { width: 1920, height: 1300 },
+      deviceScaleFactor: 1,
+      locale: 'en-US',
+      timezoneId: 'UTC',
+    });
+    const adminPage = await adminContext.newPage();
+    await installVisualRoutes(adminPage);
+    await installStableRuntime(adminPage);
+    await gotoAppPage(
+      adminPage,
+      '/admin/index.html?view=designer&series=battle-bros&page=about&surface=header'
+    );
+    await expect(adminPage.locator('#pageBuilderSection')).toBeVisible();
+    await waitForPreviewReady(adminPage, 'desktop');
+
+    const previewFrame = await getPreviewFrame(adminPage);
+    await assertNoReaderBuilderPage(previewFrame);
+    await waitForFrameAssets(previewFrame);
+
+    const metrics = await collectPreviewMetricsDataset(adminPage);
+    expect(metrics.metricsPreset).toBe('desktop');
+    expect(metrics.metricsInnerWidth).toBe(String(viewport.width));
+    expect(metrics.metricsHasOverflow).toBe('false');
+    await adminPage.waitForSelector('.pb-preview-frame[data-target-count]');
+    const targetCount = Number((await collectPreviewMetricsDataset(adminPage)).targetCount || '0');
+    expect(targetCount).toBeGreaterThan(0);
+
+    await adminContext.close();
+    await readerContext.close();
+  });
+
   for (const viewportId of PREVIEW_VIEWPORT_ORDER) {
     const viewport = PREVIEW_VIEWPORTS[viewportId];
 

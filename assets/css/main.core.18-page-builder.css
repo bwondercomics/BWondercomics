@@ -1,5 +1,28 @@
 /* Page Builder Public Styles */
 
+.builder-page-content {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 48px;
+}
+
+body[data-reader-shell='inactive'] main {
+  min-height: calc(100vh - 72px);
+  min-height: calc(100dvh - 72px);
+  height: auto;
+  overflow: visible;
+}
+
+body[data-reader-shell='inactive'] .viewerWrap {
+  display: none !important;
+}
+
+body[data-reader-shell='inactive'] .entry-controls,
+body[data-reader-shell='inactive'] #entry,
+body[data-reader-shell='inactive'] #statusPanel {
+  display: none !important;
+}
+
 .pb-page {
   width: 100%;
 }

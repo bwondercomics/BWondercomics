@@ -1,3 +1,5 @@
+import { waitForReaderShellState } from './shell-state.js';
+
 const TRACK_ENDPOINT = '/api/track/visitor';
 const VISITOR_ID_KEY = 'battlebros_visitor_id';
 const COUNT_VIEWS_KEY = 'battlebros_count_views';
@@ -125,8 +127,10 @@ export function updateLiveContext(partial = {}) {
   sendUpdate();
 }
 
-export function initLiveTracking() {
+export async function initLiveTracking() {
   if (started || !canTrack() || isBuilderPreview()) return;
+  const shellState = await waitForReaderShellState();
+  if (started || !canTrack() || isBuilderPreview() || shellState.active !== true) return;
   started = true;
   visitorId = getVisitorId();
   updateContext({
