@@ -8,7 +8,8 @@ Created: 2026-06-06
 Turn the comic reader into an authorable page-builder block instead of a permanent fixture on every
 builder page. A canonical series reader page still needs one active reader block, but ordinary
 series pages and global pages should be able to omit the reader entirely, place content above or
-below it, or build custom pages without forced reader chrome.
+below it, or build custom pages without forced reader chrome. Bound reader pages should also support
+normal authored sections and columns below the required reader block.
 
 This plan also covers two related authoring gaps:
 
@@ -44,6 +45,9 @@ This plan also covers two related authoring gaps:
 - A bound series reader page must contain exactly one active, non-hidden `reader` module. Missing,
   duplicate, or hidden reader modules should produce admin warnings and block publish or binding
   updates where practical.
+- A bound series reader page may contain normal builder sections and columns before or after the
+  required reader module. Under-reader columns are ordinary page content and must not invalidate the
+  reader binding.
 - Global pages may contain a reader module that targets a specific series, but they are not valid
   `reader` bindings for a series.
 - The reader DOM remains a view. Saved builder page/section/module records remain canonical.
@@ -126,6 +130,8 @@ Rules:
   width ratios.
 - Validate module `columnIndex` against the effective column count before save, move, reorder, and
   render.
+- Sections after a reader module remain valid on bound reader pages and render as normal page
+  content below the reader stage, not inside reader side panels or the reader mount.
 - Per-column styling uses sanitized appearance, spacing, width ratio, alignment, and visibility
   fields only.
 - Panel-specific styling remains structured. Reuse or migrate `meta.panelBackgrounds` and
@@ -180,6 +186,8 @@ Acceptance criteria:
 
 - Authors can remove the reader from non-bound pages.
 - Bound series reader pages cannot silently lose their only active reader module.
+- Bound series reader pages can still add, remove, and style normal sections/columns below the
+  required reader module without breaking the binding.
 - Existing series reader routes keep working after migration.
 
 ## Phase 3 - Reader Module Customization
@@ -245,6 +253,8 @@ Implementation:
 - Add a layout editor that supports selecting 1-6 columns and width ratios.
 - Migrate fixed layout presets into the new column settings model while still serializing compatible
   `layout` strings until all consumers are updated.
+- Add live-canvas insertion paths for adding a normal section below the selected reader module on a
+  bound reader page, then editing that section's column count and per-column styles.
 - Add per-column controls for background, text color where applicable, border, radius, padding,
   alignment, minimum height, hidden state, and responsive overrides.
 - Update shared renderers to emit column styles from sanitized column settings.
@@ -257,7 +267,10 @@ Implementation:
 Acceptance criteria:
 
 - Authors can create and style layouts with 1-6 columns.
-- Modules can be inserted above and below reader modules like any other block.
+- Modules and normal sections/columns can be inserted above and below reader modules like any other
+  block, including below the required reader module on bound reader pages.
+- A styled under-reader column on a bound reader page renders below the reader in admin preview and
+  public reader output.
 - Existing pages with fixed layout strings render the same after migration.
 - Per-device layout changes do not corrupt global module placement.
 
@@ -283,6 +296,8 @@ Required tests:
   - reader template creates one reader module and binding behavior stays stable
   - reader customization controls save through module drafts and respect dirty guards
   - column count and per-column styles save/discard/undo correctly
+  - bound reader pages can add and style a section/column below the required reader module without
+    losing the reader binding
   - live drag/drop can place blocks above and below reader modules
 
 - Reader/runtime tests:
@@ -291,6 +306,7 @@ Required tests:
     navigation
   - vertical mode renders all entry pages in order
   - vertical mode updates progress, comments target, and analytics
+  - under-reader sections render after the reader mount on bound reader pages
   - premium, scheduled, private, and empty entry states remain safe
   - preview mode keeps side-effect suppression
 
@@ -304,6 +320,7 @@ Required tests:
   - paged reader page
   - vertical-scroll reader page
   - blocks above and below a reader module
+  - a bound reader page with a styled column below the reader
   - styled 1, 2, 3, and 4+ column layouts
   - desktop 1920x1080, tablet 768x1024, and phone 375x812 admin preview parity
 

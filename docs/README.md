@@ -25,6 +25,7 @@ Recommended starting points:
 - `docs/BUILDER_PREVIEW_PARITY_PLAN.md` - dedicated plan for making the builder preview match the reader at desktop, tablet, and mobile viewport sizes.
 - `docs/INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md` and `docs/INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md` - completed full-page live builder phase plan.
 - `docs/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md` - post-0.8.2 plan for making the reader a removable/customizable block and expanding column styling.
+- `docs/BUILDER_STRIPE_STORE_PLAN.md` - follow-up plan for builder-authored one-time purchase store pages using Stripe-hosted Checkout.
 - `docs/admin-overview.md` - admin panel and page-builder behavior.
 - `docs/reader-overview.md` - reader runtime behavior and builder-page loading.
 - `docs/API_REFERENCE.md` - backend route reference.
