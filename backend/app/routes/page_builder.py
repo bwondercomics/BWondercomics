@@ -14,6 +14,7 @@ from ..models import User
 from ..page_store import (
     PAGE_SCOPE_GLOBAL,
     PAGE_SCOPE_SERIES,
+    PageBuilderValidationError,
     add_module,
     add_section,
     create_page,
@@ -274,6 +275,12 @@ def api_update_page_bindings(
 
     try:
         return update_page_bindings(db, series_id, payload.bindings)
+    except PageBuilderValidationError as e:
+        db.rollback()
+        return JSONResponse(
+            status_code=400,
+            content={"error": str(e), "code": e.code, "warnings": e.warnings},
+        )
     except ValueError as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
 
@@ -360,6 +367,12 @@ def api_update_page(
         if not page:
             return JSONResponse(status_code=404, content={"error": "Page not found"})
         return {"page": page}
+    except PageBuilderValidationError as e:
+        db.rollback()
+        return JSONResponse(
+            status_code=400,
+            content={"error": str(e), "code": e.code, "warnings": e.warnings},
+        )
     except ValueError as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
 

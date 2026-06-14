@@ -80,9 +80,10 @@ Current page-level fields include: `scope` (`series` or `global`), nullable `ser
 Current page-level `meta` ownership: `meta.header`, `meta.theme`, `meta.panelBackgrounds`, and `meta.panelSpacing`.
 
 Series route roles are stored in `BuilderPageBinding`; Phase 8 requires the `reader` role for each
-series, and reader bindings must point at a same-series page. Feed and media/gallery pages are now
-normal builder pages composed from CMS modules, while `feed`/`gallery` binding roles remain reserved
-for later routing work.
+series, and reader bindings must point at a same-series page. A valid bound reader page also needs
+exactly one Comic Reader module that is visible on the default Desktop device and uses the active
+page series source. Feed and media/gallery pages are now normal builder pages composed from CMS
+modules, while `feed`/`gallery` binding roles remain reserved for later routing work.
 
 ### Section
 
@@ -741,8 +742,10 @@ CMS-backed modules:
   client-side and protected media URLs keep the existing protected access route.
 
 The Add Page modal provides Blank, Reader, Feed, Media Gallery, and Entry Gallery templates. These
-templates create ordinary page, section, and module records; the Reader template is series-only and
-only assigns the reader binding when the active series does not already have one.
+templates create ordinary page, section, and module records; the Reader template is series-only,
+inserts one Comic Reader module, and only assigns the reader binding when the active series does not
+already have one. Slug `reader`, `pageType: "reader"`, or an existing binding alone is not enough to
+make a page a canonical series reader page.
 
 Again: `header` is compatibility-only in the catalog and is not part of the normal insertable palette.
 
@@ -753,6 +756,11 @@ Again: `header` is compatibility-only in the catalog and is not part of the norm
 - The admin canvas is an editing surface with builder chrome. Live mode and chrome-collapsed Preview both render through the same real reader iframe (`index.html?builderPreview=1`) for full reader-shell parity, not through a constrained div or the direct `preview-renderers.js` path.
 - Shared renderer parity exists at the module/section/page HTML level through `shared-renderers.js`. The iframe preview approach means real viewport dimensions, real media queries, and real reader-side JavaScript all run in preview.
 - The iframe preview bridge (`reader/preview-bridge.js`) and the `postMessage` protocol defined in `preview-contract.js` are implemented. The snapshot merge path covers module config, theme metadata, normalized header metadata, page settings, and section spacing without mutating `currentPage`. Validated live-builder snapshots can opt into `builderEditing` markers; public reader output keeps admin-only `data-builder-*` attributes absent. In builder editing mode, target messages drive admin-only hover/selection overlays and block iframe links/forms before reader side effects can fire. Chrome-collapsed Preview deliberately sends `builderEditing: false`, so target messages stop while the reader stays in builder preview side-effect-suppressed mode.
+- Bound reader pages warn before delete, section-delete, or current-device hide actions would leave
+  the page without exactly one visible Comic Reader module. Confirmed draft edits can proceed, but
+  backend publish and reader-binding saves reject invalid bound reader pages with stable warning
+  codes. The backend binding rule is Desktop visibility; hiding the bound reader only on Tablet or
+  Phone shows advisory authoring copy instead of a publish/binding-blocking warning.
 - Responsive parity instrumentation is also implemented: the iframe keeps exact preset dimensions, the admin preview scale shell can shrink the visible presentation without changing iframe pixels, and preview metrics verify breakpoint branches, two-page mode expectations, and horizontal overflow risks.
 - Legacy `page-config` and legacy `header` module content still exist as migration/backfill inputs. Normal reader startup and page-builder header editing resolve V3 page headers with `pageConfig: null`; stored legacy `header` modules are later cleanup debt once V3 metadata exists.
 

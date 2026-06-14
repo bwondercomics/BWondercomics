@@ -42,6 +42,32 @@ function createDragLikeEvent(type, dataTransfer, init = {}) {
   return event;
 }
 
+function withReaderModule(page, overrides = {}) {
+  return buildContractFixture('builderPage', {
+    ...page,
+    sections: [
+      ...(page.sections || []),
+      {
+        id: `${page.id}-reader-section`,
+        sectionType: 'row',
+        layout: '1',
+        sortIndex: (page.sections || []).length,
+        settings: {},
+        modules: [
+          {
+            id: `${page.id}-reader-module`,
+            moduleType: 'reader',
+            columnIndex: 0,
+            sortIndex: 0,
+            config: { source: { mode: 'active-page-series' } },
+            ...overrides,
+          },
+        ],
+      },
+    ],
+  });
+}
+
 function createKeyboardLikeEvent(key, init = {}) {
   return new KeyboardEvent('keydown', {
     key,
@@ -86,6 +112,8 @@ async function setupPageBuilder({
   reorderModulesResult = true,
   reorderSectionsResult = true,
   updatePageResult = null,
+  updatePageBindingsResult = undefined,
+  pageBuilderDataError = null,
   updateModuleResult = undefined,
   useRealEditors = false,
   viewportWidth = 1600,
@@ -114,7 +142,10 @@ async function setupPageBuilder({
   const reorderPages = vi.fn(async () => reorderPagesResult);
   const reorderScopedPages = vi.fn(async () => reorderPagesResult);
   const fetchPageBindings = vi.fn(async () => fetchPageBindingsResult);
-  const updatePageBindings = vi.fn(async () => fetchPageBindingsResult);
+  const updatePageBindings = vi.fn(async () =>
+    updatePageBindingsResult === undefined ? fetchPageBindingsResult : updatePageBindingsResult
+  );
+  const getLastPageBuilderDataError = vi.fn(() => pageBuilderDataError);
   const updatePage = vi.fn(
     async (_pageId, data) =>
       updatePageResult || {
@@ -175,6 +206,7 @@ async function setupPageBuilder({
     reorderPages,
     reorderScopedPages,
     updatePage,
+    getLastPageBuilderDataError,
     fetchPageBindings,
     updatePageBindings,
     fetchAssets: vi.fn(async () => []),
@@ -245,6 +277,7 @@ async function setupPageBuilder({
       updateSection,
       updateModule,
       updatePage,
+      getLastPageBuilderDataError,
       updatePageBindings,
       deleteSection,
       deleteModule,
@@ -983,7 +1016,7 @@ describe('admin page-builder shell', () => {
   });
 
   it('switches page scopes and updates the series reader binding', async () => {
-    const seriesPage = getContractFixture('builderPage');
+    const seriesPage = withReaderModule(getContractFixture('builderPage'));
     const globalPage = buildContractFixture('builderPageDraft', {
       id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeee98',
       scope: 'global',
@@ -994,6 +1027,7 @@ describe('admin page-builder shell', () => {
     });
     const { manager, mocks } = await setupPageBuilder({
       fetchPagesResults: [[seriesPage]],
+      fetchPageResult: seriesPage,
       fetchGlobalPagesResults: [[globalPage]],
       fetchPageBindingsResult: {
         seriesId: 'battle-bros',
@@ -1051,6 +1085,80 @@ describe('admin page-builder shell', () => {
       'battle-bros',
       'contact',
       'Contact'
+    );
+  });
+
+  it('does not bind a series page without a reader module', async () => {
+    const seriesPage = getContractFixture('builderPage');
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[seriesPage]],
+      fetchPageResult: seriesPage,
+      fetchPageBindingsResult: {
+        seriesId: 'battle-bros',
+        bindings: {},
+        warnings: [
+          {
+            role: 'reader',
+            code: 'missing_reader_binding',
+            message: 'This series is missing a reader page binding.',
+          },
+        ],
+      },
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector('.pb-page-action.reader')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(mocks.updatePageBindings).not.toHaveBeenCalled();
+    expect(document.getElementById('pbPageList')?.textContent).toContain(
+      'must contain one Comic Reader module'
+    );
+  });
+
+  it('shows backend reader-binding validation failures in the editor and page list', async () => {
+    const seriesPage = withReaderModule(getContractFixture('builderPage'));
+    const backendWarning = {
+      role: 'reader',
+      code: 'reader_module_wrong_source',
+      message: "The bound reader page's Comic Reader module must use the active page series.",
+    };
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[seriesPage]],
+      fetchPageResult: seriesPage,
+      fetchPageBindingsResult: {
+        seriesId: 'battle-bros',
+        bindings: {},
+        warnings: [],
+      },
+      updatePageBindingsResult: null,
+      pageBuilderDataError: {
+        message: backendWarning.message,
+        code: backendWarning.code,
+        warnings: [backendWarning],
+      },
+    });
+
+    await manager.showPageBuilderSection();
+
+    document
+      .querySelector('.pb-page-action.reader')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(mocks.updatePageBindings).toHaveBeenCalledWith('battle-bros', {
+      reader: seriesPage.id,
+    });
+    expect(mocks.getLastPageBuilderDataError).toHaveBeenCalled();
+    expect(document.getElementById('pbPageList')?.textContent).toContain(
+      'must use the active page series'
     );
   });
 
@@ -3826,6 +3934,143 @@ describe('admin page-builder shell', () => {
     expect(textModule.config.hidden).toBeUndefined();
   });
 
+  it('warns before hiding the bound reader module on the current device', async () => {
+    const selectedPage = withReaderModule(getContractFixture('builderPage'));
+    const readerModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'reader');
+    const readerSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === readerModule.id)
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      fetchPageBindingsResult: {
+        bindings: { reader: { pageId: selectedPage.id, page: selectedPage } },
+        warnings: [],
+      },
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const target = {
+      kind: 'module',
+      key: `module:${readerModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: readerSection.id,
+      columnIndex: readerModule.columnIndex,
+      moduleId: readerModule.id,
+      moduleType: readerModule.moduleType,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target,
+          rect: { top: 40, left: 30, right: 230, bottom: 140, width: 200, height: 100 },
+          visible: true,
+          order: 0,
+          label: 'Reader module',
+        },
+      ],
+    });
+    sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
+    await flushAdminUi(2);
+
+    frame
+      .querySelector('[data-preview-target-action="hide-device"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(6);
+
+    expect(globalThis.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('Publishing and reader binding saves will be blocked')
+    );
+    expect(mocks.updateModule).toHaveBeenCalledWith(
+      readerModule.id,
+      expect.objectContaining({
+        config: expect.objectContaining({
+          responsive: { desktop: { hidden: true } },
+        }),
+      })
+    );
+  });
+
+  it('uses advisory copy when hiding the bound reader module on a non-default device', async () => {
+    const selectedPage = withReaderModule(getContractFixture('builderPage'));
+    const readerModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'reader');
+    const readerSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === readerModule.id)
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      fetchPageBindingsResult: {
+        bindings: { reader: { pageId: selectedPage.id, page: selectedPage } },
+        warnings: [],
+      },
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+    document
+      .getElementById('pbWidthToggles')
+      ?.querySelector('[data-width="tablet"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const target = {
+      kind: 'module',
+      key: `module:${readerModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: readerSection.id,
+      columnIndex: readerModule.columnIndex,
+      moduleId: readerModule.id,
+      moduleType: readerModule.moduleType,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target,
+          rect: { top: 40, left: 30, right: 230, bottom: 140, width: 200, height: 100 },
+          visible: true,
+          order: 0,
+          label: 'Reader module',
+        },
+      ],
+    });
+    sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
+    await flushAdminUi(2);
+
+    frame
+      .querySelector('[data-preview-target-action="hide-device"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(6);
+
+    const confirmMessage = globalThis.confirm.mock.calls.at(-1)?.[0] || '';
+    expect(confirmMessage).toContain('will be hidden on Tablet');
+    expect(confirmMessage).not.toContain('Publishing and reader binding saves will be blocked');
+    expect(mocks.updateModule).toHaveBeenCalledWith(
+      readerModule.id,
+      expect.objectContaining({
+        config: expect.objectContaining({
+          responsive: { tablet: { hidden: true } },
+        }),
+      })
+    );
+  });
+
   it('keeps Duplicate disabled and routes toolbar Delete through the existing confirmation flow', async () => {
     const selectedPage = getContractFixture('builderPage');
     const textModule = selectedPage.sections
@@ -3886,6 +4131,66 @@ describe('admin page-builder shell', () => {
     await flushAdminUi(6);
 
     expect(mocks.deleteModule).toHaveBeenCalledWith(textModule.id);
+  });
+
+  it('warns before deleting the bound reader module', async () => {
+    const selectedPage = withReaderModule(getContractFixture('builderPage'));
+    const readerModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'reader');
+    const readerSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === readerModule.id)
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      fetchPageBindingsResult: {
+        bindings: { reader: { pageId: selectedPage.id, page: selectedPage } },
+        warnings: [],
+      },
+      deleteModuleResult: true,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const target = {
+      kind: 'module',
+      key: `module:${readerModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: readerSection.id,
+      columnIndex: readerModule.columnIndex,
+      moduleId: readerModule.id,
+      moduleType: readerModule.moduleType,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target,
+          rect: { top: 40, left: 30, right: 230, bottom: 140, width: 200, height: 100 },
+          visible: true,
+          order: 0,
+          label: 'Reader module',
+        },
+      ],
+    });
+    sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
+    await flushAdminUi(2);
+
+    frame
+      .querySelector('[data-preview-target-action="delete"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(6);
+
+    expect(globalThis.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('Publishing and reader binding saves will be blocked')
+    );
+    expect(mocks.deleteModule).toHaveBeenCalledWith(readerModule.id);
   });
 
   it('blocks live toolbar structural commands while a module draft is dirty', async () => {

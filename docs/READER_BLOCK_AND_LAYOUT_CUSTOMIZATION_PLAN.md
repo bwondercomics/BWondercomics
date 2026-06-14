@@ -212,6 +212,27 @@ Acceptance criteria:
   required reader module without breaking the binding.
 - Existing series reader routes keep working after migration.
 
+Completion note (`2026-06-14`): Phase 2 is implemented. Series reader bindings now require an
+actual valid reader module lifecycle: the bound page must be series-scoped, target the same series,
+contain exactly one reader module, keep it visible on the canonical default `desktop` device, and use
+the active page series source. Backend binding saves and publishes now reject invalid bound reader
+pages with stable warning/error codes, and public/homepage bound-reader resolution no longer treats
+slug, page type, or stale bindings as sufficient. Admin authoring now validates reader-binding saves,
+keeps the Reader template inserting one reader module, and warns before deleting, section-deleting, or
+hiding the only bound reader module while still allowing confirmed draft edits. Docs for the admin
+builder, reader runtime assumptions, and API warning payloads were updated. Verification passed:
+`git diff --check`, `npm run format:check`, `npm run lint`, `npm test` (`475` passed, `1` skipped),
+`npm run format:py:check`, `npm run lint:py`, `npm run test:backend` (`73` passed),
+`npm run build`, and `npm run test:visual` (`7` passed).
+
+Fix addendum (`2026-06-14`): Phase 2 audit follow-ups are applied. Invalid bound-reader publish
+validation now runs before page metadata mutation and structured validation failures roll back the
+route session before returning `400`. Admin binding-save failures from the backend now surface in the
+editor status and page-list warning area. Reader-module hide warnings now distinguish the backend
+Desktop binding rule from current-device authoring advice: hiding the bound reader on Desktop remains
+blocking, while Tablet/Phone hide actions show advisory copy and do not claim publish or binding
+saves will be blocked.
+
 ## Phase 3 - Reader Module Customization
 
 Goal: Expose reader display and controls settings through the module editor.

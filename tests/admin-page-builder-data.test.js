@@ -13,6 +13,7 @@ import {
   fetchPages,
   fetchPageBindings,
   fetchSeriesPages,
+  getLastPageBuilderDataError,
   moveModule,
   reorderModules,
   reorderSections,
@@ -150,6 +151,46 @@ describe('admin page-builder data layer', () => {
         body: JSON.stringify({ bindings: { reader: seriesPage.id } }),
       })
     );
+  });
+
+  it('preserves structured reader-binding validation errors from admin wrappers', async () => {
+    const page = getContractFixture('builderPage');
+    const validationPayload = {
+      error: 'The bound reader page must contain one Comic Reader module.',
+      code: 'reader_module_missing',
+      warnings: [
+        {
+          role: 'reader',
+          code: 'reader_module_missing',
+          message: 'The bound reader page must contain one Comic Reader module.',
+        },
+      ],
+    };
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (url === '/api/admin/page-bindings/battle-bros' && options.method === 'PUT') {
+        return jsonResponse(validationPayload, { status: 400, statusText: 'Bad Request' });
+      }
+      if (url === `/api/admin/pages/${page.id}` && options.method === 'PUT') {
+        return jsonResponse(validationPayload, { status: 400, statusText: 'Bad Request' });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await updatePageBindings('battle-bros', { reader: page.id })).toBeNull();
+    expect(getLastPageBuilderDataError()).toMatchObject({
+      message: validationPayload.error,
+      code: 'reader_module_missing',
+      warnings: validationPayload.warnings,
+    });
+    expect(globalThis.alert).toHaveBeenCalledWith(validationPayload.error);
+
+    expect(await updatePage(page.id, { isPublished: true })).toBeNull();
+    expect(getLastPageBuilderDataError()).toMatchObject({
+      message: validationPayload.error,
+      code: 'reader_module_missing',
+      warnings: validationPayload.warnings,
+    });
   });
 
   it('handles section and module endpoint wrappers plus page-create failures', async () => {

@@ -313,7 +313,12 @@ Fetch a published global builder page requested with `?pageScope=global&page=<sl
 - `POST /api/admin/pages/series/{seriesId}/reorder` and
   `POST /api/admin/pages/global/reorder` - reorder pages within one scope.
 - `GET/PUT /api/admin/page-bindings/{seriesId}` - read/update series route-role bindings. Reader
-  bindings must target a same-series page.
+  bindings must target a same-series page with exactly one Comic Reader module visible on the
+  default Desktop device and using the active page series source. Invalid reader-module state is
+  reported with stable warning codes such as `reader_module_missing`,
+  `reader_module_duplicate`, `reader_module_hidden_default_device`, and
+  `reader_module_wrong_source`; rejected binding/publish requests keep the `error` field and may
+  include `code` plus `warnings`.
 - `POST /api/admin/pages/{pageId}/sections`, `POST /api/admin/pages/{pageId}/sections/reorder`,
   `POST /api/admin/sections/{sectionId}/modules`, and related `/api/admin/sections/*` /
   `/api/admin/modules/*` routes - mutate builder sections and modules.

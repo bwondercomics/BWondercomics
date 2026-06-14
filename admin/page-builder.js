@@ -40,6 +40,11 @@ import {
 import { createDraftUndoStack } from './page-builder/undo-stack.js';
 import { BUILDER_DEVICE_ORDER } from './page-builder/preview-contract.js';
 import {
+  READER_BINDING_DEFAULT_DEVICE,
+  getReaderBindingInvalidationWarning,
+  validateReaderBindingPage,
+} from './page-builder/reader-binding-validation.js';
+import {
   isSectionResponsiveField,
   pruneEmptyResponsiveOverrides,
   setResponsiveOverrideValue,
@@ -54,6 +59,7 @@ import {
   updatePage,
   fetchPageBindings,
   updatePageBindings,
+  getLastPageBuilderDataError,
   fetchAssets,
   uploadAsset,
   addSection,
@@ -521,6 +527,7 @@ function createPageBuilder({
       createPage: (scope, seriesId, slug, title) => createScopedPage(scope, seriesId, slug, title),
       deletePage,
       updatePage,
+      getLastPageBuilderDataError,
       fetchPageBindings,
       updatePageBindings,
       uploadAsset,
@@ -705,7 +712,7 @@ function createPageBuilder({
       setEditorStatus('Page created, but the template section could not be added.', 'danger');
       return;
     }
-    await addModule(
+    const insertedModule = await addModule(
       section.id,
       template.moduleType,
       0,
@@ -714,7 +721,18 @@ function createPageBuilder({
 
     const readerBinding = pageBindings?.bindings?.reader?.pageId;
     if (templateId === 'reader' && activePageScope === 'series' && !readerBinding) {
-      await updateReaderBinding(page.id);
+      await updateReaderBinding(page.id, {
+        ...page,
+        scope: 'series',
+        seriesId: getSeriesId(),
+        sections: [
+          ...(page.sections || []),
+          {
+            ...section,
+            modules: insertedModule ? [insertedModule] : [],
+          },
+        ],
+      });
     }
   }
 
@@ -1399,12 +1417,41 @@ function createPageBuilder({
     renderLayerTree();
   }
 
-  async function updateReaderBinding(pageId) {
+  async function updateReaderBinding(pageId, candidatePageOverride = null) {
     if (!ensureCleanWorkspace('Save or discard your current changes before changing bindings.')) {
       return;
     }
+    const candidatePage =
+      candidatePageOverride || (currentPage?.id === pageId ? currentPage : await fetchPage(pageId));
+    const warnings = validateReaderBindingPage(candidatePage, {
+      seriesId: getSeriesId(),
+      deviceId: READER_BINDING_DEFAULT_DEVICE,
+    });
+    if (warnings.length) {
+      pageBindings = {
+        ...(pageBindings || {}),
+        warnings,
+      };
+      setEditorStatus(warnings[0].message, 'danger');
+      renderPageList();
+      renderEditorPanel();
+      return;
+    }
     const nextBindings = await updatePageBindings(getSeriesId(), { reader: pageId });
-    if (!nextBindings) return;
+    if (!nextBindings) {
+      const lastError = getLastPageBuilderDataError?.();
+      const warnings = Array.isArray(lastError?.warnings) ? lastError.warnings : [];
+      if (warnings.length) {
+        pageBindings = {
+          ...(pageBindings || {}),
+          warnings,
+        };
+      }
+      setEditorStatus(lastError?.message || 'Failed to update reader page binding.', 'danger');
+      renderPageList();
+      renderEditorPanel();
+      return;
+    }
     pageBindings = nextBindings;
     setEditorStatus('Reader page binding updated.', 'success');
     renderPageList();
@@ -1569,6 +1616,18 @@ function createPageBuilder({
   async function hideModuleOnCurrentDevice(moduleId) {
     const module = getSelectedModuleRecord(moduleId);
     if (!module) return false;
+    const invalidation = getReaderBindingInvalidationWarning(currentPage, {
+      pageBindings,
+      seriesId: getSeriesId(),
+      deviceId: activeDeviceId,
+      hideModuleId: moduleId,
+    });
+    if (
+      invalidation &&
+      !confirm(`${invalidation.message}\n\nHide this module on the current device?`)
+    ) {
+      return false;
+    }
     const nextConfig = cloneValue(module.config || {}) || {};
     setResponsiveOverrideValue(nextConfig, activeDeviceId, 'hidden', true);
     nextConfig.responsive = pruneEmptyResponsiveOverrides(nextConfig.responsive);
@@ -2016,7 +2075,16 @@ function createPageBuilder({
   }
 
   async function deleteModuleFromCanvas(moduleId) {
-    if (!confirm('Delete this module? This cannot be undone.')) return false;
+    const invalidation = getReaderBindingInvalidationWarning(currentPage, {
+      pageBindings,
+      seriesId: getSeriesId(),
+      deviceId: activeDeviceId,
+      removeModuleId: moduleId,
+    });
+    const confirmMessage = invalidation
+      ? `${invalidation.message}\n\nDelete this module? This cannot be undone.`
+      : 'Delete this module? This cannot be undone.';
+    if (!confirm(confirmMessage)) return false;
     if (selectedModuleId === moduleId && dirtyScope === 'module') {
       clearDirty('module');
     }
@@ -2035,7 +2103,16 @@ function createPageBuilder({
   }
 
   async function deleteSectionFromCanvas(sectionId) {
-    if (!confirm('Delete this section and all its modules?')) return false;
+    const invalidation = getReaderBindingInvalidationWarning(currentPage, {
+      pageBindings,
+      seriesId: getSeriesId(),
+      deviceId: activeDeviceId,
+      removeSectionId: sectionId,
+    });
+    const confirmMessage = invalidation
+      ? `${invalidation.message}\n\nDelete this section and all its modules?`
+      : 'Delete this section and all its modules?';
+    if (!confirm(confirmMessage)) return false;
 
     if (await deleteSection(sectionId)) {
       removeSectionFromCurrentPage(sectionId);

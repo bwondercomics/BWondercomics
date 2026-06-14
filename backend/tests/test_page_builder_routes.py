@@ -22,6 +22,26 @@ class PageBuilderRouteTests(BackendRouteTestCase):
             self._admin_user = admin
         return build_request(path, method=method, cookie=self.auth_cookie(admin))
 
+    def add_reader_module_to_page(
+        self, page_id: str, config: dict | None = None, layout: str = "1"
+    ) -> dict:
+        section = page_builder.api_add_section(
+            page_id,
+            page_builder.CreateSectionRequest(sectionType="row", layout=layout),
+            self.admin_request(f"/api/admin/pages/{page_id}/sections", "POST"),
+            self.db,
+        )["section"]
+        return page_builder.api_add_module(
+            section["id"],
+            page_builder.CreateModuleRequest(
+                moduleType="reader",
+                columnIndex=0,
+                config=config or {"source": {"mode": "active-page-series"}},
+            ),
+            self.admin_request(f"/api/admin/sections/{section['id']}/modules", "POST"),
+            self.db,
+        )["module"]
+
     def test_admin_page_crud_slug_uniqueness_homepage_and_reorder(self):
         self.seed_contract_series()
 
@@ -79,12 +99,17 @@ class PageBuilderRouteTests(BackendRouteTestCase):
                 BuilderPageBinding.role == "reader",
             )
         )
-        self.assertIsNotNone(reader_binding)
-        self.assertEqual(str(reader_binding.page_id), first["page"]["id"])
+        self.assertIsNone(reader_binding)
         about_page = next(page for page in listed["pages"] if page["id"] == second["page"]["id"])
         reader_page = next(page for page in listed["pages"] if page["id"] == first["page"]["id"])
         self.assertFalse(about_page["isHomepage"])
         self.assertTrue(reader_page["isHomepage"])
+        missing_reader_binding = page_builder.api_get_page_bindings(
+            "battle-bros",
+            self.admin_request("/api/admin/page-bindings/battle-bros"),
+            self.db,
+        )
+        self.assertEqual(missing_reader_binding["warnings"][0]["code"], "missing_reader_binding")
 
         page_builder.api_reorder_pages(
             page_builder.ReorderPagesRequest(pageIds=[second["page"]["id"], first["page"]["id"]]),
@@ -206,6 +231,7 @@ class PageBuilderRouteTests(BackendRouteTestCase):
             self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
             self.db,
         )["page"]
+        self.add_reader_module_to_page(series_reader["id"])
         other_reader = page_builder.api_create_series_page(
             "other-series",
             page_builder.CreatePageRequest(slug="reader", title="Other Reader", pageType="reader"),
@@ -228,6 +254,152 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.assertEqual(wrong_series_binding.status_code, 400)
         self.assertEqual(updated_bindings["bindings"]["reader"]["pageId"], series_reader["id"])
         self.assertFalse(updated_bindings["warnings"])
+
+    def test_reader_binding_requires_one_visible_active_reader_module(self):
+        self.seed_contract_series()
+
+        missing_reader = page_builder.api_create_series_page(
+            "battle-bros",
+            page_builder.CreatePageRequest(
+                slug="missing-reader",
+                title="Missing Reader",
+                pageType="reader",
+                isPublished=True,
+            ),
+            self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
+            self.db,
+        )["page"]
+        missing_binding = page_builder.api_update_page_bindings(
+            "battle-bros",
+            page_builder.PageBindingsRequest(bindings={"reader": missing_reader["id"]}),
+            self.admin_request("/api/admin/page-bindings/battle-bros", "PUT"),
+            self.db,
+        )
+        self.assertEqual(missing_binding.status_code, 400)
+        self.assertEqual(json_body(missing_binding)["code"], "reader_module_missing")
+
+        self.add_reader_module_to_page(missing_reader["id"])
+        text_section = page_builder.api_add_section(
+            missing_reader["id"],
+            page_builder.CreateSectionRequest(sectionType="row", layout="1"),
+            self.admin_request(f"/api/admin/pages/{missing_reader['id']}/sections", "POST"),
+            self.db,
+        )["section"]
+        page_builder.api_add_module(
+            text_section["id"],
+            page_builder.CreateModuleRequest(
+                moduleType="text", columnIndex=0, config={"content": "<p>Below reader</p>"}
+            ),
+            self.admin_request(f"/api/admin/sections/{text_section['id']}/modules", "POST"),
+            self.db,
+        )
+        valid_binding = page_builder.api_update_page_bindings(
+            "battle-bros",
+            page_builder.PageBindingsRequest(bindings={"reader": missing_reader["id"]}),
+            self.admin_request("/api/admin/page-bindings/battle-bros", "PUT"),
+            self.db,
+        )
+        self.assertEqual(valid_binding["bindings"]["reader"]["pageId"], missing_reader["id"])
+        self.assertFalse(valid_binding["warnings"])
+
+        duplicate_reader = page_builder.api_create_series_page(
+            "battle-bros",
+            page_builder.CreatePageRequest(slug="duplicate-reader", title="Duplicate Reader"),
+            self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
+            self.db,
+        )["page"]
+        self.add_reader_module_to_page(duplicate_reader["id"])
+        self.add_reader_module_to_page(duplicate_reader["id"])
+        duplicate_binding = page_builder.api_update_page_bindings(
+            "battle-bros",
+            page_builder.PageBindingsRequest(bindings={"reader": duplicate_reader["id"]}),
+            self.admin_request("/api/admin/page-bindings/battle-bros", "PUT"),
+            self.db,
+        )
+        self.assertEqual(duplicate_binding.status_code, 400)
+        self.assertEqual(json_body(duplicate_binding)["code"], "reader_module_duplicate")
+
+        hidden_reader = page_builder.api_create_series_page(
+            "battle-bros",
+            page_builder.CreatePageRequest(slug="hidden-reader", title="Hidden Reader"),
+            self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
+            self.db,
+        )["page"]
+        self.add_reader_module_to_page(
+            hidden_reader["id"],
+            config={
+                "source": {"mode": "active-page-series"},
+                "responsive": {"desktop": {"hidden": True}},
+            },
+        )
+        hidden_binding = page_builder.api_update_page_bindings(
+            "battle-bros",
+            page_builder.PageBindingsRequest(bindings={"reader": hidden_reader["id"]}),
+            self.admin_request("/api/admin/page-bindings/battle-bros", "PUT"),
+            self.db,
+        )
+        self.assertEqual(hidden_binding.status_code, 400)
+        self.assertEqual(json_body(hidden_binding)["code"], "reader_module_hidden_default_device")
+
+        wrong_source_reader = page_builder.api_create_series_page(
+            "battle-bros",
+            page_builder.CreatePageRequest(slug="wrong-source-reader", title="Wrong Source"),
+            self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
+            self.db,
+        )["page"]
+        wrong_source_module = self.add_reader_module_to_page(wrong_source_reader["id"])
+        raw_module = self.db.get(BuilderModule, UUID(wrong_source_module["id"]))
+        assert raw_module is not None
+        raw_module.config = {"source": {"mode": "specific-series", "seriesId": "other-series"}}
+        self.db.commit()
+        wrong_source_binding = page_builder.api_update_page_bindings(
+            "battle-bros",
+            page_builder.PageBindingsRequest(bindings={"reader": wrong_source_reader["id"]}),
+            self.admin_request("/api/admin/page-bindings/battle-bros", "PUT"),
+            self.db,
+        )
+        self.assertEqual(wrong_source_binding.status_code, 400)
+        self.assertEqual(json_body(wrong_source_binding)["code"], "reader_module_wrong_source")
+
+    def test_bound_reader_publish_blocks_invalid_reader_module_state(self):
+        self.seed_contract_series()
+        reader_page = page_builder.api_create_series_page(
+            "battle-bros",
+            page_builder.CreatePageRequest(slug="reader", title="Reader", pageType="reader"),
+            self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
+            self.db,
+        )["page"]
+        self.add_reader_module_to_page(reader_page["id"])
+        bound = page_builder.api_update_page_bindings(
+            "battle-bros",
+            page_builder.PageBindingsRequest(bindings={"reader": reader_page["id"]}),
+            self.admin_request("/api/admin/page-bindings/battle-bros", "PUT"),
+            self.db,
+        )
+        self.assertEqual(bound["bindings"]["reader"]["pageId"], reader_page["id"])
+
+        self.add_reader_module_to_page(reader_page["id"])
+        draft_save = page_builder.api_update_page(
+            reader_page["id"],
+            page_builder.UpdatePageRequest(isPublished=False),
+            self.admin_request(f"/api/admin/pages/{reader_page['id']}", "PUT"),
+            self.db,
+        )
+        self.assertFalse(draft_save["page"]["isPublished"])
+
+        publish = page_builder.api_update_page(
+            reader_page["id"],
+            page_builder.UpdatePageRequest(title="Should Not Persist", isPublished=True),
+            self.admin_request(f"/api/admin/pages/{reader_page['id']}", "PUT"),
+            self.db,
+        )
+        self.assertEqual(publish.status_code, 400)
+        self.assertEqual(json_body(publish)["code"], "reader_module_duplicate")
+        self.db.expire_all()
+        unchanged_page = self.db.get(BuilderPage, UUID(reader_page["id"]))
+        self.assertIsNotNone(unchanged_page)
+        self.assertFalse(unchanged_page.is_published)
+        self.assertEqual(unchanged_page.title, "Reader")
 
     def test_page_reorder_rejects_invalid_stale_or_wrong_scope_lists(self):
         self.seed_contract_series()
@@ -593,6 +765,21 @@ class PageBuilderRouteTests(BackendRouteTestCase):
     def test_homepage_endpoints_resolve_homepage_then_reader_with_visibility_rules(self):
         self.seed_builder_page("builderPage")
         self.seed_builder_page("builderPageDraft")
+        published_reader = self.db.scalar(
+            select(BuilderPage).where(
+                BuilderPage.series_id == "battle-bros",
+                BuilderPage.slug == "reader",
+            )
+        )
+        assert published_reader is not None
+        self.add_reader_module_to_page(str(published_reader.id))
+        bound_reader = page_builder.api_update_page_bindings(
+            "battle-bros",
+            page_builder.PageBindingsRequest(bindings={"reader": str(published_reader.id)}),
+            self.admin_request("/api/admin/page-bindings/battle-bros", "PUT"),
+            self.db,
+        )
+        self.assertEqual(bound_reader["bindings"]["reader"]["pageId"], str(published_reader.id))
 
         public_home = page_builder.api_public_homepage("battle-bros", self.db)
         admin_home = page_builder.api_get_homepage_page_admin(
@@ -605,13 +792,6 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.assertTrue(public_home["page"]["isPublished"])
         self.assertEqual(admin_home["page"]["slug"], "reader")
 
-        published_reader = self.db.scalar(
-            select(BuilderPage).where(
-                BuilderPage.series_id == "battle-bros",
-                BuilderPage.slug == "reader",
-            )
-        )
-        assert published_reader is not None
         published_reader.is_homepage = False
 
         draft_homepage = self.db.scalar(

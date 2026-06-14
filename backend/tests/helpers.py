@@ -293,23 +293,6 @@ class BackendRouteTestCase(unittest.TestCase):
             updated_at=now,
         )
         self.db.add(page)
-        existing_reader_binding = self.db.scalar(
-            select(BuilderPageBinding).where(
-                BuilderPageBinding.series_id == series_id,
-                BuilderPageBinding.role == "reader",
-            )
-        )
-        if (page.slug == "reader" or page.page_type == "reader") and not existing_reader_binding:
-            self.db.add(
-                BuilderPageBinding(
-                    series_id=series_id,
-                    role="reader",
-                    page_id=page.id,
-                    created_at=now,
-                    updated_at=now,
-                )
-            )
-
         sections: list[BuilderSection] = []
         modules: list[BuilderModule] = []
         for section_payload in payload.get("sections") or []:
@@ -338,6 +321,40 @@ class BackendRouteTestCase(unittest.TestCase):
                 )
                 self.db.add(module)
                 modules.append(module)
+
+        reader_modules = [module for module in modules if module.module_type == "reader"]
+        reader_module_valid = False
+        if len(reader_modules) == 1:
+            config = reader_modules[0].config if isinstance(reader_modules[0].config, dict) else {}
+            responsive = config.get("responsive") if isinstance(config.get("responsive"), dict) else {}
+            desktop = responsive.get("desktop") if isinstance(responsive.get("desktop"), dict) else {}
+            source = config.get("source") if isinstance(config.get("source"), dict) else {}
+            source_mode = str(source.get("mode") or "").strip()
+            reader_module_valid = desktop.get("hidden") is not True and source_mode in (
+                "",
+                "active-page-series",
+            )
+
+        existing_reader_binding = self.db.scalar(
+            select(BuilderPageBinding).where(
+                BuilderPageBinding.series_id == series_id,
+                BuilderPageBinding.role == "reader",
+            )
+        )
+        if (
+            (page.slug == "reader" or page.page_type == "reader")
+            and reader_module_valid
+            and not existing_reader_binding
+        ):
+            self.db.add(
+                BuilderPageBinding(
+                    series_id=series_id,
+                    role="reader",
+                    page_id=page.id,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
 
         self.db.commit()
         return {"page": page, "sections": sections, "modules": modules}

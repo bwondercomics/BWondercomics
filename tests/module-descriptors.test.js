@@ -41,6 +41,7 @@ describe('page-builder module descriptors', () => {
   it('drives insertable blocks and default configs from descriptors', () => {
     const insertableTypes = getInsertableModuleDescriptors().map((descriptor) => descriptor.type);
     expect(insertableTypes).toContain('text');
+    expect(insertableTypes).toContain('reader');
     expect(insertableTypes).toContain('feed');
     expect(insertableTypes).toContain('media-gallery');
     expect(insertableTypes).not.toContain('header');
