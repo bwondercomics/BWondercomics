@@ -89,6 +89,7 @@ async function bootReaderApp({
   }));
   const loadLatestPost = vi.fn(async () => getContractFixture('latestPost'));
   const applyBuilderPageToDOM = vi.fn();
+  const applyReaderModuleShellSettings = vi.fn();
   const resolveBuilderPageReaderSeriesId = vi.fn(
     (_page, fallbackSeriesId) => resolvedReaderSeriesId || fallbackSeriesId
   );
@@ -137,6 +138,9 @@ async function bootReaderApp({
   const hideEndOfEntry = vi.fn();
   const toggleShortcutsOverlay = vi.fn();
   const closeShortcutsOverlay = vi.fn();
+  const setVerticalScrollRestore = vi.fn();
+  const teardownVerticalMode = vi.fn();
+  const scrollVerticalToTop = vi.fn();
   const loggerLog = vi.fn();
 
   vi.doMock('../reader/data.js', () => ({
@@ -144,6 +148,7 @@ async function bootReaderApp({
     loadPageConfigWithFallback,
     loadLatestPost,
     applyBuilderPageToDOM,
+    applyReaderModuleShellSettings,
     resolveBuilderPageReaderSeriesId,
   }));
   vi.doMock('../reader/preview-bridge.js', () => ({
@@ -170,6 +175,11 @@ async function bootReaderApp({
     nextPage,
     restartEntry,
     hideEndOfEntry,
+  }));
+  vi.doMock('../reader/vertical.js', () => ({
+    setVerticalScrollRestore,
+    teardownVerticalMode,
+    scrollVerticalToTop,
   }));
   vi.doMock('../reader/overlays.js', async () => {
     const actual = await vi.importActual('../reader/overlays.js');
@@ -244,7 +254,10 @@ async function bootReaderApp({
       renderStatusPanel,
       resetView,
       restartEntry,
+      scrollVerticalToTop,
       setActiveEntry,
+      setVerticalScrollRestore,
+      teardownVerticalMode,
       toggleShortcutsOverlay,
       zoomIn,
       zoomOut,
@@ -427,6 +440,7 @@ describe('reader app bootstrap', () => {
       pageType: 'custom',
     });
     mocks.loadEntryData.mockClear();
+    mocks.teardownVerticalMode.mockClear();
 
     snapshotHandler({
       source: 'builder',
@@ -445,6 +459,7 @@ describe('reader app bootstrap', () => {
     await flushReaderUi(4);
 
     expect(mocks.loadEntryData).not.toHaveBeenCalled();
+    expect(mocks.teardownVerticalMode).toHaveBeenCalled();
     expect(mocks.applyBuilderPageToDOM).toHaveBeenLastCalledWith(noReaderPage, {
       seriesId: 'battle-bros',
       previewMode: true,
@@ -463,6 +478,29 @@ describe('reader app bootstrap', () => {
         pageSlug: 'about',
       }
     );
+  });
+
+  it('tears down vertical mode from inactive shell-state events without affecting active events', async () => {
+    const { mocks } = await bootReaderApp({ builderPreview: true });
+    mocks.teardownVerticalMode.mockClear();
+
+    window.dispatchEvent(
+      new CustomEvent('readerShellStateChanged', {
+        detail: { active: false, reason: 'no-reader-module' },
+      })
+    );
+    window.dispatchEvent(
+      new CustomEvent('readerShellStateChanged', {
+        detail: { active: false, reason: 'no-reader-module' },
+      })
+    );
+    window.dispatchEvent(
+      new CustomEvent('readerShellStateChanged', {
+        detail: { active: true, reason: 'reader-module' },
+      })
+    );
+
+    expect(mocks.teardownVerticalMode).toHaveBeenCalledTimes(2);
   });
 
   it('keeps existing reader handlers inert after an active preview updates to no-reader', async () => {
@@ -572,6 +610,7 @@ describe('reader app bootstrap', () => {
     await vi.runAllTimersAsync();
     expect(document.body.dataset.readerShell).toBe('inactive');
 
+    mocks.teardownVerticalMode.mockClear();
     mocks.nextPage.mockClear();
     mocks.render.mockClear();
     snapshotHandler({
@@ -590,6 +629,7 @@ describe('reader app bootstrap', () => {
     });
     await vi.runAllTimersAsync();
     expect(document.body.dataset.readerShell).toBe('active');
+    expect(mocks.teardownVerticalMode).not.toHaveBeenCalled();
 
     document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
     expect(mocks.nextPage).toHaveBeenCalledTimes(1);

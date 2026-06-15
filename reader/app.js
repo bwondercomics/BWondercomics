@@ -7,6 +7,7 @@ import {
   loadPageConfigWithFallback,
   loadLatestPost,
   applyBuilderPageToDOM,
+  applyReaderModuleShellSettings,
   resolveBuilderPageReaderSeriesId,
 } from './data.js';
 import { el, initElements } from './dom.js';
@@ -15,6 +16,8 @@ import { initReaderAnalytics, setActiveEntry } from './analytics.js';
 import { prevPage, nextPage, restartEntry, hideEndOfEntry } from './controls.js';
 import { fitToScreen, zoomIn, zoomOut, resetView } from './transform.js';
 import { initPointerHandlers } from './pointer.js';
+import { isVerticalMode } from './display-mode.js';
+import { setVerticalScrollRestore, teardownVerticalMode } from './vertical.js';
 import {
   toggleFullscreen,
   onFullscreenChange,
@@ -26,6 +29,7 @@ import {
   toggleShortcutsOverlay,
   closeShortcutsOverlay,
   goToNextEntry,
+  goToPreviousEntry,
   changeEntry,
 } from './overlays.js';
 
@@ -746,9 +750,26 @@ import { publishReaderShellState, resolveReaderShellState } from './shell-state.
     }
     initRightPanelFeed();
 
-    // Navigation buttons
-    if (el.prevBtn) el.prevBtn.addEventListener('click', runWhenReaderShellActive(prevPage));
-    if (el.nextBtn) el.nextBtn.addEventListener('click', runWhenReaderShellActive(nextPage));
+    // Navigation buttons. In vertical mode prev/next navigate entries (the page
+    // strip scrolls natively); in paged mode they turn pages.
+    if (el.prevBtn) {
+      el.prevBtn.addEventListener(
+        'click',
+        runWhenReaderShellActive(() => {
+          if (isVerticalMode()) goToPreviousEntry(getNavigableEntries(), entries, entryMeta);
+          else prevPage();
+        })
+      );
+    }
+    if (el.nextBtn) {
+      el.nextBtn.addEventListener(
+        'click',
+        runWhenReaderShellActive(() => {
+          if (isVerticalMode()) goToNextEntry(getNavigableEntries(), entries, entryMeta);
+          else nextPage();
+        })
+      );
+    }
 
     // Zoom and view buttons
     if (el.zoomIn) el.zoomIn.addEventListener('click', runWhenReaderShellActive(zoomIn));
@@ -789,30 +810,40 @@ import { publishReaderShellState, resolveReaderShellState } from './shell-state.
       // Don't interfere if user is typing in an input
       if (e.target.matches('input, textarea, select')) return;
 
+      // Vertical mode: let arrows/space fall through to native scrolling and
+      // disable paged-only zoom/fullscreen shortcuts. Overlay and Escape stay.
+      const vertical = isVerticalMode();
+
       switch (e.key) {
         case 'ArrowLeft':
+          if (vertical) break;
           e.preventDefault();
           prevPage();
           break;
         case 'ArrowRight':
+          if (vertical) break;
           e.preventDefault();
           nextPage();
           break;
         case '+':
         case '=':
+          if (vertical) break;
           e.preventDefault();
           zoomIn();
           break;
         case '-':
+          if (vertical) break;
           e.preventDefault();
           zoomOut();
           break;
         case '0':
+          if (vertical) break;
           e.preventDefault();
           resetView();
           break;
         case 'f':
         case 'F':
+          if (vertical) break;
           e.preventDefault();
           if (!previewMode) toggleFullscreen();
           break;
@@ -1054,6 +1085,7 @@ import { publishReaderShellState, resolveReaderShellState } from './shell-state.
   }
 
   function applyInactiveBuilderPage(pageResult, applyOptions = {}) {
+    teardownVerticalMode();
     activeReaderShell = false;
     publishReaderShellState(
       resolveReaderShellState(pageResult?.page || null, {
@@ -1120,6 +1152,19 @@ import { publishReaderShellState, resolveReaderShellState } from './shell-state.
 
     if (el.entry) el.entry.value = state.currentEntry;
     syncEntrySelectDisplay();
+
+    // Resolve the effective reader display mode BEFORE the first render so a
+    // vertical-scroll page paints as vertical on first paint (the full builder
+    // DOM application runs afterwards and re-applies the same settings).
+    if (options.page) {
+      applyReaderModuleShellSettings(options.page, {
+        builderEditing: options.builderEditing === true,
+        deviceId: options.deviceId,
+      });
+    }
+    if (isVerticalMode()) {
+      setVerticalScrollRestore(saved && entries[saved.chapter] ? saved : null);
+    }
     window.dispatchEvent(
       new CustomEvent('entryChanged', { detail: { chapter: state.currentEntry } })
     );
@@ -1174,7 +1219,12 @@ import { publishReaderShellState, resolveReaderShellState } from './shell-state.
             if (!readerRuntimeInitialized) {
               readerBootState.resolvePageConfig(nextPageResult);
               loadLatestUpdate();
-              init(nextPageResult.source, { previewMode: true });
+              init(nextPageResult.source, {
+                previewMode: true,
+                page: nextPageResult.page,
+                builderEditing,
+                deviceId,
+              });
             } else {
               publishReaderShellState({ active: true, reason: 'reader-module' });
             }
@@ -1265,7 +1315,7 @@ import { publishReaderShellState, resolveReaderShellState } from './shell-state.
 
     readerBootState.resolvePageConfig(pageResult);
     loadLatestUpdate();
-    init(pageResult.source);
+    init(pageResult.source, { page: pageResult.page });
     if (pageResult.source === 'builder' && pageResult.page) {
       // Let reader bootstrap finish first, then reapply builder DOM as the final state.
       applyBuilderPageToDOM(pageResult.page, {
@@ -1289,6 +1339,21 @@ import { publishReaderShellState, resolveReaderShellState } from './shell-state.
 
   window.addEventListener('entryChanged', () => {
     syncEntrySelectDisplay();
+  });
+
+  window.addEventListener('readerShellStateChanged', (event) => {
+    if (event?.detail?.active !== true) {
+      teardownVerticalMode();
+    }
+  });
+
+  // A builder preview snapshot can switch the reader display mode without
+  // re-running init(). Re-render so the runtime rebuilds the correct surface
+  // (vertical strip vs paged stage) and tears down the previous mode.
+  window.addEventListener('readerDisplayModeChanged', () => {
+    if (isReaderShellInteractive() && readerRuntimeInitialized) {
+      render();
+    }
   });
 
   if (document.readyState === 'complete' || document.readyState === 'interactive') {

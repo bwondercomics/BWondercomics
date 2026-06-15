@@ -546,7 +546,7 @@ function resolveReaderModuleShellSettings(page, options = {}) {
   };
 }
 
-function applyReaderModuleShellSettings(page, options = {}) {
+export function applyReaderModuleShellSettings(page, options = {}) {
   const { settings, hasExplicitPanels } = resolveReaderModuleShellSettings(page, options);
   const controls = document.getElementById('controls');
   const mainContent = document.getElementById('mainContent');
@@ -558,8 +558,18 @@ function applyReaderModuleShellSettings(page, options = {}) {
   const commentsSection = document.getElementById('comicCommentsSection');
   const commentToggle = document.getElementById('commentToggleBtn');
 
+  // Capture the previously applied mode so we can notify the runtime when a
+  // preview snapshot switches display modes (the runtime owns re-rendering).
+  const previousDisplayMode = document.body.dataset.readerDisplayMode;
   document.body.dataset.readerDisplayMode = settings.displayMode;
   document.body.dataset.readerRequestedDisplayMode = settings.requestedDisplayMode;
+  if (previousDisplayMode !== undefined && previousDisplayMode !== settings.displayMode) {
+    window.dispatchEvent(
+      new CustomEvent('readerDisplayModeChanged', {
+        detail: { displayMode: settings.displayMode, previous: previousDisplayMode },
+      })
+    );
+  }
 
   if (mainContent) {
     mainContent.dataset.readerControlsPlacement = settings.controls.placement;
@@ -598,6 +608,11 @@ function applyReaderModuleShellSettings(page, options = {}) {
   }
   if (stage) {
     stage.style.setProperty('--reader-stage-page-gap', `${settings.stage.pageGap}px`);
+  }
+  // Vertical mode renders into #verticalStrip (a child of #viewport, not #stage),
+  // so expose the page gap on the viewport too for the strip to inherit.
+  if (viewport) {
+    viewport.style.setProperty('--reader-stage-page-gap', `${settings.stage.pageGap}px`);
   }
 
   if (hasExplicitPanels) {

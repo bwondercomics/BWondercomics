@@ -666,7 +666,7 @@ describe('reader builder presentation loading', () => {
     applyBuilderPageToDOM(builderPage, { seriesId: 'battle-bros' });
 
     expect(document.body.dataset.readerShell).toBe('active');
-    expect(document.body.dataset.readerDisplayMode).toBe('paged');
+    expect(document.body.dataset.readerDisplayMode).toBe('vertical-scroll');
     expect(document.body.dataset.readerRequestedDisplayMode).toBe('vertical-scroll');
     expect(document.getElementById('mainContent')?.dataset.readerControlsPlacement).toBe('overlay');
     expect(document.getElementById('controls')?.dataset.readerControlsSize).toBe('large');

@@ -62,8 +62,16 @@ describe('renderReaderEditor', () => {
     expect(html).toContain('data-reader-key="stage.maxWidth"');
   });
 
-  it('disables the vertical-scroll display mode until Phase 4', () => {
-    expect(renderReaderEditor({})).toContain('value="vertical-scroll" disabled');
+  it('offers a selectable vertical-scroll display mode', () => {
+    const html = renderReaderEditor({});
+    expect(html).toContain('value="vertical-scroll"');
+    expect(html).not.toContain('value="vertical-scroll" disabled');
+  });
+
+  it('marks vertical-scroll as selected when authored', () => {
+    expect(renderReaderEditor({ displayMode: 'vertical-scroll' })).toMatch(
+      /value="vertical-scroll"\s+selected/
+    );
   });
 
   it('omits appearance and global-only stage fields in deviceOnly scope', () => {

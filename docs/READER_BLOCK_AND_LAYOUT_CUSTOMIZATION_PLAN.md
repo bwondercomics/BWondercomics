@@ -300,6 +300,31 @@ Acceptance criteria:
   engagement reporting.
 - Paged mode remains regression-free.
 
+Completion note (`2026-06-15`): Phase 4 is implemented. The runtime now honors the authored display
+mode (`getReaderRuntimeConfig` no longer pins `paged`) and the module editor exposes a selectable
+Vertical Scroll option. A new `reader/display-mode.js` helper publishes the active mode and a new
+`reader/vertical.js` renders every entry page into a dedicated `#verticalStrip` inside `#viewport`
+(the paged `#stageWrap` and its cached nodes are hidden, never destroyed, so paged/vertical preview
+switches repaint cleanly). `render()` branches on the mode; `updateUI()` is mode-aware (entry-level
+prev/next disabled state, single-page indicator/progress). An IntersectionObserver over the strip
+derives `state.pageIndex` from scroll position, driving page-view analytics and last-page completion;
+`getVisiblePageIndexes()` is mode-aware so vertical mode never reports the two-page phantom pair.
+Progress save/load gained an additive `scrollRatio` for resume; pointer pan/zoom/swipe/edge gestures,
+zoom/fullscreen controls, and zoom/fullscreen keyboard shortcuts are disabled in vertical mode (per v1
+decisions: fullscreen disabled, zoom/pan disabled). Boot order was fixed so the effective reader shell
+settings (and therefore the display mode) apply before the first `render()` on both the public and
+preview paths, and a `readerDisplayModeChanged` event re-renders preview snapshots that switch modes
+without leaving stale observers. CSS adds the vertical layout and control-hiding rules; the page-gap
+var is also published on `#viewport` so the strip inherits it. Coverage adds `reader-vertical`,
+`reader-vertical-analytics`, and a `vertical-scroll` visual route asserting public/admin parity at
+desktop, tablet, and phone. Verification passed: `git diff --check`, `npm run format:check`,
+`npm run lint`, `npm test` (`515` passed, `1` skipped), `npm run format:py:check`, `npm run lint:py`,
+`npm run test:backend` (`75` passed), `npm run build`, and `npm run test:visual` (`11` passed).
+Corrective patch (`2026-06-15`): inactive reader-shell transitions now deterministically tear down
+vertical observers and remove stale `#verticalStrip` DOM, and saved vertical scroll restore is now
+one-shot, image-load/error settled, and canceled by real user scroll so late image events cannot snap
+the viewport back.
+
 ## Phase 5 - Section, Column, And Panel Styling
 
 Goal: Let authors control page columns and individual column/panel styling.

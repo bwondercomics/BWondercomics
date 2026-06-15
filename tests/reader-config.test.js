@@ -132,10 +132,16 @@ describe('normalizeReaderResponsiveBranch', () => {
 });
 
 describe('getReaderRuntimeConfig', () => {
-  it('locks displayMode to paged while preserving the requested mode', () => {
+  it('honors the authored display mode and mirrors it in requestedDisplayMode', () => {
     const runtime = getReaderRuntimeConfig({ displayMode: 'vertical-scroll' });
-    expect(runtime.displayMode).toBe('paged');
+    expect(runtime.displayMode).toBe('vertical-scroll');
     expect(runtime.requestedDisplayMode).toBe('vertical-scroll');
+  });
+
+  it('defaults to paged when no display mode is authored', () => {
+    const runtime = getReaderRuntimeConfig({});
+    expect(runtime.displayMode).toBe('paged');
+    expect(runtime.requestedDisplayMode).toBe('paged');
   });
 });
 

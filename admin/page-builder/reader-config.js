@@ -1,7 +1,6 @@
 import { normalizeAppearance } from './appearance-utils.js';
 
 export const READER_DISPLAY_MODES = Object.freeze(['paged', 'vertical-scroll']);
-export const READER_RUNTIME_DISPLAY_MODE = 'paged';
 export const READER_CONTROLS_PLACEMENTS = Object.freeze(['above', 'below', 'overlay', 'hidden']);
 export const READER_CONTROLS_SIZES = Object.freeze(['compact', 'medium', 'large']);
 export const READER_STAGE_FITS = Object.freeze(['dynamic-frame', 'width', 'height', 'natural']);
@@ -151,9 +150,11 @@ export function normalizeReaderResponsiveBranch(rawBranch = {}) {
 
 export function getReaderRuntimeConfig(rawConfig = {}) {
   const config = normalizeReaderConfig(rawConfig);
+  // The runtime now honors the authored display mode. `requestedDisplayMode`
+  // is kept identical for parity/diagnostics and preview-bridge comparisons.
   return {
     ...config,
-    displayMode: READER_RUNTIME_DISPLAY_MODE,
+    displayMode: config.displayMode,
     requestedDisplayMode: config.displayMode,
   };
 }

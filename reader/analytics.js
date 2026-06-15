@@ -3,6 +3,7 @@ import { CONFIG } from './config.js';
 import { state } from './state.js';
 import { getActiveSeriesId } from './series.js';
 import { setLiveReaderContext } from './live-tracking.js';
+import { isVerticalMode } from './display-mode.js';
 
 const EVENT_PAGE_VIEW = 'reader_page_view';
 const EVENT_ENTRY_COMPLETE = 'reader_entry_complete';
@@ -120,6 +121,11 @@ function canShowTwoPages() {
 function getVisiblePageIndexes() {
   const total = state.pages.length;
   if (!total) return [];
+  // Vertical mode shows one page strip; the scroll observer reports the single
+  // center-visible page via state.pageIndex, so never append a two-page pair.
+  if (isVerticalMode()) {
+    return state.pageIndex >= 0 && state.pageIndex < total ? [state.pageIndex] : [];
+  }
   const indexes = [state.pageIndex];
   if (canShowTwoPages()) indexes.push(state.pageIndex + 1);
   return indexes.filter((idx) => idx >= 0 && idx < total);

@@ -103,6 +103,37 @@ function buildCustomizedReaderVisualPage() {
   return page;
 }
 
+function buildVerticalReaderVisualPage() {
+  const page = buildVisualPage();
+  Object.assign(page, {
+    id: 'visual-vertical-reader-page',
+    slug: 'vertical-reader',
+    title: 'Vertical Reader',
+    pageType: 'custom',
+    isHomepage: false,
+  });
+  const readerModule = page.sections
+    .flatMap((section) => section.modules || [])
+    .find((module) => module.moduleType === 'reader');
+  readerModule.config = {
+    ...readerModule.config,
+    displayMode: 'vertical-scroll',
+    controls: { placement: 'below', size: 'medium' },
+    stage: {
+      fit: 'width',
+      pageGap: 16,
+      frameBorder: false,
+      maxWidth: 1024,
+    },
+    panels: {
+      left: { enabled: false },
+      right: { enabled: false },
+    },
+    showComments: false,
+  };
+  return page;
+}
+
 function json(body) {
   return {
     contentType: 'application/json',
@@ -148,6 +179,7 @@ async function installVisualRoutes(page) {
   const visualPage = buildVisualPage();
   const noReaderPage = buildNoReaderVisualPage();
   const customReaderPage = buildCustomizedReaderVisualPage();
+  const verticalReaderPage = buildVerticalReaderVisualPage();
   const adminPosts = Object.values(fixtures.posts || {});
 
   await page.route('**/*', async (route) => {
@@ -217,8 +249,15 @@ async function installVisualRoutes(page) {
       return;
     }
 
+    if (pathname === '/api/pages/battle-bros/vertical-reader') {
+      await route.fulfill(json({ page: verticalReaderPage }));
+      return;
+    }
+
     if (pathname === '/api/admin/pages/series/battle-bros') {
-      await route.fulfill(json({ pages: [visualPage, noReaderPage, customReaderPage] }));
+      await route.fulfill(
+        json({ pages: [visualPage, noReaderPage, customReaderPage, verticalReaderPage] })
+      );
       return;
     }
 
@@ -228,7 +267,9 @@ async function installVisualRoutes(page) {
     }
 
     if (pathname === '/api/admin/pages' && url.searchParams.get('series_id') === 'battle-bros') {
-      await route.fulfill(json({ pages: [visualPage, noReaderPage, customReaderPage] }));
+      await route.fulfill(
+        json({ pages: [visualPage, noReaderPage, customReaderPage, verticalReaderPage] })
+      );
       return;
     }
 
@@ -255,6 +296,11 @@ async function installVisualRoutes(page) {
 
     if (pathname === `/api/admin/pages/${customReaderPage.id}`) {
       await route.fulfill(json({ page: customReaderPage }));
+      return;
+    }
+
+    if (pathname === `/api/admin/pages/${verticalReaderPage.id}`) {
+      await route.fulfill(json({ page: verticalReaderPage }));
       return;
     }
 
@@ -582,6 +628,25 @@ async function assertCustomizedPagedReader(target) {
   await expect(target.locator('#commentToggleBtn')).toBeHidden();
 }
 
+async function assertVerticalReader(target) {
+  await expect(target.locator('body')).toHaveAttribute('data-reader-shell', 'active');
+  await expect(target.locator('body')).toHaveAttribute(
+    'data-reader-display-mode',
+    'vertical-scroll'
+  );
+  // The vertical strip mounts every page; the paged stage is hidden (not removed).
+  await expect(target.locator('#verticalStrip')).toBeVisible();
+  expect(await target.locator('#verticalStrip .verticalPage img').count()).toBeGreaterThan(0);
+  await expect(target.locator('#stageWrap')).toBeHidden();
+  // Paged-only controls are hidden in vertical mode.
+  await expect(target.locator('#zoomIn')).toBeHidden();
+  await expect(target.locator('#zoomOut')).toBeHidden();
+  await expect(target.locator('#fullscreenBtn')).toBeHidden();
+  // Entry navigation controls remain.
+  await expect(target.locator('#prevBtn')).toBeVisible();
+  await expect(target.locator('#nextBtn')).toBeVisible();
+}
+
 async function collectPreviewMetricsDataset(page) {
   return page.locator('.pb-preview-frame').evaluate((frame) => ({
     ...frame.dataset,
@@ -715,6 +780,49 @@ test.describe('builder preview visual parity', () => {
 
   for (const viewportId of PREVIEW_VIEWPORT_ORDER) {
     const viewport = PREVIEW_VIEWPORTS[viewportId];
+
+    test(`vertical-scroll reader matches public reader and admin preview (${viewport.label})`, async ({
+      browser,
+    }) => {
+      const readerContext = await browser.newContext({
+        baseURL: VISUAL_BASE_URL,
+        viewport: { width: viewport.width, height: viewport.height },
+        deviceScaleFactor: 1,
+        locale: 'en-US',
+        timezoneId: 'UTC',
+      });
+      const readerPage = await readerContext.newPage();
+      await preparePage(readerPage, viewport);
+      await gotoAppPage(readerPage, '/index.html?series=battle-bros&page=vertical-reader');
+      await readerPage.waitForSelector('html:not(.reader-bootstrap-loading)');
+      await assertVerticalReader(readerPage);
+
+      const adminContext = await browser.newContext({
+        baseURL: VISUAL_BASE_URL,
+        viewport: {
+          width: Math.max(1920, viewport.width + 640),
+          height: Math.max(1300, viewport.height + 260),
+        },
+        deviceScaleFactor: 1,
+        locale: 'en-US',
+        timezoneId: 'UTC',
+      });
+      const adminPage = await adminContext.newPage();
+      await installVisualRoutes(adminPage);
+      await installStableRuntime(adminPage);
+      await gotoAppPage(
+        adminPage,
+        '/admin/index.html?view=designer&series=battle-bros&page=vertical-reader&surface=header'
+      );
+      await expect(adminPage.locator('#pageBuilderSection')).toBeVisible();
+      await waitForPreviewReady(adminPage, 'desktop');
+
+      const previewFrame = await getPreviewFrame(adminPage);
+      await assertVerticalReader(previewFrame);
+
+      await adminContext.close();
+      await readerContext.close();
+    });
 
     test(`${viewport.label} preview matches reader route`, async ({ browser }) => {
       const readerContext = await browser.newContext({

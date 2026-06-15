@@ -100,7 +100,9 @@ function renderLayoutControls(config) {
         <label class="pb-editor-label">Display Mode</label>
         <select class="pb-editor-select" data-reader-key="displayMode">
           <option value="paged" ${config.displayMode === 'paged' ? 'selected' : ''}>Paged</option>
-          <option value="vertical-scroll" disabled>Vertical Scroll (Phase 4)</option>
+          <option value="vertical-scroll" ${
+            config.displayMode === 'vertical-scroll' ? 'selected' : ''
+          }>Vertical Scroll</option>
         </select>
       </div>
       <div class="pb-editor-field">

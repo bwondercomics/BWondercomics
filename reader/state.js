@@ -4,6 +4,7 @@
  */
 
 import { STORAGE } from './constants.js';
+import { isVerticalMode } from './display-mode.js';
 
 /**
  * Global application state object
@@ -69,6 +70,16 @@ export function saveProgress(stateObj = state) {
       page: stateObj.pageIndex,
       timestamp: Date.now(),
     };
+    // Vertical mode resumes by scroll position; persist a 0-1 ratio of the
+    // entry's scroll height so resume works regardless of image dimensions.
+    // Additive and backward compatible — paged mode ignores it.
+    if (isVerticalMode() && typeof document !== 'undefined') {
+      const viewport = document.getElementById('viewport');
+      if (viewport) {
+        const denom = viewport.scrollHeight - viewport.clientHeight;
+        data.scrollRatio = denom > 0 ? Math.min(1, Math.max(0, viewport.scrollTop / denom)) : 0;
+      }
+    }
     localStorage.setItem(STORAGE.PROGRESS_KEY, JSON.stringify(data));
   } catch (e) {
     console.warn('Failed to save progress:', e);

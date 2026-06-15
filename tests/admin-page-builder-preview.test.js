@@ -266,7 +266,7 @@ describe('admin page-builder editor and preview renderers', () => {
     expect(seriesReaderWrapper.textContent).toContain('Panels And Comments');
     expect(seriesReaderWrapper.textContent).not.toContain('Raw Config');
     expect(seriesReaderWrapper.querySelector('option[value="vertical-scroll"]')?.disabled).toBe(
-      true
+      false
     );
 
     const setSeriesDraftConfig = vi.fn();

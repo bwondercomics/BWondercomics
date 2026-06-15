@@ -192,3 +192,12 @@ body.fullscreen-active .controls.hidden {
   transform: translateX(-50%) translateY(110%);
   opacity: 0;
 }
+
+/* Vertical (Webtoon) mode disables zoom/fit/fullscreen — the page strip uses
+   native scrolling, so these paged-only controls are hidden. */
+body[data-reader-display-mode='vertical-scroll'] #zoomIn,
+body[data-reader-display-mode='vertical-scroll'] #zoomOut,
+body[data-reader-display-mode='vertical-scroll'] #fitBtn,
+body[data-reader-display-mode='vertical-scroll'] #fullscreenBtn {
+  display: none !important;
+}

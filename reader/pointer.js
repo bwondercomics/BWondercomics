@@ -6,12 +6,19 @@ import { applyTransform, fitToScreen } from './transform.js';
 import { toggleControlsBar } from './fullscreen.js';
 import { prevPage, nextPage } from './controls.js';
 import { throttle, cachedMeasure } from './utils.js';
+import { isVerticalMode } from './display-mode.js';
 
 // Cached viewport measurement to avoid layout thrashing
 let getViewportRect = null;
 
 function isReaderShellActive() {
   return document.body?.dataset.readerShell === 'active';
+}
+
+// Pan/zoom/swipe/edge gestures only apply to the paged reader. Vertical mode
+// relies on native scrolling, so all pointer gestures are disabled there.
+function pointerGesturesEnabled() {
+  return isReaderShellActive() && !isVerticalMode();
 }
 
 function clearPointerInteractionState() {
@@ -50,6 +57,7 @@ export function initPointerHandlers() {
     });
 
     el.viewport.addEventListener('pointerup', (e) => {
+      if (!pointerGesturesEnabled()) return;
       if (!state.isDragging && state.pointers.size === 0) {
         if (document.fullscreenElement && e.pointerType === 'touch') {
           return;
@@ -68,7 +76,7 @@ export function initPointerHandlers() {
 
 function onPointerDown(e) {
   // Track pointers for drag/pinch interactions and taps.
-  if (!isReaderShellActive()) {
+  if (!pointerGesturesEnabled()) {
     clearPointerInteractionState();
     return;
   }
@@ -119,7 +127,7 @@ function onPointerDown(e) {
 
 function onPointerMove(e) {
   // Apply pan/zoom transforms based on pointer count.
-  if (!isReaderShellActive()) {
+  if (!pointerGesturesEnabled()) {
     clearPointerInteractionState();
     return;
   }
@@ -163,7 +171,7 @@ function onPointerMove(e) {
 
 function onPointerUp(e) {
   // Finish gestures, handle swipes, reset pointer state.
-  if (!isReaderShellActive()) {
+  if (!pointerGesturesEnabled()) {
     clearPointerInteractionState();
     return;
   }
@@ -226,7 +234,7 @@ function onPointerUp(e) {
 }
 
 function onWheel(e) {
-  if (!isReaderShellActive()) return;
+  if (!pointerGesturesEnabled()) return;
   if (e.ctrlKey) {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.1 : 0.1;
@@ -238,7 +246,7 @@ function onWheel(e) {
 
 export function updateEdgeZones(x, _y) {
   if (!el.viewport) return;
-  if (!isReaderShellActive()) {
+  if (!pointerGesturesEnabled()) {
     clearPointerInteractionState();
     return;
   }
