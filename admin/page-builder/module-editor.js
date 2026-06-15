@@ -14,6 +14,7 @@ import { bindGalleryEditorEvents, renderGalleryEditor } from './gallery-editor.j
 import { bindVideoEditorEvents, renderVideoEditor } from './video-editor.js';
 import { bindDividerEditorEvents, renderDividerEditor } from './divider-editor.js';
 import { bindEntryGalleryEditorEvents, renderEntryGalleryEditor } from './entry-gallery-editor.js';
+import { bindReaderEditorEvents, renderReaderEditor } from './reader-editor.js';
 import { renderInspectorSection } from './inspector-sections.js';
 import {
   getModuleDescriptor,
@@ -336,6 +337,9 @@ function renderDeviceModuleOverrideSections(moduleType, config, pages) {
   }
   if (moduleType === 'entry-gallery' && responsiveFields.includes('columns')) {
     return [renderEntryGalleryEditor(config, { deviceOnly: true })];
+  }
+  if (moduleType === 'reader') {
+    return [renderReaderEditor(config, { deviceOnly: true })];
   }
   if (moduleType === 'media-gallery' && responsiveFields.includes('columns')) {
     return [
@@ -1076,25 +1080,7 @@ export function renderModuleEditorContent({
 
     case 'reader':
       contentSections.push(renderCmsSourceCard(moduleType, config, currentPage, pages));
-      contentSections.push(
-        renderSectionCard(
-          'Behavior',
-          'Reader Visibility',
-          'Control whether the reader should show side panels and comments in this module.',
-          `
-          <div class="pb-editor-field">
-            <label class="pb-editor-label">
-              <input type="checkbox" data-key="showPanels" ${config.showPanels ? 'checked' : ''}> Show Side Panels
-            </label>
-          </div>
-          <div class="pb-editor-field">
-            <label class="pb-editor-label">
-              <input type="checkbox" data-key="showComments" ${config.showComments ? 'checked' : ''}> Show Comments
-            </label>
-          </div>
-        `
-        )
-      );
+      contentSections.push(renderReaderEditor(config));
       break;
 
     case 'promo':
@@ -1250,7 +1236,6 @@ export function renderModuleEditorContent({
     'image',
     'spacer',
     'email-signup',
-    'reader',
     'feed',
   ]);
   if (MODULES_RETAINING_RAW_CARD.has(moduleType) && responsiveEditScope !== 'device') {
@@ -1451,6 +1436,18 @@ export function bindModuleEditorEvents({
       });
       return;
     }
+    if (selectedModule.moduleType === 'reader') {
+      bindReaderEditorEvents({
+        el,
+        draftConfig,
+        setDraftConfig,
+        renderEditorPanel,
+        markDirty,
+        activeDeviceId,
+        responsiveEditScope,
+      });
+      return;
+    }
     if (selectedModule.moduleType === 'text' || selectedModule.moduleType === 'spacer') {
       bindGenericModuleDraftEvents({
         el,
@@ -1559,6 +1556,19 @@ export function bindModuleEditorEvents({
       activeDeviceId,
       responsiveEditScope,
       renderEditorPanel,
+    });
+    return;
+  }
+
+  if (selectedModule.moduleType === 'reader') {
+    bindReaderEditorEvents({
+      el,
+      draftConfig,
+      setDraftConfig,
+      renderEditorPanel,
+      markDirty,
+      activeDeviceId,
+      responsiveEditScope,
     });
     return;
   }

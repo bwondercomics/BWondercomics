@@ -94,4 +94,62 @@ describe('responsive override utilities', () => {
       false
     );
   });
+
+  it('merges safe reader customization branches without replacing nested config', () => {
+    const module = {
+      moduleType: 'reader',
+      config: {
+        displayMode: 'paged',
+        showComments: true,
+        controls: {
+          placement: 'below',
+          size: 'medium',
+          style: {
+            defaults: { appearance: { text: { color: '#ffffff' } } },
+          },
+        },
+        stage: {
+          fit: 'dynamic-frame',
+          pageGap: 8,
+          frameBorder: true,
+          maxWidth: 1200,
+        },
+        panels: {
+          left: { enabled: true },
+          right: { enabled: true },
+        },
+        responsive: {
+          mobile: {
+            controls: { placement: 'overlay' },
+            stage: { pageGap: 24 },
+            panels: { right: { enabled: false } },
+            showComments: false,
+          },
+        },
+      },
+    };
+
+    expect(getEffectiveModuleConfig(module, { builderEditing: true, deviceId: 'mobile' })).toEqual(
+      expect.objectContaining({
+        showComments: false,
+        controls: expect.objectContaining({
+          placement: 'overlay',
+          size: 'medium',
+          style: {
+            defaults: { appearance: { text: { color: '#ffffff' } } },
+          },
+        }),
+        stage: expect.objectContaining({
+          fit: 'dynamic-frame',
+          pageGap: 24,
+          frameBorder: true,
+          maxWidth: 1200,
+        }),
+        panels: {
+          left: { enabled: true },
+          right: { enabled: false },
+        },
+      })
+    );
+  });
 });

@@ -95,6 +95,16 @@ Modules currently own: `moduleType`, `columnIndex`, `sortIndex`, and `config`. C
 may include a sanitized optional `config.source` branch with `{ mode, seriesId?, filters?, limit?,
 sort? }`.
 
+Reader modules also carry a sanitized paged-reader customization contract:
+`displayMode`, `controls`, `stage`, `panels`, `showPanels`, and `showComments`. The editor exposes
+these as structured controls on the normal module draft path. `displayMode: "paged"` is the active
+runtime mode; `"vertical-scroll"` is accepted for forward compatibility but remains disabled in the
+editor until the vertical renderer phase. Safe device overrides cover hidden state, display mode,
+controls placement/size, stage fit/page gap, panel visibility, and comments visibility. Legacy
+configs that only contain `showPanels` keep that flag for compatibility, but static reader side-panel
+visibility is controlled by an explicit `panels.left/right.enabled` branch so migrated pages with
+authored side-panel modules remain visible.
+
 ## ⚙️ Current Builder Flow
 
 1. `admin/page-builder.js` loads either global pages or active-series pages through explicit scoped
@@ -372,6 +382,12 @@ The snapshot merge path covers the dirty scopes owned by the explicit-save edito
 snapshot so previewing unsaved changes does not mutate `currentPage`.
 
 `admin/page-builder.js` still owns the top-level `canvasMode` and `previewWidth` state, but the preview handshake/render logic itself is no longer inlined there.
+
+Reader module rendering uses the shared renderer contract: `.pb-reader-mount` includes normalized
+data attributes for source, display mode, controls placement/size, stage fit/gap/frame/max-width,
+panel visibility, and comments visibility. Public reader output and admin live preview consume the
+same attributes, while active reader shell pages additionally apply the effective reader module
+config to the permanent static shell.
 
 ## 💾 Data API (data.js)
 

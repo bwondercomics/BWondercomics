@@ -637,6 +637,81 @@ describe('reader builder presentation loading', () => {
     expect(document.getElementById('rightPanel')).not.toBeNull();
   });
 
+  it('applies reader module customization to the active static shell', () => {
+    const builderPage = buildReaderShellPage();
+    builderPage.sections[0].modules[0].config = {
+      ...builderPage.sections[0].modules[0].config,
+      displayMode: 'vertical-scroll',
+      controls: {
+        placement: 'overlay',
+        size: 'large',
+        style: {
+          defaults: { appearance: { text: { color: '#ffeeaa' } } },
+          primary: { appearance: { background: { color: '#123456' } } },
+        },
+      },
+      stage: {
+        fit: 'width',
+        pageGap: 24,
+        frameBorder: false,
+        maxWidth: 1280,
+      },
+      panels: {
+        left: { enabled: false },
+        right: { enabled: true },
+      },
+      showComments: false,
+    };
+
+    applyBuilderPageToDOM(builderPage, { seriesId: 'battle-bros' });
+
+    expect(document.body.dataset.readerShell).toBe('active');
+    expect(document.body.dataset.readerDisplayMode).toBe('paged');
+    expect(document.body.dataset.readerRequestedDisplayMode).toBe('vertical-scroll');
+    expect(document.getElementById('mainContent')?.dataset.readerControlsPlacement).toBe('overlay');
+    expect(document.getElementById('controls')?.dataset.readerControlsSize).toBe('large');
+    expect(
+      document.getElementById('controls')?.style.getPropertyValue('--reader-control-color')
+    ).toBe('#ffeeaa');
+    expect(
+      document.getElementById('controls')?.style.getPropertyValue('--reader-primary-control-bg')
+    ).toBe('#123456');
+    expect(document.getElementById('stageWrap')?.dataset.readerStageFit).toBe('width');
+    expect(document.getElementById('stageWrap')?.dataset.readerStageFrameBorder).toBe('false');
+    expect(document.getElementById('stageWrap')?.dataset.readerStageMaxWidth).toBe('1280');
+    expect(
+      document.getElementById('stage')?.style.getPropertyValue('--reader-stage-page-gap')
+    ).toBe('24px');
+    expect(document.getElementById('leftPanel')?.hidden).toBe(true);
+    expect(document.getElementById('rightPanel')?.hidden).toBe(false);
+    expect(document.getElementById('comicCommentsSection')?.hidden).toBe(true);
+    expect(document.getElementById('commentToggleBtn')?.hidden).toBe(true);
+  });
+
+  it('keeps migrated legacy side-panel modules visible when showPanels is false', () => {
+    const builderPage = buildPanelSnapshot();
+    const readerModule = builderPage.sections[0].modules.find(
+      (module) => module.moduleType === 'reader'
+    );
+    readerModule.config = {
+      source: { mode: 'active-page-series' },
+      showPanels: false,
+      showComments: true,
+    };
+
+    applyBuilderPageToDOM(builderPage, { seriesId: 'battle-bros' });
+
+    expect(document.body.dataset.readerShell).toBe('active');
+    expect(document.getElementById('leftPanel')?.hidden).toBe(false);
+    expect(document.getElementById('rightPanel')?.hidden).toBe(false);
+    expect(document.querySelector('#leftPanel .pb-module--text')?.textContent).toContain(
+      'Left panel'
+    );
+    expect(document.querySelector('#rightPanel .pb-module--text')?.textContent).toContain(
+      'Right panel'
+    );
+  });
+
   it('emits and cleans builder editing markers in the reader shell', () => {
     const builderPage = buildPanelSnapshot();
 

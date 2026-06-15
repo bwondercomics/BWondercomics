@@ -24,7 +24,12 @@ import {
   resolvePageHeaderState,
 } from '../admin/page-builder/header-config.js';
 import { escapeHtml } from '../admin/page-builder/helpers.js';
-import { mergeAppearance } from '../admin/page-builder/appearance-utils.js';
+import { mergeAppearance, normalizeAppearance } from '../admin/page-builder/appearance-utils.js';
+import { getReaderRuntimeConfig } from '../admin/page-builder/reader-config.js';
+import {
+  getEffectiveModuleConfig,
+  isModuleHiddenForDevice,
+} from '../admin/page-builder/responsive-overrides.js';
 
 const BUILDER_THEME_CSS_VARS = Object.freeze([
   '--primary',
@@ -42,6 +47,25 @@ const PANEL_BACKGROUND_CSS_VARS = Object.freeze([
   '--panel-bg-position',
   '--panel-bg-opacity',
 ]);
+
+const READER_CONTROL_STYLE_VARS = Object.freeze([
+  '--reader-control-bg',
+  '--reader-control-color',
+  '--reader-control-border',
+  '--reader-control-border-width',
+  '--reader-control-border-style',
+  '--reader-control-border-color',
+  '--reader-control-border-radius',
+  '--reader-primary-control-bg',
+  '--reader-primary-control-color',
+  '--reader-primary-control-border',
+  '--reader-primary-control-border-width',
+  '--reader-primary-control-border-style',
+  '--reader-primary-control-border-color',
+  '--reader-primary-control-border-radius',
+]);
+
+const HEX_COLOR_WITHOUT_ALPHA_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 function resolveHeaderPageForDevice(page, { builderEditing = false, deviceId = '' } = {}) {
   if (!builderEditing || !deviceId) return page;
@@ -399,6 +423,191 @@ function resetPanelVisibility() {
   if (rightPanel) rightPanel.style.display = '';
 }
 
+function hexToRgba(color, opacity) {
+  if (!color || color === 'transparent') return color || '';
+  if (!HEX_COLOR_WITHOUT_ALPHA_RE.test(color)) return color;
+  const hex = color.slice(1);
+  const normalized =
+    hex.length === 3
+      ? hex
+          .split('')
+          .map((char) => `${char}${char}`)
+          .join('')
+      : hex;
+  const red = parseInt(normalized.slice(0, 2), 16);
+  const green = parseInt(normalized.slice(2, 4), 16);
+  const blue = parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
+}
+
+function applyOpacity(color, opacity) {
+  if (!color) return '';
+  if (opacity == null || opacity === 1) return color;
+  return hexToRgba(color, opacity);
+}
+
+function resolveAppearanceBackground(background = {}) {
+  if (!background.color) return '';
+  const opacity = background.opacity ?? 1;
+  if (background.type === 'gradient' && background.secondaryColor) {
+    const angle = background.angle ?? 135;
+    return `linear-gradient(${angle}deg, ${applyOpacity(background.color, opacity)}, ${applyOpacity(
+      background.secondaryColor,
+      opacity
+    )})`;
+  }
+  return applyOpacity(background.color, opacity);
+}
+
+function resolveAppearanceBorder(border = {}) {
+  const width = border.width;
+  const color = border.color ? applyOpacity(border.color, border.opacity ?? 1) : '';
+  if (width === 0) return 'none';
+  if (width != null && color) {
+    return `${width}px ${border.style || 'solid'} ${color}`;
+  }
+  return '';
+}
+
+function applyReaderControlAppearanceVars(element, appearance, prefix) {
+  if (!element) return;
+  const baseVar = prefix === 'primary' ? '--reader-primary-control' : '--reader-control';
+  const normalized = normalizeAppearance(appearance);
+  const background = normalized?.background || {};
+  const text = normalized?.text || {};
+  const border = normalized?.border || {};
+  const backgroundValue = resolveAppearanceBackground(background);
+  const borderValue = resolveAppearanceBorder(border);
+
+  [
+    `${baseVar}-bg`,
+    `${baseVar}-color`,
+    `${baseVar}-border`,
+    `${baseVar}-border-width`,
+    `${baseVar}-border-style`,
+    `${baseVar}-border-color`,
+    `${baseVar}-border-radius`,
+  ].forEach((cssVar) => element.style.removeProperty(cssVar));
+
+  if (backgroundValue) element.style.setProperty(`${baseVar}-bg`, backgroundValue);
+  if (text.color) element.style.setProperty(`${baseVar}-color`, text.color);
+  if (borderValue) element.style.setProperty(`${baseVar}-border`, borderValue);
+  if (border.width != null) {
+    element.style.setProperty(`${baseVar}-border-width`, `${border.width}px`);
+  }
+  if (border.style) {
+    element.style.setProperty(`${baseVar}-border-style`, border.style);
+  }
+  if (border.color) {
+    element.style.setProperty(
+      `${baseVar}-border-color`,
+      applyOpacity(border.color, border.opacity ?? 1)
+    );
+  }
+  if (border.radius != null) {
+    element.style.setProperty(`${baseVar}-border-radius`, `${border.radius}px`);
+  }
+}
+
+function findEffectiveReaderModule(page, options = {}) {
+  if (!page || !Array.isArray(page.sections)) return null;
+  for (const section of page.sections) {
+    for (const module of section?.modules || []) {
+      if (module?.moduleType !== 'reader') continue;
+      const hidden = isModuleHiddenForDevice(module, {
+        builderEditing: options.builderEditing === true,
+        deviceId: options.deviceId,
+      });
+      if (!hidden) return module;
+    }
+  }
+  return null;
+}
+
+function isPlainObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function resolveReaderModuleShellSettings(page, options = {}) {
+  const readerModule = findEffectiveReaderModule(page, options);
+  if (!readerModule) {
+    return {
+      settings: getReaderRuntimeConfig({}),
+      hasExplicitPanels: false,
+    };
+  }
+  const effectiveConfig = getEffectiveModuleConfig(readerModule, {
+    builderEditing: options.builderEditing === true,
+    deviceId: options.deviceId,
+  });
+  return {
+    settings: getReaderRuntimeConfig(effectiveConfig),
+    hasExplicitPanels: isPlainObject(effectiveConfig.panels),
+  };
+}
+
+function applyReaderModuleShellSettings(page, options = {}) {
+  const { settings, hasExplicitPanels } = resolveReaderModuleShellSettings(page, options);
+  const controls = document.getElementById('controls');
+  const mainContent = document.getElementById('mainContent');
+  const stageWrap = document.getElementById('stageWrap');
+  const viewport = document.getElementById('viewport');
+  const stage = document.getElementById('stage');
+  const leftPanel = document.getElementById('leftPanel');
+  const rightPanel = document.getElementById('rightPanel');
+  const commentsSection = document.getElementById('comicCommentsSection');
+  const commentToggle = document.getElementById('commentToggleBtn');
+
+  document.body.dataset.readerDisplayMode = settings.displayMode;
+  document.body.dataset.readerRequestedDisplayMode = settings.requestedDisplayMode;
+
+  if (mainContent) {
+    mainContent.dataset.readerControlsPlacement = settings.controls.placement;
+    mainContent.dataset.readerControlsSize = settings.controls.size;
+  }
+
+  if (controls) {
+    controls.dataset.readerControlsPlacement = settings.controls.placement;
+    controls.dataset.readerControlsSize = settings.controls.size;
+    controls.style.maxWidth = settings.stage.maxWidth == null ? '' : `${settings.stage.maxWidth}px`;
+    READER_CONTROL_STYLE_VARS.forEach((cssVar) => controls.style.removeProperty(cssVar));
+    applyReaderControlAppearanceVars(
+      controls,
+      settings.controls.style.defaults.appearance,
+      'control'
+    );
+    applyReaderControlAppearanceVars(
+      controls,
+      settings.controls.style.primary.appearance,
+      'primary'
+    );
+    setHiddenState(controls, settings.controls.placement === 'hidden');
+  }
+
+  [viewport, stageWrap].forEach((element) => {
+    if (!element) return;
+    element.dataset.readerStageFit = settings.stage.fit;
+    element.dataset.readerStageFrameBorder = String(settings.stage.frameBorder);
+    element.dataset.readerStageMaxWidth =
+      settings.stage.maxWidth == null ? '' : String(settings.stage.maxWidth);
+    element.style.maxWidth = settings.stage.maxWidth == null ? '' : `${settings.stage.maxWidth}px`;
+  });
+
+  if (stageWrap) {
+    stageWrap.dataset.readerStagePageGap = String(settings.stage.pageGap);
+  }
+  if (stage) {
+    stage.style.setProperty('--reader-stage-page-gap', `${settings.stage.pageGap}px`);
+  }
+
+  if (hasExplicitPanels) {
+    setHiddenState(leftPanel, settings.panels.left.enabled === false);
+    setHiddenState(rightPanel, settings.panels.right.enabled === false);
+  }
+  setHiddenState(commentsSection, settings.showComments === false);
+  setHiddenState(commentToggle, settings.showComments === false);
+}
+
 function syncReaderShellBuilderMarkers(page, builderEditing, options = {}) {
   const shellActive = options.shellActive !== false;
   const pageTargets = [
@@ -712,6 +921,8 @@ export function applyBuilderPageToDOM(page, options = {}) {
       }
     }
   }
+
+  applyReaderModuleShellSettings(page, { builderEditing, deviceId });
 
   logger.log('✓ Applied page builder config to DOM');
   return shellState;

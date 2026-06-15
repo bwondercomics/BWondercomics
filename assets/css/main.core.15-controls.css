@@ -20,6 +20,28 @@
   position: relative;
 }
 
+.viewer-content-wrapper {
+  position: relative;
+}
+
+.viewer-content-wrapper[data-reader-controls-placement='above'] #controls {
+  order: -1;
+  margin: 0 auto 12px auto;
+}
+
+.viewer-content-wrapper[data-reader-controls-placement='overlay'] #controls {
+  position: absolute;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  width: min(100% - 32px, 2000px);
+  margin: 0;
+}
+
+.viewer-content-wrapper[data-reader-controls-placement='hidden'] #controls {
+  display: none !important;
+}
+
 .controls .left,
 .controls .right {
   display: flex;
@@ -30,9 +52,12 @@
   height: 46px;
   min-width: 46px;
   padding: 0 14px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text);
+  border: var(--reader-control-border, 1px solid rgba(255, 255, 255, 0.2));
+  border-width: var(--reader-control-border-width, 1px);
+  border-style: var(--reader-control-border-style, solid);
+  border-color: var(--reader-control-border-color, rgba(255, 255, 255, 0.2));
+  background: var(--reader-control-bg, rgba(255, 255, 255, 0.06));
+  color: var(--reader-control-color, var(--text));
   cursor: pointer;
   font-family: 'Bebas Neue';
   font-weight: 800;
@@ -40,7 +65,7 @@
   font-size: 15px;
   box-shadow: none;
   transition: all 0.16s ease;
-  border-radius: 10px;
+  border-radius: var(--reader-control-border-radius, 10px);
   letter-spacing: 0.5px;
   backdrop-filter: blur(4px);
 }
@@ -68,12 +93,63 @@
   font-size: 16px;
   line-height: 1;
   padding: 10px 18px;
-  border: 1px solid rgba(255, 255, 255, 0.5);
-  color: var(--bg-dark);
-  background: linear-gradient(135deg, var(--primary), var(--accent));
+  border: var(--reader-primary-control-border, 1px solid rgba(255, 255, 255, 0.5));
+  border-width: var(--reader-primary-control-border-width, 1px);
+  border-style: var(--reader-primary-control-border-style, solid);
+  border-color: var(--reader-primary-control-border-color, rgba(255, 255, 255, 0.5));
+  color: var(--reader-primary-control-color, var(--bg-dark));
+  background: var(
+    --reader-primary-control-bg,
+    linear-gradient(135deg, var(--primary), var(--accent))
+  );
+  border-radius: var(--reader-primary-control-border-radius, 10px);
   box-shadow: 0 12px 30px rgba(0, 217, 255, 0.3);
   text-shadow: none;
   font-weight: 900;
+}
+
+.controls[data-reader-controls-size='compact'] {
+  gap: 8px;
+  padding: 8px 10px;
+}
+
+.controls[data-reader-controls-size='compact'] .left,
+.controls[data-reader-controls-size='compact'] .right {
+  gap: 6px;
+}
+
+.controls[data-reader-controls-size='compact'] .btn {
+  height: 36px;
+  min-width: 36px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+
+.controls[data-reader-controls-size='compact'] .btn.primary {
+  font-size: 14px;
+  padding: 8px 12px;
+}
+
+.controls[data-reader-controls-size='large'] {
+  gap: 16px;
+  padding: 16px 18px;
+}
+
+.controls[data-reader-controls-size='large'] .left,
+.controls[data-reader-controls-size='large'] .right {
+  gap: 10px;
+}
+
+.controls[data-reader-controls-size='large'] .btn {
+  height: 56px;
+  min-width: 56px;
+  padding: 0 18px;
+  font-size: 17px;
+}
+
+.controls[data-reader-controls-size='large'] .btn.primary {
+  font-size: 18px;
+  padding: 12px 22px;
 }
 
 .btn.primary:hover {

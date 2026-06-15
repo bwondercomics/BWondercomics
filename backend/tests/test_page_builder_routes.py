@@ -193,7 +193,9 @@ class PageBuilderRouteTests(BackendRouteTestCase):
             self.db,
         )
         self.assertEqual(global_binding.status_code, 400)
-        self.assertEqual(json_body(global_binding)["error"], "Page cannot be used for reader binding")
+        self.assertEqual(
+            json_body(global_binding)["error"], "Page cannot be used for reader binding"
+        )
 
         self.db.add(
             BuilderPageBinding(
@@ -639,6 +641,16 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         feed = sanitize_module_config("feed", {"source": {"mode": "specific-series"}})
 
         self.assertEqual(reader["source"], {"mode": "active-page-series"})
+        legacy_reader = sanitize_module_config(
+            "reader",
+            {
+                "source": {"mode": "active-page-series"},
+                "showPanels": False,
+                "showComments": True,
+            },
+        )
+        self.assertFalse(legacy_reader["showPanels"])
+        self.assertNotIn("panels", legacy_reader)
         self.assertEqual(entry_gallery["source"]["mode"], "specific-series")
         self.assertEqual(entry_gallery["source"]["seriesId"], "battle-bros")
         self.assertEqual(entry_gallery["source"]["filters"]["access"], "premium")
@@ -652,6 +664,114 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.assertEqual(media_gallery["responsive"]["mobile"]["columns"], 2)
         self.assertFalse(media_gallery["includePremium"])
         self.assertEqual(feed["source"], {"mode": "site"})
+
+    def test_reader_module_customization_config_sanitization(self):
+        reader = sanitize_module_config(
+            "reader",
+            {
+                "source": {"mode": "active-page-series"},
+                "displayMode": "vertical-scroll",
+                "showPanels": False,
+                "showComments": False,
+                "controls": {
+                    "placement": "overlay",
+                    "size": "large",
+                    "style": {
+                        "defaults": {
+                            "appearance": {
+                                "background": {"color": "#112233", "opacity": 2},
+                                "text": {"color": "#ffffff"},
+                            }
+                        },
+                        "primary": {
+                            "appearance": {
+                                "background": {"color": "not-a-color"},
+                                "border": {"width": 32, "radius": 240},
+                            }
+                        },
+                    },
+                    "unsafe": "drop",
+                },
+                "stage": {
+                    "fit": "width",
+                    "pageGap": 999,
+                    "frameBorder": False,
+                    "maxWidth": 99999,
+                    "unsafe": "drop",
+                },
+                "panels": {
+                    "left": {"enabled": True},
+                    "right": {"enabled": False},
+                    "unsafe": {"enabled": True},
+                },
+                "responsive": {
+                    "mobile": {
+                        "hidden": True,
+                        "displayMode": "vertical-scroll",
+                        "controls": {"placement": "hidden", "size": "compact", "style": "drop"},
+                        "stage": {"fit": "height", "pageGap": -8, "maxWidth": 900},
+                        "panels": {"left": {"enabled": False}, "right": {"enabled": True}},
+                        "showComments": True,
+                        "showPanels": True,
+                    },
+                    "tablet": {
+                        "displayMode": "unknown",
+                        "controls": {"placement": "sideways", "size": "huge"},
+                    },
+                },
+            },
+        )
+
+        self.assertEqual(reader["displayMode"], "vertical-scroll")
+        self.assertFalse(reader["showPanels"])
+        self.assertFalse(reader["showComments"])
+        self.assertEqual(reader["controls"]["placement"], "overlay")
+        self.assertEqual(reader["controls"]["size"], "large")
+        self.assertEqual(
+            reader["controls"]["style"]["defaults"]["appearance"]["background"]["opacity"], 1.0
+        )
+        self.assertIsNone(
+            reader["controls"]["style"]["primary"]["appearance"]["background"]["color"]
+        )
+        self.assertEqual(
+            reader["controls"]["style"]["primary"]["appearance"]["border"]["width"], 20
+        )
+        self.assertEqual(
+            reader["controls"]["style"]["primary"]["appearance"]["border"]["radius"], 200
+        )
+        self.assertEqual(reader["stage"]["fit"], "width")
+        self.assertEqual(reader["stage"]["pageGap"], 64)
+        self.assertFalse(reader["stage"]["frameBorder"])
+        self.assertEqual(reader["stage"]["maxWidth"], 2400)
+        self.assertTrue(reader["panels"]["left"]["enabled"])
+        self.assertFalse(reader["panels"]["right"]["enabled"])
+
+        mobile = reader["responsive"]["mobile"]
+        self.assertTrue(mobile["hidden"])
+        self.assertEqual(mobile["displayMode"], "vertical-scroll")
+        self.assertEqual(mobile["controls"], {"placement": "hidden", "size": "compact"})
+        self.assertEqual(mobile["stage"], {"fit": "height", "pageGap": 0})
+        self.assertEqual(mobile["panels"], {"left": {"enabled": False}, "right": {"enabled": True}})
+        self.assertTrue(mobile["showComments"])
+        self.assertNotIn("showPanels", mobile)
+        self.assertEqual(reader["responsive"]["tablet"]["displayMode"], "paged")
+        self.assertEqual(reader["responsive"]["tablet"]["controls"]["placement"], "below")
+        self.assertEqual(reader["responsive"]["tablet"]["controls"]["size"], "medium")
+
+    def test_reader_stage_rejects_non_integer_strings_like_the_client(self):
+        # F1: crafted, non-integer stage values must fall back identically on the
+        # client (normalizeReaderConfig) and the server, preserving preview parity.
+        for bad_max_width in ("wide", "480px", "12.5"):
+            reader = sanitize_module_config("reader", {"stage": {"maxWidth": bad_max_width}})
+            self.assertIsNone(
+                reader["stage"]["maxWidth"], f"maxWidth={bad_max_width!r} should be Auto"
+            )
+
+        reader = sanitize_module_config("reader", {"stage": {"pageGap": "12px"}})
+        self.assertEqual(reader["stage"]["pageGap"], 8)
+
+        reader = sanitize_module_config("reader", {"stage": {"maxWidth": "500"}})
+        self.assertEqual(reader["stage"]["maxWidth"], 500)
 
     def test_reader_module_source_normalizes_by_page_scope(self):
         self.seed_contract_series()
@@ -695,7 +815,9 @@ class PageBuilderRouteTests(BackendRouteTestCase):
             self.db,
         )["page"]
         serialized_series_reader = serialized_series["sections"][0]["modules"][0]
-        self.assertEqual(serialized_series_reader["config"]["source"], {"mode": "active-page-series"})
+        self.assertEqual(
+            serialized_series_reader["config"]["source"], {"mode": "active-page-series"}
+        )
 
         global_page = page_builder.api_create_global_page(
             page_builder.CreatePageRequest(slug="global-reader-source", title="Global Reader"),

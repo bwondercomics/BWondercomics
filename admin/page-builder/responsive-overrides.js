@@ -1,5 +1,6 @@
 import { BUILDER_DEVICE_ORDER, getBuilderDevice, isBuilderDeviceId } from './preview-contract.js';
 import { getModuleResponsiveOverrides } from './module-descriptors.js';
+import { normalizeReaderResponsiveBranch } from './reader-config.js';
 
 export const SECTION_RESPONSIVE_FIELDS = Object.freeze([
   'layout',
@@ -150,6 +151,22 @@ function mergeButtonsResponsiveConfig(baseConfig, branch) {
   return nextConfig;
 }
 
+function mergeReaderResponsiveConfig(baseConfig, branch) {
+  const nextConfig = cloneValue(baseConfig || {}) || {};
+  const safeBranch = normalizeReaderResponsiveBranch(branch);
+  ['displayMode', 'showComments'].forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(safeBranch, key)) {
+      nextConfig[key] = cloneValue(safeBranch[key]);
+    }
+  });
+  ['controls', 'stage', 'panels'].forEach((key) => {
+    if (isPlainObject(safeBranch[key])) {
+      nextConfig[key] = mergePlainObject(nextConfig[key] || {}, safeBranch[key]);
+    }
+  });
+  return nextConfig;
+}
+
 export function getEffectiveModuleConfig(module, renderOptions = {}) {
   const baseConfig = cloneValue(module?.config || {}) || {};
   const responsive = baseConfig.responsive;
@@ -162,10 +179,14 @@ export function getEffectiveModuleConfig(module, renderOptions = {}) {
   getModuleResponsiveFields(moduleType).forEach((key) => {
     if (!Object.prototype.hasOwnProperty.call(branch, key)) return;
     if (moduleType === 'buttons' && (key === 'defaults' || key === 'buttons')) return;
+    if (moduleType === 'reader' && ['controls', 'stage', 'panels'].includes(key)) return;
     nextConfig[key] = cloneValue(branch[key]);
   });
   if (moduleType === 'buttons') {
     nextConfig = mergeButtonsResponsiveConfig(nextConfig, branch);
+  }
+  if (moduleType === 'reader') {
+    nextConfig = mergeReaderResponsiveConfig(nextConfig, branch);
   }
   return nextConfig;
 }

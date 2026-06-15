@@ -61,12 +61,43 @@ describe('page-builder module descriptors', () => {
 
     feedConfig.style.headingBgColor = '#000000';
     expect(getModuleDefaultConfig('feed').style.headingBgColor).toBe('#ffed00');
+
+    const readerConfig = getDefaultConfig('reader');
+    expect(readerConfig).toEqual(
+      expect.objectContaining({
+        displayMode: 'paged',
+        showPanels: true,
+        showComments: true,
+        controls: expect.objectContaining({
+          placement: 'below',
+          size: 'medium',
+        }),
+        stage: expect.objectContaining({
+          fit: 'dynamic-frame',
+          pageGap: 8,
+          frameBorder: true,
+          maxWidth: null,
+        }),
+        panels: {
+          left: { enabled: true },
+          right: { enabled: true },
+        },
+      })
+    );
   });
 
   it('keeps labels, previews, responsive fields, and style sectors descriptor-backed', () => {
     expect(getModuleLabel('entry-gallery')).toBe('Entries');
     expect(getModulePreview('text', { content: '<p>Hello Builder</p>' })).toBe('Hello Builder');
     expect(getModuleResponsiveFields('buttons')).toEqual(['hidden', 'defaults', 'buttons']);
+    expect(getModuleResponsiveFields('reader')).toEqual([
+      'hidden',
+      'displayMode',
+      'controls',
+      'stage',
+      'panels',
+      'showComments',
+    ]);
     expect(getModuleResponsiveOverrides('text')).toEqual(['hidden', 'alignment']);
     expect(getModuleResponsiveOverrides('media-gallery')).toEqual(['hidden', 'columns']);
     expect(getModuleSourceModes('reader')).toEqual(['active-page-series', 'specific-series']);

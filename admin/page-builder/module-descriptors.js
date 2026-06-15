@@ -184,11 +184,27 @@ const MODULE_DESCRIPTOR_DEFS = [
     category: 'special',
     defaultConfig: {
       source: createSourceConfig(SOURCE_ACTIVE_PAGE_SERIES),
+      displayMode: 'paged',
       showPanels: true,
       showComments: true,
+      controls: {
+        placement: 'below',
+        size: 'medium',
+        style: {},
+      },
+      stage: {
+        fit: 'dynamic-frame',
+        pageGap: 8,
+        frameBorder: true,
+        maxWidth: null,
+      },
+      panels: {
+        left: { enabled: true },
+        right: { enabled: true },
+      },
     },
     editorKind: 'reader',
-    responsiveOverrides: HIDDEN_ONLY_RESPONSIVE_FIELDS,
+    responsiveOverrides: ['hidden', 'displayMode', 'controls', 'stage', 'panels', 'showComments'],
     appearanceSectors: [],
     requiredContext: [],
     sourceModes: [SOURCE_ACTIVE_PAGE_SERIES, SOURCE_SPECIFIC_SERIES],

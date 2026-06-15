@@ -260,6 +260,19 @@ Acceptance criteria:
 - Paged reader behavior remains unchanged when new config is absent.
 - Device overrides affect preview and public runtime consistently.
 
+Completion note (`2026-06-15`): Phase 3 is implemented for the existing paged reader shell. The
+reader descriptor and backend sanitizer now normalize `displayMode`, `controls`, `stage`, `panels`,
+legacy `showPanels`, `showComments`, and safe device overrides. The reader module editor exposes
+structured source, controls placement/size, controls appearance, stage fit/gap/frame/max-width,
+panel visibility, and comments visibility controls; the Vertical Scroll option is stored-compatible
+but disabled in the editor until Phase 4. Shared builder rendering emits normalized
+`.pb-reader-mount` data attributes, and `reader/data.js` resolves the effective reader module config
+before applying controls, stage, panel, and comments settings to the static shell. Visual coverage now
+includes a separate customized paged reader route in both public reader and admin live preview.
+Verification passed: `git diff --check`, `npm run format:check`, `npm run lint`, `npm test`
+(`477` passed, `1` skipped), `npm run format:py:check`, `npm run lint:py`,
+`npm run test:backend` (`74` passed), `npm run build`, and `npm run test:visual` (`8` passed).
+
 ## Phase 4 - Vertical Comic Mode
 
 Goal: Add Webtoon-style vertical scrolling as a reader display mode.

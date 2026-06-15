@@ -21,7 +21,7 @@
  *                                                                      responsive overrides
  */
 
-import { escapeHtml } from './helpers.js';
+import { escapeAttr, escapeHtml } from './helpers.js';
 import { renderPromoModule } from './promo-renderer.js';
 import {
   normalizeButtonsConfig,
@@ -35,6 +35,7 @@ import {
   getEffectiveSectionSettings,
   isModuleHiddenForDevice,
 } from './responsive-overrides.js';
+import { getReaderMountDataAttributes } from './reader-config.js';
 import {
   sanitizeAssetUrl,
   sanitizeBuilderHtml,
@@ -88,6 +89,13 @@ export function createRenderers({
     const source = normalizeSourceConfig(config);
     const json = escapeHtml(JSON.stringify(source));
     return ` data-source-mode="${escapeHtml(source.mode || '')}" data-source-series-id="${escapeHtml(source.seriesId || '')}" data-source-config="${json}"`;
+  }
+
+  function dataAttrs(attrs = {}) {
+    return Object.entries(attrs)
+      .filter(([, value]) => value !== undefined && value !== null)
+      .map(([key, value]) => ` ${key}="${escapeAttr(String(value))}"`)
+      .join('');
   }
 
   const MODULE_RENDERERS = {
@@ -297,15 +305,12 @@ export function createRenderers({
     },
 
     reader: (config) => {
-      const showPanels = config.showPanels !== false;
-      const showComments = config.showComments !== false;
+      const readerAttrs = getReaderMountDataAttributes(config);
       const inner = showMountPlaceholders
         ? '<div class="pb-mount-placeholder">Reader Component (renders on live page)</div>'
         : '<!-- Reader will be mounted here -->';
       return `
-        <div class="pb-reader-mount"
-             data-show-panels="${showPanels}"
-             data-show-comments="${showComments}"${sourceAttrs(config)}>
+        <div class="pb-reader-mount"${dataAttrs(readerAttrs)}${sourceAttrs(config)}>
           ${inner}
         </div>
       `;

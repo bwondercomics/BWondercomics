@@ -13,7 +13,7 @@
 
 .stage {
   display: flex;
-  gap: 8px;
+  gap: var(--reader-stage-page-gap, 8px);
   align-items: center;
   justify-content: center;
   transform-origin: 50% 50%;
@@ -48,6 +48,29 @@
   -webkit-user-drag: none;
   pointer-events: none;
   user-select: none;
+}
+
+.stageWrap[data-reader-stage-frame-border='false'] .page {
+  border-width: 0;
+}
+
+.stageWrap[data-reader-stage-fit='width'] .page img {
+  width: 100%;
+  height: auto;
+  max-height: none;
+}
+
+.stageWrap[data-reader-stage-fit='height'] .page img {
+  width: auto;
+  height: 100%;
+  max-width: none;
+}
+
+.stageWrap[data-reader-stage-fit='natural'] .page img {
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
 }
 
 .spinner {

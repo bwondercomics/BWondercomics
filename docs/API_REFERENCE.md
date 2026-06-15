@@ -323,6 +323,11 @@ Fetch a published global builder page requested with `?pageScope=global&page=<sl
   `POST /api/admin/sections/{sectionId}/modules`, and related `/api/admin/sections/*` /
   `/api/admin/modules/*` routes - mutate builder sections and modules.
 
+Reader module configs accepted through these page-builder routes include sanitized paged-reader
+customization fields: `displayMode`, `controls`, `stage`, `panels`, `showPanels`, and
+`showComments`. `vertical-scroll` is accepted in `displayMode` for forward compatibility, but the
+current reader runtime still renders paged mode.
+
 ---
 
 ## State Management
