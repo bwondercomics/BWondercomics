@@ -49,6 +49,7 @@ import {
   pruneEmptyResponsiveOverrides,
   setResponsiveOverrideValue,
 } from './page-builder/responsive-overrides.js';
+import { MAX_COLUMNS, parseLayoutRatios, ratiosToLayout } from './page-builder/layout-utils.js';
 import { sanitizeBuilderHtml } from './page-builder/sanitize.js';
 import {
   fetchSeriesPages,
@@ -262,6 +263,9 @@ function createPageBuilder({
         renderEditorPanel();
       },
       updateActiveSectionDraftField,
+      setActiveSectionColumnCount,
+      updateActiveSectionColumnRatio,
+      updateActiveSectionColumnField,
       setActiveModuleDraft: (nextDraft) => {
         activeModuleDraft = cloneValue(nextDraft);
       },
@@ -363,6 +367,9 @@ function createPageBuilder({
       changeSectionLayout: canvasMutations.changeSectionLayout,
       toggleSectionSettings,
       updateActiveSectionDraftField,
+      setActiveSectionColumnCount,
+      updateActiveSectionColumnRatio,
+      updateActiveSectionColumnField,
       discardSectionSettings,
       saveSectionSettings,
       setDraggedModuleId: (moduleId) => {
@@ -557,6 +564,7 @@ function createPageBuilder({
     actions: {
       buildNormalizedPageMeta,
       buildSectionSettingsFromDraft,
+      getSectionLayoutFromDraft,
       setActiveDeviceId: (nextDeviceId) => {
         activeDeviceId = nextDeviceId;
       },
@@ -1835,6 +1843,9 @@ function createPageBuilder({
 
   function buildSectionSettingsFromDraft(draft = activeSectionDraft) {
     const settings = cloneValue(draft || {}) || {};
+    // Layout is a top-level section field, not a setting; saveSectionSettings reads it
+    // separately from the draft and sends it atomically alongside settings.
+    delete settings.layout;
     ['moduleGap', 'columnGap', 'sectionGap', 'paddingTop', 'paddingBottom'].forEach((key) => {
       const value = settings?.[key];
       if (value !== '' && value !== null && value !== undefined) {
@@ -1846,11 +1857,48 @@ function createPageBuilder({
     if (!settings.backgroundColor) {
       delete settings.backgroundColor;
     }
+    settings.columns = pruneSectionColumns(settings.columns, draft?.layout);
+    if (!settings.columns.length) {
+      delete settings.columns;
+    }
     settings.responsive = pruneEmptyResponsiveOverrides(settings.responsive);
     if (!Object.keys(settings.responsive).length) {
       delete settings.responsive;
     }
     return settings;
+  }
+
+  function getSectionLayoutFromDraft(draft = activeSectionDraft) {
+    return ratiosToLayout(parseLayoutRatios(draft?.layout || '1'));
+  }
+
+  // After an atomic section update the backend may have rehomed modules orphaned by a
+  // column-count reduction; mirror the returned column/sort indexes onto local records
+  // so the canvas reflects the new placement without a reload.
+  function syncSectionModulesFromUpdate(section, updated) {
+    if (!section || !Array.isArray(updated?.modules)) return;
+    const byId = new Map((section.modules || []).map((module) => [module.id, module]));
+    updated.modules.forEach((updatedModule) => {
+      const local = byId.get(updatedModule.id);
+      if (local) {
+        local.columnIndex = updatedModule.columnIndex;
+        local.sortIndex = updatedModule.sortIndex;
+      }
+    });
+  }
+
+  // Drop column entries that fall outside the effective column count or carry no
+  // styling beyond their index; the backend sanitizer makes the final decision.
+  function pruneSectionColumns(columns, layout) {
+    if (!Array.isArray(columns)) return [];
+    const count = parseLayoutRatios(layout || '1').length;
+    return columns
+      .filter((column) => column && typeof column === 'object')
+      .map((column) => ({ ...column, index: Number(column.index) }))
+      .filter(
+        (column) => Number.isInteger(column.index) && column.index >= 0 && column.index < count
+      )
+      .filter((column) => Object.keys(column).some((key) => key !== 'index'));
   }
 
   function toggleSectionSettings(sectionId) {
@@ -1898,6 +1946,180 @@ function createPageBuilder({
     renderEditorPanel();
   }
 
+  function ensureSectionColumnEntry(index) {
+    if (!Array.isArray(activeSectionDraft.columns)) activeSectionDraft.columns = [];
+    let entry = activeSectionDraft.columns.find((col) => Number(col?.index) === index);
+    if (!entry) {
+      entry = { index };
+      activeSectionDraft.columns.push(entry);
+      activeSectionDraft.columns.sort((a, b) => Number(a.index) - Number(b.index));
+    }
+    return entry;
+  }
+
+  function cleanupSectionColumnEntry(entry) {
+    if (!entry || !Array.isArray(activeSectionDraft?.columns)) return;
+    if (entry.responsive) {
+      entry.responsive = pruneEmptyResponsiveOverrides(entry.responsive);
+      if (!Object.keys(entry.responsive).length) {
+        delete entry.responsive;
+      }
+    }
+    if (!Object.keys(entry).some((key) => key !== 'index')) {
+      activeSectionDraft.columns = activeSectionDraft.columns.filter((item) => item !== entry);
+    }
+    if (!activeSectionDraft.columns.length) {
+      delete activeSectionDraft.columns;
+    }
+  }
+
+  function ensureSectionColumnEditTarget(index) {
+    const entry = ensureSectionColumnEntry(index);
+    if (responsiveEditScope !== 'device') return { entry, target: entry };
+    entry.responsive =
+      entry.responsive && typeof entry.responsive === 'object' ? entry.responsive : {};
+    entry.responsive[activeDeviceId] =
+      entry.responsive[activeDeviceId] && typeof entry.responsive[activeDeviceId] === 'object'
+        ? entry.responsive[activeDeviceId]
+        : {};
+    return { entry, target: entry.responsive[activeDeviceId] };
+  }
+
+  function setActiveSectionColumnCount(rawCount) {
+    if (!activeSectionDraft) return;
+    const globalRatios = parseLayoutRatios(activeSectionDraft.layout || '1');
+    if (responsiveEditScope === 'device') {
+      const raw = String(rawCount ?? '').trim();
+      if (!raw || raw === 'inherit') {
+        setResponsiveOverrideValue(activeSectionDraft, activeDeviceId, 'layout', '');
+      } else {
+        const count = Math.max(1, Math.min(globalRatios.length, Math.round(Number(rawCount) || 1)));
+        const branchLayout = activeSectionDraft.responsive?.[activeDeviceId]?.layout;
+        const sourceRatios = branchLayout ? parseLayoutRatios(branchLayout) : globalRatios;
+        const next = [];
+        for (let index = 0; index < count; index += 1) {
+          next.push(sourceRatios[index] ?? globalRatios[index] ?? 1);
+        }
+        setResponsiveOverrideValue(
+          activeSectionDraft,
+          activeDeviceId,
+          'layout',
+          ratiosToLayout(next)
+        );
+      }
+      markDirty('section');
+      renderCanvas();
+      renderEditorPanel();
+      return;
+    }
+
+    const count = Math.max(1, Math.min(MAX_COLUMNS, Math.round(Number(rawCount) || 1)));
+    const ratios = globalRatios;
+    const next = [];
+    for (let i = 0; i < count; i++) next.push(ratios[i] ?? 1);
+    activeSectionDraft.layout = ratiosToLayout(next);
+    if (Array.isArray(activeSectionDraft.columns)) {
+      activeSectionDraft.columns = activeSectionDraft.columns.filter(
+        (col) => Number(col?.index) < count
+      );
+    }
+    markDirty('section');
+    renderCanvas();
+    renderEditorPanel();
+  }
+
+  function updateActiveSectionColumnRatio(rawIndex, rawValue) {
+    if (!activeSectionDraft) return;
+    const index = Number(rawIndex);
+    const branchLayout =
+      responsiveEditScope === 'device'
+        ? activeSectionDraft.responsive?.[activeDeviceId]?.layout
+        : null;
+    const ratios = parseLayoutRatios(branchLayout || activeSectionDraft.layout || '1');
+    if (!Number.isInteger(index) || index < 0 || index >= ratios.length) return;
+    ratios[index] = Math.max(1, Math.min(12, Math.round(Number(rawValue) || 1)));
+    if (responsiveEditScope === 'device') {
+      setResponsiveOverrideValue(
+        activeSectionDraft,
+        activeDeviceId,
+        'layout',
+        ratiosToLayout(ratios)
+      );
+    } else {
+      activeSectionDraft.layout = ratiosToLayout(ratios);
+    }
+    markDirty('section');
+    renderCanvas();
+    renderEditorPanel();
+  }
+
+  function updateActiveSectionColumnField(rawIndex, key, rawValue, options = {}) {
+    if (!activeSectionDraft || !key) return;
+    const index = Number(rawIndex);
+    const globalColumnCount = parseLayoutRatios(activeSectionDraft.layout || '1').length;
+    if (!Number.isInteger(index) || index < 0 || index >= globalColumnCount) return;
+    const { entry, target } = ensureSectionColumnEditTarget(index);
+    switch (key) {
+      case 'hidden': {
+        if (responsiveEditScope === 'device') {
+          const value = String(rawValue ?? '').trim();
+          if (!value || value === 'inherit') delete target.hidden;
+          else target.hidden = value === 'true';
+        } else if (rawValue) {
+          target.hidden = true;
+        } else {
+          delete target.hidden;
+        }
+        break;
+      }
+      case 'alignment': {
+        const raw = String(rawValue || '').trim();
+        const value = raw === 'inherit' ? '' : raw;
+        if (value && (responsiveEditScope === 'device' || value !== 'stretch')) {
+          target.alignment = value;
+        } else {
+          delete target.alignment;
+        }
+        break;
+      }
+      case 'minHeight': {
+        const raw = String(rawValue ?? '').trim();
+        if (raw) target.minHeight = Math.max(0, Math.round(Number(raw) || 0));
+        else delete target.minHeight;
+        break;
+      }
+      case 'appearance': {
+        if (rawValue && typeof rawValue === 'object' && Object.keys(rawValue).length) {
+          target.appearance = cloneValue(rawValue);
+        } else {
+          delete target.appearance;
+        }
+        break;
+      }
+      case 'paddingTop':
+      case 'paddingRight':
+      case 'paddingBottom':
+      case 'paddingLeft': {
+        const side = key.replace('padding', '').toLowerCase();
+        const raw = String(rawValue ?? '').trim();
+        const padding = { ...(target.padding || {}) };
+        if (raw) padding[side] = Math.max(0, Math.round(Number(raw) || 0));
+        else delete padding[side];
+        if (Object.keys(padding).length) target.padding = padding;
+        else delete target.padding;
+        break;
+      }
+      default:
+        return;
+    }
+    cleanupSectionColumnEntry(entry);
+    markDirty('section');
+    renderCanvas();
+    if (options.rerenderEditor !== false) {
+      renderEditorPanel();
+    }
+  }
+
   function discardSectionSettings() {
     if (!activeSectionId) return;
     draftManager.initializeSectionDraft(activeSectionId);
@@ -1913,10 +2135,15 @@ function createPageBuilder({
     if (!section) return false;
 
     const settings = buildSectionSettingsFromDraft(activeSectionDraft);
+    const layout = getSectionLayoutFromDraft(activeSectionDraft);
 
-    const updated = await updateSection(activeSectionId, { settings });
+    // Layout (column count/ratio) and settings (per-column styling, spacing) save in one
+    // request; the backend rehomes any modules orphaned by a column-count reduction.
+    const updated = await updateSection(activeSectionId, { layout, settings });
     if (updated) {
       section.settings = updated.settings || settings;
+      section.layout = updated.layout || layout;
+      syncSectionModulesFromUpdate(section, updated);
       draftManager.initializeSectionDraft(activeSectionId);
       clearDirty('section');
       setCanvasStatus('Section settings saved.', 'success');

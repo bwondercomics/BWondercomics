@@ -1,4 +1,5 @@
 import { LAYOUT_OPTIONS } from './constants.js';
+import { layoutColumnCount, layoutToGridTemplate } from './layout-utils.js';
 import { appearanceToInlineStyle } from './appearance-utils.js';
 import { escapeAttr, escapeHtml } from './helpers.js';
 import { getInsertableModuleDescriptors } from './module-descriptors.js';
@@ -296,12 +297,15 @@ function getSectionDraft(section, state) {
 }
 
 function renderCanvasSection(section, sectionIndex, state, helpers) {
-  const layoutValue = section.layout || '1';
-  const columnCount = layoutValue.split('-').length;
-  const columnIndices = Array.from({ length: columnCount }, (_, index) => index);
-  const moduleCount = helpers.getVisibleSectionModuleCount(section);
   const isSettingsOpen = state.activeSectionId === section.id;
   const sectionDraft = getSectionDraft(section, state);
+  // While the section is being edited, reflect the draft layout (live column
+  // count/ratio changes) rather than the last-saved layout.
+  const layoutValue = (isSettingsOpen && sectionDraft.layout) || section.layout || '1';
+  const columnCount = layoutColumnCount(layoutValue);
+  const columnIndices = Array.from({ length: columnCount }, (_, index) => index);
+  const moduleCount = helpers.getVisibleSectionModuleCount(section);
+  const gridTemplate = layoutToGridTemplate(layoutValue);
 
   return `
     ${renderSectionInsertBar(sectionIndex)}
@@ -371,7 +375,7 @@ function renderCanvasSection(section, sectionIndex, state, helpers) {
           `
           : ''
       }
-      <div class="pb-section-columns" data-layout="${layoutValue}">
+      <div class="pb-section-columns" data-layout="${escapeAttr(layoutValue)}" style="grid-template-columns: ${gridTemplate};">
         ${columnIndices
           .map((columnIndex) => {
             const modules = helpers.sortCanvasModulesForColumn(section, columnIndex);

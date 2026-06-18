@@ -526,8 +526,6 @@ describe('reader builder presentation loading', () => {
 
     const leftPanel = document.getElementById('leftPanel');
     const rightPanel = document.getElementById('rightPanel');
-    const leftBuilder = leftPanel?.querySelector('.panel-builder--left');
-    const rightBuilder = rightPanel?.querySelector('.panel-builder--right');
 
     expect(leftPanel?.style.getPropertyValue('--panel-bg-image')).toContain(
       '/assets/media/panels/left-grid.png'
@@ -535,11 +533,145 @@ describe('reader builder presentation loading', () => {
     expect(rightPanel?.style.getPropertyValue('--panel-bg-image')).toContain(
       '/assets/media/panels/right-burst.png'
     );
-    expect(leftBuilder?.style.getPropertyValue('--pb-panel-gap')).toBe('18px');
-    expect(rightBuilder?.style.getPropertyValue('--pb-panel-gap')).toBe('26px');
-    expect(leftBuilder?.querySelector('.pb-module--promo')).not.toBeNull();
-    expect(rightBuilder?.querySelector('.pb-module--feed')).not.toBeNull();
-    expect(rightBuilder?.querySelector('.latest-name')?.textContent).toBe('Issue 10 Released');
+
+    // Sections after the reader module render as below-reader page content (panels
+    // are reader-owned and fed only from the reader's own section). The contract
+    // fixture's promo/feed sections sit after the reader, so they land below it.
+    const below = document.getElementById('builderBelowReader');
+    expect(below?.hidden).toBe(false);
+    expect(below?.querySelector('.pb-module--promo')).not.toBeNull();
+    expect(below?.querySelector('.pb-module--feed')).not.toBeNull();
+    expect(below?.querySelector('.latest-name')?.textContent).toBe('Issue 10 Released');
+  });
+
+  it('renders sections above and below the reader module into reader content surfaces', () => {
+    const page = getContractFixture('builderPage');
+    const readerModule = getContractFixture('builderModules').reader;
+    page.sections = [
+      {
+        id: 'above-sec',
+        sectionType: 'row',
+        layout: '1',
+        sortIndex: 0,
+        settings: {},
+        modules: [
+          {
+            id: 'above-text',
+            moduleType: 'text',
+            columnIndex: 0,
+            sortIndex: 0,
+            config: { content: '<p>Above reader</p>' },
+          },
+        ],
+      },
+      {
+        id: 'reader-sec',
+        sectionType: 'row',
+        layout: '1',
+        sortIndex: 1,
+        settings: {},
+        modules: [
+          {
+            ...readerModule,
+            id: 'reader-shell-module',
+            columnIndex: 0,
+            sortIndex: -1,
+            config: { ...readerModule.config, source: { mode: 'active-page-series' } },
+          },
+          {
+            id: 'panel-text',
+            moduleType: 'text',
+            columnIndex: 0,
+            sortIndex: 0,
+            config: { content: '<p>Reader panel</p>' },
+          },
+        ],
+      },
+      {
+        id: 'below-sec',
+        sectionType: 'row',
+        layout: '1',
+        sortIndex: 2,
+        settings: {},
+        modules: [
+          {
+            id: 'below-text',
+            moduleType: 'text',
+            columnIndex: 0,
+            sortIndex: 0,
+            config: { content: '<p>Below reader</p>' },
+          },
+        ],
+      },
+    ];
+
+    const shellState = applyBuilderPageToDOM(page, { seriesId: 'battle-bros' });
+    expect(shellState.active).toBe(true);
+
+    const above = document.getElementById('builderAboveReader');
+    const below = document.getElementById('builderBelowReader');
+    expect(above?.hidden).toBe(false);
+    expect(above?.textContent).toContain('Above reader');
+    expect(below?.hidden).toBe(false);
+    expect(below?.textContent).toContain('Below reader');
+
+    // Under/over-reader content stays out of the reader panels; only the reader
+    // section's own column feeds the panels.
+    const leftPanel = document.getElementById('leftPanel');
+    expect(leftPanel?.textContent).toContain('Reader panel');
+    expect(leftPanel?.textContent || '').not.toContain('Above reader');
+    expect(leftPanel?.textContent || '').not.toContain('Below reader');
+  });
+
+  it('clears reader content surfaces when switching to a no-reader page', () => {
+    const page = getContractFixture('builderPage');
+    const readerModule = getContractFixture('builderModules').reader;
+    page.sections = [
+      {
+        id: 'reader-sec',
+        sectionType: 'row',
+        layout: '1',
+        sortIndex: 0,
+        settings: {},
+        modules: [
+          {
+            ...readerModule,
+            id: 'reader-shell-module',
+            columnIndex: 0,
+            sortIndex: -1,
+            config: { ...readerModule.config, source: { mode: 'active-page-series' } },
+          },
+        ],
+      },
+      {
+        id: 'below-sec',
+        sectionType: 'row',
+        layout: '1',
+        sortIndex: 1,
+        settings: {},
+        modules: [
+          {
+            id: 'below-text',
+            moduleType: 'text',
+            columnIndex: 0,
+            sortIndex: 0,
+            config: { content: '<p>Below reader</p>' },
+          },
+        ],
+      },
+    ];
+    applyBuilderPageToDOM(page, { seriesId: 'battle-bros' });
+    expect(document.getElementById('builderBelowReader')?.hidden).toBe(false);
+
+    const noReaderPage = buildContractFixture('builderPageDraft', {
+      slug: 'about',
+      title: 'About',
+      pageType: 'custom',
+    });
+    applyBuilderPageToDOM(noReaderPage, { seriesId: 'battle-bros' });
+    const below = document.getElementById('builderBelowReader');
+    expect(below?.hidden).toBe(true);
+    expect(below?.textContent).toBe('');
   });
 
   it('restores reader-owned header chrome when an active reader page follows a no-reader page', () => {
@@ -620,9 +752,11 @@ describe('reader builder presentation loading', () => {
     applyBuilderPageToDOM(builderPage, { seriesId: 'battle-bros' });
     await flushReaderUi(4);
 
-    const leftBuilder = document.querySelector('#leftPanel .panel-builder--left');
-    expect(leftBuilder?.querySelector('.pb-module--entry-gallery')).not.toBeNull();
-    expect(leftBuilder?.querySelector('.pb-entry-gallery-item')?.textContent).toContain(
+    // The entry-gallery section sits after the reader module, so it renders as
+    // below-reader page content rather than reader-panel content.
+    const below = document.getElementById('builderBelowReader');
+    expect(below?.querySelector('.pb-module--entry-gallery')).not.toBeNull();
+    expect(below?.querySelector('.pb-entry-gallery-item')?.textContent).toContain(
       'Issue 1 - Issue'
     );
   });

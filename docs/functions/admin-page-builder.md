@@ -89,6 +89,24 @@ modules, while `feed`/`gallery` binding roles remain reserved for later routing 
 
 Sections currently own: `layout`, `sortIndex`, and `settings`.
 
+`layout` is a 1-6 segment dash-separated ratio string (each segment a positive integer 1-12); legacy
+presets (`1`, `1-1`, `1-2`, `2-1`, `1-1-1`, `1-3-1`) are a strict subset. It is the single source of
+truth for column count and width ratios. `settings.columns[]` holds sparse per-column styling keyed by
+`index` (sanitized appearance, padding, alignment, min-height, hidden, and a per-column `responsive`
+branch); it never carries width. Device track count/ratio rides
+`settings.responsive[device].layout`, is limited to the global structural column count, and reflows
+the stable global column nodes without changing `module.columnIndex`. When a saved global layout
+shrinks, modules already in the last surviving column stay first, orphaned modules append by original
+column/sort order, and the merged destination order is resequenced contiguously in the same
+transaction.
+
+Panel precedence: reader side panels are reader-owned. They are styled through the reader module's
+`panels` settings and the page-level `meta.panelBackgrounds` / `meta.panelSpacing`, and are fed only
+from the reader module's own section. Generic section columns use the `settings.columns[]` contract;
+the two do not overload each other. On a bound reader page, sections before the reader module render
+into the above-reader content surface and sections after it into the below-reader content surface as
+ordinary page content (not panels).
+
 ### Module
 
 Modules currently own: `moduleType`, `columnIndex`, `sortIndex`, and `config`. CMS-backed modules
@@ -207,18 +225,21 @@ Current responsibilities:
 
 ## 📱 Responsive Overrides (responsive-overrides.js)
 
-This helper owns the builder-editing responsive override contract. It normalizes device ids from the
-preview contract, prunes empty responsive branches, exposes the per-module responsive field list from
-`module-descriptors.js`, and resolves the effective section/module config used while the iframe is
-rendering a specific builder device.
+This helper owns the responsive override contract shared by builder-device rendering and public
+responsive CSS generation. It normalizes device ids from the preview contract, prunes empty
+responsive branches, exposes the per-module responsive field list from `module-descriptors.js`, and
+resolves effective section/module/column state for a specific device.
 
 Current responsibilities:
 
 - `SECTION_RESPONSIVE_FIELDS` defines editable section-level overrides such as layout, gaps,
   padding, and background color
 - `setResponsiveOverrideValue(...)` writes sparse per-device branches and removes empty values
-- `getEffectiveSectionLayout(...)` and `getEffectiveSectionSettings(...)` merge section overrides
-  only while `builderEditing` is true
+- `getEffectiveSectionLayout(...)`, `getEffectiveSectionSettings(...)`, and
+  `getEffectiveColumnSettings(...)` merge sparse device overrides for builder rendering or explicit
+  public CSS resolution
+- `resolveEffectiveColumnLayout(...)` returns global column indexes, visible indexes, effective
+  track ratios/grid template, and effective settings for every stable structural column
 - `getEffectiveModuleConfig(...)` applies descriptor-backed module overrides, including nested
   button defaults and per-button responsive appearance overrides
 - `isModuleHiddenForDevice(...)` gates builder-editing render output for device-hidden modules
@@ -622,6 +643,12 @@ The most complex module, handling carousels, focal points, and rich CTA text. Ma
 
 This is the shared rendering core used by both admin preview output and the public reader. Factory outputs `renderModule`, `renderSection`, and `renderPage`. This establishes true structural parity between the admin canvas and live website.
 
+Section rendering always emits every global structural column in stable index order. Responsive
+layouts change only the CSS Grid track template, so module ownership and `data-builder-column-index`
+never follow a device reflow. Hidden columns remain in the DOM with `display: none`, and both base
+inline rendering and scoped public media CSS derive grid templates from visible columns so hidden
+nodes do not reserve empty tracks.
+
 Buttons renderer behavior now uses the shared appearance contract directly:
 
 - the whole buttons module config is normalized through `normalizeButtonsConfig(...)`, not just individual items, so `defaults.appearance` is available at render time
@@ -673,6 +700,10 @@ measurements onto the frame dataset for optional debug display, and `TARGETS`/`T
 `TARGET_SELECT` by rendering live-canvas overlays and routing selection through
 `selectCanvasTarget(...)`. A new preview session token (`previewSession`) is minted on page/series
 identity change to prevent stale message acceptance.
+
+Working section snapshots copy the normalized draft `layout` and pruned draft `settings` together,
+so unsaved structural ratios, responsive reflow, visibility, and column appearance render in the
+iframe before Save while persisted page state remains unchanged.
 
 ## 🎡 Promo Renderer (promo-renderer.js)
 

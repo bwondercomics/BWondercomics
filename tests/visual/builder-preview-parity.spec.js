@@ -37,27 +37,35 @@ function stabilizeVisualPage(page) {
 function buildVisualPage() {
   const page = stabilizeVisualPage(clone(fixtures.builderPage));
   const readerModule = clone(fixtures.builderModules.reader);
-  page.sections.unshift({
+  // Panels are reader-owned and fed from the reader's own section, so co-locate the
+  // reader and its panel content in one multi-column section (the canonical model).
+  const panelSection = (page.sections || []).find((section) =>
+    (section.modules || []).some((module) => module.moduleType === 'promo')
+  ) || {
     id: 'visual-reader-shell-section',
     sectionType: 'row',
-    layout: '1',
-    sortIndex: -1,
+    layout: '1-1',
     settings: {},
-    modules: [
-      {
-        ...readerModule,
-        id: 'visual-reader-shell-module',
-        columnIndex: 0,
-        sortIndex: 0,
-        config: {
-          ...readerModule.config,
-          source: { mode: 'active-page-series' },
-          showPanels: true,
-          showComments: true,
-        },
+    modules: [],
+  };
+  panelSection.modules = [
+    {
+      ...readerModule,
+      id: 'visual-reader-shell-module',
+      columnIndex: 0,
+      sortIndex: -1,
+      config: {
+        ...readerModule.config,
+        source: { mode: 'active-page-series' },
+        showPanels: true,
+        showComments: true,
       },
-    ],
-  });
+    },
+    ...panelSection.modules,
+  ];
+  if (!page.sections.includes(panelSection)) {
+    page.sections.push(panelSection);
+  }
   return page;
 }
 
@@ -134,6 +142,149 @@ function buildVerticalReaderVisualPage() {
   return page;
 }
 
+function buildPhase5ColumnsVisualPage() {
+  const page = buildVisualPage();
+  Object.assign(page, {
+    id: 'visual-phase5-layout-page',
+    slug: 'phase5-layout',
+    title: 'Phase 5 Layout',
+    pageType: 'reader',
+    isHomepage: false,
+  });
+  const readerSection = page.sections.find((section) =>
+    (section.modules || []).some((module) => module.moduleType === 'reader')
+  );
+  const textModule = (id, columnIndex, label) => ({
+    id,
+    moduleType: 'text',
+    columnIndex,
+    sortIndex: 0,
+    config: {
+      content: `<p>${label}</p>`,
+    },
+  });
+
+  const aboveSection = {
+    id: 'phase5-above-reader',
+    sectionType: 'row',
+    layout: '1',
+    settings: {
+      columnGap: 12,
+      columns: [
+        {
+          index: 0,
+          appearance: {
+            background: { color: '#132238' },
+            text: { color: '#f4f8ff' },
+            border: { width: 1, color: '#35557d', radius: 12 },
+          },
+          padding: { top: 12, right: 12, bottom: 12, left: 12 },
+        },
+      ],
+    },
+    modules: [textModule('phase5-above-copy', 0, 'Authored content above the reader')],
+  };
+  const fourColumnSection = {
+    id: 'phase5-four-columns',
+    sectionType: 'row',
+    layout: '2-1-1-1',
+    settings: {
+      columnGap: 10,
+      columns: [
+        {
+          index: 0,
+          appearance: {
+            background: {
+              type: 'gradient',
+              color: '#193552',
+              secondaryColor: '#245b72',
+              angle: 135,
+              opacity: 0.9,
+            },
+            text: { color: '#ffffff' },
+            border: { width: 1, color: '#4f9db5', radius: 10 },
+          },
+          padding: { top: 10, right: 10, bottom: 10, left: 10 },
+          minHeight: 84,
+        },
+        {
+          index: 1,
+          appearance: {
+            background: { color: '#2f2440', opacity: 0.9 },
+            text: { color: '#f8efff' },
+            border: { width: 1, color: '#8a67aa', radius: 10 },
+          },
+          padding: { top: 10, right: 10, bottom: 10, left: 10 },
+        },
+        {
+          index: 2,
+          appearance: {
+            background: { color: '#3f2b1d' },
+            text: { color: '#fff6e8' },
+            border: { width: 1, color: '#a66b35', radius: 10 },
+          },
+          padding: { top: 10, right: 10, bottom: 10, left: 10 },
+          responsive: {
+            mobile: {
+              hidden: true,
+            },
+          },
+        },
+        {
+          index: 3,
+          appearance: {
+            background: { color: '#18382b' },
+            text: { color: '#ecfff6' },
+            border: { width: 1, color: '#3c9168', radius: 10 },
+          },
+          padding: { top: 10, right: 10, bottom: 10, left: 10 },
+          responsive: {
+            tablet: {
+              alignment: 'center',
+              minHeight: 96,
+            },
+          },
+        },
+      ],
+      responsive: {
+        tablet: { layout: '1-1' },
+        mobile: { layout: '1' },
+      },
+    },
+    modules: Array.from({ length: 4 }, (_, index) =>
+      textModule(`phase5-four-${index}`, index, `Four column ${index + 1}`)
+    ),
+  };
+  const sixColumnSection = {
+    id: 'phase5-six-columns',
+    sectionType: 'row',
+    layout: '1-1-1-1-1-1',
+    settings: {
+      columnGap: 8,
+      columns: Array.from({ length: 6 }, (_, index) => ({
+        index,
+        appearance: {
+          background: { color: index % 2 ? '#252b38' : '#1d2330' },
+          text: { color: '#f5f7fb' },
+          border: { width: 1, color: '#4b5568', radius: 8 },
+        },
+        padding: { top: 8, right: 8, bottom: 8, left: 8 },
+        ...(index === 4 ? { hidden: true } : {}),
+      })),
+      responsive: {
+        tablet: { layout: '1-1-1' },
+        mobile: { layout: '1-1' },
+      },
+    },
+    modules: Array.from({ length: 6 }, (_, index) =>
+      textModule(`phase5-six-${index}`, index, `Six column ${index + 1}`)
+    ),
+  };
+
+  page.sections = [aboveSection, readerSection, fourColumnSection, sixColumnSection];
+  return page;
+}
+
 function json(body) {
   return {
     contentType: 'application/json',
@@ -180,6 +331,7 @@ async function installVisualRoutes(page) {
   const noReaderPage = buildNoReaderVisualPage();
   const customReaderPage = buildCustomizedReaderVisualPage();
   const verticalReaderPage = buildVerticalReaderVisualPage();
+  const phase5ColumnsPage = buildPhase5ColumnsVisualPage();
   const adminPosts = Object.values(fixtures.posts || {});
 
   await page.route('**/*', async (route) => {
@@ -254,9 +406,22 @@ async function installVisualRoutes(page) {
       return;
     }
 
+    if (pathname === '/api/pages/battle-bros/phase5-layout') {
+      await route.fulfill(json({ page: phase5ColumnsPage }));
+      return;
+    }
+
     if (pathname === '/api/admin/pages/series/battle-bros') {
       await route.fulfill(
-        json({ pages: [visualPage, noReaderPage, customReaderPage, verticalReaderPage] })
+        json({
+          pages: [
+            visualPage,
+            noReaderPage,
+            customReaderPage,
+            verticalReaderPage,
+            phase5ColumnsPage,
+          ],
+        })
       );
       return;
     }
@@ -268,7 +433,15 @@ async function installVisualRoutes(page) {
 
     if (pathname === '/api/admin/pages' && url.searchParams.get('series_id') === 'battle-bros') {
       await route.fulfill(
-        json({ pages: [visualPage, noReaderPage, customReaderPage, verticalReaderPage] })
+        json({
+          pages: [
+            visualPage,
+            noReaderPage,
+            customReaderPage,
+            verticalReaderPage,
+            phase5ColumnsPage,
+          ],
+        })
       );
       return;
     }
@@ -301,6 +474,11 @@ async function installVisualRoutes(page) {
 
     if (pathname === `/api/admin/pages/${verticalReaderPage.id}`) {
       await route.fulfill(json({ page: verticalReaderPage }));
+      return;
+    }
+
+    if (pathname === `/api/admin/pages/${phase5ColumnsPage.id}`) {
+      await route.fulfill(json({ page: phase5ColumnsPage }));
       return;
     }
 
@@ -647,6 +825,42 @@ async function assertVerticalReader(target) {
   await expect(target.locator('#nextBtn')).toBeVisible();
 }
 
+async function collectPhase5ColumnState(target) {
+  return target.evaluate(() => {
+    const collectSection = (sectionId) => {
+      const section =
+        document.querySelector(`[data-builder-section-id="${sectionId}"]`) ||
+        document.querySelector(`[data-pb-section="${sectionId}"]`);
+      if (!section) return null;
+      const grid = section.querySelector('.pb-section-columns');
+      const columns = Array.from(grid?.children || []);
+      const gridTemplate = window.getComputedStyle(grid).gridTemplateColumns;
+      const moduleOwners = {};
+      section.querySelectorAll('[data-module-id]').forEach((module) => {
+        const column = module.closest('.pb-column');
+        moduleOwners[module.getAttribute('data-module-id')] = columns.indexOf(column);
+      });
+      return {
+        columnCount: columns.length,
+        displays: columns.map((column) => window.getComputedStyle(column).display),
+        gridTemplate,
+        moduleOwners,
+        trackCount:
+          !gridTemplate || gridTemplate === 'none'
+            ? 0
+            : gridTemplate.split(/\s+/).filter(Boolean).length,
+      };
+    };
+
+    return {
+      aboveSectionCount: document.querySelectorAll('#builderAboveReader .pb-section').length,
+      belowSectionCount: document.querySelectorAll('#builderBelowReader .pb-section').length,
+      four: collectSection('phase5-four-columns'),
+      six: collectSection('phase5-six-columns'),
+    };
+  });
+}
+
 async function collectPreviewMetricsDataset(page) {
   return page.locator('.pb-preview-frame').evaluate((frame) => ({
     ...frame.dataset,
@@ -819,6 +1033,65 @@ test.describe('builder preview visual parity', () => {
 
       const previewFrame = await getPreviewFrame(adminPage);
       await assertVerticalReader(previewFrame);
+
+      await adminContext.close();
+      await readerContext.close();
+    });
+
+    test(`Phase 5 column layouts match public output (${viewport.label})`, async ({ browser }) => {
+      const readerContext = await browser.newContext({
+        baseURL: VISUAL_BASE_URL,
+        viewport: { width: viewport.width, height: viewport.height },
+        deviceScaleFactor: 1,
+        locale: 'en-US',
+        timezoneId: 'UTC',
+      });
+      const readerPage = await readerContext.newPage();
+      await preparePage(readerPage, viewport);
+      await gotoAppPage(readerPage, '/index.html?series=battle-bros&page=phase5-layout');
+      await readerPage.waitForSelector('html:not(.reader-bootstrap-loading)');
+      await expect(readerPage.locator('#builderAboveReader .pb-section')).toHaveCount(1);
+      await expect(readerPage.locator('#builderBelowReader .pb-section')).toHaveCount(2);
+      const publicState = await collectPhase5ColumnState(readerPage);
+
+      const adminContext = await browser.newContext({
+        baseURL: VISUAL_BASE_URL,
+        viewport: {
+          width: Math.max(1920, viewport.width + 640),
+          height: Math.max(1300, viewport.height + 260),
+        },
+        deviceScaleFactor: 1,
+        locale: 'en-US',
+        timezoneId: 'UTC',
+      });
+      const adminPage = await adminContext.newPage();
+      await installVisualRoutes(adminPage);
+      await installStableRuntime(adminPage);
+      await gotoAppPage(
+        adminPage,
+        '/admin/index.html?view=designer&series=battle-bros&page=phase5-layout&surface=header'
+      );
+      await expect(adminPage.locator('#pageBuilderSection')).toBeVisible();
+      await adminPage.locator(`#pbWidthToggles [data-width="${viewportId}"]`).click();
+      await waitForPreviewReady(adminPage, viewportId);
+      const previewFrame = await getPreviewFrame(adminPage);
+      await expect(previewFrame.locator('#builderAboveReader .pb-section')).toHaveCount(1);
+      await expect(previewFrame.locator('#builderBelowReader .pb-section')).toHaveCount(2);
+      const previewState = await collectPhase5ColumnState(previewFrame);
+
+      expect(previewState).toEqual(publicState);
+      expect(publicState.four.columnCount).toBe(4);
+      expect(publicState.six.columnCount).toBe(6);
+      expect(publicState.four.trackCount).toBe({ desktop: 4, tablet: 2, mobile: 1 }[viewportId]);
+      expect(publicState.six.trackCount).toBe({ desktop: 5, tablet: 3, mobile: 2 }[viewportId]);
+      expect(publicState.six.displays[4]).toBe('none');
+      expect(publicState.four.displays[2]).toBe(viewportId === 'mobile' ? 'none' : 'block');
+      for (let index = 0; index < 4; index += 1) {
+        expect(publicState.four.moduleOwners[`phase5-four-${index}`]).toBe(index);
+      }
+      for (let index = 0; index < 6; index += 1) {
+        expect(publicState.six.moduleOwners[`phase5-six-${index}`]).toBe(index);
+      }
 
       await adminContext.close();
       await readerContext.close();

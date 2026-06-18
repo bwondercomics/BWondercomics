@@ -355,6 +355,40 @@ Acceptance criteria:
 - Existing pages with fixed layout strings render the same after migration.
 - Per-device layout changes do not corrupt global module placement.
 
+Completion note (`2026-06-18`): Phase 5 is implemented. The section `layout` string is generalized
+to a 1-6 segment ratio contract (each segment a positive integer 1-12; legacy presets are a strict
+subset) and is the single source of truth for column count and width ratios; `validate_layout`,
+`parse_layout_ratios`, and `layout_column_count` in `backend/app/builder_security.py` enforce it. A
+new `sanitize_column_settings` +
+`sanitize_column_responsive` sanitize sparse per-column styling (appearance, padding, alignment,
+min-height, hidden, per-device overrides) through the existing appearance contract, wired into
+`sanitize_section_settings`. `update_section` now rehomes modules orphaned by a column-count
+reduction to the last column in the same commit (atomic, no dropped modules) instead of rejecting the
+change. Shared rendering (`shared-renderers.js`) keeps every global structural column in stable index
+order, emits per-column inline styles, and treats responsive layouts as grid-track reflow without
+rewriting module ownership. Device overrides now apply on the public runtime via scoped `@media` CSS
+emitted by `responsive-css.js` (banded desktop/tablet/phone queries), not just in the admin preview.
+Bound reader pages render sections before/after the reader module into new `#builderAboveReader` /
+`#builderBelowReader` surfaces (`reader/data.js`), and reader panels are now fed only from the reader's
+own section. The section inspector gained a column-count selector (1-6), per-column width-ratio inputs,
+the shared sanitized appearance editor, and device-specific reflow/style controls saved atomically
+(layout + settings.columns) through the existing section draft. Pure layout helpers live in
+`admin/page-builder/layout-utils.js` (shared by the public bundle and admin).
+
+Corrective addendum (`2026-06-18`): Phase 5 audit findings are fixed. Dirty section snapshots now
+copy normalized draft `layout` and settings into the iframe before Save. The shared effective-column
+resolver drives admin rendering and public responsive CSS, keeps global column nodes/module ownership
+stable, restricts device tracks to the global count, and removes hidden columns from effective grid
+templates. Current Device authoring exposes reflow ratios plus sparse appearance, padding, alignment,
+minimum-height, and visibility overrides for every global column; visibility can explicitly inherit,
+show, or hide. Global shrink persistence retains the last surviving column's modules first, appends
+orphans by original column/sort order, and resequences the merged destination contiguously. The visual
+fixture again preserves authored sections around the reader and now covers styled four-/six-column
+sections, responsive reflow, hidden columns, and public/live-preview parity at all three device
+widths. Verification passed: `git diff --check`, `npm run format:check`, `npm run lint`, `npm test`
+(`534` passed, `1` skipped), `npm run format:py:check`, `npm run lint:py`,
+`npm run test:backend` (`76` passed), `npm run build`, and `npm run test:visual` (`14` passed).
+
 ## Phase 6 - Regression And Release Gates
 
 Goal: Prove the reader-block and layout contracts work across backend, admin, reader runtime, and

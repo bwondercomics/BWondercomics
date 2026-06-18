@@ -13,7 +13,13 @@ import {
   sanitizePageSlug,
 } from './series.js';
 import { logger } from './logger.js';
-import { renderPage, renderModule, initEmailForms, initPromoCarousels } from './page-renderer.js';
+import {
+  renderPage,
+  renderSection,
+  renderModule,
+  initEmailForms,
+  initPromoCarousels,
+} from './page-renderer.js';
 import { initFeedModules } from './feed-panel.js';
 import { initEntryGalleryModules } from './entry-gallery-module.js';
 import { initMediaGalleryModules } from './media-gallery-module.js';
@@ -672,6 +678,80 @@ function setHiddenState(element, hidden) {
   if ('inert' in element) element.inert = false;
 }
 
+// Above/below-reader content surfaces. On a bound reader page authors may place
+// normal sections before or after the required reader module; those render here as
+// full-width page content (not reader panels), bracketing the static reader stage.
+const READER_SURFACE_IDS = Object.freeze({
+  above: 'builderAboveReader',
+  below: 'builderBelowReader',
+});
+
+function ensureReaderSurface(placement) {
+  const id = READER_SURFACE_IDS[placement];
+  let surface = document.getElementById(id);
+  if (surface) return surface;
+
+  surface = document.createElement('div');
+  surface.id = id;
+  surface.className = `builder-reader-surface builder-reader-surface--${placement}`;
+  surface.hidden = true;
+
+  const main = document.querySelector('main');
+  const viewerWrap = main?.querySelector('.viewerWrap');
+  if (main && viewerWrap) {
+    if (placement === 'above') {
+      main.insertBefore(surface, viewerWrap);
+    } else {
+      viewerWrap.insertAdjacentElement('afterend', surface);
+    }
+  } else {
+    (main || document.body).appendChild(surface);
+  }
+  return surface;
+}
+
+function clearReaderSurfaces() {
+  Object.keys(READER_SURFACE_IDS).forEach((placement) => {
+    const surface = ensureReaderSurface(placement);
+    surface.innerHTML = '';
+    setHiddenState(surface, true);
+  });
+}
+
+function initBuilderSurfaceModules(container, options = {}) {
+  initEmailForms(container, { previewMode: !!options.previewMode });
+  initPromoCarousels(container);
+  initEntryGalleryModules(container);
+  initFeedModules(container);
+  initMediaGalleryModules(container);
+}
+
+function renderReaderSurface(placement, page, entries, options = {}) {
+  const surface = ensureReaderSurface(placement);
+  if (!entries.length) {
+    surface.innerHTML = '';
+    setHiddenState(surface, true);
+    return;
+  }
+  const builderEditing = options.builderEditing === true;
+  const deviceId = options.deviceId;
+  surface.innerHTML = entries
+    .map(({ section, sectionIndex }) =>
+      renderSection(section, { builderEditing, deviceId, sectionIndex })
+    )
+    .join('');
+  initBuilderSurfaceModules(surface, options);
+  setHiddenState(surface, false);
+}
+
+// Index of the section that contains the active (effective) reader module.
+function findReaderSectionIndex(page, readerModule) {
+  if (!readerModule || !Array.isArray(page?.sections)) return -1;
+  return page.sections.findIndex((section) =>
+    (section?.modules || []).some((module) => module === readerModule)
+  );
+}
+
 function clearReaderShellBuilderTargets() {
   document.querySelector('.viewerWrap')?.removeAttribute('data-builder-page-id');
   document.querySelectorAll('.viewerWrap [data-builder-module-id]').forEach((element) => {
@@ -712,6 +792,9 @@ function applyReaderShellDomState(shellState) {
   } else {
     clearReaderShellBuilderTargets();
   }
+  // Reset the above/below-reader surfaces on every apply; the active branch
+  // repopulates them from the page's non-reader sections when appropriate.
+  clearReaderSurfaces();
 }
 
 function applyReaderHeaderChromeState(shellState) {
@@ -861,6 +944,33 @@ export function applyBuilderPageToDOM(page, options = {}) {
     return shellState;
   }
 
+  // Locate the reader module's section. Sections before it render into the
+  // above-reader surface and sections after it into the below-reader surface as
+  // normal page content; only the reader's own section feeds the reader panels.
+  const readerModule = findEffectiveReaderModule(page, { builderEditing, deviceId });
+  const readerSectionIndex = findReaderSectionIndex(page, readerModule);
+  const aboveSections = [];
+  const belowSections = [];
+  if (readerSectionIndex >= 0) {
+    page.sections.forEach((section, sectionIndex) => {
+      if (sectionIndex < readerSectionIndex) {
+        aboveSections.push({ section, sectionIndex });
+      } else if (sectionIndex > readerSectionIndex) {
+        belowSections.push({ section, sectionIndex });
+      }
+    });
+  }
+  renderReaderSurface('above', page, aboveSections, {
+    builderEditing,
+    deviceId,
+    previewMode: !!options.previewMode,
+  });
+  renderReaderSurface('below', page, belowSections, {
+    builderEditing,
+    deviceId,
+    previewMode: !!options.previewMode,
+  });
+
   const panelSpacing = page?.meta?.panelSpacing || {};
   const panelBackgrounds = page?.meta?.panelBackgrounds || {};
 
@@ -880,9 +990,16 @@ export function applyBuilderPageToDOM(page, options = {}) {
     'video',
   ]);
 
+  // Panels are reader-owned: only the reader module's own section feeds them, so
+  // above/below-reader sections stay page content rather than being pulled into panels.
+  const panelSections =
+    readerSectionIndex >= 0
+      ? [[readerSectionIndex, page.sections[readerSectionIndex]]]
+      : Array.from(page.sections.entries());
+
   const findPanelModules = (side) => {
     const results = [];
-    for (const [sectionIndex, section] of page.sections.entries()) {
+    for (const [sectionIndex, section] of panelSections) {
       const layout = section.layout || '1';
       const colCount = layout.split('-').length;
       const leftIndex = 0;
@@ -917,9 +1034,10 @@ export function applyBuilderPageToDOM(page, options = {}) {
     deviceId,
   });
 
-  // Check panel visibility from section settings
+  // Check panel visibility from section settings (reader-owned: only the reader
+  // section's panelEnabled controls the reader panels).
   resetPanelVisibility();
-  for (const section of page.sections) {
+  for (const [, section] of panelSections) {
     const settings = section.settings || {};
     if (settings.panelEnabled) {
       const leftPanel = document.getElementById('leftPanel');

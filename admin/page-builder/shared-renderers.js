@@ -29,11 +29,13 @@ import {
   shouldOpenLinkInNewTab,
 } from './link-utils.js';
 import { appearanceToInlineStyle, mergeAppearance } from './appearance-utils.js';
+import { alignmentToJustifySelf } from './layout-utils.js';
+import { buildSectionResponsiveCss, sectionHasResponsiveOverrides } from './responsive-css.js';
 import {
   getEffectiveModuleConfig,
-  getEffectiveSectionLayout,
   getEffectiveSectionSettings,
   isModuleHiddenForDevice,
+  resolveEffectiveColumnLayout,
 } from './responsive-overrides.js';
 import { getReaderMountDataAttributes } from './reader-config.js';
 import {
@@ -471,14 +473,37 @@ export function createRenderers({
     return `<div class="pb-module pb-module--${safeType}${hiddenClass}"${moduleIdAttr}${markerAttrs}>${content}</div>`;
   }
 
+  function buildColumnInlineStyle(colSettings) {
+    const tokens = [];
+    const appearanceStyle = appearanceToInlineStyle(colSettings?.appearance);
+    if (appearanceStyle) tokens.push(appearanceStyle);
+    const padding = colSettings?.padding;
+    if (padding && typeof padding === 'object') {
+      ['top', 'right', 'bottom', 'left'].forEach((side) => {
+        if (padding[side] !== undefined && padding[side] !== null) {
+          tokens.push(`padding-${side}: ${sanitizeNumber(padding[side], 0, 0, 600)}px`);
+        }
+      });
+    }
+    const alignment = colSettings?.alignment;
+    if (alignment && alignment !== 'stretch') {
+      tokens.push(`justify-self: ${alignmentToJustifySelf(alignment)}`);
+    }
+    if (colSettings?.minHeight !== undefined && colSettings?.minHeight !== null) {
+      tokens.push(`min-height: ${sanitizeNumber(colSettings.minHeight, 0, 0, 2000)}px`);
+    }
+    return tokens.join('; ');
+  }
+
   function renderSection(section, renderOptions = {}) {
     const emitMarkers = isBuilderEditingEnabled(renderOptions);
-    const layout = sanitizeKeyword(
-      getEffectiveSectionLayout(section, { ...renderOptions, builderEditing: emitMarkers }),
-      ['1', '1-1', '1-2', '2-1', '1-1-1', '1-3-1'],
-      '1'
-    );
-    const columnCount = layout.split('-').length;
+    const effectiveLayout = resolveEffectiveColumnLayout(section, {
+      ...renderOptions,
+      builderEditing: emitMarkers,
+    });
+    const layout = effectiveLayout.layout;
+    const columnCount = effectiveLayout.globalColumnIndexes.length;
+    const gridTemplate = effectiveLayout.gridTemplate;
     const settings = getEffectiveSectionSettings(section, {
       ...renderOptions,
       builderEditing: emitMarkers,
@@ -501,30 +526,33 @@ export function createRenderers({
       style += `--pb-section-gap: ${sanitizeNumber(settings.sectionGap, 0, 0, 600)}px;`;
     }
 
+    // Group modules by their stable global structural column. Responsive layouts
+    // only change grid tracks; they never rewrite or clamp module ownership.
     const columnModules = {};
     for (let i = 0; i < columnCount; i++) columnModules[i] = [];
     for (const mod of section.modules || []) {
-      const colIdx = mod.columnIndex || 0;
-      if (!columnModules[colIdx]) columnModules[colIdx] = [];
+      const colIdx = Math.min(Math.max(Number(mod.columnIndex) || 0, 0), columnCount - 1);
       columnModules[colIdx].push(mod);
     }
 
-    const columnsHtml = Object.keys(columnModules)
-      .sort((a, b) => Number(a) - Number(b))
-      .map((colIdx) => {
-        const modules = columnModules[colIdx];
-        const modulesHtml = modules
-          .map((mod) => renderModule(mod, { ...renderOptions, builderEditing: emitMarkers }))
-          .join('');
-        const columnMarkerAttrs = builderMarkerAttrs(
-          {
-            'data-builder-column-index': colIdx,
-          },
-          emitMarkers
-        );
-        return `<div class="pb-column"${columnMarkerAttrs}>${modulesHtml}</div>`;
-      })
-      .join('');
+    let columnsHtml = '';
+    for (let colIdx = 0; colIdx < columnCount; colIdx++) {
+      const modulesHtml = columnModules[colIdx]
+        .map((mod) => renderModule(mod, { ...renderOptions, builderEditing: emitMarkers }))
+        .join('');
+      const colSettings = effectiveLayout.columns[colIdx]?.settings || {};
+      const columnStyle = buildColumnInlineStyle(colSettings);
+      const hidden = colSettings?.hidden === true;
+      const hiddenClass = hidden ? ' pb-column--hidden' : '';
+      const columnMarkerAttrs = builderMarkerAttrs(
+        {
+          'data-builder-column-index': colIdx,
+        },
+        emitMarkers
+      );
+      const styleAttr = columnStyle ? ` style="${columnStyle}"` : '';
+      columnsHtml += `<div class="pb-column${hiddenClass}"${columnMarkerAttrs}${styleAttr}>${modulesHtml}</div>`;
+    }
 
     const sectionMarkerAttrs = builderMarkerAttrs(
       {
@@ -535,9 +563,24 @@ export function createRenderers({
       emitMarkers
     );
 
+    // On the public path, device overrides are emitted as scoped @media CSS (the
+    // builder preview instead JS-merges the active device branch). The base inline
+    // styles above remain the desktop baseline.
+    let scopeAttr = '';
+    let responsiveStyle = '';
+    if (!emitMarkers && sectionHasResponsiveOverrides(section)) {
+      const scopeId = String(section?.id || '').replace(/[^a-zA-Z0-9_-]/g, '');
+      if (scopeId) {
+        scopeAttr = ` data-pb-section="${escapeAttr(scopeId)}"`;
+        const css = buildSectionResponsiveCss(section, `[data-pb-section="${scopeId}"]`);
+        if (css) responsiveStyle = `<style>${css}</style>`;
+      }
+    }
+
+    const columnsStyle = `grid-template-columns: ${gridTemplate};`;
     return `
-      <section class="pb-section" data-layout="${layout}"${sectionMarkerAttrs} style="${style}">
-        <div class="pb-section-columns pb-layout--${layout}">${columnsHtml}</div>
+      <section class="pb-section" data-layout="${layout}"${scopeAttr}${sectionMarkerAttrs} style="${style}">
+        ${responsiveStyle}<div class="pb-section-columns pb-layout--${escapeAttr(layout)}" style="${columnsStyle}">${columnsHtml}</div>
       </section>
     `;
   }

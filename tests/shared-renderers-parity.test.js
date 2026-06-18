@@ -242,6 +242,73 @@ describe('shared renderer parity', () => {
     expect(builderWrapper.querySelector('.pb-module--hidden-device')?.dataset.builderModuleId).toBe(
       'module-spacer'
     );
+    expect(builderWrapper.querySelectorAll('.pb-column')).toHaveLength(2);
+    expect(
+      builderWrapper.querySelector('[data-builder-module-id="module-spacer"]')?.parentElement
+        ?.dataset.builderColumnIndex
+    ).toBe('1');
+  });
+
+  it('keeps responsive column nodes and module ownership identical across render paths', () => {
+    const section = {
+      id: 'section-columns',
+      layout: '2-1-1-1',
+      settings: {
+        columns: [
+          {
+            index: 2,
+            responsive: {
+              mobile: {
+                hidden: true,
+              },
+            },
+          },
+        ],
+        responsive: {
+          mobile: {
+            layout: '1-2',
+          },
+        },
+      },
+      modules: Array.from({ length: 4 }, (_, index) => ({
+        id: `module-${index}`,
+        moduleType: 'text',
+        columnIndex: index,
+        sortIndex: 0,
+        config: { content: `<p>Column ${index + 1}</p>` },
+      })),
+    };
+    const renderer = makeReaderRenderers();
+
+    const publicWrapper = document.createElement('div');
+    publicWrapper.innerHTML = renderer.renderSection(section);
+    const builderWrapper = document.createElement('div');
+    builderWrapper.innerHTML = renderer.renderSection(section, {
+      builderEditing: true,
+      deviceId: 'mobile',
+    });
+
+    expect(publicWrapper.querySelectorAll('.pb-column')).toHaveLength(4);
+    expect(builderWrapper.querySelectorAll('.pb-column')).toHaveLength(4);
+    for (let index = 0; index < 4; index += 1) {
+      expect(
+        publicWrapper.querySelector(`[data-module-id="module-${index}"]`)?.closest('.pb-column')
+      ).not.toBeNull();
+      expect(
+        builderWrapper.querySelector(`[data-builder-module-id="module-${index}"]`)?.parentElement
+          ?.dataset.builderColumnIndex
+      ).toBe(String(index));
+    }
+
+    const builderColumns = builderWrapper.querySelectorAll('.pb-column');
+    expect(builderColumns[2]?.classList.contains('pb-column--hidden')).toBe(true);
+    expect(builderWrapper.querySelector('.pb-section-columns')?.getAttribute('style')).toContain(
+      'grid-template-columns: 1fr 2fr'
+    );
+
+    const publicStyle = publicWrapper.querySelector('style')?.textContent || '';
+    expect(publicStyle).toContain('grid-template-columns: 1fr 2fr !important');
+    expect(publicStyle).toContain('.pb-column:nth-child(3) { display: none !important');
   });
 
   it('reader omits mount placeholders, preview shows them', () => {
@@ -408,6 +475,202 @@ describe('shared renderer parity', () => {
     expect(previewButtons[1]?.getAttribute('style')).toBe(
       'background: #112233; color: #ffffff; border: none; border-radius: 12px'
     );
+  });
+
+  it('renders 1-6 column layouts with grid-template-columns from ratios', () => {
+    const page = {
+      id: 'page-grid',
+      sections: [
+        {
+          id: 'section-grid',
+          layout: '2-1-1-1',
+          settings: {},
+          modules: [],
+        },
+      ],
+    };
+    const reader = makeReaderRenderers();
+    const preview = makePreviewRenderers();
+
+    const readerEl = document.createElement('div');
+    readerEl.innerHTML = reader.renderPage(page);
+    const previewEl = document.createElement('div');
+    previewEl.innerHTML = preview.renderPage(page);
+
+    const readerColumns = readerEl.querySelector('.pb-section-columns');
+    expect(readerColumns?.getAttribute('style')).toContain(
+      'grid-template-columns: 2fr 1fr 1fr 1fr'
+    );
+    expect(readerColumns?.querySelectorAll('.pb-column').length).toBe(4);
+    // Reader and preview emit identical grid templates.
+    expect(previewEl.querySelector('.pb-section-columns')?.getAttribute('style')).toBe(
+      readerColumns?.getAttribute('style')
+    );
+  });
+
+  it('emits per-column appearance, padding, alignment, and min-height styles', () => {
+    const page = {
+      id: 'page-col-style',
+      sections: [
+        {
+          id: 'section-col-style',
+          layout: '1-1',
+          settings: {
+            columns: [
+              {
+                index: 0,
+                appearance: {
+                  background: { color: '#f5f5f5' },
+                  border: { width: 1, color: '#ddd' },
+                },
+                padding: { top: 12, left: 8 },
+                alignment: 'center',
+                minHeight: 200,
+              },
+              { index: 1, hidden: true },
+            ],
+          },
+          modules: [],
+        },
+      ],
+    };
+
+    const publicWrapper = document.createElement('div');
+    publicWrapper.innerHTML = makeReaderRenderers().renderPage(page);
+    const columns = publicWrapper.querySelectorAll('.pb-column');
+    const firstStyle = columns[0]?.getAttribute('style') || '';
+    expect(firstStyle).toContain('background: #f5f5f5');
+    expect(firstStyle).toContain('border: 1px solid #ddd');
+    expect(firstStyle).toContain('padding-top: 12px');
+    expect(firstStyle).toContain('padding-left: 8px');
+    expect(firstStyle).toContain('justify-self: center');
+    expect(firstStyle).toContain('min-height: 200px');
+    // Hidden column collapses on the public path.
+    expect(columns[1]?.classList.contains('pb-column--hidden')).toBe(true);
+
+    // Builder preview keeps the same hidden state and structural node.
+    const builderWrapper = document.createElement('div');
+    builderWrapper.innerHTML = makeReaderRenderers().renderPage(page, { builderEditing: true });
+    const builderColumns = builderWrapper.querySelectorAll('.pb-column');
+    expect(builderColumns[1]?.classList.contains('pb-column--hidden')).toBe(true);
+  });
+
+  it('clamps out-of-range module columns into the last visible column', () => {
+    const page = {
+      id: 'page-clamp',
+      sections: [
+        {
+          id: 'section-clamp',
+          layout: '1-1',
+          settings: {},
+          modules: [
+            {
+              id: 'm-a',
+              moduleType: 'text',
+              columnIndex: 0,
+              sortIndex: 0,
+              config: { content: '<p>A</p>' },
+            },
+            // columnIndex 4 no longer exists in a 2-column layout.
+            {
+              id: 'm-b',
+              moduleType: 'text',
+              columnIndex: 4,
+              sortIndex: 1,
+              config: { content: '<p>B</p>' },
+            },
+          ],
+        },
+      ],
+    };
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = makeReaderRenderers().renderPage(page);
+    const columns = wrapper.querySelectorAll('.pb-column');
+    expect(columns.length).toBe(2);
+    // No modules dropped; the out-of-range module lands in the last column.
+    expect(wrapper.querySelectorAll('.pb-module--text').length).toBe(2);
+    expect(columns[1]?.querySelectorAll('.pb-module--text').length).toBe(1);
+  });
+
+  it('applies per-column responsive styling only in builder device context', () => {
+    const page = {
+      id: 'page-col-responsive',
+      sections: [
+        {
+          id: 'section-col-responsive',
+          layout: '1-1',
+          settings: {
+            columns: [{ index: 0, responsive: { mobile: { hidden: true } } }],
+          },
+          modules: [],
+        },
+      ],
+    };
+    const renderer = makeReaderRenderers();
+
+    const publicWrapper = document.createElement('div');
+    publicWrapper.innerHTML = renderer.renderPage(page);
+    expect(
+      publicWrapper.querySelectorAll('.pb-column')[0]?.classList.contains('pb-column--hidden')
+    ).toBe(false);
+
+    const builderWrapper = document.createElement('div');
+    builderWrapper.innerHTML = renderer.renderPage(page, {
+      builderEditing: true,
+      deviceId: 'mobile',
+    });
+    expect(
+      builderWrapper.querySelectorAll('.pb-column')[0]?.classList.contains('pb-column--hidden')
+    ).toBe(true);
+  });
+
+  it('emits scoped @media CSS so device overrides apply on the public runtime', () => {
+    const page = {
+      id: 'page-public-responsive',
+      sections: [
+        {
+          id: 'sec-pub-resp',
+          layout: '1-1-1',
+          settings: {
+            responsive: { mobile: { layout: '1' } },
+            columns: [
+              { index: 0, responsive: { tablet: { hidden: true } } },
+              {
+                index: 1,
+                responsive: { mobile: { appearance: { background: { color: '#222' } } } },
+              },
+            ],
+          },
+          modules: [],
+        },
+      ],
+    };
+
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = makeReaderRenderers().renderPage(page);
+    const section = wrapper.querySelector('.pb-section');
+    expect(section?.getAttribute('data-pb-section')).toBe('sec-pub-resp');
+    const css = wrapper.querySelector('style')?.textContent || '';
+    // Per-device layout change becomes a grid-template-columns override at phone width.
+    expect(css).toContain('@media (max-width: 480px)');
+    expect(css).toContain('grid-template-columns: 1fr !important');
+    // Per-column tablet hide and mobile background land in the right banded queries.
+    expect(css).toContain('@media (min-width: 481px) and (max-width: 768px)');
+    expect(css).toContain('.pb-column:nth-child(1) { display: none !important');
+    expect(css).toContain('.pb-column:nth-child(2)');
+    expect(css).toContain('background: #222 !important');
+  });
+
+  it('does not emit a responsive style block for sections without overrides', () => {
+    const page = {
+      id: 'page-no-resp',
+      sections: [{ id: 'sec-no-resp', layout: '1-1', settings: {}, modules: [] }],
+    };
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = makeReaderRenderers().renderPage(page);
+    expect(wrapper.querySelector('style')).toBeNull();
+    expect(wrapper.querySelector('.pb-section')?.hasAttribute('data-pb-section')).toBe(false);
   });
 
   it('keeps legacy class-only button output when no appearance is configured', () => {

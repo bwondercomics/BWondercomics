@@ -13,6 +13,7 @@ from .builder_security import (
     ALLOWED_MODULE_TYPES,
     CMS_SOURCE_ACTIVE_PAGE_SERIES,
     CMS_SOURCE_SPECIFIC_SERIES,
+    layout_column_count,
     sanitize_module_config,
     sanitize_page_meta,
     sanitize_section_settings,
@@ -132,7 +133,7 @@ def _serialize_section(section: BuilderSection, page: BuilderPage | None = None)
         "sectionType": section_type,
         "layout": layout,
         "sortIndex": max(0, int(section.sort_index or 0)),
-        "settings": sanitize_section_settings(section.settings),
+        "settings": sanitize_section_settings(section.settings, layout),
         "modules": modules,
     }
 
@@ -789,7 +790,7 @@ def add_section(db: Session, page_id: str, data: dict[str, Any]) -> dict[str, An
         section_type=section_type,
         layout=layout,
         sort_index=sort_index,
-        settings=sanitize_section_settings(data.get("settings") or {}),
+        settings=sanitize_section_settings(data.get("settings") or {}, layout),
         created_at=now,
     )
     db.add(section)
@@ -818,9 +819,24 @@ def update_section(db: Session, section_id: str, data: dict[str, Any]) -> dict[s
     next_layout = (
         validate_layout(data["layout"]) if "layout" in data else validate_layout(section.layout)
     )
-    if "layout" in data:
-        for module in section.modules:
-            validate_column_index(module.column_index, next_layout)
+    previous_column_count = layout_column_count(section.layout)
+    next_column_count = layout_column_count(next_layout)
+    if "layout" in data and next_column_count < previous_column_count:
+        # Atomically rehome modules whose column no longer exists when the column
+        # count shrinks. Existing modules in the last surviving column retain
+        # precedence; orphaned modules append by original column and sort order.
+        last_column = max(0, next_column_count - 1)
+        destination_modules = sorted(
+            (module for module in section.modules if module.column_index == last_column),
+            key=lambda module: (module.sort_index, str(module.id)),
+        )
+        orphaned_modules = sorted(
+            (module for module in section.modules if module.column_index > last_column),
+            key=lambda module: (module.column_index, module.sort_index, str(module.id)),
+        )
+        for sort_index, module in enumerate(destination_modules + orphaned_modules):
+            module.column_index = last_column
+            module.sort_index = sort_index
     if "sectionType" in data:
         section.section_type = validate_section_type(data["sectionType"])
     if "layout" in data:
@@ -828,7 +844,7 @@ def update_section(db: Session, section_id: str, data: dict[str, Any]) -> dict[s
     if "sortIndex" in data:
         section.sort_index = validate_sort_index(data["sortIndex"])
     if "settings" in data and isinstance(data["settings"], dict):
-        section.settings = sanitize_section_settings(data["settings"])
+        section.settings = sanitize_section_settings(data["settings"], section.layout)
 
     page = db.get(BuilderPage, section.page_id)
     if page:

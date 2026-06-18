@@ -1423,6 +1423,7 @@ describe('admin page-builder shell', () => {
     await flushAdminUi(3);
 
     expect(mocks.updateSection).toHaveBeenCalledWith(editableSection.id, {
+      layout: '1-1',
       settings: {
         moduleGap: 28,
         columnGap: 24,
@@ -1443,6 +1444,415 @@ describe('admin page-builder shell', () => {
         `.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-input[data-setting="sectionGap"]`
       )?.value
     ).toBe('40');
+  });
+
+  it('edits column count, ratios, and per-column styling and saves layout atomically', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const editableSection = selectedPage.sections[1]; // layout '1-1'
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      updateSectionResult: {
+        id: editableSection.id,
+        layout: '2-1-1-1',
+        settings: { columns: [{ index: 0, appearance: { background: { color: '#123456' } } }] },
+      },
+      useRealEditors: true,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] [data-action="toggle-section-settings"]`
+      )
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    // Grow to 4 columns.
+    const countSelect = document.getElementById('pbEditSectionColumnCount');
+    expect(countSelect).not.toBeNull();
+    countSelect.value = '4';
+    countSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    // Four column cards now render.
+    expect(document.querySelectorAll('[data-column-ratio]').length).toBe(4);
+
+    // Widen the first column and give it a background through the shared
+    // sanitized appearance editor.
+    const ratioInput = document.querySelector('[data-column-ratio][data-column-index="0"]');
+    ratioInput.value = '2';
+    ratioInput.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const backgroundToggle = document.querySelector(
+      '[data-appearance-toggle="true"][data-appearance-scope="section-column"][data-appearance-key="background.color"][data-item-index="0"]'
+    );
+    backgroundToggle.checked = true;
+    backgroundToggle.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const backgroundInput = document.querySelector(
+      '[data-appearance-input="true"][data-appearance-input-kind="hex"][data-appearance-scope="section-column"][data-appearance-key="background.color"][data-item-index="0"]'
+    );
+    backgroundInput.value = '#123456';
+    backgroundInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAdminUi(2);
+
+    document
+      .querySelector('[data-action="save-section-settings"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.updateSection).toHaveBeenCalledWith(
+      editableSection.id,
+      expect.objectContaining({
+        layout: '2-1-1-1',
+        settings: expect.objectContaining({
+          columns: expect.arrayContaining([
+            expect.objectContaining({
+              index: 0,
+              appearance: { background: { color: '#123456' } },
+            }),
+          ]),
+        }),
+      })
+    );
+  });
+
+  it('sends unsaved section layout and appearance drafts to live preview and restores on discard', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const editableSection = selectedPage.sections[1];
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+    document
+      .querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] [data-action="toggle-section-settings"]`
+      )
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const countSelect = document.getElementById('pbEditSectionColumnCount');
+    countSelect.value = '4';
+    countSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const ratioInput = document.querySelector('[data-column-ratio][data-column-index="0"]');
+    ratioInput.value = '2';
+    ratioInput.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const backgroundToggle = document.querySelector(
+      '[data-appearance-toggle="true"][data-appearance-scope="section-column"][data-appearance-key="background.color"][data-item-index="0"]'
+    );
+    backgroundToggle.checked = true;
+    backgroundToggle.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+    const backgroundInput = document.querySelector(
+      '[data-appearance-input="true"][data-appearance-input-kind="hex"][data-appearance-scope="section-column"][data-appearance-key="background.color"][data-item-index="0"]'
+    );
+    backgroundInput.value = '#123456';
+    backgroundInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const draftSnapshot = requestCurrentPreviewSnapshot();
+    const draftSection = draftSnapshot.page.sections.find(
+      (section) => section.id === editableSection.id
+    );
+    expect(draftSnapshot.source).toBe('working');
+    expect(draftSection.layout).toBe('2-1-1-1');
+    expect(draftSection.settings.columns[0].appearance.background.color).toBe('#123456');
+    expect(editableSection.layout).toBe('1-1');
+    expect(mocks.updateSection).not.toHaveBeenCalled();
+
+    document
+      .querySelector('[data-action="discard-current"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    const restoredSnapshot = requestCurrentPreviewSnapshot();
+    const restoredSection = restoredSnapshot.page.sections.find(
+      (section) => section.id === editableSection.id
+    );
+    expect(restoredSnapshot.source).toBe('saved');
+    expect(restoredSection.layout).toBe('1-1');
+    expect(restoredSection.settings.columns).toBeUndefined();
+    expect(mocks.updateSection).not.toHaveBeenCalled();
+  });
+
+  it('authors responsive track layouts and per-device column styles without changing structure', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const editableSection = selectedPage.sections[1];
+    editableSection.layout = '1-1-1-1';
+    editableSection.settings = {
+      ...(editableSection.settings || {}),
+      columns: [{ index: 0, alignment: 'center' }],
+    };
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      updateSectionResult: {
+        ...editableSection,
+        settings: {
+          ...editableSection.settings,
+          responsive: { mobile: { layout: '2-1-1' } },
+          columns: [
+            {
+              index: 0,
+              alignment: 'center',
+              responsive: {
+                mobile: {
+                  appearance: { text: { color: '#abcdef' } },
+                  padding: { top: 12 },
+                  alignment: 'stretch',
+                  minHeight: 240,
+                  hidden: true,
+                },
+              },
+            },
+          ],
+        },
+      },
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] [data-action="toggle-section-settings"]`
+      )
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    document
+      .querySelector('#pbWidthToggles [data-width="mobile"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    const scopeSelect = document.querySelector('[data-responsive-edit-scope]');
+    scopeSelect.value = 'device';
+    scopeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(document.querySelectorAll('.pb-column-editor')).toHaveLength(4);
+    const countSelect = document.getElementById('pbEditSectionColumnCount');
+    expect(
+      Array.from(countSelect.options)
+        .map((option) => option.value)
+        .slice(-4)
+    ).toEqual(['1', '2', '3', '4']);
+    countSelect.value = '3';
+    countSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const firstRatio = document.querySelector('[data-column-ratio][data-column-index="0"]');
+    firstRatio.value = '2';
+    firstRatio.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const textToggle = document.querySelector(
+      '[data-appearance-toggle="true"][data-appearance-scope="section-column"][data-appearance-key="text.color"][data-item-index="0"]'
+    );
+    textToggle.checked = true;
+    textToggle.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+    const textInput = document.querySelector(
+      '[data-appearance-input="true"][data-appearance-input-kind="hex"][data-appearance-scope="section-column"][data-appearance-key="text.color"][data-item-index="0"]'
+    );
+    textInput.value = '#abcdef';
+    textInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const paddingInput = document.querySelector(
+      '[data-column-field="paddingTop"][data-column-index="0"]'
+    );
+    paddingInput.value = '12';
+    paddingInput.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+    const alignmentSelect = document.querySelector(
+      '[data-column-field="alignment"][data-column-index="0"]'
+    );
+    alignmentSelect.value = 'stretch';
+    alignmentSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+    const minHeightInput = document.querySelector(
+      '[data-column-field="minHeight"][data-column-index="0"]'
+    );
+    minHeightInput.value = '240';
+    minHeightInput.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+    const visibilitySelect = document.querySelector(
+      '[data-column-field="hidden"][data-column-index="0"]'
+    );
+    visibilitySelect.value = 'true';
+    visibilitySelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    document
+      .querySelector('[data-action="save-section-settings"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.updateSection).toHaveBeenCalledWith(
+      editableSection.id,
+      expect.objectContaining({
+        layout: '1-1-1-1',
+        settings: expect.objectContaining({
+          responsive: {
+            mobile: {
+              layout: '2-1-1',
+            },
+          },
+          columns: expect.arrayContaining([
+            expect.objectContaining({
+              index: 0,
+              responsive: {
+                mobile: {
+                  appearance: { text: { color: '#abcdef' } },
+                  padding: { top: 12 },
+                  alignment: 'stretch',
+                  minHeight: 240,
+                  hidden: true,
+                },
+              },
+            }),
+          ]),
+        }),
+      })
+    );
+  });
+
+  it('wires the complete column appearance editor into undo, clearing, and discard', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const editableSection = selectedPage.sections[1];
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] [data-action="toggle-section-settings"]`
+      )
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const appearanceKeys = Array.from(
+      document.querySelectorAll(
+        '[data-appearance-toggle="true"][data-appearance-scope="section-column"][data-item-index="0"]'
+      )
+    ).map((toggle) => toggle.dataset.appearanceKey);
+    expect(appearanceKeys).toEqual(
+      expect.arrayContaining([
+        'background.type',
+        'background.color',
+        'background.secondaryColor',
+        'background.opacity',
+        'text.color',
+        'border.width',
+        'border.style',
+        'border.color',
+        'border.opacity',
+        'border.radius',
+      ])
+    );
+
+    const setAppearanceField = async (key, value, inputKind = '') => {
+      const toggleSelector =
+        `[data-appearance-toggle="true"][data-appearance-scope="section-column"]` +
+        `[data-appearance-key="${key}"][data-item-index="0"]`;
+      const toggle = document.querySelector(toggleSelector);
+      if (!toggle.checked) {
+        toggle.checked = true;
+        toggle.dispatchEvent(new Event('change', { bubbles: true }));
+        await flushAdminUi(2);
+      }
+      const kindSelector = inputKind
+        ? `[data-appearance-input-kind="${inputKind}"]`
+        : ':not([data-appearance-input-kind="hex"])';
+      const input = document.querySelector(
+        `[data-appearance-input="true"]${kindSelector}` +
+          `[data-appearance-scope="section-column"][data-appearance-key="${key}"]` +
+          '[data-item-index="0"]'
+      );
+      input.value = String(value);
+      input.dispatchEvent(
+        new Event(input.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })
+      );
+      await flushAdminUi(2);
+    };
+
+    await setAppearanceField('background.type', 'gradient');
+    await setAppearanceField('background.color', '#112233', 'hex');
+    await setAppearanceField('background.secondaryColor', '#445566', 'hex');
+    await setAppearanceField('background.opacity', '0.5');
+    await setAppearanceField('text.color', '#ffffff', 'hex');
+    await setAppearanceField('border.width', '2');
+    await setAppearanceField('border.style', 'dashed');
+    await setAppearanceField('border.color', '#778899', 'hex');
+    await setAppearanceField('border.opacity', '0.75');
+    await setAppearanceField('border.radius', '14');
+
+    let snapshot = requestCurrentPreviewSnapshot();
+    let appearance = snapshot.page.sections.find((section) => section.id === editableSection.id)
+      .settings.columns[0].appearance;
+    expect(appearance).toEqual({
+      background: {
+        type: 'gradient',
+        color: '#112233',
+        secondaryColor: '#445566',
+        opacity: 0.5,
+      },
+      text: { color: '#ffffff' },
+      border: {
+        width: 2,
+        style: 'dashed',
+        color: '#778899',
+        opacity: 0.75,
+        radius: 14,
+      },
+    });
+
+    document
+      .querySelector('[data-action="undo-current"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    snapshot = requestCurrentPreviewSnapshot();
+    appearance = snapshot.page.sections.find((section) => section.id === editableSection.id)
+      .settings.columns[0].appearance;
+    expect(appearance.border.radius).toBe(6);
+
+    const textToggle = document.querySelector(
+      '[data-appearance-toggle="true"][data-appearance-scope="section-column"][data-appearance-key="text.color"][data-item-index="0"]'
+    );
+    textToggle.checked = false;
+    textToggle.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+    snapshot = requestCurrentPreviewSnapshot();
+    appearance = snapshot.page.sections.find((section) => section.id === editableSection.id)
+      .settings.columns[0].appearance;
+    expect(appearance.text).toBeUndefined();
+
+    document
+      .querySelector('[data-action="discard-current"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+    snapshot = requestCurrentPreviewSnapshot();
+    expect(
+      snapshot.page.sections.find((section) => section.id === editableSection.id).settings.columns
+    ).toBeUndefined();
+    expect(mocks.updateSection).not.toHaveBeenCalled();
   });
 
   it('clears selected module state when a module is deleted from the canvas', async () => {

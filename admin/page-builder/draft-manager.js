@@ -97,6 +97,9 @@ export function createDraftManager({ getState, actions, deps }) {
     actions.setActiveSectionId(sectionId);
     actions.setActiveSectionDraft({
       ...cloneValue(settings),
+      // Layout (column count + ratios) lives at the section top level but is edited
+      // alongside settings so column count/ratio and per-column styling save atomically.
+      layout: section.layout || '1',
       moduleGap: settings.moduleGap ?? '',
       columnGap: settings.columnGap ?? '',
       sectionGap: settings.sectionGap ?? '',

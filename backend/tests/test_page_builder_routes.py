@@ -1391,9 +1391,10 @@ class PageBuilderRouteTests(BackendRouteTestCase):
             self.db,
         )["page"]
 
+        # 7 columns exceeds the 1-6 column bound; "9-9" is now a valid two-column ratio.
         bad_section = page_builder.api_add_section(
             page["id"],
-            page_builder.CreateSectionRequest(sectionType="row", layout="9-9"),
+            page_builder.CreateSectionRequest(sectionType="row", layout="1-1-1-1-1-1-1"),
             self.admin_request(f"/api/admin/pages/{page['id']}/sections", "POST"),
             self.db,
         )
@@ -1454,6 +1455,115 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.assertNotIn("<script", hydrated_text["config"]["content"])
         self.assertNotIn("javascript:", hydrated_text["config"]["content"])
         self.assertIn("<strong>Safe</strong>", hydrated_text["config"]["content"])
+
+    def test_builder_security_sanitizes_column_settings_and_rehomes_on_shrink(self):
+        self.seed_contract_series()
+        page = page_builder.api_create_page(
+            page_builder.CreatePageRequest(slug="columns", title="Columns"),
+            self.admin_request("/api/admin/pages", "POST"),
+            "battle-bros",
+            self.db,
+        )["page"]
+
+        # 1-6 columns with width ratios are accepted; the legacy preset set no longer caps us.
+        section = page_builder.api_add_section(
+            page["id"],
+            page_builder.CreateSectionRequest(
+                sectionType="row",
+                layout="2-1-1-1",
+                settings={
+                    "columnGap": 24,
+                    "columns": [
+                        {
+                            "index": 0,
+                            "appearance": {
+                                "background": {"color": "#f5f5f5", "opacity": 2},
+                                "border": {"width": 999, "radius": 999},
+                            },
+                            "padding": {"top": -10, "left": 12},
+                            "alignment": "center",
+                            "minHeight": 5000,
+                            "hidden": True,
+                            "responsive": {
+                                "tablet": {"hidden": True},
+                                "mobile": {"alignment": "stretch", "hidden": False},
+                            },
+                        },
+                        {"index": 1, "alignment": "not-a-real-alignment"},
+                        # Out-of-range index is dropped.
+                        {"index": 9, "alignment": "end"},
+                    ],
+                    "responsive": {
+                        # Device layouts cannot create more tracks than the global
+                        # structural column count.
+                        "mobile": {"layout": "1-1-1-1-1-1"},
+                    },
+                },
+            ),
+            self.admin_request(f"/api/admin/pages/{page['id']}/sections", "POST"),
+            self.db,
+        )["section"]
+
+        self.assertEqual(section["layout"], "2-1-1-1")
+        columns = section["settings"]["columns"]
+        # Only column 0 carries real styling; column 1's invalid alignment is dropped to
+        # default and emits nothing; the out-of-range index-9 entry is dropped entirely.
+        self.assertEqual([col["index"] for col in columns], [0])
+        col0 = columns[0]
+        self.assertEqual(col0["appearance"]["background"]["opacity"], 1.0)
+        self.assertEqual(col0["appearance"]["border"]["width"], 20)
+        self.assertEqual(col0["appearance"]["border"]["radius"], 200)
+        self.assertEqual(col0["padding"]["top"], 0)
+        self.assertEqual(col0["padding"]["left"], 12)
+        self.assertEqual(col0["alignment"], "center")
+        self.assertEqual(col0["minHeight"], 2000)
+        self.assertTrue(col0["hidden"])
+        self.assertTrue(col0["responsive"]["tablet"]["hidden"])
+        self.assertEqual(
+            col0["responsive"]["mobile"],
+            {"alignment": "stretch", "hidden": False},
+        )
+        self.assertEqual(section["settings"]["responsive"]["mobile"]["layout"], "1-1-1-1")
+
+        # Place one module per column across all four columns.
+        module_ids = []
+        for column_index in range(4):
+            module = page_builder.api_add_module(
+                section["id"],
+                page_builder.CreateModuleRequest(
+                    moduleType="text",
+                    columnIndex=column_index,
+                    config={"content": f"<p>col {column_index}</p>"},
+                ),
+                self.admin_request(f"/api/admin/sections/{section['id']}/modules", "POST"),
+                self.db,
+            )["module"]
+            module_ids.append(module["id"])
+
+        # Shrinking 4 -> 2 columns rehomes out-of-range modules to the last column
+        # atomically instead of dropping or rejecting them.
+        shrunk = page_builder.api_update_section(
+            section["id"],
+            page_builder.UpdateSectionRequest(layout="1-1"),
+            self.admin_request(f"/api/admin/sections/{section['id']}", "PUT"),
+            self.db,
+        )["section"]
+        self.assertEqual(shrunk["layout"], "1-1")
+
+        payload = page_builder.api_get_page(
+            page["id"],
+            self.admin_request(f"/api/admin/pages/{page['id']}"),
+            self.db,
+        )["page"]
+        modules = payload["sections"][0]["modules"]
+        self.assertEqual({m["id"] for m in modules}, set(module_ids))
+        self.assertTrue(all(0 <= m["columnIndex"] <= 1 for m in modules))
+        merged = [module for module in modules if module["columnIndex"] == 1]
+        self.assertEqual(
+            [module["id"] for module in merged],
+            [module_ids[1], module_ids[2], module_ids[3]],
+        )
+        self.assertEqual([module["sortIndex"] for module in merged], [0, 1, 2])
 
 
 if __name__ == "__main__":
