@@ -56,7 +56,8 @@ The reader is split into three layers:
 
 ### Canonical Data Sources
 
-- `data.json` or `/series/<seriesId>/data.json`: entry pages, entry metadata, status message, premium flags, unit labels, and entry labels.
+- `data.json` or `/series/<seriesId>/data.json`: entry pages, entry metadata, status message, premium flags, unit labels, and entry labels. The public payload hides `draft` entries and advertises future `scheduled` entries with `status: "scheduled"` + `publishAt` while withholding their page images, so the reader shows COMING SOON until release. Due scheduled rows are promoted to `published` before payload generation and then expose their pages normally. Entry saves persist and normalize `status` + `publishAt`; accepted states are `published`, `scheduled`, and `draft`.
+- Admin series-data aliases under `/admin/*` and `/api/admin/*` require an authenticated admin and return `Cache-Control: no-store`. Their payloads include every entry, raw `status`, `publishAt`, and complete pages so the entry editor can manage drafts and schedules without data loss.
 - `/api/pages/home/<seriesId>`: effective published homepage page for the series root; resolves the page marked homepage and falls back to the same-series bound published `reader` page when no homepage is set. The reader fallback is valid only when the bound page contains exactly one visible Comic Reader module.
 - `/api/admin/pages/home/<seriesId>`: admin-only draft/homepage resolver used when `draft=1` is requested without an explicit page slug.
 - `/api/pages/<seriesId>/<slug>`: published builder pages for reader pages.

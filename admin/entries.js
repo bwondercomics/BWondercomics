@@ -200,17 +200,12 @@ export function createEntriesApi({
 
   function syncEntryScheduleFields() {
     const status = normalizeEntryStatus(el.entryStatus?.value);
-    const isScheduled = status === 'scheduled';
     const isDraft = status === 'draft';
     const autoPostEnabled = !!el.entryAutoPost?.checked && !isDraft;
 
     if (el.entryPublishAt) {
       el.entryPublishAt.disabled = isDraft;
       if (isDraft) el.entryPublishAt.value = '';
-    }
-    if (el.entryComingSoon) {
-      el.entryComingSoon.disabled = !isScheduled;
-      if (!isScheduled) el.entryComingSoon.checked = false;
     }
     if (el.entryAutoPost) {
       el.entryAutoPost.disabled = isDraft;
@@ -1358,9 +1353,6 @@ export function createEntriesApi({
     if (el.entryPublishAt) {
       el.entryPublishAt.value = isoToDateTimeLocal(meta.publishAt);
     }
-    if (el.entryComingSoon) {
-      el.entryComingSoon.checked = !!meta.comingSoon;
-    }
     if (el.entryAutoPost) {
       el.entryAutoPost.checked = !!meta.autoPost;
     }
@@ -1396,7 +1388,6 @@ export function createEntriesApi({
     if (el.entryDisplayNumber) el.entryDisplayNumber.value = '';
     if (el.entryStatus) el.entryStatus.value = 'published';
     if (el.entryPublishAt) el.entryPublishAt.value = '';
-    if (el.entryComingSoon) el.entryComingSoon.checked = false;
     if (el.entryAutoPost) el.entryAutoPost.checked = false;
     if (el.entryShareBluesky) el.entryShareBluesky.checked = false;
     if (el.entryPostTitle) el.entryPostTitle.value = '';
@@ -1422,6 +1413,29 @@ export function createEntriesApi({
     if (!newName) {
       alert(`${labels().singular} name is required`);
       return;
+    }
+
+    let status = normalizeEntryStatus(el.entryStatus?.value);
+    const rawPublishAt = String(el.entryPublishAt?.value ?? '').trim();
+    let publishAtIso = dateTimeLocalToIso(rawPublishAt);
+    if (rawPublishAt && !publishAtIso) {
+      alert('Publish date/time is invalid.');
+      return;
+    }
+    if (status === 'scheduled') {
+      const publishAtMs = publishAtIso ? new Date(publishAtIso).getTime() : Number.NaN;
+      if (!publishAtIso || !Number.isFinite(publishAtMs) || publishAtMs <= Date.now()) {
+        alert('Scheduled entries require a future publish date and time.');
+        return;
+      }
+    } else if (
+      status === 'published' &&
+      publishAtIso &&
+      new Date(publishAtIso).getTime() > Date.now()
+    ) {
+      status = 'scheduled';
+    } else if (status === 'draft') {
+      publishAtIso = '';
     }
 
     let pages = [...state.currentPages];
@@ -1483,9 +1497,6 @@ export function createEntriesApi({
         return;
       }
     }
-    const status = normalizeEntryStatus(el.entryStatus?.value);
-    const publishAtIso = dateTimeLocalToIso(el.entryPublishAt?.value ?? '');
-    const comingSoon = status === 'scheduled' && !!el.entryComingSoon?.checked;
     const autoPost = !!el.entryAutoPost?.checked;
     const shareBluesky = autoPost && !!el.entryShareBluesky?.checked;
     const releasePostTitle = String(el.entryPostTitle?.value || '').trim();
@@ -1498,7 +1509,7 @@ export function createEntriesApi({
       getEntryLabels().find((label) => label && label.id === selectedLabelId) ||
       getActiveEntryLabel();
     state.entryMeta = state.entryMeta || {};
-    state.entryMeta[newName] = {
+    const nextMeta = {
       ...(state.entryMeta[newName] || {}),
       premium: premiumFlag,
       displayNumber,
@@ -1512,12 +1523,13 @@ export function createEntriesApi({
       coverImage,
       status,
       publishAt: publishAtIso,
-      comingSoon,
       autoPost,
       shareBluesky,
       releasePostTitle,
       releasePostContent,
     };
+    delete nextMeta.comingSoon;
+    state.entryMeta[newName] = nextMeta;
     await saveEntries();
     renderEntryList();
     clearUnsaved();
@@ -1635,7 +1647,7 @@ export function createEntriesApi({
               ? `Scheduled - ${publishAtLabel}`
               : 'Scheduled'
             : 'Published';
-      const comingSoonLabel = status === 'scheduled' && meta.comingSoon ? 'Coming soon' : '';
+      const comingSoonLabel = status === 'scheduled' ? 'Coming soon' : '';
       const displayNumber = Number.isFinite(meta.displayNumber) ? meta.displayNumber : null;
       const entryLabelSingular = String(meta.entryLabelSingular || '').trim() || labels().singular;
       const displayLabel =

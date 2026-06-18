@@ -281,7 +281,70 @@ function buildPhase5ColumnsVisualPage() {
     ),
   };
 
-  page.sections = [aboveSection, readerSection, fourColumnSection, sixColumnSection];
+  const twoColumnSection = {
+    id: 'phase5-two-columns',
+    sectionType: 'row',
+    layout: '1-1',
+    settings: {
+      columnGap: 12,
+      columns: [
+        {
+          index: 0,
+          appearance: {
+            background: { color: '#1f2a44' },
+            text: { color: '#f4f8ff' },
+            border: { width: 2, color: '#4f9db5', radius: 12 },
+          },
+          padding: { top: 14, right: 14, bottom: 14, left: 14 },
+          minHeight: 80,
+        },
+        {
+          index: 1,
+          appearance: {
+            background: { color: '#44261f' },
+            text: { color: '#fff6ef' },
+            border: { width: 2, color: '#b5734f', radius: 12 },
+          },
+          padding: { top: 14, right: 14, bottom: 14, left: 14 },
+          minHeight: 80,
+        },
+      ],
+      responsive: { mobile: { layout: '1' } },
+    },
+    modules: Array.from({ length: 2 }, (_, index) =>
+      textModule(`phase5-two-${index}`, index, `Two column ${index + 1}`)
+    ),
+  };
+  const threeColumnSection = {
+    id: 'phase5-three-columns',
+    sectionType: 'row',
+    layout: '1-1-1',
+    settings: {
+      columnGap: 10,
+      columns: Array.from({ length: 3 }, (_, index) => ({
+        index,
+        appearance: {
+          background: { color: ['#203a2b', '#2b2440', '#3a3320'][index] },
+          text: { color: '#f6fff9' },
+          border: { width: 2, color: '#5f8f6f', radius: 8 },
+        },
+        padding: { top: 12, right: 12, bottom: 12, left: 12 },
+      })),
+      responsive: { tablet: { layout: '1-1' }, mobile: { layout: '1' } },
+    },
+    modules: Array.from({ length: 3 }, (_, index) =>
+      textModule(`phase5-three-${index}`, index, `Three column ${index + 1}`)
+    ),
+  };
+
+  page.sections = [
+    aboveSection,
+    readerSection,
+    twoColumnSection,
+    threeColumnSection,
+    fourColumnSection,
+    sixColumnSection,
+  ];
   return page;
 }
 
@@ -731,6 +794,12 @@ function snapshotOptions(viewportId) {
   return viewportId === 'mobile' ? { maxDiffPixelRatio: 0.06 } : { maxDiffPixelRatio: 0.02 };
 }
 
+function adminPreviewSnapshotOptions(viewportId) {
+  // Chromium rasterizes iframe text/borders with slight subpixel differences even
+  // when the computed layout and capture geometry match the top-level reader.
+  return viewportId === 'mobile' ? snapshotOptions(viewportId) : { maxDiffPixelRatio: 0.025 };
+}
+
 async function getPreviewFrame(page) {
   const iframeHandle = await page.locator('.pb-preview-iframe').elementHandle();
   const frame = await iframeHandle?.contentFrame();
@@ -840,11 +909,24 @@ async function collectPhase5ColumnState(target) {
         const column = module.closest('.pb-column');
         moduleOwners[module.getAttribute('data-module-id')] = columns.indexOf(column);
       });
+      const styles = columns.map((column) => {
+        const computed = window.getComputedStyle(column);
+        return {
+          backgroundColor: computed.backgroundColor,
+          borderTopWidth: computed.borderTopWidth,
+          borderTopStyle: computed.borderTopStyle,
+          borderTopLeftRadius: computed.borderTopLeftRadius,
+          paddingTop: computed.paddingTop,
+          paddingLeft: computed.paddingLeft,
+          minHeight: computed.minHeight,
+        };
+      });
       return {
         columnCount: columns.length,
         displays: columns.map((column) => window.getComputedStyle(column).display),
         gridTemplate,
         moduleOwners,
+        styles,
         trackCount:
           !gridTemplate || gridTemplate === 'none'
             ? 0
@@ -855,6 +937,8 @@ async function collectPhase5ColumnState(target) {
     return {
       aboveSectionCount: document.querySelectorAll('#builderAboveReader .pb-section').length,
       belowSectionCount: document.querySelectorAll('#builderBelowReader .pb-section').length,
+      two: collectSection('phase5-two-columns'),
+      three: collectSection('phase5-three-columns'),
       four: collectSection('phase5-four-columns'),
       six: collectSection('phase5-six-columns'),
     };
@@ -1051,8 +1135,19 @@ test.describe('builder preview visual parity', () => {
       await gotoAppPage(readerPage, '/index.html?series=battle-bros&page=phase5-layout');
       await readerPage.waitForSelector('html:not(.reader-bootstrap-loading)');
       await expect(readerPage.locator('#builderAboveReader .pb-section')).toHaveCount(1);
-      await expect(readerPage.locator('#builderBelowReader .pb-section')).toHaveCount(2);
+      await expect(readerPage.locator('#builderBelowReader .pb-section')).toHaveCount(4);
       const publicState = await collectPhase5ColumnState(readerPage);
+
+      await waitForAssets(readerPage);
+      await lockScreenshotViewport(readerPage, getReaderCaptureViewport(viewport, viewportId));
+      const phase5Screenshot = await readerPage.locator(VISUAL_CAPTURE_SELECTOR).screenshot({
+        animations: 'disabled',
+        scale: 'css',
+      });
+      expect(phase5Screenshot).toMatchSnapshot(
+        `builder-preview-parity-phase5-${viewportId}.png`,
+        snapshotOptions(viewportId)
+      );
 
       const adminContext = await browser.newContext({
         baseURL: VISUAL_BASE_URL,
@@ -1076,10 +1171,22 @@ test.describe('builder preview visual parity', () => {
       await waitForPreviewReady(adminPage, viewportId);
       const previewFrame = await getPreviewFrame(adminPage);
       await expect(previewFrame.locator('#builderAboveReader .pb-section')).toHaveCount(1);
-      await expect(previewFrame.locator('#builderBelowReader .pb-section')).toHaveCount(2);
+      await expect(previewFrame.locator('#builderBelowReader .pb-section')).toHaveCount(4);
       const previewState = await collectPhase5ColumnState(previewFrame);
 
       expect(previewState).toEqual(publicState);
+      await waitForAssets(previewFrame);
+      await lockScreenshotViewport(previewFrame, viewport);
+      const adminPreviewScreenshot = await previewFrame
+        .locator(VISUAL_CAPTURE_SELECTOR)
+        .screenshot({
+          animations: 'disabled',
+          scale: 'css',
+        });
+      expect(adminPreviewScreenshot).toMatchSnapshot(
+        `builder-preview-parity-phase5-${viewportId}.png`,
+        adminPreviewSnapshotOptions(viewportId)
+      );
       expect(publicState.four.columnCount).toBe(4);
       expect(publicState.six.columnCount).toBe(6);
       expect(publicState.four.trackCount).toBe({ desktop: 4, tablet: 2, mobile: 1 }[viewportId]);
@@ -1092,6 +1199,35 @@ test.describe('builder preview visual parity', () => {
       for (let index = 0; index < 6; index += 1) {
         expect(publicState.six.moduleOwners[`phase5-six-${index}`]).toBe(index);
       }
+
+      // Styled 2- and 3-column layouts keep their authored global column count and
+      // per-column styling while reflowing grid tracks across device widths.
+      expect(publicState.two.columnCount).toBe(2);
+      expect(publicState.three.columnCount).toBe(3);
+      expect(publicState.two.trackCount).toBe({ desktop: 2, tablet: 2, mobile: 1 }[viewportId]);
+      expect(publicState.three.trackCount).toBe({ desktop: 3, tablet: 2, mobile: 1 }[viewportId]);
+      for (let index = 0; index < 2; index += 1) {
+        expect(publicState.two.moduleOwners[`phase5-two-${index}`]).toBe(index);
+      }
+      for (let index = 0; index < 3; index += 1) {
+        expect(publicState.three.moduleOwners[`phase5-three-${index}`]).toBe(index);
+      }
+      // Authored appearance/padding lands on the column element as computed styles.
+      expect(publicState.two.styles[0]).toMatchObject({
+        backgroundColor: 'rgb(31, 42, 68)',
+        borderTopWidth: '2px',
+        borderTopStyle: 'solid',
+        borderTopLeftRadius: '12px',
+        paddingTop: '14px',
+        paddingLeft: '14px',
+        minHeight: '80px',
+      });
+      expect(publicState.three.styles[1]).toMatchObject({
+        backgroundColor: 'rgb(43, 36, 64)',
+        borderTopWidth: '2px',
+        borderTopLeftRadius: '8px',
+        paddingTop: '12px',
+      });
 
       await adminContext.close();
       await readerContext.close();

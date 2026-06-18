@@ -586,7 +586,7 @@ The heaviest orchestrator in the Admin suite. It manages the entire lifecycle of
 
 #### `loadEntries()` / `saveEntries()`
 
-The dual-pass persistence engine. It attempts to load from `data.json` (DB) before falling back to `localStorage` (Drafts). Saving always performs an atomic update to both the persistent store and the local cache.
+The dual-pass persistence engine. It loads from the authenticated, no-store admin series-data endpoint before falling back to `localStorage` drafts. Saving updates both the persistent store and local cache. Entry `status` and `publishAt` are persisted by the backend; scheduled entries require a future date in the editor and are always advertised as Coming Soon until automatic release. The backend accepts only `published`, `scheduled`, and `draft`, normalizes future published dates to scheduled, and promotes due scheduled entries to published.
 
 #### `syncEntryAccessPaths(seriesPremiumOnly)`
 
@@ -615,7 +615,7 @@ The module uses `inferFolderFromPages`, `canonicalizeEntryPaths`, `mapPageFolder
 
 ### DOM Dependencies
 
-- **Entry Workspace**: `entryList`, `entryEditSection`, `entryStatus`, `entryAutoPost`.
+- **Entry Workspace**: `entryList`, `entryEditSection`, `entryStatus`, `entryPublishAt`, `entryAutoPost`.
 - **Reorder Suite**: `pageReorderShell`, `pageList`, `insertCaret`, `pagePreviewImg`.
 - **Navigation Controls**: `btnInsertPage`, `btnDeletePage`, `btnMoveMode`.
 

@@ -422,7 +422,7 @@ Required tests:
   - vertical mode renders all entry pages in order
   - vertical mode updates progress, comments target, and analytics
   - under-reader sections render after the reader mount on bound reader pages
-  - premium, scheduled, private, and empty entry states remain safe
+  - premium, scheduled, draft/unpublished, and empty entry states remain safe
   - preview mode keeps side-effect suppression
 
 - Shared renderer/parity tests:
@@ -437,7 +437,8 @@ Required tests:
   - blocks above and below a reader module
   - a bound reader page with a styled column below the reader
   - styled 1, 2, 3, and 4+ column layouts
-  - desktop 1920x1080, tablet 768x1024, and phone 375x812 admin preview parity
+  - desktop 1920x1080, tablet 768x1024, and phone 375x812 public/admin preview
+    captures against the same committed baselines
 
 Final gate:
 
@@ -445,9 +446,36 @@ Final gate:
 - `npm run format:check`
 - `npm run lint`
 - `npm test`
+- `npm run test:coverage`
+- `npm run format:py:check`
+- `npm run lint:py`
+- Ruff format check for changed backend tests
 - `npm run test:backend`
 - `npm run build`
 - `npm run test:visual`
+
+Completion note (`2026-06-18`): Phase 6 is complete after a corrective security, persistence,
+atomicity, and parity pass. Every `/admin/*` and `/api/admin/*` series-data read now requires an
+authenticated admin and successful responses use `Cache-Control: no-store`. Entry saves validate and
+persist `status` + `publishAt`, normalize future published entries to scheduled, normalize due
+scheduled entries to published, and promote due database rows before public/admin payloads are built.
+Public payloads omit drafts, advertise future scheduled entries as COMING SOON with pages withheld,
+and expose pages after release; authenticated admin payloads retain every entry, raw publication
+metadata, and complete pages. The optional `comingSoon` field was removed from admin/reader behavior
+because scheduled status is authoritative.
+
+`update_module` now validates and sanitizes the complete proposed type, column, sort order, and config
+before mutating the SQLAlchemy object, and module mutation routes roll back on validation errors.
+Regression coverage proves a composite rejected update cannot persist earlier valid field changes.
+Phase 5 visual coverage now captures both public output and the matching admin iframe against the
+same desktop/tablet/mobile baselines for styled 1/2/3/4+ column layouts. The "Open Product Decisions"
+section was resolved (see "Resolved Product Decisions"). Corrective verification passed:
+`git diff --check`, `npm run format:check`, `npm run lint`, `npm test` (`543` passed, `1` skipped),
+`npm run test:coverage` (`543` passed, `1` skipped), `npm run format:py:check`, `npm run lint:py`,
+`ruff format --check backend/tests/test_page_builder_routes.py backend/tests/test_series_contracts.py`,
+`npm run test:backend` (`81` passed), `npm run build`, and `npm run test:visual` (`14` passed). Per the
+migration note, legacy static reader DOM is intentionally left in place; its removal remains a
+separate follow-up.
 
 ## Migration And Compatibility Notes
 
@@ -458,11 +486,19 @@ Final gate:
 - The implementation should not delete legacy static reader DOM until the no-reader page path,
   paged reader path, vertical reader path, and builder preview path all pass release gates.
 
-## Open Product Decisions Before Implementation
+## Resolved Product Decisions
 
-- Whether fullscreen is disabled or adapted in vertical-scroll mode.
-- Whether controls placement `overlay` ships in v1 or waits until paged/vertical basics are stable.
-- Whether bound reader page validation blocks publish immediately or starts as warnings before
-  becoming strict.
-- Whether side panels remain global page surfaces, reader-owned surfaces, or both with documented
-  precedence.
+- Vertical-scroll fullscreen: disabled in v1 — zoom, pan, and fullscreen are all turned off in
+  vertical mode (Phase 4).
+- Controls placement `overlay`: shipped in v1 (Phase 3; exercised by the `custom-reader` visual
+  route and paged-reader customization assertions).
+- Bound reader page validation: strict — invalid bound pages block publish and reader-binding saves
+  with stable warning/error codes (Phase 2).
+- Side panels: reader-owned surfaces fed from the reader module's own section and styled through the
+  reader module `panels` settings; generic content columns use section/column styling instead and are
+  never overloaded as panel surfaces (Phase 5).
+- Non-published entry publication (Phase 6): the public series payload hides `draft` entries entirely
+  and advertises `scheduled` entries as COMING SOON (`status` + `publishAt`, page images withheld
+  until `publish_at`). Due scheduled entries are promoted to published before payload generation.
+  Admin series-data endpoints require an authenticated admin, disable caching, and stay unfiltered so
+  the entry editor keeps drafts, raw publication metadata, and full pages.

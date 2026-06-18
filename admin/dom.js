@@ -456,9 +456,6 @@ export const el = {
   entryPublishAt: /** @type {HTMLInputElement | null} */ (
     document.getElementById('entryPublishAt')
   ),
-  entryComingSoon: /** @type {HTMLInputElement | null} */ (
-    document.getElementById('entryComingSoon')
-  ),
   entryAutoPost: /** @type {HTMLInputElement | null} */ (document.getElementById('entryAutoPost')),
   entryShareBluesky: /** @type {HTMLInputElement | null} */ (
     document.getElementById('entryShareBluesky')

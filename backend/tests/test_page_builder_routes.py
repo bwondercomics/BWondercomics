@@ -596,6 +596,94 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.assertEqual(deleted_module, {"status": "success"})
         self.assertEqual(deleted_section, {"status": "success"})
 
+    def test_module_endpoints_reject_out_of_range_column_index(self):
+        self.seed_contract_series()
+        page = page_builder.api_create_page(
+            page_builder.CreatePageRequest(slug="reader", title="Reader", pageType="reader"),
+            self.admin_request("/api/admin/pages", "POST"),
+            "battle-bros",
+            self.db,
+        )["page"]
+        # Two-column sections: valid column indexes are 0 and 1, so 2 is invalid.
+        section_a = page_builder.api_add_section(
+            page["id"],
+            page_builder.CreateSectionRequest(sectionType="row", layout="1-1"),
+            self.admin_request(f"/api/admin/pages/{page['id']}/sections", "POST"),
+            self.db,
+        )["section"]
+        section_b = page_builder.api_add_section(
+            page["id"],
+            page_builder.CreateSectionRequest(sectionType="row", layout="1-1"),
+            self.admin_request(f"/api/admin/pages/{page['id']}/sections", "POST"),
+            self.db,
+        )["section"]
+        module = page_builder.api_add_module(
+            section_a["id"],
+            page_builder.CreateModuleRequest(
+                moduleType="text", columnIndex=0, sortIndex=0, config={"content": "<p>A</p>"}
+            ),
+            self.admin_request(f"/api/admin/sections/{section_a['id']}/modules", "POST"),
+            self.db,
+        )["module"]
+
+        # add: an out-of-range column index is rejected.
+        add_resp = page_builder.api_add_module(
+            section_a["id"],
+            page_builder.CreateModuleRequest(
+                moduleType="text", columnIndex=2, config={"content": "<p>B</p>"}
+            ),
+            self.admin_request(f"/api/admin/sections/{section_a['id']}/modules", "POST"),
+            self.db,
+        )
+        # update: relocating the existing module to an invalid column is rejected.
+        update_resp = page_builder.api_update_module(
+            module["id"],
+            page_builder.UpdateModuleRequest(
+                moduleType="image",
+                columnIndex=2,
+                sortIndex=5,
+                config={"src": "assets/rejected.png", "alt": "Rejected"},
+            ),
+            self.admin_request(f"/api/admin/modules/{module['id']}", "PUT"),
+            self.db,
+        )
+        # move: relocating into another section's nonexistent column is rejected.
+        move_resp = page_builder.api_move_module(
+            module["id"],
+            page_builder.MoveModuleRequest(
+                targetSectionId=section_b["id"], columnIndex=2, sortIndex=0
+            ),
+            self.admin_request(f"/api/admin/modules/{module['id']}/move", "POST"),
+            self.db,
+        )
+        # reorder: targeting a nonexistent column is rejected.
+        reorder_resp = page_builder.api_reorder_modules(
+            section_a["id"],
+            page_builder.ReorderModulesRequest(columnIndex=2, moduleIds=[module["id"]]),
+            self.admin_request(f"/api/admin/sections/{section_a['id']}/modules/reorder", "POST"),
+            self.db,
+        )
+
+        for resp in (add_resp, update_resp, move_resp, reorder_resp):
+            self.assertEqual(resp.status_code, 400)
+
+        # No mutation: the single module is still in section A, column 0, sort 0,
+        # and nothing leaked into section B.
+        payload = page_builder.api_get_page(
+            page["id"],
+            self.admin_request(f"/api/admin/pages/{page['id']}"),
+            self.db,
+        )["page"]
+        sections = {section["id"]: section for section in payload["sections"]}
+        self.assertEqual(len(sections[section_a["id"]]["modules"]), 1)
+        self.assertEqual(sections[section_b["id"]]["modules"], [])
+        persisted = sections[section_a["id"]]["modules"][0]
+        self.assertEqual(persisted["id"], module["id"])
+        self.assertEqual(persisted["columnIndex"], 0)
+        self.assertEqual(persisted["sortIndex"], 0)
+        self.assertEqual(persisted["moduleType"], "text")
+        self.assertEqual(persisted["config"]["content"], "<p>A</p>")
+
     def test_cms_module_source_config_sanitization(self):
         reader = sanitize_module_config(
             "reader",

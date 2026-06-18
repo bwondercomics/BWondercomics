@@ -119,7 +119,7 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - `tests/helpers/reader-fixture.js`: live reader markup harness from `index.html`
 - `tests/reader-preview-bridge.test.js`: `reader/preview-bridge.js` handshake protocol — `requestPreviewSnapshot(...)` resolves on valid `SNAPSHOT`, rejects on timeout or invalid envelope, and sends correct `ACK`/`ERROR` control messages; `validatePreviewMessageEvent(...)` rejects cross-origin and cross-source events
 - `tests/reader-preview-side-effects.test.js`: end-to-end reader preview side-effect guards — verifies that `?builderPreview=1` suppresses analytics initialization, live tracking, email form submission, comment mutations, chat SSO, safe-mode redirect, user-settings overlay, fullscreen, and external navigation links while leaving read-only reader shell behavior intact
-- `tests/visual/builder-preview-parity.spec.js`: Playwright visual parity coverage for the admin builder preview iframe against the public reader route at Desktop, Tablet, and Phone, plus DOM/assertion coverage for no-reader pages and a customized paged reader route. It uses seeded contract fixtures, mocked reader/admin endpoints, deterministic media placeholders, frozen visual timing, iframe width/metrics/overflow assertions, and committed screenshot baselines.
+- `tests/visual/builder-preview-parity.spec.js`: Playwright visual parity coverage for the admin builder preview iframe against the public reader route at Desktop, Tablet, and Phone, plus DOM/assertion coverage for no-reader pages and a customized paged reader route. Phase 5 styled 1/2/3/4+ column layouts capture both public output and the matching admin iframe against the same committed baselines.
 - `tests/visual/builder-authoring-workflows.spec.js`: Phase 12 Playwright authoring workflow coverage for the full-page builder shell. It uses stateful mocked builder/page endpoints and DOM/layout assertions for exact Desktop/Tablet/Phone iframe dimensions, bound series reader pages with authored content below the reader module, chrome collapse/restore, side-panel save/reload, current-device override persistence, inline text Save/Discard, live block drag/drop persistence, and global Feed template page creation.
 
 ## Backend Test Files
@@ -129,7 +129,7 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - `backend/tests/test_auth_routes.py`: auth/session/register/login/logout route contracts
 - `backend/tests/test_comments_routes.py`: comment auth, moderation, duplicate/rate-limit, and censored-phrase handling
 - `backend/tests/test_files_routes.py`: page-config/media index contracts, protected asset access, and virtual save behavior
-- `backend/tests/test_page_builder_routes.py`: page-builder admin CRUD, slug uniqueness, homepage exclusivity, reader-binding module validation, invalid bound-reader publish blocking, effective-homepage public/admin endpoint resolution, header-nav style sanitization, section/module move-reorder, and public published-page access
+- `backend/tests/test_page_builder_routes.py`: page-builder admin CRUD, slug uniqueness, homepage exclusivity, reader-binding module validation, invalid bound-reader publish blocking, effective-homepage public/admin endpoint resolution, header-nav style sanitization, section/module move-reorder, atomic rejection of composite invalid module updates, and public published-page access
 - `backend/tests/test_backfill_page_headers.py`: dry-run and write-mode coverage for canonical V3 header backfill, no-op behavior on already-clean V3 pages, legacy copy import, nav-style preservation, hidden-block persistence after override cleanup, additive `pageReports`, published-`reader` readiness blocking, and sanitized header/nav appearance preservation
 
 ## Phase 8 Runtime Fallback Retirement Coverage
@@ -139,7 +139,7 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - `tests/reader-customization.test.js` keeps the legacy customization entrypoint documented as a compatibility no-op so missing builder pages cannot rehydrate the old shell through stale boot data.
 - `backend/tests/test_backfill_page_headers.py` complements the frontend gate by proving clean V3 pages stay untouched in dry-run/write mode and that readiness still fails when no published `reader` page exists.
 - `backend/tests/test_posts_routes.py`: public/admin post visibility, scheduled promotion, protected-image copy, and asset cleanup
-- `backend/tests/test_series_contracts.py`: `series.json` and `data.json` payload contracts
+- `backend/tests/test_series_contracts.py`: public/admin `series.json` and `data.json` payload contracts, admin alias authorization/no-store headers, entry publication save normalization, draft/scheduled visibility, and automatic scheduled release
 - `backend/tests/test_tracking_routes.py`: visitor-session create/update behavior, dedupe, and validation
 - `backend/tests/test_user_routes.py`: email subscribe/opt-in, user settings, comment self-service, premium redemption, and account deletion rules
 - `backend/tests/helpers.py`: shared in-memory DB, request factory, and contract seeding helpers for series, builder pages, comments, premium codes, and visitor sessions

@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyBuilderPageToDOM,
   loadBuilderPage,
+  loadEntryData,
   extractSubtitlesFromBuilderPage,
   loadHomepageBuilderPage,
   loadPageConfigWithFallback,
@@ -111,6 +112,37 @@ describe('reader builder presentation loading', () => {
   afterEach(() => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
+  });
+
+  it('preserves a scheduled empty entry from the public payload for bound-reader startup', async () => {
+    const fetchMock = vi.fn(async (url, options) => {
+      expect(url).toBe('data.json');
+      expect(options).toEqual({ cache: 'no-store' });
+      return jsonResponse({
+        entries: {
+          Published: ['comics/published/01.png'],
+          Scheduled: [],
+        },
+        entryMeta: {
+          Published: { status: 'published', showInDropdown: true },
+          Scheduled: {
+            status: 'scheduled',
+            publishAt: '2099-01-01T00:00:00.000Z',
+            showInDropdown: true,
+          },
+        },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await loadEntryData('battle-bros');
+
+    expect(result.entries.Scheduled).toEqual([]);
+    expect(result.entryOrder).toContain('Scheduled');
+    expect(result.entryMeta.Scheduled).toMatchObject({
+      status: 'scheduled',
+      publishAt: '2099-01-01T00:00:00.000Z',
+    });
   });
 
   it('prefers a published builder page and extracts header subtitles', async () => {

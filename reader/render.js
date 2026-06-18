@@ -21,9 +21,8 @@ function formatDateTime(value) {
 function getEmptyEntryMessage() {
   const meta = state.entryMeta || {};
   const status = String(meta.status || '').toLowerCase();
-  const comingSoon = !!meta.comingSoon || status === 'scheduled';
   const publishAt = formatDateTime(meta.publishAt);
-  if (comingSoon) {
+  if (status === 'scheduled') {
     return {
       title: 'COMING SOON',
       detail: publishAt ? `Scheduled for ${publishAt}` : 'Scheduled for a future release.',
@@ -293,8 +292,7 @@ export function updateUI() {
     if (el.indicator) {
       const meta = state.entryMeta || {};
       const status = String(meta.status || '').toLowerCase();
-      el.indicator.textContent =
-        status === 'scheduled' || meta.comingSoon ? 'COMING SOON' : 'NO PAGES';
+      el.indicator.textContent = status === 'scheduled' ? 'COMING SOON' : 'NO PAGES';
     }
     if (el.progressFill) el.progressFill.style.width = '0%';
     if (el.prevBtn) el.prevBtn.disabled = true;

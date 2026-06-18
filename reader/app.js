@@ -344,8 +344,7 @@ import { publishReaderShellState, resolveReaderShellState } from './shell-state.
     const entryLabel = getEntryLabelFor(name);
     const baseLabel =
       displayNumber == null ? name : `${entryLabel.singular} ${displayNumber} - ${name}`;
-    const isComingSoon =
-      !!meta.comingSoon || String(meta.status || '').toLowerCase() === 'scheduled';
+    const isComingSoon = String(meta.status || '').toLowerCase() === 'scheduled';
     return isComingSoon ? `${baseLabel} (Coming Soon)` : baseLabel;
   }
 

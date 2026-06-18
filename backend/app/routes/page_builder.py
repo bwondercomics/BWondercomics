@@ -554,6 +554,7 @@ def api_add_module(
             return JSONResponse(status_code=404, content={"error": "Section not found"})
         return {"module": module}
     except ValueError as e:
+        db.rollback()
         return JSONResponse(status_code=400, content={"error": str(e)})
 
 
@@ -574,6 +575,7 @@ def api_update_module(
             return JSONResponse(status_code=404, content={"error": "Module not found"})
         return {"module": module}
     except ValueError as e:
+        db.rollback()
         return JSONResponse(status_code=400, content={"error": str(e)})
 
 
@@ -607,6 +609,7 @@ def api_move_module(
             return JSONResponse(status_code=404, content={"error": "Module or section not found"})
         return {"module": module}
     except ValueError as e:
+        db.rollback()
         return JSONResponse(status_code=400, content={"error": str(e)})
 
 
@@ -625,6 +628,7 @@ def api_reorder_modules(
         reorder_modules(db, section_id, payload.column_index, payload.module_ids)
         return {"status": "success"}
     except ValueError as e:
+        db.rollback()
         return JSONResponse(status_code=400, content={"error": str(e)})
 
 

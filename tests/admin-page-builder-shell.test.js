@@ -1855,6 +1855,108 @@ describe('admin page-builder shell', () => {
     expect(mocks.updateSection).not.toHaveBeenCalled();
   });
 
+  it('supports undo and redo of section column-count changes', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const editableSection = selectedPage.sections[1]; // layout '1-1'
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] [data-action="toggle-section-settings"]`
+      )
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const columnCount = () => {
+      const layout = requestCurrentPreviewSnapshot().page.sections.find(
+        (section) => section.id === editableSection.id
+      ).layout;
+      return String(layout || '1').split('-').length;
+    };
+
+    expect(columnCount()).toBe(2);
+
+    const countSelect = document.getElementById('pbEditSectionColumnCount');
+    countSelect.value = '4';
+    countSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+    expect(columnCount()).toBe(4);
+
+    document
+      .querySelector('[data-action="undo-current"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    expect(columnCount()).toBe(2);
+
+    document
+      .querySelector('[data-action="redo-current"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    expect(columnCount()).toBe(4);
+  });
+
+  it('redoes a per-column style edit after undo', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const editableSection = selectedPage.sections[1];
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] [data-action="toggle-section-settings"]`
+      )
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const setAppearanceField = async (key, value) => {
+      const toggle = document.querySelector(
+        `[data-appearance-toggle="true"][data-appearance-scope="section-column"]` +
+          `[data-appearance-key="${key}"][data-item-index="0"]`
+      );
+      if (!toggle.checked) {
+        toggle.checked = true;
+        toggle.dispatchEvent(new Event('change', { bubbles: true }));
+        await flushAdminUi(2);
+      }
+      const input = document.querySelector(
+        `[data-appearance-input="true"]:not([data-appearance-input-kind="hex"])` +
+          `[data-appearance-scope="section-column"][data-appearance-key="${key}"][data-item-index="0"]`
+      );
+      input.value = String(value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      await flushAdminUi(2);
+    };
+
+    const columnRadius = () =>
+      requestCurrentPreviewSnapshot().page.sections.find(
+        (section) => section.id === editableSection.id
+      ).settings.columns[0].appearance.border.radius;
+
+    await setAppearanceField('border.radius', '14');
+    expect(columnRadius()).toBe(14);
+
+    document
+      .querySelector('[data-action="undo-current"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    expect(columnRadius()).not.toBe(14);
+
+    document
+      .querySelector('[data-action="redo-current"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    expect(columnRadius()).toBe(14);
+  });
+
   it('clears selected module state when a module is deleted from the canvas', async () => {
     const selectedPage = getContractFixture('builderPage');
     const feedModule = selectedPage.sections[1].modules.find(

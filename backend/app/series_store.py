@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import UUID, uuid4
 
-from sqlalchemy import select
+from sqlalchemy import and_, select, update
 from sqlalchemy.orm import Session
 
 from .file_ops import safe_path
@@ -20,6 +20,7 @@ from .preview_pipeline import (
 
 DEFAULT_SERIES_ID = "battle-bros"
 SERIES_ID_RE = re.compile(r"^[a-z0-9_-]{1,64}$")
+ENTRY_STATUSES = {"published", "scheduled", "draft"}
 logger = logging.getLogger(__name__)
 
 
@@ -31,6 +32,57 @@ def sanitize_series_id(raw: str | None) -> str:
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _as_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _parse_entry_publish_at(raw: Any, *, title: str) -> datetime | None:
+    if raw is None:
+        return None
+    if isinstance(raw, datetime):
+        return _as_utc(raw)
+    value = str(raw).strip()
+    if not value:
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"Entry '{title}' has an invalid publishAt") from exc
+    return _as_utc(parsed)
+
+
+def _normalize_entry_publication(
+    meta: dict[str, Any], *, title: str, now: datetime
+) -> tuple[str, datetime]:
+    status = str(meta.get("status") or "published").strip().lower()
+    if status not in ENTRY_STATUSES:
+        raise ValueError(f"Entry '{title}' has an invalid status")
+
+    raw_publish_at = meta.get("publishAt") if "publishAt" in meta else meta.get("publish_at")
+    publish_at = _parse_entry_publish_at(raw_publish_at, title=title)
+    if status == "scheduled" and publish_at is None:
+        raise ValueError(f"Entry '{title}' requires publishAt when scheduled")
+
+    publish_at = publish_at or now
+    if status == "published" and publish_at > now:
+        status = "scheduled"
+    elif status == "scheduled" and publish_at <= now:
+        status = "published"
+    return status, publish_at
+
+
+def _promote_due_scheduled_entries(db: Session, now: datetime) -> None:
+    result = db.execute(
+        update(Entry)
+        .where(and_(Entry.status == "scheduled", Entry.publish_at <= now))
+        .values(status="published", updated_at=now)
+    )
+    if getattr(result, "rowcount", 0):
+        db.commit()
 
 
 def _normalize_label_text(raw: Any, fallback: str) -> str:
@@ -173,7 +225,9 @@ def series_index_payload(db: Session) -> dict[str, Any]:
     }
 
 
-def series_data_payload(db: Session, series_id: str) -> dict[str, Any]:
+def series_data_payload(
+    db: Session, series_id: str, *, include_unpublished: bool = False
+) -> dict[str, Any]:
     ensure_seeded(db)
     sid = sanitize_series_id(series_id)
     series = db.get(Series, sid)
@@ -191,6 +245,9 @@ def series_data_payload(db: Session, series_id: str) -> dict[str, Any]:
             "publishedBy": "Database",
             "payloadVersion": 2,
         }
+
+    now = _now()
+    _promote_due_scheduled_entries(db, now)
 
     entry_labels = _ensure_entry_labels(db, series)
     entry_labels = sorted(entry_labels, key=lambda label: (label.sort_index, label.created_at))
@@ -211,12 +268,35 @@ def series_data_payload(db: Session, series_id: str) -> dict[str, Any]:
     chapter_meta: dict[str, dict[str, Any]] = {}
 
     for entry in entries:
+        raw_status = str(entry.status or "published").strip().lower()
+        # Draft entries are hidden from the public payload but retained for admin
+        # consumers (the entry editor loads and re-saves the full set, so dropping
+        # them here would delete drafts on the next save).
+        if raw_status == "draft" and not include_unpublished:
+            continue
+        # Treat an entry as scheduled when it is explicitly scheduled or its
+        # publish time is still in the future.
+        publish_at = entry.publish_at
+        if publish_at is not None:
+            publish_at = _as_utc(publish_at)
+        is_scheduled = raw_status == "scheduled" or (publish_at is not None and publish_at > now)
+        if include_unpublished:
+            # Admin consumers keep the raw status and full page list.
+            effective_status = raw_status or "published"
+            withhold_pages = False
+        else:
+            # Public consumers see a normalized status; a scheduled entry is
+            # advertised (so the reader can show COMING SOON) but its page images
+            # are withheld until publish_at passes.
+            effective_status = "scheduled" if is_scheduled else "published"
+            withhold_pages = is_scheduled
+
         pages = db.scalars(
             select(EntryPage)
             .where(EntryPage.entry_id == entry.id)
             .order_by(EntryPage.sort_index.asc())
         ).all()
-        chapters[entry.title] = [p.path for p in pages]
+        chapters[entry.title] = [] if withhold_pages else [p.path for p in pages]
         if entry.folder_path:
             chapter_folders[entry.title] = entry.folder_path
         label = label_by_id.get(entry.entry_label_id) or default_label
@@ -230,6 +310,14 @@ def series_data_payload(db: Session, series_id: str) -> dict[str, Any]:
             "coverImage": entry.cover_image or "",
             "coverThumbPath": entry.cover_thumb_path or "",
         }
+        if include_unpublished:
+            meta["status"] = effective_status
+            meta["publishAt"] = publish_at.isoformat().replace("+00:00", "Z") if publish_at else ""
+        elif effective_status != "published":
+            # "published" remains the implicit public default for compatibility.
+            meta["status"] = effective_status
+        if not include_unpublished and is_scheduled and publish_at is not None:
+            meta["publishAt"] = publish_at.isoformat().replace("+00:00", "Z")
         if label:
             meta["entryLabelId"] = str(label.id)
             meta["entryLabelSingular"] = label.singular
@@ -370,6 +458,25 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
         raise ValueError("Invalid series data payload")
     sid = sanitize_series_id(series_id)
     allow_deletions = bool(payload.get("allowDeletions"))
+    chapters = payload.get("entries") if isinstance(payload.get("entries"), dict) else {}
+    chapter_folders = (
+        payload.get("entryFolders") if isinstance(payload.get("entryFolders"), dict) else {}
+    )
+    chapter_meta = payload.get("entryMeta") if isinstance(payload.get("entryMeta"), dict) else {}
+    entry_labels_payload = (
+        payload.get("entryLabels") if isinstance(payload.get("entryLabels"), list) else None
+    )
+    now = _now()
+    publication_by_title: dict[str, tuple[str, datetime]] = {}
+    for raw_title in chapters:
+        if not isinstance(raw_title, str):
+            continue
+        title = raw_title.strip()
+        if not title:
+            continue
+        raw_meta = chapter_meta.get(raw_title) or chapter_meta.get(title) or {}
+        meta = raw_meta if isinstance(raw_meta, dict) else {}
+        publication_by_title[title] = _normalize_entry_publication(meta, title=title, now=now)
 
     series = db.get(Series, sid)
     if not series:
@@ -396,15 +503,6 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
     series.active = True
     series.updated_at = _now()
     db.add(series)
-
-    chapters = payload.get("entries") if isinstance(payload.get("entries"), dict) else {}
-    chapter_folders = (
-        payload.get("entryFolders") if isinstance(payload.get("entryFolders"), dict) else {}
-    )
-    chapter_meta = payload.get("entryMeta") if isinstance(payload.get("entryMeta"), dict) else {}
-    entry_labels_payload = (
-        payload.get("entryLabels") if isinstance(payload.get("entryLabels"), list) else None
-    )
 
     existing_labels = db.scalars(
         select(EntryLabel)
@@ -497,6 +595,7 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
         )
 
         meta = chapter_meta.get(raw_title) or chapter_meta.get(title) or {}
+        status, publish_at = publication_by_title[title]
         premium_only = bool(meta.get("premium")) if isinstance(meta, dict) else False
         display_number = None
         if isinstance(meta, dict):
@@ -576,8 +675,8 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
                 store_url=store_url or None,
                 cover_image=cover_image or None,
                 cover_thumb_path=None,
-                status="published",
-                publish_at=_now(),
+                status=status,
+                publish_at=publish_at,
                 sort_index=display_number
                 if display_number is not None
                 else _extract_sort_index(
@@ -598,6 +697,8 @@ def apply_series_data_save(db: Session, series_id: str, payload: Any) -> None:
             entry.release_type = release_type
             entry.store_url = store_url or None
             entry.cover_image = cover_image or None
+            entry.status = status
+            entry.publish_at = publish_at
             if display_number is not None:
                 entry.display_number = display_number
             effective_display = (

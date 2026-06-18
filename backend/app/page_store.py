@@ -969,14 +969,27 @@ def update_module(db: Session, module_id: str, data: dict[str, Any]) -> dict[str
         if "moduleType" in data
         else validate_module_type(module.module_type)
     )
-    if "moduleType" in data:
-        module.module_type = next_type
-    if "columnIndex" in data:
-        module.column_index = validate_column_index(data["columnIndex"], layout)
-    if "sortIndex" in data:
-        module.sort_index = validate_sort_index(data["sortIndex"])
-    if "config" in data and isinstance(data["config"], dict):
-        module.config = _sanitize_module_config_for_page(page, next_type, data["config"])
+    next_column_index = (
+        validate_column_index(data["columnIndex"], layout)
+        if "columnIndex" in data
+        else validate_column_index(module.column_index, layout)
+    )
+    next_sort_index = (
+        validate_sort_index(data["sortIndex"])
+        if "sortIndex" in data
+        else validate_sort_index(module.sort_index)
+    )
+    proposed_config = (
+        data["config"]
+        if "config" in data and isinstance(data["config"], dict)
+        else module.config or {}
+    )
+    next_config = _sanitize_module_config_for_page(page, next_type, proposed_config)
+
+    module.module_type = next_type
+    module.column_index = next_column_index
+    module.sort_index = next_sort_index
+    module.config = next_config
 
     module.updated_at = now
 
@@ -1031,9 +1044,14 @@ def move_module(
     now = _now()
     layout = validate_layout(target_section.layout)
 
+    # Validate before mutating so a rejected column index cannot leave a
+    # half-applied move (e.g. a changed section_id) on the session.
+    next_column_index = validate_column_index(column_index, layout)
+    next_sort_index = validate_sort_index(sort_index)
+
     module.section_id = target_sid
-    module.column_index = validate_column_index(column_index, layout)
-    module.sort_index = validate_sort_index(sort_index)
+    module.column_index = next_column_index
+    module.sort_index = next_sort_index
     module.updated_at = now
 
     page = db.get(BuilderPage, target_section.page_id)

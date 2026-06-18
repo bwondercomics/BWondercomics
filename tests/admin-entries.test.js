@@ -91,6 +91,78 @@ describe('admin entries api', () => {
     expect(document.getElementById('entryList').textContent).toContain('Issue 7 - Issue Alpha');
   });
 
+  it('requires a future date for scheduled entries and always labels them Coming Soon', async () => {
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/create-entry') return jsonResponse({});
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const [{ createEntriesApi }, { state }, { el }] = await Promise.all([
+      import('../admin/entries.js'),
+      import('../admin/state.js'),
+      import('../admin/dom.js'),
+    ]);
+    state.entries = {};
+    state.entryFolders = {};
+    state.entryMeta = {};
+    state.entryLabels = [
+      {
+        id: 'issues',
+        singular: 'Issue',
+        plural: 'Issues',
+        slug: 'issues',
+        sortIndex: 0,
+        isDefault: true,
+      },
+    ];
+    state.activeEntryLabelId = 'issues';
+    state.currentPages = [];
+    state.statusMessage = '';
+    state.premiumOnly = false;
+    state.loadedEntries = [];
+    state.loadedEntryIds = [];
+
+    const saveToServer = vi.fn(async () => true);
+    const api = createEntriesApi({
+      state,
+      el,
+      saveToServer,
+      showSuccess: vi.fn(),
+      showError: vi.fn(),
+      getUnitLabels: () => ({ singular: 'Issue', plural: 'Issues' }),
+      getDataFileUrl: () => 'data.json',
+      getSaveFilename: () => 'admin/data.json',
+      getChaptersRoot: () => 'chapters',
+      getStorageKey: () => 'battlebros_admin_data',
+      STORAGE_KEY: 'battlebros_admin_data',
+    });
+
+    expect(document.getElementById('entryComingSoon')).toBeNull();
+    api.addNewEntry();
+    document.getElementById('entryName').value = 'Scheduled Issue';
+    document.getElementById('entryStatus').value = 'scheduled';
+    document.getElementById('entryStatus').dispatchEvent(new Event('change', { bubbles: true }));
+    document.getElementById('entryPublishAt').value = '2020-01-01T00:00';
+
+    await api.saveEntryEdit();
+
+    expect(alert).toHaveBeenCalledWith('Scheduled entries require a future publish date and time.');
+    expect(saveToServer).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    document.getElementById('entryPublishAt').value = '2099-01-01T00:00';
+    await api.saveEntryEdit();
+
+    expect(state.entryMeta['Scheduled Issue']).toMatchObject({
+      status: 'scheduled',
+      publishAt: expect.stringContaining('2099-01-01T'),
+    });
+    expect(state.entryMeta['Scheduled Issue']).not.toHaveProperty('comingSoon');
+    expect(document.getElementById('entryList').textContent).toContain('Coming soon');
+    expect(saveToServer).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps entry-level premium working inside a public series', async () => {
     const fetchMock = vi.fn(async (url, options = {}) => {
       if (url === '/api/move-path') {
