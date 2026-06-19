@@ -75,6 +75,17 @@
     align-items: stretch;
   }
 
+  /* Appearance rows use horizontal flex bases at wider widths. Once the shared
+     field row stacks, reset those bases so they do not become 150-180px heights. */
+  .pb-appearance-row > .pb-editor-input.pb-appearance-input,
+  .pb-appearance-row > .pb-editor-select.pb-appearance-input,
+  .pb-appearance-row > .pb-promo-style-range.pb-appearance-input,
+  .pb-appearance-row > .pb-appearance-color-control {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: none;
+  }
+
   .pb-section-header-actions,
   .pb-section-settings-actions,
   .pb-editor-footer {

@@ -1032,4 +1032,76 @@ describe('header appearance', () => {
     expect(aboutChip?.getAttribute('style')).toContain('background: #445566');
     expect(aboutChip?.getAttribute('style')).toContain('color: #ffffff');
   });
+
+  it('makes each header part row the named and described checkbox target', () => {
+    const { wrapper } = mountHeaderEditor();
+
+    const brandToggle = wrapper.querySelector('.pb-header-block-input[data-block-id="brand"]');
+    expect(brandToggle).not.toBeNull();
+    // Phase 2 keeps the data hooks intact while restyling the row.
+    expect(brandToggle.getAttribute('data-key')).toBe('enabled');
+
+    const toggleRow = brandToggle.closest('label.pb-header-toggle-row');
+    expect(toggleRow).not.toBeNull();
+    const actionId = brandToggle.getAttribute('aria-labelledby');
+    const descriptionId = brandToggle.getAttribute('aria-describedby');
+    expect(toggleRow.querySelector(`#${actionId}`)?.textContent).toBe(
+      'Show Logo / Title / Subtitle in header'
+    );
+    expect(toggleRow.querySelector(`#${descriptionId}`)?.textContent).toBe(
+      'Shows the site branding, page title, subtitle, and rotating subtitle lines.'
+    );
+    expect(wrapper.textContent).not.toContain('Show in header');
+  });
+
+  it('toggles a header part when its visible row text is activated', () => {
+    const { wrapper, setDraftState } = mountHeaderEditor();
+
+    const brandToggle = wrapper.querySelector('.pb-header-block-input[data-block-id="brand"]');
+    expect(brandToggle.checked).toBe(true);
+    wrapper.querySelector('.pb-header-toggle-label').click();
+
+    expect(setDraftState.mock.lastCall[0].header.blocks.brand.enabled).toBe(false);
+  });
+
+  it('truncates shared inspector section titles with a full-text title attribute', () => {
+    const { wrapper } = mountHeaderEditor();
+
+    const sectionTitles = wrapper.querySelectorAll(
+      '.pb-inspector-section-summary .pb-editor-section-title'
+    );
+    expect(sectionTitles.length).toBeGreaterThan(0);
+    sectionTitles.forEach((title) => {
+      expect(title.classList.contains('pb-truncate')).toBe(true);
+      expect(title.getAttribute('title')).toBe(title.textContent);
+    });
+  });
+
+  it('keeps appearance select controls as native <select> (no segmented-control swap)', () => {
+    const { wrapper } = mountHeaderEditor();
+
+    const secondaryColorToggle = wrapper.querySelector(
+      '[data-appearance-toggle="true"][data-appearance-key="background.secondaryColor"]'
+    );
+    expect(secondaryColorToggle).not.toBeNull();
+    expect(secondaryColorToggle.nextElementSibling).not.toBeNull();
+    expect(
+      secondaryColorToggle
+        .closest('.pb-appearance-toggle')
+        .querySelector('span')
+        .getAttribute('title')
+    ).toBe('Secondary Color');
+
+    const typeControl = wrapper.querySelector(
+      '[data-appearance-input="true"][data-appearance-key="background.type"]'
+    );
+    expect(typeControl).not.toBeNull();
+    expect(typeControl.tagName).toBe('SELECT');
+
+    const borderStyleControl = wrapper.querySelector(
+      '[data-appearance-input="true"][data-appearance-key="border.style"]'
+    );
+    expect(borderStyleControl).not.toBeNull();
+    expect(borderStyleControl.tagName).toBe('SELECT');
+  });
 });

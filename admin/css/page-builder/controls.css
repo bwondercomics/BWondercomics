@@ -166,7 +166,7 @@
 }
 
 .pb-appearance-card {
-  padding: 14px 16px;
+  padding: 10px 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.02);
@@ -175,11 +175,13 @@
 .pb-appearance-groups,
 .pb-appearance-stack {
   display: grid;
-  gap: 12px;
+  gap: var(--pb-row-gap);
 }
 
 .pb-appearance-row {
   justify-content: space-between;
+  gap: var(--pb-row-gap);
+  margin-bottom: var(--pb-row-gap);
 }
 
 .pb-appearance-group {
@@ -195,11 +197,22 @@
 .pb-appearance-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  flex: 1 1 180px;
-  min-width: 180px;
-  font-size: 0.8rem;
+  gap: var(--pb-row-gap);
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--pb-inspector-font);
   color: rgba(255, 255, 255, 0.82);
+}
+
+.pb-appearance-toggle > span {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pb-appearance-toggle > input {
+  flex-shrink: 0;
 }
 
 .pb-appearance-row > .pb-appearance-input {
@@ -246,6 +259,16 @@
 .pb-appearance-input:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* Density: tighten only the text/select/number appearance inputs. The compound selector outranks
+   the global .pb-editor-input/.pb-editor-select rule and deliberately EXCLUDES the color picker
+   (.pb-promo-style-color, padding:0, fixed 42px) and range (.pb-promo-style-range, height:4px),
+   whose fixed geometry must not receive control padding. */
+.pb-editor-input.pb-appearance-input,
+.pb-editor-select.pb-appearance-input {
+  padding: var(--pb-control-pad-y) var(--pb-control-pad-x);
+  font-size: var(--pb-inspector-font);
 }
 
 /* ---------- Reusable inspector components (Phase 0) ---------- */

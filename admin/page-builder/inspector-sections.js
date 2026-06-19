@@ -20,7 +20,7 @@ function renderInspectorSection({
       <summary class="pb-inspector-section-summary">
         <span class="pb-inspector-section-text">
           ${kicker ? `<span class="pb-editor-section-kicker">${escapeHtml(kicker)}</span>` : ''}
-          <span class="pb-editor-section-title">${escapeHtml(title)}</span>
+          <span class="pb-editor-section-title pb-truncate" title="${escapeAttr(title)}">${escapeHtml(title)}</span>
         </span>
         ${
           summaryText

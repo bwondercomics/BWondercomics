@@ -681,6 +681,77 @@ async function saveActiveDraft(page) {
 }
 
 test.describe('builder Phase 12 authoring workflows', () => {
+  test('keeps Phase 2 header controls row-toggleable and dense below 720px', async ({ page }) => {
+    const state = createWorkflowState();
+    await prepareWorkflowPage(page, state);
+    await openBuilder(page);
+
+    await page.locator('[data-tab="layers"]').click();
+    await page.locator('[data-layer-action="select-page-header"]').click();
+
+    const brandToggleSelector = '.pb-header-block-input[data-block-id="brand"]';
+    const brandToggle = page.locator(brandToggleSelector);
+    const partsSection = page.locator('.pb-inspector-section').filter({ has: brandToggle });
+    await partsSection.evaluate((section) => {
+      section.open = true;
+    });
+    await expect(brandToggle).toBeChecked();
+    await partsSection.locator('.pb-header-toggle-label').first().click();
+    await expect(page.locator(brandToggleSelector)).not.toBeChecked();
+
+    await page.setViewportSize({ width: 700, height: 1000 });
+
+    const appearanceSelector =
+      '[data-appearance-input="true"][data-appearance-scope="shell-top"]' +
+      '[data-appearance-key="background.type"]';
+    const appearanceControl = page.locator(appearanceSelector);
+    const appearanceSection = page
+      .locator('.pb-inspector-section')
+      .filter({ has: appearanceControl });
+    const appearanceGroup = page.locator('.pb-appearance-group').filter({ has: appearanceControl });
+    await appearanceSection.evaluate((section) => {
+      section.open = true;
+    });
+    await appearanceGroup.evaluate((group) => {
+      group.open = true;
+    });
+    await expect(appearanceControl).toBeVisible();
+
+    const geometry = await appearanceSection.evaluate((section) => {
+      const keys = [
+        'background.type',
+        'background.angle',
+        'background.secondaryColor',
+        'background.opacity',
+      ];
+      return keys.map((key) => {
+        const input = section.querySelector(
+          `[data-appearance-input="true"][data-appearance-scope="shell-top"][data-appearance-key="${key}"]`
+        );
+        const row = input.closest('.pb-appearance-row');
+        const control =
+          input.getAttribute('type') === 'color'
+            ? input.closest('.pb-appearance-color-control')
+            : input;
+        const rowRect = row.getBoundingClientRect();
+        const controlRect = control.getBoundingClientRect();
+        return {
+          key,
+          rowHeight: rowRect.height,
+          controlHeight: controlRect.height,
+          contained:
+            controlRect.left >= rowRect.left - 0.5 && controlRect.right <= rowRect.right + 0.5,
+        };
+      });
+    });
+
+    geometry.forEach(({ key, rowHeight, controlHeight, contained }) => {
+      expect(contained, `${key} should stay within its stacked row`).toBe(true);
+      expect(controlHeight, `${key} should retain a compact control height`).toBeLessThan(60);
+      expect(rowHeight, `${key} should retain a compact row height`).toBeLessThan(90);
+    });
+  });
+
   test('opens a bound series reader page, switches exact device widths, and restores chrome preview', async ({
     page,
   }) => {

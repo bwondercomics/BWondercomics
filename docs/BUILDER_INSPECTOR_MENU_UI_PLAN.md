@@ -1,6 +1,6 @@
 # Builder Inspector Menu UI Plan (GrapesJS-Aligned Density)
 
-Status: In Progress — Phases 0–1 complete; Phases 2–3 pending.
+Status: In Progress — Phases 0–2 complete; Phase 3 pending.
 Created: 2026-06-18
 
 ## Purpose
@@ -403,6 +403,32 @@ and the production build.
 - Apply the truncation utility to section titles in `renderInspectorSection()`.
 - Explicitly **out of Phase 2:** converting any `<select>` or button group to `.pb-seg` (see Phase 3
   Deferred). This keeps Phase 2 within its file scope and leaves existing binding tests green.
+
+**Completed 2026-06-19.** Shipped the compact Parts toggle rows (two-line `.pb-field-row` with a
+truncating label + muted description line, an `.pb-sr-only` "Show {label} in header" accessible name,
+and the preserved `.pb-header-block-input` / `data-block-id` / `data-key` hooks); the Appearance
+density pass — including a **fix for the pre-existing `.pb-appearance-toggle { min-width: 180px }`
+overflow** (now `min-width: 0` with a non-shrinking checkbox and a truncating label) — tightening
+only the text/select/number appearance inputs (`.pb-editor-input.pb-appearance-input`,
+`.pb-editor-select.pb-appearance-input`) via the shared tokens while leaving the color picker, range
+slider, and the global `.pb-editor-input` / `.pb-editor-select` sizing untouched; and the truncation
+utility plus a full-text `title` on the shared `renderInspectorSection()` titles. No control types
+changed — every checkbox and `<select>` is unchanged, and `.pb-seg` conversions remain deferred. Four
+contract tests were added (parts accessible name, parts toggle state mutation, section-title
+truncation, and Appearance `<select>` preservation).
+
+**Corrective follow-up 2026-06-19.** The Parts row itself is now the checkbox's wrapping label, with
+stable `aria-labelledby` / `aria-describedby` references so visible row activation toggles the
+control while retaining the concise "Show {label} in header" accessible name and visible
+description. Appearance labels now expose their full text with `title`, and the ≤720px stacked-row
+rules reset the desktop `flex-basis` values for select, number, color-wrapper, and range controls so
+those width budgets cannot become 150–180px control heights. Unit coverage exercises the row
+activation and label references; a Chromium regression measures all four Appearance control shapes
+below 720px and verifies horizontal containment and compact heights. Final verification passed
+Prettier, JavaScript syntax checking, ESLint, all 59 Vitest files (548 passed, 1 skipped), all 15
+Chromium Playwright tests without snapshot baseline changes, the production build, and
+`git diff --check`. The broader measured-width / drag / focus-ring / contrast regressions and manual
+rail-width QA remain Phase 3.
 
 ### Phase 3 — QA, accessibility, and docs
 

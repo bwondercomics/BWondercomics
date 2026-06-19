@@ -223,7 +223,7 @@ function renderAppearanceControls(appearance, scope, index = null, title = '', c
           <div class="pb-editor-field pb-editor-field--row pb-appearance-row">
             <label class="pb-appearance-toggle">
               <input type="checkbox" class="pb-appearance-enable" data-appearance-toggle="true" data-appearance-scope="${scope}" data-appearance-key="${field.key}"${indexAttr} ${checked ? 'checked' : ''}>
-              <span>${escapeHtml(field.label)}</span>
+              <span title="${escapeAttr(field.label)}">${escapeHtml(field.label)}</span>
             </label>
             ${renderAppearanceInput(field, scope, index, resolvedValue, checked, inputLabel)}
           </div>

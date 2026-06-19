@@ -453,25 +453,45 @@
 .pb-header-toggle-list {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--pb-row-gap);
 }
 
 .pb-header-toggle-row {
-  display: flex;
-  align-items: center;
+  /* Composes with .pb-field-row (display: flex; align-items: center). */
   justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 10px 12px;
+  gap: var(--pb-row-gap);
+  padding: var(--pb-control-pad-y) var(--pb-control-pad-x);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
 }
 
-.pb-header-toggle-actions {
+.pb-header-toggle-text {
+  flex: 1 1 auto;
+  min-width: 0;
   display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pb-header-toggle-label {
+  font-size: var(--pb-inspector-font);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.pb-header-toggle-help {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.pb-header-toggle-switch {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  margin: 0;
+  cursor: pointer;
 }
 
 .pb-header-layout-card {

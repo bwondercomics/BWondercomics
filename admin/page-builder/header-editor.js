@@ -242,18 +242,19 @@ function renderNavigationEditor(header, pages) {
 function renderPartsEditor(header) {
   const partsHtml = HEADER_BLOCK_DEFS.map((block) => {
     const enabled = header.blocks?.[block.id]?.enabled !== false;
+    const actionId = escapeAttr(`pb-header-part-${block.id}-action`);
+    const descriptionId = escapeAttr(`pb-header-part-${block.id}-description`);
     return `
-      <div class="pb-header-toggle-row">
-        <div>
-          <strong>${escapeHtml(block.label)}</strong>
-          <div class="pb-editor-help">${escapeHtml(block.description)}</div>
-        </div>
-        <div class="pb-header-toggle-actions">
-          <label class="pb-editor-label">
-            <input type="checkbox" class="pb-header-block-input" data-block-id="${block.id}" data-key="enabled" ${enabled ? 'checked' : ''}> Show in header
-          </label>
-        </div>
-      </div>
+      <label class="pb-header-toggle-row pb-field-row">
+        <span class="pb-header-toggle-text">
+          <span class="pb-header-toggle-label pb-truncate" title="${escapeAttr(block.label)}">${escapeHtml(block.label)}</span>
+          <span id="${descriptionId}" class="pb-header-toggle-help pb-truncate" title="${escapeAttr(block.description)}">${escapeHtml(block.description)}</span>
+        </span>
+        <span class="pb-header-toggle-switch">
+          <input type="checkbox" class="pb-header-block-input" data-block-id="${block.id}" data-key="enabled" aria-labelledby="${actionId}" aria-describedby="${descriptionId}" ${enabled ? 'checked' : ''}>
+          <span id="${actionId}" class="pb-sr-only">Show ${escapeHtml(block.label)} in header</span>
+        </span>
+      </label>
     `;
   }).join('');
 
