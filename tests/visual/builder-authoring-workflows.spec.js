@@ -685,8 +685,24 @@ test.describe('builder Phase 12 authoring workflows', () => {
     page,
   }) => {
     const state = createWorkflowState();
+    state.seriesPages[0].meta.header.blocks.status.enabled = false;
     await prepareWorkflowPage(page, state);
     await openBuilder(page);
+
+    await page.locator('[data-tab="layers"]').click();
+    await page.locator('[data-layer-action="select-page-header"]').click();
+    const visiblePlacementCard = page.locator('.pb-header-layout-card[data-block-id="brand"]');
+    const hiddenPlacementCard = page.locator('.pb-header-layout-card[data-block-id="status"]');
+    await page
+      .locator('.pb-inspector-section')
+      .filter({ has: visiblePlacementCard })
+      .evaluate((section) => {
+        section.open = true;
+      });
+    await expect(visiblePlacementCard).toHaveAccessibleName('Logo / Title / Subtitle');
+    await expect(visiblePlacementCard).toHaveAccessibleDescription('Visible');
+    await expect(hiddenPlacementCard).toHaveAccessibleName('Status Message');
+    await expect(hiddenPlacementCard).toHaveAccessibleDescription('Hidden on this page');
 
     await expect(page.locator('.pb-page-item.active')).toContainText('Reader');
     expect(state.pageBindings.reader.pageId).toBe(state.seriesPages[0].id);

@@ -1,5 +1,39 @@
 /* ==================== PAGE BUILDER CONTROLS ==================== */
 
+/* ---------- Inspector density tokens (Phase 0) ----------
+   The inspector renders in a ~280px rail that nets out to ~134-166px of usable
+   width at card depth, so inspector menus share one compact density scale instead
+   of the heavier global admin control sizing. */
+.page-builder {
+  --pb-inspector-font: 0.78rem;
+  --pb-control-pad-y: 6px;
+  --pb-control-pad-x: 8px;
+  --pb-row-gap: 8px;
+  --pb-icon-btn-size: 28px;
+}
+
+/* Visually-hidden text that stays in the accessibility tree (for state that is
+   shown visually as an icon/dimming only). */
+.pb-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Single-line truncation utility — truncate, never clip-wrap. */
+.pb-truncate {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .pb-style-group {
   margin-bottom: 12px;
   padding-bottom: 12px;
@@ -212,4 +246,126 @@
 .pb-appearance-input:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+/* ---------- Reusable inspector components (Phase 0) ---------- */
+
+/* Compact square icon button — replaces the heavy global .btn-secondary inside
+   dense inspector menus. */
+.pb-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: var(--pb-icon-btn-size);
+  height: var(--pb-icon-btn-size);
+  min-width: var(--pb-icon-btn-size);
+  padding: 0;
+  font-size: 0.7rem;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 7px;
+  cursor: pointer;
+  transition:
+    color 0.12s ease,
+    border-color 0.12s ease,
+    background 0.12s ease;
+}
+
+.pb-icon-btn:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(0, 217, 255, 0.55);
+  background: rgba(0, 217, 255, 0.12);
+}
+
+.pb-icon-btn:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.pb-icon-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Segmented radio control (port of GrapesJS .gjs-radio-item). Introduced as a
+   component here; adoption on existing selects is deferred (see plan Phase 3).
+   Expected markup:
+     <div class="pb-seg" role="radiogroup">
+       <label class="pb-seg-item"><input type="radio" name="x" value="a"><span>A</span></label>
+       ...
+     </div> */
+.pb-seg {
+  display: flex;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.pb-seg-item {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+}
+
+.pb-seg-item > input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pb-seg-item > span {
+  display: block;
+  padding: var(--pb-control-pad-y) var(--pb-control-pad-x);
+  font-size: var(--pb-inspector-font);
+  text-align: center;
+  color: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.pb-seg-item:first-child > span {
+  border-left: none;
+}
+
+.pb-seg-item > input:checked + span {
+  background: rgba(0, 217, 255, 0.16);
+  color: #fff;
+}
+
+.pb-seg-item > input:focus-visible + span {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+
+/* Label-left / control-right compact row (port of GrapesJS trait row). */
+.pb-field-row {
+  display: flex;
+  align-items: center;
+  gap: var(--pb-row-gap);
+}
+
+.pb-field-row > .pb-field-row-label {
+  flex: 0 0 38%;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: var(--pb-inspector-font);
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.pb-field-row > .pb-field-row-control {
+  flex: 1 1 auto;
+  min-width: 0;
 }

@@ -590,6 +590,63 @@ describe('header appearance', () => {
     expect(renderEditorPanel).toHaveBeenCalledTimes(2);
   });
 
+  it('names and describes placement card groups without changing move control semantics', () => {
+    const { wrapper } = mountHeaderEditor({
+      draftState: {
+        header: {
+          blocks: {
+            brand: { enabled: true },
+            status: { enabled: false },
+          },
+        },
+      },
+    });
+
+    const cards = Array.from(wrapper.querySelectorAll('.pb-header-layout-card'));
+    expect(cards).toHaveLength(5);
+
+    cards.forEach((card) => {
+      expect(card.getAttribute('role')).toBe('group');
+
+      const labelId = card.getAttribute('aria-labelledby');
+      const descriptionId = card.getAttribute('aria-describedby');
+      expect(labelId).toBeTruthy();
+      expect(descriptionId).toBeTruthy();
+      expect(wrapper.querySelector(`#${labelId}`)).not.toBeNull();
+      expect(wrapper.querySelector(`#${descriptionId}`)).not.toBeNull();
+    });
+
+    const brandCard = wrapper.querySelector('.pb-header-layout-card[data-block-id="brand"]');
+    const statusCard = wrapper.querySelector('.pb-header-layout-card[data-block-id="status"]');
+    expect(brandCard?.getAttribute('aria-labelledby')).toBe('pb-header-placement-brand-label');
+    expect(brandCard?.getAttribute('aria-describedby')).toBe('pb-header-placement-brand-state');
+    expect(wrapper.querySelector('#pb-header-placement-brand-label')?.textContent).toBe(
+      'Logo / Title / Subtitle'
+    );
+    expect(wrapper.querySelector('#pb-header-placement-brand-state')?.textContent).toBe('Visible');
+    expect(wrapper.querySelector('#pb-header-placement-status-state')?.textContent).toBe(
+      'Hidden on this page'
+    );
+    expect(
+      statusCard?.querySelector('.pb-header-layout-card-state')?.getAttribute('aria-hidden')
+    ).toBe('true');
+
+    const expectedBrandButtons = [
+      ['move-left', 'Move Logo / Title / Subtitle left', true],
+      ['move-right', 'Move Logo / Title / Subtitle right', false],
+      ['move-up', 'Move Logo / Title / Subtitle up', true],
+      ['move-down', 'Move Logo / Title / Subtitle down', false],
+    ];
+    expectedBrandButtons.forEach(([action, accessibleName, disabled]) => {
+      const button = brandCard?.querySelector(`[data-action="${action}"]`);
+      expect(button?.getAttribute('aria-label')).toBe(accessibleName);
+      expect(button?.disabled).toBe(disabled);
+    });
+
+    const navCard = wrapper.querySelector('.pb-header-layout-card[data-block-id="nav"]');
+    expect(navCard?.querySelector('[data-action="move-right"]')?.disabled).toBe(true);
+  });
+
   it('saves and clears seriesId for header builder-page link targets', () => {
     const { wrapper, setDraftState, renderEditorPanel } = mountHeaderEditor();
 

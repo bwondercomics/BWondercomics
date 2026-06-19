@@ -1,6 +1,6 @@
 # Builder Inspector Menu UI Plan (GrapesJS-Aligned Density)
 
-Status: Proposed
+Status: In Progress — Phases 0–1 complete; Phases 2–3 pending.
 Created: 2026-06-18
 
 ## Purpose
@@ -34,14 +34,35 @@ header data model, the preview contract, or any backend validation.
 
 ## Problem Statement (Observed)
 
-Inside the 280px rail (≈248px of usable content width after section padding), the header Placement
-editor and a few sibling menus show:
+Inside the 280px rail (which previously netted out to only **approximately 134px** of measured card
+width and now provides **approximately 166px** after Phase 1 — see
+[Measured width budget](#measured-width-budget)), the header Placement editor and a few sibling menus
+showed:
 
 - Buttons whose text is clipped ("Move Left/Right/Up/Down").
 - Cards and pills that wrap onto multiple lines or overflow their column.
 - A generally heavy, oversized feel compared to the dense canvas beside them.
 
 ## Root Cause Analysis
+
+### Measured width budget
+
+The usable width is not ~248px. Padding nests five levels deep before a placement card is laid out;
+every layer is verified in source:
+
+| Layer                        | Rule                                            | Horizontal padding | Running width |
+| ---------------------------- | ----------------------------------------------- | ------------------ | ------------- |
+| Sidebar rail                 | `--pb-sidebar-width` (`layout.css:119`)         | —                  | **280px**     |
+| `.page-builder-sidebar`      | `padding: 12px` (`sidebar.css:7`)               | −24px              | 256px         |
+| `.pb-editor-content`         | `padding: 16px 18px 96px` (`inspector.css:126`) | −36px              | 220px         |
+| `.pb-inspector-section-body` | `padding: 0 16px 16px` (`inspector.css:302`)    | −32px              | 188px         |
+| `.pb-header-layout-row`      | `padding: 12px` (`inspector.css:362`)           | −24px              | 164px         |
+| `.pb-header-region`          | `padding: 12px` (`inspector.css:385`)           | −24px              | ≈140px        |
+
+That padding-only estimate omitted the retained row and region borders; the browser-measured
+pre-Phase 1 card width was approximately **134px**, not ~248px. Four 28px icon buttons consume 112px
+before gaps, so a one-line card cannot fit. Phase 1 reduces row/region padding while retaining both
+borders, recovering 32px for an approximately **166px** measured card width.
 
 ### 1. The Placement board forces a 3-column grid into a 280px rail
 
@@ -245,10 +266,15 @@ inspector already approximates this with `<details>` in `renderInspectorSection(
 
 ## Design Principles Adopted
 
-1. **Design for 280px first.** No inspector menu may assume more than ~248px of content width. Verify
-   at the rail width and at the ≤1099px mobile drawer width (`layout.css:222`).
-2. **Icon-first, drag-first.** Reordering uses a drag handle (primary) + compact icon buttons
-   (precise/a11y fallback). No multi-word text buttons inside dense menus.
+1. **Design for the measured budget, not the rail width.** A placement card had **≈134px** before
+   Phase 1 and has **≈166px** after reducing row/region padding while retaining their borders. No
+   inspector control may assume more than the
+   measured budget at its nesting depth. Verify at the rail width and at the ≤1099px mobile drawer
+   width (`layout.css:222`). The collapsed rail is out of scope (it hides the inspector — see
+   Acceptance Criteria).
+2. **Icon-first, whole-row drag.** The card stays a single draggable surface (current behavior); the
+   handle glyph is a visual grip, not a separate drag target. Compact icon buttons are the precise /
+   keyboard / a11y path. No multi-word text buttons inside dense menus.
 3. **Truncate, never clip-wrap.** Labels/titles ellipsis-truncate and expose full text via `title`.
 4. **Adapt layout to the control.** Stack to a single column when width is tight; reserve multi-column
    only for controls that genuinely fit.
@@ -263,35 +289,45 @@ inspector already approximates this with `<details>` in `renderInspectorSection(
 
 Replace the cramped 3-column board of multi-button cards with a dense, GrapesJS-style layout:
 
-- **Responsive region layout.** Keep the spatial Top/Main/Bottom rows, but make each row's
-  Left/Center/Right regions **stack to a single column at rail width** (`grid-template-columns: 1fr`),
+- **Responsive region layout + trimmed chrome.** Keep the spatial Top/Main/Bottom rows, but make each
+  row's Left/Center/Right regions **stack to a single column at rail width** (`grid-template-columns: 1fr`),
   switching to multi-column only when the container is wide enough (container query / width breakpoint).
-  This alone gives each card full row width (~248px) instead of ~70px.
-- **Minimal draggable cards.** Each block becomes a single-line row, modeled on a GrapesJS layer:
+  In the stacked state, also reduce row padding and drop region horizontal padding (the section body
+  already supplies it) while retaining the row and region borders. This recovers 32px and lifts the
+  measured card width from approximately 134px to **approximately 166px**.
+- **Two-line cards (not one line).** A one-line card does not fit the measured budget, so each block is
+  a **two-line** row modeled on a GrapesJS layer:
 
   ```
-  [⠿ handle]  Block label (ellipsis)            [◀] [▶] [▲] [▼]
+  Line 1:  [⠿ grip]  Block label (ellipsis)           [eye state]
+  Line 2:  [◀ left] [▶ right] [▲ up] [▼ down]
   ```
 
-  - Drag handle stays as the primary reorder affordance (drag between regions/rows already works).
-  - Drop the redundant `TOP / LEFT` pill; the region/row is already labeled by the enclosing cell.
-    (Optionally keep a tiny muted location caption only in the single-column collapsed view.)
-  - The "Visible / Hidden on this page" sub-label collapses into a muted state on the row (dimmed +
-    a small eye-off icon), matching GrapesJS `.gjs-layer-hidden`.
+  - The card remains a single draggable surface (whole-row drag, unchanged). The ⠿ grip is a visual
+    affordance only — it owns no separate listener.
+  - Drop the redundant `TOP / LEFT` pill; the region/row is already labeled by the enclosing cell. A
+    tiny muted location caption may be shown only in the single-column stacked view.
+  - **Visible/Hidden state stays accessible.** The visual cue is dimming + an eye-off icon
+    (`.gjs-layer-hidden` style), while the card is a named `group`: `aria-labelledby` references the
+    visible block label and `aria-describedby` references visually hidden "Visible" / "Hidden on this
+    page" text.
 
-- **Icon move cluster.** Replace the four `.btn-secondary` text buttons with four **compact icon
-  buttons** (`.pb-icon-btn`, ~26px square, transparent, 1px border, arrow glyph, proper `disabled`
-  state, `aria-label` per direction). Four × 26px ≈ 104px fits comfortably on one line beside an
-  ellipsis-truncated label within 248px.
+- **Icon move cluster on line 2.** Replace the four `.btn-secondary` text buttons with four **compact
+  icon buttons** (`.pb-icon-btn`, ~28px square, transparent, 1px border, arrow glyph, proper
+  `disabled` state, `aria-label` per direction). On line 2 they get the full card width: 4 × 28px +
+  3 × 6px gaps ≈ 130px, within the ≈166px budget. They reuse the existing move handlers (drag is
+  the other path); they are the keyboard/precise affordance.
 
 ### Reusable inspector components (used by Placement and beyond)
 
 1. **`.pb-icon-btn`** — compact square icon button (~26–28px), transparent background, subtle border,
    hover/active/disabled states. Replaces `.btn-secondary` inside inspector menus.
 2. **`.pb-seg` / `.pb-seg-item`** — segmented radio control (port of `.gjs-radio-item`): equal-flex
-   connected segments with shared borders and a checked state. Use for region/row choice, alignment,
-   display-mode, and any small enumerated option currently rendered as separate buttons or an
-   oversized `<select>`.
+   connected segments with shared borders and a checked state. Introduced as a component in Phase 0 and
+   used by **new** markup only. Converting **existing** `<select>`/button controls (alignment,
+   display-mode, edit-scope) to it changes element types that browser tests assert against via
+   `selectOption()`/`toHaveValue()`, so those conversions are **deferred to Phase 3 (Deferred)** with an
+   enumerated renderer + test list — they are not part of the CSS-only Phase 2.
 3. **`.pb-field-row`** — label-left (`min-width` ~38%) / control-right (`flex-grow: 1`) row with an
    ellipsis-truncating label, for compact single-line fields where today the label sits on its own line.
 4. **Truncation utility** — shared `overflow:hidden; white-space:nowrap; text-overflow:ellipsis` on
@@ -305,7 +341,7 @@ Replace the cramped 3-column board of multi-button cards with a dense, GrapesJS-
   --pb-control-pad-y: 6px;
   --pb-control-pad-x: 8px;
   --pb-row-gap: 8px;
-  --pb-icon-btn-size: 26px;
+  --pb-icon-btn-size: 28px;
 }
 ```
 
@@ -321,35 +357,84 @@ elsewhere in the admin app is untouched.
   `admin/css/page-builder/controls.css`.
 - Add a small inline-SVG (or CSS-glyph) arrow set for the move icons.
 
+**Completed 2026-06-19.** Shipped the scoped inspector density tokens, including the implemented 28px
+icon-button size, plus reusable icon-button, segmented-control, compact-field-row, visually-hidden,
+and truncation styles. Existing controls were not converted to segmented controls. Final
+verification passed Prettier, JavaScript syntax checking, ESLint, all 59 Vitest files (544 passed, 1
+skipped), all 14 Chromium Playwright tests without snapshot baseline changes, and the production
+build.
+
 ### Phase 1 — Header Placement editor (the headline fix)
 
 - Rework `renderPlacementEditor()` markup in `admin/page-builder/header-editor.js`:
-  - minimal single-line cards (handle + ellipsis label + icon move cluster),
+  - **two-line cards**: line 1 `[⠿ grip] [ellipsis label] [eye state]`, line 2 the four `.pb-icon-btn`
+    move buttons,
   - remove the redundant region chip,
-  - icon buttons (`.pb-icon-btn`) with `aria-label`s and the existing `disabled` edge logic,
-  - hidden-state styling instead of a verbose sub-label.
+  - icon buttons with per-direction `aria-label`s and the existing `disabled` edge logic,
+  - expose each card as a named `group`, with `aria-labelledby` referencing the visible block label
+    and `aria-describedby` referencing visually hidden Visible/Hidden state text; keep the eye icon
+    hidden from assistive technology.
 - Rework `.pb-header-layout-*` / `.pb-header-region*` in `admin/css/page-builder/inspector.css`:
   - responsive region grid (single column at rail width, multi-column when wide),
+  - **trim chrome in the stacked state**: reduce row padding and drop region horizontal padding while
+    retaining both borders, recovering 32px (approximately 134px → approximately 166px card width),
   - compact card chrome and gaps using the new tokens.
-- Preserve drag-and-drop and keyboard handlers in `header-editor.js` (move-left/right/up/down logic at
-  `header-editor.js:526-565` is reused as-is; only the trigger markup changes).
+- **Drag model:** keep whole-row dragging exactly as today — `draggable="true"` and the `dragstart`/
+  `dragend` listeners stay on `.pb-header-layout-card` (`header-editor.js:789`); the ⠿ grip gets no
+  separate listener. The move-left/right/up/down logic (`header-editor.js:526-565`) is reused as-is;
+  only the trigger markup changes.
 
-### Phase 2 — Density pass on sibling inspector menus
+**Completed 2026-06-19.** Shipped the responsive single-column placement board, approximately 166px
+measured card width with 32px recovered from reduced padding and retained borders, two-line draggable
+cards, decorative grip/eye glyphs, unchanged move selectors and handlers, and 28px directional
+buttons. Each card is now a named `group` whose visible label and Visible/Hidden description are
+connected with stable `aria-labelledby`/`aria-describedby` references. Unit coverage verifies group
+references, descriptions, button names, and disabled edges; Chromium verifies accessible names and
+descriptions. Final verification passed Prettier, JavaScript syntax checking, ESLint, all 59 Vitest
+files (544 passed, 1 skipped), all 14 Chromium Playwright tests without snapshot baseline changes,
+and the production build.
 
-- `renderPartsEditor()` toggle rows → compact `.pb-field-row` with the toggle on the right.
-- Appearance rows (`controls.css` `.pb-appearance-*`) and any option group currently using separate
-  buttons or a wide select → adopt `.pb-seg` segmented control where the option set is small and fixed.
+### Phase 2 — Density pass on sibling inspector menus (CSS-only, no control-type swaps)
+
+- `renderPartsEditor()` toggle rows → compact `.pb-field-row` layout via CSS + class change; the
+  `<input type="checkbox">` element and its `data-block-id`/`data-key` hooks are unchanged.
+- Appearance rows (`controls.css` `.pb-appearance-*`) → tighten padding/gaps/font with the new tokens;
+  **selects stay `<select>`**.
 - Apply the truncation utility to section titles in `renderInspectorSection()`.
+- Explicitly **out of Phase 2:** converting any `<select>` or button group to `.pb-seg` (see Phase 3
+  Deferred). This keeps Phase 2 within its file scope and leaves existing binding tests green.
 
 ### Phase 3 — QA, accessibility, and docs
 
-- Manual QA at 280px rail, collapsed rail (`72px`, `layout.css:205`), and ≤1099px mobile drawer.
-- Accessibility: icon buttons have `aria-label`s; segmented control is keyboard-operable (radio
-  semantics); focus-visible rings; contrast check.
-- Update/extend visual specs under `tests/visual/` (`builder-authoring-workflows.spec.js`) to cover
-  the header Placement menu; add a regression assertion that no inspector menu overflows its rail.
+- Manual QA at the 280px rail and the ≤1099px mobile drawer (`layout.css:222`). **The collapsed rail
+  (72px) is not a layout target** — it hides `.pb-sidebar-body` entirely (`sidebar.css:43`); QA there
+  is limited to confirming the inspector body and its controls are not rendered/focusable while
+  collapsed, and render correctly after expansion.
+- **Measured-width regression** (not visual-only): in `tests/visual/builder-authoring-workflows.spec.js`,
+  open the header Placement menu at the 280px rail and assert no overflow using measured geometry —
+  e.g. each card/row `scrollWidth <= clientWidth`, and each move button's rendered width ≥ its content
+  width (no text/glyph clipping).
+- **Drag interaction regression:** assert that dragging a placement card from one region to another
+  (whole-row drag) still moves the block, and that the move icon buttons perform the same moves.
+- **Accessibility tests:** retain the Phase 1 named-group/name/description/button-edge coverage, then
+  add focus-visible-ring and contrast checks.
 - Update `docs/functions/admin-page-builder.md` / `docs/functions/admin-page-builder-styles.md`,
   `docs/READER_BUILDER_QA.md`, and add this doc to the `docs/README.md` index.
+
+### Phase 3 (Deferred / optional) — segmented-control conversions
+
+Converting existing controls to `.pb-seg` is valuable but changes element types that current tests
+assert against, so it is scoped separately and only taken on with its tests updated in lockstep. Each
+conversion must be enumerated with its renderer **and** its affected test before it ships:
+
+| Control               | Renderer                                                                           | Test(s) using select APIs to migrate                                                                      |
+| --------------------- | ---------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| Text-module alignment | `appearance-editor.js:179` (`renderAppearanceInput`, `inputType: 'select'`)        | `builder-authoring-workflows.spec.js:789-794` (`selectOption`, `toHaveValue` on `[data-key="alignment"]`) |
+| Responsive edit scope | `header-editor.js` `renderResponsiveScopeControl` (`[data-responsive-edit-scope]`) | `builder-authoring-workflows.spec.js:788`/`:801` (`selectOption('device')`)                               |
+| Reader display mode   | `reader-editor.js:92` (`renderLayoutControls`, `[data-reader-key="displayMode"]`)  | any reader-editor spec asserting `selectOption`/`toHaveValue`                                             |
+
+Until each row above is migrated with its test, those controls remain `<select>` and only receive the
+Phase 2 CSS density treatment.
 
 ## Files To Touch
 
@@ -359,27 +444,45 @@ elsewhere in the admin app is untouched.
 - `admin/css/page-builder/controls.css` — density tokens + `.pb-icon-btn` / `.pb-seg` / `.pb-field-row`
   / truncation utility.
 - `admin/page-builder/inspector-sections.js` — apply truncation class to section titles (optional).
-- `tests/visual/builder-authoring-workflows.spec.js` — coverage for the redesigned menus.
+- `tests/visual/builder-authoring-workflows.spec.js` — measured-width, drag-interaction, and a11y
+  coverage for the redesigned Placement menu (Phase 3).
+- Phase 3 (Deferred) only: `admin/page-builder/appearance-editor.js`,
+  `admin/page-builder/reader-editor.js`, and `admin/page-builder/header-editor.js`
+  (`renderResponsiveScopeControl`) plus their select-based tests — touched **only** when a row in the
+  deferred conversion table is taken on.
 - `docs/README.md`, `docs/functions/admin-page-builder*.md`, `docs/READER_BUILDER_QA.md` — references.
 
 ## Acceptance Criteria
 
-- At the 280px rail (and the collapsed rail and ≤1099px drawer), **no inspector menu clips text or
-  overflows horizontally**; the header Placement controls are fully visible and operable.
-- Blocks can be reordered by **both** drag-and-drop and the icon move buttons; icon buttons expose
-  accessible labels and correct disabled edges.
+- At the 280px rail and the ≤1099px drawer, **no inspector menu clips text or overflows horizontally**,
+  verified by **measured geometry** (`scrollWidth <= clientWidth`; move-button rendered width ≥ content
+  width), not by eyeballing snapshots. The header Placement controls are fully visible and operable.
+- The collapsed rail (72px) is explicitly **not** an operability target: its inspector body is hidden
+  (`sidebar.css:43`). Acceptance there is that the inspector content is absent from the layout and not
+  focusable while collapsed, and returns intact on expand.
+- Blocks can be reordered by **both** whole-row drag-and-drop (unchanged behavior) and the icon move
+  buttons, verified by an interaction test; icon buttons expose per-direction accessible names and
+  correct disabled edges.
+- Each placement card is a named `group`; its visible label supplies the accessible name and its
+  Visible/Hidden state supplies the accessible description while the eye icon remains decorative.
 - Inspector menus share one density scale (font, padding, gaps, icon size) and read as compact and
   icon-first, consistent with the GrapesJS reference.
 - No change to saved header/page/module data, the preview contract, or backend validation; existing
-  page-builder tests pass unchanged.
+  page-builder tests (including the select-based binding tests) pass unchanged.
 
 ## Risks, Non-Goals, and Notes
 
 - **Non-goal:** redesigning the canvas, block palette, layer tree, or the global admin button system.
   Only inspector menu density and the Placement editor markup/CSS are in scope.
-- **Risk — drag affordance discoverability.** Shrinking cards must keep the drag handle obvious; the
-  icon move buttons are retained specifically so reordering never depends on discovering drag.
-- **Risk — visual snapshot churn.** Existing visual specs will need re-baselining; do this
-  deliberately in Phase 3 rather than disabling the specs.
+- **Risk — drag affordance discoverability.** The whole card stays draggable, but the two-line layout
+  is denser; the ⠿ grip glyph and the always-visible line-2 icon buttons together ensure reordering
+  never depends on discovering the drag surface.
+- **Risk — recovered width depends on chrome trimming.** The ≈166px budget assumes Phase 1 reduces
+  row padding and removes region horizontal padding in the stacked state. If that trim is descoped,
+  the move cluster must fall back to a 2×2 grid (still two-line-safe at the approximately 134px
+  baseline); the measured-width test is the gate.
+- **Verification note — current snapshots.** All 14 current Chromium Playwright tests pass without
+  baseline changes. Phase 2 coverage and the broader measured-width, drag, focus-ring, and contrast
+  work remain pending in Phases 2–3.
 - **Note:** our `renderInspectorSection()` already gives us GrapesJS-style collapsible sectors via
   `<details>`, so Phase work focuses on _intra-section_ density rather than re-implementing collapse.

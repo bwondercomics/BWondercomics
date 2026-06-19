@@ -355,11 +355,14 @@
 .pb-header-layout-grid {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
+  /* Lets the region grid respond to the inspector's real width rather than the
+     viewport, so it stays single-column in the ~280px rail. */
+  container-type: inline-size;
 }
 
 .pb-header-layout-row {
-  padding: 12px;
+  padding: 10px 8px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.02);
@@ -376,8 +379,16 @@
 
 .pb-header-layout-row-cells {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
+  /* Single column at rail width so each card gets the full row; only split into
+     columns once the inspector is genuinely wide enough to hold them. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+@container (min-width: 520px) {
+  .pb-header-layout-row-cells {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .pb-header-region {
@@ -388,8 +399,13 @@
   background: rgba(255, 255, 255, 0.03);
 }
 
+/* In the board, drop horizontal padding so cards span the available row width;
+   keep a transparent 1px border so the drag-over highlight doesn't shift layout. */
 .pb-header-region--board {
   min-height: 0;
+  padding: 2px 0 0;
+  border-color: transparent;
+  background: transparent;
 }
 
 .pb-header-region-title {
@@ -461,15 +477,15 @@
 .pb-header-layout-card {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 12px;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
 }
 
 .pb-header-layout-card + .pb-header-layout-card {
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 .pb-header-layout-card.is-disabled {
@@ -477,34 +493,31 @@
   border-color: rgba(255, 255, 255, 0.05);
 }
 
+/* Line 1: grip + truncating label + state indicator. */
 .pb-header-layout-card-head {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.pb-header-layout-region-chip {
-  flex-shrink: 0;
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: rgba(0, 217, 255, 0.12);
-  border: 1px solid rgba(0, 217, 255, 0.2);
-  color: #baf9ff;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.pb-header-layout-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: center;
   gap: 8px;
 }
 
-.pb-header-layout-button {
-  min-width: 0;
+.pb-header-layout-card-label {
+  flex: 1 1 auto;
+  font-size: var(--pb-inspector-font);
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.pb-header-layout-card-state {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+/* Line 2: four compact icon move buttons on one row. */
+.pb-header-layout-actions {
+  display: flex;
+  gap: 6px;
 }
 
 .pb-header-layout-card-drag-handle {
@@ -512,11 +525,11 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   border-radius: 6px;
   color: rgba(255, 255, 255, 0.4);
-  font-size: 1rem;
+  font-size: 0.95rem;
   cursor: grab;
   user-select: none;
   transition: color 0.12s ease;

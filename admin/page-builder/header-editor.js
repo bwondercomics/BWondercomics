@@ -30,6 +30,15 @@ import {
   pruneEmptyResponsiveOverrides,
 } from './responsive-overrides.js';
 
+// Eye-off glyph for the "hidden on this page" state. Paired with visually-hidden
+// descriptive text on the placement card (see renderPlacementEditor).
+const EYE_OFF_ICON =
+  '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">' +
+  '<path d="M1.5 8 Q8 2 14.5 8 Q8 14 1.5 8 Z" fill="none" stroke="currentColor" stroke-width="1.2"/>' +
+  '<circle cx="8" cy="8" r="1.9" fill="currentColor"/>' +
+  '<line x1="3" y1="3" x2="13" y2="13" stroke="currentColor" stroke-width="1.2"/>' +
+  '</svg>';
+
 function getRegionLabel(region) {
   return String(region || '').replace(/^\w/, (char) => char.toUpperCase());
 }
@@ -268,25 +277,34 @@ function renderPlacementEditor(header) {
         .map((blockId) => {
           const block = HEADER_BLOCK_DEFS.find((item) => item.id === blockId);
           const enabled = header.blocks?.[blockId]?.enabled !== false;
+          const label = block?.label || blockId;
+          const labelAttr = escapeAttr(label);
+          const idAttr = escapeAttr(blockId);
+          const labelIdAttr = escapeAttr(`pb-header-placement-${blockId}-label`);
+          const stateIdAttr = escapeAttr(`pb-header-placement-${blockId}-state`);
+          const stateMarkup = enabled
+            ? `<span id="${stateIdAttr}" class="pb-sr-only">Visible</span>`
+            : `<span class="pb-header-layout-card-state" aria-hidden="true" title="Hidden on this page">${EYE_OFF_ICON}</span><span id="${stateIdAttr}" class="pb-sr-only">Hidden on this page</span>`;
+          // Whole card stays draggable (unchanged); the grip is a visual cue only.
           return `
             <div
               class="pb-header-layout-card ${enabled ? '' : 'is-disabled'}"
-              data-block-id="${blockId}"
+              data-block-id="${idAttr}"
               draggable="true"
+              role="group"
+              aria-labelledby="${labelIdAttr}"
+              aria-describedby="${stateIdAttr}"
             >
               <div class="pb-header-layout-card-head">
-                <div class="pb-header-layout-card-drag-handle" aria-hidden="true">⠿</div>
-                <div>
-                  <strong>${escapeHtml(block?.label || blockId)}</strong>
-                  <div class="pb-editor-help">${enabled ? 'Visible' : 'Hidden on this page'}</div>
-                </div>
-                <span class="pb-header-layout-region-chip">${escapeHtml(getRowLabel(rowId))} / ${escapeHtml(getRegionLabel(region))}</span>
+                <span class="pb-header-layout-card-drag-handle" aria-hidden="true">⠿</span>
+                <span id="${labelIdAttr}" class="pb-header-layout-card-label pb-truncate" title="${labelAttr}">${escapeHtml(label)}</span>
+                ${stateMarkup}
               </div>
-              <div class="pb-header-layout-actions">
-                <button type="button" class="btn-secondary pb-header-layout-button" data-action="move-left" data-block-id="${blockId}" ${region === 'left' ? 'disabled' : ''}>Move Left</button>
-                <button type="button" class="btn-secondary pb-header-layout-button" data-action="move-right" data-block-id="${blockId}" ${region === 'right' ? 'disabled' : ''}>Move Right</button>
-                <button type="button" class="btn-secondary pb-header-layout-button" data-action="move-up" data-block-id="${blockId}" ${rowIndex === 0 ? 'disabled' : ''}>Move Up</button>
-                <button type="button" class="btn-secondary pb-header-layout-button" data-action="move-down" data-block-id="${blockId}" ${rowIndex === HEADER_ROW_ORDER.length - 1 ? 'disabled' : ''}>Move Down</button>
+              <div class="pb-header-layout-actions" role="group" aria-label="Move ${labelAttr}">
+                <button type="button" class="pb-icon-btn pb-header-layout-button" data-action="move-left" data-block-id="${idAttr}" aria-label="Move ${labelAttr} left" title="Move left" ${region === 'left' ? 'disabled' : ''}>◀</button>
+                <button type="button" class="pb-icon-btn pb-header-layout-button" data-action="move-right" data-block-id="${idAttr}" aria-label="Move ${labelAttr} right" title="Move right" ${region === 'right' ? 'disabled' : ''}>▶</button>
+                <button type="button" class="pb-icon-btn pb-header-layout-button" data-action="move-up" data-block-id="${idAttr}" aria-label="Move ${labelAttr} up" title="Move up" ${rowIndex === 0 ? 'disabled' : ''}>▲</button>
+                <button type="button" class="pb-icon-btn pb-header-layout-button" data-action="move-down" data-block-id="${idAttr}" aria-label="Move ${labelAttr} down" title="Move down" ${rowIndex === HEADER_ROW_ORDER.length - 1 ? 'disabled' : ''}>▼</button>
               </div>
             </div>
           `;
