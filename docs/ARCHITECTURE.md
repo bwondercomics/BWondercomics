@@ -12,7 +12,9 @@ This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic p
 
 ## Data sources
 
-- Series + entries (including per-series entry labels) + status message: Postgres (served to the frontend as DB-backed JSON at `data.json` and `series/<id>/data.json`; admin aliases still exist).
+- Series + entries (including per-series entry labels, publication status/date, and status message):
+  Postgres. Public DB-backed JSON is served at `data.json` and `series/<id>/data.json`; authenticated
+  no-store admin aliases include unpublished records and complete page lists.
 - Entry page images: on disk under `comics/<seriesId>/entries/` (public) or `protected/comics/<seriesId>/entries/` (premium/private).
 - Blog/feed posts: Postgres `posts` table (supports draft/scheduled/published).
 - Comments + accounts: Postgres (`users`, `comments` tables).
@@ -33,7 +35,9 @@ This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic p
 
 - Series + entries (DB-backed JSON views, used by reader/admin):
   - Public: `GET /series.json`, `GET /data.json`, `GET /series/{id}/data.json`
-  - Admin: `GET /admin/series.json`, `GET /admin/data.json`, `GET /admin/series/{id}/data.json`
+  - Admin (admin cookie required; successful responses are `no-store`):
+    `GET /admin/series.json`, `GET /admin/data.json`, `GET /admin/series/{id}/data.json`, plus
+    `/api/admin/*` aliases
 - Builder pages:
   - Public series pages: `GET /api/pages/{series_id}/{slug}`
   - Public global pages: `GET /api/pages/global/by-slug/{slug}`
@@ -75,12 +79,28 @@ This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic p
   drag/drop, and text-module inline editing.
 - Public reader output and admin preview share module HTML through the page-builder shared renderer
   path; the iframe DOM remains a view, while saved builder records remain canonical.
+- The effective Comic Reader module owns reader-shell visibility. Pages without one render ordinary
+  builder content without reader chrome; bound reader pages require exactly one valid active module.
+- Reader module config supports paged/vertical display, controls/stage/panel/comment settings, and
+  safe responsive overrides. Bound reader pages may render ordinary sections above and below the
+  reader; only modules in the reader's own section feed its side panels.
+- Section layout is a sanitized 1-6 segment ratio contract. Stable global columns retain module
+  ownership while responsive layouts reflow visible tracks and apply sparse per-column styling.
 
-## Scheduling model (posts)
+## Scheduling model
+
+Posts:
 
 - `status=draft` → never public, forces `share=false`
 - `status=scheduled` + `date` in the future → becomes public automatically once `date <= now`
 - `status=published` → public immediately
+
+Entries:
+
+- `status=draft` → omitted from public series data
+- `status=scheduled` + future `publishAt` → listed as Coming Soon with pages withheld
+- due scheduled entries are promoted to `published` before payload generation
+- `status=published` with a future date normalizes to `scheduled`
 
 ## Analytics
 

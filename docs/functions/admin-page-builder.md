@@ -113,15 +113,13 @@ Modules currently own: `moduleType`, `columnIndex`, `sortIndex`, and `config`. C
 may include a sanitized optional `config.source` branch with `{ mode, seriesId?, filters?, limit?,
 sort? }`.
 
-Reader modules also carry a sanitized paged-reader customization contract:
+Reader modules carry a sanitized reader customization contract:
 `displayMode`, `controls`, `stage`, `panels`, `showPanels`, and `showComments`. The editor exposes
-these as structured controls on the normal module draft path. `displayMode: "paged"` is the active
-runtime mode; `"vertical-scroll"` is accepted for forward compatibility but remains disabled in the
-editor until the vertical renderer phase. Safe device overrides cover hidden state, display mode,
-controls placement/size, stage fit/page gap, panel visibility, and comments visibility. Legacy
-configs that only contain `showPanels` keep that flag for compatibility, but static reader side-panel
-visibility is controlled by an explicit `panels.left/right.enabled` branch so migrated pages with
-authored side-panel modules remain visible.
+these as structured controls on the normal module draft path. Both `paged` and `vertical-scroll` are
+active editor/runtime options. Safe device overrides cover hidden state, display mode, controls
+placement/size, stage fit/page gap, panel visibility, and comments visibility. Legacy configs that
+only contain `showPanels` keep that flag for compatibility, while explicit
+`panels.left/right.enabled` settings control reader-owned side-panel visibility.
 
 ## ⚙️ Current Builder Flow
 
@@ -408,7 +406,9 @@ Reader module rendering uses the shared renderer contract: `.pb-reader-mount` in
 data attributes for source, display mode, controls placement/size, stage fit/gap/frame/max-width,
 panel visibility, and comments visibility. Public reader output and admin live preview consume the
 same attributes, while active reader shell pages additionally apply the effective reader module
-config to the permanent static shell.
+config before first render. Pages without an effective reader module publish an inactive shell and
+render ordinary builder content without reader chrome. Active pages render ordinary sections before
+and after the reader into dedicated above/below surfaces.
 
 ## 💾 Data API (data.js)
 
@@ -782,6 +782,7 @@ The builder currently recognizes these module types:
 CMS-backed modules:
 
 - `reader`: comic reader mount; source can be the active page series or a specific series.
+  Supports paged/vertical display, controls/stage/panel/comment settings, and safe device overrides.
 - `entry-gallery`: entry thumbnail grid; source can be active page series, a specific series, or all
   public series data.
 - `feed`: site-wide post/feed module using existing `/api/posts` behavior.
@@ -809,6 +810,12 @@ Again: `header` is compatibility-only in the catalog and is not part of the norm
   codes. The backend binding rule is Desktop visibility; hiding the bound reader only on Tablet or
   Phone shows advisory authoring copy instead of a publish/binding-blocking warning.
 - Responsive parity instrumentation is also implemented: the iframe keeps exact preset dimensions, the admin preview scale shell can shrink the visible presentation without changing iframe pixels, and preview metrics verify breakpoint branches, two-page mode expectations, and horizontal overflow risks.
+- Section layouts support 1-6 structural columns with positive integer ratios. Responsive reflow
+  never rewrites global module ownership, and sparse per-column styling/visibility applies in both
+  public output and admin preview.
+- Module add/update/move/reorder routes validate the target column against the global layout.
+  Composite module updates are validated/sanitized before SQLAlchemy mutation, and validation errors
+  roll back the route session.
 - Legacy `page-config` and legacy `header` module content still exist as migration/backfill inputs. Normal reader startup and page-builder header editing resolve V3 page headers with `pageConfig: null`; stored legacy `header` modules are later cleanup debt once V3 metadata exists.
 
 ## 🧭 Maintenance Rule

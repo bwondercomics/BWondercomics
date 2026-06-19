@@ -82,7 +82,15 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - `tests/entries.test.js`: entry parsing, sorting, and normalization helpers in `reader/entries.js`
 - `tests/state.test.js`: `reader/state.js` persistence behavior
 - `tests/data.test.js`: `reader/data.js` loaders
-- `tests/reader-data-builder.test.js`: builder-first page loading, effective-homepage resolution for public and admin draft roots, retired legacy fallback behavior, explicit `source: 'builder'` / `source: 'none'` startup constraints, reader shell contract presence from `index.html`, header-state parity between reader copy and topbar layout, backfilled V3 header parity in live DOM output, theme variable clearing between snapshots, panel background/visibility reset behavior, theme/panel application, and empty-panel handling
+- `tests/reader-data-builder.test.js`: builder-first page loading, effective-homepage resolution for
+  public and admin draft roots, retired legacy fallback behavior, explicit `source: 'builder'` /
+  `source: 'none'` startup constraints, reader-shell activation/inactivation, authored
+  above/below-reader surfaces, scheduled empty-entry preservation, header parity, theme/panel reset,
+  and responsive builder DOM application
+- `tests/reader-entry-publication.test.js`: scheduled Coming Soon empty states, published page
+  rendering, and scheduled-entry selectability
+- `tests/reader-vertical.test.js` and `tests/reader-vertical-analytics.test.js`: vertical strip
+  rendering, cleanup, entry navigation, scroll restore, visible-page analytics, and completion
 - `tests/reader-page-renderer.test.js`: `reader/page-renderer.js` module rendering contracts and placeholder states
 - `tests/reader-feed-panel.test.js`: `reader/feed-panel.js` and `reader/latest.js` sorting, sanitization, expansion, latest preview, and feed-mode behavior
 - `tests/reader-controls.test.js`: `reader/controls.js` navigation and end-of-entry behavior

@@ -1,6 +1,6 @@
 # Builder Stripe Store Plan
 
-Status: Planned after `docs/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md`
+Status: Planned; reader/layout prerequisite completed
 Created: 2026-06-08
 
 ## Purpose
@@ -28,8 +28,8 @@ Out of scope for v1:
 
 Local source of truth:
 
-- `docs/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md` - prerequisite builder/reader decoupling,
-  reader module lifecycle, layout expansion, and preview side-effect rules.
+- `docs/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md` - completed prerequisite for builder/reader
+  decoupling, reader module lifecycle, layout expansion, and preview side-effect rules.
 - `docs/functions/admin-page-builder.md` - builder records, live iframe authoring, module draft
   workflow, preview target markers, and data API ownership.
 - `docs/functions/reader-core.md` - public builder page loading, preview bridge, side-effect

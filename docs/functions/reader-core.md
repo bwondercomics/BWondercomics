@@ -9,6 +9,9 @@ This document describes the current reader runtime under `reader/`. It replaces 
 - [🔌 Main Entry Point (app.js)](#-main-entry-point-appjs)
 - [💾 Data Hydration (data.js)](#-data-hydration-datajs)
 - [💾 Global State (state.js)](#-global-state-statejs)
+- [🐚 Reader Shell State (shell-state.js)](#-reader-shell-state-shell-statejs)
+- [↕️ Display Mode (display-mode.js)](#️-display-mode-display-modejs)
+- [📜 Vertical Reader (vertical.js)](#-vertical-reader-verticaljs)
 - [🖼️ Page Renderer (render.js)](#️-page-renderer-renderjs)
 - [🎮 Navigation Controls (controls.js)](#-navigation-controls-controlsjs)
 - [🖱️ Pointer Engine (pointer.js)](#️-pointer-engine-pointerjs)
@@ -77,7 +80,11 @@ The reader is split into three layers:
    - when the URL has an explicit `?page=<slug>`, it loads `/api/pages/<seriesId>/<slug>` or, when `?pageScope=global` is present, `/api/pages/global/by-slug/<slug>`
    - when no explicit page slug is present, it loads `/api/pages/home/<seriesId>` or the admin homepage draft endpoint so the series root follows homepage assignment and a same-series reader binding with one valid Comic Reader module instead of hard-coding `reader`
 4. `reader/shell-state.js` resolves whether the page has an effective `reader` module. Pages without one publish `body[data-reader-shell="inactive"]`, render the full builder page into `#builderPageContent`, hide reader-owned shell and topbar controls, and skip entry-data loading, reader analytics, gallery/latest panel setup, pointer/fullscreen handlers, comments, and live tracking.
-5. Pages with an effective `reader` module publish `body[data-reader-shell="active"]`, load the reader module's target series data via `loadEntryData()`, apply premium gating, load latest posts, and initialize the static reader shell. The effective reader module config is also applied to the static shell: controls placement/size/appearance update `#controls`, stage fit/gap/frame/max-width update `#stageWrap`, `.stage`, and related data attributes, panel visibility updates `#leftPanel`/`#rightPanel`, and comments visibility updates `#comicCommentsSection` plus the comment toggle. `displayMode: "vertical-scroll"` may be stored for forward compatibility, but Phase 3 runtime still falls back to paged behavior until the Phase 4 renderer ships.
+5. Pages with an effective `reader` module publish `body[data-reader-shell="active"]`, load the
+   reader module's target series data via `loadEntryData()`, apply premium gating, load latest posts,
+   and initialize the reader shell. The effective config applies controls placement/size/appearance,
+   stage fit/gap/frame/max-width, panel visibility, comments visibility, and the active `paged` or
+   `vertical-scroll` display mode before the first render.
 6. **Builder preview mode** (`?builderPreview=1`): when the URL carries this flag, `app.js` skips `loadPageConfigWithFallback()` entirely, lazy-imports `reader/preview-bridge.js`, and calls `requestPreviewSnapshot(...)`. The bridge sends a `REQUEST_SNAPSHOT` message to the parent admin frame, validates the `SNAPSHOT` reply, and returns a resolved page result. Each snapshot is applied via `applyBuilderPageToDOM(...)` with `previewMode: true`; no-reader snapshots still emit responsive metrics and builder target geometry from `#builderPageContent`, while active reader snapshots keep reader side effects suppressed for preview. Reader handlers that were attached by an earlier active preview state check the current shell state and no-op after an active-to-inactive snapshot transition. If the request times out or the snapshot is invalid, `handlePreviewLoadError()` surfaces an inline error and releases bootstrap state with `source: 'error'`.
 7. Missing builder pages resolve to `source: 'none'`; normal startup does not fetch legacy `page-config.json` or force the static reader shell back into view.
 8. After the first render, no-reader builder-page application, or error state is ready, `app.js` releases bootstrap hiding and exposes `window.BattleBros` subtitle helpers.
@@ -97,25 +104,55 @@ Important current behavior:
 - root-path builder loading now follows the effective homepage resolver instead of always requesting the `reader` slug directly
 - `applyBuilderPageToDOM()` resolves header state once and reuses that same state for both visible copy and shared topbar layout
 - `applyBuilderPageToDOM()` publishes reader-shell state. Active pages use the existing static shell/panel path; no-reader pages render a normal `.pb-page` into `#builderPageContent` and hide reader-only shell chrome plus reader-owned topbar controls.
-- Active reader pages resolve the effective `reader` module through builder responsive overrides before applying sanitized paged-reader customization fields. Missing customization config preserves legacy paged defaults, including `showPanels`/`showComments` compatibility. For migrated records, legacy `showPanels: false` by itself does not hide authored left/right side-panel modules; static shell panel visibility changes require an explicit Phase 3 `panels.left/right.enabled` branch.
+- Active reader pages resolve the effective `reader` module through builder responsive overrides
+  before applying sanitized display/controls/stage/panel/comment settings. Missing config preserves
+  paged defaults and `showPanels`/`showComments` compatibility.
+- Reader panels are fed only by modules in the reader module's own section. Other sections render
+  into `#builderAboveReader` or `#builderBelowReader` as ordinary authored content.
+- Section rendering keeps global column nodes/module ownership stable while responsive layouts
+  reflow visible tracks and apply sparse per-column appearance, padding, alignment, min-height, and
+  visibility settings.
 - `applyBuilderPageToDOM()` accepts a `previewMode` option that propagates to `renderPanelStack(...)` and `initEmailForms(...)` so email signup forms show a preview stub instead of submitting
 - normal startup resolves V3 page headers with `pageConfig: null`; optional legacy config remains accepted only for migration/safety helper calls
 
 ## 💾 Global State (state.js)
 
-The shared runtime state for current entry, page index, zoom/pan, page metrics, image cache, and persisted progress.
+The shared runtime state for current entry, page index, zoom/pan, page metrics, image cache, and
+persisted progress. Vertical progress adds a `scrollRatio` while retaining the page index fallback.
+
+## 🐚 Reader Shell State (shell-state.js)
+
+Resolves and publishes active/inactive reader ownership from the effective Comic Reader module.
+Consumers can read, wait for, or subscribe to shell state so reader-only analytics, comments,
+tracking, controls, and gestures do not initialize or remain active on no-reader pages.
+
+## ↕️ Display Mode (display-mode.js)
+
+Reads `body[data-reader-display-mode]` and exposes the normalized active mode. Paged is the default;
+`vertical-scroll` switches render, controls, analytics, pointer, fullscreen, and persistence behavior.
+
+## 📜 Vertical Reader (vertical.js)
+
+Builds a continuous `#verticalStrip`, observes page visibility/scroll position, updates
+`state.pageIndex`, analytics, completion, and saved scroll progress, and tears down observers/DOM on
+entry, mode, or reader-shell transitions. The cached paged stage remains hidden rather than destroyed
+so preview mode can switch display modes safely.
 
 ## 🖼️ Page Renderer (render.js)
 
-Renders the current page or spread, updates labels and disabled states, preloads upcoming pages, caches natural image sizes, and reapplies desktop frame fitting outside fullscreen.
+Branches between paged rendering and `renderVertical()`. Paged mode renders the current page/spread,
+preloads neighbors, caches dimensions, and reapplies desktop frame fitting. Empty scheduled entries
+render a Coming Soon state from `status`/`publishAt`.
 
 ## 🎮 Navigation Controls (controls.js)
 
-Prev/next/restart navigation and end-of-entry overlay helpers.
+Prev/next/restart navigation and end-of-entry overlay helpers. In vertical mode, previous/next moves
+between entries while restart scrolls the strip to the top.
 
 ## 🖱️ Pointer Engine (pointer.js)
 
-Pointer, drag, wheel, pinch, swipe, and edge-zone handling for navigation and zoom/pan.
+Pointer, drag, wheel, pinch, swipe, and edge-zone handling for paged navigation and zoom/pan. Paged
+gestures are disabled in vertical mode so native scrolling remains authoritative.
 
 ## 📐 Transform Engine (transform.js)
 
@@ -123,7 +160,8 @@ Scale/pan math, reset/zoom helpers, desktop on-page frame sizing, and fullscreen
 
 ## 🔲 Fullscreen Manager (fullscreen.js)
 
-Fullscreen entry/exit, controls-bar visibility, and coordination with frame fitting. In builder preview mode (`?builderPreview=1`) `toggleFullscreen()` returns immediately, so the preview iframe cannot go fullscreen.
+Fullscreen entry/exit, controls-bar visibility, and coordination with frame fitting. Fullscreen is
+disabled in builder preview and vertical mode.
 
 ## 🪟 Overlays Management (overlays.js)
 
@@ -325,10 +363,15 @@ success message, and navigation clicks are suppressed by the preview-mode event 
 ## 📜 Current Behavioral Contracts
 
 - Two-page mode is derived at render time; it is not a separate persisted mode toggle in `state`.
+- `displayMode` is authored on the reader module. Both `paged` and `vertical-scroll` are active
+  runtime modes, including safe responsive overrides.
 - Protected entry assets starting with `protected/` are mapped to `/api/protected/...`.
 - The desktop "dynamic frame" behavior is owned by `transform.js` and only applies outside fullscreen and outside stacked/mobile layouts.
 - Fullscreen keeps its own fit-height path and clears the desktop frame while active.
-- Progress is persisted with `state.saveProgress()` to the `battleBros_progress` key.
+- Vertical mode disables zoom, pan, swipe page turns, and fullscreen, and uses page visibility plus
+  scroll position for progress/analytics.
+- Progress is persisted with `state.saveProgress()` to the `battleBros_progress` key; vertical saves
+  include `scrollRatio`.
 - Premium gating is applied in `app.js` after session state is known; non-premium users can have premium entries removed from the active entry list or the whole reader locked when the series is premium-only.
 
 ## ⚠️ Deprecated Or Easy-To-Misstate Areas

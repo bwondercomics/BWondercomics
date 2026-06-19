@@ -17,13 +17,24 @@ This document covers the admin panel (content editor) architecture, data flow, a
 
 - Auth/session: Uses the site's account system (`/api/login`, `/api/session`) and requires an `admin` role.
 - Analytics: `admin/analytics.js` is the public analytics facade used by `admin/app.js`; analytics screen logic now lives under `admin/analytics/` with focused modules for traffic, reader analytics, reads-over-time, visitor history, live visitors, and shared formatters. The analytics UI is grouped into `Site Traffic`, `Visitor History`, and `Reader Engagement`.
-- Entry management (issues/etc): Load/save entries; add/edit/delete; reconcile pages with disk via `/api/list-entry-images`; reorder pages (drag/drop and up/down); renumber flow with confirmation; keep local entry folders under the canonical `comics/<seriesId>/entries/<label-slug>/...` root; and move local pages into or out of `protected/` when effective premium access changes.
+- Entry management (issues/etc): Load/save entries; add/edit/delete; reconcile pages with disk via
+  `/api/list-entry-images`; reorder pages (drag/drop and up/down); renumber flow with confirmation;
+  keep local entry folders under the canonical `comics/<seriesId>/entries/<label-slug>/...` root;
+  and move local pages into or out of `protected/` when effective premium access changes. Entry
+  publication supports `published`, `scheduled`, and `draft`; scheduled saves require a future date
+  and are always advertised as Coming Soon until automatic release.
 - Page ops: Add/remove pages; ensure entry folder creation via `/api/create-entry`; delete images via `/api/delete-image`; move/copy files with `/api/move-path` + `/api/copy-path`.
 - Status message: Editable site-wide status stored with entry payload.
 - Blog/updates: CRUD for posts via the DB-backed API (`/api/admin/posts`), with draft/scheduled/published and a “publish date/time” field.
 - Media library: Load/save `/media.json` (DB-backed); search/filter by tags/path; sync with disk via `/api/list-media`; apply media to posts; tag propagation from posts; per-item access (`public`/`premium`/`private`) and premium visibility (`blur`/`hidden`). Premium/private items are stored under `protected/media/`. Post images may be copied to `media/post-assets/` automatically; that folder is derived and excluded from media sync. Blurred previews live at `media/previews/` and are excluded from the admin list; the preview panel shows both the original and public preview.
 - Page builder: Structured page editing for landing/custom pages now opens as a full-page builder shell that hides the normal admin header/nav while active. A top toolbar owns page status/actions, Add Page, live/structure mode, exact Desktop / Tablet / Phone device controls, chrome-collapsed Preview, Save Draft, Publish, side-panel visibility, and Exit. A single side panel owns Pages, Blocks, Layers, Settings, and Styles; descriptor-backed blocks provide insertable module defaults, layers mirror page/header/section/column/module structure, and module fields, theme controls, section settings, page-header settings, and page metadata settings still use explicit local drafts with `Save`/`Discard`. Add Page templates for Blank, Reader, Feed, Media Gallery, and Entry Gallery create normal page/section/module records; the Reader template is series-only and only assigns the series reader binding when one is missing. Structural actions such as add, move, reorder, hide-on-device, and delete remain immediate and now route through the live structural command adapter from Blocks, Layers, the selected-target toolbar, and Structure Debug. The live same-origin iframe preview is the default canvas and loads `/index.html?...&builderPreview=1&previewSession=...` with viewport presets backed by the builder preview contract (1920x1080 / 768x1024 / 375x812). Live builder snapshots set `options.builderEditing: true`, which lets the iframe emit admin-only `data-builder-*` markers and live target geometry for hover/selection overlays and drag/drop placement without adding those markers to public reader output. Chrome-collapsed Preview reuses the same iframe and session with `builderEditing: false`, hides editor chrome except a small Edit restore button, and restores the selected device/target when editing resumes. The old structural canvas is retained as **Structure Debug** for diagnostic fallback and older visual workflows, but core structural mutations now happen on the live canvas.
 - Builder module layout: the inspector shell lives in `admin/page-builder/editor-panel.js`, snapshot-driven Structure Debug markup lives in `admin/page-builder/canvas-renderer.js`, canvas rebinding lives in `admin/page-builder/canvas-events.js`, and page/module rail rendering lives in `admin/page-builder/sidebar-panel.js`. The refactor also split draft lifecycle into `draft-manager.js`, structural section/module mutations into `canvas-mutations.js`, live structural intent into `structural-commands.js`, live drop ranking into `live-drop-placement.js`, page lifecycle actions into `page-actions.js`, iframe preview synchronization into `preview-manager.js`, and responsive shell math into `layout.js`. **Shared module HTML output still lives in `admin/page-builder/shared-renderers.js`** via a `createRenderers(options)` factory consumed by both the public reader (`reader/page-renderer.js`) and builder-owned render paths.
+- Reader and layout authoring: Comic Reader modules expose paged/vertical display, controls
+  placement/size/appearance, stage fit/gap/frame/max-width, panel visibility, comments, and safe
+  device overrides. Sections expose 1-6 structural columns, width ratios, and sparse per-column
+  appearance, padding, alignment, min-height, visibility, and responsive reflow. Bound reader pages
+  can contain normal sections above or below the required reader module without invalidating the
+  binding.
 - Page header editing: the header is edited from the canvas itself. Clicking the header preview opens plain-language sections for `Header Copy`, `Navigation Buttons`, `Header Parts`, and `Placement`; the old shared-header tab model is no longer the primary workflow.
 - Structured module editing: `gallery`, `video`, `divider`, `entry-gallery`, and `media-gallery` now use dedicated editors instead of JSON-only fallback controls. CMS-backed modules persist a sanitized optional `config.source` branch: reader modules use the active page series on series pages and a selected specific series on global pages, entry galleries can target active/specific/all series, and feed/media-gallery remain site-wide over the existing post and media indexes. The gallery editor uses the same asset picker flow as promo, social, and theme editing, including asset browsing/upload and draft updates through the shared picker contract. The generic raw JSON `Advanced` card is now limited to modules that still round-trip through the generic draft binder; dedicated-binder modules such as `promo`, `social`, and `buttons` no longer advertise a raw fallback they do not save.
 - Internal builder-page links: header buttons and `buttons` modules can target a global builder page,
@@ -36,7 +47,13 @@ This document covers the admin panel (content editor) architecture, data flow, a
 
 ## Data Paths and Persistence
 
-- Reads: `/admin/data.json`/`/admin/series/<id>/data.json` (DB-backed JSON views for entries + folders + status), `/media.json` (DB-backed), `/api/admin/pages/series/<id>`, `/api/admin/pages/global`, `/api/admin/pages/<page_id>`, `/api/admin/page-bindings/<id>`, `/api/admin/pages/home/<id>` for effective homepage/draft preview resolution, and `/api/admin/assets`; image paths under `comics/<seriesId>/entries/` or `protected/comics/<seriesId>/entries/`.
+- Reads: authenticated, no-store `/admin/data.json`/`/admin/series/<id>/data.json` DB-backed views
+  include every entry, raw `status`/`publishAt`, folders, and complete pages; `/media.json`
+  (DB-backed), `/api/admin/pages/series/<id>`, `/api/admin/pages/global`,
+  `/api/admin/pages/<page_id>`, `/api/admin/page-bindings/<id>`,
+  `/api/admin/pages/home/<id>` for effective homepage/draft preview resolution, and
+  `/api/admin/assets`; image paths live under `comics/<seriesId>/entries/` or
+  `protected/comics/<seriesId>/entries/`.
 - Writes (server):
   - Entries (DB): `/api/save` for `admin/data.json` and `admin/series/<id>/data.json` writes to Postgres (no disk write).
   - Series index (DB): `/api/save` for `admin/series.json` writes to Postgres (no disk write).
@@ -90,7 +107,7 @@ flowchart LR
   M --> O
   N --> O[ensure entry folder via /api/create-entry]
   O --> P[save entries draft to localStorage]
-  P --> Q[POST admin/data.json via /api/save]
+  P --> Q[validate status + publishAt and POST admin/data.json via /api/save]
   Q --> R[refresh entry list + clear unsaved]
 ```
 

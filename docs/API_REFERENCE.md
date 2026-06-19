@@ -1,6 +1,7 @@
 # BWonderComics - API Documentation
 
-This document provides an overview of all public APIs available in the BWonderComics reader modules.
+This document provides an overview of reader-facing JavaScript APIs plus the current public/admin
+backend routes they consume.
 
 ---
 
@@ -10,8 +11,9 @@ This document provides an overview of all public APIs available in the BWonderCo
 2. [Constants](#constants)
 3. [Authentication](#authentication)
 4. [API Utilities](#api-utilities)
-5. [Builder Page APIs](#builder-page-apis)
-6. [State Management](#state-management)
+5. [Series Data APIs](#series-data-apis)
+6. [Builder Page APIs](#builder-page-apis)
+7. [State Management](#state-management)
 
 ---
 
@@ -285,6 +287,31 @@ Save data to server.
 
 ---
 
+## Series Data APIs
+
+### Public Routes
+
+- `GET /series.json` - active series index.
+- `GET /data.json` - default-series entry payload.
+- `GET /series/{seriesId}/data.json` - selected-series entry payload.
+
+Public entry payloads omit drafts. Future scheduled entries remain listed with
+`status: "scheduled"` and `publishAt`, but their page arrays are empty until release. Due scheduled
+rows are promoted to published before serialization.
+
+### Admin Routes
+
+- `GET /admin/series.json`
+- `GET /admin/data.json`
+- `GET /admin/series/{seriesId}/data.json`
+- Matching aliases under `/api/admin/*`
+
+All admin series-data routes require an authenticated admin and return `403` otherwise. Successful
+responses include `Cache-Control: no-store`, drafts, raw publication metadata, and complete page
+arrays.
+
+---
+
 ## Builder Page APIs
 
 Reader startup resolves structured builder pages through scoped page routes. Series routes and
@@ -323,10 +350,11 @@ Fetch a published global builder page requested with `?pageScope=global&page=<sl
   `POST /api/admin/sections/{sectionId}/modules`, and related `/api/admin/sections/*` /
   `/api/admin/modules/*` routes - mutate builder sections and modules.
 
-Reader module configs accepted through these page-builder routes include sanitized paged-reader
-customization fields: `displayMode`, `controls`, `stage`, `panels`, `showPanels`, and
-`showComments`. `vertical-scroll` is accepted in `displayMode` for forward compatibility, but the
-current reader runtime still renders paged mode.
+Reader module configs accepted through these page-builder routes include sanitized
+`displayMode`, `controls`, `stage`, `panels`, `showPanels`, `showComments`, and responsive overrides.
+Both `paged` and `vertical-scroll` are active runtime modes. Section `layout` accepts 1-6 positive
+integer ratio segments; per-column settings are sanitized and module `columnIndex` is validated
+against the global structural layout before add/update/move/reorder mutations.
 
 ---
 

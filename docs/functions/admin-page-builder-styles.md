@@ -93,7 +93,12 @@ rendered.
   - Features structural badges (`.pb-page-header-badge--import` / `--stale`)
   - The `nav` region displays representing chips: standard `.pb-page-header-chip` (`pb-page-header-chip--primary`) or outline-only `.pb-page-header-chip--secondary` for secondary buttons.
   - Empty regions display a `.pb-page-header-empty-region` indicator.
-- **Section Grid Layout**: `.pb-section-columns` drives horizontal layout via `data-layout` attributes (e.g. `1-1`, `1-2`, `1-3-1`) determining how CSS Grid distributes `.pb-column` children.
+- **Section Grid Layout**: `.pb-section-columns` renders 1-6 stable global `.pb-column` nodes. The
+  generalized ratio layout (for example `1`, `1-1`, `1-2-1`, or `2-1-1-2`) becomes the CSS Grid
+  template; responsive device layouts reflow visible tracks without changing module ownership.
+- **Column Styling**: sparse column appearance, padding, alignment, minimum height, and visibility
+  are emitted on the stable column elements. Hidden responsive columns remain structural DOM nodes
+  with `display: none` and do not reserve grid tracks.
 - **Target Selections**: `.pb-section` and `.pb-module` use `.selected` classes to render cyan highlight borders when targeted by the right-hand Inspector.
 - **Preview Host**: `.pb-preview-frame` and `.pb-preview-iframe` receive exact dimensions from the
   shared `PREVIEW_VIEWPORTS` contract (`desktop`, `tablet`, or `mobile`), while
@@ -130,6 +135,9 @@ The atomic input form fields embedded across the inspector panels.
   - `.pb-button-appearance-row` and `.pb-button-appearance-toggle` for checkbox-gated sparse appearance leaves
   - `.pb-button-appearance-input:disabled` to dim inherited fields instead of inventing fake null values for color/range controls
   - `.pb-editor-section-head--compact` to keep nested appearance card headings visually consistent without duplicating full section spacing
+- **Section/Column Controls**: section inspector controls use the shared form and appearance-card
+  patterns for global/device column count, ratios, per-column appearance, padding, alignment,
+  min-height, and inherit/visible/hidden state.
 
 ---
 

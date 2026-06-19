@@ -13,7 +13,9 @@ This repo serves a plain HTML/CSS/JS frontend, with a FastAPI backend adding dyn
 ## Core data model
 
 - **Series**: a comic series (title/description, premium flag, and the per-series entry label like `Issue/Issues`).
-- **Entries**: the updates within a series (internally “entries”; a series can call them “issues”, “chapters”, “episodes”, etc).
+- **Entries**: the updates within a series (internally “entries”; a series can call them “issues”,
+  “chapters”, “episodes”, etc). Publication state is `published`, `scheduled`, or `draft`, with
+  `publish_at` controlling automatic scheduled release.
 - **Entry pages**: ordered image paths for each entry (local images live on disk under the canonical `comics/<seriesId>/entries/<label-slug>/...` tree for public pages or `protected/comics/<seriesId>/entries/<label-slug>/...` for premium/private; paths are stored in DB).
 - **Posts**: feed/blog updates (draft/scheduled/published + optional share flag for RSS/social).
 - **Users + comments**: accounts + comment threads (with roles for admin/premium).
@@ -35,6 +37,11 @@ The backend serves **DB-backed JSON at the existing file paths** (Caddy proxies 
   - `GET /admin/series.json` → series list (DB-backed)
   - `GET /admin/data.json` → default series entries (DB-backed)
   - `GET /admin/series/<id>/data.json` → per-series entries (DB-backed)
+
+Every admin series-data alias requires an authenticated admin. Successful responses use
+`Cache-Control: no-store`, include drafts and scheduled entries, and retain complete page lists plus
+raw `status`/`publishAt` metadata. Public payloads omit drafts and advertise future scheduled entries
+as Coming Soon with page paths withheld until release.
 
 DB is the source of truth. Do not reintroduce static HTML/JSON files as a data store.
 
@@ -59,18 +66,29 @@ Builder pages use explicit page-builder APIs rather than the legacy save-JSON pa
 2. `reader/app.js` determines `seriesId` from `?series=<id>` (default is `battle-bros`).
 3. Reader fetches:
    - `series.json` (series list + labels)
-   - `data.json` or `series/<id>/data.json` (entries + page paths + status + labels)
    - `GET /api/pages/home/<seriesId>`, `GET /api/pages/<seriesId>/<slug>`, or `GET /api/pages/global/by-slug/<slug>` when `pageScope=global` is requested
-   - `GET /api/posts/latest` (latest update widget)
-4. Reader renders pages from the paths in the data JSON.
+4. The resolved builder page determines reader-shell ownership.
+   - Pages without an effective Comic Reader module render authored builder content and skip
+     reader-only data, controls, comments, analytics, pointer, fullscreen, and live tracking setup.
+   - Pages with a reader module fetch `data.json` or `series/<id>/data.json`, apply the module's
+     source/settings, and initialize reader-owned panels/comments.
+5. Active reader pages render in the authored `paged` or `vertical-scroll` display mode and load
+   `/api/posts/latest` for the latest-update surface.
    - If a page path starts with `protected/`, the reader requests it via `/api/protected/<path>`.
+   - Paged mode uses the static stage, spread logic, zoom/pan, and optional fullscreen.
+   - Vertical mode renders every page into a continuous strip, tracks progress from scroll
+     visibility, and disables paged-only zoom/pan/fullscreen behavior.
+   - Ordinary builder sections before/after the reader module render above/below the reader rather
+     than becoming side panels.
    - Legacy `page-config.json` is no longer part of normal reader startup; it remains available for branding/admin helpers and `reader/safe-mode.js` recovery behavior.
 
 ### 2) Managing series + entries (admin)
 
 1. Admin opens `/admin/` and signs in (must be an `admin` role).
 2. Admin edits series settings (including the per-series entry label). Series `premiumOnly` changes first synchronize every entry's folder/page paths with the effective access level.
-3. Admin creates/edits entries, uploads pages, reorders pages, and saves. Entry saves use the same access-path sync as the series toggle flow.
+3. Admin creates/edits entries, uploads pages, reorders pages, and saves. Entry saves use the same
+   access-path sync as the series toggle flow. Scheduled entries require a future date in the editor
+   and are always advertised as Coming Soon until the backend promotes them at release time.
 4. Admin writes go through `/api/save` (DB-backed for series, entries, media index, and page configs).
 5. File moves/copies (public ↔ protected) go through `/api/move-path` and `/api/copy-path`, and `apply_series_data_save(...)` rejects mismatched local public/protected entry paths before the DB write completes.
 
@@ -90,6 +108,9 @@ Builder pages use explicit page-builder APIs rather than the legacy save-JSON pa
 4. Unsaved module/header/theme/page/section drafts are merged into cloned preview snapshots without mutating saved records.
 5. Blocks, layers, selected-target overlays, live drag/drop, text inline editing, commands/keymaps, and local draft undo all operate on canonical builder records through the page-builder API.
 6. Desktop, Tablet, and Phone preview contexts use exact iframe pixels (`1920x1080`, `768x1024`, `375x812`); the admin canvas can visually scale Desktop without changing reader viewport behavior.
+7. Reader module settings expose paged/vertical display, controls, stage, panels, comments, and safe
+   device overrides. Section settings expose 1-6 structural columns, ratios, sparse per-column
+   appearance/padding/alignment/min-height/visibility, and device-specific reflow.
 
 ### 3) Posts + RSS
 

@@ -4,7 +4,8 @@ This summarizes the reader runtime after modularization: what each file does, ke
 
 ## Data sources
 
-- `data.json`: entries map, order, statusMessage.
+- `data.json`: public entries map, metadata, status message, and labels. Drafts are omitted; future
+  scheduled entries are listed as Coming Soon with pages withheld until automatic release.
 - `/api/pages/home/<seriesId>`: effective published homepage for a series root, falling back to the
   same-series bound reader page when needed.
 - `/api/pages/<seriesId>/<slug>`: published series-scoped builder page source.
@@ -20,9 +21,14 @@ This summarizes the reader runtime after modularization: what each file does, ke
 - `reader/config.js`: constants (storage key, cache sizes, zoom steps, breakpoints, animation timings).
 - `reader/entries.js`: entry helpers (`extractEntryNumber`, `sortEntryNames`, `sortEntryNamesWithMeta`, `sanitizeEntries`).
 - `reader/state.js`: shared `state` object; `saveProgress`, `loadProgress`, cached natural page metrics, and the last successful desktop on-page frame.
+- `reader/shell-state.js`: effective reader-module ownership and active/inactive shell state.
+- `reader/display-mode.js`: active paged/vertical mode helpers.
 - `reader/data.js`: loaders for entry data, builder-page startup resolution, optional legacy page-config helper access, and latest post.
 - `reader/dom.js`: element lookups (`el` map), including `#mainContent`, and `initElements`.
-- `reader/render.js`: status typing, image preload/cache, natural-size caching, two-page checks, main `render`/`updateUI`, and non-fullscreen frame refits when visible pages change/load.
+- `reader/render.js`: scheduled/empty states, paged image preload/cache, two-page checks, vertical
+  dispatch, `render`/`updateUI`, and paged frame refits.
+- `reader/vertical.js`: continuous page strip, scroll/visibility progress, analytics/completion,
+  scroll restore, and cleanup.
 - `reader/controls.js`: page navigation, end-of-entry overlay helpers.
 - `reader/transform.js`: zoom/reset/fit helpers, desktop on-page frame sizing, and fullscreen fit scaling.
 - `reader/pointer.js`: pan/zoom/swipe handling, edge zones, scroll zoom; initializes pointer listeners.
@@ -38,8 +44,10 @@ This summarizes the reader runtime after modularization: what each file does, ke
 ## Flow (runtime)
 
 1. `index.html` applies a temporary bootstrap-loading state, then loads `reader/app.js` + `reader/customization.js` as ES modules.
-2. `app.start()`:
-   - `loadEntryData()` → sets entries/order/statusMessage.
+2. `app.start()` resolves the builder page and effective reader-shell state first.
+   - No-reader pages render authored content and skip reader-only data and side effects.
+   - Active reader pages apply module settings, then `loadEntryData()` sets
+     entries/order/status/metadata.
 
 - `loadPageConfigWithFallback()` → resolves the startup builder page through the effective-homepage,
   explicit series-slug, or explicit global-slug API and returns `source: 'builder'` or
@@ -47,14 +55,18 @@ This summarizes the reader runtime after modularization: what each file does, ke
   `createEffectivePageHeader(page, null)` is the V3 reader header contract after a clean
   fallback-retirement audit.
 - `loadLatestPost()` → fetches `/api/posts/latest`, passes to `renderLatestUpdate`.
-- Initializes elements, entry select, status panel, email form, pointer/fullscreen/nav handlers, then releases the bootstrap-loading state once the initial render or error UI is ready.
-- Restores saved progress if present; renders current pages and applies the desktop on-page frame when eligible.
+- Initializes only shell-appropriate elements/handlers, then releases bootstrap hiding once the
+  initial builder or reader output is ready.
+- Restores page progress and vertical scroll ratio when present.
 
 3. `customization.js` waits for the bootstrap result and remains a no-op so missing builder pages cannot re-enter the old page-config shell.
 4. User interactions:
-   - Navigation via buttons/edge zones/keyboard/swipe → `controls.js` updates state and calls `render` + `saveProgress`.
+   - Paged navigation via buttons/edge zones/keyboard/swipe → `controls.js` updates state and calls
+     `render` + `saveProgress`.
+   - Vertical mode uses native scrolling for page progress; prev/next moves between entries and
+     restart scrolls to the top.
    - Zoom/pan via pointer/pinch/wheel or buttons → `pointer.js` + `transform.js`.
-   - Fullscreen toggle → `fullscreen.js` (auto-hide controls, fullscreen height fit, and suspension of on-page frame sizing).
+   - Fullscreen toggle → `fullscreen.js` in paged mode only.
    - Gallery overlay → `gallery.js`; selecting a card calls `changeChapter` and re-renders.
    - Shortcuts overlay → `overlays.js`; end-of-chapter overlay uses `controls.js` helpers.
 
@@ -67,6 +79,10 @@ This summarizes the reader runtime after modularization: what each file does, ke
 
 - Reader logic assumes `data.json` is reachable; on failure, a user-friendly error is shown in the viewport.
 - Reader bootstrap hides the static shell until the initial page source is known so the legacy shell does not flash before a custom builder page is applied.
+- Pages without a Comic Reader module keep the reader shell inactive. Bound reader pages can render
+  ordinary authored sections above and below the required reader module.
 - Image caching uses a FIFO map capped by `CONFIG.IMAGE_CACHE_SIZE`; natural page dimensions are cached in `state.pageMetrics` and the last successful desktop frame in `state.lastOnPageFrame`.
 - Two-page mode: width ≥ `CONFIG.TWO_PAGE_BREAKPOINT` (900) and aspect ratio > 0.714; otherwise single-page.
 - Non-fullscreen on-page frame: in the fixed-height desktop layout, the viewport follows the current visible page or spread; stacked/mobile keeps the existing full-width flow.
+- Vertical mode: all pages render in document order; zoom, pan, swipe page turns, and fullscreen are
+  disabled.

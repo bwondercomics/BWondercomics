@@ -1,17 +1,18 @@
 # Reader Block and Layout Customization Plan
 
-Status: Planned post-Phase-12 work
+Status: Completed
 Created: 2026-06-06
+Completed: 2026-06-18
 
 ## Purpose
 
-Turn the comic reader into an authorable page-builder block instead of a permanent fixture on every
-builder page. A canonical series reader page still needs one active reader block, but ordinary
-series pages and global pages should be able to omit the reader entirely, place content above or
-below it, or build custom pages without forced reader chrome. Bound reader pages should also support
-normal authored sections and columns below the required reader block.
+The comic reader is now an authorable page-builder block instead of a permanent fixture on every
+builder page. A canonical series reader page still needs one active reader block, while ordinary
+series pages and global pages can omit the reader entirely, place content above or below it, or build
+custom pages without forced reader chrome. Bound reader pages also support normal authored sections
+and columns below the required reader block.
 
-This plan also covers two related authoring gaps:
+The completed work also closes two related authoring gaps:
 
 - Reader customization: control reader display mode, controls styling/size, stage behavior, panels,
   and comments from the reader module.
@@ -24,27 +25,32 @@ This plan also covers two related authoring gaps:
   builder-page loading, and reader bridge behavior.
 - `docs/admin-overview.md` and `docs/functions/admin-page-builder.md` describe the full-page builder,
   live iframe preview, module ownership, commands, and explicit draft workflow.
-- `admin/page-builder/module-descriptors.js` defines the current `reader` descriptor. Today it only
-  stores source, `showPanels`, and `showComments`.
+- `admin/page-builder/module-descriptors.js` defines the current `reader` descriptor, including
+  source, display mode, controls, stage, panels, comments, and responsive overrides.
 - `admin/page-builder/shared-renderers.js` is the shared renderer factory used by public reader output
-  and admin preview. Its current `reader` renderer emits a `.pb-reader-mount`.
-- `admin/page-builder/module-editor.js` owns the reader module editor controls.
-- `reader/data.js` currently applies builder pages to the existing static reader shell and routes
-  non-reader modules into left/right panels from section columns.
-- `reader/render.js`, `reader/controls.js`, and `reader/transform.js` own paged image rendering,
-  page navigation, zoom/pan, fullscreen fitting, and dynamic frame sizing.
+  and admin preview. Its reader renderer emits a normalized `.pb-reader-mount`, while section
+  rendering applies generalized column layouts and per-column styling.
+- `admin/page-builder/reader-editor.js` and `admin/page-builder/editor-panel.js` own reader and
+  section/column authoring controls.
+- `reader/data.js` resolves reader-shell ownership, applies reader module settings, feeds reader
+  panels only from the reader module's section, and renders ordinary authored sections into
+  above-reader and below-reader surfaces.
+- `reader/render.js`, `reader/display-mode.js`, `reader/vertical.js`, `reader/controls.js`, and
+  `reader/transform.js` own paged/vertical rendering, navigation, progress, zoom/pan, fullscreen
+  fitting, and dynamic frame sizing.
 - `backend/app/builder_security.py` and `backend/app/page_store.py` own allowed module types,
-  layout validation, column validation, reader source normalization, and sanitization.
+  generalized layout/column validation, reader source normalization, sanitization, and atomic
+  section/module persistence.
 
 ## Product Model
 
-- The `reader` module becomes the only source of visible reader stage, page images, reader controls,
+- The `reader` module is the only source of visible reader stage, page images, reader controls,
   comments, and reader side panels on builder pages.
 - Pages without a `reader` module render normal builder content without forcing `.viewerWrap`,
   `.stageWrap`, `.controls`, comments, or side panels into view.
 - A bound series reader page must contain exactly one active, non-hidden `reader` module. Missing,
-  duplicate, or hidden reader modules should produce admin warnings and block publish or binding
-  updates where practical.
+  duplicate, hidden, or wrong-source reader modules produce admin warnings and block publish or
+  binding updates.
 - A bound series reader page may contain normal builder sections and columns before or after the
   required reader module. Under-reader columns are ordinary page content and must not invalidate the
   reader binding.
@@ -52,11 +58,11 @@ This plan also covers two related authoring gaps:
   `reader` bindings for a series.
 - The reader DOM remains a view. Saved builder page/section/module records remain canonical.
 
-## Proposed Data Contracts
+## Implemented Data Contracts
 
 ### Reader Module Config
 
-Extend `reader` module config with a structured, sparse contract:
+The `reader` module uses this structured, sparse contract:
 
 ```json
 {
@@ -100,8 +106,8 @@ Rules:
 
 ### Section And Column Layout Config
 
-Evolve section layout from fixed preset strings into an authorable but sanitized column contract.
-Keep the existing `layout` string for compatibility during migration.
+Section layout uses an authorable, sanitized column contract. The existing `layout` string remains
+the compatibility and persistence shape.
 
 ```json
 {
@@ -480,11 +486,13 @@ separate follow-up.
 ## Migration And Compatibility Notes
 
 - Existing pages keep working because missing reader config defaults to current paged behavior.
-- Existing fixed section layouts remain supported during the transition.
+- Existing fixed section layouts remain supported as a strict subset of the generalized ratio
+  contract.
 - No arbitrary CSS editor is introduced.
-- If a backend migration is needed, it should be additive and backfill only normalized defaults.
-- The implementation should not delete legacy static reader DOM until the no-reader page path,
-  paged reader path, vertical reader path, and builder preview path all pass release gates.
+- No schema migration was required; existing builder JSON fields and entry publication columns remain
+  authoritative.
+- Legacy static reader DOM remains as the active-shell implementation detail for paged and vertical
+  modes. Removing or replacing it is a separate follow-up despite all release gates passing.
 
 ## Resolved Product Decisions
 

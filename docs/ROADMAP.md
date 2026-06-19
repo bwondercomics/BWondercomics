@@ -19,9 +19,9 @@ Out of scope for `1.0.0`:
 - Multi-site or hosted product abstractions
 - Stoat/Revolt chat SSO work
 - Advanced analytics such as cohort, funnel, or retention features
-- Vertical-comic support unless it directly fixes the current architecture
+- Additional reader display modes beyond the shipped paged and vertical-scroll modes
 
-Last updated: 2026-06-06
+Last updated: 2026-06-18
 
 ## `0.7.9` Release Baseline
 
@@ -55,7 +55,12 @@ Goal: make the full-page live builder the canonical authoring surface.
 - [x] Add command/keymap plumbing, local draft undo/redo, and text-module inline editing.
 - [x] Lock Desktop/Tablet/Phone preview dimensions at `1920x1080`, `768x1024`, and `375x812`, with admin-only scaling for Desktop.
 - [x] Add Phase 12 browser workflow coverage and keep full release verification manual/local.
-- [ ] Implement the next reader-as-block/layout customization plan in `docs/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md`.
+- [x] Implement the reader-as-block/layout customization plan in
+      `docs/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md`.
+- [x] Support no-reader custom pages, strict bound-reader lifecycle validation, paged/vertical reader
+      customization, authored sections above/below the reader, and responsive 1-6 column styling.
+- [x] Close Phase 6 security, scheduling, atomic mutation, coverage, and public/admin visual parity
+      gates.
 
 ## `0.8.5` UX and Terminology Pass
 

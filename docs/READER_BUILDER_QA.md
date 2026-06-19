@@ -1,6 +1,8 @@
-# Reader + Builder QA Worksheet (`0.8.0`)
+# Reader + Builder QA Worksheet (`0.8.2`)
 
-Use this worksheet for the `0.8.0` reader + builder lock pass. The goal is not to explore new features. The goal is to prove the current reader-first + builder-first shape is stable enough to carry into `1.0.0`.
+Use this worksheet for the current reader-block + live-builder lock pass. The goal is not to explore
+new features. The goal is to prove the shipped paged/vertical reader, removable reader shell,
+responsive layout authoring, and builder-first architecture are stable enough to carry into `1.0.0`.
 
 ## Prep
 
@@ -50,6 +52,21 @@ Use this worksheet for the `0.8.0` reader + builder lock pass. The goal is not t
 - [ ] Desktop/mobile behavior
   - Desktop: verify fixed-height frame, zoom, fit, fullscreen, and keyboard shortcuts.
   - Mobile/narrow width: verify stacked flow, touch navigation, overlays, and controls visibility.
+- [ ] No-reader custom page
+  - Open a published custom page with no Comic Reader module.
+  - Confirm authored content/header render without stage, controls, comments, side panels, entry
+    controls, reader analytics, or reader interaction handlers becoming active.
+- [ ] Vertical reader mode
+  - Set a reader module to Vertical Scroll and verify all pages render in order on desktop, tablet,
+    and phone.
+  - Confirm scrolling updates page progress/comments/analytics targets and restores near the saved
+    position after reload.
+  - Confirm zoom, pan, swipe page turns, and fullscreen remain disabled while entry navigation still
+    works.
+- [ ] Publication states
+  - Confirm drafts never appear publicly.
+  - Confirm a future scheduled entry is selectable as Coming Soon but exposes no pages.
+  - Confirm the same entry becomes published with pages available after its release time.
 
 ## Page Builder Flows
 
@@ -68,6 +85,22 @@ Use this worksheet for the `0.8.0` reader + builder lock pass. The goal is not t
   - Add, remove, and reorder sections.
   - Add, move, and reorder modules across columns.
   - Confirm the canvas updates immediately and stays in sync after reload.
+- [ ] Reader lifecycle and authored content around it
+  - On a non-bound page, add/remove a Comic Reader module normally.
+  - On the bound reader page, verify deleting/hiding the only active reader warns and publish/binding
+    validation rejects an invalid result.
+  - Add normal sections above and below the reader module and confirm both admin preview and public
+    output preserve the same order without treating them as side panels.
+- [ ] Section and column customization
+  - Exercise 1, 2, 3, and 4+ column layouts, edit ratios, and style individual columns.
+  - Change Tablet/Phone reflow and column visibility while confirming module ownership remains in
+    the original global columns.
+  - Shrink the global column count and confirm orphaned modules merge into the final surviving column
+    in stable order.
+- [ ] Reader customization
+  - Save controls placement/size/appearance, stage fit/gap/frame/max-width, panel visibility,
+    comments visibility, and display mode.
+  - Verify global and Current Device overrides match in the live iframe and public reader.
 - [ ] Explicit-save editing
   - Modify a module, theme settings, and section settings.
   - Confirm dirty-state blocking works and `Save`/`Discard` do what they claim.
@@ -109,5 +142,7 @@ For each problem found, capture:
 
 ## Exit Criteria
 
-- No blocker remains in reader bootstrap, entry navigation, premium gating, comments, latest update, or builder draft/publish/open-reader flow.
+- No blocker remains in reader bootstrap, shell activation, paged/vertical navigation, publication
+  states, premium gating, comments, latest update, responsive columns, or builder
+  draft/publish/open-reader flow.
 - The worksheet is completed against the current baseline and any discovered issues are either fixed or logged into the roadmap with clear follow-up.

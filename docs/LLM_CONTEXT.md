@@ -143,9 +143,9 @@ sudo ufw delete allow from 10.0.0.0/24 to any port 5173 proto tcp
 Vite proxies these to the API (so data.json/series.json work):
 `/api`, `/data.json`, `/series.json`, `/page-config.json`, `/media.json`, `/series/*`, `/analytics.js`.
 
-## Recent Builder Changes (updated 2026-06-06)
+## Recent Builder and Reader Changes (updated 2026-06-18)
 
-- Current project version is `0.8.2`, the live builder authoring lock.
+- Current project version is `0.8.2`, the live builder plus reader-block/layout lock.
 - Page Builder is a full-page admin shell. The default canvas is the real reader route in a
   same-origin iframe using `builderPreview=1`, `previewSession`, and exact Desktop/Tablet/Phone
   iframe presets: `1920x1080`, `768x1024`, and `375x812`. Desktop may be visually scaled by the
@@ -160,6 +160,19 @@ Vite proxies these to the API (so data.json/series.json work):
 - CMS modules are structured: `reader`, `entry-gallery`, `feed`, and `media-gallery` persist
   sanitized source config. Feed/media-gallery remain site-wide; reader/entry modules remain
   series-aware.
+- The effective Comic Reader module owns reader-shell visibility. No-reader pages render authored
+  content without reader chrome or reader-only side effects; a bound series reader page requires
+  exactly one visible same-series reader module.
+- Reader modules expose paged/vertical-scroll display, controls, stage, panels, comments, and safe
+  device overrides. Vertical mode renders a continuous strip, persists scroll progress, and disables
+  paged-only zoom/pan/fullscreen.
+- Bound reader pages can render ordinary sections before and after the reader. Reader side panels
+  are fed only from the reader module's own section.
+- Section layouts support 1-6 ratio-based structural columns with sparse per-column styling and
+  responsive reflow that preserves global module ownership.
+- Public entry payloads omit drafts and withhold future scheduled pages while advertising Coming
+  Soon. Authenticated admin payloads retain all entries and full pages; due schedules promote
+  automatically.
 - Header canvas and editor only show provenance badges for migration states (`legacy-import`,
   `page-meta-stale`, etc); normal V3 header editing resolves with `pageConfig: null`.
 
