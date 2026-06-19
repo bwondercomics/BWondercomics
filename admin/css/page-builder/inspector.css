@@ -658,3 +658,34 @@
   padding: 14px;
   background: rgba(0, 0, 0, 0.18);
 }
+
+/* Per-column styling editor (section Columns inspector). */
+.pb-column-editor-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.pb-column-editor {
+  padding: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.pb-column-editor-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.82);
+  margin-bottom: 8px;
+}
+
+.pb-column-padding-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.pb-column-padding-input {
+  text-align: center;
+}

@@ -5,6 +5,7 @@ import { getActiveSeriesId } from './series.js';
 import { h } from './dom.js';
 import { buildEntryTargetId } from './comment-targets.js';
 import { fitOnPageFrame } from './transform.js';
+import { getReaderShellState, subscribeReaderShellState } from './shell-state.js';
 
 (() => {
   'use strict';
@@ -539,9 +540,24 @@ import { fitOnPageFrame } from './transform.js';
     loadComments(ctx);
   }
 
+  function initWhenReaderShellIsActive() {
+    let unsubscribe = null;
+    const handleShellState = (shellState) => {
+      if (commentCtx) {
+        unsubscribe?.();
+        return;
+      }
+      if (shellState?.active !== true) return;
+      unsubscribe?.();
+      init();
+    };
+    unsubscribe = subscribeReaderShellState(handleShellState, { immediate: false });
+    handleShellState(getReaderShellState());
+  }
+
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', init);
+    document.addEventListener('DOMContentLoaded', initWhenReaderShellIsActive);
   } else {
-    init();
+    initWhenReaderShellIsActive();
   }
 })();

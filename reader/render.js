@@ -8,6 +8,8 @@ import { state } from './state.js';
 import { el } from './dom.js';
 import { markEntryComplete, trackVisiblePages } from './analytics.js';
 import { clearOnPageFrame, fitOnPageFrame } from './transform.js';
+import { isVerticalMode } from './display-mode.js';
+import { renderVertical, teardownVerticalMode } from './vertical.js';
 
 function formatDateTime(value) {
   if (!value) return '';
@@ -19,9 +21,8 @@ function formatDateTime(value) {
 function getEmptyEntryMessage() {
   const meta = state.entryMeta || {};
   const status = String(meta.status || '').toLowerCase();
-  const comingSoon = !!meta.comingSoon || status === 'scheduled';
   const publishAt = formatDateTime(meta.publishAt);
-  if (comingSoon) {
+  if (status === 'scheduled') {
     return {
       title: 'COMING SOON',
       detail: publishAt ? `Scheduled for ${publishAt}` : 'Scheduled for a future release.',
@@ -56,7 +57,7 @@ function ensureEmptyStateContainer() {
   return container;
 }
 
-function showEmptyEntryState() {
+export function showEmptyEntryState() {
   const container = ensureEmptyStateContainer();
   if (!container) return;
   const { title, detail } = getEmptyEntryMessage();
@@ -70,10 +71,12 @@ function showEmptyEntryState() {
   if (el.stageWrap) el.stageWrap.style.display = 'none';
 }
 
-function hideEmptyEntryState() {
+export function hideEmptyEntryState() {
   const container = document.getElementById('entryEmptyState');
   if (container) container.style.display = 'none';
-  if (el.stageWrap) el.stageWrap.style.display = '';
+  // Vertical mode keeps the paged stage hidden and renders into its own strip,
+  // so only restore the paged stage when paged mode is active.
+  if (el.stageWrap && !isVerticalMode()) el.stageWrap.style.display = '';
 }
 
 function rememberPageMetric(url, imgEl) {
@@ -235,6 +238,15 @@ export function canShowTwoPages() {
  * Triggers page transition animation and preloads upcoming pages
  */
 export function render() {
+  if (isVerticalMode()) {
+    renderVertical();
+    return;
+  }
+
+  // Paged mode: ensure any vertical strip is torn down and the static stage is
+  // restored before rendering into the cached paged nodes.
+  teardownVerticalMode();
+
   if (!state.pages.length) {
     state.isTransitioning = false;
     if (el.stage) el.stage.classList.remove('transitioning');
@@ -280,8 +292,7 @@ export function updateUI() {
     if (el.indicator) {
       const meta = state.entryMeta || {};
       const status = String(meta.status || '').toLowerCase();
-      el.indicator.textContent =
-        status === 'scheduled' || meta.comingSoon ? 'COMING SOON' : 'NO PAGES';
+      el.indicator.textContent = status === 'scheduled' ? 'COMING SOON' : 'NO PAGES';
     }
     if (el.progressFill) el.progressFill.style.width = '0%';
     if (el.prevBtn) el.prevBtn.disabled = true;
@@ -291,6 +302,20 @@ export function updateUI() {
 
   const total = state.pages.length || 1;
   const current = state.pageIndex + 1;
+
+  // In vertical mode the prev/next buttons navigate entries (not pages), so their
+  // disabled state tracks the entry selector position instead of the page index.
+  if (isVerticalMode()) {
+    if (el.indicator) el.indicator.textContent = `PAGE ${current} / ${total}`;
+    if (el.progressFill) el.progressFill.style.width = (current / total) * 100 + '%';
+    const entrySelect = el.entry;
+    const entryIndex = entrySelect ? entrySelect.selectedIndex : -1;
+    const entryCount = entrySelect ? entrySelect.options.length : 0;
+    if (el.prevBtn) el.prevBtn.disabled = entryIndex <= 0;
+    if (el.nextBtn) el.nextBtn.disabled = entryIndex < 0 || entryIndex >= entryCount - 1;
+    return;
+  }
+
   const twoPageMode = canShowTwoPages();
 
   if (el.indicator) {

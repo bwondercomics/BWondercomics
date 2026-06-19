@@ -48,6 +48,10 @@ assets/uploads/**
 comics/**
 !comics/.gitkeep
 
+# Playwright visual test artifacts (snapshots under tests/visual are tracked)
+test-results/
+playwright-report/
+
 # Vite build output and cache
 dist/
 dist-ssr/

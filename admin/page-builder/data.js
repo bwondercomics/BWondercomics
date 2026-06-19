@@ -1,3 +1,21 @@
+let lastPageBuilderDataError = null;
+
+function clearLastPageBuilderDataError() {
+  lastPageBuilderDataError = null;
+}
+
+function rememberPageBuilderDataError(error, fallbackMessage) {
+  lastPageBuilderDataError = {
+    message: error?.message || fallbackMessage,
+    code: error?.code || '',
+    warnings: Array.isArray(error?.warnings) ? error.warnings : [],
+  };
+}
+
+export function getLastPageBuilderDataError() {
+  return lastPageBuilderDataError;
+}
+
 export async function fetchPages(seriesId) {
   return fetchSeriesPages(seriesId);
 }
@@ -124,6 +142,7 @@ export async function fetchPageBindings(seriesId) {
 }
 
 export async function updatePageBindings(seriesId, bindings) {
+  clearLastPageBuilderDataError();
   try {
     const res = await fetch(`/api/admin/page-bindings/${encodeURIComponent(seriesId)}`, {
       method: 'PUT',
@@ -132,9 +151,15 @@ export async function updatePageBindings(seriesId, bindings) {
       credentials: 'same-origin',
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'Failed to update page bindings');
+    if (!res.ok) {
+      const err = new Error(data.error || 'Failed to update page bindings');
+      err.code = data.code || '';
+      err.warnings = data.warnings || [];
+      throw err;
+    }
     return data;
   } catch (err) {
+    rememberPageBuilderDataError(err, 'Failed to update page bindings');
     console.error('updatePageBindings error:', err);
     alert(err.message || 'Failed to update page bindings');
     return null;
@@ -142,15 +167,23 @@ export async function updatePageBindings(seriesId, bindings) {
 }
 
 export async function updatePage(pageId, data) {
+  clearLastPageBuilderDataError();
   try {
     const res = await fetch(`/api/admin/pages/${pageId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error('Failed to update page');
-    return (await res.json()).page;
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(payload.error || 'Failed to update page');
+      err.code = payload.code || '';
+      err.warnings = payload.warnings || [];
+      throw err;
+    }
+    return payload.page;
   } catch (err) {
+    rememberPageBuilderDataError(err, 'Failed to update page');
     console.error('updatePage error:', err);
     return null;
   }

@@ -4,6 +4,8 @@ import { state, saveProgress } from './state.js';
 import { render } from './render.js';
 import { hideEndOfEntry } from './controls.js';
 import { resetEntryCompletion, setActiveEntry, trackEntryExit } from './analytics.js';
+import { isVerticalMode } from './display-mode.js';
+import { scrollVerticalToTop } from './vertical.js';
 
 export function toggleShortcutsOverlay() {
   const overlay = document.getElementById('shortcutsOverlay');
@@ -30,9 +32,23 @@ export function goToNextEntry(entryOrder, entries, entryMeta = {}) {
   }
 }
 
+export function goToPreviousEntry(entryOrder, entries, entryMeta = {}) {
+  const entryNames = entryOrder.length ? entryOrder : Object.keys(entries);
+  const currentIndex = entryNames.indexOf(state.currentEntry);
+  if (currentIndex > 0) {
+    const prevEntry = entryNames[currentIndex - 1];
+    if (el.entry) el.entry.value = prevEntry;
+    changeEntry(prevEntry, entries, entryMeta);
+    hideEndOfEntry();
+  }
+}
+
 export function restartEntry(_entries) {
   state.pageIndex = 0;
   render();
+  // Vertical mode keeps all pages mounted; restarting means scrolling to the top
+  // rather than re-rendering a single page.
+  if (isVerticalMode()) scrollVerticalToTop();
   saveProgress(state);
   resetEntryCompletion();
   hideEndOfEntry();

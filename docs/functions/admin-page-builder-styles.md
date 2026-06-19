@@ -4,6 +4,7 @@ This document provides a technical map of the modular CSS architecture within `a
 
 ## Table of Contents
 
+- [📦 Source Import Manifest](#-source-import-manifest)
 - [🎨 Design System & Tokens](#-design-system--tokens)
 - [🏗️ Layout Orchestration (layout.css)](#️-layout-orchestration-layoutcss)
 - [📂 Sidebar (sidebar.css)](#-sidebar-sidebarcss)
@@ -12,8 +13,18 @@ This document provides a technical map of the modular CSS architecture within `a
 - [🎮 Controls (controls.css)](#-controls-controlscss)
 - [⚡ Insertions & Feedback (insertions.css)](#-insertions--feedback-insertionscss)
 - [🌈 Theme & Responsive](#-theme--responsive)
+- [🧭 Maintenance Rule](#-maintenance-rule)
 
 ---
+
+## 📦 Source Import Manifest
+
+`admin/css/admin.page-builder.css` is the source-of-truth bridge manifest for these files. Current
+imports:
+
+`page-builder/layout.css`, `page-builder/sidebar.css`, `page-builder/canvas.css`,
+`page-builder/insertions.css`, `page-builder/inspector.css`, `page-builder/controls.css`,
+`page-builder/theme.css`, and `page-builder/responsive.css`.
 
 ## 🎨 Design System & Tokens
 
@@ -40,11 +51,13 @@ The `layout.css` module defines the top-level shell. It uses a **Data-Attribute 
 ### Principal Containers
 
 - **`.page-builder-layout`**: The master grid.
-  - **Default State**: 3 columns: `var(--pb-sidebar-width)` (200px), `1fr`, and `var(--pb-editor-width)` (320px).
+  - **Default State**: 2 columns: `var(--pb-sidebar-width)` (280px) and `minmax(0, 1fr)`, with `--pb-editor-width` controlled by the full-page shell and side-panel/editor state.
   - **Attributes**:
     - `[data-editor-mode='docked']`: Expands the editor to 520px for complex module editing.
     - `[data-editor-mode='overlay']`: Remaps the editor to `position: absolute`, floating over the canvas for tablet viewports.
     - `[data-viewport-band='stacked']`: Triggers a vertical 1-column stack for mobile authoring.
+    - `[data-sidebar-mode='collapsed']`: Shrinks the side panel to the compact 72px rail.
+    - `[data-canvas-mode='structure']`: Hides the iframe preview host while Structure Debug is visible.
     - `[data-canvas-mode='preview']`: Hides all side panels so the iframe preview host has the
       full available admin canvas width.
 
@@ -80,7 +93,12 @@ rendered.
   - Features structural badges (`.pb-page-header-badge--import` / `--stale`)
   - The `nav` region displays representing chips: standard `.pb-page-header-chip` (`pb-page-header-chip--primary`) or outline-only `.pb-page-header-chip--secondary` for secondary buttons.
   - Empty regions display a `.pb-page-header-empty-region` indicator.
-- **Section Grid Layout**: `.pb-section-columns` drives horizontal layout via `data-layout` attributes (e.g. `1-1`, `1-2`, `1-3-1`) determining how CSS Grid distributes `.pb-column` children.
+- **Section Grid Layout**: `.pb-section-columns` renders 1-6 stable global `.pb-column` nodes. The
+  generalized ratio layout (for example `1`, `1-1`, `1-2-1`, or `2-1-1-2`) becomes the CSS Grid
+  template; responsive device layouts reflow visible tracks without changing module ownership.
+- **Column Styling**: sparse column appearance, padding, alignment, minimum height, and visibility
+  are emitted on the stable column elements. Hidden responsive columns remain structural DOM nodes
+  with `display: none` and do not reserve grid tracks.
 - **Target Selections**: `.pb-section` and `.pb-module` use `.selected` classes to render cyan highlight borders when targeted by the right-hand Inspector.
 - **Preview Host**: `.pb-preview-frame` and `.pb-preview-iframe` receive exact dimensions from the
   shared `PREVIEW_VIEWPORTS` contract (`desktop`, `tablet`, or `mobile`), while
@@ -117,6 +135,9 @@ The atomic input form fields embedded across the inspector panels.
   - `.pb-button-appearance-row` and `.pb-button-appearance-toggle` for checkbox-gated sparse appearance leaves
   - `.pb-button-appearance-input:disabled` to dim inherited fields instead of inventing fake null values for color/range controls
   - `.pb-editor-section-head--compact` to keep nested appearance card headings visually consistent without duplicating full section spacing
+- **Section/Column Controls**: section inspector controls use the shared form and appearance-card
+  patterns for global/device column count, ratios, per-column appearance, padding, alignment,
+  min-height, and inherit/visible/hidden state.
 
 ---
 
@@ -142,3 +163,10 @@ Classes related to drag-and-drop structural manipulation and interactive context
 - **Sub-1199px**: Flattens out `2-column` and `3-column` controls in the Inspector into a unified `1fr` grid stack.
 - **Sub-1099px**: Relaxes max-height limits on the `.page-builder-sidebar` when stacked in tablet mode.
 - **Sub-720px**: Mobile squashing constraint. Stretches footer action buttons `.btn-primary` and `.btn-secondary` out to `100%` widths, and breaks horizontal layout flows in the inspector down into vertical stacks.
+
+## 🧭 Maintenance Rule
+
+Update this document when `admin/css/admin.page-builder.css` imports change, a file under
+`admin/css/page-builder/` is added or removed, page-builder shell data attributes change, preview
+frame/scale behavior changes, or inspector/sidebar/canvas component ownership moves between CSS
+files.

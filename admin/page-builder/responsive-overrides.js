@@ -1,5 +1,7 @@
 import { BUILDER_DEVICE_ORDER, getBuilderDevice, isBuilderDeviceId } from './preview-contract.js';
+import { parseLayoutRatios, ratiosToGridTemplate, ratiosToLayout } from './layout-utils.js';
 import { getModuleResponsiveOverrides } from './module-descriptors.js';
+import { normalizeReaderResponsiveBranch } from './reader-config.js';
 
 export const SECTION_RESPONSIVE_FIELDS = Object.freeze([
   'layout',
@@ -99,17 +101,23 @@ export function setResponsiveOverrideValue(source, deviceId, key, value) {
   return source;
 }
 
+function shouldResolveResponsive(renderOptions = {}) {
+  return renderOptions.builderEditing === true || renderOptions.resolveResponsive === true;
+}
+
 export function getEffectiveSectionLayout(section, renderOptions = {}) {
   const baseLayout = section?.layout || '1';
-  if (renderOptions.builderEditing !== true) return baseLayout;
+  if (!shouldResolveResponsive(renderOptions)) return baseLayout;
   const branch = getResponsiveBranch(section?.settings || {}, renderOptions.deviceId);
-  return branch.layout || baseLayout;
+  if (!branch.layout) return baseLayout;
+  const globalColumnCount = parseLayoutRatios(baseLayout).length;
+  return ratiosToLayout(parseLayoutRatios(branch.layout).slice(0, globalColumnCount));
 }
 
 export function getEffectiveSectionSettings(section, renderOptions = {}) {
   const baseSettings = cloneValue(section?.settings || {}) || {};
   delete baseSettings.responsive;
-  if (renderOptions.builderEditing !== true) return baseSettings;
+  if (!shouldResolveResponsive(renderOptions)) return baseSettings;
 
   const branch = getResponsiveBranch(section?.settings || {}, renderOptions.deviceId);
   SECTION_RESPONSIVE_FIELDS.forEach((key) => {
@@ -119,6 +127,72 @@ export function getEffectiveSectionSettings(section, renderOptions = {}) {
     }
   });
   return baseSettings;
+}
+
+export const COLUMN_RESPONSIVE_FIELDS = Object.freeze([
+  'appearance',
+  'padding',
+  'alignment',
+  'minHeight',
+  'hidden',
+]);
+
+// Resolve a single column's effective styling. On the public path (builderEditing
+// false) device overrides are emitted as scoped @media CSS instead, so this returns
+// the base styling; in the admin preview the active device branch is merged in.
+export function getEffectiveColumnSettings(section, columnIndex, renderOptions = {}) {
+  const columns = section?.settings?.columns;
+  const match = Array.isArray(columns)
+    ? columns.find((column) => Number(column?.index) === Number(columnIndex))
+    : null;
+  const base = isPlainObject(match) ? cloneValue(match) : {};
+  const responsive = base.responsive;
+  delete base.responsive;
+  if (!shouldResolveResponsive(renderOptions)) return base;
+
+  const branch = getResponsiveBranch({ responsive }, renderOptions.deviceId);
+  COLUMN_RESPONSIVE_FIELDS.forEach((key) => {
+    if (!Object.prototype.hasOwnProperty.call(branch, key)) return;
+    if (isPlainObject(branch[key]) && isPlainObject(base[key])) {
+      base[key] = mergePlainObject(base[key], branch[key]);
+    } else {
+      base[key] = cloneValue(branch[key]);
+    }
+  });
+  return base;
+}
+
+export function resolveEffectiveColumnLayout(section, renderOptions = {}) {
+  const globalRatios = parseLayoutRatios(section?.layout || '1');
+  const globalColumnIndexes = globalRatios.map((_, index) => index);
+  const useResponsive = shouldResolveResponsive(renderOptions);
+  const sectionBranch = useResponsive
+    ? getResponsiveBranch(section?.settings || {}, renderOptions.deviceId)
+    : {};
+  const hasResponsiveLayout = !!sectionBranch.layout;
+  const trackRatios = hasResponsiveLayout
+    ? parseLayoutRatios(sectionBranch.layout).slice(0, globalRatios.length)
+    : [...globalRatios];
+  const columns = globalColumnIndexes.map((index) => ({
+    index,
+    settings: getEffectiveColumnSettings(section, index, renderOptions),
+  }));
+  const visibleColumnIndexes = columns
+    .filter((column) => column.settings?.hidden !== true)
+    .map((column) => column.index);
+  const effectiveTrackRatios = hasResponsiveLayout
+    ? trackRatios.slice(0, visibleColumnIndexes.length)
+    : visibleColumnIndexes.map((index) => globalRatios[index]);
+
+  return {
+    columns,
+    effectiveTrackRatios,
+    globalColumnIndexes,
+    globalRatios,
+    gridTemplate: ratiosToGridTemplate(effectiveTrackRatios),
+    layout: ratiosToLayout(trackRatios),
+    visibleColumnIndexes,
+  };
 }
 
 function mergePlainObject(base, override) {
@@ -150,6 +224,22 @@ function mergeButtonsResponsiveConfig(baseConfig, branch) {
   return nextConfig;
 }
 
+function mergeReaderResponsiveConfig(baseConfig, branch) {
+  const nextConfig = cloneValue(baseConfig || {}) || {};
+  const safeBranch = normalizeReaderResponsiveBranch(branch);
+  ['displayMode', 'showComments'].forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(safeBranch, key)) {
+      nextConfig[key] = cloneValue(safeBranch[key]);
+    }
+  });
+  ['controls', 'stage', 'panels'].forEach((key) => {
+    if (isPlainObject(safeBranch[key])) {
+      nextConfig[key] = mergePlainObject(nextConfig[key] || {}, safeBranch[key]);
+    }
+  });
+  return nextConfig;
+}
+
 export function getEffectiveModuleConfig(module, renderOptions = {}) {
   const baseConfig = cloneValue(module?.config || {}) || {};
   const responsive = baseConfig.responsive;
@@ -162,10 +252,14 @@ export function getEffectiveModuleConfig(module, renderOptions = {}) {
   getModuleResponsiveFields(moduleType).forEach((key) => {
     if (!Object.prototype.hasOwnProperty.call(branch, key)) return;
     if (moduleType === 'buttons' && (key === 'defaults' || key === 'buttons')) return;
+    if (moduleType === 'reader' && ['controls', 'stage', 'panels'].includes(key)) return;
     nextConfig[key] = cloneValue(branch[key]);
   });
   if (moduleType === 'buttons') {
     nextConfig = mergeButtonsResponsiveConfig(nextConfig, branch);
+  }
+  if (moduleType === 'reader') {
+    nextConfig = mergeReaderResponsiveConfig(nextConfig, branch);
   }
   return nextConfig;
 }

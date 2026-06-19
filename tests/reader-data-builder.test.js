@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   applyBuilderPageToDOM,
   loadBuilderPage,
+  loadEntryData,
   extractSubtitlesFromBuilderPage,
   loadHomepageBuilderPage,
   loadPageConfigWithFallback,
@@ -24,6 +25,7 @@ function jsonResponse(body, options = {}) {
 
 function buildPanelSnapshot({ meta = {}, sectionSettings = {} } = {}) {
   const page = getContractFixture('builderPage');
+  const readerModule = getContractFixture('builderModules').reader;
   page.sections = [
     {
       id: 'panel-row',
@@ -32,6 +34,16 @@ function buildPanelSnapshot({ meta = {}, sectionSettings = {} } = {}) {
       sortIndex: 0,
       settings: { ...sectionSettings },
       modules: [
+        {
+          ...readerModule,
+          id: 'reader-shell-module',
+          columnIndex: 0,
+          sortIndex: -1,
+          config: {
+            ...readerModule.config,
+            source: { mode: 'active-page-series' },
+          },
+        },
         {
           id: 'left-panel-text',
           moduleType: 'text',
@@ -60,6 +72,34 @@ function buildPanelSnapshot({ meta = {}, sectionSettings = {} } = {}) {
   return page;
 }
 
+function buildReaderShellPage(overrides = {}) {
+  const page = buildContractFixture('builderPage', overrides);
+  const readerModule = getContractFixture('builderModules').reader;
+  page.sections = [
+    {
+      id: 'reader-shell-section',
+      sectionType: 'row',
+      layout: '1',
+      sortIndex: -1,
+      settings: {},
+      modules: [
+        {
+          ...readerModule,
+          id: 'reader-shell-module',
+          columnIndex: 0,
+          sortIndex: 0,
+          config: {
+            ...readerModule.config,
+            source: { mode: 'active-page-series' },
+          },
+        },
+      ],
+    },
+    ...(Array.isArray(page.sections) ? page.sections : []),
+  ];
+  return page;
+}
+
 describe('reader builder presentation loading', () => {
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -72,6 +112,37 @@ describe('reader builder presentation loading', () => {
   afterEach(() => {
     vi.clearAllMocks();
     vi.restoreAllMocks();
+  });
+
+  it('preserves a scheduled empty entry from the public payload for bound-reader startup', async () => {
+    const fetchMock = vi.fn(async (url, options) => {
+      expect(url).toBe('data.json');
+      expect(options).toEqual({ cache: 'no-store' });
+      return jsonResponse({
+        entries: {
+          Published: ['comics/published/01.png'],
+          Scheduled: [],
+        },
+        entryMeta: {
+          Published: { status: 'published', showInDropdown: true },
+          Scheduled: {
+            status: 'scheduled',
+            publishAt: '2099-01-01T00:00:00.000Z',
+            showInDropdown: true,
+          },
+        },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await loadEntryData('battle-bros');
+
+    expect(result.entries.Scheduled).toEqual([]);
+    expect(result.entryOrder).toContain('Scheduled');
+    expect(result.entryMeta.Scheduled).toMatchObject({
+      status: 'scheduled',
+      publishAt: '2099-01-01T00:00:00.000Z',
+    });
   });
 
   it('prefers a published builder page and extracts header subtitles', async () => {
@@ -323,6 +394,111 @@ describe('reader builder presentation loading', () => {
     expect(fetchMock.mock.calls.map(([url]) => url)).toEqual(['/api/pages/battle-bros/about']);
   });
 
+  it('renders series pages without reader modules as normal builder content', async () => {
+    const builderPage = buildContractFixture('builderPage', {
+      slug: 'about',
+      title: 'About',
+      pageType: 'custom',
+    });
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/posts') {
+        return jsonResponse({ posts: getContractFixture('feedPosts') });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const shellState = applyBuilderPageToDOM(builderPage, { seriesId: 'battle-bros' });
+    await flushReaderUi(4);
+
+    const builderContent = document.getElementById('builderPageContent');
+    expect(shellState).toEqual({ active: false, reason: 'no-reader-module' });
+    expect(document.body.dataset.readerShell).toBe('inactive');
+    expect(builderContent?.hidden).toBe(false);
+    expect(builderContent?.querySelector('.pb-page')).not.toBeNull();
+    expect(builderContent?.querySelector('.pb-module--text')).not.toBeNull();
+    expect(document.querySelector('.viewerWrap')?.hidden).toBe(true);
+    expect(document.getElementById('controls')?.hidden).toBe(true);
+    expect(document.getElementById('leftPanel')?.hidden).toBe(true);
+    expect(document.getElementById('rightPanel')?.hidden).toBe(true);
+    expect(document.getElementById('comicCommentsSection')?.hidden).toBe(true);
+    expect(document.querySelector('.entry-controls')?.hidden).toBe(true);
+    expect(document.querySelector('.entry-controls')?.getAttribute('aria-hidden')).toBe('true');
+    expect(document.getElementById('entry')?.hidden).toBe(true);
+    expect(document.getElementById('statusPanel')?.hidden).toBe(true);
+    expect(document.querySelector('.brand')?.hidden).toBe(false);
+    expect(document.querySelector('.nav-links')?.hidden).toBe(false);
+    expect(document.getElementById('patronWelcome')?.hidden).toBe(false);
+    expect(document.querySelector('#leftPanel .panel-builder--left')).toBeNull();
+    expect(document.querySelector('#rightPanel .panel-builder--right')).toBeNull();
+  });
+
+  it('renders global pages without reader modules with builder editing markers', () => {
+    const globalPage = buildContractFixture('builderPageDraft', {
+      id: 'global-about-page',
+      scope: 'global',
+      seriesId: null,
+      slug: 'about',
+      pageType: 'custom',
+    });
+
+    const shellState = applyBuilderPageToDOM(globalPage, {
+      previewMode: true,
+      builderEditing: true,
+      deviceId: 'mobile',
+    });
+
+    const builderContent = document.getElementById('builderPageContent');
+    expect(shellState).toEqual({ active: false, reason: 'no-reader-module' });
+    expect(builderContent?.hidden).toBe(false);
+    expect(builderContent?.querySelector('.pb-page')?.dataset.builderPageId).toBe(
+      'global-about-page'
+    );
+    expect(builderContent?.querySelector('[data-builder-section-id]')).not.toBeNull();
+    expect(builderContent?.querySelector('[data-builder-column-index]')).not.toBeNull();
+    expect(builderContent?.querySelector('[data-builder-module-id]')).not.toBeNull();
+    expect(document.querySelector('.viewerWrap')?.dataset.builderPageId).toBeUndefined();
+  });
+
+  it('treats reader modules hidden on the active builder device as inactive', () => {
+    const readerModule = getContractFixture('builderModules').reader;
+    const page = buildContractFixture('builderPage', {
+      sections: [
+        {
+          id: 'hidden-reader-section',
+          sectionType: 'row',
+          layout: '1',
+          sortIndex: 0,
+          settings: {},
+          modules: [
+            {
+              ...readerModule,
+              config: {
+                ...readerModule.config,
+                responsive: {
+                  mobile: {
+                    hidden: true,
+                  },
+                },
+              },
+            },
+          ],
+        },
+      ],
+    });
+
+    const shellState = applyBuilderPageToDOM(page, {
+      previewMode: true,
+      builderEditing: true,
+      deviceId: 'mobile',
+    });
+
+    expect(shellState).toEqual({ active: false, reason: 'no-reader-module' });
+    expect(document.body.dataset.readerShell).toBe('inactive');
+    expect(document.getElementById('builderPageContent')?.hidden).toBe(false);
+    expect(document.querySelector('.viewerWrap')?.hidden).toBe(true);
+  });
+
   it('ignores stale pb-no-fallback state when the builder page is missing', async () => {
     localStorage.setItem('pb-no-fallback', '1');
     const setSubtitles = vi.fn();
@@ -357,7 +533,7 @@ describe('reader builder presentation loading', () => {
   });
 
   it('applies the builder page contract to the live reader DOM', async () => {
-    const builderPage = getContractFixture('builderPage');
+    const builderPage = buildReaderShellPage();
     const fetchMock = vi.fn(async (url) => {
       if (url === '/api/posts/latest') {
         return jsonResponse({ post: getContractFixture('latestPost') });
@@ -374,13 +550,14 @@ describe('reader builder presentation loading', () => {
 
     expect(document.querySelector('.topbar .title h1')?.textContent).toBe('Battle Bros');
     expect(document.getElementById('subtitle')?.textContent).toBe('Hero Time');
+    expect(document.querySelector('.entry-controls')?.hidden).toBe(false);
+    expect(document.getElementById('entry')?.hidden).toBe(false);
+    expect(document.getElementById('statusPanel')?.hidden).toBe(false);
     expect(document.documentElement.style.getPropertyValue('--accent')).toBe('#ffcc00');
     expect(document.documentElement.style.getPropertyValue('--bg-panel')).toBe('#151a33');
 
     const leftPanel = document.getElementById('leftPanel');
     const rightPanel = document.getElementById('rightPanel');
-    const leftBuilder = leftPanel?.querySelector('.panel-builder--left');
-    const rightBuilder = rightPanel?.querySelector('.panel-builder--right');
 
     expect(leftPanel?.style.getPropertyValue('--panel-bg-image')).toContain(
       '/assets/media/panels/left-grid.png'
@@ -388,17 +565,191 @@ describe('reader builder presentation loading', () => {
     expect(rightPanel?.style.getPropertyValue('--panel-bg-image')).toContain(
       '/assets/media/panels/right-burst.png'
     );
-    expect(leftBuilder?.style.getPropertyValue('--pb-panel-gap')).toBe('18px');
-    expect(rightBuilder?.style.getPropertyValue('--pb-panel-gap')).toBe('26px');
-    expect(leftBuilder?.querySelector('.pb-module--promo')).not.toBeNull();
-    expect(rightBuilder?.querySelector('.pb-module--feed')).not.toBeNull();
-    expect(rightBuilder?.querySelector('.latest-name')?.textContent).toBe('Issue 10 Released');
+
+    // Sections after the reader module render as below-reader page content (panels
+    // are reader-owned and fed only from the reader's own section). The contract
+    // fixture's promo/feed sections sit after the reader, so they land below it.
+    const below = document.getElementById('builderBelowReader');
+    expect(below?.hidden).toBe(false);
+    expect(below?.querySelector('.pb-module--promo')).not.toBeNull();
+    expect(below?.querySelector('.pb-module--feed')).not.toBeNull();
+    expect(below?.querySelector('.latest-name')?.textContent).toBe('Issue 10 Released');
+  });
+
+  it('renders sections above and below the reader module into reader content surfaces', () => {
+    const page = getContractFixture('builderPage');
+    const readerModule = getContractFixture('builderModules').reader;
+    page.sections = [
+      {
+        id: 'above-sec',
+        sectionType: 'row',
+        layout: '1',
+        sortIndex: 0,
+        settings: {},
+        modules: [
+          {
+            id: 'above-text',
+            moduleType: 'text',
+            columnIndex: 0,
+            sortIndex: 0,
+            config: { content: '<p>Above reader</p>' },
+          },
+        ],
+      },
+      {
+        id: 'reader-sec',
+        sectionType: 'row',
+        layout: '1',
+        sortIndex: 1,
+        settings: {},
+        modules: [
+          {
+            ...readerModule,
+            id: 'reader-shell-module',
+            columnIndex: 0,
+            sortIndex: -1,
+            config: { ...readerModule.config, source: { mode: 'active-page-series' } },
+          },
+          {
+            id: 'panel-text',
+            moduleType: 'text',
+            columnIndex: 0,
+            sortIndex: 0,
+            config: { content: '<p>Reader panel</p>' },
+          },
+        ],
+      },
+      {
+        id: 'below-sec',
+        sectionType: 'row',
+        layout: '1',
+        sortIndex: 2,
+        settings: {},
+        modules: [
+          {
+            id: 'below-text',
+            moduleType: 'text',
+            columnIndex: 0,
+            sortIndex: 0,
+            config: { content: '<p>Below reader</p>' },
+          },
+        ],
+      },
+    ];
+
+    const shellState = applyBuilderPageToDOM(page, { seriesId: 'battle-bros' });
+    expect(shellState.active).toBe(true);
+
+    const above = document.getElementById('builderAboveReader');
+    const below = document.getElementById('builderBelowReader');
+    expect(above?.hidden).toBe(false);
+    expect(above?.textContent).toContain('Above reader');
+    expect(below?.hidden).toBe(false);
+    expect(below?.textContent).toContain('Below reader');
+
+    // Under/over-reader content stays out of the reader panels; only the reader
+    // section's own column feeds the panels.
+    const leftPanel = document.getElementById('leftPanel');
+    expect(leftPanel?.textContent).toContain('Reader panel');
+    expect(leftPanel?.textContent || '').not.toContain('Above reader');
+    expect(leftPanel?.textContent || '').not.toContain('Below reader');
+  });
+
+  it('clears reader content surfaces when switching to a no-reader page', () => {
+    const page = getContractFixture('builderPage');
+    const readerModule = getContractFixture('builderModules').reader;
+    page.sections = [
+      {
+        id: 'reader-sec',
+        sectionType: 'row',
+        layout: '1',
+        sortIndex: 0,
+        settings: {},
+        modules: [
+          {
+            ...readerModule,
+            id: 'reader-shell-module',
+            columnIndex: 0,
+            sortIndex: -1,
+            config: { ...readerModule.config, source: { mode: 'active-page-series' } },
+          },
+        ],
+      },
+      {
+        id: 'below-sec',
+        sectionType: 'row',
+        layout: '1',
+        sortIndex: 1,
+        settings: {},
+        modules: [
+          {
+            id: 'below-text',
+            moduleType: 'text',
+            columnIndex: 0,
+            sortIndex: 0,
+            config: { content: '<p>Below reader</p>' },
+          },
+        ],
+      },
+    ];
+    applyBuilderPageToDOM(page, { seriesId: 'battle-bros' });
+    expect(document.getElementById('builderBelowReader')?.hidden).toBe(false);
+
+    const noReaderPage = buildContractFixture('builderPageDraft', {
+      slug: 'about',
+      title: 'About',
+      pageType: 'custom',
+    });
+    applyBuilderPageToDOM(noReaderPage, { seriesId: 'battle-bros' });
+    const below = document.getElementById('builderBelowReader');
+    expect(below?.hidden).toBe(true);
+    expect(below?.textContent).toBe('');
+  });
+
+  it('restores reader-owned header chrome when an active reader page follows a no-reader page', () => {
+    const noReaderPage = buildContractFixture('builderPageDraft', {
+      slug: 'about',
+      title: 'About',
+      pageType: 'custom',
+    });
+    applyBuilderPageToDOM(noReaderPage, { seriesId: 'battle-bros' });
+
+    expect(document.querySelector('.entry-controls')?.hidden).toBe(true);
+    expect(document.getElementById('entry')?.hidden).toBe(true);
+    expect(document.getElementById('statusPanel')?.hidden).toBe(true);
+
+    applyBuilderPageToDOM(buildReaderShellPage({ sections: [] }), { seriesId: 'battle-bros' });
+
+    expect(document.body.dataset.readerShell).toBe('active');
+    expect(document.querySelector('.entry-controls')?.hidden).toBe(false);
+    expect(document.getElementById('entry')?.hidden).toBe(false);
+    expect(document.getElementById('statusPanel')?.hidden).toBe(false);
   });
 
   it('renders entry-gallery modules through the reader shell panel stack', async () => {
     const entryGallery = getContractFixture('builderModules')['entry-gallery'];
+    const readerModule = getContractFixture('builderModules').reader;
     const builderPage = buildContractFixture('builderPage', {
       sections: [
+        {
+          id: 'reader-shell-section',
+          sectionType: 'row',
+          layout: '1',
+          sortIndex: -1,
+          settings: {},
+          modules: [
+            {
+              ...readerModule,
+              id: 'reader-shell-module',
+              columnIndex: 0,
+              sortIndex: 0,
+              config: {
+                ...readerModule.config,
+                source: { mode: 'active-page-series' },
+              },
+            },
+          ],
+        },
         {
           id: 'entry-gallery-section',
           sectionType: 'row',
@@ -433,9 +784,11 @@ describe('reader builder presentation loading', () => {
     applyBuilderPageToDOM(builderPage, { seriesId: 'battle-bros' });
     await flushReaderUi(4);
 
-    const leftBuilder = document.querySelector('#leftPanel .panel-builder--left');
-    expect(leftBuilder?.querySelector('.pb-module--entry-gallery')).not.toBeNull();
-    expect(leftBuilder?.querySelector('.pb-entry-gallery-item')?.textContent).toContain(
+    // The entry-gallery section sits after the reader module, so it renders as
+    // below-reader page content rather than reader-panel content.
+    const below = document.getElementById('builderBelowReader');
+    expect(below?.querySelector('.pb-module--entry-gallery')).not.toBeNull();
+    expect(below?.querySelector('.pb-entry-gallery-item')?.textContent).toContain(
       'Issue 1 - Issue'
     );
   });
@@ -448,6 +801,81 @@ describe('reader builder presentation loading', () => {
     expect(document.getElementById('viewport')).not.toBeNull();
     expect(document.getElementById('controls')).not.toBeNull();
     expect(document.getElementById('rightPanel')).not.toBeNull();
+  });
+
+  it('applies reader module customization to the active static shell', () => {
+    const builderPage = buildReaderShellPage();
+    builderPage.sections[0].modules[0].config = {
+      ...builderPage.sections[0].modules[0].config,
+      displayMode: 'vertical-scroll',
+      controls: {
+        placement: 'overlay',
+        size: 'large',
+        style: {
+          defaults: { appearance: { text: { color: '#ffeeaa' } } },
+          primary: { appearance: { background: { color: '#123456' } } },
+        },
+      },
+      stage: {
+        fit: 'width',
+        pageGap: 24,
+        frameBorder: false,
+        maxWidth: 1280,
+      },
+      panels: {
+        left: { enabled: false },
+        right: { enabled: true },
+      },
+      showComments: false,
+    };
+
+    applyBuilderPageToDOM(builderPage, { seriesId: 'battle-bros' });
+
+    expect(document.body.dataset.readerShell).toBe('active');
+    expect(document.body.dataset.readerDisplayMode).toBe('vertical-scroll');
+    expect(document.body.dataset.readerRequestedDisplayMode).toBe('vertical-scroll');
+    expect(document.getElementById('mainContent')?.dataset.readerControlsPlacement).toBe('overlay');
+    expect(document.getElementById('controls')?.dataset.readerControlsSize).toBe('large');
+    expect(
+      document.getElementById('controls')?.style.getPropertyValue('--reader-control-color')
+    ).toBe('#ffeeaa');
+    expect(
+      document.getElementById('controls')?.style.getPropertyValue('--reader-primary-control-bg')
+    ).toBe('#123456');
+    expect(document.getElementById('stageWrap')?.dataset.readerStageFit).toBe('width');
+    expect(document.getElementById('stageWrap')?.dataset.readerStageFrameBorder).toBe('false');
+    expect(document.getElementById('stageWrap')?.dataset.readerStageMaxWidth).toBe('1280');
+    expect(
+      document.getElementById('stage')?.style.getPropertyValue('--reader-stage-page-gap')
+    ).toBe('24px');
+    expect(document.getElementById('leftPanel')?.hidden).toBe(true);
+    expect(document.getElementById('rightPanel')?.hidden).toBe(false);
+    expect(document.getElementById('comicCommentsSection')?.hidden).toBe(true);
+    expect(document.getElementById('commentToggleBtn')?.hidden).toBe(true);
+  });
+
+  it('keeps migrated legacy side-panel modules visible when showPanels is false', () => {
+    const builderPage = buildPanelSnapshot();
+    const readerModule = builderPage.sections[0].modules.find(
+      (module) => module.moduleType === 'reader'
+    );
+    readerModule.config = {
+      source: { mode: 'active-page-series' },
+      showPanels: false,
+      showComments: true,
+    };
+
+    applyBuilderPageToDOM(builderPage, { seriesId: 'battle-bros' });
+
+    expect(document.body.dataset.readerShell).toBe('active');
+    expect(document.getElementById('leftPanel')?.hidden).toBe(false);
+    expect(document.getElementById('rightPanel')?.hidden).toBe(false);
+    expect(document.querySelector('#leftPanel .pb-module--text')?.textContent).toContain(
+      'Left panel'
+    );
+    expect(document.querySelector('#rightPanel .pb-module--text')?.textContent).toContain(
+      'Right panel'
+    );
   });
 
   it('emits and cleans builder editing markers in the reader shell', () => {
@@ -968,9 +1396,8 @@ describe('reader builder presentation loading', () => {
   });
 
   it('uses the current empty-panel behavior and hideEmptyText contract', () => {
-    const basePage = getContractFixture('builderPage');
-    const emptyPage = buildContractFixture('builderPage', {
-      sections: [basePage.sections[0]],
+    const emptyPage = buildReaderShellPage({
+      sections: [],
       meta: {
         panelBackgrounds: {
           right: {

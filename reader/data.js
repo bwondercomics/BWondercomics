@@ -13,17 +13,29 @@ import {
   sanitizePageSlug,
 } from './series.js';
 import { logger } from './logger.js';
-import { renderModule, initEmailForms, initPromoCarousels } from './page-renderer.js';
+import {
+  renderPage,
+  renderSection,
+  renderModule,
+  initEmailForms,
+  initPromoCarousels,
+} from './page-renderer.js';
 import { initFeedModules } from './feed-panel.js';
 import { initEntryGalleryModules } from './entry-gallery-module.js';
 import { initMediaGalleryModules } from './media-gallery-module.js';
 import { applySharedHeaderLayout } from './header-layout.js';
+import { publishReaderShellState, resolveReaderShellState } from './shell-state.js';
 import {
   createEffectivePageHeader,
   resolvePageHeaderState,
 } from '../admin/page-builder/header-config.js';
 import { escapeHtml } from '../admin/page-builder/helpers.js';
-import { mergeAppearance } from '../admin/page-builder/appearance-utils.js';
+import { mergeAppearance, normalizeAppearance } from '../admin/page-builder/appearance-utils.js';
+import { getReaderRuntimeConfig } from '../admin/page-builder/reader-config.js';
+import {
+  getEffectiveModuleConfig,
+  isModuleHiddenForDevice,
+} from '../admin/page-builder/responsive-overrides.js';
 
 const BUILDER_THEME_CSS_VARS = Object.freeze([
   '--primary',
@@ -41,6 +53,25 @@ const PANEL_BACKGROUND_CSS_VARS = Object.freeze([
   '--panel-bg-position',
   '--panel-bg-opacity',
 ]);
+
+const READER_CONTROL_STYLE_VARS = Object.freeze([
+  '--reader-control-bg',
+  '--reader-control-color',
+  '--reader-control-border',
+  '--reader-control-border-width',
+  '--reader-control-border-style',
+  '--reader-control-border-color',
+  '--reader-control-border-radius',
+  '--reader-primary-control-bg',
+  '--reader-primary-control-color',
+  '--reader-primary-control-border',
+  '--reader-primary-control-border-width',
+  '--reader-primary-control-border-style',
+  '--reader-primary-control-border-color',
+  '--reader-primary-control-border-radius',
+]);
+
+const HEX_COLOR_WITHOUT_ALPHA_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 function resolveHeaderPageForDevice(page, { builderEditing = false, deviceId = '' } = {}) {
   if (!builderEditing || !deviceId) return page;
@@ -398,8 +429,212 @@ function resetPanelVisibility() {
   if (rightPanel) rightPanel.style.display = '';
 }
 
-function syncReaderShellBuilderMarkers(page, builderEditing) {
-  const pageTargets = [document.body, document.querySelector('.viewerWrap')].filter(Boolean);
+function hexToRgba(color, opacity) {
+  if (!color || color === 'transparent') return color || '';
+  if (!HEX_COLOR_WITHOUT_ALPHA_RE.test(color)) return color;
+  const hex = color.slice(1);
+  const normalized =
+    hex.length === 3
+      ? hex
+          .split('')
+          .map((char) => `${char}${char}`)
+          .join('')
+      : hex;
+  const red = parseInt(normalized.slice(0, 2), 16);
+  const green = parseInt(normalized.slice(2, 4), 16);
+  const blue = parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${opacity})`;
+}
+
+function applyOpacity(color, opacity) {
+  if (!color) return '';
+  if (opacity == null || opacity === 1) return color;
+  return hexToRgba(color, opacity);
+}
+
+function resolveAppearanceBackground(background = {}) {
+  if (!background.color) return '';
+  const opacity = background.opacity ?? 1;
+  if (background.type === 'gradient' && background.secondaryColor) {
+    const angle = background.angle ?? 135;
+    return `linear-gradient(${angle}deg, ${applyOpacity(background.color, opacity)}, ${applyOpacity(
+      background.secondaryColor,
+      opacity
+    )})`;
+  }
+  return applyOpacity(background.color, opacity);
+}
+
+function resolveAppearanceBorder(border = {}) {
+  const width = border.width;
+  const color = border.color ? applyOpacity(border.color, border.opacity ?? 1) : '';
+  if (width === 0) return 'none';
+  if (width != null && color) {
+    return `${width}px ${border.style || 'solid'} ${color}`;
+  }
+  return '';
+}
+
+function applyReaderControlAppearanceVars(element, appearance, prefix) {
+  if (!element) return;
+  const baseVar = prefix === 'primary' ? '--reader-primary-control' : '--reader-control';
+  const normalized = normalizeAppearance(appearance);
+  const background = normalized?.background || {};
+  const text = normalized?.text || {};
+  const border = normalized?.border || {};
+  const backgroundValue = resolveAppearanceBackground(background);
+  const borderValue = resolveAppearanceBorder(border);
+
+  [
+    `${baseVar}-bg`,
+    `${baseVar}-color`,
+    `${baseVar}-border`,
+    `${baseVar}-border-width`,
+    `${baseVar}-border-style`,
+    `${baseVar}-border-color`,
+    `${baseVar}-border-radius`,
+  ].forEach((cssVar) => element.style.removeProperty(cssVar));
+
+  if (backgroundValue) element.style.setProperty(`${baseVar}-bg`, backgroundValue);
+  if (text.color) element.style.setProperty(`${baseVar}-color`, text.color);
+  if (borderValue) element.style.setProperty(`${baseVar}-border`, borderValue);
+  if (border.width != null) {
+    element.style.setProperty(`${baseVar}-border-width`, `${border.width}px`);
+  }
+  if (border.style) {
+    element.style.setProperty(`${baseVar}-border-style`, border.style);
+  }
+  if (border.color) {
+    element.style.setProperty(
+      `${baseVar}-border-color`,
+      applyOpacity(border.color, border.opacity ?? 1)
+    );
+  }
+  if (border.radius != null) {
+    element.style.setProperty(`${baseVar}-border-radius`, `${border.radius}px`);
+  }
+}
+
+function findEffectiveReaderModule(page, options = {}) {
+  if (!page || !Array.isArray(page.sections)) return null;
+  for (const section of page.sections) {
+    for (const module of section?.modules || []) {
+      if (module?.moduleType !== 'reader') continue;
+      const hidden = isModuleHiddenForDevice(module, {
+        builderEditing: options.builderEditing === true,
+        deviceId: options.deviceId,
+      });
+      if (!hidden) return module;
+    }
+  }
+  return null;
+}
+
+function isPlainObject(value) {
+  return !!value && typeof value === 'object' && !Array.isArray(value);
+}
+
+function resolveReaderModuleShellSettings(page, options = {}) {
+  const readerModule = findEffectiveReaderModule(page, options);
+  if (!readerModule) {
+    return {
+      settings: getReaderRuntimeConfig({}),
+      hasExplicitPanels: false,
+    };
+  }
+  const effectiveConfig = getEffectiveModuleConfig(readerModule, {
+    builderEditing: options.builderEditing === true,
+    deviceId: options.deviceId,
+  });
+  return {
+    settings: getReaderRuntimeConfig(effectiveConfig),
+    hasExplicitPanels: isPlainObject(effectiveConfig.panels),
+  };
+}
+
+export function applyReaderModuleShellSettings(page, options = {}) {
+  const { settings, hasExplicitPanels } = resolveReaderModuleShellSettings(page, options);
+  const controls = document.getElementById('controls');
+  const mainContent = document.getElementById('mainContent');
+  const stageWrap = document.getElementById('stageWrap');
+  const viewport = document.getElementById('viewport');
+  const stage = document.getElementById('stage');
+  const leftPanel = document.getElementById('leftPanel');
+  const rightPanel = document.getElementById('rightPanel');
+  const commentsSection = document.getElementById('comicCommentsSection');
+  const commentToggle = document.getElementById('commentToggleBtn');
+
+  // Capture the previously applied mode so we can notify the runtime when a
+  // preview snapshot switches display modes (the runtime owns re-rendering).
+  const previousDisplayMode = document.body.dataset.readerDisplayMode;
+  document.body.dataset.readerDisplayMode = settings.displayMode;
+  document.body.dataset.readerRequestedDisplayMode = settings.requestedDisplayMode;
+  if (previousDisplayMode !== undefined && previousDisplayMode !== settings.displayMode) {
+    window.dispatchEvent(
+      new CustomEvent('readerDisplayModeChanged', {
+        detail: { displayMode: settings.displayMode, previous: previousDisplayMode },
+      })
+    );
+  }
+
+  if (mainContent) {
+    mainContent.dataset.readerControlsPlacement = settings.controls.placement;
+    mainContent.dataset.readerControlsSize = settings.controls.size;
+  }
+
+  if (controls) {
+    controls.dataset.readerControlsPlacement = settings.controls.placement;
+    controls.dataset.readerControlsSize = settings.controls.size;
+    controls.style.maxWidth = settings.stage.maxWidth == null ? '' : `${settings.stage.maxWidth}px`;
+    READER_CONTROL_STYLE_VARS.forEach((cssVar) => controls.style.removeProperty(cssVar));
+    applyReaderControlAppearanceVars(
+      controls,
+      settings.controls.style.defaults.appearance,
+      'control'
+    );
+    applyReaderControlAppearanceVars(
+      controls,
+      settings.controls.style.primary.appearance,
+      'primary'
+    );
+    setHiddenState(controls, settings.controls.placement === 'hidden');
+  }
+
+  [viewport, stageWrap].forEach((element) => {
+    if (!element) return;
+    element.dataset.readerStageFit = settings.stage.fit;
+    element.dataset.readerStageFrameBorder = String(settings.stage.frameBorder);
+    element.dataset.readerStageMaxWidth =
+      settings.stage.maxWidth == null ? '' : String(settings.stage.maxWidth);
+    element.style.maxWidth = settings.stage.maxWidth == null ? '' : `${settings.stage.maxWidth}px`;
+  });
+
+  if (stageWrap) {
+    stageWrap.dataset.readerStagePageGap = String(settings.stage.pageGap);
+  }
+  if (stage) {
+    stage.style.setProperty('--reader-stage-page-gap', `${settings.stage.pageGap}px`);
+  }
+  // Vertical mode renders into #verticalStrip (a child of #viewport, not #stage),
+  // so expose the page gap on the viewport too for the strip to inherit.
+  if (viewport) {
+    viewport.style.setProperty('--reader-stage-page-gap', `${settings.stage.pageGap}px`);
+  }
+
+  if (hasExplicitPanels) {
+    setHiddenState(leftPanel, settings.panels.left.enabled === false);
+    setHiddenState(rightPanel, settings.panels.right.enabled === false);
+  }
+  setHiddenState(commentsSection, settings.showComments === false);
+  setHiddenState(commentToggle, settings.showComments === false);
+}
+
+function syncReaderShellBuilderMarkers(page, builderEditing, options = {}) {
+  const shellActive = options.shellActive !== false;
+  const pageTargets = [
+    document.body,
+    shellActive ? document.querySelector('.viewerWrap') : null,
+  ].filter(Boolean);
   pageTargets.forEach((target) => {
     if (builderEditing && page?.id) {
       target.setAttribute('data-builder-page-id', String(page.id));
@@ -407,11 +642,181 @@ function syncReaderShellBuilderMarkers(page, builderEditing) {
     }
     target.removeAttribute('data-builder-page-id');
   });
+  if (!shellActive) {
+    document.querySelector('.viewerWrap')?.removeAttribute('data-builder-page-id');
+  }
   if (!builderEditing) {
     const topbar = document.querySelector('header.topbar#topbar');
     topbar?.removeAttribute('data-builder-page-id');
     topbar?.removeAttribute('data-builder-surface');
   }
+}
+
+function ensureBuilderPageContent() {
+  let container = document.getElementById('builderPageContent');
+  if (container) return container;
+
+  container = document.createElement('div');
+  container.id = 'builderPageContent';
+  container.className = 'builder-page-content';
+  container.hidden = true;
+
+  const main = document.querySelector('main') || document.body;
+  main?.appendChild(container);
+  return container;
+}
+
+function setHiddenState(element, hidden) {
+  if (!element) return;
+  element.hidden = hidden;
+  if (hidden) {
+    element.setAttribute('aria-hidden', 'true');
+    if ('inert' in element) element.inert = true;
+    return;
+  }
+  element.removeAttribute('aria-hidden');
+  if ('inert' in element) element.inert = false;
+}
+
+// Above/below-reader content surfaces. On a bound reader page authors may place
+// normal sections before or after the required reader module; those render here as
+// full-width page content (not reader panels), bracketing the static reader stage.
+const READER_SURFACE_IDS = Object.freeze({
+  above: 'builderAboveReader',
+  below: 'builderBelowReader',
+});
+
+function ensureReaderSurface(placement) {
+  const id = READER_SURFACE_IDS[placement];
+  let surface = document.getElementById(id);
+  if (surface) return surface;
+
+  surface = document.createElement('div');
+  surface.id = id;
+  surface.className = `builder-reader-surface builder-reader-surface--${placement}`;
+  surface.hidden = true;
+
+  const main = document.querySelector('main');
+  const viewerWrap = main?.querySelector('.viewerWrap');
+  if (main && viewerWrap) {
+    if (placement === 'above') {
+      main.insertBefore(surface, viewerWrap);
+    } else {
+      viewerWrap.insertAdjacentElement('afterend', surface);
+    }
+  } else {
+    (main || document.body).appendChild(surface);
+  }
+  return surface;
+}
+
+function clearReaderSurfaces() {
+  Object.keys(READER_SURFACE_IDS).forEach((placement) => {
+    const surface = ensureReaderSurface(placement);
+    surface.innerHTML = '';
+    setHiddenState(surface, true);
+  });
+}
+
+function initBuilderSurfaceModules(container, options = {}) {
+  initEmailForms(container, { previewMode: !!options.previewMode });
+  initPromoCarousels(container);
+  initEntryGalleryModules(container);
+  initFeedModules(container);
+  initMediaGalleryModules(container);
+}
+
+function renderReaderSurface(placement, page, entries, options = {}) {
+  const surface = ensureReaderSurface(placement);
+  if (!entries.length) {
+    surface.innerHTML = '';
+    setHiddenState(surface, true);
+    return;
+  }
+  const builderEditing = options.builderEditing === true;
+  const deviceId = options.deviceId;
+  surface.innerHTML = entries
+    .map(({ section, sectionIndex }) =>
+      renderSection(section, { builderEditing, deviceId, sectionIndex })
+    )
+    .join('');
+  initBuilderSurfaceModules(surface, options);
+  setHiddenState(surface, false);
+}
+
+// Index of the section that contains the active (effective) reader module.
+function findReaderSectionIndex(page, readerModule) {
+  if (!readerModule || !Array.isArray(page?.sections)) return -1;
+  return page.sections.findIndex((section) =>
+    (section?.modules || []).some((module) => module === readerModule)
+  );
+}
+
+function clearReaderShellBuilderTargets() {
+  document.querySelector('.viewerWrap')?.removeAttribute('data-builder-page-id');
+  document.querySelectorAll('.viewerWrap [data-builder-module-id]').forEach((element) => {
+    element.removeAttribute('data-builder-module-id');
+    element.removeAttribute('data-builder-module-type');
+  });
+  document.querySelectorAll('.viewerWrap [data-builder-section-id]').forEach((element) => {
+    element.removeAttribute('data-builder-section-id');
+    element.removeAttribute('data-builder-section-index');
+    element.removeAttribute('data-builder-layout');
+  });
+  document.querySelectorAll('.viewerWrap [data-builder-column-index]').forEach((element) => {
+    element.removeAttribute('data-builder-column-index');
+  });
+}
+
+function applyReaderShellDomState(shellState) {
+  const active = shellState?.active === true;
+  const builderContent = ensureBuilderPageContent();
+  setHiddenState(builderContent, active);
+
+  [
+    document.querySelector('.viewerWrap'),
+    document.getElementById('leftPanel'),
+    document.getElementById('rightPanel'),
+    document.getElementById('stageWrap'),
+    document.getElementById('controls'),
+    document.getElementById('edgeLeft'),
+    document.getElementById('edgeRight'),
+    document.getElementById('comicCommentsSection'),
+    document.getElementById('entryCoverGallery'),
+    document.getElementById('shortcutsOverlay'),
+    document.getElementById('entryEndOverlay'),
+  ].forEach((element) => setHiddenState(element, !active));
+
+  if (active) {
+    builderContent.innerHTML = '';
+  } else {
+    clearReaderShellBuilderTargets();
+  }
+  // Reset the above/below-reader surfaces on every apply; the active branch
+  // repopulates them from the page's non-reader sections when appropriate.
+  clearReaderSurfaces();
+}
+
+function applyReaderHeaderChromeState(shellState) {
+  const active = shellState?.active === true;
+  [
+    document.querySelector('.entry-controls'),
+    document.getElementById('entry'),
+    document.getElementById('statusPanel'),
+  ].forEach((element) => setHiddenState(element, !active));
+}
+
+function renderBuilderPageContent(page, options = {}) {
+  const container = ensureBuilderPageContent();
+  container.innerHTML = renderPage(page, {
+    builderEditing: options.builderEditing === true,
+    deviceId: options.deviceId,
+  });
+  initEmailForms(container, { previewMode: !!options.previewMode });
+  initPromoCarousels(container);
+  initEntryGalleryModules(container);
+  initFeedModules(container);
+  initMediaGalleryModules(container);
 }
 
 function builderMarkerAttrs(attrs = {}, enabled = false) {
@@ -488,11 +893,18 @@ function renderPanelBuilderEditingStack(side, modules, options = {}) {
 export function applyBuilderPageToDOM(page, options = {}) {
   const builderEditing = options.builderEditing === true;
   const deviceId = options.deviceId;
+  const shellState = publishReaderShellState(
+    resolveReaderShellState(page, { builderEditing, deviceId })
+  );
+  applyReaderShellDomState(shellState);
+
   if (!page || !page.sections) {
-    syncReaderShellBuilderMarkers(null, false);
-    return;
+    syncReaderShellBuilderMarkers(null, false, { shellActive: false });
+    applyReaderHeaderChromeState(shellState);
+    renderBuilderPageContent(null, options);
+    return shellState;
   }
-  syncReaderShellBuilderMarkers(page, builderEditing);
+  syncReaderShellBuilderMarkers(page, builderEditing, { shellActive: shellState.active });
   const headerPage = resolveHeaderPageForDevice(page, { builderEditing, deviceId });
   const headerState = resolvePageHeaderState({
     page: headerPage,
@@ -505,10 +917,60 @@ export function applyBuilderPageToDOM(page, options = {}) {
     headerState,
     builderEditing,
   });
+  applyReaderHeaderChromeState(shellState);
 
   // Apply theme first
   applyPageTheme(page);
   applyPanelBackgrounds(page);
+
+  // Apply effective page header copy.
+  const titleEl = document.querySelector('.topbar .title h1');
+  if (titleEl && effectiveHeader.copy?.title) {
+    titleEl.textContent = effectiveHeader.copy.title;
+  }
+  const subtitleEl = document.getElementById('subtitle');
+  const subtitleText = effectiveHeader.copy?.subtitle || effectiveHeader.copy?.subtitles?.[0] || '';
+  if (subtitleEl) {
+    subtitleEl.textContent = subtitleText;
+  }
+  if (window.BattleBros?.setSubtitles) {
+    const subtitles = extractSubtitlesFromBuilderPage(page, options.pageConfig || null);
+    window.BattleBros.setSubtitles(subtitles);
+  }
+
+  if (!shellState.active) {
+    renderBuilderPageContent(page, options);
+    logger.log('✓ Applied no-reader builder page to DOM');
+    return shellState;
+  }
+
+  // Locate the reader module's section. Sections before it render into the
+  // above-reader surface and sections after it into the below-reader surface as
+  // normal page content; only the reader's own section feeds the reader panels.
+  const readerModule = findEffectiveReaderModule(page, { builderEditing, deviceId });
+  const readerSectionIndex = findReaderSectionIndex(page, readerModule);
+  const aboveSections = [];
+  const belowSections = [];
+  if (readerSectionIndex >= 0) {
+    page.sections.forEach((section, sectionIndex) => {
+      if (sectionIndex < readerSectionIndex) {
+        aboveSections.push({ section, sectionIndex });
+      } else if (sectionIndex > readerSectionIndex) {
+        belowSections.push({ section, sectionIndex });
+      }
+    });
+  }
+  renderReaderSurface('above', page, aboveSections, {
+    builderEditing,
+    deviceId,
+    previewMode: !!options.previewMode,
+  });
+  renderReaderSurface('below', page, belowSections, {
+    builderEditing,
+    deviceId,
+    previewMode: !!options.previewMode,
+  });
+
   const panelSpacing = page?.meta?.panelSpacing || {};
   const panelBackgrounds = page?.meta?.panelBackgrounds || {};
 
@@ -528,9 +990,16 @@ export function applyBuilderPageToDOM(page, options = {}) {
     'video',
   ]);
 
+  // Panels are reader-owned: only the reader module's own section feeds them, so
+  // above/below-reader sections stay page content rather than being pulled into panels.
+  const panelSections =
+    readerSectionIndex >= 0
+      ? [[readerSectionIndex, page.sections[readerSectionIndex]]]
+      : Array.from(page.sections.entries());
+
   const findPanelModules = (side) => {
     const results = [];
-    for (const [sectionIndex, section] of page.sections.entries()) {
+    for (const [sectionIndex, section] of panelSections) {
       const layout = section.layout || '1';
       const colCount = layout.split('-').length;
       const leftIndex = 0;
@@ -551,21 +1020,6 @@ export function applyBuilderPageToDOM(page, options = {}) {
     return results;
   };
 
-  // Apply effective page header copy.
-  const titleEl = document.querySelector('.topbar .title h1');
-  if (titleEl && effectiveHeader.copy?.title) {
-    titleEl.textContent = effectiveHeader.copy.title;
-  }
-  const subtitleEl = document.getElementById('subtitle');
-  const subtitleText = effectiveHeader.copy?.subtitle || effectiveHeader.copy?.subtitles?.[0] || '';
-  if (subtitleEl) {
-    subtitleEl.textContent = subtitleText;
-  }
-  if (window.BattleBros?.setSubtitles) {
-    const subtitles = extractSubtitlesFromBuilderPage(page, options.pageConfig || null);
-    window.BattleBros.setSubtitles(subtitles);
-  }
-
   // Apply left/right panel content based on columns
   const leftModules = findPanelModules('left');
   const rightModules = findPanelModules('right');
@@ -580,9 +1034,10 @@ export function applyBuilderPageToDOM(page, options = {}) {
     deviceId,
   });
 
-  // Check panel visibility from section settings
+  // Check panel visibility from section settings (reader-owned: only the reader
+  // section's panelEnabled controls the reader panels).
   resetPanelVisibility();
-  for (const section of page.sections) {
+  for (const [, section] of panelSections) {
     const settings = section.settings || {};
     if (settings.panelEnabled) {
       const leftPanel = document.getElementById('leftPanel');
@@ -600,7 +1055,10 @@ export function applyBuilderPageToDOM(page, options = {}) {
     }
   }
 
+  applyReaderModuleShellSettings(page, { builderEditing, deviceId });
+
   logger.log('✓ Applied page builder config to DOM');
+  return shellState;
 }
 
 /**

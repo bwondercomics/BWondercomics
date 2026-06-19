@@ -4,6 +4,7 @@
  */
 
 import { STORAGE } from './constants.js';
+import { isVerticalMode } from './display-mode.js';
 
 /**
  * Global application state object
@@ -12,7 +13,7 @@ import { STORAGE } from './constants.js';
  * @property {string} currentEntry - Name of the currently displayed chapter
  * @property {string[]} pages - Array of image URLs for the current chapter
  * @property {number} pageIndex - Current page index (0-based)
- * @property {Object|null} entryMeta - Metadata for the current entry (status, comingSoon, etc)
+ * @property {Object|null} entryMeta - Metadata for the current entry (status, publishAt, etc)
  * @property {number} scale - Current zoom scale factor
  * @property {{x: number, y: number}} pan - Current pan offset in pixels
  * @property {Map} pointers - Active pointer/touch events
@@ -69,6 +70,16 @@ export function saveProgress(stateObj = state) {
       page: stateObj.pageIndex,
       timestamp: Date.now(),
     };
+    // Vertical mode resumes by scroll position; persist a 0-1 ratio of the
+    // entry's scroll height so resume works regardless of image dimensions.
+    // Additive and backward compatible — paged mode ignores it.
+    if (isVerticalMode() && typeof document !== 'undefined') {
+      const viewport = document.getElementById('viewport');
+      if (viewport) {
+        const denom = viewport.scrollHeight - viewport.clientHeight;
+        data.scrollRatio = denom > 0 ? Math.min(1, Math.max(0, viewport.scrollTop / denom)) : 0;
+      }
+    }
     localStorage.setItem(STORAGE.PROGRESS_KEY, JSON.stringify(data));
   } catch (e) {
     console.warn('Failed to save progress:', e);

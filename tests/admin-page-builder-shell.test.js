@@ -42,6 +42,32 @@ function createDragLikeEvent(type, dataTransfer, init = {}) {
   return event;
 }
 
+function withReaderModule(page, overrides = {}) {
+  return buildContractFixture('builderPage', {
+    ...page,
+    sections: [
+      ...(page.sections || []),
+      {
+        id: `${page.id}-reader-section`,
+        sectionType: 'row',
+        layout: '1',
+        sortIndex: (page.sections || []).length,
+        settings: {},
+        modules: [
+          {
+            id: `${page.id}-reader-module`,
+            moduleType: 'reader',
+            columnIndex: 0,
+            sortIndex: 0,
+            config: { source: { mode: 'active-page-series' } },
+            ...overrides,
+          },
+        ],
+      },
+    ],
+  });
+}
+
 function createKeyboardLikeEvent(key, init = {}) {
   return new KeyboardEvent('keydown', {
     key,
@@ -86,6 +112,8 @@ async function setupPageBuilder({
   reorderModulesResult = true,
   reorderSectionsResult = true,
   updatePageResult = null,
+  updatePageBindingsResult = undefined,
+  pageBuilderDataError = null,
   updateModuleResult = undefined,
   useRealEditors = false,
   viewportWidth = 1600,
@@ -114,7 +142,10 @@ async function setupPageBuilder({
   const reorderPages = vi.fn(async () => reorderPagesResult);
   const reorderScopedPages = vi.fn(async () => reorderPagesResult);
   const fetchPageBindings = vi.fn(async () => fetchPageBindingsResult);
-  const updatePageBindings = vi.fn(async () => fetchPageBindingsResult);
+  const updatePageBindings = vi.fn(async () =>
+    updatePageBindingsResult === undefined ? fetchPageBindingsResult : updatePageBindingsResult
+  );
+  const getLastPageBuilderDataError = vi.fn(() => pageBuilderDataError);
   const updatePage = vi.fn(
     async (_pageId, data) =>
       updatePageResult || {
@@ -175,6 +206,7 @@ async function setupPageBuilder({
     reorderPages,
     reorderScopedPages,
     updatePage,
+    getLastPageBuilderDataError,
     fetchPageBindings,
     updatePageBindings,
     fetchAssets: vi.fn(async () => []),
@@ -245,6 +277,7 @@ async function setupPageBuilder({
       updateSection,
       updateModule,
       updatePage,
+      getLastPageBuilderDataError,
       updatePageBindings,
       deleteSection,
       deleteModule,
@@ -983,7 +1016,7 @@ describe('admin page-builder shell', () => {
   });
 
   it('switches page scopes and updates the series reader binding', async () => {
-    const seriesPage = getContractFixture('builderPage');
+    const seriesPage = withReaderModule(getContractFixture('builderPage'));
     const globalPage = buildContractFixture('builderPageDraft', {
       id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeee98',
       scope: 'global',
@@ -994,6 +1027,7 @@ describe('admin page-builder shell', () => {
     });
     const { manager, mocks } = await setupPageBuilder({
       fetchPagesResults: [[seriesPage]],
+      fetchPageResult: seriesPage,
       fetchGlobalPagesResults: [[globalPage]],
       fetchPageBindingsResult: {
         seriesId: 'battle-bros',
@@ -1051,6 +1085,80 @@ describe('admin page-builder shell', () => {
       'battle-bros',
       'contact',
       'Contact'
+    );
+  });
+
+  it('does not bind a series page without a reader module', async () => {
+    const seriesPage = getContractFixture('builderPage');
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[seriesPage]],
+      fetchPageResult: seriesPage,
+      fetchPageBindingsResult: {
+        seriesId: 'battle-bros',
+        bindings: {},
+        warnings: [
+          {
+            role: 'reader',
+            code: 'missing_reader_binding',
+            message: 'This series is missing a reader page binding.',
+          },
+        ],
+      },
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector('.pb-page-action.reader')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(mocks.updatePageBindings).not.toHaveBeenCalled();
+    expect(document.getElementById('pbPageList')?.textContent).toContain(
+      'must contain one Comic Reader module'
+    );
+  });
+
+  it('shows backend reader-binding validation failures in the editor and page list', async () => {
+    const seriesPage = withReaderModule(getContractFixture('builderPage'));
+    const backendWarning = {
+      role: 'reader',
+      code: 'reader_module_wrong_source',
+      message: "The bound reader page's Comic Reader module must use the active page series.",
+    };
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[seriesPage]],
+      fetchPageResult: seriesPage,
+      fetchPageBindingsResult: {
+        seriesId: 'battle-bros',
+        bindings: {},
+        warnings: [],
+      },
+      updatePageBindingsResult: null,
+      pageBuilderDataError: {
+        message: backendWarning.message,
+        code: backendWarning.code,
+        warnings: [backendWarning],
+      },
+    });
+
+    await manager.showPageBuilderSection();
+
+    document
+      .querySelector('.pb-page-action.reader')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(mocks.updatePageBindings).toHaveBeenCalledWith('battle-bros', {
+      reader: seriesPage.id,
+    });
+    expect(mocks.getLastPageBuilderDataError).toHaveBeenCalled();
+    expect(document.getElementById('pbPageList')?.textContent).toContain(
+      'must use the active page series'
     );
   });
 
@@ -1315,6 +1423,7 @@ describe('admin page-builder shell', () => {
     await flushAdminUi(3);
 
     expect(mocks.updateSection).toHaveBeenCalledWith(editableSection.id, {
+      layout: '1-1',
       settings: {
         moduleGap: 28,
         columnGap: 24,
@@ -1335,6 +1444,517 @@ describe('admin page-builder shell', () => {
         `.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-input[data-setting="sectionGap"]`
       )?.value
     ).toBe('40');
+  });
+
+  it('edits column count, ratios, and per-column styling and saves layout atomically', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const editableSection = selectedPage.sections[1]; // layout '1-1'
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      updateSectionResult: {
+        id: editableSection.id,
+        layout: '2-1-1-1',
+        settings: { columns: [{ index: 0, appearance: { background: { color: '#123456' } } }] },
+      },
+      useRealEditors: true,
+    });
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    document
+      .querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] [data-action="toggle-section-settings"]`
+      )
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    // Grow to 4 columns.
+    const countSelect = document.getElementById('pbEditSectionColumnCount');
+    expect(countSelect).not.toBeNull();
+    countSelect.value = '4';
+    countSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    // Four column cards now render.
+    expect(document.querySelectorAll('[data-column-ratio]').length).toBe(4);
+
+    // Widen the first column and give it a background through the shared
+    // sanitized appearance editor.
+    const ratioInput = document.querySelector('[data-column-ratio][data-column-index="0"]');
+    ratioInput.value = '2';
+    ratioInput.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const backgroundToggle = document.querySelector(
+      '[data-appearance-toggle="true"][data-appearance-scope="section-column"][data-appearance-key="background.color"][data-item-index="0"]'
+    );
+    backgroundToggle.checked = true;
+    backgroundToggle.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const backgroundInput = document.querySelector(
+      '[data-appearance-input="true"][data-appearance-input-kind="hex"][data-appearance-scope="section-column"][data-appearance-key="background.color"][data-item-index="0"]'
+    );
+    backgroundInput.value = '#123456';
+    backgroundInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAdminUi(2);
+
+    document
+      .querySelector('[data-action="save-section-settings"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.updateSection).toHaveBeenCalledWith(
+      editableSection.id,
+      expect.objectContaining({
+        layout: '2-1-1-1',
+        settings: expect.objectContaining({
+          columns: expect.arrayContaining([
+            expect.objectContaining({
+              index: 0,
+              appearance: { background: { color: '#123456' } },
+            }),
+          ]),
+        }),
+      })
+    );
+  });
+
+  it('sends unsaved section layout and appearance drafts to live preview and restores on discard', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const editableSection = selectedPage.sections[1];
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+    document
+      .querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] [data-action="toggle-section-settings"]`
+      )
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const countSelect = document.getElementById('pbEditSectionColumnCount');
+    countSelect.value = '4';
+    countSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const ratioInput = document.querySelector('[data-column-ratio][data-column-index="0"]');
+    ratioInput.value = '2';
+    ratioInput.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const backgroundToggle = document.querySelector(
+      '[data-appearance-toggle="true"][data-appearance-scope="section-column"][data-appearance-key="background.color"][data-item-index="0"]'
+    );
+    backgroundToggle.checked = true;
+    backgroundToggle.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+    const backgroundInput = document.querySelector(
+      '[data-appearance-input="true"][data-appearance-input-kind="hex"][data-appearance-scope="section-column"][data-appearance-key="background.color"][data-item-index="0"]'
+    );
+    backgroundInput.value = '#123456';
+    backgroundInput.dispatchEvent(new Event('input', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const draftSnapshot = requestCurrentPreviewSnapshot();
+    const draftSection = draftSnapshot.page.sections.find(
+      (section) => section.id === editableSection.id
+    );
+    expect(draftSnapshot.source).toBe('working');
+    expect(draftSection.layout).toBe('2-1-1-1');
+    expect(draftSection.settings.columns[0].appearance.background.color).toBe('#123456');
+    expect(editableSection.layout).toBe('1-1');
+    expect(mocks.updateSection).not.toHaveBeenCalled();
+
+    document
+      .querySelector('[data-action="discard-current"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    const restoredSnapshot = requestCurrentPreviewSnapshot();
+    const restoredSection = restoredSnapshot.page.sections.find(
+      (section) => section.id === editableSection.id
+    );
+    expect(restoredSnapshot.source).toBe('saved');
+    expect(restoredSection.layout).toBe('1-1');
+    expect(restoredSection.settings.columns).toBeUndefined();
+    expect(mocks.updateSection).not.toHaveBeenCalled();
+  });
+
+  it('authors responsive track layouts and per-device column styles without changing structure', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const editableSection = selectedPage.sections[1];
+    editableSection.layout = '1-1-1-1';
+    editableSection.settings = {
+      ...(editableSection.settings || {}),
+      columns: [{ index: 0, alignment: 'center' }],
+    };
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      updateSectionResult: {
+        ...editableSection,
+        settings: {
+          ...editableSection.settings,
+          responsive: { mobile: { layout: '2-1-1' } },
+          columns: [
+            {
+              index: 0,
+              alignment: 'center',
+              responsive: {
+                mobile: {
+                  appearance: { text: { color: '#abcdef' } },
+                  padding: { top: 12 },
+                  alignment: 'stretch',
+                  minHeight: 240,
+                  hidden: true,
+                },
+              },
+            },
+          ],
+        },
+      },
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] [data-action="toggle-section-settings"]`
+      )
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    document
+      .querySelector('#pbWidthToggles [data-width="mobile"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    const scopeSelect = document.querySelector('[data-responsive-edit-scope]');
+    scopeSelect.value = 'device';
+    scopeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(document.querySelectorAll('.pb-column-editor')).toHaveLength(4);
+    const countSelect = document.getElementById('pbEditSectionColumnCount');
+    expect(
+      Array.from(countSelect.options)
+        .map((option) => option.value)
+        .slice(-4)
+    ).toEqual(['1', '2', '3', '4']);
+    countSelect.value = '3';
+    countSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const firstRatio = document.querySelector('[data-column-ratio][data-column-index="0"]');
+    firstRatio.value = '2';
+    firstRatio.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const textToggle = document.querySelector(
+      '[data-appearance-toggle="true"][data-appearance-scope="section-column"][data-appearance-key="text.color"][data-item-index="0"]'
+    );
+    textToggle.checked = true;
+    textToggle.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+    const textInput = document.querySelector(
+      '[data-appearance-input="true"][data-appearance-input-kind="hex"][data-appearance-scope="section-column"][data-appearance-key="text.color"][data-item-index="0"]'
+    );
+    textInput.value = '#abcdef';
+    textInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    const paddingInput = document.querySelector(
+      '[data-column-field="paddingTop"][data-column-index="0"]'
+    );
+    paddingInput.value = '12';
+    paddingInput.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+    const alignmentSelect = document.querySelector(
+      '[data-column-field="alignment"][data-column-index="0"]'
+    );
+    alignmentSelect.value = 'stretch';
+    alignmentSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+    const minHeightInput = document.querySelector(
+      '[data-column-field="minHeight"][data-column-index="0"]'
+    );
+    minHeightInput.value = '240';
+    minHeightInput.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+    const visibilitySelect = document.querySelector(
+      '[data-column-field="hidden"][data-column-index="0"]'
+    );
+    visibilitySelect.value = 'true';
+    visibilitySelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    document
+      .querySelector('[data-action="save-section-settings"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.updateSection).toHaveBeenCalledWith(
+      editableSection.id,
+      expect.objectContaining({
+        layout: '1-1-1-1',
+        settings: expect.objectContaining({
+          responsive: {
+            mobile: {
+              layout: '2-1-1',
+            },
+          },
+          columns: expect.arrayContaining([
+            expect.objectContaining({
+              index: 0,
+              responsive: {
+                mobile: {
+                  appearance: { text: { color: '#abcdef' } },
+                  padding: { top: 12 },
+                  alignment: 'stretch',
+                  minHeight: 240,
+                  hidden: true,
+                },
+              },
+            }),
+          ]),
+        }),
+      })
+    );
+  });
+
+  it('wires the complete column appearance editor into undo, clearing, and discard', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const editableSection = selectedPage.sections[1];
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] [data-action="toggle-section-settings"]`
+      )
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const appearanceKeys = Array.from(
+      document.querySelectorAll(
+        '[data-appearance-toggle="true"][data-appearance-scope="section-column"][data-item-index="0"]'
+      )
+    ).map((toggle) => toggle.dataset.appearanceKey);
+    expect(appearanceKeys).toEqual(
+      expect.arrayContaining([
+        'background.type',
+        'background.color',
+        'background.secondaryColor',
+        'background.opacity',
+        'text.color',
+        'border.width',
+        'border.style',
+        'border.color',
+        'border.opacity',
+        'border.radius',
+      ])
+    );
+
+    const setAppearanceField = async (key, value, inputKind = '') => {
+      const toggleSelector =
+        `[data-appearance-toggle="true"][data-appearance-scope="section-column"]` +
+        `[data-appearance-key="${key}"][data-item-index="0"]`;
+      const toggle = document.querySelector(toggleSelector);
+      if (!toggle.checked) {
+        toggle.checked = true;
+        toggle.dispatchEvent(new Event('change', { bubbles: true }));
+        await flushAdminUi(2);
+      }
+      const kindSelector = inputKind
+        ? `[data-appearance-input-kind="${inputKind}"]`
+        : ':not([data-appearance-input-kind="hex"])';
+      const input = document.querySelector(
+        `[data-appearance-input="true"]${kindSelector}` +
+          `[data-appearance-scope="section-column"][data-appearance-key="${key}"]` +
+          '[data-item-index="0"]'
+      );
+      input.value = String(value);
+      input.dispatchEvent(
+        new Event(input.tagName === 'SELECT' ? 'change' : 'input', { bubbles: true })
+      );
+      await flushAdminUi(2);
+    };
+
+    await setAppearanceField('background.type', 'gradient');
+    await setAppearanceField('background.color', '#112233', 'hex');
+    await setAppearanceField('background.secondaryColor', '#445566', 'hex');
+    await setAppearanceField('background.opacity', '0.5');
+    await setAppearanceField('text.color', '#ffffff', 'hex');
+    await setAppearanceField('border.width', '2');
+    await setAppearanceField('border.style', 'dashed');
+    await setAppearanceField('border.color', '#778899', 'hex');
+    await setAppearanceField('border.opacity', '0.75');
+    await setAppearanceField('border.radius', '14');
+
+    let snapshot = requestCurrentPreviewSnapshot();
+    let appearance = snapshot.page.sections.find((section) => section.id === editableSection.id)
+      .settings.columns[0].appearance;
+    expect(appearance).toEqual({
+      background: {
+        type: 'gradient',
+        color: '#112233',
+        secondaryColor: '#445566',
+        opacity: 0.5,
+      },
+      text: { color: '#ffffff' },
+      border: {
+        width: 2,
+        style: 'dashed',
+        color: '#778899',
+        opacity: 0.75,
+        radius: 14,
+      },
+    });
+
+    document
+      .querySelector('[data-action="undo-current"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    snapshot = requestCurrentPreviewSnapshot();
+    appearance = snapshot.page.sections.find((section) => section.id === editableSection.id)
+      .settings.columns[0].appearance;
+    expect(appearance.border.radius).toBe(6);
+
+    const textToggle = document.querySelector(
+      '[data-appearance-toggle="true"][data-appearance-scope="section-column"][data-appearance-key="text.color"][data-item-index="0"]'
+    );
+    textToggle.checked = false;
+    textToggle.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+    snapshot = requestCurrentPreviewSnapshot();
+    appearance = snapshot.page.sections.find((section) => section.id === editableSection.id)
+      .settings.columns[0].appearance;
+    expect(appearance.text).toBeUndefined();
+
+    document
+      .querySelector('[data-action="discard-current"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+    snapshot = requestCurrentPreviewSnapshot();
+    expect(
+      snapshot.page.sections.find((section) => section.id === editableSection.id).settings.columns
+    ).toBeUndefined();
+    expect(mocks.updateSection).not.toHaveBeenCalled();
+  });
+
+  it('supports undo and redo of section column-count changes', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const editableSection = selectedPage.sections[1]; // layout '1-1'
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] [data-action="toggle-section-settings"]`
+      )
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const columnCount = () => {
+      const layout = requestCurrentPreviewSnapshot().page.sections.find(
+        (section) => section.id === editableSection.id
+      ).layout;
+      return String(layout || '1').split('-').length;
+    };
+
+    expect(columnCount()).toBe(2);
+
+    const countSelect = document.getElementById('pbEditSectionColumnCount');
+    countSelect.value = '4';
+    countSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+    expect(columnCount()).toBe(4);
+
+    document
+      .querySelector('[data-action="undo-current"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    expect(columnCount()).toBe(2);
+
+    document
+      .querySelector('[data-action="redo-current"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    expect(columnCount()).toBe(4);
+  });
+
+  it('redoes a per-column style edit after undo', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const editableSection = selectedPage.sections[1];
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] [data-action="toggle-section-settings"]`
+      )
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const setAppearanceField = async (key, value) => {
+      const toggle = document.querySelector(
+        `[data-appearance-toggle="true"][data-appearance-scope="section-column"]` +
+          `[data-appearance-key="${key}"][data-item-index="0"]`
+      );
+      if (!toggle.checked) {
+        toggle.checked = true;
+        toggle.dispatchEvent(new Event('change', { bubbles: true }));
+        await flushAdminUi(2);
+      }
+      const input = document.querySelector(
+        `[data-appearance-input="true"]:not([data-appearance-input-kind="hex"])` +
+          `[data-appearance-scope="section-column"][data-appearance-key="${key}"][data-item-index="0"]`
+      );
+      input.value = String(value);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      await flushAdminUi(2);
+    };
+
+    const columnRadius = () =>
+      requestCurrentPreviewSnapshot().page.sections.find(
+        (section) => section.id === editableSection.id
+      ).settings.columns[0].appearance.border.radius;
+
+    await setAppearanceField('border.radius', '14');
+    expect(columnRadius()).toBe(14);
+
+    document
+      .querySelector('[data-action="undo-current"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    expect(columnRadius()).not.toBe(14);
+
+    document
+      .querySelector('[data-action="redo-current"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    expect(columnRadius()).toBe(14);
   });
 
   it('clears selected module state when a module is deleted from the canvas', async () => {
@@ -3826,6 +4446,143 @@ describe('admin page-builder shell', () => {
     expect(textModule.config.hidden).toBeUndefined();
   });
 
+  it('warns before hiding the bound reader module on the current device', async () => {
+    const selectedPage = withReaderModule(getContractFixture('builderPage'));
+    const readerModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'reader');
+    const readerSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === readerModule.id)
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      fetchPageBindingsResult: {
+        bindings: { reader: { pageId: selectedPage.id, page: selectedPage } },
+        warnings: [],
+      },
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const target = {
+      kind: 'module',
+      key: `module:${readerModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: readerSection.id,
+      columnIndex: readerModule.columnIndex,
+      moduleId: readerModule.id,
+      moduleType: readerModule.moduleType,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target,
+          rect: { top: 40, left: 30, right: 230, bottom: 140, width: 200, height: 100 },
+          visible: true,
+          order: 0,
+          label: 'Reader module',
+        },
+      ],
+    });
+    sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
+    await flushAdminUi(2);
+
+    frame
+      .querySelector('[data-preview-target-action="hide-device"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(6);
+
+    expect(globalThis.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('Publishing and reader binding saves will be blocked')
+    );
+    expect(mocks.updateModule).toHaveBeenCalledWith(
+      readerModule.id,
+      expect.objectContaining({
+        config: expect.objectContaining({
+          responsive: { desktop: { hidden: true } },
+        }),
+      })
+    );
+  });
+
+  it('uses advisory copy when hiding the bound reader module on a non-default device', async () => {
+    const selectedPage = withReaderModule(getContractFixture('builderPage'));
+    const readerModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'reader');
+    const readerSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === readerModule.id)
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      fetchPageBindingsResult: {
+        bindings: { reader: { pageId: selectedPage.id, page: selectedPage } },
+        warnings: [],
+      },
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+    document
+      .getElementById('pbWidthToggles')
+      ?.querySelector('[data-width="tablet"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const target = {
+      kind: 'module',
+      key: `module:${readerModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: readerSection.id,
+      columnIndex: readerModule.columnIndex,
+      moduleId: readerModule.id,
+      moduleType: readerModule.moduleType,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target,
+          rect: { top: 40, left: 30, right: 230, bottom: 140, width: 200, height: 100 },
+          visible: true,
+          order: 0,
+          label: 'Reader module',
+        },
+      ],
+    });
+    sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
+    await flushAdminUi(2);
+
+    frame
+      .querySelector('[data-preview-target-action="hide-device"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(6);
+
+    const confirmMessage = globalThis.confirm.mock.calls.at(-1)?.[0] || '';
+    expect(confirmMessage).toContain('will be hidden on Tablet');
+    expect(confirmMessage).not.toContain('Publishing and reader binding saves will be blocked');
+    expect(mocks.updateModule).toHaveBeenCalledWith(
+      readerModule.id,
+      expect.objectContaining({
+        config: expect.objectContaining({
+          responsive: { tablet: { hidden: true } },
+        }),
+      })
+    );
+  });
+
   it('keeps Duplicate disabled and routes toolbar Delete through the existing confirmation flow', async () => {
     const selectedPage = getContractFixture('builderPage');
     const textModule = selectedPage.sections
@@ -3886,6 +4643,66 @@ describe('admin page-builder shell', () => {
     await flushAdminUi(6);
 
     expect(mocks.deleteModule).toHaveBeenCalledWith(textModule.id);
+  });
+
+  it('warns before deleting the bound reader module', async () => {
+    const selectedPage = withReaderModule(getContractFixture('builderPage'));
+    const readerModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'reader');
+    const readerSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === readerModule.id)
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      fetchPageBindingsResult: {
+        bindings: { reader: { pageId: selectedPage.id, page: selectedPage } },
+        warnings: [],
+      },
+      deleteModuleResult: true,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const target = {
+      kind: 'module',
+      key: `module:${readerModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: readerSection.id,
+      columnIndex: readerModule.columnIndex,
+      moduleId: readerModule.id,
+      moduleType: readerModule.moduleType,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target,
+          rect: { top: 40, left: 30, right: 230, bottom: 140, width: 200, height: 100 },
+          visible: true,
+          order: 0,
+          label: 'Reader module',
+        },
+      ],
+    });
+    sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
+    await flushAdminUi(2);
+
+    frame
+      .querySelector('[data-preview-target-action="delete"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(6);
+
+    expect(globalThis.confirm).toHaveBeenCalledWith(
+      expect.stringContaining('Publishing and reader binding saves will be blocked')
+    );
+    expect(mocks.deleteModule).toHaveBeenCalledWith(readerModule.id);
   });
 
   it('blocks live toolbar structural commands while a module draft is dirty', async () => {

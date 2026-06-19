@@ -22,6 +22,26 @@ class PageBuilderRouteTests(BackendRouteTestCase):
             self._admin_user = admin
         return build_request(path, method=method, cookie=self.auth_cookie(admin))
 
+    def add_reader_module_to_page(
+        self, page_id: str, config: dict | None = None, layout: str = "1"
+    ) -> dict:
+        section = page_builder.api_add_section(
+            page_id,
+            page_builder.CreateSectionRequest(sectionType="row", layout=layout),
+            self.admin_request(f"/api/admin/pages/{page_id}/sections", "POST"),
+            self.db,
+        )["section"]
+        return page_builder.api_add_module(
+            section["id"],
+            page_builder.CreateModuleRequest(
+                moduleType="reader",
+                columnIndex=0,
+                config=config or {"source": {"mode": "active-page-series"}},
+            ),
+            self.admin_request(f"/api/admin/sections/{section['id']}/modules", "POST"),
+            self.db,
+        )["module"]
+
     def test_admin_page_crud_slug_uniqueness_homepage_and_reorder(self):
         self.seed_contract_series()
 
@@ -79,12 +99,17 @@ class PageBuilderRouteTests(BackendRouteTestCase):
                 BuilderPageBinding.role == "reader",
             )
         )
-        self.assertIsNotNone(reader_binding)
-        self.assertEqual(str(reader_binding.page_id), first["page"]["id"])
+        self.assertIsNone(reader_binding)
         about_page = next(page for page in listed["pages"] if page["id"] == second["page"]["id"])
         reader_page = next(page for page in listed["pages"] if page["id"] == first["page"]["id"])
         self.assertFalse(about_page["isHomepage"])
         self.assertTrue(reader_page["isHomepage"])
+        missing_reader_binding = page_builder.api_get_page_bindings(
+            "battle-bros",
+            self.admin_request("/api/admin/page-bindings/battle-bros"),
+            self.db,
+        )
+        self.assertEqual(missing_reader_binding["warnings"][0]["code"], "missing_reader_binding")
 
         page_builder.api_reorder_pages(
             page_builder.ReorderPagesRequest(pageIds=[second["page"]["id"], first["page"]["id"]]),
@@ -168,7 +193,9 @@ class PageBuilderRouteTests(BackendRouteTestCase):
             self.db,
         )
         self.assertEqual(global_binding.status_code, 400)
-        self.assertEqual(json_body(global_binding)["error"], "Page cannot be used for reader binding")
+        self.assertEqual(
+            json_body(global_binding)["error"], "Page cannot be used for reader binding"
+        )
 
         self.db.add(
             BuilderPageBinding(
@@ -206,6 +233,7 @@ class PageBuilderRouteTests(BackendRouteTestCase):
             self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
             self.db,
         )["page"]
+        self.add_reader_module_to_page(series_reader["id"])
         other_reader = page_builder.api_create_series_page(
             "other-series",
             page_builder.CreatePageRequest(slug="reader", title="Other Reader", pageType="reader"),
@@ -228,6 +256,152 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.assertEqual(wrong_series_binding.status_code, 400)
         self.assertEqual(updated_bindings["bindings"]["reader"]["pageId"], series_reader["id"])
         self.assertFalse(updated_bindings["warnings"])
+
+    def test_reader_binding_requires_one_visible_active_reader_module(self):
+        self.seed_contract_series()
+
+        missing_reader = page_builder.api_create_series_page(
+            "battle-bros",
+            page_builder.CreatePageRequest(
+                slug="missing-reader",
+                title="Missing Reader",
+                pageType="reader",
+                isPublished=True,
+            ),
+            self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
+            self.db,
+        )["page"]
+        missing_binding = page_builder.api_update_page_bindings(
+            "battle-bros",
+            page_builder.PageBindingsRequest(bindings={"reader": missing_reader["id"]}),
+            self.admin_request("/api/admin/page-bindings/battle-bros", "PUT"),
+            self.db,
+        )
+        self.assertEqual(missing_binding.status_code, 400)
+        self.assertEqual(json_body(missing_binding)["code"], "reader_module_missing")
+
+        self.add_reader_module_to_page(missing_reader["id"])
+        text_section = page_builder.api_add_section(
+            missing_reader["id"],
+            page_builder.CreateSectionRequest(sectionType="row", layout="1"),
+            self.admin_request(f"/api/admin/pages/{missing_reader['id']}/sections", "POST"),
+            self.db,
+        )["section"]
+        page_builder.api_add_module(
+            text_section["id"],
+            page_builder.CreateModuleRequest(
+                moduleType="text", columnIndex=0, config={"content": "<p>Below reader</p>"}
+            ),
+            self.admin_request(f"/api/admin/sections/{text_section['id']}/modules", "POST"),
+            self.db,
+        )
+        valid_binding = page_builder.api_update_page_bindings(
+            "battle-bros",
+            page_builder.PageBindingsRequest(bindings={"reader": missing_reader["id"]}),
+            self.admin_request("/api/admin/page-bindings/battle-bros", "PUT"),
+            self.db,
+        )
+        self.assertEqual(valid_binding["bindings"]["reader"]["pageId"], missing_reader["id"])
+        self.assertFalse(valid_binding["warnings"])
+
+        duplicate_reader = page_builder.api_create_series_page(
+            "battle-bros",
+            page_builder.CreatePageRequest(slug="duplicate-reader", title="Duplicate Reader"),
+            self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
+            self.db,
+        )["page"]
+        self.add_reader_module_to_page(duplicate_reader["id"])
+        self.add_reader_module_to_page(duplicate_reader["id"])
+        duplicate_binding = page_builder.api_update_page_bindings(
+            "battle-bros",
+            page_builder.PageBindingsRequest(bindings={"reader": duplicate_reader["id"]}),
+            self.admin_request("/api/admin/page-bindings/battle-bros", "PUT"),
+            self.db,
+        )
+        self.assertEqual(duplicate_binding.status_code, 400)
+        self.assertEqual(json_body(duplicate_binding)["code"], "reader_module_duplicate")
+
+        hidden_reader = page_builder.api_create_series_page(
+            "battle-bros",
+            page_builder.CreatePageRequest(slug="hidden-reader", title="Hidden Reader"),
+            self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
+            self.db,
+        )["page"]
+        self.add_reader_module_to_page(
+            hidden_reader["id"],
+            config={
+                "source": {"mode": "active-page-series"},
+                "responsive": {"desktop": {"hidden": True}},
+            },
+        )
+        hidden_binding = page_builder.api_update_page_bindings(
+            "battle-bros",
+            page_builder.PageBindingsRequest(bindings={"reader": hidden_reader["id"]}),
+            self.admin_request("/api/admin/page-bindings/battle-bros", "PUT"),
+            self.db,
+        )
+        self.assertEqual(hidden_binding.status_code, 400)
+        self.assertEqual(json_body(hidden_binding)["code"], "reader_module_hidden_default_device")
+
+        wrong_source_reader = page_builder.api_create_series_page(
+            "battle-bros",
+            page_builder.CreatePageRequest(slug="wrong-source-reader", title="Wrong Source"),
+            self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
+            self.db,
+        )["page"]
+        wrong_source_module = self.add_reader_module_to_page(wrong_source_reader["id"])
+        raw_module = self.db.get(BuilderModule, UUID(wrong_source_module["id"]))
+        assert raw_module is not None
+        raw_module.config = {"source": {"mode": "specific-series", "seriesId": "other-series"}}
+        self.db.commit()
+        wrong_source_binding = page_builder.api_update_page_bindings(
+            "battle-bros",
+            page_builder.PageBindingsRequest(bindings={"reader": wrong_source_reader["id"]}),
+            self.admin_request("/api/admin/page-bindings/battle-bros", "PUT"),
+            self.db,
+        )
+        self.assertEqual(wrong_source_binding.status_code, 400)
+        self.assertEqual(json_body(wrong_source_binding)["code"], "reader_module_wrong_source")
+
+    def test_bound_reader_publish_blocks_invalid_reader_module_state(self):
+        self.seed_contract_series()
+        reader_page = page_builder.api_create_series_page(
+            "battle-bros",
+            page_builder.CreatePageRequest(slug="reader", title="Reader", pageType="reader"),
+            self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
+            self.db,
+        )["page"]
+        self.add_reader_module_to_page(reader_page["id"])
+        bound = page_builder.api_update_page_bindings(
+            "battle-bros",
+            page_builder.PageBindingsRequest(bindings={"reader": reader_page["id"]}),
+            self.admin_request("/api/admin/page-bindings/battle-bros", "PUT"),
+            self.db,
+        )
+        self.assertEqual(bound["bindings"]["reader"]["pageId"], reader_page["id"])
+
+        self.add_reader_module_to_page(reader_page["id"])
+        draft_save = page_builder.api_update_page(
+            reader_page["id"],
+            page_builder.UpdatePageRequest(isPublished=False),
+            self.admin_request(f"/api/admin/pages/{reader_page['id']}", "PUT"),
+            self.db,
+        )
+        self.assertFalse(draft_save["page"]["isPublished"])
+
+        publish = page_builder.api_update_page(
+            reader_page["id"],
+            page_builder.UpdatePageRequest(title="Should Not Persist", isPublished=True),
+            self.admin_request(f"/api/admin/pages/{reader_page['id']}", "PUT"),
+            self.db,
+        )
+        self.assertEqual(publish.status_code, 400)
+        self.assertEqual(json_body(publish)["code"], "reader_module_duplicate")
+        self.db.expire_all()
+        unchanged_page = self.db.get(BuilderPage, UUID(reader_page["id"]))
+        self.assertIsNotNone(unchanged_page)
+        self.assertFalse(unchanged_page.is_published)
+        self.assertEqual(unchanged_page.title, "Reader")
 
     def test_page_reorder_rejects_invalid_stale_or_wrong_scope_lists(self):
         self.seed_contract_series()
@@ -422,6 +596,94 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.assertEqual(deleted_module, {"status": "success"})
         self.assertEqual(deleted_section, {"status": "success"})
 
+    def test_module_endpoints_reject_out_of_range_column_index(self):
+        self.seed_contract_series()
+        page = page_builder.api_create_page(
+            page_builder.CreatePageRequest(slug="reader", title="Reader", pageType="reader"),
+            self.admin_request("/api/admin/pages", "POST"),
+            "battle-bros",
+            self.db,
+        )["page"]
+        # Two-column sections: valid column indexes are 0 and 1, so 2 is invalid.
+        section_a = page_builder.api_add_section(
+            page["id"],
+            page_builder.CreateSectionRequest(sectionType="row", layout="1-1"),
+            self.admin_request(f"/api/admin/pages/{page['id']}/sections", "POST"),
+            self.db,
+        )["section"]
+        section_b = page_builder.api_add_section(
+            page["id"],
+            page_builder.CreateSectionRequest(sectionType="row", layout="1-1"),
+            self.admin_request(f"/api/admin/pages/{page['id']}/sections", "POST"),
+            self.db,
+        )["section"]
+        module = page_builder.api_add_module(
+            section_a["id"],
+            page_builder.CreateModuleRequest(
+                moduleType="text", columnIndex=0, sortIndex=0, config={"content": "<p>A</p>"}
+            ),
+            self.admin_request(f"/api/admin/sections/{section_a['id']}/modules", "POST"),
+            self.db,
+        )["module"]
+
+        # add: an out-of-range column index is rejected.
+        add_resp = page_builder.api_add_module(
+            section_a["id"],
+            page_builder.CreateModuleRequest(
+                moduleType="text", columnIndex=2, config={"content": "<p>B</p>"}
+            ),
+            self.admin_request(f"/api/admin/sections/{section_a['id']}/modules", "POST"),
+            self.db,
+        )
+        # update: relocating the existing module to an invalid column is rejected.
+        update_resp = page_builder.api_update_module(
+            module["id"],
+            page_builder.UpdateModuleRequest(
+                moduleType="image",
+                columnIndex=2,
+                sortIndex=5,
+                config={"src": "assets/rejected.png", "alt": "Rejected"},
+            ),
+            self.admin_request(f"/api/admin/modules/{module['id']}", "PUT"),
+            self.db,
+        )
+        # move: relocating into another section's nonexistent column is rejected.
+        move_resp = page_builder.api_move_module(
+            module["id"],
+            page_builder.MoveModuleRequest(
+                targetSectionId=section_b["id"], columnIndex=2, sortIndex=0
+            ),
+            self.admin_request(f"/api/admin/modules/{module['id']}/move", "POST"),
+            self.db,
+        )
+        # reorder: targeting a nonexistent column is rejected.
+        reorder_resp = page_builder.api_reorder_modules(
+            section_a["id"],
+            page_builder.ReorderModulesRequest(columnIndex=2, moduleIds=[module["id"]]),
+            self.admin_request(f"/api/admin/sections/{section_a['id']}/modules/reorder", "POST"),
+            self.db,
+        )
+
+        for resp in (add_resp, update_resp, move_resp, reorder_resp):
+            self.assertEqual(resp.status_code, 400)
+
+        # No mutation: the single module is still in section A, column 0, sort 0,
+        # and nothing leaked into section B.
+        payload = page_builder.api_get_page(
+            page["id"],
+            self.admin_request(f"/api/admin/pages/{page['id']}"),
+            self.db,
+        )["page"]
+        sections = {section["id"]: section for section in payload["sections"]}
+        self.assertEqual(len(sections[section_a["id"]]["modules"]), 1)
+        self.assertEqual(sections[section_b["id"]]["modules"], [])
+        persisted = sections[section_a["id"]]["modules"][0]
+        self.assertEqual(persisted["id"], module["id"])
+        self.assertEqual(persisted["columnIndex"], 0)
+        self.assertEqual(persisted["sortIndex"], 0)
+        self.assertEqual(persisted["moduleType"], "text")
+        self.assertEqual(persisted["config"]["content"], "<p>A</p>")
+
     def test_cms_module_source_config_sanitization(self):
         reader = sanitize_module_config(
             "reader",
@@ -467,6 +729,16 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         feed = sanitize_module_config("feed", {"source": {"mode": "specific-series"}})
 
         self.assertEqual(reader["source"], {"mode": "active-page-series"})
+        legacy_reader = sanitize_module_config(
+            "reader",
+            {
+                "source": {"mode": "active-page-series"},
+                "showPanels": False,
+                "showComments": True,
+            },
+        )
+        self.assertFalse(legacy_reader["showPanels"])
+        self.assertNotIn("panels", legacy_reader)
         self.assertEqual(entry_gallery["source"]["mode"], "specific-series")
         self.assertEqual(entry_gallery["source"]["seriesId"], "battle-bros")
         self.assertEqual(entry_gallery["source"]["filters"]["access"], "premium")
@@ -480,6 +752,114 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.assertEqual(media_gallery["responsive"]["mobile"]["columns"], 2)
         self.assertFalse(media_gallery["includePremium"])
         self.assertEqual(feed["source"], {"mode": "site"})
+
+    def test_reader_module_customization_config_sanitization(self):
+        reader = sanitize_module_config(
+            "reader",
+            {
+                "source": {"mode": "active-page-series"},
+                "displayMode": "vertical-scroll",
+                "showPanels": False,
+                "showComments": False,
+                "controls": {
+                    "placement": "overlay",
+                    "size": "large",
+                    "style": {
+                        "defaults": {
+                            "appearance": {
+                                "background": {"color": "#112233", "opacity": 2},
+                                "text": {"color": "#ffffff"},
+                            }
+                        },
+                        "primary": {
+                            "appearance": {
+                                "background": {"color": "not-a-color"},
+                                "border": {"width": 32, "radius": 240},
+                            }
+                        },
+                    },
+                    "unsafe": "drop",
+                },
+                "stage": {
+                    "fit": "width",
+                    "pageGap": 999,
+                    "frameBorder": False,
+                    "maxWidth": 99999,
+                    "unsafe": "drop",
+                },
+                "panels": {
+                    "left": {"enabled": True},
+                    "right": {"enabled": False},
+                    "unsafe": {"enabled": True},
+                },
+                "responsive": {
+                    "mobile": {
+                        "hidden": True,
+                        "displayMode": "vertical-scroll",
+                        "controls": {"placement": "hidden", "size": "compact", "style": "drop"},
+                        "stage": {"fit": "height", "pageGap": -8, "maxWidth": 900},
+                        "panels": {"left": {"enabled": False}, "right": {"enabled": True}},
+                        "showComments": True,
+                        "showPanels": True,
+                    },
+                    "tablet": {
+                        "displayMode": "unknown",
+                        "controls": {"placement": "sideways", "size": "huge"},
+                    },
+                },
+            },
+        )
+
+        self.assertEqual(reader["displayMode"], "vertical-scroll")
+        self.assertFalse(reader["showPanels"])
+        self.assertFalse(reader["showComments"])
+        self.assertEqual(reader["controls"]["placement"], "overlay")
+        self.assertEqual(reader["controls"]["size"], "large")
+        self.assertEqual(
+            reader["controls"]["style"]["defaults"]["appearance"]["background"]["opacity"], 1.0
+        )
+        self.assertIsNone(
+            reader["controls"]["style"]["primary"]["appearance"]["background"]["color"]
+        )
+        self.assertEqual(
+            reader["controls"]["style"]["primary"]["appearance"]["border"]["width"], 20
+        )
+        self.assertEqual(
+            reader["controls"]["style"]["primary"]["appearance"]["border"]["radius"], 200
+        )
+        self.assertEqual(reader["stage"]["fit"], "width")
+        self.assertEqual(reader["stage"]["pageGap"], 64)
+        self.assertFalse(reader["stage"]["frameBorder"])
+        self.assertEqual(reader["stage"]["maxWidth"], 2400)
+        self.assertTrue(reader["panels"]["left"]["enabled"])
+        self.assertFalse(reader["panels"]["right"]["enabled"])
+
+        mobile = reader["responsive"]["mobile"]
+        self.assertTrue(mobile["hidden"])
+        self.assertEqual(mobile["displayMode"], "vertical-scroll")
+        self.assertEqual(mobile["controls"], {"placement": "hidden", "size": "compact"})
+        self.assertEqual(mobile["stage"], {"fit": "height", "pageGap": 0})
+        self.assertEqual(mobile["panels"], {"left": {"enabled": False}, "right": {"enabled": True}})
+        self.assertTrue(mobile["showComments"])
+        self.assertNotIn("showPanels", mobile)
+        self.assertEqual(reader["responsive"]["tablet"]["displayMode"], "paged")
+        self.assertEqual(reader["responsive"]["tablet"]["controls"]["placement"], "below")
+        self.assertEqual(reader["responsive"]["tablet"]["controls"]["size"], "medium")
+
+    def test_reader_stage_rejects_non_integer_strings_like_the_client(self):
+        # F1: crafted, non-integer stage values must fall back identically on the
+        # client (normalizeReaderConfig) and the server, preserving preview parity.
+        for bad_max_width in ("wide", "480px", "12.5"):
+            reader = sanitize_module_config("reader", {"stage": {"maxWidth": bad_max_width}})
+            self.assertIsNone(
+                reader["stage"]["maxWidth"], f"maxWidth={bad_max_width!r} should be Auto"
+            )
+
+        reader = sanitize_module_config("reader", {"stage": {"pageGap": "12px"}})
+        self.assertEqual(reader["stage"]["pageGap"], 8)
+
+        reader = sanitize_module_config("reader", {"stage": {"maxWidth": "500"}})
+        self.assertEqual(reader["stage"]["maxWidth"], 500)
 
     def test_reader_module_source_normalizes_by_page_scope(self):
         self.seed_contract_series()
@@ -523,7 +903,9 @@ class PageBuilderRouteTests(BackendRouteTestCase):
             self.db,
         )["page"]
         serialized_series_reader = serialized_series["sections"][0]["modules"][0]
-        self.assertEqual(serialized_series_reader["config"]["source"], {"mode": "active-page-series"})
+        self.assertEqual(
+            serialized_series_reader["config"]["source"], {"mode": "active-page-series"}
+        )
 
         global_page = page_builder.api_create_global_page(
             page_builder.CreatePageRequest(slug="global-reader-source", title="Global Reader"),
@@ -593,6 +975,21 @@ class PageBuilderRouteTests(BackendRouteTestCase):
     def test_homepage_endpoints_resolve_homepage_then_reader_with_visibility_rules(self):
         self.seed_builder_page("builderPage")
         self.seed_builder_page("builderPageDraft")
+        published_reader = self.db.scalar(
+            select(BuilderPage).where(
+                BuilderPage.series_id == "battle-bros",
+                BuilderPage.slug == "reader",
+            )
+        )
+        assert published_reader is not None
+        self.add_reader_module_to_page(str(published_reader.id))
+        bound_reader = page_builder.api_update_page_bindings(
+            "battle-bros",
+            page_builder.PageBindingsRequest(bindings={"reader": str(published_reader.id)}),
+            self.admin_request("/api/admin/page-bindings/battle-bros", "PUT"),
+            self.db,
+        )
+        self.assertEqual(bound_reader["bindings"]["reader"]["pageId"], str(published_reader.id))
 
         public_home = page_builder.api_public_homepage("battle-bros", self.db)
         admin_home = page_builder.api_get_homepage_page_admin(
@@ -605,13 +1002,6 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.assertTrue(public_home["page"]["isPublished"])
         self.assertEqual(admin_home["page"]["slug"], "reader")
 
-        published_reader = self.db.scalar(
-            select(BuilderPage).where(
-                BuilderPage.series_id == "battle-bros",
-                BuilderPage.slug == "reader",
-            )
-        )
-        assert published_reader is not None
         published_reader.is_homepage = False
 
         draft_homepage = self.db.scalar(
@@ -1089,9 +1479,10 @@ class PageBuilderRouteTests(BackendRouteTestCase):
             self.db,
         )["page"]
 
+        # 7 columns exceeds the 1-6 column bound; "9-9" is now a valid two-column ratio.
         bad_section = page_builder.api_add_section(
             page["id"],
-            page_builder.CreateSectionRequest(sectionType="row", layout="9-9"),
+            page_builder.CreateSectionRequest(sectionType="row", layout="1-1-1-1-1-1-1"),
             self.admin_request(f"/api/admin/pages/{page['id']}/sections", "POST"),
             self.db,
         )
@@ -1152,6 +1543,115 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.assertNotIn("<script", hydrated_text["config"]["content"])
         self.assertNotIn("javascript:", hydrated_text["config"]["content"])
         self.assertIn("<strong>Safe</strong>", hydrated_text["config"]["content"])
+
+    def test_builder_security_sanitizes_column_settings_and_rehomes_on_shrink(self):
+        self.seed_contract_series()
+        page = page_builder.api_create_page(
+            page_builder.CreatePageRequest(slug="columns", title="Columns"),
+            self.admin_request("/api/admin/pages", "POST"),
+            "battle-bros",
+            self.db,
+        )["page"]
+
+        # 1-6 columns with width ratios are accepted; the legacy preset set no longer caps us.
+        section = page_builder.api_add_section(
+            page["id"],
+            page_builder.CreateSectionRequest(
+                sectionType="row",
+                layout="2-1-1-1",
+                settings={
+                    "columnGap": 24,
+                    "columns": [
+                        {
+                            "index": 0,
+                            "appearance": {
+                                "background": {"color": "#f5f5f5", "opacity": 2},
+                                "border": {"width": 999, "radius": 999},
+                            },
+                            "padding": {"top": -10, "left": 12},
+                            "alignment": "center",
+                            "minHeight": 5000,
+                            "hidden": True,
+                            "responsive": {
+                                "tablet": {"hidden": True},
+                                "mobile": {"alignment": "stretch", "hidden": False},
+                            },
+                        },
+                        {"index": 1, "alignment": "not-a-real-alignment"},
+                        # Out-of-range index is dropped.
+                        {"index": 9, "alignment": "end"},
+                    ],
+                    "responsive": {
+                        # Device layouts cannot create more tracks than the global
+                        # structural column count.
+                        "mobile": {"layout": "1-1-1-1-1-1"},
+                    },
+                },
+            ),
+            self.admin_request(f"/api/admin/pages/{page['id']}/sections", "POST"),
+            self.db,
+        )["section"]
+
+        self.assertEqual(section["layout"], "2-1-1-1")
+        columns = section["settings"]["columns"]
+        # Only column 0 carries real styling; column 1's invalid alignment is dropped to
+        # default and emits nothing; the out-of-range index-9 entry is dropped entirely.
+        self.assertEqual([col["index"] for col in columns], [0])
+        col0 = columns[0]
+        self.assertEqual(col0["appearance"]["background"]["opacity"], 1.0)
+        self.assertEqual(col0["appearance"]["border"]["width"], 20)
+        self.assertEqual(col0["appearance"]["border"]["radius"], 200)
+        self.assertEqual(col0["padding"]["top"], 0)
+        self.assertEqual(col0["padding"]["left"], 12)
+        self.assertEqual(col0["alignment"], "center")
+        self.assertEqual(col0["minHeight"], 2000)
+        self.assertTrue(col0["hidden"])
+        self.assertTrue(col0["responsive"]["tablet"]["hidden"])
+        self.assertEqual(
+            col0["responsive"]["mobile"],
+            {"alignment": "stretch", "hidden": False},
+        )
+        self.assertEqual(section["settings"]["responsive"]["mobile"]["layout"], "1-1-1-1")
+
+        # Place one module per column across all four columns.
+        module_ids = []
+        for column_index in range(4):
+            module = page_builder.api_add_module(
+                section["id"],
+                page_builder.CreateModuleRequest(
+                    moduleType="text",
+                    columnIndex=column_index,
+                    config={"content": f"<p>col {column_index}</p>"},
+                ),
+                self.admin_request(f"/api/admin/sections/{section['id']}/modules", "POST"),
+                self.db,
+            )["module"]
+            module_ids.append(module["id"])
+
+        # Shrinking 4 -> 2 columns rehomes out-of-range modules to the last column
+        # atomically instead of dropping or rejecting them.
+        shrunk = page_builder.api_update_section(
+            section["id"],
+            page_builder.UpdateSectionRequest(layout="1-1"),
+            self.admin_request(f"/api/admin/sections/{section['id']}", "PUT"),
+            self.db,
+        )["section"]
+        self.assertEqual(shrunk["layout"], "1-1")
+
+        payload = page_builder.api_get_page(
+            page["id"],
+            self.admin_request(f"/api/admin/pages/{page['id']}"),
+            self.db,
+        )["page"]
+        modules = payload["sections"][0]["modules"]
+        self.assertEqual({m["id"] for m in modules}, set(module_ids))
+        self.assertTrue(all(0 <= m["columnIndex"] <= 1 for m in modules))
+        merged = [module for module in modules if module["columnIndex"] == 1]
+        self.assertEqual(
+            [module["id"] for module in merged],
+            [module_ids[1], module_ids[2], module_ids[3]],
+        )
+        self.assertEqual([module["sortIndex"] for module in merged], [0, 1, 2])
 
 
 if __name__ == "__main__":

@@ -875,6 +875,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     if (dirtyScope === 'section' && activeSectionId && activeSectionDraft) {
       const section = (pageSnapshot.sections || []).find((item) => item.id === activeSectionId);
       if (section) {
+        section.layout = actions.getSectionLayoutFromDraft(activeSectionDraft);
         section.settings = actions.buildSectionSettingsFromDraft(activeSectionDraft);
       }
     }

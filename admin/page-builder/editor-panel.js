@@ -1,4 +1,13 @@
 import { escapeAttr, escapeHtml } from './helpers.js';
+import { COLUMN_ALIGNMENTS, MAX_COLUMNS, parseLayoutRatios } from './layout-utils.js';
+import {
+  getAppearanceInputValue,
+  removeAppearanceLeaf,
+  renderAppearanceControls,
+  setAppearanceLeaf,
+  syncAppearanceColorInputs,
+  toSparseAppearance,
+} from './appearance-editor.js';
 import { BUILDER_COMMANDS } from './commands.js';
 import { BUILDER_STRUCTURAL_COMMANDS } from './structural-commands.js';
 import { bindHeaderEditorEvents, renderHeaderEditorContent } from './header-editor.js';
@@ -84,6 +93,160 @@ function renderResponsiveScopeControl({ activeDeviceId, responsiveEditScope }) {
   });
 }
 
+function getColumnDraft(draft, index) {
+  const columns = Array.isArray(draft?.columns) ? draft.columns : [];
+  return columns.find((column) => Number(column?.index) === index) || {};
+}
+
+function getColumnScopeDraft(draft, index, responsiveEditScope, activeDeviceId) {
+  const column = getColumnDraft(draft, index);
+  if (responsiveEditScope !== 'device') return column;
+  const branch = column?.responsive?.[activeDeviceId];
+  return branch && typeof branch === 'object' && !Array.isArray(branch) ? branch : {};
+}
+
+function cloneAppearanceValue(value) {
+  return JSON.parse(JSON.stringify(value || {}));
+}
+
+function renderSectionLayoutEditor(draft, { activeDeviceId, responsiveEditScope }) {
+  const globalRatios = parseLayoutRatios(draft?.layout || '1');
+  const deviceLayout =
+    responsiveEditScope === 'device'
+      ? String(draft?.responsive?.[activeDeviceId]?.layout || '')
+      : '';
+  const ratios =
+    responsiveEditScope === 'device'
+      ? deviceLayout
+        ? parseLayoutRatios(deviceLayout).slice(0, globalRatios.length)
+        : []
+      : globalRatios;
+  const count = ratios.length;
+  const maxColumns =
+    responsiveEditScope === 'device' ? Math.max(1, globalRatios.length) : MAX_COLUMNS;
+  const countOptions = Array.from({ length: maxColumns }, (_, i) => i + 1)
+    .map(
+      (value) => `<option value="${value}" ${value === count ? 'selected' : ''}>${value}</option>`
+    )
+    .join('');
+  const inheritOption =
+    responsiveEditScope === 'device'
+      ? `<option value="inherit" ${deviceLayout ? '' : 'selected'}>Inherit global (${globalRatios.length})</option>`
+      : '';
+  const ratioInputs = ratios
+    .map(
+      (ratio, index) => `
+        <div class="form-group">
+          <label class="form-label">Track ${index + 1} ratio</label>
+          <input type="number" class="form-input" min="1" max="12" step="1" value="${escapeAttr(String(ratio))}" data-column-ratio data-column-index="${index}" />
+        </div>
+      `
+    )
+    .join('');
+
+  return `
+    <div class="form-editor">
+      <div class="form-group">
+        <label class="form-label" for="pbEditSectionColumnCount">${
+          responsiveEditScope === 'device' ? 'Reflow track count' : 'Column count'
+        }</label>
+        <select id="pbEditSectionColumnCount" class="form-input" data-section-column-count>
+          ${inheritOption}${countOptions}
+        </select>
+        <div class="settings-note">${
+          responsiveEditScope === 'device'
+            ? `Choose up to ${globalRatios.length} tracks. Structural columns and module ownership remain global.`
+            : 'Choose 1–6 structural columns and set their width ratios.'
+        }</div>
+      </div>
+      ${ratioInputs}
+    </div>
+  `;
+}
+
+function renderColumnEditorContent(draft, { activeDeviceId, responsiveEditScope }) {
+  const globalRatios = parseLayoutRatios(draft?.layout || '1');
+  const columnCards = globalRatios
+    .map((_, index) => {
+      const column = getColumnScopeDraft(draft, index, responsiveEditScope, activeDeviceId);
+      const padding = column.padding || {};
+      const alignment = column.alignment || '';
+      const paddingInputs = ['Top', 'Right', 'Bottom', 'Left']
+        .map((side) => {
+          const value = padding[side.toLowerCase()];
+          return `<input type="number" class="form-input pb-column-padding-input" min="0" step="1" value="${escapeAttr(String(value ?? ''))}" placeholder="${side[0]}" aria-label="Padding ${side}" data-column-field="padding${side}" data-column-index="${index}" />`;
+        })
+        .join('');
+      return `
+        <div class="pb-column-editor" data-column-index="${index}">
+          <div class="pb-column-editor-title">Global Column ${index + 1}</div>
+          ${renderAppearanceControls(
+            column.appearance,
+            'section-column',
+            index,
+            'Appearance',
+            responsiveEditScope === 'device'
+              ? 'Unset fields inherit the global column appearance.'
+              : 'Use the shared sanitized background, text, and border controls.'
+          )}
+          <div class="form-group">
+            <label class="form-label">Alignment</label>
+            <select class="form-input" data-column-field="alignment" data-column-index="${index}">
+              ${
+                responsiveEditScope === 'device'
+                  ? `<option value="inherit" ${alignment ? '' : 'selected'}>Inherit global</option>`
+                  : ''
+              }
+              ${COLUMN_ALIGNMENTS.map(
+                (value) =>
+                  `<option value="${value}" ${
+                    (alignment || (responsiveEditScope === 'global' ? 'stretch' : '')) === value
+                      ? 'selected'
+                      : ''
+                  }>${value}</option>`
+              ).join('')}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Padding (T / R / B / L)</label>
+            <div class="pb-column-padding-grid">${paddingInputs}</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Min height</label>
+            <input type="number" class="form-input" min="0" step="1" value="${escapeAttr(String(column.minHeight ?? ''))}" placeholder="auto" data-column-field="minHeight" data-column-index="${index}" />
+          </div>
+          <div class="form-group">
+            ${
+              responsiveEditScope === 'device'
+                ? `
+                  <label class="form-label">Visibility</label>
+                  <select class="form-input" data-column-field="hidden" data-column-index="${index}">
+                    <option value="inherit" ${
+                      Object.prototype.hasOwnProperty.call(column, 'hidden') ? '' : 'selected'
+                    }>Inherit global</option>
+                    <option value="false" ${column.hidden === false ? 'selected' : ''}>Visible</option>
+                    <option value="true" ${column.hidden === true ? 'selected' : ''}>Hidden</option>
+                  </select>
+                `
+                : `
+                  <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem;">
+                    <input type="checkbox" data-column-field="hidden" data-column-index="${index}" ${column.hidden ? 'checked' : ''} />
+                    Hidden
+                  </label>
+                `
+            }
+          </div>
+        </div>
+      `;
+    })
+    .join('');
+
+  return `
+    ${renderSectionLayoutEditor(draft, { activeDeviceId, responsiveEditScope })}
+    <div class="pb-column-editor-list">${columnCards}</div>
+  `;
+}
+
 function renderSectionSettingsContent(section, draft, options = {}) {
   if (!section || !draft) return '';
   const activeDeviceId = options.activeDeviceId;
@@ -92,6 +255,7 @@ function renderSectionSettingsContent(section, draft, options = {}) {
     responsiveEditScope === 'device'
       ? {
           ...section,
+          layout: draft.layout || section.layout || '1',
           settings: draft,
         }
       : section;
@@ -113,28 +277,27 @@ function renderSectionSettingsContent(section, draft, options = {}) {
     ${renderResponsiveScopeControl({ activeDeviceId, responsiveEditScope })}
     ${renderInspectorSection({
       kicker: 'Section',
+      title: 'Columns',
+      summary:
+        responsiveEditScope === 'device'
+          ? `${getBuilderDeviceLabel(activeDeviceId)} reflow`
+          : `${parseLayoutRatios(draft.layout || section.layout || '1').length} cols`,
+      copy:
+        responsiveEditScope === 'device'
+          ? 'Reflow stable structural columns and author sparse device-specific column styles.'
+          : 'Choose structural column count, ratios, and base per-column styling.',
+      body: renderColumnEditorContent(draft, {
+        activeDeviceId,
+        responsiveEditScope,
+      }),
+    })}
+    ${renderInspectorSection({
+      kicker: 'Section',
       title: 'Spacing',
       summary: displayLayout || 'Layout',
       copy: 'Adjust spacing for this section.',
       body: `
         <div class="form-editor">
-          ${
-            responsiveEditScope === 'device'
-              ? `
-          <div class="form-group">
-            <label class="form-label" for="pbEditSectionLayout">Layout</label>
-            <select id="pbEditSectionLayout" class="form-input" data-section-setting="layout">
-              ${['1', '1-1', '1-2', '2-1', '1-1-1', '1-3-1']
-                .map(
-                  (layout) =>
-                    `<option value="${escapeAttr(layout)}" ${displayLayout === layout ? 'selected' : ''}>${escapeHtml(layout)}</option>`
-                )
-                .join('')}
-            </select>
-          </div>
-          `
-              : ''
-          }
           <div class="form-group">
             <label class="form-label" for="pbEditSectionModuleGap">Module Gap</label>
             <input type="number" id="pbEditSectionModuleGap" class="form-input" value="${escapeHtml(String(displayDraft.moduleGap ?? ''))}" min="0" step="1" placeholder="16" data-section-setting="moduleGap" />
@@ -633,6 +796,90 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
           actions.updateActiveSectionDraftField(
             /** @type {HTMLElement} */ (e.target).dataset.sectionSetting,
             /** @type {HTMLInputElement} */ (e.target).value
+          );
+        });
+      });
+
+      el.pbModuleEditor
+        .querySelector('[data-section-column-count]')
+        ?.addEventListener('change', (e) => {
+          actions.setActiveSectionColumnCount(/** @type {HTMLInputElement} */ (e.target).value);
+        });
+
+      el.pbModuleEditor.querySelectorAll('[data-column-ratio]').forEach((input) => {
+        input.addEventListener('change', (e) => {
+          const target = /** @type {HTMLInputElement} */ (e.target);
+          actions.updateActiveSectionColumnRatio(target.dataset.columnIndex, target.value);
+        });
+      });
+
+      el.pbModuleEditor.querySelectorAll('[data-column-field]').forEach((input) => {
+        input.addEventListener('change', (e) => {
+          const target = /** @type {HTMLInputElement} */ (e.target);
+          const value = target.type === 'checkbox' ? target.checked : target.value;
+          actions.updateActiveSectionColumnField(
+            target.dataset.columnIndex,
+            target.dataset.columnField,
+            value
+          );
+        });
+      });
+
+      el.pbModuleEditor.querySelectorAll('[data-appearance-toggle="true"]').forEach((toggle) => {
+        toggle.addEventListener('change', () => {
+          const index = Number(toggle.dataset.itemIndex);
+          const key = toggle.dataset.appearanceKey;
+          if (!Number.isInteger(index) || !key) return;
+          const latestState = getState();
+          const column = getColumnScopeDraft(
+            latestState.activeSectionDraft,
+            index,
+            latestState.responsiveEditScope,
+            latestState.activeDeviceId
+          );
+          const appearance = cloneAppearanceValue(column.appearance);
+          if (toggle.checked) {
+            const pairedInput = el.pbModuleEditor.querySelector(
+              `[data-appearance-input="true"][data-appearance-scope="section-column"][data-appearance-key="${key}"][data-item-index="${index}"]:not([data-appearance-input-kind="hex"])`
+            );
+            const value = getAppearanceInputValue(pairedInput);
+            if (value !== null) {
+              setAppearanceLeaf(appearance, key, value);
+            }
+          } else {
+            removeAppearanceLeaf(appearance, key);
+          }
+          actions.updateActiveSectionColumnField(
+            index,
+            'appearance',
+            toSparseAppearance(appearance)
+          );
+        });
+      });
+
+      el.pbModuleEditor.querySelectorAll('[data-appearance-input="true"]').forEach((input) => {
+        const eventName = input.tagName === 'SELECT' ? 'change' : 'input';
+        input.addEventListener(eventName, () => {
+          if (input.disabled) return;
+          const index = Number(input.dataset.itemIndex);
+          const key = input.dataset.appearanceKey;
+          if (!Number.isInteger(index) || !key) return;
+          const value = syncAppearanceColorInputs(el.pbModuleEditor, input);
+          if (value === null) return;
+          const latestState = getState();
+          const column = getColumnScopeDraft(
+            latestState.activeSectionDraft,
+            index,
+            latestState.responsiveEditScope,
+            latestState.activeDeviceId
+          );
+          const appearance = cloneAppearanceValue(column.appearance);
+          setAppearanceLeaf(appearance, key, value);
+          actions.updateActiveSectionColumnField(
+            index,
+            'appearance',
+            toSparseAppearance(appearance),
+            { rerenderEditor: false }
           );
         });
       });

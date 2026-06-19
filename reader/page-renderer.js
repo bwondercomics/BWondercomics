@@ -29,6 +29,7 @@ const _renderers = createRenderers({
 
 export const MODULE_RENDERERS = _renderers.MODULE_RENDERERS;
 export const renderModule = _renderers.renderModule;
+export const renderSection = _renderers.renderSection;
 
 /**
  * Render a complete page to HTML, including the page-id data attribute

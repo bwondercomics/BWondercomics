@@ -240,7 +240,20 @@ export function createCanvasMutations({ getState, actions, deps, helpers }) {
     const updated = await deps.updateSection(sectionId, { layout });
     if (updated) {
       const section = getSectionRecord(sectionId);
-      if (section) section.layout = updated.layout || layout;
+      if (section) {
+        section.layout = updated.layout || layout;
+        // Reflect any backend module rehoming from a column-count reduction.
+        if (Array.isArray(updated.modules) && Array.isArray(section.modules)) {
+          const byId = new Map(section.modules.map((module) => [module.id, module]));
+          updated.modules.forEach((updatedModule) => {
+            const local = byId.get(updatedModule.id);
+            if (local) {
+              local.columnIndex = updatedModule.columnIndex;
+              local.sortIndex = updatedModule.sortIndex;
+            }
+          });
+        }
+      }
       actions.renderCanvas();
     }
   }

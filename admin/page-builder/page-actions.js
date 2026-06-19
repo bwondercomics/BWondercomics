@@ -59,7 +59,8 @@ export function createPageActions({ el, getState, actions, deps }) {
         isPublished,
       });
       if (!updated) {
-        throw new Error('Failed to update page status');
+        const lastError = deps.getLastPageBuilderDataError?.();
+        throw new Error(lastError?.message || 'Failed to update page status');
       }
 
       actions.syncPageSummary(updated);
@@ -79,7 +80,7 @@ export function createPageActions({ el, getState, actions, deps }) {
       console.error('Page status update error:', err);
       releaseButtons();
       actions.setEditorStatus(
-        isPublished ? 'Failed to publish changes.' : 'Failed to save draft.',
+        err?.message || (isPublished ? 'Failed to publish changes.' : 'Failed to save draft.'),
         'danger'
       );
       actions.renderEditorPanel();

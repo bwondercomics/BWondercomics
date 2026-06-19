@@ -7,6 +7,7 @@ import {
   loadPageConfigWithFallback,
   loadLatestPost,
   applyBuilderPageToDOM,
+  applyReaderModuleShellSettings,
   resolveBuilderPageReaderSeriesId,
 } from './data.js';
 import { el, initElements } from './dom.js';
@@ -15,6 +16,8 @@ import { initReaderAnalytics, setActiveEntry } from './analytics.js';
 import { prevPage, nextPage, restartEntry, hideEndOfEntry } from './controls.js';
 import { fitToScreen, zoomIn, zoomOut, resetView } from './transform.js';
 import { initPointerHandlers } from './pointer.js';
+import { isVerticalMode } from './display-mode.js';
+import { setVerticalScrollRestore, teardownVerticalMode } from './vertical.js';
 import {
   toggleFullscreen,
   onFullscreenChange,
@@ -26,6 +29,7 @@ import {
   toggleShortcutsOverlay,
   closeShortcutsOverlay,
   goToNextEntry,
+  goToPreviousEntry,
   changeEntry,
 } from './overlays.js';
 
@@ -73,6 +77,7 @@ import {
   isBuilderPreviewRequested,
   isDraftPageRequested,
 } from './series.js';
+import { publishReaderShellState, resolveReaderShellState } from './shell-state.js';
 
 (function () {
   'use strict';
@@ -169,6 +174,8 @@ import {
   let unitLabelSingular = 'Entry';
   let unitLabelPlural = 'Entries';
   let entrySelectBound = false;
+  let activeReaderShell = false;
+  let readerRuntimeInitialized = false;
   let fullEntries = {};
   let fullEntryOrder = [];
   let fullEntryMeta = {};
@@ -337,8 +344,7 @@ import {
     const entryLabel = getEntryLabelFor(name);
     const baseLabel =
       displayNumber == null ? name : `${entryLabel.singular} ${displayNumber} - ${name}`;
-    const isComingSoon =
-      !!meta.comingSoon || String(meta.status || '').toLowerCase() === 'scheduled';
+    const isComingSoon = String(meta.status || '').toLowerCase() === 'scheduled';
     return isComingSoon ? `${baseLabel} (Coming Soon)` : baseLabel;
   }
 
@@ -728,6 +734,7 @@ import {
     const bookTurnPromo = document.getElementById('bookTurnPromo');
     if (bookTurnPromo) {
       bookTurnPromo.addEventListener('click', (event) => {
+        if (!isReaderShellInteractive()) return;
         if (previewMode) {
           event.preventDefault();
           return;
@@ -742,33 +749,54 @@ import {
     }
     initRightPanelFeed();
 
-    // Navigation buttons
-    if (el.prevBtn) el.prevBtn.addEventListener('click', prevPage);
-    if (el.nextBtn) el.nextBtn.addEventListener('click', nextPage);
+    // Navigation buttons. In vertical mode prev/next navigate entries (the page
+    // strip scrolls natively); in paged mode they turn pages.
+    if (el.prevBtn) {
+      el.prevBtn.addEventListener(
+        'click',
+        runWhenReaderShellActive(() => {
+          if (isVerticalMode()) goToPreviousEntry(getNavigableEntries(), entries, entryMeta);
+          else prevPage();
+        })
+      );
+    }
+    if (el.nextBtn) {
+      el.nextBtn.addEventListener(
+        'click',
+        runWhenReaderShellActive(() => {
+          if (isVerticalMode()) goToNextEntry(getNavigableEntries(), entries, entryMeta);
+          else nextPage();
+        })
+      );
+    }
 
     // Zoom and view buttons
-    if (el.zoomIn) el.zoomIn.addEventListener('click', zoomIn);
-    if (el.zoomOut) el.zoomOut.addEventListener('click', zoomOut);
-    if (el.fitBtn) el.fitBtn.addEventListener('click', fitToScreen);
+    if (el.zoomIn) el.zoomIn.addEventListener('click', runWhenReaderShellActive(zoomIn));
+    if (el.zoomOut) el.zoomOut.addEventListener('click', runWhenReaderShellActive(zoomOut));
+    if (el.fitBtn) el.fitBtn.addEventListener('click', runWhenReaderShellActive(fitToScreen));
     if (el.fullscreenBtn && !previewMode) {
-      el.fullscreenBtn.addEventListener('click', toggleFullscreen);
+      el.fullscreenBtn.addEventListener('click', runWhenReaderShellActive(toggleFullscreen));
     }
 
     // Help button
     const helpBtn = document.getElementById('helpBtn');
-    if (helpBtn) helpBtn.addEventListener('click', toggleShortcutsOverlay);
+    if (helpBtn) {
+      helpBtn.addEventListener('click', runWhenReaderShellActive(toggleShortcutsOverlay));
+    }
     attachGalleryButton().catch((err) => {
       logger.warn('Gallery button setup failed:', err);
     });
 
     if (el.edgeLeftBtn) {
       el.edgeLeftBtn.addEventListener('click', (e) => {
+        if (!isReaderShellInteractive()) return;
         e.stopPropagation();
         prevPage();
       });
     }
     if (el.edgeRightBtn) {
       el.edgeRightBtn.addEventListener('click', (e) => {
+        if (!isReaderShellInteractive()) return;
         e.stopPropagation();
         nextPage();
       });
@@ -777,33 +805,44 @@ import {
     initPointerHandlers();
 
     document.addEventListener('keydown', (e) => {
+      if (!isReaderShellInteractive()) return;
       // Don't interfere if user is typing in an input
       if (e.target.matches('input, textarea, select')) return;
 
+      // Vertical mode: let arrows/space fall through to native scrolling and
+      // disable paged-only zoom/fullscreen shortcuts. Overlay and Escape stay.
+      const vertical = isVerticalMode();
+
       switch (e.key) {
         case 'ArrowLeft':
+          if (vertical) break;
           e.preventDefault();
           prevPage();
           break;
         case 'ArrowRight':
+          if (vertical) break;
           e.preventDefault();
           nextPage();
           break;
         case '+':
         case '=':
+          if (vertical) break;
           e.preventDefault();
           zoomIn();
           break;
         case '-':
+          if (vertical) break;
           e.preventDefault();
           zoomOut();
           break;
         case '0':
+          if (vertical) break;
           e.preventDefault();
           resetView();
           break;
         case 'f':
         case 'F':
+          if (vertical) break;
           e.preventDefault();
           if (!previewMode) toggleFullscreen();
           break;
@@ -855,6 +894,7 @@ import {
 
     if (el.entry) {
       el.entry.addEventListener('change', (e) => {
+        if (!isReaderShellInteractive()) return;
         const nextName = e.target.value;
         const meta = entryMeta?.[nextName] || {};
         if (String(meta.releaseType || '').toLowerCase() === 'store' && meta.storeUrl) {
@@ -875,6 +915,7 @@ import {
     // Handle window resize and orientation changes
     let resizeTimeout;
     window.addEventListener('resize', () => {
+      if (!isReaderShellInteractive()) return;
       // Debounce resize events to avoid excessive re-renders
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(() => {
@@ -886,7 +927,7 @@ import {
     // Shortcuts overlay buttons
     const shortcutsClose = document.getElementById('shortcutsClose');
     if (shortcutsClose) {
-      shortcutsClose.addEventListener('click', closeShortcutsOverlay);
+      shortcutsClose.addEventListener('click', runWhenReaderShellActive(closeShortcutsOverlay));
     }
 
     // End of chapter overlay buttons
@@ -896,14 +937,17 @@ import {
 
     if (nextEntryBtn) {
       nextEntryBtn.addEventListener('click', () =>
-        goToNextEntry(getNavigableEntries(), entries, entryMeta)
+        runWhenReaderShellActive(() => goToNextEntry(getNavigableEntries(), entries, entryMeta))()
       );
     }
     if (restartEntryBtn) {
-      restartEntryBtn.addEventListener('click', () => restartEntry(entries));
+      restartEntryBtn.addEventListener(
+        'click',
+        runWhenReaderShellActive(() => restartEntry(entries))
+      );
     }
     if (closeEndOverlay) {
-      closeEndOverlay.addEventListener('click', hideEndOfEntry);
+      closeEndOverlay.addEventListener('click', runWhenReaderShellActive(hideEndOfEntry));
     }
   }
 
@@ -939,6 +983,7 @@ import {
   const statusTimerRef = { current: null };
 
   function handleDataLoadError(error) {
+    publishReaderShellState({ active: true, reason: 'reader-data-error' });
     const viewport = document.getElementById('viewport');
     if (viewport) {
       viewport.innerHTML = `
@@ -963,6 +1008,7 @@ import {
   }
 
   function handlePreviewLoadError(error) {
+    publishReaderShellState({ active: true, reason: 'preview-error' });
     const viewport = document.getElementById('viewport');
     if (viewport) {
       viewport.innerHTML = `
@@ -979,8 +1025,82 @@ import {
 
   // ==================== INITIALIZATION ====================
 
+  async function fetchSessionUser() {
+    try {
+      const res = await fetch('/api/session', { cache: 'no-store', credentials: 'same-origin' });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.user || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function syncSessionChrome(user) {
+    updatePatronWelcome(user);
+    const role = (user?.role || '').toString().toLowerCase();
+    const adminNavLink = document.getElementById('adminNavLink');
+    if (adminNavLink) {
+      adminNavLink.style.display = role === 'admin' ? 'inline-flex' : 'none';
+    }
+    return role;
+  }
+
+  function resolvePageShellActive(page, options = {}) {
+    return resolveReaderShellState(page, options).active;
+  }
+
+  function isReaderShellInteractive() {
+    return activeReaderShell && document.body?.dataset.readerShell === 'active';
+  }
+
+  function runWhenReaderShellActive(handler) {
+    return (...args) => {
+      if (!isReaderShellInteractive()) return undefined;
+      return handler(...args);
+    };
+  }
+
+  async function loadReaderDataForPage(page, fallbackSeriesId, options = {}) {
+    const targetSeriesId = resolveBuilderPageReaderSeriesId(page, fallbackSeriesId);
+    const data = await loadEntryData(targetSeriesId);
+    if (typeof options.isCurrent === 'function' && !options.isCurrent()) {
+      return { seriesId: targetSeriesId, stale: true };
+    }
+    applyLoadedEntryData(data, targetSeriesId);
+    return { seriesId: targetSeriesId, stale: false };
+  }
+
+  async function prepareActiveReaderPage(page, fallbackSeriesId, sessionUser, options = {}) {
+    const targetSeriesId = resolveBuilderPageReaderSeriesId(page, fallbackSeriesId);
+    const hasLoadedEntries =
+      fullEntries && typeof fullEntries === 'object' && Object.keys(fullEntries).length > 0;
+    if (!hasLoadedEntries || targetSeriesId !== activeReaderSeriesId) {
+      const loaded = await loadReaderDataForPage(page, fallbackSeriesId, options);
+      if (loaded.stale) return loaded;
+    }
+    const refresh = await refreshReaderSeriesView(page, targetSeriesId, sessionUser, options);
+    return refresh;
+  }
+
+  function applyInactiveBuilderPage(pageResult, applyOptions = {}) {
+    teardownVerticalMode();
+    activeReaderShell = false;
+    publishReaderShellState(
+      resolveReaderShellState(pageResult?.page || null, {
+        builderEditing: applyOptions.builderEditing === true,
+        deviceId: applyOptions.deviceId,
+      })
+    );
+    readerBootState.resolvePageConfig(pageResult || { source: 'none' });
+    applyBuilderPageToDOM(pageResult?.page || null, applyOptions);
+    releaseReaderBootstrap(pageResult?.source || 'none');
+  }
+
   function init(pageSource = 'none', options = {}) {
     const previewMode = !!options.previewMode;
+    activeReaderShell = true;
+    readerRuntimeInitialized = true;
     initElements();
     initEntrySelect();
     if (!previewMode) {
@@ -1031,9 +1151,23 @@ import {
 
     if (el.entry) el.entry.value = state.currentEntry;
     syncEntrySelectDisplay();
+
+    // Resolve the effective reader display mode BEFORE the first render so a
+    // vertical-scroll page paints as vertical on first paint (the full builder
+    // DOM application runs afterwards and re-applies the same settings).
+    if (options.page) {
+      applyReaderModuleShellSettings(options.page, {
+        builderEditing: options.builderEditing === true,
+        deviceId: options.deviceId,
+      });
+    }
+    if (isVerticalMode()) {
+      setVerticalScrollRestore(saved && entries[saved.chapter] ? saved : null);
+    }
     window.dispatchEvent(
       new CustomEvent('entryChanged', { detail: { chapter: state.currentEntry } })
     );
+    publishReaderShellState({ active: true, reason: 'reader-module' });
 
     attachEventHandlers({ previewMode });
     render();
@@ -1051,33 +1185,8 @@ import {
     const pageScope = getRequestedPageScope();
     const previewMode = isBuilderPreviewRequested();
 
-    try {
-      const data = await loadEntryData(seriesId);
-      applyLoadedEntryData(data, seriesId);
-    } catch (err) {
-      handleDataLoadError(err);
-      return;
-    }
-
-    // Apply premium gating (client-side UX; server enforces for protected folders too)
-    let sessionUser = null;
-    try {
-      const res = await fetch('/api/session', { cache: 'no-store', credentials: 'same-origin' });
-      if (res.ok) {
-        const data = await res.json();
-        sessionUser = data.user || null;
-      }
-    } catch {
-      sessionUser = null;
-    }
-
-    updatePatronWelcome(sessionUser);
-
-    const role = (sessionUser?.role || '').toString().toLowerCase();
-    const adminNavLink = document.getElementById('adminNavLink');
-    if (adminNavLink) {
-      adminNavLink.style.display = role === 'admin' ? 'inline-flex' : 'none';
-    }
+    const sessionUser = await fetchSessionUser();
+    const role = syncSessionChrome(sessionUser);
 
     let pageResult = null;
     if (previewMode) {
@@ -1087,59 +1196,83 @@ import {
           seriesId,
           pageSlug: explicitPageSlug || 'reader',
         });
-        ({ seriesId } = await refreshReaderSeriesView(pageResult.page, seriesId, sessionUser));
-        readerBootState.resolvePageConfig(pageResult);
-        loadLatestUpdate();
-        init(pageResult.source, { previewMode: true });
-        applyBuilderPageToDOM(pageResult.page, {
-          seriesId,
-          previewMode: true,
-          builderEditing: pageResult.builderEditing === true,
-          deviceId: pageResult.deviceId || pageResult.snapshot?.options?.deviceId,
-        });
-        previewBridge.setPreviewMetricsContext?.(pageResult.snapshot, {
-          seriesId,
-          pageId: pageResult.snapshot?.pageId,
-          pageSlug: pageResult.snapshot?.pageSlug || explicitPageSlug || 'reader',
-        });
-        previewBridge.emitPreviewMetrics?.('snapshot-applied');
-        previewBridge.startPreviewTargetBridge?.(pageResult.snapshot, {
-          seriesId,
-          pageId: pageResult.snapshot?.pageId,
-          pageSlug: pageResult.snapshot?.pageSlug || explicitPageSlug || 'reader',
-        });
+
+        const applyPreviewResult = async (nextPageResult, reason, options = {}) => {
+          const builderEditing = nextPageResult.builderEditing === true;
+          const deviceId = nextPageResult.deviceId || nextPageResult.snapshot?.options?.deviceId;
+          const shellActive = resolvePageShellActive(nextPageResult.page, {
+            builderEditing,
+            deviceId,
+          });
+          let pageApplied = false;
+
+          if (shellActive) {
+            const refresh = await prepareActiveReaderPage(
+              nextPageResult.page,
+              seriesId,
+              sessionUser,
+              options
+            );
+            if (refresh.stale) return;
+            seriesId = refresh.seriesId;
+            if (!readerRuntimeInitialized) {
+              readerBootState.resolvePageConfig(nextPageResult);
+              loadLatestUpdate();
+              init(nextPageResult.source, {
+                previewMode: true,
+                page: nextPageResult.page,
+                builderEditing,
+                deviceId,
+              });
+            } else {
+              publishReaderShellState({ active: true, reason: 'reader-module' });
+            }
+            activeReaderShell = true;
+          } else {
+            applyInactiveBuilderPage(nextPageResult, {
+              seriesId,
+              previewMode: true,
+              builderEditing,
+              deviceId,
+            });
+            pageApplied = true;
+          }
+
+          if (!pageApplied) {
+            applyBuilderPageToDOM(nextPageResult.page, {
+              seriesId,
+              previewMode: true,
+              builderEditing,
+              deviceId,
+            });
+          }
+          previewBridge.setPreviewMetricsContext?.(nextPageResult.snapshot, {
+            seriesId,
+            pageId: nextPageResult.snapshot?.pageId,
+            pageSlug: nextPageResult.snapshot?.pageSlug || explicitPageSlug || 'reader',
+          });
+          previewBridge.emitPreviewMetrics?.(reason);
+          if (builderEditing) {
+            previewBridge.startPreviewTargetBridge?.(nextPageResult.snapshot, {
+              seriesId,
+              pageId: nextPageResult.snapshot?.pageId,
+              pageSlug: nextPageResult.snapshot?.pageSlug || explicitPageSlug || 'reader',
+            });
+          } else {
+            previewBridge.stopPreviewTargetBridge?.();
+          }
+        };
+
+        await applyPreviewResult(pageResult, 'snapshot-applied');
         let previewApplyVersion = 0;
         previewBridge.subscribePreviewSnapshots?.(
           (nextPageResult) => {
             const applyVersion = ++previewApplyVersion;
             Promise.resolve()
               .then(async () => {
-                const refresh = await refreshReaderSeriesView(
-                  nextPageResult.page,
-                  seriesId,
-                  sessionUser,
-                  {
-                    isCurrent: () => applyVersion === previewApplyVersion,
-                  }
-                );
-                if (refresh.stale) return;
-                seriesId = refresh.seriesId;
-                applyBuilderPageToDOM(nextPageResult.page, {
-                  seriesId,
-                  previewMode: true,
-                  builderEditing: nextPageResult.builderEditing === true,
-                  deviceId: nextPageResult.deviceId || nextPageResult.snapshot?.options?.deviceId,
+                await applyPreviewResult(nextPageResult, 'snapshot-updated', {
+                  isCurrent: () => applyVersion === previewApplyVersion,
                 });
-                previewBridge.emitPreviewMetrics?.('snapshot-updated');
-                if (nextPageResult.builderEditing === true) {
-                  previewBridge.startPreviewTargetBridge?.(nextPageResult.snapshot, {
-                    seriesId,
-                    pageId: nextPageResult.snapshot?.pageId,
-                    pageSlug: nextPageResult.snapshot?.pageSlug || explicitPageSlug || 'reader',
-                  });
-                } else {
-                  previewBridge.stopPreviewTargetBridge?.();
-                }
               })
               .catch((error) => {
                 if (applyVersion === previewApplyVersion) {
@@ -1164,15 +1297,24 @@ import {
       pageScope,
       draft: role === 'admin' && isDraftPageRequested(),
     });
+
+    const shellActive = resolvePageShellActive(pageResult.page);
+    if (!shellActive) {
+      applyInactiveBuilderPage(pageResult, { seriesId });
+      return;
+    }
+
     try {
-      ({ seriesId } = await refreshReaderSeriesView(pageResult.page, seriesId, sessionUser));
+      const refresh = await prepareActiveReaderPage(pageResult.page, seriesId, sessionUser);
+      seriesId = refresh.seriesId;
     } catch (err) {
       handleDataLoadError(err);
       return;
     }
+
     readerBootState.resolvePageConfig(pageResult);
     loadLatestUpdate();
-    init(pageResult.source);
+    init(pageResult.source, { page: pageResult.page });
     if (pageResult.source === 'builder' && pageResult.page) {
       // Let reader bootstrap finish first, then reapply builder DOM as the final state.
       applyBuilderPageToDOM(pageResult.page, {
@@ -1189,11 +1331,28 @@ import {
       adminNavLink.style.display = role === 'admin' ? 'inline-flex' : 'none';
     }
     updatePatronWelcome(user);
-    refreshEntriesForSession(user);
+    if (isReaderShellInteractive() && readerRuntimeInitialized) {
+      refreshEntriesForSession(user);
+    }
   });
 
   window.addEventListener('entryChanged', () => {
     syncEntrySelectDisplay();
+  });
+
+  window.addEventListener('readerShellStateChanged', (event) => {
+    if (event?.detail?.active !== true) {
+      teardownVerticalMode();
+    }
+  });
+
+  // A builder preview snapshot can switch the reader display mode without
+  // re-running init(). Re-render so the runtime rebuilds the correct surface
+  // (vertical strip vs paged stage) and tears down the previous mode.
+  window.addEventListener('readerDisplayModeChanged', () => {
+    if (isReaderShellInteractive() && readerRuntimeInitialized) {
+      render();
+    }
   });
 
   if (document.readyState === 'complete' || document.readyState === 'interactive') {

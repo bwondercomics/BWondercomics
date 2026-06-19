@@ -13,6 +13,7 @@ from .builder_security import (
     ALLOWED_MODULE_TYPES,
     CMS_SOURCE_ACTIVE_PAGE_SERIES,
     CMS_SOURCE_SPECIFIC_SERIES,
+    layout_column_count,
     sanitize_module_config,
     sanitize_page_meta,
     sanitize_section_settings,
@@ -30,6 +31,26 @@ PAGE_SCOPE_GLOBAL = "global"
 PAGE_SCOPES = {PAGE_SCOPE_SERIES, PAGE_SCOPE_GLOBAL}
 BINDING_ROLE_READER = "reader"
 BINDING_ROLES = {BINDING_ROLE_READER, "feed", "gallery"}
+READER_BINDING_DEFAULT_DEVICE = "desktop"
+READER_MODULE_MISSING = "reader_module_missing"
+READER_MODULE_DUPLICATE = "reader_module_duplicate"
+READER_MODULE_HIDDEN_DEFAULT_DEVICE = "reader_module_hidden_default_device"
+READER_MODULE_WRONG_SOURCE = "reader_module_wrong_source"
+
+
+class PageBuilderValidationError(ValueError):
+    """Structured validation failure returned by page-builder admin routes."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "page_builder_validation_failed",
+        warnings: list[dict[str, str]] | None = None,
+    ) -> None:
+        super().__init__(message)
+        self.code = code
+        self.warnings = warnings or []
 
 
 def _now() -> datetime:
@@ -112,7 +133,7 @@ def _serialize_section(section: BuilderSection, page: BuilderPage | None = None)
         "sectionType": section_type,
         "layout": layout,
         "sortIndex": max(0, int(section.sort_index or 0)),
-        "settings": sanitize_section_settings(section.settings),
+        "settings": sanitize_section_settings(section.settings, layout),
         "modules": modules,
     }
 
@@ -170,6 +191,10 @@ def _load_page_with_content(db: Session, *filters: Any) -> BuilderPage | None:
     )
 
 
+def _load_page_model_with_content(db: Session, page_id: uuid.UUID) -> BuilderPage | None:
+    return _load_page_with_content(db, BuilderPage.id == page_id)
+
+
 def _serialize_page_with_sections(
     page: BuilderPage, include_sort_index: bool = True
 ) -> dict[str, Any]:
@@ -223,10 +248,114 @@ def _page_can_bind_to_series(page: BuilderPage, series_id: str, role: str | None
     )
 
 
+def _reader_warning(code: str, message: str) -> dict[str, str]:
+    return {
+        "role": BINDING_ROLE_READER,
+        "code": code,
+        "message": message,
+    }
+
+
+def _reader_modules_for_page(page: BuilderPage) -> list[BuilderModule]:
+    modules: list[BuilderModule] = []
+    for section in sorted(page.sections, key=lambda item: item.sort_index):
+        for module in sorted(
+            section.modules, key=lambda item: (item.column_index, item.sort_index)
+        ):
+            if str(module.module_type or "").strip() == "reader":
+                modules.append(module)
+    return modules
+
+
+def _reader_module_hidden_for_default_device(page: BuilderPage, module: BuilderModule) -> bool:
+    config = _sanitize_module_config_for_page(page, "reader", module.config)
+    responsive = config.get("responsive") if isinstance(config.get("responsive"), dict) else {}
+    branch = responsive.get(READER_BINDING_DEFAULT_DEVICE)
+    return isinstance(branch, dict) and branch.get("hidden") is True
+
+
+def _reader_module_has_wrong_source(module: BuilderModule) -> bool:
+    config = module.config if isinstance(module.config, dict) else {}
+    source = config.get("source") if isinstance(config.get("source"), dict) else {}
+    raw_mode = str(source.get("mode") or "").strip()
+    if not raw_mode:
+        return False
+    return raw_mode != CMS_SOURCE_ACTIVE_PAGE_SERIES
+
+
+def _reader_binding_module_warnings(
+    page: BuilderPage, series_id: str | None
+) -> list[dict[str, str]]:
+    if sanitize_page_scope(page.scope) != PAGE_SCOPE_SERIES or page.series_id != series_id:
+        return [
+            _reader_warning(
+                "reader_binding_invalid",
+                "The reader page binding must point to a same-series page.",
+            )
+        ]
+
+    reader_modules = _reader_modules_for_page(page)
+    if not reader_modules:
+        return [
+            _reader_warning(
+                READER_MODULE_MISSING,
+                "The bound reader page must contain one Comic Reader module.",
+            )
+        ]
+    if len(reader_modules) > 1:
+        return [
+            _reader_warning(
+                READER_MODULE_DUPLICATE,
+                "The bound reader page must contain exactly one Comic Reader module.",
+            )
+        ]
+
+    [reader_module] = reader_modules
+    warnings: list[dict[str, str]] = []
+    if _reader_module_hidden_for_default_device(page, reader_module):
+        warnings.append(
+            _reader_warning(
+                READER_MODULE_HIDDEN_DEFAULT_DEVICE,
+                "The bound reader page's Comic Reader module cannot be hidden on Desktop.",
+            )
+        )
+    if _reader_module_has_wrong_source(reader_module):
+        warnings.append(
+            _reader_warning(
+                READER_MODULE_WRONG_SOURCE,
+                "The bound reader page's Comic Reader module must use the active page series.",
+            )
+        )
+    return warnings
+
+
+def _raise_for_invalid_reader_binding(page: BuilderPage, series_id: str) -> None:
+    warnings = _reader_binding_module_warnings(page, series_id)
+    if not warnings:
+        return
+    first = warnings[0]
+    raise PageBuilderValidationError(first["message"], code=first["code"], warnings=warnings)
+
+
+def _page_has_reader_binding(db: Session, page: BuilderPage) -> bool:
+    if sanitize_page_scope(page.scope) != PAGE_SCOPE_SERIES or not page.series_id:
+        return False
+    existing = db.scalar(
+        select(BuilderPageBinding).where(
+            BuilderPageBinding.series_id == page.series_id,
+            BuilderPageBinding.role == BINDING_ROLE_READER,
+            BuilderPageBinding.page_id == page.id,
+        )
+    )
+    return existing is not None
+
+
 def _ensure_reader_binding_for_page(db: Session, page: BuilderPage) -> None:
     if sanitize_page_scope(page.scope) != PAGE_SCOPE_SERIES or not page.series_id:
         return
     if page.slug != "reader" and page.page_type != "reader":
+        return
+    if _reader_binding_module_warnings(page, page.series_id):
         return
     existing = db.scalar(
         select(BuilderPageBinding).where(
@@ -346,6 +475,8 @@ def get_bound_page(
     )
     if not page or not _page_can_bind_to_series(page, sid, safe_role):
         return None
+    if safe_role == BINDING_ROLE_READER and _reader_binding_module_warnings(page, sid):
+        return None
     return page
 
 
@@ -437,6 +568,9 @@ def update_page(db: Session, page_id: str, data: dict[str, Any]) -> dict[str, An
     now = _now()
     scope = sanitize_page_scope(page.scope)
 
+    if data.get("isPublished") is True and _page_has_reader_binding(db, page):
+        _raise_for_invalid_reader_binding(page, _require_series_id(page.series_id))
+
     if "title" in data:
         page.title = str(data["title"]).strip()[:200]
     if "slug" in data:
@@ -525,7 +659,11 @@ def get_page_bindings(db: Session, series_id: str | None) -> dict[str, Any]:
     binding_rows = db.scalars(
         select(BuilderPageBinding)
         .where(BuilderPageBinding.series_id == sid)
-        .options(selectinload(BuilderPageBinding.page))
+        .options(
+            selectinload(BuilderPageBinding.page)
+            .selectinload(BuilderPage.sections)
+            .selectinload(BuilderSection.modules)
+        )
         .order_by(BuilderPageBinding.role.asc())
     ).all()
 
@@ -548,14 +686,16 @@ def get_page_bindings(db: Session, series_id: str | None) -> dict[str, Any]:
             "pageId": str(page.id),
             "page": _serialize_page(page, include_sort_index=False),
         }
-        if role == BINDING_ROLE_READER and not page.is_published:
-            warnings.append(
-                {
-                    "role": role,
-                    "code": "reader_page_unpublished",
-                    "message": "The bound reader page is not published.",
-                }
-            )
+        if role == BINDING_ROLE_READER:
+            warnings.extend(_reader_binding_module_warnings(page, sid))
+            if not page.is_published:
+                warnings.append(
+                    {
+                        "role": role,
+                        "code": "reader_page_unpublished",
+                        "message": "The bound reader page is not published.",
+                    }
+                )
 
     if BINDING_ROLE_READER not in bindings:
         warnings.append(
@@ -593,9 +733,11 @@ def update_page_bindings(
             pid = uuid.UUID(str(raw_page_id))
         except ValueError as exc:
             raise ValueError(f"Invalid page id for {role} binding") from exc
-        page = db.get(BuilderPage, pid)
+        page = _load_page_model_with_content(db, pid)
         if not page or not _page_can_bind_to_series(page, sid, role):
             raise ValueError(f"Page cannot be used for {role} binding")
+        if role == BINDING_ROLE_READER:
+            _raise_for_invalid_reader_binding(page, sid)
         if existing:
             existing.page_id = page.id
             existing.updated_at = now
@@ -648,7 +790,7 @@ def add_section(db: Session, page_id: str, data: dict[str, Any]) -> dict[str, An
         section_type=section_type,
         layout=layout,
         sort_index=sort_index,
-        settings=sanitize_section_settings(data.get("settings") or {}),
+        settings=sanitize_section_settings(data.get("settings") or {}, layout),
         created_at=now,
     )
     db.add(section)
@@ -677,9 +819,24 @@ def update_section(db: Session, section_id: str, data: dict[str, Any]) -> dict[s
     next_layout = (
         validate_layout(data["layout"]) if "layout" in data else validate_layout(section.layout)
     )
-    if "layout" in data:
-        for module in section.modules:
-            validate_column_index(module.column_index, next_layout)
+    previous_column_count = layout_column_count(section.layout)
+    next_column_count = layout_column_count(next_layout)
+    if "layout" in data and next_column_count < previous_column_count:
+        # Atomically rehome modules whose column no longer exists when the column
+        # count shrinks. Existing modules in the last surviving column retain
+        # precedence; orphaned modules append by original column and sort order.
+        last_column = max(0, next_column_count - 1)
+        destination_modules = sorted(
+            (module for module in section.modules if module.column_index == last_column),
+            key=lambda module: (module.sort_index, str(module.id)),
+        )
+        orphaned_modules = sorted(
+            (module for module in section.modules if module.column_index > last_column),
+            key=lambda module: (module.column_index, module.sort_index, str(module.id)),
+        )
+        for sort_index, module in enumerate(destination_modules + orphaned_modules):
+            module.column_index = last_column
+            module.sort_index = sort_index
     if "sectionType" in data:
         section.section_type = validate_section_type(data["sectionType"])
     if "layout" in data:
@@ -687,7 +844,7 @@ def update_section(db: Session, section_id: str, data: dict[str, Any]) -> dict[s
     if "sortIndex" in data:
         section.sort_index = validate_sort_index(data["sortIndex"])
     if "settings" in data and isinstance(data["settings"], dict):
-        section.settings = sanitize_section_settings(data["settings"])
+        section.settings = sanitize_section_settings(data["settings"], section.layout)
 
     page = db.get(BuilderPage, section.page_id)
     if page:
@@ -812,14 +969,27 @@ def update_module(db: Session, module_id: str, data: dict[str, Any]) -> dict[str
         if "moduleType" in data
         else validate_module_type(module.module_type)
     )
-    if "moduleType" in data:
-        module.module_type = next_type
-    if "columnIndex" in data:
-        module.column_index = validate_column_index(data["columnIndex"], layout)
-    if "sortIndex" in data:
-        module.sort_index = validate_sort_index(data["sortIndex"])
-    if "config" in data and isinstance(data["config"], dict):
-        module.config = _sanitize_module_config_for_page(page, next_type, data["config"])
+    next_column_index = (
+        validate_column_index(data["columnIndex"], layout)
+        if "columnIndex" in data
+        else validate_column_index(module.column_index, layout)
+    )
+    next_sort_index = (
+        validate_sort_index(data["sortIndex"])
+        if "sortIndex" in data
+        else validate_sort_index(module.sort_index)
+    )
+    proposed_config = (
+        data["config"]
+        if "config" in data and isinstance(data["config"], dict)
+        else module.config or {}
+    )
+    next_config = _sanitize_module_config_for_page(page, next_type, proposed_config)
+
+    module.module_type = next_type
+    module.column_index = next_column_index
+    module.sort_index = next_sort_index
+    module.config = next_config
 
     module.updated_at = now
 
@@ -874,9 +1044,14 @@ def move_module(
     now = _now()
     layout = validate_layout(target_section.layout)
 
+    # Validate before mutating so a rejected column index cannot leave a
+    # half-applied move (e.g. a changed section_id) on the session.
+    next_column_index = validate_column_index(column_index, layout)
+    next_sort_index = validate_sort_index(sort_index)
+
     module.section_id = target_sid
-    module.column_index = validate_column_index(column_index, layout)
-    module.sort_index = validate_sort_index(sort_index)
+    module.column_index = next_column_index
+    module.sort_index = next_sort_index
     module.updated_at = now
 
     page = db.get(BuilderPage, target_section.page_id)

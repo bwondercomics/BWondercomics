@@ -261,8 +261,16 @@ describe('admin page-builder editor and preview renderers', () => {
       'active-page-series',
     ]);
     expect(seriesReaderWrapper.querySelector('[data-source-key="seriesId"]')).toBeNull();
+    expect(seriesReaderWrapper.textContent).toContain('Display And Controls');
+    expect(seriesReaderWrapper.textContent).toContain('Stage');
+    expect(seriesReaderWrapper.textContent).toContain('Panels And Comments');
+    expect(seriesReaderWrapper.textContent).not.toContain('Raw Config');
+    expect(seriesReaderWrapper.querySelector('option[value="vertical-scroll"]')?.disabled).toBe(
+      false
+    );
 
     const setSeriesDraftConfig = vi.fn();
+    const renderReaderEditorPanel = vi.fn();
     bindModuleEditorEvents({
       el: { pbModuleEditor: seriesReaderWrapper },
       currentPage: seriesPage,
@@ -270,18 +278,31 @@ describe('admin page-builder editor and preview renderers', () => {
       draftConfig: seriesPage.sections[0].modules[0].config,
       setDraftConfig: setSeriesDraftConfig,
       markDirty: vi.fn(),
-      renderEditorPanel: vi.fn(),
+      renderEditorPanel: renderReaderEditorPanel,
       pages,
       openImagePicker: vi.fn(),
       fetchAssets: vi.fn(async () => []),
       uploadAssetFile: vi.fn(async () => ({})),
     });
-    const showPanels = seriesReaderWrapper.querySelector('[data-key="showPanels"]');
-    showPanels.checked = false;
-    showPanels.dispatchEvent(new Event('change', { bubbles: true }));
+    const controlsPlacement = seriesReaderWrapper.querySelector(
+      '[data-reader-key="controls.placement"]'
+    );
+    controlsPlacement.value = 'overlay';
+    controlsPlacement.dispatchEvent(new Event('change', { bubbles: true }));
     expect(setSeriesDraftConfig).toHaveBeenLastCalledWith(
       expect.objectContaining({
-        showPanels: false,
+        source: { mode: 'active-page-series' },
+        controls: expect.objectContaining({ placement: 'overlay', size: 'medium' }),
+      })
+    );
+    expect(renderReaderEditorPanel).toHaveBeenCalled();
+
+    const showComments = seriesReaderWrapper.querySelector('[data-reader-key="showComments"]');
+    showComments.checked = false;
+    showComments.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(setSeriesDraftConfig).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        showComments: false,
         source: { mode: 'active-page-series' },
       })
     );

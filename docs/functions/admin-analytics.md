@@ -14,6 +14,7 @@ This document provides a comprehensive map of the internal functions and data st
 - [🚦 traffic.js](#-trafficjs)
 - [🕰️ visitor-history.js](#️-visitor-historyjs)
 - [🛠️ shared.js](#️-sharedjs)
+- [🧭 Maintenance Rule](#-maintenance-rule)
 
 ## 💡 Core Concepts
 
@@ -21,7 +22,7 @@ To understand these modules, keep the following identifiers in mind:
 
 - **`entryKey`**: A string in the format `<seriesId>:<displayNumber>` (e.g., `battle-bros:5`). This is the primary key used to link reader events to database entries.
 - **`displayNumber`**: The human-readable ID of an entry (Chapter 1, Chapter 2). The analytics backend parses this from event labels.
-- **`liveHistory`**: A rolling array of samples stored in `localStorage` to ensure the live seismometer doesn't reset on page refresh.
+- **`liveHistory`**: A rolling array of `{ ts, count }` samples stored in `localStorage` to ensure the live seismometer doesn't reset on page refresh.
 
 ## 🔌 Module Initialization
 
@@ -137,9 +138,11 @@ The `createLiveAnalytics` factory function manages the real-time "Seismometer" c
 
 ### Internal State
 
-- `liveHistory`: Array of `{timestamp, count}` recorded over the current session.
-- `liveTickerOffset`: Current scroll position of the visitor marquee.
-- `liveHistorySeconds`: The duration window currently shown on the chart.
+- `liveHistory`: Array of `{ ts, count }` samples retained for up to 24 hours.
+- `liveTimer`: Polling interval for the live endpoint.
+- `liveTickerRaf` / `liveGraphRaf`: Animation handles for ticker and chart loops.
+- `liveCanvasSize` / `liveCanvasColors`: Cached canvas render metadata.
+- `selectedLiveTime`: Optional timestamp used when inspecting a past chart point.
 
 ### Public API (🔌)
 
@@ -155,11 +158,16 @@ Clears all active intervals and pauses the animation loop.
 
 Increments or decrements the time range selection (30m, 60m, 2h, 6h, 12h, 24h) and re-loads data.
 
+#### `loadLiveVisitors({ showLoading })`
+
+Fetches current active visitor data from `/api/admin/analytics/live`, records a sample, updates the
+chart/ticker, and returns the parsed payload or `null` on failure.
+
 ### Internal Helpers (🔒)
 
-#### `getLiveRangeSeconds()`
+#### `getLiveRangeMinutes()`
 
-Converts the select menu's duration string (e.g., "30m") into raw seconds.
+Reads the live range select and normalizes it to one of the supported minute values.
 
 #### `setLiveStatus(message, isError)`
 
@@ -172,21 +180,17 @@ Adds a new visitor count to `liveHistory`.
 > [!NOTE]
 > Points recorded within the same 60-second window replace the previous point rather than appending, preventing the chart from becoming overcrowded.
 
-#### `saveLiveHistory()`
+#### `saveLiveHistoryToStorage()`
 
 Persists the current history and timestamp to `localStorage`.
 
-#### `loadLiveHistory()`
+#### `loadLiveHistoryFromStorage()`
 
 Restores previous session history from `localStorage` if it's less than 24 hours old.
 
 #### `drawLiveSeismometer()`
 
 The main rendering loop for the Canvas chart. Uses a `requestAnimationFrame` cycle to create a smooth, "pulsing" line effect and scrolling grid.
-
-#### `loadLiveVisitors({ showLoading })`
-
-Fetches current active visitor data from `/api/admin/analytics/live`.
 
 #### `renderLiveTicker(visitors)`
 
@@ -344,3 +348,9 @@ Stateless utility functions used for consistent formatting.
 - `formatTimeAgo(value)`: Returns "Xm ago" style strings.
 - `getCssVar(name, fallback)`: Reads from `:root` for canvas color syncing.
 - `escapeHtml(value)`: Basic security sanitization.
+
+## 🧭 Maintenance Rule
+
+Update this document when `admin/analytics.js` changes its facade, files under
+`admin/analytics/` are added or removed, analytics endpoint usage changes, DOM ids used by the
+analytics dashboard change, or payload/state ownership moves between analytics submodules.

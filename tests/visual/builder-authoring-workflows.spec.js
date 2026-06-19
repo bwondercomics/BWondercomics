@@ -61,6 +61,32 @@ function makeWorkflowPage(overrides = {}) {
   page.scope = page.scope || 'series';
   page.seriesId = page.scope === 'global' ? null : page.seriesId || SERIES_ID;
   page.sections = Array.isArray(page.sections) ? page.sections : [];
+  if (
+    !page.sections.some((section) =>
+      (section.modules || []).some((mod) => mod.moduleType === 'reader')
+    )
+  ) {
+    page.sections = page.sections.map((section, index) => ({
+      ...section,
+      sortIndex: index + 1,
+    }));
+    page.sections.unshift({
+      id: 'phase-12-reader-section',
+      sectionType: 'row',
+      layout: '1',
+      sortIndex: 0,
+      settings: {},
+      modules: [
+        {
+          id: 'phase-12-reader-module',
+          moduleType: 'reader',
+          columnIndex: 0,
+          sortIndex: 0,
+          config: { source: { mode: 'active-page-series' } },
+        },
+      ],
+    });
+  }
   for (const section of page.sections) {
     section.modules = Array.isArray(section.modules) ? section.modules : [];
     for (const mod of section.modules) {
@@ -664,6 +690,14 @@ test.describe('builder Phase 12 authoring workflows', () => {
 
     await expect(page.locator('.pb-page-item.active')).toContainText('Reader');
     expect(state.pageBindings.reader.pageId).toBe(state.seriesPages[0].id);
+    const initialPreviewFrame = await getPreviewFrame(page);
+    await expect(initialPreviewFrame.locator('body')).toHaveAttribute(
+      'data-reader-shell',
+      'active'
+    );
+    await expect(
+      initialPreviewFrame.locator(`[data-builder-module-id="${TEXT_MODULE_ID}"]`)
+    ).toBeVisible();
 
     for (const viewportId of PREVIEW_VIEWPORT_ORDER) {
       const viewport = PREVIEW_VIEWPORTS[viewportId];

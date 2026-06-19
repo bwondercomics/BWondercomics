@@ -10,7 +10,13 @@ This guide maps the reader-side modules, their responsibilities, and how they co
 - `reader/data.js` — Fetches `/data.json` (or `/series/<id>/data.json`), scoped builder page APIs, optional standalone legacy page-config helpers, and `/api/posts/latest`; normalizes entry metadata, effective page-header state, and maps `protected/*` asset paths to `/api/protected/*`.
 - `reader/header-layout.js` — Applies the effective header layout to the existing topbar DOM, repositions stable header blocks into left/center/right regions, and rebuilds configurable nav links while preserving the runtime admin link.
 - `reader/state.js` — Single state container: current entry/page, zoom, fit mode, progress persistence (localStorage), cached natural page metrics, and derived helpers (e.g., `isTwoPageMode`).
-- `reader/render.js` — Renders pages into the stage, caches natural page dimensions as images preload/load, reapplies non-fullscreen frame fitting, and updates UI labels/buttons.
+- `reader/shell-state.js` — Effective Comic Reader module ownership and active/inactive state
+  publication/subscription.
+- `reader/display-mode.js` — Active `paged`/`vertical-scroll` mode helpers.
+- `reader/render.js` — Routes to paged or vertical rendering, manages scheduled/empty states, caches
+  paged dimensions, and updates UI labels/buttons.
+- `reader/vertical.js` — Continuous vertical strip rendering, visible-page tracking, scroll restore,
+  analytics/completion updates, and deterministic cleanup.
 - `reader/controls.js` — Keyboard and click navigation (prev/next, first/last, toggle two-page, reset zoom, fullscreen), debounce helpers, and guard rails when zoomed.
 - `reader/pointer.js` — Wheel/pinch/drag handling for zoom + pan, including zoom focal point math and drag inertia limits.
 - `reader/fullscreen.js` — Cross-browser fullscreen enter/exit, button state sync, and switching between on-page frame sizing and fullscreen height fitting.
@@ -29,11 +35,16 @@ This guide maps the reader-side modules, their responsibilities, and how they co
 
 ```mermaid
 flowchart TD
-  A[startup] --> B[hide static shell + load data.json]
-  B --> C[resolve builder page + load latest post]
-  C --> D[populate state (entries, folders, status)]
-  D --> E[render initial entry/page + attach controls/listeners]
-  E --> F[apply builder page DOM as final state when builder source wins]
+  A[startup] --> B[hide shell + resolve builder page]
+  B --> C{effective reader module?}
+  C -- no --> N[render authored page only]
+  C -- yes --> D[apply reader config + load series data/latest]
+  D --> M{paged or vertical}
+  M -- paged --> E[render page/spread]
+  M -- vertical --> V[render continuous strip]
+  N --> F[release bootstrap state]
+  E --> F
+  V --> F
   F --> G{user input}
   G -->|prev/next/entry| H[controls -> state -> render]
   G -->|zoom/pan| I[pointer -> state -> render]
@@ -45,23 +56,32 @@ flowchart TD
 ## Key Responsibilities by Module
 
 - **state.js**
-  - Holds `currentEntry`, `pages`, `pageIndex`, `scale`, `pan`, pointer/cache state, cached page metrics, and `lastOnPageFrame`.
-  - Persists progress to `localStorage` (`battleBros_progress`) and restores on boot.
+  - Holds `currentEntry`, `pages`, `pageIndex`, `scale`, `pan`, pointer/cache state, cached page
+    metrics, and `lastOnPageFrame`.
+  - Persists page progress and vertical `scrollRatio` to `localStorage`
+    (`battleBros_progress`) and restores on boot.
 - **render.js**
-  - Computes the visible page(s), resolves URLs relative to `comics/<seriesId>/entries/`.
+  - Routes to `renderVertical()` when the authored display mode is vertical; otherwise computes the
+    visible paged page/spread.
   - If a page path starts with `protected/`, it is requested via `/api/protected/<path>`.
   - Applies transform (scale + translate) based on `state` and `transform` helpers.
   - Stores natural image dimensions from both preloaded images and live DOM image loads.
   - Recomputes the non-fullscreen on-page frame when visible pages change or finish loading.
   - Preloads neighbor pages for snappier navigation.
   - Updates UI affordances: prev/next disabled states, page label, status text.
+- **vertical.js**
+  - Keeps the paged stage hidden but intact and renders every page into `#verticalStrip`.
+  - Uses scroll geometry plus IntersectionObserver wakeups to update page index, analytics,
+    completion, and saved progress.
+  - Removes observers/handlers/strip DOM on mode, entry, or reader-shell transitions.
 - **controls.js**
   - Keyboard: arrows / PageUp/PageDown / Home/End / `[` `]` / `0` / `+` `-` / `F` / `?` / `Esc`.
   - Click zones: left/right edge, button bar, gallery open/close, shortcuts modal.
   - Two-page toggle and fit reset, with guards when zoomed.
 - **pointer.js**
-  - Wheel + Ctrl/⌘ zoom, pinch zoom (scale around pointer), drag-to-pan when zoomed.
+  - Wheel + Ctrl/⌘ zoom, pinch zoom (scale around pointer), drag-to-pan when zoomed in paged mode.
   - Clamps scale and translate using `transform` utilities to keep content on screen.
+  - Leaves native scrolling authoritative in vertical mode.
 - **transform.js**
   - Computes the desktop on-page viewport frame from visible page metrics, stage gap, page border chrome, and remaining `#mainContent` space.
   - Applies the dynamic frame only outside fullscreen and outside the stacked/mobile layout; otherwise clears it and falls back to the normal CSS flow.
@@ -69,11 +89,15 @@ flowchart TD
 - **fullscreen.js**
   - Clears the on-page dynamic frame on fullscreen entry and restores it on exit.
   - Keeps button state and auto-hide controls synchronized with fullscreen state.
+  - Returns without action in builder preview and vertical mode.
 - **data.js**
   - Fetches JSON with `cache: 'no-store'` to avoid stale content.
   - Normalizes status message, entry folder mapping, and builder-page metadata.
   - Resolves an effective page header from V3 `page.meta.header` during normal startup with `pageConfig: null`; legacy config is accepted only by lower-level helpers for migration/safety coverage.
   - Applies page header copy, subtitle rotation, panel content, theme, and page-scoped navigation targets.
+  - Publishes reader-shell state; no-reader pages render into `#builderPageContent`.
+  - Applies reader config before first render, feeds side panels from the reader's section only, and
+    renders other sections into above/below-reader surfaces.
   - Exposes `loadEntryData()`, `loadPageConfigWithFallback()`, and `loadLatestPost()` for startup wiring.
 - **header-layout.js**
   - Builds the live topbar layout from the effective header config instead of replacing the whole header.
@@ -103,14 +127,19 @@ flowchart TD
 
 ## Persistence & Progress
 
-- Progress: saved per entry/page in `state.saveProgress()`; restored on load.
+- Progress: saved per entry/page in `state.saveProgress()`; vertical mode also saves/restores
+  `scrollRatio`.
+- Display mode: authored per reader module (and safe device override); defaults to paged.
 - Two-page mode: derived from viewport width/aspect (thresholds in `config.js`).
 - On-page frame: in the fixed-height desktop layout, `fitOnPageFrame()` resizes the viewport to the current visible page or spread; stacked/mobile keeps the existing full-width flow, and fullscreen uses the existing height-fit path.
-- Zoom/fit: transient in memory; reset on entry change unless the user zooms manually.
+- Zoom/fit: transient paged state; vertical mode disables zoom/pan/fullscreen.
 
 ## Testing
 
-- Vitest suite (`tests/entries.test.js`, `tests/data.test.js`, `tests/render.test.js`, `tests/state.test.js`, `tests/transform.test.js`, `tests/on-page-frame.test.js`, `tests/reader-app.test.js`, `tests/reader-data-builder.test.js`, `tests/reader-customization.test.js`) covers:
+- Vitest suite includes `tests/reader-app.test.js`, `tests/reader-data-builder.test.js`,
+  `tests/reader-entry-publication.test.js`, `tests/reader-vertical.test.js`,
+  `tests/reader-vertical-analytics.test.js`, `tests/render.test.js`, `tests/state.test.js`,
+  `tests/transform.test.js`, and `tests/on-page-frame.test.js`, covering:
   - Page resolution and ordering
   - Progress save/load with localStorage error handling
   - Two-page mode logic
@@ -119,6 +148,9 @@ flowchart TD
   - Reader bootstrap release after builder-page application and the no-flash handoff from the static shell
   - Fallback-retirement coordination so missing builder pages do not fetch `page-config.json` or repaint the legacy shell
   - Entry sorting and normalization
+  - No-reader shell suppression and active/inactive snapshot transitions
+  - Vertical rendering, cleanup, scroll restore, analytics, and completion
+  - Scheduled Coming Soon and released-entry behavior
 
 ## Common Extension Points
 
@@ -128,6 +160,7 @@ flowchart TD
 
 ## Gotchas / Notes
 
-- Admin auth is minimal; reader fetches data anonymously. Ensure `data.json` and assets are publicly readable on your host.
+- Public reader data is anonymous; admin series-data aliases require an authenticated admin and are
+  `no-store`.
 - Image paths must live under `comics/<seriesId>/entries/`, `protected/comics/<seriesId>/entries/`, or be absolute URLs for the preview/reader to resolve them.
 - Double-check `statusMessage`: shown both on the reader ticker and in admin; comes from `data.json`.

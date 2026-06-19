@@ -32,9 +32,21 @@ CMS_SOURCE_ACTIVE_PAGE_SERIES = "active-page-series"
 CMS_SOURCE_SPECIFIC_SERIES = "specific-series"
 CMS_SOURCE_ALL_SERIES = "all-series"
 CMS_SOURCE_SITE = "site"
+READER_DISPLAY_MODES = {"paged", "vertical-scroll"}
+READER_CONTROLS_PLACEMENTS = {"above", "below", "overlay", "hidden"}
+READER_CONTROLS_SIZES = {"compact", "medium", "large"}
+READER_STAGE_FITS = {"dynamic-frame", "width", "height", "natural"}
+READER_STAGE_MAX_WIDTH_MIN = 320
+READER_STAGE_MAX_WIDTH_MAX = 2400
 
+# Legacy preset layouts. These remain a strict subset of the generalized ratio-string
+# contract (1-6 dash-separated positive-integer ratio segments) so existing pages render
+# identically. Validation accepts any well-formed ratio string, not just these presets.
 ALLOWED_LAYOUTS = {"1", "1-1", "1-2", "2-1", "1-1-1", "1-3-1"}
 LAYOUT_COLUMN_COUNTS = {layout: len(layout.split("-")) for layout in ALLOWED_LAYOUTS}
+MAX_COLUMNS = 6
+MAX_COLUMN_RATIO = 12
+COLUMN_ALIGNMENTS = {"stretch", "start", "center", "end"}
 ALLOWED_SECTION_TYPES = {"row"}
 BUILDER_DEVICE_IDS = ("desktop", "tablet", "mobile")
 SECTION_RESPONSIVE_FIELDS = {
@@ -736,7 +748,7 @@ def sanitize_page_responsive(raw: Any) -> dict[str, Any]:
     return sanitized
 
 
-def sanitize_section_responsive(raw: Any) -> dict[str, Any]:
+def sanitize_section_responsive(raw: Any, *, max_columns: int = MAX_COLUMNS) -> dict[str, Any]:
     responsive = raw if isinstance(raw, dict) else {}
     sanitized: dict[str, Any] = {}
     for device_id in BUILDER_DEVICE_IDS:
@@ -745,14 +757,21 @@ def sanitize_section_responsive(raw: Any) -> dict[str, Any]:
             continue
         branch_payload: dict[str, Any] = {}
         layout = str(branch.get("layout") or "").strip()
-        if layout in ALLOWED_LAYOUTS:
-            branch_payload["layout"] = layout
+        if layout:
+            try:
+                ratios = parse_layout_ratios(layout)[: max(1, min(MAX_COLUMNS, max_columns))]
+                branch_payload["layout"] = "-".join(str(ratio) for ratio in ratios)
+            except ValueError:
+                pass
         background_color = sanitize_color(branch.get("backgroundColor"))
         if background_color:
             branch_payload["backgroundColor"] = background_color
         for key in ("paddingTop", "paddingBottom", "moduleGap", "columnGap", "sectionGap"):
             if key in branch:
                 branch_payload[key] = _clamp_int(branch.get(key), 0, 0, 600)
+        # Per-device column count/ratio rides the layout field above. Per-device column
+        # *styling* lives on each column's own responsive branch (columns[i].responsive),
+        # so it is not duplicated here.
         branch_payload = _prune_empty_dicts(branch_payload)
         if branch_payload:
             sanitized[device_id] = branch_payload
@@ -784,6 +803,110 @@ def sanitize_buttons_responsive_branch(branch: dict[str, Any]) -> dict[str, Any]
     return _prune_empty_dicts(branch_payload)
 
 
+def _sanitize_reader_keyword(value: Any, allowed: set[str], default: str) -> str:
+    current = str(value or "").strip()
+    return current if current in allowed else default
+
+
+def _sanitize_reader_stage_max_width(value: Any) -> int | None:
+    if value is None or value == "":
+        return None
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        # Invalid (non-integer) input falls back to Auto, matching the client.
+        return None
+    return max(READER_STAGE_MAX_WIDTH_MIN, min(READER_STAGE_MAX_WIDTH_MAX, number))
+
+
+def sanitize_reader_controls_style(raw: Any) -> dict[str, Any]:
+    style = raw if isinstance(raw, dict) else {}
+    result: dict[str, Any] = {}
+    for key in ("defaults", "primary"):
+        branch = style.get(key) if isinstance(style.get(key), dict) else {}
+        appearance = sanitize_appearance(branch.get("appearance"))
+        if appearance is not None:
+            result[key] = {"appearance": appearance}
+    return result
+
+
+def sanitize_reader_controls(raw: Any) -> dict[str, Any]:
+    controls = raw if isinstance(raw, dict) else {}
+    return {
+        "placement": _sanitize_reader_keyword(
+            controls.get("placement"), READER_CONTROLS_PLACEMENTS, "below"
+        ),
+        "size": _sanitize_reader_keyword(controls.get("size"), READER_CONTROLS_SIZES, "medium"),
+        "style": sanitize_reader_controls_style(controls.get("style")),
+    }
+
+
+def sanitize_reader_stage(raw: Any) -> dict[str, Any]:
+    stage = raw if isinstance(raw, dict) else {}
+    return {
+        "fit": _sanitize_reader_keyword(stage.get("fit"), READER_STAGE_FITS, "dynamic-frame"),
+        "pageGap": _clamp_int(stage.get("pageGap"), 8, 0, 64),
+        "frameBorder": _coerce_bool(stage.get("frameBorder"), True),
+        "maxWidth": _sanitize_reader_stage_max_width(stage.get("maxWidth")),
+    }
+
+
+def sanitize_reader_panels(raw: Any, *, show_panels: bool = True) -> dict[str, Any]:
+    panels = raw if isinstance(raw, dict) else {}
+    left = panels.get("left") if isinstance(panels.get("left"), dict) else {}
+    right = panels.get("right") if isinstance(panels.get("right"), dict) else {}
+    return {
+        "left": {"enabled": _coerce_bool(left.get("enabled"), show_panels)},
+        "right": {"enabled": _coerce_bool(right.get("enabled"), show_panels)},
+    }
+
+
+def sanitize_reader_responsive_branch(branch: dict[str, Any]) -> dict[str, Any]:
+    branch_payload: dict[str, Any] = {}
+    if "displayMode" in branch:
+        branch_payload["displayMode"] = _sanitize_reader_keyword(
+            branch.get("displayMode"), READER_DISPLAY_MODES, "paged"
+        )
+    if "showComments" in branch:
+        branch_payload["showComments"] = _coerce_bool(branch.get("showComments"), True)
+    controls = branch.get("controls") if isinstance(branch.get("controls"), dict) else {}
+    if controls:
+        controls_payload: dict[str, Any] = {}
+        if "placement" in controls:
+            controls_payload["placement"] = _sanitize_reader_keyword(
+                controls.get("placement"), READER_CONTROLS_PLACEMENTS, "below"
+            )
+        if "size" in controls:
+            controls_payload["size"] = _sanitize_reader_keyword(
+                controls.get("size"), READER_CONTROLS_SIZES, "medium"
+            )
+        if controls_payload:
+            branch_payload["controls"] = controls_payload
+    stage = branch.get("stage") if isinstance(branch.get("stage"), dict) else {}
+    if stage:
+        stage_payload: dict[str, Any] = {}
+        if "fit" in stage:
+            stage_payload["fit"] = _sanitize_reader_keyword(
+                stage.get("fit"), READER_STAGE_FITS, "dynamic-frame"
+            )
+        if "pageGap" in stage:
+            stage_payload["pageGap"] = _clamp_int(stage.get("pageGap"), 8, 0, 64)
+        if stage_payload:
+            branch_payload["stage"] = stage_payload
+    panels = branch.get("panels") if isinstance(branch.get("panels"), dict) else {}
+    if panels:
+        panels_payload: dict[str, Any] = {}
+        left = panels.get("left") if isinstance(panels.get("left"), dict) else {}
+        right = panels.get("right") if isinstance(panels.get("right"), dict) else {}
+        if "enabled" in left:
+            panels_payload["left"] = {"enabled": _coerce_bool(left.get("enabled"), True)}
+        if "enabled" in right:
+            panels_payload["right"] = {"enabled": _coerce_bool(right.get("enabled"), True)}
+        if panels_payload:
+            branch_payload["panels"] = panels_payload
+    return _prune_empty_dicts(branch_payload)
+
+
 def sanitize_module_responsive(module_type: str, raw: Any) -> dict[str, Any]:
     responsive = raw if isinstance(raw, dict) else {}
     sanitized: dict[str, Any] = {}
@@ -806,6 +929,8 @@ def sanitize_module_responsive(module_type: str, raw: Any) -> dict[str, Any]:
                 branch_payload["height"] = _clamp_int(branch.get("height"), 40, 0, 600)
         elif module_type == "buttons":
             branch_payload.update(sanitize_buttons_responsive_branch(branch))
+        elif module_type == "reader":
+            branch_payload.update(sanitize_reader_responsive_branch(branch))
         branch_payload = _prune_empty_dicts(branch_payload)
         if branch_payload:
             sanitized[device_id] = branch_payload
@@ -843,9 +968,103 @@ def sanitize_page_meta(raw_meta: Any) -> dict[str, Any]:
     return sanitized
 
 
-def sanitize_section_settings(raw_settings: Any) -> dict[str, Any]:
+def _sanitize_column_padding(raw: Any) -> dict[str, int] | None:
+    if not isinstance(raw, dict):
+        return None
+    padding: dict[str, int] = {}
+    for side in ("top", "right", "bottom", "left"):
+        if side in raw:
+            padding[side] = _clamp_int(raw.get(side), 0, 0, 600)
+    return padding or None
+
+
+def sanitize_column_settings(
+    raw: Any, *, include_responsive: bool = True, preserve_responsive_defaults: bool = False
+) -> dict[str, Any]:
+    """Sanitize per-column styling. Reuses the appearance contract; no style strings.
+
+    Sparse: only present/non-default fields are emitted. Column width/ratio rides the
+    section ``layout`` string, not this payload.
+    """
+    column = raw if isinstance(raw, dict) else {}
+    result: dict[str, Any] = {}
+
+    appearance = sanitize_appearance(column.get("appearance"))
+    if appearance is not None:
+        result["appearance"] = appearance
+
+    padding = _sanitize_column_padding(column.get("padding"))
+    if padding is not None:
+        result["padding"] = padding
+
+    alignment = str(column.get("alignment") or "").strip()
+    if alignment in COLUMN_ALIGNMENTS and (preserve_responsive_defaults or alignment != "stretch"):
+        result["alignment"] = alignment
+
+    min_height = _sanitize_optional_clamped_int(column, "minHeight", 0, 2000)
+    if min_height is not None:
+        result["minHeight"] = min_height
+
+    if preserve_responsive_defaults and "hidden" in column:
+        result["hidden"] = _coerce_bool(column.get("hidden"), False)
+    elif _coerce_bool(column.get("hidden"), False):
+        result["hidden"] = True
+
+    if include_responsive:
+        responsive = sanitize_column_responsive(column.get("responsive"))
+        if responsive:
+            result["responsive"] = responsive
+
+    return result
+
+
+def sanitize_column_responsive(raw: Any) -> dict[str, Any]:
+    responsive = raw if isinstance(raw, dict) else {}
+    sanitized: dict[str, Any] = {}
+    for device_id in BUILDER_DEVICE_IDS:
+        branch = responsive.get(device_id)
+        if not isinstance(branch, dict):
+            continue
+        branch_payload = sanitize_column_settings(
+            branch,
+            include_responsive=False,
+            preserve_responsive_defaults=True,
+        )
+        if branch_payload:
+            sanitized[device_id] = branch_payload
+    return sanitized
+
+
+def _sanitize_column_list(
+    raw_list: Any, column_count: int, *, include_responsive: bool = True
+) -> list[dict[str, Any]]:
+    """Sanitize a sparse list of per-column styling entries keyed by ``index``.
+
+    Entries whose index falls outside the effective column count are dropped, and
+    only columns carrying real styling are kept.
+    """
+    if not isinstance(raw_list, list):
+        return []
+    columns: dict[int, dict[str, Any]] = {}
+    for position, item in enumerate(raw_list[:MAX_COLUMNS]):
+        if not isinstance(item, dict):
+            continue
+        try:
+            index = int(item.get("index"))
+        except (TypeError, ValueError):
+            index = position
+        if not 0 <= index < column_count or index in columns:
+            continue
+        sanitized = sanitize_column_settings(item, include_responsive=include_responsive)
+        if sanitized:
+            columns[index] = {"index": index, **sanitized}
+    return [columns[index] for index in sorted(columns)]
+
+
+def sanitize_section_settings(raw_settings: Any, layout: Any = "1") -> dict[str, Any]:
     settings = raw_settings if isinstance(raw_settings, dict) else {}
     sanitized: dict[str, Any] = {}
+    column_count = layout_column_count(layout)
 
     background_color = sanitize_color(settings.get("backgroundColor"))
     if background_color:
@@ -855,6 +1074,10 @@ def sanitize_section_settings(raw_settings: Any) -> dict[str, Any]:
         if key in settings:
             sanitized[key] = _clamp_int(settings.get(key), 0, 0, 600)
 
+    columns = _sanitize_column_list(settings.get("columns"), column_count)
+    if columns:
+        sanitized["columns"] = columns
+
     panel_enabled = settings.get("panelEnabled")
     if isinstance(panel_enabled, dict):
         sanitized["panelEnabled"] = {
@@ -862,7 +1085,10 @@ def sanitize_section_settings(raw_settings: Any) -> dict[str, Any]:
             "right": _coerce_bool(panel_enabled.get("right"), True),
         }
 
-    responsive = sanitize_section_responsive(settings.get("responsive"))
+    responsive = sanitize_section_responsive(
+        settings.get("responsive"),
+        max_columns=column_count,
+    )
     if responsive:
         sanitized["responsive"] = responsive
 
@@ -876,10 +1102,41 @@ def validate_section_type(section_type: Any) -> str:
     return value
 
 
+def parse_layout_ratios(layout: Any) -> list[int]:
+    """Parse a layout ratio string into a list of positive integer ratios.
+
+    A valid layout is 1-6 dash-separated segments, each a positive integer ratio
+    (clamped to 1..MAX_COLUMN_RATIO). Raises ValueError for malformed input. Legacy
+    presets such as "1-3-1" parse to [1, 3, 1] and remain valid.
+    """
+    value = str(layout or "1").strip()
+    segments = value.split("-")
+    if not 1 <= len(segments) <= MAX_COLUMNS:
+        raise ValueError(f"Unsupported section layout '{value}'")
+    ratios: list[int] = []
+    for segment in segments:
+        try:
+            ratio = int(segment)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Unsupported section layout '{value}'") from exc
+        if not 1 <= ratio <= MAX_COLUMN_RATIO:
+            raise ValueError(f"Unsupported section layout '{value}'")
+        ratios.append(ratio)
+    return ratios
+
+
+def layout_column_count(layout: Any) -> int:
+    """Return the number of columns for a layout string, defaulting to 1."""
+    try:
+        return len(parse_layout_ratios(layout))
+    except ValueError:
+        return 1
+
+
 def validate_layout(layout: Any) -> str:
     value = str(layout or "1").strip()
-    if value not in ALLOWED_LAYOUTS:
-        raise ValueError(f"Unsupported section layout '{value}'")
+    # Raises ValueError for malformed input; legacy presets remain valid.
+    parse_layout_ratios(value)
     return value
 
 
@@ -900,7 +1157,7 @@ def validate_column_index(column_index: Any, layout: str | None = None) -> int:
         raise ValueError("columnIndex must be an integer") from exc
     if number < 0:
         raise ValueError("columnIndex must be non-negative")
-    if layout and number >= LAYOUT_COLUMN_COUNTS.get(layout, 1):
+    if layout and number >= layout_column_count(layout):
         raise ValueError(f"columnIndex {number} is out of range for layout '{layout}'")
     return number
 
@@ -1217,13 +1474,22 @@ def sanitize_module_config(module_type: str, raw_config: Any) -> dict[str, Any]:
         )
 
     if module_type == "reader":
-        return with_responsive(
-            {
-                "source": sanitize_cms_source(module_type, config.get("source")),
-                "showPanels": _coerce_bool(config.get("showPanels"), True),
-                "showComments": _coerce_bool(config.get("showComments"), True),
-            }
-        )
+        show_panels = _coerce_bool(config.get("showPanels"), True)
+        sanitized = {
+            "source": sanitize_cms_source(module_type, config.get("source")),
+            "displayMode": _sanitize_reader_keyword(
+                config.get("displayMode"), READER_DISPLAY_MODES, "paged"
+            ),
+            "showPanels": show_panels,
+            "showComments": _coerce_bool(config.get("showComments"), True),
+            "controls": sanitize_reader_controls(config.get("controls")),
+            "stage": sanitize_reader_stage(config.get("stage")),
+        }
+        if isinstance(config.get("panels"), dict):
+            sanitized["panels"] = sanitize_reader_panels(
+                config.get("panels"), show_panels=show_panels
+            )
+        return with_responsive(sanitized)
 
     if module_type == "entry-gallery":
         return with_responsive(

@@ -1,5 +1,46 @@
 /* Page Builder Public Styles */
 
+.builder-page-content {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+  padding: 24px 0 48px;
+}
+
+/* Above/below-reader page content on bound reader pages. */
+.builder-reader-surface {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+}
+
+.builder-reader-surface--above {
+  padding: 24px 0 8px;
+}
+
+.builder-reader-surface--below {
+  padding: 8px 0 48px;
+}
+
+.builder-reader-surface[hidden] {
+  display: none;
+}
+
+body[data-reader-shell='inactive'] main {
+  min-height: calc(100vh - 72px);
+  min-height: calc(100dvh - 72px);
+  height: auto;
+  overflow: visible;
+}
+
+body[data-reader-shell='inactive'] .viewerWrap {
+  display: none !important;
+}
+
+body[data-reader-shell='inactive'] .entry-controls,
+body[data-reader-shell='inactive'] #entry,
+body[data-reader-shell='inactive'] #statusPanel {
+  display: none !important;
+}
+
 .pb-page {
   width: 100%;
 }
@@ -41,6 +82,13 @@
 
 .pb-column {
   min-width: 0;
+}
+
+/* Authored per-column visibility. grid-template-columns, per-column appearance,
+   padding, alignment, and min-height are emitted inline by the shared renderer;
+   the legacy .pb-layout--* rules above remain as a fallback for the column count. */
+.pb-column--hidden {
+  display: none;
 }
 
 .pb-module {

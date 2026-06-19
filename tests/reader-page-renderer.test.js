@@ -277,7 +277,14 @@ describe('reader page renderer', () => {
     const reader = parseModuleHtml(
       renderModule({
         moduleType: 'reader',
-        config: { source: { mode: 'specific-series', seriesId: 'battle-bros' } },
+        config: {
+          source: { mode: 'specific-series', seriesId: 'battle-bros' },
+          displayMode: 'vertical-scroll',
+          controls: { placement: 'overlay', size: 'large' },
+          stage: { fit: 'width', pageGap: 24, frameBorder: false, maxWidth: 1280 },
+          panels: { left: { enabled: false }, right: { enabled: true } },
+          showComments: false,
+        },
       })
     );
     const entryGallery = parseModuleHtml(
@@ -295,6 +302,16 @@ describe('reader page renderer', () => {
 
     expect(reader.querySelector('.pb-reader-mount')?.dataset.sourceMode).toBe('specific-series');
     expect(reader.querySelector('.pb-reader-mount')?.dataset.sourceSeriesId).toBe('battle-bros');
+    expect(reader.querySelector('.pb-reader-mount')?.dataset.displayMode).toBe('vertical-scroll');
+    expect(reader.querySelector('.pb-reader-mount')?.dataset.controlsPlacement).toBe('overlay');
+    expect(reader.querySelector('.pb-reader-mount')?.dataset.controlsSize).toBe('large');
+    expect(reader.querySelector('.pb-reader-mount')?.dataset.stageFit).toBe('width');
+    expect(reader.querySelector('.pb-reader-mount')?.dataset.stagePageGap).toBe('24');
+    expect(reader.querySelector('.pb-reader-mount')?.dataset.stageFrameBorder).toBe('false');
+    expect(reader.querySelector('.pb-reader-mount')?.dataset.stageMaxWidth).toBe('1280');
+    expect(reader.querySelector('.pb-reader-mount')?.dataset.leftPanelEnabled).toBe('false');
+    expect(reader.querySelector('.pb-reader-mount')?.dataset.rightPanelEnabled).toBe('true');
+    expect(reader.querySelector('.pb-reader-mount')?.dataset.showComments).toBe('false');
     expect(entryGallery.querySelector('.pb-entry-gallery-mount')?.dataset.sourceMode).toBe(
       'all-series'
     );

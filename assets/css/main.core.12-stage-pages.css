@@ -13,7 +13,7 @@
 
 .stage {
   display: flex;
-  gap: 8px;
+  gap: var(--reader-stage-page-gap, 8px);
   align-items: center;
   justify-content: center;
   transform-origin: 50% 50%;
@@ -50,6 +50,29 @@
   user-select: none;
 }
 
+.stageWrap[data-reader-stage-frame-border='false'] .page {
+  border-width: 0;
+}
+
+.stageWrap[data-reader-stage-fit='width'] .page img {
+  width: 100%;
+  height: auto;
+  max-height: none;
+}
+
+.stageWrap[data-reader-stage-fit='height'] .page img {
+  width: auto;
+  height: 100%;
+  max-width: none;
+}
+
+.stageWrap[data-reader-stage-fit='natural'] .page img {
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+}
+
 .spinner {
   position: absolute;
   width: 50px;
@@ -60,4 +83,67 @@
   border-bottom: 4px solid var(--accent);
   animation: spin 0.8s linear infinite;
   box-shadow: 0 0 20px rgba(0, 217, 255, 0.5);
+}
+
+/* ==================== VERTICAL (WEBTOON) MODE ==================== */
+/* Vertical mode turns the viewport into a native vertical scroll surface and
+   renders every page into #verticalStrip. The paged stage (#stageWrap) is
+   hidden, not removed, so paged mode can repaint into its cached nodes. */
+body[data-reader-display-mode='vertical-scroll'] .viewport {
+  display: block;
+  align-items: stretch;
+  justify-content: flex-start;
+  overflow-y: auto;
+  overflow-x: hidden;
+  touch-action: pan-y;
+  margin: 0 auto;
+}
+
+body[data-reader-display-mode='vertical-scroll'] .viewport.dynamic-frame {
+  flex: 1 1 auto;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+body[data-reader-display-mode='vertical-scroll'] .stageWrap {
+  display: none !important;
+}
+
+body[data-reader-display-mode='vertical-scroll'] .edgeZone,
+body[data-reader-display-mode='vertical-scroll'] .flashOverlay {
+  display: none !important;
+}
+
+.verticalStrip {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--reader-stage-page-gap, 8px);
+  width: 100%;
+  padding: var(--reader-stage-page-gap, 8px) 0;
+  box-sizing: border-box;
+}
+
+.verticalStrip .page {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+}
+
+.verticalStrip .page img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  max-height: none;
+  object-fit: contain;
+  -webkit-user-drag: none;
+  user-select: none;
+}
+
+/* Honor the per-page frame-border toggle in vertical mode too. */
+.viewport[data-reader-stage-frame-border='false'] .verticalStrip .page {
+  border-width: 0;
 }

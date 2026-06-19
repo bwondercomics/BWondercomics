@@ -656,6 +656,7 @@
 
           btn.addEventListener('click', async (e) => {
             e.preventDefault();
+            if (document.body?.dataset.readerShell !== 'active') return;
 
             // Toggle comments
             if (typeof window.toggleReaderComments === 'function') {
@@ -685,6 +686,10 @@
         if (!['1', 'true', 'yes'].includes(flag)) return;
 
         const tryOpenComments = () => {
+          const shellState = document.body?.dataset.readerShell;
+          if (shellState === 'inactive') return true;
+          if (shellState !== 'active') return false;
+
           const panel = document.getElementById('comicCommentsSection');
           const btn = document.getElementById('commentToggleBtn');
           if (!panel || !btn) return false;

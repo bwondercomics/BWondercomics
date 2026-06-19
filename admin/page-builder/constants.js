@@ -1,5 +1,16 @@
 import { getModuleDescriptors } from './module-descriptors.js';
 
+export {
+  MAX_COLUMNS,
+  MAX_COLUMN_RATIO,
+  COLUMN_ALIGNMENTS,
+  parseLayoutRatios,
+  layoutColumnCount,
+  ratiosToLayout,
+  layoutToGridTemplate,
+  alignmentToJustifySelf,
+} from './layout-utils.js';
+
 export const MODULE_TYPES = getModuleDescriptors().map(({ type, label, icon, category }) => ({
   type,
   label,
