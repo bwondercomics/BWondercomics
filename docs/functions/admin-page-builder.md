@@ -496,10 +496,20 @@ Current editor responsibilities include:
 - title and subtitle copy editing
 - nav item CRUD: add, remove, reorder, enable/disable, and target editing for every header button
 - **Style preset dropdown** per nav item: `Primary` (filled/neon) or `Secondary` (outline-only) — maps to the same variant model used by the `buttons` module
-- block visibility toggles
-- drag-and-drop left/center/right region placement (with keyboard-accessible buttons as fallback)
+- block visibility toggles (`renderPartsEditor()`): compact `.pb-field-row` rows, each the checkbox's own wrapping label with `aria-labelledby`/`aria-describedby` for a concise "Show {label} in header" accessible name
+- placement editing (`renderPlacementEditor()`): a dense board of Top/Middle/Bottom rows × Left/Center/Right regions (see below)
 
 Saving header changes writes back through `updatePage(..., { meta: nextMeta })` and clears any import/upgrade banners since the header is upgraded to canonical V3.
+
+### Placement board (`renderPlacementEditor()`)
+
+Each block renders as a two-line `.pb-header-layout-card` sized for the 280px inspector rail:
+
+- **Line 1** — a decorative `⠿` grip, a truncating label (`.pb-truncate`, full text via `title`), and — **for hidden blocks only** — an eye-off icon. Enabled blocks render no visible status icon; visible/hidden status is exposed to assistive tech through the card's `.pb-sr-only` description, not a visible badge.
+- **Line 2** — four compact `.pb-icon-btn.pb-header-layout-button` move buttons (`data-action="move-left|move-right|move-up|move-down"`), each with a per-direction `aria-label` and the correct `disabled` edge, wrapped in a `role="group"` labeled `Move {label}`.
+- The card is a named `role="group"` (`aria-labelledby` → label, `aria-describedby` → state) and stays a single `draggable="true"` surface; the grip owns no separate listener.
+
+Reordering works two ways, both reusing the same handlers: **whole-row drag** between `.pb-header-region--board` drop zones, and the move buttons via `moveBlockAcrossRegions()` / `moveBlockAcrossRows()`. Moves update the active header draft and re-render immediately; they persist only on **Save Header** (`saveActiveHeaderDraft()` → `updatePage`).
 
 ## 🎨 Theme Editor (theme-editor.js)
 

@@ -1,6 +1,6 @@
 # Builder Inspector Menu UI Plan (GrapesJS-Aligned Density)
 
-Status: In Progress — Phases 0–2 complete; Phase 3 pending.
+Status: Phases 0–3 complete; Phase 3 (Deferred / optional) segmented-control conversions not taken on.
 Created: 2026-06-18
 
 ## Purpose
@@ -447,6 +447,33 @@ rail-width QA remain Phase 3.
 - Update `docs/functions/admin-page-builder.md` / `docs/functions/admin-page-builder-styles.md`,
   `docs/READER_BUILDER_QA.md`, and add this doc to the `docs/README.md` index.
 
+**Completed 2026-06-19.** Added three Chromium regressions to
+`tests/visual/builder-authoring-workflows.spec.js`: a **measured-width** gate (each Placement card,
+row, action cluster, and move button satisfies `scrollWidth <= clientWidth`, the four buttons sit on
+one line, and the label is `nowrap`/`ellipsis`) checked at both the 280px rail and the ≤1099px drawer
+band, with representative Parts and Appearance overflow spot-checks; a **dual-reorder** test proving
+both whole-row drag and the icon move buttons move a block — asserting the immediate rerendered DOM and
+dirty footer, then a single Save that persists `meta.header.layoutRows` — plus an inert disabled edge;
+and an **accessibility** test covering per-direction button names, the keyboard `:focus-visible` ring,
+and dependency-free WCAG AA (≥ 4.5:1) contrast for the label, an enabled move-button glyph, and the
+region title. The Phase 1 named-group/name/description coverage is retained, and `docs/README.md`
+already indexes this plan. Docs updated: `docs/functions/admin-page-builder.md` (placement board),
+`docs/functions/admin-page-builder-styles.md` (density tokens + reusable components), and
+`docs/READER_BUILDER_QA.md` (rail/drawer + collapsed-rail QA). No builder markup, CSS, or behavior
+changed; no snapshot baselines changed.
+
+**Corrective follow-up 2026-06-20.** The measured-width regression now proves its layout preconditions:
+the wide-band sidebar is expanded at exactly 280px, while the 1000px stacked-band drawer remains
+expanded at exactly 360px before geometry is checked. A dedicated collapsed-rail regression focuses
+an inspector control, collapses through the toolbar control, verifies the 72px rail and hidden,
+keyboard-inert sidebar body, then expands and proves the 280px Placement inspector and focusable move
+controls return intact. Reorder coverage now invokes the native click path on a disabled edge without
+dirtying or moving the block, verifies source removal and single-card uniqueness after every button
+and drag move, and checks the same source-removal and exactly-once invariants in persisted
+`meta.header.layoutRows`. Final verification passed JavaScript syntax checking, Prettier, ESLint, all
+59 Vitest files (548 passed, 1 skipped), all 19 Chromium Playwright tests without snapshot baseline
+changes, the production build, and `git diff --check`.
+
 ### Phase 3 (Deferred / optional) — segmented-control conversions
 
 Converting existing controls to `.pb-seg` is valuable but changes element types that current tests
@@ -507,8 +534,8 @@ Phase 2 CSS density treatment.
   row padding and removes region horizontal padding in the stacked state. If that trim is descoped,
   the move cluster must fall back to a 2×2 grid (still two-line-safe at the approximately 134px
   baseline); the measured-width test is the gate.
-- **Verification note — current snapshots.** All 14 current Chromium Playwright tests pass without
-  baseline changes. Phase 2 coverage and the broader measured-width, drag, focus-ring, and contrast
-  work remain pending in Phases 2–3.
+- **Verification note — Phase 3 closeout.** All 19 current Chromium Playwright tests pass without
+  baseline changes, including the measured-width, collapsed-rail, dual-reorder, focus-ring, and
+  contrast coverage.
 - **Note:** our `renderInspectorSection()` already gives us GrapesJS-style collapsible sectors via
   `<details>`, so Phase work focuses on _intra-section_ density rather than re-implementing collapse.

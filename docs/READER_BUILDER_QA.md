@@ -128,6 +128,18 @@ responsive layout authoring, and builder-first architecture are stable enough to
 - [ ] Series isolation
   - Switch to another series.
   - Confirm page list, homepage state, and builder edits remain scoped to the active series only.
+- [ ] Inspector density & 280px rail
+  - Click the header surface and open the Placement editor at the full 280px rail.
+  - Confirm each block is a two-line card whose four icon move buttons (left/right/up/down) sit on one
+    line with no clipping, and whose label truncates with an ellipsis rather than wrapping.
+  - Reorder a block with the move buttons and by dragging the whole card between regions; confirm both
+    paths move it and the footer reports unsaved changes until saved.
+  - Resize to a ≤1099px drawer width and confirm the Placement controls still fit without horizontal overflow.
+- [ ] Collapsed-rail behavior (≥1100px)
+  - At a wide viewport (the 72px collapse is disabled in the ≤1099px stacked band, which forces the
+    sidebar expanded), collapse the sidebar.
+  - Confirm the inspector body and its controls are absent from layout and not reachable by keyboard while collapsed.
+  - Expand the sidebar and confirm the inspector returns intact and operable.
 
 ## Issue Log
 

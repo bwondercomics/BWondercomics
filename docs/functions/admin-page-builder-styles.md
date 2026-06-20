@@ -116,7 +116,7 @@ The right-side properties panel responding dynamically to the active section/mod
 - **Sticky Regions**: Implements `position: sticky` on `.pb-editor-header` and `.pb-editor-footer` combined with intense background blur `backdrop-filter: blur(18px)` to ensure controls are always available while scrolling property fields.
 - **Footer Status**: Updates `.pb-editor-footer-status` with dataset states (`success`, `warning`, `danger`) to report API save failures or drafted states.
 - **Empty & Feedback States**: Uses customized `.pb-editor-empty-card` for messaging when no modules are selected.
-- **Structurals**: Features accordion blocks (`.pb-editor-accordion`), draggable sort-blocks (`.pb-header-block`), and internal layout switchers (`.pb-header-layout-card`).
+- **Structurals**: Features accordion blocks (`.pb-editor-accordion`), draggable sort-blocks (`.pb-header-block`), and the header **placement board** (`.pb-header-layout-grid` → `.pb-header-layout-row` → `.pb-header-region--board` → two-line `.pb-header-layout-card`), whose region grid is single-column at rail width and splits into columns via a container query when space allows.
 
 ---
 
@@ -138,6 +138,16 @@ The atomic input form fields embedded across the inspector panels.
 - **Section/Column Controls**: section inspector controls use the shared form and appearance-card
   patterns for global/device column count, ratios, per-column appearance, padding, alignment,
   min-height, and inherit/visible/hidden state.
+- **Inspector density layer**: a `.page-builder`-scoped token set — `--pb-inspector-font` (~0.78rem),
+  `--pb-control-pad-y`/`--pb-control-pad-x`, `--pb-row-gap`, and `--pb-icon-btn-size` (28px) — drives
+  the compact, icon-first inspector. Reusable components built on it:
+  - `.pb-icon-btn` — 28px square transparent icon button (hover, `:focus-visible` ring via
+    `var(--primary)`, and disabled states) that replaces CTA-weight `.btn-secondary` inside inspector menus
+  - `.pb-field-row` — label-left (`flex: 0 0 38%`) / control-right row with a truncating label, for
+    compact single-line fields
+  - `.pb-truncate` and `.pb-sr-only` — shared ellipsis-truncation and visually-hidden utilities
+  - `.pb-seg`/`.pb-seg-item` — a segmented radio control ported from GrapesJS `.gjs-radio-item`;
+    shipped as a component, but existing `<select>` conversions remain deferred
 
 ---
 
