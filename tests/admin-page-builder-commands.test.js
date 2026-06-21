@@ -40,14 +40,20 @@ describe('admin page-builder command registry', () => {
   });
 
   it('uses enabled state for disabled commands', () => {
-    const registry = createBuilderCommandRegistry();
+    const run = vi.fn(() => ({ ok: true }));
+    const registry = createBuilderCommandRegistry({
+      commands: [
+        { id: 'builder:test-disabled', enabled: false, visible: true, describe: 'Disabled', run },
+      ],
+    });
 
-    expect(registry.canRunCommand(BUILDER_STRUCTURAL_COMMANDS.DUPLICATE_SELECTED)).toBe(false);
-    expect(registry.isCommandVisible(BUILDER_STRUCTURAL_COMMANDS.DUPLICATE_SELECTED)).toBe(true);
-    expect(registry.runCommand(BUILDER_STRUCTURAL_COMMANDS.DUPLICATE_SELECTED)).toEqual({
+    expect(registry.canRunCommand('builder:test-disabled')).toBe(false);
+    expect(registry.isCommandVisible('builder:test-disabled')).toBe(true);
+    expect(registry.runCommand('builder:test-disabled')).toEqual({
       ok: false,
       status: 'Command is disabled.',
     });
+    expect(run).not.toHaveBeenCalled();
   });
 
   it('runs confirmations before custom commands', () => {

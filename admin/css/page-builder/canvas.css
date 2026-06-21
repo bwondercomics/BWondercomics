@@ -789,6 +789,13 @@
   pointer-events: none;
 }
 
+.pb-preview-drop-guide--page-end-target {
+  box-sizing: border-box;
+  border: 1px dashed rgba(255, 237, 0, 0.95);
+  border-radius: 6px;
+  background: rgba(255, 237, 0, 0.14);
+}
+
 .pb-preview-target-toolbar {
   position: absolute;
   display: inline-flex;

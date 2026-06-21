@@ -1,4 +1,5 @@
 import { LIVE_DROP_PLACEMENTS, resolveLiveDropPlacement } from './live-drop-placement.js';
+import { getPageModuleDuplicateEligibility } from './module-eligibility.js';
 
 export const BUILDER_STRUCTURAL_COMMANDS = Object.freeze({
   DRAG_START: 'builder:drag-start',
@@ -259,15 +260,12 @@ export function createStructuralCommandAdapter({ getState, actions, helpers }) {
   async function runDrop(payload = {}) {
     const dragState = getState().liveDragState;
     if (!dragState) return result(false);
-    const placement =
-      payload.placement ||
-      dragState.currentPlacement ||
-      resolveLiveDropPlacement({
-        page: getState().currentPage,
-        targets: payload.targets || [],
-        point: payload.point || {},
-        dragState,
-      });
+    const placement = resolveLiveDropPlacement({
+      page: getState().currentPage,
+      targets: payload.targets || [],
+      point: payload.point || {},
+      dragState,
+    });
     if (!placement) {
       actions.clearLiveDragState();
       return result(false, { status: 'No valid drop target.' });
@@ -307,6 +305,32 @@ export function createStructuralCommandAdapter({ getState, actions, helpers }) {
     return result(false, { status: 'This target cannot be deleted.' });
   }
 
+  async function runDuplicateSelected(payload = {}) {
+    const target = getSelectedTarget(payload.target);
+    if (getTargetKind(target) !== 'module' || !target.moduleId) return result(false);
+    const eligibility = getPageModuleDuplicateEligibility(getState().currentPage, target.moduleId);
+    if (!eligibility.allowed) {
+      const status =
+        eligibility.reason === 'missing'
+          ? 'The selected module could not be found.'
+          : 'This module cannot be duplicated.';
+      actions.setCanvasStatus(status, eligibility.reason === 'missing' ? 'danger' : 'warning');
+      actions.renderCanvas();
+      return result(false, { status });
+    }
+    if (!ensureClean('Save or discard your current changes before duplicating a module.')) {
+      return result(false);
+    }
+    const created = await actions.duplicateModuleAfter(target.moduleId);
+    if (!created?.id) return result(false, { status: 'Module duplicate failed.' });
+    await selectResultTarget({ kind: 'module', moduleId: created.id });
+    actions.requestFreshTargets();
+    return result(true, {
+      selectedTarget: { kind: 'module', moduleId: created.id },
+      status: `${helpers.getModuleLabel(eligibility.location.module.moduleType)} module duplicated.`,
+    });
+  }
+
   async function runHideOnDevice(payload = {}) {
     const target = getSelectedTarget(payload.target);
     if (getTargetKind(target) !== 'module' || !target.moduleId) return result(false);
@@ -343,7 +367,7 @@ export function createStructuralCommandAdapter({ getState, actions, helpers }) {
       case BUILDER_STRUCTURAL_COMMANDS.HIDE_ON_DEVICE:
         return runHideOnDevice(payload);
       case BUILDER_STRUCTURAL_COMMANDS.DUPLICATE_SELECTED:
-        return result(false, { status: 'Duplicate is not implemented yet.' });
+        return runDuplicateSelected(payload);
       default:
         return result(false, { status: `Unknown command: ${id}` });
     }

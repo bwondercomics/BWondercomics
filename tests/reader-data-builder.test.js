@@ -891,6 +891,7 @@ describe('reader builder presentation loading', () => {
     const leftSection = document.querySelector('#leftPanel .pb-builder-panel-section');
     const leftColumn = document.querySelector('#leftPanel .pb-builder-panel-column');
     const leftModule = document.querySelector('#leftPanel .pb-module');
+    const pageEndTarget = document.getElementById('builderReaderPageEndTarget');
 
     expect(document.body.dataset.builderPageId).toBe(builderPage.id);
     expect(document.querySelector('.viewerWrap')?.dataset.builderPageId).toBe(builderPage.id);
@@ -902,6 +903,8 @@ describe('reader builder presentation loading', () => {
     expect(leftColumn?.dataset.builderColumnIndex).toBe('0');
     expect(leftModule?.dataset.builderModuleId).toBe('left-panel-text');
     expect(leftModule?.dataset.builderModuleType).toBe('text');
+    expect(pageEndTarget?.dataset.builderSurface).toBe('page-end');
+    expect(pageEndTarget?.parentElement?.previousElementSibling?.id).toBe('builderBelowReader');
 
     applyBuilderPageToDOM(builderPage, {
       seriesId: 'battle-bros',
@@ -915,6 +918,7 @@ describe('reader builder presentation loading', () => {
     expect(document.querySelector('[data-builder-section-id]')).toBeNull();
     expect(document.querySelector('[data-builder-column-index]')).toBeNull();
     expect(document.querySelector('[data-builder-module-id]')).toBeNull();
+    expect(document.querySelector('[data-builder-surface="page-end"]')).toBeNull();
   });
 
   it('keeps right-panel modules selectable when a builder device layout collapses columns', () => {

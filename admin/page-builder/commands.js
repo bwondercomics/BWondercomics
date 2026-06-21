@@ -77,13 +77,7 @@ function createDefaultCommands() {
     createStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.MOVE_SECTION),
     createStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.DELETE_SELECTED),
     createStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.HIDE_ON_DEVICE),
-    {
-      id: BUILDER_STRUCTURAL_COMMANDS.DUPLICATE_SELECTED,
-      enabled: false,
-      visible: true,
-      describe: 'Duplicate selected target',
-      run: () => result(false, { status: 'Duplicate is not implemented yet.' }),
-    },
+    createStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.DUPLICATE_SELECTED),
     {
       id: BUILDER_COMMANDS.SELECT,
       enabled: ({ payload }) => !!payload?.target,

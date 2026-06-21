@@ -30,6 +30,7 @@ const _renderers = createRenderers({
 export const MODULE_RENDERERS = _renderers.MODULE_RENDERERS;
 export const renderModule = _renderers.renderModule;
 export const renderSection = _renderers.renderSection;
+export const renderPageEndTarget = _renderers.renderPageEndTarget;
 
 /**
  * Render a complete page to HTML, including the page-id data attribute
@@ -48,8 +49,9 @@ export function renderPage(page, options = {}) {
     )
     .join('');
   const builderAttrs = builderEditing ? ` data-builder-page-id="${escapeHtml(page.id || '')}"` : '';
+  const pageEndTarget = renderPageEndTarget(page, { builderEditing });
 
-  return `<div class="pb-page" data-page-id="${escapeHtml(page.id || '')}"${builderAttrs}>${sectionsHtml}</div>`;
+  return `<div class="pb-page" data-page-id="${escapeHtml(page.id || '')}"${builderAttrs}>${sectionsHtml}${pageEndTarget}</div>`;
 }
 
 /**

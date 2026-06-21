@@ -204,6 +204,7 @@ const MODULE_DESCRIPTOR_DEFS = [
       },
     },
     editorKind: 'reader',
+    duplicatable: false,
     responsiveOverrides: ['hidden', 'displayMode', 'controls', 'stage', 'panels', 'showComments'],
     appearanceSectors: [],
     requiredContext: [],
@@ -296,6 +297,7 @@ function normalizeDescriptor(definition) {
   return Object.freeze({
     ...definition,
     insertable: definition.insertable !== false,
+    duplicatable: definition.duplicatable !== false,
     allowedParents: Object.freeze([...(definition.allowedParents || DEFAULT_ALLOWED_PARENTS)]),
     quickActions: Object.freeze([...(definition.quickActions || DEFAULT_QUICK_ACTIONS)]),
     responsiveOverrides: Object.freeze([...(definition.responsiveOverrides || [])]),
@@ -340,6 +342,10 @@ export function getModuleDescriptor(moduleType) {
 
 export function getInsertableModuleDescriptors() {
   return MODULE_DESCRIPTORS.filter((descriptor) => descriptor.insertable);
+}
+
+export function isModuleTypeDuplicatable(moduleType) {
+  return getModuleDescriptor(moduleType).duplicatable !== false;
 }
 
 export function getModuleDefaultConfig(moduleType) {

@@ -135,7 +135,9 @@ async function setupPageBuilder({
   const fetchGlobalPages = vi.fn();
   fetchGlobalPages.mockResolvedValue(fetchGlobalPagesResults.at(-1) || []);
   fetchGlobalPagesResults.forEach((result) => fetchGlobalPages.mockResolvedValueOnce(result));
-  const fetchPage = vi.fn(async () => fetchPageResult);
+  const fetchPage = vi.fn(async (...args) =>
+    typeof fetchPageResult === 'function' ? fetchPageResult(...args) : fetchPageResult
+  );
   const createPage = vi.fn(async () => createPageResult);
   const createScopedPage = vi.fn(async () => createPageResult);
   const deletePage = vi.fn(async () => deletePageResult);
@@ -3975,6 +3977,157 @@ describe('admin page-builder shell', () => {
     );
   });
 
+  it('creates a trailing section only through the explicit page-end target on a populated page', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const originalSectionIds = selectedPage.sections.map((section) => section.id);
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    frame.dataset.previewScale = '1';
+    getPreviewScaleShell().dataset.previewScale = '1';
+    frame.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      right: 1920,
+      bottom: 1080,
+      width: 1920,
+      height: 1080,
+    });
+    const iframeWindow = attachPreviewIframeWindow();
+    const pageEndTarget = {
+      kind: 'page',
+      key: `page-end:${selectedPage.id}`,
+      pageId: selectedPage.id,
+      surface: 'page-end',
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target: pageEndTarget,
+          rect: { top: 900, left: 40, right: 1880, bottom: 940, width: 1840, height: 40 },
+          visible: true,
+          order: 0,
+          label: 'Page end',
+        },
+      ],
+    });
+
+    const overlay = frame.querySelector('.pb-preview-target-overlay');
+    const block = document.querySelector('.pb-module-type[data-module-type="text"]');
+    const dataTransfer = createDataTransfer();
+    block.dispatchEvent(createDragLikeEvent('dragstart', dataTransfer));
+    overlay.dispatchEvent(
+      createDragLikeEvent('dragover', dataTransfer, { clientX: 120, clientY: 920 })
+    );
+
+    const dropGuide = frame.querySelector('.pb-preview-drop-guide--page-end-target');
+    expect(dropGuide).not.toBeNull();
+    expect(dropGuide?.getAttribute('style')).toContain('height: 40px');
+
+    overlay.dispatchEvent(
+      createDragLikeEvent('drop', dataTransfer, { clientX: 120, clientY: 920 })
+    );
+    await flushAdminUi(6);
+
+    expect(mocks.addSection).toHaveBeenCalledWith(selectedPage.id);
+    expect(mocks.reorderSections).toHaveBeenCalledWith(selectedPage.id, [
+      ...originalSectionIds,
+      'new-section-id',
+    ]);
+    expect(mocks.addModule).toHaveBeenCalledWith(
+      'new-section-id',
+      'text',
+      0,
+      expect.objectContaining({ content: expect.stringContaining('Enter your text') }),
+      null
+    );
+  });
+
+  it('does not execute a cached valid placement when the final drop is in dead space', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const textSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === textModule.id)
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    frame.dataset.previewScale = '1';
+    getPreviewScaleShell().dataset.previewScale = '1';
+    frame.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      right: 1920,
+      bottom: 1080,
+      width: 1920,
+      height: 1080,
+    });
+    const iframeWindow = attachPreviewIframeWindow();
+    const moduleTarget = {
+      kind: 'module',
+      key: `module:${textModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: textSection.id,
+      columnIndex: textModule.columnIndex,
+      moduleId: textModule.id,
+      moduleType: textModule.moduleType,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target: moduleTarget,
+          rect: { top: 20, left: 20, right: 320, bottom: 120, width: 300, height: 100 },
+          visible: true,
+          order: 0,
+          label: 'Text module',
+        },
+      ],
+    });
+
+    const overlay = frame.querySelector('.pb-preview-target-overlay');
+    const block = document.querySelector('.pb-module-type[data-module-type="image"]');
+    const dataTransfer = createDataTransfer();
+    block.dispatchEvent(createDragLikeEvent('dragstart', dataTransfer));
+    overlay.dispatchEvent(
+      createDragLikeEvent('dragover', dataTransfer, { clientX: 80, clientY: 40 })
+    );
+    expect(frame.querySelector('.pb-preview-drop-guide')).not.toBeNull();
+
+    overlay.dispatchEvent(
+      createDragLikeEvent('drop', dataTransfer, { clientX: 1200, clientY: 900 })
+    );
+    await flushAdminUi(4);
+
+    expect(mocks.addSection).not.toHaveBeenCalled();
+    expect(mocks.addModule).not.toHaveBeenCalled();
+    expect(mocks.moveModule).not.toHaveBeenCalled();
+    expect(mocks.reorderSections).not.toHaveBeenCalled();
+    expect(mocks.reorderModules).not.toHaveBeenCalled();
+    expect(
+      frame.querySelector('.pb-preview-target-overlay')?.classList.contains('is-live-dragging')
+    ).toBe(false);
+  });
+
   it('uses toolbar Insert Before to create a pending target completed by a block click', async () => {
     const selectedPage = getContractFixture('builderPage');
     const textModule = selectedPage.sections
@@ -4583,7 +4736,7 @@ describe('admin page-builder shell', () => {
     );
   });
 
-  it('keeps Duplicate disabled and routes toolbar Delete through the existing confirmation flow', async () => {
+  it('routes toolbar Delete through the existing confirmation flow', async () => {
     const selectedPage = getContractFixture('builderPage');
     const textModule = selectedPage.sections
       .flatMap((section) => section.modules || [])
@@ -4628,14 +4781,7 @@ describe('admin page-builder shell', () => {
     sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
     await flushAdminUi(2);
 
-    const duplicateButton = frame.querySelector('[data-preview-target-action="duplicate"]');
-    expect(duplicateButton?.disabled).toBe(true);
-    duplicateButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    await flushAdminUi(2);
-
     expect(mocks.deleteModule).not.toHaveBeenCalled();
-    expect(mocks.addModule).not.toHaveBeenCalled();
-    expect(mocks.updateModule).not.toHaveBeenCalled();
 
     frame
       .querySelector('[data-preview-target-action="delete"]')
@@ -4643,6 +4789,284 @@ describe('admin page-builder shell', () => {
     await flushAdminUi(6);
 
     expect(mocks.deleteModule).toHaveBeenCalledWith(textModule.id);
+  });
+
+  it('enables Duplicate for a normal module and clones it after the original', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const textSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === textModule.id)
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const target = {
+      kind: 'module',
+      key: `module:${textModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: textSection.id,
+      columnIndex: textModule.columnIndex,
+      moduleId: textModule.id,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target,
+          rect: { top: 40, left: 30, right: 230, bottom: 140, width: 200, height: 100 },
+          visible: true,
+          order: 0,
+          label: 'Text module',
+        },
+      ],
+    });
+    sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
+    await flushAdminUi(2);
+
+    const duplicateButton = frame.querySelector('[data-preview-target-action="duplicate"]');
+    expect(duplicateButton).not.toBeNull();
+    expect(duplicateButton?.disabled).toBe(false);
+
+    duplicateButton?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(4);
+
+    expect(mocks.addModule).toHaveBeenCalledWith(
+      textSection.id,
+      'text',
+      textModule.columnIndex,
+      textModule.config
+    );
+    expect(mocks.reorderModules).toHaveBeenCalled();
+    const clonedConfig = mocks.addModule.mock.calls.at(-1)[3];
+    expect(clonedConfig).toEqual(textModule.config);
+    expect(clonedConfig).not.toBe(textModule.config);
+  });
+
+  it('rolls back a created duplicate when ordering fails', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const textSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === textModule.id)
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      reorderModulesResult: false,
+      deleteModuleResult: true,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const target = {
+      kind: 'module',
+      key: `module:${textModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: textSection.id,
+      columnIndex: textModule.columnIndex,
+      moduleId: textModule.id,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target,
+          rect: { top: 40, left: 30, right: 230, bottom: 140, width: 200, height: 100 },
+          visible: true,
+          order: 0,
+          label: 'Text module',
+        },
+      ],
+    });
+    sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
+    await flushAdminUi(2);
+
+    frame
+      .querySelector('[data-preview-target-action="duplicate"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(6);
+
+    expect(mocks.deleteModule).toHaveBeenCalledWith('new-module-id');
+    expect(document.querySelector('.pb-live-canvas-status')?.textContent).toContain(
+      'Failed to duplicate Text module.'
+    );
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Text Module');
+  });
+
+  it('reconciles the visible page when duplicate rollback also fails', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const textSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === textModule.id)
+    );
+    const reconciledPage = JSON.parse(JSON.stringify(selectedPage));
+    const reconciledSection = reconciledPage.sections.find(
+      (section) => section.id === textSection.id
+    );
+    reconciledSection.modules.push({
+      id: 'new-module-id',
+      moduleType: 'text',
+      columnIndex: textModule.columnIndex,
+      sortIndex: 99,
+      config: JSON.parse(JSON.stringify(textModule.config)),
+    });
+    let fetchCount = 0;
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: () => (fetchCount++ === 0 ? selectedPage : reconciledPage),
+      reorderModulesResult: false,
+      deleteModuleResult: false,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const target = {
+      kind: 'module',
+      key: `module:${textModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: textSection.id,
+      columnIndex: textModule.columnIndex,
+      moduleId: textModule.id,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target,
+          rect: { top: 40, left: 30, right: 230, bottom: 140, width: 200, height: 100 },
+          visible: true,
+          order: 0,
+          label: 'Text module',
+        },
+      ],
+    });
+    sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
+    await flushAdminUi(2);
+
+    frame
+      .querySelector('[data-preview-target-action="duplicate"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(8);
+
+    expect(mocks.fetchPage).toHaveBeenCalledTimes(2);
+    expect(
+      document.querySelector('[data-layer-action="select-module"][data-module-id="new-module-id"]')
+    ).not.toBeNull();
+    expect(document.querySelector('[data-layer-action="select-module"].active')).toBeNull();
+    expect(document.querySelector('.pb-live-canvas-status')?.textContent).toContain(
+      'The page was refreshed to show the saved state.'
+    );
+  });
+
+  it('does not offer Duplicate for the Comic Reader module', async () => {
+    const selectedPage = withReaderModule(getContractFixture('builderPage'));
+    const readerModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'reader');
+    const readerSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === readerModule.id)
+    );
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const target = {
+      kind: 'module',
+      key: `module:${readerModule.id}`,
+      pageId: selectedPage.id,
+      sectionId: readerSection.id,
+      columnIndex: readerModule.columnIndex,
+      moduleId: readerModule.id,
+      moduleType: 'text',
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target,
+          rect: { top: 40, left: 30, right: 230, bottom: 140, width: 200, height: 100 },
+          visible: true,
+          order: 0,
+          label: 'Comic Reader module',
+        },
+      ],
+    });
+    sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
+    await flushAdminUi(2);
+
+    expect(frame.querySelector('[data-preview-target-action="duplicate"]')).toBeNull();
+    expect(frame.querySelector('[data-preview-target-action="settings"]')).not.toBeNull();
+  });
+
+  it('keeps section duplicate unavailable', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const section = selectedPage.sections[0];
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    const iframeWindow = attachPreviewIframeWindow();
+    const target = {
+      kind: 'section',
+      key: `section:${section.id}`,
+      pageId: selectedPage.id,
+      sectionId: section.id,
+    };
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target,
+          rect: { top: 20, left: 20, right: 420, bottom: 220, width: 400, height: 200 },
+          visible: true,
+          order: 0,
+          label: 'Section',
+        },
+      ],
+    });
+    sendPreviewTargetSelect({ frame, iframeWindow, page: selectedPage, target });
+    await flushAdminUi(2);
+
+    expect(frame.querySelector('[data-preview-target-action="duplicate"]')).toBeNull();
   });
 
   it('warns before deleting the bound reader module', async () => {

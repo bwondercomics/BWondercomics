@@ -339,6 +339,7 @@ describe('reader page renderer', () => {
 
     expect(publicWrapper.querySelector('[data-builder-page-id]')).toBeNull();
     expect(publicWrapper.querySelector('[data-builder-module-id]')).toBeNull();
+    expect(publicWrapper.querySelector('[data-builder-surface="page-end"]')).toBeNull();
     expect(editingWrapper.querySelector('.pb-page')?.dataset.builderPageId).toBe(page.id);
     expect(editingWrapper.querySelector('.pb-section')?.dataset.builderSectionId).toBe(
       firstSection.id
@@ -350,5 +351,10 @@ describe('reader page renderer', () => {
     expect(editingWrapper.querySelector('.pb-module')?.dataset.builderModuleType).toBe(
       firstModule.moduleType
     );
+    expect(
+      editingWrapper.querySelector(
+        '.pb-page > .pb-page-end-target-anchor [data-builder-surface="page-end"]'
+      )
+    ).not.toBeNull();
   });
 });

@@ -41,6 +41,7 @@ let targetSequence = 0;
 const TARGET_SELECTOR = [
   '[data-builder-module-id]',
   '[data-builder-surface="page-header"]',
+  '[data-builder-surface="page-end"]',
   '[data-builder-column-index]',
   '[data-builder-section-id]',
   '[data-builder-page-id]',
@@ -162,6 +163,15 @@ function buildTargetRef(element, snapshot = activePreviewContext?.snapshot) {
     };
   }
 
+  if (element.matches('[data-builder-surface="page-end"]')) {
+    return {
+      kind: BUILDER_PREVIEW_TARGET_KINDS.PAGE,
+      key: `page-end:${pageId}`,
+      pageId,
+      surface: 'page-end',
+    };
+  }
+
   if (element.matches('[data-builder-column-index]')) {
     const sectionId = getNearestSectionId(element);
     const columnIndex = parseColumnIndex(element.dataset.builderColumnIndex);
@@ -203,6 +213,9 @@ function getTargetLabel(target) {
     return target.moduleType ? `${target.moduleType} module` : 'Module';
   }
   if (target.kind === BUILDER_PREVIEW_TARGET_KINDS.HEADER) return 'Page header';
+  if (target.kind === BUILDER_PREVIEW_TARGET_KINDS.PAGE && target.surface === 'page-end') {
+    return 'Page end';
+  }
   if (target.kind === BUILDER_PREVIEW_TARGET_KINDS.SECTION) return 'Section';
   if (target.kind === BUILDER_PREVIEW_TARGET_KINDS.COLUMN) {
     return `Column ${(target.columnIndex ?? 0) + 1}`;
@@ -249,6 +262,7 @@ function findTargetFromEventTarget(rawTarget, snapshot = activePreviewContext?.s
     rawTarget?.nodeType === Node.TEXT_NODE ? rawTarget.parentElement : rawTarget?.closest?.('*');
   let fallback = null;
   while (element && element !== document.documentElement) {
+    if (element.matches?.('[data-builder-surface="page-end"]')) return null;
     if (
       element.matches?.('[data-builder-module-id]') ||
       element.matches?.('[data-builder-surface="page-header"]')
@@ -275,6 +289,7 @@ function collectBuilderTargetElements() {
     .querySelectorAll(
       [
         '[data-builder-surface="page-header"]',
+        '[data-builder-surface="page-end"]',
         '[data-builder-section-id]',
         '[data-builder-column-index]',
         '[data-builder-module-id]',
@@ -311,6 +326,9 @@ function findElementForTarget(target) {
   }
   if (target.kind === BUILDER_PREVIEW_TARGET_KINDS.HEADER) {
     return document.querySelector('[data-builder-surface="page-header"]');
+  }
+  if (target.kind === BUILDER_PREVIEW_TARGET_KINDS.PAGE && target.surface === 'page-end') {
+    return document.querySelector('[data-builder-surface="page-end"]');
   }
   if (target.kind === BUILDER_PREVIEW_TARGET_KINDS.COLUMN && target.sectionId) {
     const sectionSelector = `[data-builder-section-id="${escapeCssIdent(target.sectionId)}"]`;

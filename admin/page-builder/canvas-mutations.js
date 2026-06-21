@@ -1,19 +1,10 @@
+import { findPageModuleLocation } from './module-eligibility.js';
+
 function sortModulesForColumn(section, columnIndex) {
   return (section?.modules || [])
     .filter((module) => module.columnIndex === columnIndex)
     .slice()
     .sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0));
-}
-
-function findModuleLocation(currentPage, moduleId) {
-  for (const section of currentPage?.sections || []) {
-    const modules = section.modules || [];
-    const module = modules.find((item) => item.id === moduleId);
-    if (module) {
-      return { section, module };
-    }
-  }
-  return null;
 }
 
 export function createCanvasMutations({ getState, actions, deps, helpers }) {
@@ -103,6 +94,19 @@ export function createCanvasMutations({ getState, actions, deps, helpers }) {
     return null;
   }
 
+  function retainCreatedModuleLocally(section, newModule) {
+    section.modules = section.modules || [];
+    if (!section.modules.some((module) => module.id === newModule.id)) {
+      section.modules.push(newModule);
+    }
+    section.modules.sort((a, b) => {
+      if ((a.columnIndex ?? 0) !== (b.columnIndex ?? 0)) {
+        return (a.columnIndex ?? 0) - (b.columnIndex ?? 0);
+      }
+      return (a.sortIndex ?? 0) - (b.sortIndex ?? 0);
+    });
+  }
+
   async function insertModuleAt(sectionId, columnIndex, insertIndex, moduleType) {
     const { currentPage } = getState();
     if (!currentPage) return;
@@ -131,10 +135,63 @@ export function createCanvasMutations({ getState, actions, deps, helpers }) {
     return newModule;
   }
 
+  async function duplicateModuleAfter(moduleId) {
+    const { currentPage } = getState();
+    if (!currentPage) return;
+    const location = findPageModuleLocation(currentPage, moduleId);
+    if (!location) return;
+    const { section, module } = location;
+    const columnIndex = module.columnIndex ?? 0;
+    const moduleType = module.moduleType;
+
+    // Clone the source config verbatim (no default normalization); the backend re-sanitizes it
+    // and assigns a fresh module id.
+    const clonedConfig = JSON.parse(JSON.stringify(module.config || {}));
+    const newModule = await deps.addModule(section.id, moduleType, columnIndex, clonedConfig);
+    if (!newModule) return;
+
+    const visibleOrderedIds = sortCanvasModulesForColumn(section, columnIndex)
+      .map((item) => item.id)
+      .filter((id) => id !== newModule.id);
+    const originalIndex = visibleOrderedIds.indexOf(moduleId);
+    const insertIndex = originalIndex >= 0 ? originalIndex + 1 : visibleOrderedIds.length;
+    visibleOrderedIds.splice(insertIndex, 0, newModule.id);
+    const orderedIds = buildColumnOrder(section, columnIndex, visibleOrderedIds);
+
+    if (!(await deps.reorderModules(section.id, columnIndex, orderedIds))) {
+      const deleted = await deps.deleteModule(newModule.id);
+      if (deleted) {
+        return failStructuralMutation(
+          `Failed to duplicate ${helpers.getModuleLabel(moduleType)} module.`
+        );
+      }
+
+      const reconciledPage = await deps.fetchPage(currentPage.id);
+      if (reconciledPage?.id === currentPage.id) {
+        actions.replaceCurrentPageAfterMutationFailure(reconciledPage);
+        return failStructuralMutation(
+          `Failed to place the duplicate ${helpers.getModuleLabel(moduleType)} module. The page was refreshed to show the saved state.`
+        );
+      }
+
+      retainCreatedModuleLocally(section, newModule);
+      return failStructuralMutation(
+        `The duplicate ${helpers.getModuleLabel(moduleType)} module was created, but ordering and recovery failed. Reload the page before continuing.`
+      );
+    }
+
+    section.modules = section.modules || [];
+    section.modules.push(newModule);
+    applyModuleOrderLocally(section.id, columnIndex, orderedIds);
+    actions.setCanvasStatus(`${helpers.getModuleLabel(moduleType)} module duplicated.`, 'success');
+    actions.renderCanvas();
+    return newModule;
+  }
+
   async function moveModuleToTarget(moduleId, targetSectionId, targetColumnIndex, insertIndex) {
     const { currentPage } = getState();
     if (!currentPage) return;
-    const location = findModuleLocation(currentPage, moduleId);
+    const location = findPageModuleLocation(currentPage, moduleId);
     const targetSection = getSectionRecord(targetSectionId);
     if (!location || !targetSection) return;
 
@@ -261,6 +318,7 @@ export function createCanvasMutations({ getState, actions, deps, helpers }) {
   return {
     changeSectionLayout,
     insertModuleAt,
+    duplicateModuleAfter,
     insertSectionAt,
     moveModuleToTarget,
     reorderSectionToIndex,

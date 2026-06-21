@@ -320,6 +320,8 @@ This factory owns the immediate structural mutations for sections and modules.
 Current responsibilities:
 
 - insert modules with default config at an exact section/column/index target
+- duplicate eligible modules directly after their source with a deep-cloned config and fresh backend
+  identity
 - move modules within a column or across sections/columns
 - preserve hidden compatibility-only `header` modules in module-order calculations while excluding them from visible canvas counts
 - insert and reorder sections
@@ -327,6 +329,8 @@ Current responsibilities:
 - apply local order updates after backend reorder calls so the canvas can rerender from the latest in-memory shape
 - return the created or moved module/section record so live-canvas commands can select the affected
   target after a successful mutation
+- compensate for duplicate reorder failures by deleting the created copy; if cleanup fails, reconcile
+  from the authoritative page response or retain the returned copy visibly with a reload warning
 
 ## 🕹️ Structural Commands (structural-commands.js)
 
@@ -336,15 +340,18 @@ structural mutations while the broader command/keymap/undo layers coordinate edi
 Current responsibilities:
 
 - own the supported structural command IDs: drag start/over/drop/end, insert, move,
-  insert-section, move-section, delete-selected, hide-on-device, and disabled duplicate-selected
+  insert-section, move-section, delete-selected, hide-on-device, and duplicate-selected
 - guard structural commands with the existing dirty-workspace checks before changing selection or
   mutating structure
 - translate block/module/section drag state into `canvas-mutations.js` calls
+- re-resolve placement from the final drop event geometry instead of executing a cached drag-over
+  placement
 - create pending insert targets when toolbar Insert Before/After is clicked, then let a Blocks card
   click complete the insertion
-- select the inserted or moved target, switch the side panel back to Settings, request fresh iframe
-  target geometry, and clear live drag state after successful commands
-- keep Duplicate visible but disabled until an actual duplicate mutation exists
+- resolve duplicate eligibility from the authoritative current-page module record rather than
+  trusting iframe or selected-target type metadata
+- select the inserted, moved, or duplicated target, switch the side panel back to Settings, request
+  fresh iframe target geometry, and clear live drag state after successful commands
 
 ## 📍 Live Drop Placement (live-drop-placement.js)
 
@@ -353,9 +360,12 @@ This pure helper ranks iframe target geometry into structural placements.
 Current responsibilities:
 
 - accept block descriptors and reject non-insertable modules such as `header`
-- rank targets by specificity and proximity: module edge, column, section, then page
+- rank only targets that explicitly contain the pointer: module edge, column, section, explicit page
+  end, then generic page
 - resolve placements for module before/after, column start/end, empty column, section before/after,
-  and page end
+  explicit page end, plus the preserved first-block fallback for genuinely empty pages
+- reject populated-page dead space instead of snapping to the nearest target or silently appending a
+  section
 - use the global saved section layout and actual module `columnIndex` for structural validity rather
   than device-collapsed layout
 - exclude the dragged module or section from placement index calculations so moves land at the
@@ -382,8 +392,12 @@ Current responsibilities:
   compact selected-target toolbar chrome, and insert guide lines above the iframe
 - render the active live drop guide while dragging and make the admin overlay catch drag/drop events
   only for the duration of a live drag
+- render the editor-only `page-end` surface as a bounded drag guide without changing public output or
+  reader preview layout
 - route selected-target toolbar actions through the structural command adapter while leaving iframe
   `TARGET_ACTION` messages for non-mutating requests such as target refresh
+- offer Duplicate only when the selected module ID resolves to a duplicatable module in the current
+  page model; section duplicate remains unavailable
 - route selected text-module toolbar Edit Text through the command registry and post an internal
   inline-edit start request to the same live iframe session
 - clear live target geometry and send `builderEditing: false` snapshots when the builder enters
@@ -730,12 +744,20 @@ Current exports:
 - `getModuleDescriptors()` and `getModuleDescriptor(type)` expose normalized descriptors
 - `getInsertableModuleDescriptors()` feeds the Blocks palette and excludes compatibility-only
   descriptors such as `header`
+- `isModuleTypeDuplicatable(type)` exposes singleton/duplicate eligibility metadata; Comic Reader is
+  currently the only non-duplicatable standard module
 - `getModuleDefaultConfig(type)` supplies cloned default config for insertions
 - `getModuleResponsiveOverrides(type)` and `getModuleStyleSectors(type)` drive responsive and style
   inspector surfaces
 - `getModuleSourceModes(type)` and `getModuleEditorKind(type)` decide CMS source UI and
   module-specific editor routing
 - `getModulePreviewText(type, config)` renders compact list/layer summaries
+
+## ✅ Module Eligibility (module-eligibility.js)
+
+This page-model helper resolves module IDs to their authoritative section/module records and combines
+that lookup with descriptor duplicate eligibility. Structural commands, canvas mutations, and the
+live preview toolbar share it so iframe metadata cannot bypass singleton guards.
 
 ## 🔢 Constants Registry (constants.js)
 

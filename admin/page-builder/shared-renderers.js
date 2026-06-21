@@ -68,6 +68,11 @@ export function createRenderers({
       .join('');
   }
 
+  function renderPageEndTarget(page, renderOptions = {}) {
+    if (!isBuilderEditingEnabled(renderOptions) || !page?.id) return '';
+    return '<div class="pb-page-end-target-anchor" aria-hidden="true"><div class="pb-page-end-target" data-builder-surface="page-end"></div></div>';
+  }
+
   function resolveModuleImageUrl(path) {
     const raw = sanitizeAssetUrl(path || '');
     if (!raw) return '';
@@ -601,8 +606,12 @@ export function createRenderers({
       },
       emitMarkers
     );
-    return `<div class="pb-page"${pageMarkerAttrs}>${sectionsHtml}</div>`;
+    const pageEndTarget = renderPageEndTarget(page, {
+      ...renderOptions,
+      builderEditing: emitMarkers,
+    });
+    return `<div class="pb-page"${pageMarkerAttrs}>${sectionsHtml}${pageEndTarget}</div>`;
   }
 
-  return { MODULE_RENDERERS, renderModule, renderSection, renderPage };
+  return { MODULE_RENDERERS, renderModule, renderSection, renderPage, renderPageEndTarget };
 }

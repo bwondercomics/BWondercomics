@@ -164,6 +164,148 @@ describe('resolveLiveDropPlacement', () => {
     );
   });
 
+  it('returns null for a bare-page drop on a populated page instead of appending at page end', () => {
+    const page = buildPage();
+    const pageTarget = { kind: 'page', key: 'page:page-1', pageId: page.id };
+
+    const placement = resolveLiveDropPlacement({
+      page,
+      targets: [geometry(pageTarget)],
+      point: { x: 80, y: 80 },
+      dragState: { source: 'block', moduleType: 'image' },
+    });
+
+    expect(placement).toBeNull();
+  });
+
+  it('returns null when the pointer is over no target on a populated page (no nearest snap)', () => {
+    const page = buildPage();
+    const farTarget = {
+      kind: 'module',
+      key: 'module:module-b',
+      pageId: page.id,
+      sectionId: 'section-1',
+      columnIndex: 0,
+      moduleId: 'module-b',
+      moduleType: 'image',
+    };
+
+    const placement = resolveLiveDropPlacement({
+      page,
+      // The module rect is 20-120 / 10-210; the point is well outside it.
+      targets: [geometry(farTarget)],
+      point: { x: 900, y: 900 },
+      dragState: { source: 'block', moduleType: 'text' },
+    });
+
+    expect(placement).toBeNull();
+  });
+
+  it('resolves an explicit page-end surface on a populated page', () => {
+    const page = buildPage();
+    const genericPage = geometry(
+      { kind: 'page', key: 'page:page-1', pageId: page.id },
+      { top: 0, left: 0, right: 800, bottom: 600, width: 800, height: 600 }
+    );
+    const pageEnd = geometry(
+      {
+        kind: 'page',
+        key: 'page-end:page-1',
+        pageId: page.id,
+        surface: 'page-end',
+      },
+      { top: 500, left: 20, right: 780, bottom: 540, width: 760, height: 40 }
+    );
+
+    const placement = resolveLiveDropPlacement({
+      page,
+      targets: [genericPage, pageEnd],
+      point: { x: 80, y: 520 },
+      dragState: { source: 'block', moduleType: 'feed' },
+    });
+
+    expect(placement).toEqual(
+      expect.objectContaining({
+        target: expect.objectContaining({ key: 'page-end:page-1', surface: 'page-end' }),
+        placement: LIVE_DROP_PLACEMENTS.PAGE_END,
+        sectionIndex: 2,
+      })
+    );
+  });
+
+  it('moves a module into a new trailing section through the explicit page-end surface', () => {
+    const page = buildPage();
+    const target = {
+      kind: 'page',
+      key: 'page-end:page-1',
+      pageId: page.id,
+      surface: 'page-end',
+    };
+
+    const placement = resolveLiveDropPlacement({
+      page,
+      targets: [geometry(target)],
+      point: { x: 80, y: 80 },
+      dragState: { source: 'module', moduleId: 'module-a' },
+    });
+
+    expect(placement).toEqual(
+      expect.objectContaining({
+        placement: LIVE_DROP_PLACEMENTS.PAGE_END,
+        sectionIndex: 2,
+      })
+    );
+  });
+
+  it('moves a section to the final index through the explicit page-end surface', () => {
+    const page = buildPage();
+    const target = {
+      kind: 'page',
+      key: 'page-end:page-1',
+      pageId: page.id,
+      surface: 'page-end',
+    };
+
+    const placement = resolveLiveDropPlacement({
+      page,
+      targets: [geometry(target)],
+      point: { x: 80, y: 80 },
+      dragState: { source: 'section', sectionId: 'section-1' },
+    });
+
+    expect(placement).toEqual(
+      expect.objectContaining({
+        placement: LIVE_DROP_PLACEMENTS.PAGE_END,
+        sectionIndex: 1,
+      })
+    );
+  });
+
+  it('still moves a section to the end when dropping on the lower half of the last section', () => {
+    const page = buildPage();
+    const target = {
+      kind: 'section',
+      key: 'section:section-2',
+      pageId: page.id,
+      sectionId: 'section-2',
+    };
+
+    const placement = resolveLiveDropPlacement({
+      page,
+      // rect midpoint is y=70; y=110 lands in the lower half => after.
+      targets: [geometry(target)],
+      point: { x: 80, y: 110 },
+      dragState: { source: 'section', sectionId: 'section-1' },
+    });
+
+    expect(placement).toEqual(
+      expect.objectContaining({
+        placement: LIVE_DROP_PLACEMENTS.SECTION_AFTER,
+        sectionIndex: 1,
+      })
+    );
+  });
+
   it('creates new-section placements from section edges', () => {
     const page = buildPage();
     const target = {

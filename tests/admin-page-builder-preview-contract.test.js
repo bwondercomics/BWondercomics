@@ -233,6 +233,14 @@ describe('admin page-builder preview contract', () => {
 
     expect(validatePreviewTargetRef(target)).toEqual({ valid: true, reason: '' });
     expect(validatePreviewTargetGeometry(geometry)).toEqual({ valid: true, reason: '' });
+    expect(
+      validatePreviewTargetRef({
+        kind: 'page',
+        key: 'page-end:page-1',
+        pageId: 'page-1',
+        surface: 'page-end',
+      })
+    ).toEqual({ valid: true, reason: '' });
 
     const targets = buildPreviewTargetMessage(
       BUILDER_PREVIEW_MESSAGE_TYPES.TARGETS,
@@ -286,6 +294,23 @@ describe('admin page-builder preview contract', () => {
 
     expect(validatePreviewTargetRef({ ...target, kind: 'widget' }).valid).toBe(false);
     expect(validatePreviewTargetRef({ ...target, moduleId: '' }).valid).toBe(false);
+    expect(validatePreviewTargetRef({ ...target, surface: 'page-end' }).valid).toBe(false);
+    expect(
+      validatePreviewTargetRef({
+        kind: 'page',
+        key: 'page:page-1',
+        pageId: 'page-1',
+        surface: 'page-header',
+      }).valid
+    ).toBe(false);
+    expect(
+      validatePreviewTargetRef({
+        kind: 'header',
+        key: 'header:page-1',
+        pageId: 'page-1',
+        surface: 'page-end',
+      }).valid
+    ).toBe(false);
     expect(
       validatePreviewTargetGeometry({
         ...geometry,

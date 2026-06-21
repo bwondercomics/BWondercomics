@@ -14,6 +14,7 @@ import {
   getModuleResponsiveOverrides,
   getModuleSourceModes,
   getModuleStyleSectors,
+  isModuleTypeDuplicatable,
 } from '../admin/page-builder/module-descriptors.js';
 import { getModuleResponsiveFields } from '../admin/page-builder/responsive-overrides.js';
 
@@ -109,6 +110,15 @@ describe('page-builder module descriptors', () => {
     expect(getModuleSourceModes('media-gallery')).toEqual(['site']);
     expect(getModuleStyleSectors('buttons')).toEqual(['button-defaults', 'button-overrides']);
     expect(getModuleStyleSectors('html')).toEqual([]);
+  });
+
+  it('marks the Comic Reader as the only non-duplicatable standard module', () => {
+    expect(isModuleTypeDuplicatable('reader')).toBe(false);
+    expect(isModuleTypeDuplicatable('text')).toBe(true);
+    expect(isModuleTypeDuplicatable('image')).toBe(true);
+    expect(isModuleTypeDuplicatable('feed')).toBe(true);
+    // Unknown types default to duplicatable; they never reach the toolbar regardless.
+    expect(isModuleTypeDuplicatable('custom-widget')).toBe(true);
   });
 
   it('falls back safely for unknown module types', () => {

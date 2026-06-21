@@ -17,6 +17,7 @@ import {
   renderPage,
   renderSection,
   renderModule,
+  renderPageEndTarget,
   initEmailForms,
   initPromoCarousels,
 } from './page-renderer.js';
@@ -685,6 +686,7 @@ const READER_SURFACE_IDS = Object.freeze({
   above: 'builderAboveReader',
   below: 'builderBelowReader',
 });
+const READER_PAGE_END_TARGET_ID = 'builderReaderPageEndTarget';
 
 function ensureReaderSurface(placement) {
   const id = READER_SURFACE_IDS[placement];
@@ -716,6 +718,26 @@ function clearReaderSurfaces() {
     surface.innerHTML = '';
     setHiddenState(surface, true);
   });
+}
+
+function removeReaderPageEndTarget() {
+  const target = document.getElementById(READER_PAGE_END_TARGET_ID);
+  target?.closest('.pb-page-end-target-anchor')?.remove();
+}
+
+function syncReaderPageEndTarget(page, builderEditing) {
+  removeReaderPageEndTarget();
+  if (!builderEditing || !page?.id) return;
+
+  const belowSurface = ensureReaderSurface('below');
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = renderPageEndTarget(page, { builderEditing: true });
+  const anchor = wrapper.firstElementChild;
+  const target = anchor?.querySelector?.('[data-builder-surface="page-end"]');
+  if (!anchor || !target) return;
+  target.id = READER_PAGE_END_TARGET_ID;
+  anchor.classList.add('builder-reader-page-end-target-anchor');
+  belowSurface.insertAdjacentElement('afterend', anchor);
 }
 
 function initBuilderSurfaceModules(container, options = {}) {
@@ -795,6 +817,7 @@ function applyReaderShellDomState(shellState) {
   // Reset the above/below-reader surfaces on every apply; the active branch
   // repopulates them from the page's non-reader sections when appropriate.
   clearReaderSurfaces();
+  removeReaderPageEndTarget();
 }
 
 function applyReaderHeaderChromeState(shellState) {
@@ -970,6 +993,7 @@ export function applyBuilderPageToDOM(page, options = {}) {
     deviceId,
     previewMode: !!options.previewMode,
   });
+  syncReaderPageEndTarget(page, builderEditing);
 
   const panelSpacing = page?.meta?.panelSpacing || {};
   const panelBackgrounds = page?.meta?.panelBackgrounds || {};

@@ -45,6 +45,27 @@ body[data-reader-shell='inactive'] #statusPanel {
   width: 100%;
 }
 
+.pb-page-end-target-anchor {
+  position: relative;
+  width: 100%;
+  height: 0;
+  pointer-events: none;
+}
+
+.pb-page-end-target {
+  position: absolute;
+  top: 0;
+  left: 0;
+  box-sizing: border-box;
+  width: 100%;
+  height: 40px;
+}
+
+.builder-reader-page-end-target-anchor {
+  width: min(1180px, calc(100% - 32px));
+  margin: 0 auto;
+}
+
 .pb-section {
   width: 100%;
   margin-bottom: var(--pb-section-gap, 24px);

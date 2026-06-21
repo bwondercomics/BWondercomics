@@ -19,6 +19,11 @@ const TARGET_PRIORITY = Object.freeze({
   header: 1,
 });
 
+function getTargetPriority(target = {}) {
+  if (target.kind === 'page' && target.surface === 'page-end') return 2.5;
+  return TARGET_PRIORITY[target.kind] || 0;
+}
+
 function sortSections(sections = []) {
   return sections.slice().sort((a, b) => (a.sortIndex ?? 0) - (b.sortIndex ?? 0));
 }
@@ -68,16 +73,6 @@ function rectContains(rect = {}, point = {}) {
   return point.x >= left && point.x <= right && point.y >= top && point.y <= bottom;
 }
 
-function getRectDistance(rect = {}, point = {}) {
-  const left = Number(rect.left) || 0;
-  const right = Number(rect.right) || 0;
-  const top = Number(rect.top) || 0;
-  const bottom = Number(rect.bottom) || 0;
-  const dx = point.x < left ? left - point.x : point.x > right ? point.x - right : 0;
-  const dy = point.y < top ? top - point.y : point.y > bottom ? point.y - bottom : 0;
-  return Math.sqrt(dx * dx + dy * dy);
-}
-
 function isAllowedModuleDrag(page, dragState = {}) {
   if (dragState.source === 'section') return true;
   const moduleType =
@@ -96,18 +91,14 @@ function getCandidateTarget(targets = [], point = {}) {
   const containing = visibleTargets
     .filter((item) => rectContains(item.rect, point))
     .sort((a, b) => {
-      const priorityDiff =
-        (TARGET_PRIORITY[b.target.kind] || 0) - (TARGET_PRIORITY[a.target.kind] || 0);
+      const priorityDiff = getTargetPriority(b.target) - getTargetPriority(a.target);
       if (priorityDiff) return priorityDiff;
       return (a.order ?? 0) - (b.order ?? 0);
     });
-  if (containing.length) return containing[0];
-
-  return visibleTargets.slice().sort((a, b) => {
-    const distanceDiff = getRectDistance(a.rect, point) - getRectDistance(b.rect, point);
-    if (distanceDiff) return distanceDiff;
-    return (TARGET_PRIORITY[b.target.kind] || 0) - (TARGET_PRIORITY[a.target.kind] || 0);
-  })[0];
+  // Only an explicit target under the pointer is a valid drop candidate. Snapping to the
+  // nearest target by distance is what let an invalid drop silently mutate a different part
+  // of the page, so it is intentionally removed.
+  return containing[0] || null;
 }
 
 function buildPlacement(geometry, placement, details = {}) {
@@ -189,12 +180,24 @@ function resolveSectionPlacement({ page, geometry, point, dragState }) {
   );
 }
 
-function resolvePagePlacement({ page, geometry, dragState }) {
+function resolvePageEndPlacement({ page, geometry, dragState }) {
   const sections = sortSections(page?.sections || []).filter(
     (section) => section.id !== dragState?.sectionId
   );
   return buildPlacement(geometry, LIVE_DROP_PLACEMENTS.PAGE_END, {
     sectionIndex: sections.length,
+  });
+}
+
+function resolveEmptyPagePlacement({ page, dragState }) {
+  // Page-end is only valid as a first-block placement on a page that has no sections.
+  // On a populated page, bare page space is not a drop target and must resolve to null
+  // rather than silently appending a section below the existing content.
+  if (sortSections(page?.sections || []).length > 0) return null;
+  return resolvePageEndPlacement({
+    page,
+    geometry: { target: { kind: 'page' } },
+    dragState,
   });
 }
 
@@ -204,7 +207,7 @@ export function resolveLiveDropPlacement({ page, targets = [], point = {}, dragS
 
   const geometry = getCandidateTarget(targets, point);
   if (!geometry?.target) {
-    return resolvePagePlacement({ page, geometry: { target: { kind: 'page' } }, dragState });
+    return resolveEmptyPagePlacement({ page, dragState });
   }
 
   if (dragState.source === 'section') {
@@ -212,7 +215,10 @@ export function resolveLiveDropPlacement({ page, targets = [], point = {}, dragS
       return resolveSectionPlacement({ page, geometry, point, dragState });
     }
     if (geometry.target.kind === 'page') {
-      return resolvePagePlacement({ page, geometry, dragState });
+      if (geometry.target.surface === 'page-end') {
+        return resolvePageEndPlacement({ page, geometry, dragState });
+      }
+      return resolveEmptyPagePlacement({ page, dragState });
     }
     const sectionId = geometry.target.sectionId;
     const sectionGeometry = targets.find(
@@ -220,7 +226,7 @@ export function resolveLiveDropPlacement({ page, targets = [], point = {}, dragS
     );
     return sectionGeometry
       ? resolveSectionPlacement({ page, geometry: sectionGeometry, point, dragState })
-      : resolvePagePlacement({ page, geometry, dragState });
+      : resolveEmptyPagePlacement({ page, dragState });
   }
 
   if (geometry.target.kind === 'module') {
@@ -233,7 +239,10 @@ export function resolveLiveDropPlacement({ page, targets = [], point = {}, dragS
     return resolveSectionPlacement({ page, geometry, point, dragState });
   }
   if (geometry.target.kind === 'page') {
-    return resolvePagePlacement({ page, geometry, dragState });
+    if (geometry.target.surface === 'page-end') {
+      return resolvePageEndPlacement({ page, geometry, dragState });
+    }
+    return resolveEmptyPagePlacement({ page, dragState });
   }
   return null;
 }

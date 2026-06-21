@@ -492,6 +492,19 @@ export function validatePreviewTargetRef(target) {
   ) {
     return validationResult(false, 'Header target surface is invalid.');
   }
+  if (
+    target.kind === BUILDER_PREVIEW_TARGET_KINDS.PAGE &&
+    target.surface !== undefined &&
+    target.surface !== 'page-end'
+  ) {
+    return validationResult(false, 'Page target surface is invalid.');
+  }
+  if (target.surface === 'page-end' && target.kind !== BUILDER_PREVIEW_TARGET_KINDS.PAGE) {
+    return validationResult(false, 'Page-end surface requires a page target.');
+  }
+  if (target.surface === 'page-header' && target.kind !== BUILDER_PREVIEW_TARGET_KINDS.HEADER) {
+    return validationResult(false, 'Page-header surface requires a header target.');
+  }
 
   return validationResult(true);
 }

@@ -174,6 +174,7 @@ describe('reader preview bridge', () => {
             <article data-builder-module-id="module-1" data-builder-module-type="text"></article>
           </div>
         </section>
+        <div class="pb-page-end-target" data-builder-surface="page-end"></div>
       </div>
     `;
     const rects = new Map([
@@ -185,6 +186,10 @@ describe('reader preview bridge', () => {
         { top: 90, left: 30, right: 400, bottom: 260, width: 370, height: 170 },
       ],
       ['article', { top: 100, left: 40, right: 240, bottom: 180, width: 200, height: 80 }],
+      [
+        '[data-builder-surface="page-end"]',
+        { top: 300, left: 20, right: 780, bottom: 340, width: 760, height: 40 },
+      ],
     ]);
     rects.forEach((rect, selector) => {
       document.querySelector(selector).getBoundingClientRect = () => rect;
@@ -199,8 +204,9 @@ describe('reader preview bridge', () => {
       'section',
       'column',
       'module',
+      'page',
     ]);
-    expect(targets.at(-1)).toMatchObject({
+    expect(targets.at(-2)).toMatchObject({
       target: {
         key: 'module:module-1',
         moduleId: 'module-1',
@@ -211,6 +217,17 @@ describe('reader preview bridge', () => {
       rect: { top: 100, left: 40, width: 200, height: 80 },
       visible: true,
       label: 'text module',
+    });
+    expect(targets.at(-1)).toMatchObject({
+      target: {
+        kind: 'page',
+        key: 'page-end:page-1',
+        pageId: 'page-1',
+        surface: 'page-end',
+      },
+      rect: { top: 300, left: 20, width: 760, height: 40 },
+      visible: true,
+      label: 'Page end',
     });
   });
 

@@ -1,4 +1,5 @@
 import { cloneValue, escapeAttr, escapeHtml } from './helpers.js';
+import { getPageModuleDuplicateEligibility } from './module-eligibility.js';
 import {
   BUILDER_PREVIEW_MESSAGE_TYPES,
   BUILDER_PREVIEW_SNAPSHOT_VERSION,
@@ -57,6 +58,14 @@ function getTargetStyle(targetGeometry) {
 
 function getPlacementGuideStyle(placement, geometry) {
   const rect = geometry?.rect || {};
+  if (placement?.target?.surface === 'page-end') {
+    return [
+      `top: ${Math.max(0, Number(rect.top) || 0)}px`,
+      `left: ${Math.max(0, Number(rect.left) || 0)}px`,
+      `width: ${Math.max(24, Number(rect.width) || 0)}px`,
+      `height: ${Math.max(3, Number(rect.height) || 0)}px`,
+    ].join('; ');
+  }
   const top = Math.max(
     0,
     ['after', 'end', 'section-after', 'page-end'].includes(placement?.placement)
@@ -114,7 +123,7 @@ function getFramePoint(frame, event) {
   };
 }
 
-function getToolbarActions(target) {
+function getToolbarActions(target, currentPage) {
   if (target?.kind === 'module') {
     const actions = [
       ['settings', 'Settings'],
@@ -123,8 +132,10 @@ function getToolbarActions(target) {
       ['insert-after', 'Insert After'],
       ['hide-device', 'Hide Device'],
       ['delete', 'Delete'],
-      ['duplicate', 'Duplicate'],
     ];
+    if (getPageModuleDuplicateEligibility(currentPage, target.moduleId).allowed) {
+      actions.push(['duplicate', 'Duplicate']);
+    }
     if (target.moduleType === 'text') {
       actions.splice(1, 0, ['edit-text', 'Edit Text']);
     }
@@ -524,6 +535,10 @@ export function createPreviewManager({ el, getState, actions, deps }) {
           await runBuilderCommand('builder:hide-on-device', { target });
           return;
         }
+        if (action === 'duplicate') {
+          await runBuilderCommand('builder:duplicate-selected', { target });
+          return;
+        }
         if (action === 'delete') {
           await runBuilderCommand('builder:delete-selected', { target });
         }
@@ -629,7 +644,7 @@ export function createPreviewManager({ el, getState, actions, deps }) {
       : '';
     const dragGuideHtml =
       liveDragState && dragPlacement && dragGeometry?.visible
-        ? `<div class="pb-preview-drop-guide pb-preview-drop-guide--${escapeAttr(dragPlacement.placement)}" style="${escapeAttr(getPlacementGuideStyle(dragPlacement, dragGeometry))}"></div>`
+        ? `<div class="pb-preview-drop-guide pb-preview-drop-guide--${escapeAttr(dragPlacement.placement)}${dragPlacement.target?.surface === 'page-end' ? ' pb-preview-drop-guide--page-end-target' : ''}" style="${escapeAttr(getPlacementGuideStyle(dragPlacement, dragGeometry))}"></div>`
         : '';
     const toolbarHtml = selectedGeometry?.visible
       ? `
@@ -638,11 +653,10 @@ export function createPreviewManager({ el, getState, actions, deps }) {
           style="top: ${escapeAttr(String(toolbarTop))}px; left: ${escapeAttr(String(toolbarLeft))}px;"
         >
           <span class="pb-preview-target-toolbar-label">${escapeHtml(selectedGeometry.label || 'Selected')}</span>
-          ${getToolbarActions(selectedGeometry.target)
+          ${getToolbarActions(selectedGeometry.target, getState().currentPage)
             .map(([action, label]) => {
-              const disabled = action === 'duplicate';
               const draggable = action === 'move' ? ' draggable="true"' : '';
-              return `<button type="button" class="btn-small btn-secondary" data-preview-target-action="${escapeAttr(action)}"${draggable}${disabled ? ' disabled aria-disabled="true"' : ''}>${escapeHtml(label)}</button>`;
+              return `<button type="button" class="btn-small btn-secondary" data-preview-target-action="${escapeAttr(action)}"${draggable}>${escapeHtml(label)}</button>`;
             })
             .join('')}
         </div>

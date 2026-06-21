@@ -321,9 +321,27 @@ function createPageBuilder({
       },
       setCanvasStatus,
       renderCanvas: () => renderCanvas(),
+      replaceCurrentPageAfterMutationFailure: (nextPage) => {
+        currentPage = nextPage;
+        draftManager.clearSelectedModuleState();
+        draftManager.clearActiveSectionState();
+        selectedCanvasSurface = null;
+        dirtyScope = null;
+        activeInsertTarget = null;
+        liveDragState = null;
+        clearInlineEditView('mutation-reconciliation', 'cancel');
+        draftUndoStack?.clear();
+        activeThemeDraft = draftManager.normalizeThemeDraft(currentPage);
+        activeHeaderDraft = draftManager.normalizeHeaderDraft(currentPage);
+        draftManager.initializePageSettingsDraft();
+        renderPageList();
+        renderEditorPanel();
+      },
     },
     deps: {
       addModule,
+      deleteModule,
+      fetchPage,
       moveModule,
       reorderModules,
       addSection,
@@ -603,7 +621,9 @@ function createPageBuilder({
       },
       createPendingInsertTarget,
       setCanvasStatus,
+      renderCanvas: () => renderCanvas(),
       insertModuleAt: canvasMutations.insertModuleAt,
+      duplicateModuleAfter: canvasMutations.duplicateModuleAfter,
       moveModuleToTarget: canvasMutations.moveModuleToTarget,
       insertSectionAt: canvasMutations.insertSectionAt,
       reorderSectionToIndex: canvasMutations.reorderSectionToIndex,

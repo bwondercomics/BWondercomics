@@ -103,6 +103,7 @@ describe('shared renderer parity', () => {
     expect(wrapper.querySelector('[data-builder-module-id]')).toBeNull();
     expect(wrapper.querySelector('[data-builder-module-type]')).toBeNull();
     expect(wrapper.querySelector('[data-builder-edit-field]')).toBeNull();
+    expect(wrapper.querySelector('[data-builder-surface="page-end"]')).toBeNull();
   });
 
   it('emits stable builder target markers only when builder editing is enabled', () => {
@@ -123,6 +124,7 @@ describe('shared renderer parity', () => {
     expect(wrapper.querySelector('.pb-module')?.dataset.builderModuleType).toBe(
       firstModule.moduleType
     );
+    expect(wrapper.querySelector('.pb-page-end-target')?.dataset.builderSurface).toBe('page-end');
   });
 
   it('emits text inline edit markers only in builder editing mode', () => {
