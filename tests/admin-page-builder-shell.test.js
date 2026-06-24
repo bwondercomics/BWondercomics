@@ -3930,6 +3930,82 @@ describe('admin page-builder shell', () => {
     expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Text Module');
   });
 
+  it('inserts a module into an existing empty column when dragging a block onto it', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const textSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === textModule.id)
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const frame = getPreviewFrame();
+    frame.getBoundingClientRect = () => ({
+      top: 0,
+      left: 0,
+      right: 1920,
+      bottom: 1080,
+      width: 1920,
+      height: 1080,
+    });
+    const iframeWindow = attachPreviewIframeWindow();
+    const columnTarget = {
+      kind: 'column',
+      key: `column:${textSection.id}:1`,
+      pageId: selectedPage.id,
+      sectionId: textSection.id,
+      columnIndex: 1,
+    };
+    // The empty column reports the bounded editor min-height (40px) rather than collapsing to zero,
+    // so the pointer lands inside it and it becomes a drop candidate.
+    sendPreviewTargets({
+      frame,
+      iframeWindow,
+      page: selectedPage,
+      targets: [
+        {
+          target: columnTarget,
+          rect: { top: 20, left: 260, right: 520, bottom: 60, width: 260, height: 40 },
+          visible: true,
+          order: 0,
+          label: 'Column 2',
+        },
+      ],
+    });
+
+    const overlay = frame.querySelector('.pb-preview-target-overlay');
+    const block = document.querySelector('.pb-module-type[data-module-type="text"]');
+    const dataTransfer = createDataTransfer();
+    block.dispatchEvent(createDragLikeEvent('dragstart', dataTransfer));
+    overlay.dispatchEvent(
+      createDragLikeEvent('dragover', dataTransfer, { clientX: 300, clientY: 40 })
+    );
+    overlay.dispatchEvent(createDragLikeEvent('drop', dataTransfer, { clientX: 300, clientY: 40 }));
+    await flushAdminUi(6);
+
+    expect(mocks.addSection).not.toHaveBeenCalled();
+    expect(mocks.addModule).toHaveBeenCalledWith(
+      textSection.id,
+      'text',
+      1,
+      expect.objectContaining({ content: expect.stringContaining('Enter your text') }),
+      null
+    );
+    expect(mocks.reorderModules).toHaveBeenCalledWith(
+      textSection.id,
+      1,
+      expect.arrayContaining(['new-module-id'])
+    );
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Text Module');
+  });
+
   it('does not continue a page-end block drop when new-section ordering fails', async () => {
     const selectedPage = buildContractFixture('builderPage', {
       sections: [],

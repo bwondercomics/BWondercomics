@@ -112,6 +112,15 @@ body[data-reader-shell='inactive'] #statusPanel {
   display: none;
 }
 
+/* Editor-only: give empty columns (structural and reader-panel) measurable geometry so they are
+   droppable in the live canvas. The data-builder-column-index marker is emitted only in edit mode,
+   so this never reaches public output. Invisible target — the drag guide supplies the visible
+   affordance, matching the page-end drop zone above. */
+.pb-column[data-builder-column-index]:empty,
+.pb-builder-panel-column[data-builder-column-index]:empty {
+  min-height: 40px;
+}
+
 .pb-module {
   margin-bottom: var(--pb-module-gap, 16px);
 }

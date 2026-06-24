@@ -148,6 +148,46 @@ describe('resolveLiveDropPlacement', () => {
     ).toBeNull();
   });
 
+  it('treats an empty column as droppable only once it has real geometry (the editor min-height affordance)', () => {
+    const page = buildPage();
+    const target = {
+      kind: 'column',
+      key: 'column:section-2:0',
+      pageId: page.id,
+      sectionId: 'section-2',
+      columnIndex: 0,
+    };
+
+    // A collapsed (zero-height) empty column does not contain the pointer, so it is not a drop
+    // candidate; on a populated page that resolves to null rather than a silent page-end fallback.
+    expect(
+      resolveLiveDropPlacement({
+        page,
+        targets: [geometry(target, { top: 200, bottom: 200, height: 0 })],
+        point: { x: 80, y: 220 },
+        dragState: { source: 'block', moduleType: 'image' },
+      })
+    ).toBeNull();
+
+    // With the editor min-height affordance the same empty column has a small but real rect and
+    // resolves to an empty-column insertion.
+    expect(
+      resolveLiveDropPlacement({
+        page,
+        targets: [geometry(target, { top: 200, bottom: 240, height: 40 })],
+        point: { x: 80, y: 220 },
+        dragState: { source: 'block', moduleType: 'image' },
+      })
+    ).toEqual(
+      expect.objectContaining({
+        placement: LIVE_DROP_PLACEMENTS.EMPTY_COLUMN,
+        sectionId: 'section-2',
+        columnIndex: 0,
+        insertIndex: 0,
+      })
+    );
+  });
+
   it('falls back to page-end placement for empty pages', () => {
     const placement = resolveLiveDropPlacement({
       page: buildPage({ sections: [] }),
