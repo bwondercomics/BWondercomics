@@ -861,6 +861,38 @@ function getPanelModuleColumnIndex(item, side) {
   return 0;
 }
 
+// Editor-only panel column wrapper. Shared by the non-empty stack and the empty-panel drop
+// affordance so both emit the same section/column markers the bridge already collects. When
+// `modulesHtml` is empty the inner column is `:empty`, which the editor min-height rule targets to
+// give the empty panel measurable drop geometry.
+function renderPanelColumnWrapper({
+  sectionId,
+  sectionIndex,
+  layout,
+  columnIndex,
+  modulesHtml = '',
+}) {
+  const sectionAttrs = builderMarkerAttrs(
+    {
+      'data-builder-section-id': sectionId,
+      'data-builder-section-index': sectionIndex,
+      'data-builder-layout': layout,
+    },
+    true
+  );
+  const columnAttrs = builderMarkerAttrs(
+    {
+      'data-builder-column-index': columnIndex,
+    },
+    true
+  );
+  return `
+        <div class="pb-builder-panel-section"${sectionAttrs}>
+          <div class="pb-builder-panel-column"${columnAttrs}>${modulesHtml}</div>
+        </div>
+      `;
+}
+
 function renderPanelBuilderEditingStack(side, modules, options = {}) {
   const groups = new Map();
   modules.forEach((item) => {
@@ -880,31 +912,19 @@ function renderPanelBuilderEditingStack(side, modules, options = {}) {
   });
 
   return Array.from(groups.values())
-    .map(({ section, sectionIndex, columnIndex, modules: groupModules }) => {
-      const layout = String(section.layout || '1');
-      const sectionAttrs = builderMarkerAttrs(
-        {
-          'data-builder-section-id': section.id,
-          'data-builder-section-index': sectionIndex,
-          'data-builder-layout': layout,
-        },
-        true
-      );
-      const columnAttrs = builderMarkerAttrs(
-        {
-          'data-builder-column-index': columnIndex,
-        },
-        true
-      );
-      const modulesHtml = groupModules
-        .map((module) => renderModule(module, { builderEditing: true, deviceId: options.deviceId }))
-        .join('');
-      return `
-        <div class="pb-builder-panel-section"${sectionAttrs}>
-          <div class="pb-builder-panel-column"${columnAttrs}>${modulesHtml}</div>
-        </div>
-      `;
-    })
+    .map(({ section, sectionIndex, columnIndex, modules: groupModules }) =>
+      renderPanelColumnWrapper({
+        sectionId: section.id,
+        sectionIndex,
+        layout: String(section.layout || '1'),
+        columnIndex,
+        modulesHtml: groupModules
+          .map((module) =>
+            renderModule(module, { builderEditing: true, deviceId: options.deviceId })
+          )
+          .join(''),
+      })
+    )
     .join('');
 }
 
@@ -1021,6 +1041,10 @@ export function applyBuilderPageToDOM(page, options = {}) {
       ? [[readerSectionIndex, page.sections[readerSectionIndex]]]
       : Array.from(page.sections.entries());
 
+  // Left/right panel ownership resolves identically in edit and public mode so a panel that looks
+  // right in the editor renders the same way when published. Left is column 0; the right panel
+  // exists only once the section has 2+ columns and owns exactly the last column. A dropped module
+  // lands at exactly leftIndex/rightIndex, so it stays in the same panel across both modes.
   const findPanelModules = (side) => {
     const results = [];
     for (const [sectionIndex, section] of panelSections) {
@@ -1032,11 +1056,7 @@ export function applyBuilderPageToDOM(page, options = {}) {
         if (!PANEL_MODULE_TYPES.has(mod.moduleType)) continue;
         if (side === 'left' && mod.columnIndex === leftIndex) {
           results.push({ module: mod, section, sectionIndex });
-        } else if (
-          side === 'right' &&
-          (builderEditing ? Number(mod.columnIndex || 0) > leftIndex : colCount > 1) &&
-          (builderEditing || mod.columnIndex === rightIndex)
-        ) {
+        } else if (side === 'right' && colCount > 1 && mod.columnIndex === rightIndex) {
           results.push({ module: mod, section, sectionIndex });
         }
       }
@@ -1047,15 +1067,36 @@ export function applyBuilderPageToDOM(page, options = {}) {
   // Apply left/right panel content based on columns
   const leftModules = findPanelModules('left');
   const rightModules = findPanelModules('right');
+
+  // Reader-owned panels resolve drops to the reader section's structural columns. Use the stable
+  // structural layout (not the device/effective layout) so a mobile reflow that visually collapses
+  // columns does not disable a panel. The right panel is droppable only once the section has 2+
+  // columns, which keeps the right-panel-disabled invariant identical to findPanelModules above.
+  const readerPanelSection = readerSectionIndex >= 0 ? page.sections[readerSectionIndex] : null;
+  const readerPanelLayout = String(readerPanelSection?.layout || '1');
+  const readerPanelColCount = readerPanelLayout.split('-').filter(Boolean).length;
+  const buildPanelColumn = (side) =>
+    readerPanelSection
+      ? {
+          sectionId: readerPanelSection.id,
+          sectionIndex: readerSectionIndex,
+          layout: readerPanelLayout,
+          columnIndex: side === 'left' ? 0 : readerPanelColCount - 1,
+          droppable: side === 'left' ? true : readerPanelColCount > 1,
+        }
+      : null;
+
   renderPanelStack('left', leftModules, panelSpacing, panelBackgrounds, {
     previewMode: !!options.previewMode,
     builderEditing,
     deviceId,
+    panelColumn: buildPanelColumn('left'),
   });
   renderPanelStack('right', rightModules, panelSpacing, panelBackgrounds, {
     previewMode: !!options.previewMode,
     builderEditing,
     deviceId,
+    panelColumn: buildPanelColumn('right'),
   });
 
   // Check panel visibility from section settings (reader-owned: only the reader
@@ -1148,6 +1189,20 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
   modules.sort((a, b) => (a.module.sortIndex || 0) - (b.module.sortIndex || 0));
 
   if (isEmptyPanel) {
+    // In edit mode, render an empty droppable column marker for reader-owned panels so the panel
+    // resolves to the reader section's structural column via the existing column target path. The
+    // right panel is only droppable once the section has 2+ columns (`panelColumn.droppable`), which
+    // enforces the right-panel-disabled-until-2-columns invariant at the source.
+    const panelColumn = options.panelColumn;
+    if (builderEditing && panelColumn?.droppable) {
+      container.innerHTML = renderPanelColumnWrapper({
+        sectionId: panelColumn.sectionId,
+        sectionIndex: panelColumn.sectionIndex,
+        layout: panelColumn.layout,
+        columnIndex: panelColumn.columnIndex,
+      });
+      return;
+    }
     const hideEmptyText = !!panelBackgrounds?.[side]?.hideEmptyText;
     container.innerHTML = hideEmptyText ? '' : '<div class="pb-page-empty">No panel modules.</div>';
     return;

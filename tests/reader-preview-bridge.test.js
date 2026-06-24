@@ -231,6 +231,51 @@ describe('reader preview bridge', () => {
     });
   });
 
+  it('collects an empty reader-panel column as a column drop target', async () => {
+    setPreviewUrl();
+    // The renderer emits this markup for an empty droppable panel: a section-id wrapper around an
+    // empty column marker, living inside #leftPanel (outside the main section flow). It must still
+    // be collected and measured through the existing [data-builder-column-index] path.
+    document.body.innerHTML = `
+      <div class="viewerWrap" data-builder-page-id="page-1">
+        <aside id="leftPanel">
+          <div class="panel-builder panel-builder--left" data-builder-surface="left-panel">
+            <div class="pb-builder-panel-section" data-builder-section-id="reader-section" data-builder-section-index="0" data-builder-layout="1-1">
+              <div class="pb-builder-panel-column" data-builder-column-index="0"></div>
+            </div>
+          </div>
+        </aside>
+      </div>
+    `;
+    const rects = new Map([
+      ['.viewerWrap', { top: 0, left: 0, right: 800, bottom: 600, width: 800, height: 600 }],
+      [
+        '.pb-builder-panel-section',
+        { top: 80, left: 0, right: 240, bottom: 200, width: 240, height: 120 },
+      ],
+      [
+        '.pb-builder-panel-column',
+        { top: 90, left: 10, right: 230, bottom: 130, width: 220, height: 40 },
+      ],
+    ]);
+    rects.forEach((rect, selector) => {
+      document.querySelector(selector).getBoundingClientRect = () => rect;
+    });
+
+    const { collectPreviewTargets } = await import('../reader/preview-bridge.js');
+    const targets = collectPreviewTargets(buildSnapshot({ options: { builderEditing: true } }));
+
+    const columnTarget = targets.find((item) => item.target.key === 'column:reader-section:0');
+    // Fails if the empty panel column is not collected/measured (the dual-selector-list pitfall).
+    expect(columnTarget).toBeDefined();
+    expect(columnTarget).toMatchObject({
+      target: { kind: 'column', sectionId: 'reader-section', columnIndex: 0 },
+      rect: { top: 90, left: 10, width: 220, height: 40 },
+      visible: true,
+      label: 'Column 1',
+    });
+  });
+
   it('emits hover/select target messages and blocks iframe interactions while editing', async () => {
     setPreviewUrl();
     vi.stubGlobal('requestAnimationFrame', (callback) => {

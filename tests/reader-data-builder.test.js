@@ -972,6 +972,152 @@ describe('reader builder presentation loading', () => {
     );
   });
 
+  it('renders droppable empty-column markers for empty reader panels in edit mode', () => {
+    const builderPage = buildPanelSnapshot();
+    builderPage.sections[0].modules = builderPage.sections[0].modules.filter(
+      (mod) => mod.moduleType === 'reader'
+    );
+
+    applyBuilderPageToDOM(builderPage, {
+      seriesId: 'battle-bros',
+      previewMode: true,
+      builderEditing: true,
+    });
+
+    const leftColumn = document.querySelector(
+      '#leftPanel .pb-builder-panel-column[data-builder-column-index="0"]'
+    );
+    const rightColumn = document.querySelector(
+      '#rightPanel .pb-builder-panel-column[data-builder-column-index="1"]'
+    );
+    // Both panels emit an empty, reader-section-attributed column so the bridge's existing column
+    // collection resolves them as drop targets without a new section.
+    expect(leftColumn).not.toBeNull();
+    expect(leftColumn?.children.length).toBe(0);
+    expect(leftColumn?.closest('.pb-builder-panel-section')?.dataset.builderSectionId).toBe(
+      'panel-row'
+    );
+    expect(rightColumn).not.toBeNull();
+    expect(rightColumn?.children.length).toBe(0);
+  });
+
+  it('does not emit a droppable right-panel column for a single-column reader section', () => {
+    const builderPage = buildPanelSnapshot();
+    builderPage.sections[0].layout = '1';
+    builderPage.sections[0].modules = builderPage.sections[0].modules.filter(
+      (mod) => mod.moduleType === 'reader'
+    );
+
+    applyBuilderPageToDOM(builderPage, {
+      seriesId: 'battle-bros',
+      previewMode: true,
+      builderEditing: true,
+    });
+
+    // Left stays droppable; the right panel has no column target until the section has 2+ columns,
+    // so a right-panel drop is rejected at the source with no implicit layout change.
+    expect(
+      document.querySelector('#leftPanel .pb-builder-panel-column[data-builder-column-index="0"]')
+    ).not.toBeNull();
+    expect(document.querySelector('#rightPanel .pb-builder-panel-column')).toBeNull();
+  });
+
+  it('keeps an empty right panel droppable on mobile reflow when global structure is 2+ columns', () => {
+    const builderPage = buildPanelSnapshot({
+      sectionSettings: { responsive: { mobile: { layout: '1' } } },
+    });
+    builderPage.sections[0].modules = builderPage.sections[0].modules.filter(
+      (mod) => mod.moduleType === 'reader'
+    );
+
+    applyBuilderPageToDOM(builderPage, {
+      seriesId: 'battle-bros',
+      previewMode: true,
+      builderEditing: true,
+      deviceId: 'mobile',
+    });
+
+    // Gating uses the stable structural layout (1-1), not the collapsed mobile layout (1).
+    expect(
+      document.querySelector('#rightPanel .pb-builder-panel-column[data-builder-column-index="1"]')
+    ).not.toBeNull();
+  });
+
+  it('excludes middle-column modules from the right panel identically in edit and public mode', () => {
+    const buildThreeColumnPage = () => {
+      const page = buildPanelSnapshot();
+      const readerModule = page.sections[0].modules.find((mod) => mod.moduleType === 'reader');
+      page.sections[0].layout = '1-1-1';
+      page.sections[0].modules = [
+        readerModule,
+        {
+          id: 'middle-text',
+          moduleType: 'text',
+          columnIndex: 1,
+          sortIndex: 0,
+          config: { content: '<p>Middle</p>' },
+        },
+        {
+          id: 'far-right-text',
+          moduleType: 'text',
+          columnIndex: 2,
+          sortIndex: 0,
+          config: { content: '<p>Far right</p>' },
+        },
+      ];
+      return page;
+    };
+
+    // Edit mode: only the last column belongs to the right panel (the old fork wrongly pulled in
+    // any column > 0).
+    applyBuilderPageToDOM(buildThreeColumnPage(), {
+      seriesId: 'battle-bros',
+      previewMode: true,
+      builderEditing: true,
+    });
+    expect(
+      document.querySelector('#rightPanel [data-builder-module-id="far-right-text"]')
+    ).not.toBeNull();
+    expect(document.querySelector('#rightPanel [data-builder-module-id="middle-text"]')).toBeNull();
+
+    // Public mode resolves ownership the same way.
+    applyBuilderPageToDOM(buildThreeColumnPage(), { seriesId: 'battle-bros', previewMode: true });
+    expect(document.getElementById('rightPanel')?.textContent).toContain('Far right');
+    expect(document.getElementById('rightPanel')?.textContent || '').not.toContain('Middle');
+  });
+
+  it('clears droppable right-panel markers when the layout collapses or the render goes public', () => {
+    const builderPage = buildPanelSnapshot();
+    builderPage.sections[0].modules = builderPage.sections[0].modules.filter(
+      (mod) => mod.moduleType === 'reader'
+    );
+
+    applyBuilderPageToDOM(builderPage, {
+      seriesId: 'battle-bros',
+      previewMode: true,
+      builderEditing: true,
+    });
+    expect(
+      document.querySelector('#rightPanel .pb-builder-panel-column[data-builder-column-index="1"]')
+    ).not.toBeNull();
+
+    // Collapse the structural layout to one column: the stale right column marker is replaced.
+    builderPage.sections[0].layout = '1';
+    applyBuilderPageToDOM(builderPage, {
+      seriesId: 'battle-bros',
+      previewMode: true,
+      builderEditing: true,
+    });
+    expect(document.querySelector('#rightPanel [data-builder-column-index]')).toBeNull();
+
+    // Re-widen and go public: no editor-only markers survive in either panel.
+    builderPage.sections[0].layout = '1-1';
+    applyBuilderPageToDOM(builderPage, { seriesId: 'battle-bros', previewMode: true });
+    expect(document.querySelector('#rightPanel [data-builder-section-id]')).toBeNull();
+    expect(document.querySelector('#rightPanel [data-builder-column-index]')).toBeNull();
+    expect(document.querySelector('#leftPanel [data-builder-column-index]')).toBeNull();
+  });
+
   it('clears stale page theme variables before applying the next snapshot', () => {
     const themedPage = getContractFixture('builderPage');
     const defaultThemePage = getContractFixture('builderPage');
