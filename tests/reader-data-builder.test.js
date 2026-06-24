@@ -8,8 +8,10 @@ import {
   loadHomepageBuilderPage,
   loadPageConfigWithFallback,
   resolveBuilderPageReaderSeriesId,
+  PANEL_MODULE_TYPES,
 } from '../reader/data.js';
 import { resolvePageHeaderState } from '../admin/page-builder/header-config.js';
+import { getInsertableModuleDescriptors } from '../admin/page-builder/module-descriptors.js';
 import { buildContractFixture, getContractFixture } from './helpers/contracts.js';
 import { flushReaderUi, mountReaderDom, stubReaderGlobals } from './helpers/reader-fixture.js';
 
@@ -1116,6 +1118,52 @@ describe('reader builder presentation loading', () => {
     expect(document.querySelector('#rightPanel [data-builder-section-id]')).toBeNull();
     expect(document.querySelector('#rightPanel [data-builder-column-index]')).toBeNull();
     expect(document.querySelector('#leftPanel [data-builder-column-index]')).toBeNull();
+  });
+
+  it('renders a divider dropped into a reader panel in both edit and public mode', () => {
+    const buildDividerPanelPage = () => {
+      const page = buildPanelSnapshot();
+      const readerModule = page.sections[0].modules.find((mod) => mod.moduleType === 'reader');
+      page.sections[0].modules = [
+        readerModule,
+        {
+          id: 'left-panel-divider',
+          moduleType: 'divider',
+          columnIndex: 0,
+          sortIndex: 0,
+          config: {},
+        },
+      ];
+      return page;
+    };
+
+    // Edit mode: the divider is surfaced into the panel (it no longer falls outside the partition).
+    applyBuilderPageToDOM(buildDividerPanelPage(), {
+      seriesId: 'battle-bros',
+      previewMode: true,
+      builderEditing: true,
+    });
+    expect(
+      document.querySelector('#leftPanel [data-builder-module-id="left-panel-divider"]')
+    ).not.toBeNull();
+
+    // Public mode renders the same divider, so a dropped divider survives reload instead of
+    // vanishing.
+    applyBuilderPageToDOM(buildDividerPanelPage(), { seriesId: 'battle-bros', previewMode: true });
+    expect(document.querySelector('#leftPanel .pb-divider')).not.toBeNull();
+  });
+
+  it('keeps PANEL_MODULE_TYPES in sync with insertable section-column modules', () => {
+    // Anything droppable into a section column (the live-drop gate) but absent from the panel
+    // render set would persist on a panel drop and then vanish on render. Reader is intentionally
+    // excluded — it is the singleton reader shell module, not panel content.
+    const documentedExclusions = new Set(['reader']);
+    const missing = getInsertableModuleDescriptors()
+      .filter((descriptor) => descriptor.allowedParents.includes('section-column'))
+      .map((descriptor) => descriptor.type)
+      .filter((type) => !PANEL_MODULE_TYPES.has(type) && !documentedExclusions.has(type));
+
+    expect(missing).toEqual([]);
   });
 
   it('clears stale page theme variables before applying the next snapshot', () => {

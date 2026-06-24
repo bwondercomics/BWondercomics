@@ -557,6 +557,110 @@ describe('shared renderer parity', () => {
     expect(builderColumns[1]?.classList.contains('pb-column--hidden')).toBe(true);
   });
 
+  it('floors empty columns to the editor affordance height in builder editing, never in public', () => {
+    const page = {
+      id: 'page-empty-floor',
+      sections: [
+        {
+          id: 'section-empty-floor',
+          layout: '1-1',
+          settings: {
+            columns: [
+              { index: 0, minHeight: 0 },
+              { index: 1, minHeight: 100 },
+            ],
+          },
+          modules: [],
+        },
+      ],
+    };
+
+    // Builder editing: an empty column with authored min-height 0 is floored so it stays a visible
+    // drop target; a larger authored min-height is preserved (the floor never lowers it).
+    const builderWrapper = document.createElement('div');
+    builderWrapper.innerHTML = makeReaderRenderers().renderPage(page, { builderEditing: true });
+    const builderColumns = builderWrapper.querySelectorAll('.pb-column');
+    expect(builderColumns[0]?.getAttribute('style') || '').toContain('min-height: 40px');
+    expect(builderColumns[1]?.getAttribute('style') || '').toContain('min-height: 100px');
+
+    // Public path is unchanged: authored 0 stays 0, so the editor affordance never leaks into
+    // published output.
+    const publicWrapper = document.createElement('div');
+    publicWrapper.innerHTML = makeReaderRenderers().renderPage(page);
+    const publicColumns = publicWrapper.querySelectorAll('.pb-column');
+    expect(publicColumns[0]?.getAttribute('style') || '').toContain('min-height: 0px');
+  });
+
+  it('floors only empty columns in builder editing, leaving populated columns untouched', () => {
+    const page = {
+      id: 'page-nonempty-floor',
+      sections: [
+        {
+          id: 'section-nonempty-floor',
+          layout: '1-1',
+          settings: {
+            columns: [
+              { index: 0, minHeight: 0 },
+              { index: 1, minHeight: 0 },
+            ],
+          },
+          modules: [
+            {
+              id: 'm0',
+              moduleType: 'text',
+              columnIndex: 0,
+              sortIndex: 0,
+              config: { content: '<p>A</p>' },
+            },
+          ],
+        },
+      ],
+    };
+
+    const builderWrapper = document.createElement('div');
+    builderWrapper.innerHTML = makeReaderRenderers().renderPage(page, { builderEditing: true });
+    const builderColumns = builderWrapper.querySelectorAll('.pb-column');
+    // Column 0 has a module, so its authored min-height 0 is respected; the empty column 1 is
+    // floored to the affordance height.
+    expect(builderColumns[0]?.getAttribute('style') || '').toContain('min-height: 0px');
+    expect(builderColumns[1]?.getAttribute('style') || '').toContain('min-height: 40px');
+  });
+
+  it('floors an empty column whose responsive min-height resolves to 0 in builder device context', () => {
+    const page = {
+      id: 'page-resp-floor',
+      sections: [
+        {
+          id: 'section-resp-floor',
+          layout: '1-1',
+          settings: {
+            columns: [{ index: 0, minHeight: 200, responsive: { mobile: { minHeight: 0 } } }],
+          },
+          modules: [],
+        },
+      ],
+    };
+    const renderer = makeReaderRenderers();
+
+    // Desktop builder context keeps the authored 200 (already above the affordance).
+    const desktopWrapper = document.createElement('div');
+    desktopWrapper.innerHTML = renderer.renderPage(page, { builderEditing: true });
+    expect(desktopWrapper.querySelectorAll('.pb-column')[0]?.getAttribute('style') || '').toContain(
+      'min-height: 200px'
+    );
+
+    // Mobile builder context resolves the responsive override to 0, which the editor floor lifts
+    // back to the affordance height instead of collapsing the drop target.
+    const mobileWrapper = document.createElement('div');
+    mobileWrapper.innerHTML = renderer.renderPage(page, {
+      builderEditing: true,
+      deviceId: 'mobile',
+    });
+    expect(mobileWrapper.querySelectorAll('.pb-column')[0]?.getAttribute('style') || '').toContain(
+      'min-height: 40px'
+    );
+  });
+
   it('clamps out-of-range module columns into the last visible column', () => {
     const page = {
       id: 'page-clamp',

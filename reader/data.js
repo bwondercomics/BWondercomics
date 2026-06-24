@@ -74,6 +74,27 @@ const READER_CONTROL_STYLE_VARS = Object.freeze([
 
 const HEX_COLOR_WITHOUT_ALPHA_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
+// Module types eligible to render inside reader side panels. findPanelModules surfaces only these
+// from the reader section's columns; any other type dropped into a panel column would persist but
+// never render. Keep in sync with the insertable section-column module descriptors (see the
+// drift-guard test). 'reader' is intentionally excluded — it is the singleton reader shell module.
+export const PANEL_MODULE_TYPES = new Set([
+  'text',
+  'image',
+  'html',
+  'social',
+  'email-signup',
+  'buttons',
+  'spacer',
+  'divider',
+  'promo',
+  'feed',
+  'entry-gallery',
+  'media-gallery',
+  'gallery',
+  'video',
+]);
+
 function resolveHeaderPageForDevice(page, { builderEditing = false, deviceId = '' } = {}) {
   if (!builderEditing || !deviceId) return page;
   const responsiveHeader = page?.meta?.responsive?.[deviceId]?.header;
@@ -1017,22 +1038,6 @@ export function applyBuilderPageToDOM(page, options = {}) {
 
   const panelSpacing = page?.meta?.panelSpacing || {};
   const panelBackgrounds = page?.meta?.panelBackgrounds || {};
-
-  const PANEL_MODULE_TYPES = new Set([
-    'text',
-    'image',
-    'html',
-    'social',
-    'email-signup',
-    'buttons',
-    'spacer',
-    'promo',
-    'feed',
-    'entry-gallery',
-    'media-gallery',
-    'gallery',
-    'video',
-  ]);
 
   // Panels are reader-owned: only the reader module's own section feeds them, so
   // above/below-reader sections stay page content rather than being pulled into panels.

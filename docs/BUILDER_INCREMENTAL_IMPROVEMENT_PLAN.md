@@ -240,6 +240,31 @@ For a **single-column** reader section, there is no real right-hand column (`lef
   empty columns and panels as separate commits so either can roll back alone. Rollback: revert the
   affordance/bridge changes; columns/panels return to current behavior.
 
+### Completed 2026-06-24
+
+- Empty structural columns are droppable: the shared renderer floors an empty column to an
+  editor-only min-height in builder-editing mode (`buildColumnInlineStyle` + `minHeightFloor` /
+  `EDITOR_EMPTY_COLUMN_MIN_HEIGHT` in `admin/page-builder/shared-renderers.js`), producing visible
+  drop geometry. Because it is emitted inline it also overrides an authored/responsive
+  `min-height: 0`. Public output is unchanged.
+- Empty reader panels are droppable by rendering the existing `.pb-builder-panel-column` markers for
+  empty panels in edit mode and resolving the drop through the existing column-target path — no new
+  bridge surface and no new section. The right panel is droppable only once the reader section has
+  2+ columns, gated on the stable `section.layout` (not the device layout).
+- Left/right panel ownership in `findPanelModules` resolves identically in edit and public mode, so a
+  panel composed in the editor renders the same way when published.
+- Panel render eligibility is aligned with the live-drop gate: `divider` now renders in panels (a
+  dropped divider no longer persists then disappears), guarded by a drift-guard test that fails if a
+  future insertable section-column module is omitted from `PANEL_MODULE_TYPES` (only `reader` is
+  intentionally excluded).
+- Shipped on `builder-incremental-improvement` as commits `90b1aef` (empty columns) and `3b6fb95`
+  (panels + ownership), plus follow-up changes in the same branch addressing the
+  divider-eligibility and authored-`min-height: 0` review findings.
+- Verified with `npm run format:check`, `npm run lint`, `npm test` (584 passed, 1 skipped),
+  `npm run build`, and `npm run test:visual` (19 passed). `npm run test:backend` not run — no backend
+  changes.
+- Manual Pyre reader-page QA (verification step 6): **PENDING — not yet performed.**
+
 ---
 
 ## How we verify

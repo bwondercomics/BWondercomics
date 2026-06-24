@@ -48,6 +48,11 @@ import {
   sanitizeVideoUrl,
 } from './sanitize.js';
 
+// Minimum height (px) given to an empty column in builder-editing mode so it stays a visible drop
+// target even when an authored/responsive min-height is 0. Mirrored by the panel-column affordance
+// fallback in assets/css/main.core.18-page-builder.css.
+const EDITOR_EMPTY_COLUMN_MIN_HEIGHT = 40;
+
 export function createRenderers({
   resolveImageUrl = /** @type {function(string): string} */ ((path) => path),
   getSeriesId = /** @type {function(): string} */ (() => ''),
@@ -478,7 +483,7 @@ export function createRenderers({
     return `<div class="pb-module pb-module--${safeType}${hiddenClass}"${moduleIdAttr}${markerAttrs}>${content}</div>`;
   }
 
-  function buildColumnInlineStyle(colSettings) {
+  function buildColumnInlineStyle(colSettings, { minHeightFloor = 0 } = {}) {
     const tokens = [];
     const appearanceStyle = appearanceToInlineStyle(colSettings?.appearance);
     if (appearanceStyle) tokens.push(appearanceStyle);
@@ -494,8 +499,17 @@ export function createRenderers({
     if (alignment && alignment !== 'stretch') {
       tokens.push(`justify-self: ${alignmentToJustifySelf(alignment)}`);
     }
-    if (colSettings?.minHeight !== undefined && colSettings?.minHeight !== null) {
-      tokens.push(`min-height: ${sanitizeNumber(colSettings.minHeight, 0, 0, 2000)}px`);
+    const authoredMinHeight =
+      colSettings?.minHeight !== undefined && colSettings?.minHeight !== null
+        ? sanitizeNumber(colSettings.minHeight, 0, 0, 2000)
+        : null;
+    // In builder-editing mode an empty column is floored to the editor affordance height so it
+    // stays a visible drop target even when an authored/responsive min-height is 0. The floor is
+    // applied after the authored value resolves and never lowers a larger authored min-height.
+    const effectiveMinHeight =
+      minHeightFloor > 0 ? Math.max(authoredMinHeight ?? 0, minHeightFloor) : authoredMinHeight;
+    if (effectiveMinHeight !== null) {
+      tokens.push(`min-height: ${effectiveMinHeight}px`);
     }
     return tokens.join('; ');
   }
@@ -546,7 +560,10 @@ export function createRenderers({
         .map((mod) => renderModule(mod, { ...renderOptions, builderEditing: emitMarkers }))
         .join('');
       const colSettings = effectiveLayout.columns[colIdx]?.settings || {};
-      const columnStyle = buildColumnInlineStyle(colSettings);
+      const isEmptyColumn = columnModules[colIdx].length === 0;
+      const columnStyle = buildColumnInlineStyle(colSettings, {
+        minHeightFloor: emitMarkers && isEmptyColumn ? EDITOR_EMPTY_COLUMN_MIN_HEIGHT : 0,
+      });
       const hidden = colSettings?.hidden === true;
       const hiddenClass = hidden ? ' pb-column--hidden' : '';
       const columnMarkerAttrs = builderMarkerAttrs(
