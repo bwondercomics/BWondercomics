@@ -20,7 +20,7 @@
   position: sticky;
   top: 0;
   z-index: 2;
-  padding: 14px 18px 10px;
+  padding: 12px 14px 9px;
   background:
     linear-gradient(180deg, rgba(10, 10, 18, 0.98), rgba(10, 10, 18, 0.9)),
     radial-gradient(circle at top right, rgba(0, 217, 255, 0.16), transparent 52%);
@@ -32,7 +32,7 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .pb-editor-heading-line {
@@ -56,7 +56,7 @@
 
 .pb-editor-title {
   margin: 0;
-  font-size: 1.12rem;
+  font-size: 1rem;
   color: #fff;
   letter-spacing: 0.01em;
   min-width: 0;
@@ -65,15 +65,15 @@
 .pb-editor-subtitle {
   margin: 0;
   color: rgba(255, 255, 255, 0.66);
-  font-size: 0.84rem;
+  font-size: 0.78rem;
   line-height: 1.35;
 }
 
 .pb-editor-tabs {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 6px;
-  padding: 4px;
+  gap: 4px;
+  padding: 3px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 999px;
@@ -85,14 +85,14 @@
 
 .pb-editor-tab {
   min-width: 0;
-  padding: 9px 12px;
+  padding: 7px 8px;
   background: transparent;
   border: 0;
   border-radius: 999px;
   color: rgba(255, 255, 255, 0.74);
   cursor: pointer;
   transition: all 0.15s ease;
-  font-size: 0.84rem;
+  font-size: var(--pb-inspector-font);
   font-weight: 600;
   letter-spacing: 0.02em;
 }
@@ -116,14 +116,14 @@
 .pb-editor-content {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
   overscroll-behavior: contain;
   scroll-padding-bottom: 96px;
-  padding: 16px 18px 96px;
+  padding: 12px 14px 84px;
 }
 
 .pb-editor-footer {
@@ -133,18 +133,18 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
-  padding: 14px 18px 18px;
+  padding: 10px 14px 12px;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   background: linear-gradient(180deg, rgba(11, 13, 24, 0.88), rgba(11, 13, 24, 0.98));
   backdrop-filter: blur(18px);
 }
 
 .pb-editor-footer-status {
-  flex: 1 1 220px;
+  flex: 1 1 118px;
   min-width: 0;
-  font-size: 0.82rem;
+  font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.62);
 }
 
@@ -162,14 +162,14 @@
 
 .pb-editor-footer-actions {
   display: flex;
-  gap: 10px;
+  gap: 6px;
   flex-wrap: wrap;
   margin-left: auto;
 }
 
 .pb-editor-footer .btn-primary,
 .pb-editor-footer .btn-secondary {
-  min-width: 120px;
+  min-width: 0;
 }
 
 .pb-editor-empty {
@@ -177,22 +177,22 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 300px;
+  min-height: 240px;
   color: rgba(255, 255, 255, 0.6);
   text-align: center;
-  padding: 20px;
+  padding: 14px;
 }
 
 .pb-editor-source-notice {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 12px 14px;
-  border-radius: 12px;
+  padding: 9px 10px;
+  border-radius: var(--pb-card-radius);
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.04);
   color: rgba(255, 255, 255, 0.78);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
 }
 
 .pb-editor-source-notice[data-status='warning'] {
@@ -209,7 +209,7 @@
 .pb-editor-empty-card,
 .pb-editor-section-card {
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 14px;
+  border-radius: var(--pb-card-radius);
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
     rgba(8, 11, 19, 0.68);
@@ -218,24 +218,24 @@
 
 .pb-editor-empty-card {
   max-width: 320px;
-  padding: 22px 20px;
+  padding: 16px 14px;
 }
 
 .pb-editor-empty-card h4 {
-  margin: 8px 0 10px;
+  margin: 6px 0 8px;
   color: #fff;
-  font-size: 1rem;
+  font-size: 0.92rem;
 }
 
 .pb-editor-empty-card p {
   margin: 0;
   line-height: 1.5;
   color: rgba(255, 255, 255, 0.66);
-  font-size: 0.88rem;
+  font-size: 0.8rem;
 }
 
 .pb-editor-section-card {
-  padding: 16px;
+  padding: 12px;
 }
 
 .pb-inspector-section {
@@ -247,8 +247,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: 8px;
+  padding: 10px 12px;
   cursor: pointer;
   list-style: none;
   color: inherit;
@@ -264,12 +264,12 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: rgba(255, 255, 255, 0.72);
-  font-size: 0.9rem;
+  font-size: 0.78rem;
   line-height: 1;
 }
 
@@ -299,16 +299,16 @@
 }
 
 .pb-inspector-section-body {
-  padding: 0 16px 16px;
+  padding: 0 12px 12px;
   overflow: visible;
 }
 
 .pb-inspector-section-body > .pb-editor-section-copy:first-child {
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .pb-editor-section-card--summary {
-  padding: 14px 16px;
+  padding: 10px 12px;
   background:
     linear-gradient(135deg, rgba(0, 217, 255, 0.12), rgba(255, 237, 0, 0.08)), rgba(8, 11, 19, 0.72);
 }
@@ -316,7 +316,7 @@
 .pb-editor-stack {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
 }
 
 .pb-editor-section-head,
@@ -324,15 +324,15 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .pb-editor-section-title,
 .pb-editor-subcard-title {
-  margin: 4px 0 0;
-  font-size: 0.98rem;
+  margin: 2px 0 0;
+  font-size: 0.88rem;
   color: #fff;
 }
 
@@ -342,34 +342,34 @@
   margin: 0;
   max-width: 280px;
   color: rgba(255, 255, 255, 0.62);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   line-height: 1.45;
 }
 
 .pb-editor-actions {
   display: flex;
   justify-content: flex-end;
-  margin-top: 12px;
+  margin-top: 8px;
 }
 
 .pb-header-layout-grid {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   /* Lets the region grid respond to the inspector's real width rather than the
      viewport, so it stays single-column in the ~280px rail. */
   container-type: inline-size;
 }
 
 .pb-header-layout-row {
-  padding: 10px 8px;
+  padding: 8px 7px;
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 12px;
+  border-radius: var(--pb-card-radius);
   background: rgba(255, 255, 255, 0.02);
 }
 
 .pb-header-layout-row-title {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   font-size: 0.74rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -382,7 +382,7 @@
   /* Single column at rail width so each card gets the full row; only split into
      columns once the inspector is genuinely wide enough to hold them. */
   grid-template-columns: minmax(0, 1fr);
-  gap: 10px;
+  gap: 8px;
 }
 
 @container (min-width: 520px) {
@@ -393,9 +393,9 @@
 
 .pb-header-region {
   min-height: 160px;
-  padding: 12px;
+  padding: 9px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
+  border-radius: var(--pb-card-radius);
   background: rgba(255, 255, 255, 0.03);
 }
 
@@ -409,7 +409,7 @@
 }
 
 .pb-header-region-title {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   font-size: 0.72rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -417,8 +417,8 @@
 }
 
 .pb-header-block {
-  padding: 10px 12px;
-  border-radius: 10px;
+  padding: 8px 9px;
+  border-radius: var(--pb-card-radius);
   border: 1px solid rgba(0, 217, 255, 0.22);
   background: rgba(0, 217, 255, 0.08);
   cursor: grab;
@@ -436,9 +436,9 @@
 
 .pb-header-drop-zone {
   margin-bottom: 8px;
-  padding: 8px;
+  padding: 7px;
   border: 1px dashed rgba(255, 255, 255, 0.18);
-  border-radius: 10px;
+  border-radius: var(--pb-card-radius);
   color: rgba(255, 255, 255, 0.42);
   font-size: 0.78rem;
   text-align: center;
@@ -462,7 +462,7 @@
   gap: var(--pb-row-gap);
   padding: var(--pb-control-pad-y) var(--pb-control-pad-x);
   border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: 10px;
+  border-radius: var(--pb-card-radius);
   background: rgba(255, 255, 255, 0.02);
   cursor: pointer;
 }
@@ -497,15 +497,15 @@
 .pb-header-layout-card {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-  border-radius: 10px;
+  gap: 7px;
+  padding: 8px;
+  border-radius: var(--pb-card-radius);
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
 }
 
 .pb-header-layout-card + .pb-header-layout-card {
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 .pb-header-layout-card.is-disabled {
@@ -517,7 +517,7 @@
 .pb-header-layout-card-head {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .pb-header-layout-card-label {
@@ -537,7 +537,7 @@
 /* Line 2: four compact icon move buttons on one row. */
 .pb-header-layout-actions {
   display: flex;
-  gap: 6px;
+  gap: 5px;
 }
 
 .pb-header-layout-card-drag-handle {
@@ -574,9 +574,9 @@
 }
 
 .pb-header-region-empty {
-  padding: 12px;
+  padding: 9px;
   border: 1px dashed rgba(255, 255, 255, 0.14);
-  border-radius: 10px;
+  border-radius: var(--pb-card-radius);
   text-align: center;
   transition:
     border-color 0.12s ease,
@@ -592,13 +592,13 @@
 .pb-editor-summary {
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
 }
 
 .pb-editor-summary-badge {
   flex-shrink: 0;
-  padding: 6px 10px;
+  padding: 4px 8px;
   border-radius: 999px;
   background: rgba(0, 217, 255, 0.16);
   border: 1px solid rgba(0, 217, 255, 0.26);
@@ -614,27 +614,27 @@
 }
 
 .pb-editor-summary-title {
-  margin: 0 0 4px;
-  font-size: 0.98rem;
+  margin: 0 0 3px;
+  font-size: 0.9rem;
   color: #fff;
 }
 
 .pb-editor-summary-copy {
   margin: 0;
   color: rgba(255, 255, 255, 0.66);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
   line-height: 1.45;
 }
 
 .pb-editor-subgrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
 }
 
 .pb-editor-subcard {
-  padding: 14px;
-  border-radius: 12px;
+  padding: 10px;
+  border-radius: var(--pb-card-radius);
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.02);
 }
@@ -643,28 +643,79 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .pb-editor-inline-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
   width: 100%;
 }
 
 .pb-editor-inline-actions > .pb-editor-input {
-  flex: 1 1 180px;
+  flex: 1 1 100%;
   min-width: 0;
+}
+
+.pb-editor-inline-actions > .pb-panel-bg-path {
+  padding-inline: 6px;
+  font-size: 0.68rem;
+}
+
+.pb-editor-content .pb-theme-preset-grid {
+  gap: 6px;
+}
+
+.pb-editor-content .pb-theme-preset-btn {
+  padding: 8px 9px;
+  border-radius: var(--pb-card-radius);
+  font-size: var(--pb-inspector-font);
+}
+
+.pb-editor-content .pb-theme-preset-btn:hover {
+  transform: none;
+  box-shadow: 0 8px 16px rgba(0, 217, 255, 0.12);
+}
+
+.pb-editor-content .pb-theme-colors {
+  gap: 8px;
+}
+
+.pb-editor-content .pb-theme-color-row {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 5px;
+}
+
+.pb-editor-content .pb-theme-color-label {
+  min-width: 0;
+  font-size: var(--pb-inspector-font);
+}
+
+.pb-editor-content .pb-theme-color-inputs {
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 6px;
+}
+
+.pb-editor-content .pb-theme-color-picker {
+  width: 40px;
+  height: 28px;
+  border-radius: var(--pb-control-radius);
+}
+
+.pb-editor-content .pb-theme-color-text {
+  min-width: 0;
+  padding: var(--pb-control-pad-y) 6px;
+  font-size: 0.72rem;
 }
 
 .pb-editor-accordion,
 .pb-promo-style-accordion {
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
+  border-radius: var(--pb-card-radius);
   background: rgba(255, 255, 255, 0.03);
   overflow: hidden;
 }
@@ -672,10 +723,10 @@
 .pb-editor-accordion-toggle,
 .pb-promo-style-toggle {
   display: block;
-  padding: 12px 14px;
+  padding: 8px 10px;
   cursor: pointer;
   list-style: none;
-  font-size: 0.84rem;
+  font-size: var(--pb-inspector-font);
   font-weight: 600;
   color: rgba(255, 255, 255, 0.76);
   background: rgba(255, 255, 255, 0.04);
@@ -688,29 +739,29 @@
 
 .pb-editor-accordion-content,
 .pb-promo-style-content {
-  padding: 14px;
+  padding: 10px;
   background: rgba(0, 0, 0, 0.18);
 }
 
 /* Per-column styling editor (section Columns inspector). */
 .pb-column-editor-list {
   display: grid;
-  gap: 12px;
-  margin-top: 10px;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .pb-column-editor {
-  padding: 12px;
+  padding: 9px;
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  border-radius: var(--pb-card-radius);
   background: rgba(255, 255, 255, 0.03);
 }
 
 .pb-column-editor-title {
-  font-size: 0.82rem;
+  font-size: var(--pb-inspector-font);
   font-weight: 700;
   color: rgba(255, 255, 255, 0.82);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .pb-column-padding-grid {

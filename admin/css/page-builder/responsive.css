@@ -35,10 +35,6 @@
   .page-builder-layout[data-viewport-band='stacked'] .page-builder-sidebar {
     max-height: none;
   }
-
-  .pb-module-palette {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 720px) {
@@ -64,10 +60,6 @@
     left: 14px;
     right: auto;
     transform: none;
-  }
-
-  .pb-module-palette {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .pb-editor-field--row {

@@ -1,6 +1,6 @@
 import { getInsertableModuleDescriptors } from './module-descriptors.js';
 import { BUILDER_STRUCTURAL_COMMANDS } from './structural-commands.js';
-import { escapeHtml } from './helpers.js';
+import { escapeAttr, escapeHtml } from './helpers.js';
 
 const INSERTABLE_MODULE_TYPES = getInsertableModuleDescriptors();
 
@@ -94,9 +94,11 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
           (page) => `
           <div class="pb-page-item ${currentPage?.id === page.id ? 'active' : ''}" data-page-id="${page.id}" draggable="true">
             <div class="pb-page-item-main">
-              <button type="button" class="pb-page-drag-handle" title="Move page" style="background:none;border:none;color:currentColor;cursor:grab;padding:0 8px 0 0;font-size:1.1rem;opacity:0.3;">\u22EE</button>
-              <span class="pb-page-item-title">${escapeHtml(helpers.getPageDisplayTitle(page))}</span>
-              <span class="pb-page-item-meta">${escapeHtml(page.slug || 'reader')} · ${escapeHtml(page.pageType || 'custom')} · ${escapeHtml(getPageScopeLabel(page))}</span>
+              <button type="button" class="pb-page-drag-handle" title="Move page" aria-label="Move page">\u22EE</button>
+              <span class="pb-page-item-copy">
+                <span class="pb-page-item-title" title="${escapeAttr(helpers.getPageDisplayTitle(page))}">${escapeHtml(helpers.getPageDisplayTitle(page))}</span>
+                <span class="pb-page-item-meta">${escapeHtml(page.slug || 'reader')} · ${escapeHtml(page.pageType || 'custom')} · ${escapeHtml(getPageScopeLabel(page))}</span>
+              </span>
             </div>
             <span class="pb-page-item-badges">${helpers.renderPageStatusBadges(page)}</span>
             <span class="pb-page-item-actions">
@@ -226,8 +228,8 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
                 .map(
                   (module) => `
                     <div class="pb-module-type" draggable="true" data-module-type="${module.type}">
-                      <span class="pb-module-type-icon">${module.icon}</span>
-                      <span class="pb-module-type-label">${escapeHtml(module.label)}</span>
+                      <span class="pb-module-type-icon" aria-hidden="true">${module.icon}</span>
+                      <span class="pb-module-type-label" title="${escapeAttr(module.label)}">${escapeHtml(module.label)}</span>
                     </div>
                   `
                 )

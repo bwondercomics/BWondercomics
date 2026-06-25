@@ -10,6 +10,8 @@
   --pb-control-pad-x: 8px;
   --pb-row-gap: 8px;
   --pb-icon-btn-size: 28px;
+  --pb-control-radius: 6px;
+  --pb-card-radius: 8px;
 }
 
 /* Visually-hidden text that stays in the accessibility tree (for state that is
@@ -35,8 +37,8 @@
 }
 
 .pb-style-group {
-  margin-bottom: 12px;
-  padding-bottom: 12px;
+  margin-bottom: 10px;
+  padding-bottom: 10px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.05);
 }
 
@@ -51,11 +53,11 @@
   text-transform: uppercase;
   letter-spacing: 0.1em;
   color: rgba(255, 255, 255, 0.52);
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .pb-editor-field {
-  margin-bottom: 14px;
+  margin-bottom: 10px;
 }
 
 .pb-editor-field:last-child {
@@ -64,9 +66,9 @@
 
 .pb-editor-label {
   display: block;
-  font-size: 0.8rem;
+  font-size: var(--pb-inspector-font);
   font-weight: 500;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
   color: rgba(255, 255, 255, 0.82);
 }
 
@@ -75,12 +77,12 @@
 .pb-editor-select {
   width: 100%;
   min-width: 0;
-  padding: 9px 10px;
+  padding: var(--pb-control-pad-y) var(--pb-control-pad-x);
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 8px;
+  border-radius: var(--pb-control-radius);
   color: var(--text);
-  font-size: 0.9rem;
+  font-size: var(--pb-inspector-font);
   font-family: inherit;
   box-sizing: border-box;
 }
@@ -94,42 +96,70 @@
 }
 
 .pb-editor-textarea {
-  min-height: 110px;
+  min-height: 92px;
   resize: vertical;
 }
 
 .pb-editor-textarea--code {
-  min-height: 220px;
+  min-height: 180px;
   font-family: monospace;
 }
 
 .pb-editor-field--row {
   display: flex;
   align-items: center;
-  gap: 10px 12px;
+  gap: var(--pb-row-gap);
   flex-wrap: wrap;
 }
 
 .pb-editor-field--row > .pb-editor-label:first-child {
   margin: 0;
-  flex: 1 1 150px;
+  flex: 1 1 96px;
 }
 
 .pb-editor-field--row label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 0.8rem;
+  font-size: var(--pb-inspector-font);
   color: rgba(255, 255, 255, 0.76);
   white-space: normal;
 }
 
+.pb-editor-checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  margin-bottom: 0;
+  line-height: 1.3;
+}
+
+.pb-editor-checkbox > input {
+  flex: 0 0 auto;
+}
+
+.pb-editor-checkbox > span {
+  min-width: 0;
+}
+
 .pb-editor-hint {
   display: block;
-  margin-top: 6px;
+  margin-top: 5px;
   font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.45);
   line-height: 1.4;
+}
+
+.pb-editor-help {
+  margin: 5px 0 0;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.74rem;
+  line-height: 1.35;
+}
+
+.pb-editor-help[data-status='warning'] {
+  color: #fff0a3;
 }
 
 .pb-promo-style-color {
@@ -162,13 +192,13 @@
 }
 
 .pb-editor-section-head--compact {
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .pb-appearance-card {
-  padding: 10px 12px;
+  padding: 8px 9px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
+  border-radius: var(--pb-card-radius);
   background: rgba(255, 255, 255, 0.02);
 }
 
@@ -259,16 +289,6 @@
 .pb-appearance-input:disabled {
   opacity: 0.45;
   cursor: not-allowed;
-}
-
-/* Density: tighten only the text/select/number appearance inputs. The compound selector outranks
-   the global .pb-editor-input/.pb-editor-select rule and deliberately EXCLUDES the color picker
-   (.pb-promo-style-color, padding:0, fixed 42px) and range (.pb-promo-style-range, height:4px),
-   whose fixed geometry must not receive control padding. */
-.pb-editor-input.pb-appearance-input,
-.pb-editor-select.pb-appearance-input {
-  padding: var(--pb-control-pad-y) var(--pb-control-pad-x);
-  font-size: var(--pb-inspector-font);
 }
 
 /* ---------- Reusable inspector components (Phase 0) ---------- */
@@ -391,4 +411,75 @@
 .pb-field-row > .pb-field-row-control {
   flex: 1 1 auto;
   min-width: 0;
+}
+
+.pb-editor-stack--compact {
+  gap: var(--pb-row-gap);
+}
+
+/* Builder-scoped compact buttons. Keep the original .btn-primary/.btn-secondary
+   classes in markup so existing responsive selectors keep matching. */
+.page-builder .pb-editor-content .btn-primary,
+.page-builder .pb-editor-content .btn-secondary,
+.page-builder .pb-editor-footer-actions .btn-primary,
+.page-builder .pb-editor-footer-actions .btn-secondary,
+.page-builder .pb-section-settings-buttons .btn-primary,
+.page-builder .pb-section-settings-buttons .btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  min-width: 0;
+  padding: var(--pb-control-pad-y) var(--pb-control-pad-x);
+  border-width: 1px;
+  border-radius: var(--pb-control-radius);
+  font-family: inherit;
+  font-size: var(--pb-inspector-font);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.2;
+  text-transform: none;
+  box-shadow: none;
+}
+
+.page-builder .pb-editor-content .btn-secondary,
+.page-builder .pb-editor-footer-actions .btn-secondary,
+.page-builder .pb-section-settings-buttons .btn-secondary {
+  color: rgba(255, 255, 255, 0.78);
+  border-color: rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.page-builder .pb-editor-content .btn-secondary:hover:not(:disabled),
+.page-builder .pb-editor-footer-actions .btn-secondary:hover:not(:disabled),
+.page-builder .pb-section-settings-buttons .btn-secondary:hover:not(:disabled) {
+  color: #fff;
+  border-color: rgba(0, 217, 255, 0.5);
+  background: rgba(0, 217, 255, 0.12);
+  box-shadow: none;
+}
+
+.page-builder .pb-editor-content .btn-primary,
+.page-builder .pb-editor-footer-actions .btn-primary,
+.page-builder .pb-section-settings-buttons .btn-primary {
+  color: var(--bg-dark);
+  border-color: rgba(0, 217, 255, 0.86);
+  background: rgba(0, 217, 255, 0.92);
+}
+
+.page-builder .pb-editor-content .btn-primary:hover:not(:disabled),
+.page-builder .pb-editor-footer-actions .btn-primary:hover:not(:disabled),
+.page-builder .pb-section-settings-buttons .btn-primary:hover:not(:disabled) {
+  background: rgba(126, 245, 227, 0.96);
+  box-shadow: none;
+}
+
+.page-builder .pb-editor-content .btn-primary:disabled,
+.page-builder .pb-editor-content .btn-secondary:disabled,
+.page-builder .pb-editor-footer-actions .btn-primary:disabled,
+.page-builder .pb-editor-footer-actions .btn-secondary:disabled,
+.page-builder .pb-section-settings-buttons .btn-primary:disabled,
+.page-builder .pb-section-settings-buttons .btn-secondary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }

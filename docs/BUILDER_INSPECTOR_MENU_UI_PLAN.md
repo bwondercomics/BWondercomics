@@ -474,6 +474,21 @@ and drag move, and checks the same source-removal and exactly-once invariants in
 59 Vitest files (548 passed, 1 skipped), all 19 Chromium Playwright tests without snapshot baseline
 changes, the production build, and `git diff --check`.
 
+**Whole-sidebar compactness follow-up 2026-06-25.** Extended the GrapesJS-aligned density pass from
+Placement into the whole admin authoring sidebar: Pages, Blocks, Layers, Settings, Styles, page
+settings, section settings, header settings, module settings, theme panel backgrounds, and sticky
+footer actions. Native `<input>`, `<select>`, and textarea controls remain native, but base
+`.pb-editor-*` controls now use the shared density tokens instead of the older full-size admin
+spacing. Builder-local `.form-*` page/section/header settings markup was replaced with
+`.pb-editor-*`, `.pb-editor-checkbox`, and `.pb-field-row` patterns while preserving IDs, `data-*`
+hooks, save/discard wiring, and responsive-scope select bindings. Footer and section action buttons
+keep `.btn-primary` / `.btn-secondary` so the existing ≤720px responsive stacking selectors continue
+to match; the compact sizing is applied through `.page-builder`-scoped overrides only. Blocks now use
+the live `.pb-block-group-grid` as compact icon-left draggable rows, preserving `draggable` and
+`data-module-type`, and stale no-op `.pb-module-palette` responsive grid overrides were removed. This
+follow-up did not touch backend/API/schema code, reader runtime CSS such as
+`assets/css/main.core.18-page-builder.css`, saved page/module/section data, or the preview contract.
+
 ### Phase 3 (Deferred / optional) — segmented-control conversions
 
 Converting existing controls to `.pb-seg` is valuable but changes element types that current tests

@@ -699,6 +699,80 @@ async function openHeaderPlacement(page) {
   await expect(page.locator('.pb-header-layout-card[data-block-id="brand"]')).toBeVisible();
 }
 
+async function openAllInspectorSections(page) {
+  await page.locator('.pb-inspector-section').evaluateAll((sections) => {
+    sections.forEach((section) => {
+      section.open = true;
+    });
+  });
+}
+
+async function assertNoHorizontalOverflow(page, selectors, label) {
+  const failures = await page.evaluate((selectorList) => {
+    const isVisible = (element) => {
+      const style = getComputedStyle(element);
+      return (
+        style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        element.getClientRects().length > 0 &&
+        element.clientWidth > 0
+      );
+    };
+
+    return selectorList.flatMap((selector) =>
+      Array.from(document.querySelectorAll(selector))
+        .filter(isVisible)
+        .map((element, index) => {
+          const overflow = element.scrollWidth - element.clientWidth;
+          if (overflow <= 1) return null;
+          const rect = element.getBoundingClientRect();
+          return {
+            selector,
+            index,
+            className: element.className,
+            text: element.textContent?.trim().slice(0, 80),
+            clientWidth: element.clientWidth,
+            scrollWidth: element.scrollWidth,
+            renderedWidth: Math.round(rect.width * 10) / 10,
+            overflow,
+          };
+        })
+        .filter(Boolean)
+    );
+  }, selectors);
+
+  expect(failures, `${label} should not overflow horizontally`).toEqual([]);
+}
+
+async function assertTruncates(page, selectors, label) {
+  const failures = await page.evaluate((selectorList) => {
+    return selectorList.flatMap((selector) =>
+      Array.from(document.querySelectorAll(selector))
+        .filter((element) => element.getClientRects().length > 0)
+        .map((element, index) => {
+          const style = getComputedStyle(element);
+          const ok =
+            style.overflow === 'hidden' &&
+            style.textOverflow === 'ellipsis' &&
+            style.whiteSpace === 'nowrap';
+          return ok
+            ? null
+            : {
+                selector,
+                index,
+                className: element.className,
+                overflow: style.overflow,
+                textOverflow: style.textOverflow,
+                whiteSpace: style.whiteSpace,
+              };
+        })
+        .filter(Boolean)
+    );
+  }, selectors);
+
+  expect(failures, `${label} should use ellipsis truncation`).toEqual([]);
+}
+
 test.describe('builder Phase 12 authoring workflows', () => {
   test('keeps Phase 2 header controls row-toggleable and dense below 720px', async ({ page }) => {
     const state = createWorkflowState();
@@ -1129,6 +1203,188 @@ test.describe('builder Phase 12 authoring workflows', () => {
     expect(drawer.cardsOk, 'cards must not overflow the drawer band').toBe(true);
     expect(drawer.rowsOk, 'rows must not overflow the drawer band').toBe(true);
     expect(drawer.buttonsOk, 'move buttons must not clip in the drawer band').toBe(true);
+  });
+
+  test('keeps the whole sidebar compact across panels and inspector surfaces', async ({ page }) => {
+    const state = createWorkflowState();
+    await prepareWorkflowPage(page, state);
+    await openBuilder(page);
+
+    const sidebarWideSelectors = [
+      '.pb-sidebar-tabs',
+      '.pb-sidebar-tab',
+      '#pbPageList',
+      '.pb-page-item',
+      '.pb-page-item-main',
+      '.pb-page-item-copy',
+      '.pb-page-item-title',
+      '.pb-page-item-meta',
+      '.pb-page-item-badges',
+      '.pb-page-item-actions',
+      '.pb-page-action',
+    ];
+    await assertNoHorizontalOverflow(page, sidebarWideSelectors, 'Pages rail');
+    await assertTruncates(page, ['.pb-page-item-title', '.pb-page-item-meta'], 'Page rows');
+
+    await page.locator('[data-tab="blocks"]').click();
+    await assertNoHorizontalOverflow(
+      page,
+      [
+        '#pbModulePalette',
+        '.pb-block-group',
+        '.pb-block-group-grid',
+        '.pb-module-type',
+        '.pb-module-type-label',
+      ],
+      'Blocks rail'
+    );
+    await assertTruncates(page, ['.pb-module-type-label'], 'Block labels');
+    await expect(page.locator('.pb-module-type[data-module-type="text"]')).toHaveAttribute(
+      'draggable',
+      'true'
+    );
+
+    await page.locator('[data-tab="layers"]').click();
+    await assertNoHorizontalOverflow(
+      page,
+      [
+        '#pbLayerTree',
+        '.pb-layer-row',
+        '.pb-layer-item',
+        '.pb-layer-item-label',
+        '.pb-layer-item-meta',
+        '.pb-layer-row-action',
+      ],
+      'Layers rail'
+    );
+    await assertTruncates(page, ['.pb-layer-item-label', '.pb-layer-item-meta'], 'Layer rows');
+
+    await page.locator('[data-layer-action="select-page-settings"]').click();
+    await page.locator('[data-tab="settings"]').click();
+    await openAllInspectorSections(page);
+    await expect(page.locator('#pbEditPageSlug')).toBeVisible();
+    await assertNoHorizontalOverflow(
+      page,
+      [
+        '#pbModuleEditor',
+        '.pb-editor-header',
+        '.pb-editor-tabs',
+        '.pb-editor-tab',
+        '.pb-editor-content',
+        '.pb-inspector-section',
+        '.pb-inspector-section-summary',
+        '.pb-inspector-section-body',
+        '.pb-editor-field',
+        '.pb-editor-label',
+        '.pb-editor-input',
+        '.pb-editor-select',
+        '.pb-editor-hint',
+        '.pb-editor-footer',
+        '.pb-editor-footer-status',
+        '.pb-editor-footer-actions',
+        '.pb-editor-footer-actions .btn-primary',
+        '.pb-editor-footer-actions .btn-secondary',
+      ],
+      'Page settings inspector'
+    );
+
+    await page.locator('[data-tab="layers"]').click();
+    await page.locator('[data-layer-action="select-section"]').first().click();
+    await page.locator('[data-tab="settings"]').click();
+    await openAllInspectorSections(page);
+    await expect(page.locator('#pbEditSectionColumnCount')).toBeVisible();
+    await assertNoHorizontalOverflow(
+      page,
+      [
+        '.pb-column-editor',
+        '.pb-column-editor-title',
+        '.pb-column-padding-grid',
+        '.pb-column-padding-input',
+        '.pb-appearance-card',
+        '.pb-appearance-row',
+        '.pb-appearance-toggle',
+        '.pb-appearance-input',
+      ],
+      'Section settings inspector'
+    );
+
+    await selectTextModule(page);
+    await page.locator('[data-tab="settings"]').click();
+    await openAllInspectorSections(page);
+    await expect(page.locator('[data-key="content"]')).toBeVisible();
+    await assertNoHorizontalOverflow(
+      page,
+      [
+        '.pb-editor-content',
+        '.pb-editor-textarea',
+        '.pb-editor-field',
+        '.pb-editor-footer-actions',
+        '.pb-editor-footer-actions .btn-primary',
+        '.pb-editor-footer-actions .btn-secondary',
+      ],
+      'Module settings inspector'
+    );
+
+    await page.locator('[data-tab="layers"]').click();
+    await page.locator('[data-layer-action="select-page-settings"]').click();
+    await page.locator('[data-tab="styles"]').click();
+    await openAllInspectorSections(page);
+    await expect(page.locator('.pb-panel-bg-path').first()).toBeVisible();
+    await assertNoHorizontalOverflow(
+      page,
+      [
+        '.pb-theme-preset-grid',
+        '.pb-theme-preset-btn',
+        '.pb-theme-color-row',
+        '.pb-theme-color-label',
+        '.pb-theme-color-inputs',
+        '.pb-editor-subgrid',
+        '.pb-editor-subcard',
+        '.pb-editor-inline-actions',
+        '.pb-editor-inline-actions > *',
+        '.pb-panel-bg-meta',
+      ],
+      'Theme styles inspector'
+    );
+
+    await page.setViewportSize({ width: 700, height: 1000 });
+    await expect(page.locator('.page-builder-layout')).toHaveAttribute(
+      'data-viewport-band',
+      'stacked'
+    );
+    await assertNoHorizontalOverflow(
+      page,
+      [
+        '.pb-sidebar-tabs',
+        '.pb-sidebar-tab',
+        '.pb-editor-content',
+        '.pb-editor-footer',
+        '.pb-editor-footer-actions',
+        '.pb-editor-footer-actions .btn-primary',
+        '.pb-editor-footer-actions .btn-secondary',
+      ],
+      'Stacked drawer inspector'
+    );
+    const footerButtons = await page.locator('.pb-editor-footer-actions').evaluate((actions) =>
+      Array.from(actions.querySelectorAll('.btn-primary, .btn-secondary')).map((button) => {
+        const actionRect = actions.getBoundingClientRect();
+        const buttonRect = button.getBoundingClientRect();
+        return {
+          width: Math.round(buttonRect.width),
+          actionWidth: Math.round(actionRect.width),
+        };
+      })
+    );
+    footerButtons.forEach(({ width, actionWidth }) => {
+      expect(
+        width,
+        'footer buttons should stack to the full action row below 720px'
+      ).toBeGreaterThanOrEqual(actionWidth - 1);
+      expect(
+        width,
+        'footer buttons should not overflow the action row below 720px'
+      ).toBeLessThanOrEqual(actionWidth + 1);
+    });
   });
 
   test('hides collapsed-rail controls from layout and restores the placement inspector', async ({

@@ -381,10 +381,10 @@ function renderResponsiveScopeControl({ activeDeviceId, responsiveEditScope }) {
     summary: responsiveEditScope === 'device' ? deviceLabel : 'Global',
     copy: '',
     body: `
-      <div class="form-editor">
-        <div class="form-group">
-          <label class="form-label" for="pbResponsiveEditScope">Scope</label>
-          <select id="pbResponsiveEditScope" class="form-input" data-responsive-edit-scope>
+      <div class="pb-editor-stack pb-editor-stack--compact">
+        <div class="pb-editor-field">
+          <label class="pb-editor-label" for="pbResponsiveEditScope">Scope</label>
+          <select id="pbResponsiveEditScope" class="pb-editor-select" data-responsive-edit-scope>
             <option value="global" ${responsiveEditScope === 'global' ? 'selected' : ''}>Global</option>
             <option value="device" ${responsiveEditScope === 'device' ? 'selected' : ''}>Current Device (${escapeHtml(deviceLabel)})</option>
           </select>

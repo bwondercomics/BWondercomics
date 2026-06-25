@@ -34,20 +34,20 @@ function renderPageSettingsContent(draft) {
       summary: draft.slug || 'Page URL',
       copy: 'Control the page URL, title, and type.',
       body: `
-        <div class="form-editor">
-          <div class="form-group">
-            <label class="form-label" for="pbEditPageSlug">Page Slug</label>
-            <input type="text" id="pbEditPageSlug" class="form-input" value="${escapeHtml(draft.slug)}" />
-            <div class="settings-note">Used in the URL (letters, numbers, dashes).</div>
+        <div class="pb-editor-stack pb-editor-stack--compact">
+          <div class="pb-editor-field">
+            <label class="pb-editor-label" for="pbEditPageSlug">Page Slug</label>
+            <input type="text" id="pbEditPageSlug" class="pb-editor-input" value="${escapeAttr(draft.slug)}" />
+            <div class="pb-editor-hint">Used in the URL (letters, numbers, dashes).</div>
           </div>
-          <div class="form-group">
-            <label class="form-label" for="pbEditPageTitle">Page Title</label>
-            <input type="text" id="pbEditPageTitle" class="form-input" value="${escapeHtml(draft.title)}" />
+          <div class="pb-editor-field">
+            <label class="pb-editor-label" for="pbEditPageTitle">Page Title</label>
+            <input type="text" id="pbEditPageTitle" class="pb-editor-input" value="${escapeAttr(draft.title)}" />
           </div>
-          <div class="form-group">
-            <label class="form-label" for="pbEditPageType">Page Type</label>
-            <input type="text" id="pbEditPageType" class="form-input" value="${escapeHtml(draft.pageType || '')}" />
-            <div class="settings-note">e.g., custom, reader, gallery.</div>
+          <div class="pb-editor-field">
+            <label class="pb-editor-label" for="pbEditPageType">Page Type</label>
+            <input type="text" id="pbEditPageType" class="pb-editor-input" value="${escapeAttr(draft.pageType || '')}" />
+            <div class="pb-editor-hint">e.g., custom, reader, gallery.</div>
           </div>
         </div>
       `,
@@ -58,13 +58,13 @@ function renderPageSettingsContent(draft) {
       summary: draft.isHomepage ? 'Homepage' : 'Standard page',
       copy: 'Choose whether this page is the default landing page for the series.',
       body: `
-        <div class="form-editor">
-          <div class="form-group">
-            <label style="display: flex; align-items: center; gap: 10px; font-size: 0.95rem;">
+        <div class="pb-editor-stack pb-editor-stack--compact">
+          <div class="pb-editor-field">
+            <label class="pb-editor-label pb-editor-checkbox">
               <input type="checkbox" id="pbEditIsHomepage" ${draft.isHomepage ? 'checked' : ''} />
-              Is Homepage
+              <span>Is Homepage</span>
             </label>
-            <div class="settings-note" style="margin-top: 6px;">Check to make this page the default landing page for the series.</div>
+            <div class="pb-editor-hint">Check to make this page the default landing page for the series.</div>
           </div>
         </div>
       `,
@@ -80,10 +80,10 @@ function renderResponsiveScopeControl({ activeDeviceId, responsiveEditScope }) {
     summary: responsiveEditScope === 'device' ? deviceLabel : 'Global',
     copy: '',
     body: `
-      <div class="form-editor">
-        <div class="form-group">
-          <label class="form-label" for="pbResponsiveEditScope">Scope</label>
-          <select id="pbResponsiveEditScope" class="form-input" data-responsive-edit-scope>
+      <div class="pb-editor-stack pb-editor-stack--compact">
+        <div class="pb-editor-field">
+          <label class="pb-editor-label" for="pbResponsiveEditScope">Scope</label>
+          <select id="pbResponsiveEditScope" class="pb-editor-select" data-responsive-edit-scope>
             <option value="global" ${responsiveEditScope === 'global' ? 'selected' : ''}>Global</option>
             <option value="device" ${responsiveEditScope === 'device' ? 'selected' : ''}>Current Device (${escapeHtml(deviceLabel)})</option>
           </select>
@@ -136,24 +136,24 @@ function renderSectionLayoutEditor(draft, { activeDeviceId, responsiveEditScope 
   const ratioInputs = ratios
     .map(
       (ratio, index) => `
-        <div class="form-group">
-          <label class="form-label">Track ${index + 1} ratio</label>
-          <input type="number" class="form-input" min="1" max="12" step="1" value="${escapeAttr(String(ratio))}" data-column-ratio data-column-index="${index}" />
+        <div class="pb-editor-field">
+          <label class="pb-editor-label">Track ${index + 1} ratio</label>
+          <input type="number" class="pb-editor-input" min="1" max="12" step="1" value="${escapeAttr(String(ratio))}" data-column-ratio data-column-index="${index}" />
         </div>
       `
     )
     .join('');
 
   return `
-    <div class="form-editor">
-      <div class="form-group">
-        <label class="form-label" for="pbEditSectionColumnCount">${
+    <div class="pb-editor-stack pb-editor-stack--compact">
+      <div class="pb-editor-field">
+        <label class="pb-editor-label" for="pbEditSectionColumnCount">${
           responsiveEditScope === 'device' ? 'Reflow track count' : 'Column count'
         }</label>
-        <select id="pbEditSectionColumnCount" class="form-input" data-section-column-count>
+        <select id="pbEditSectionColumnCount" class="pb-editor-select" data-section-column-count>
           ${inheritOption}${countOptions}
         </select>
-        <div class="settings-note">${
+        <div class="pb-editor-hint">${
           responsiveEditScope === 'device'
             ? `Choose up to ${globalRatios.length} tracks. Structural columns and module ownership remain global.`
             : 'Choose 1–6 structural columns and set their width ratios.'
@@ -174,7 +174,7 @@ function renderColumnEditorContent(draft, { activeDeviceId, responsiveEditScope 
       const paddingInputs = ['Top', 'Right', 'Bottom', 'Left']
         .map((side) => {
           const value = padding[side.toLowerCase()];
-          return `<input type="number" class="form-input pb-column-padding-input" min="0" step="1" value="${escapeAttr(String(value ?? ''))}" placeholder="${side[0]}" aria-label="Padding ${side}" data-column-field="padding${side}" data-column-index="${index}" />`;
+          return `<input type="number" class="pb-editor-input pb-column-padding-input" min="0" step="1" value="${escapeAttr(String(value ?? ''))}" placeholder="${side[0]}" aria-label="Padding ${side}" data-column-field="padding${side}" data-column-index="${index}" />`;
         })
         .join('');
       return `
@@ -189,9 +189,9 @@ function renderColumnEditorContent(draft, { activeDeviceId, responsiveEditScope 
               ? 'Unset fields inherit the global column appearance.'
               : 'Use the shared sanitized background, text, and border controls.'
           )}
-          <div class="form-group">
-            <label class="form-label">Alignment</label>
-            <select class="form-input" data-column-field="alignment" data-column-index="${index}">
+          <div class="pb-editor-field">
+            <label class="pb-editor-label">Alignment</label>
+            <select class="pb-editor-select" data-column-field="alignment" data-column-index="${index}">
               ${
                 responsiveEditScope === 'device'
                   ? `<option value="inherit" ${alignment ? '' : 'selected'}>Inherit global</option>`
@@ -207,20 +207,20 @@ function renderColumnEditorContent(draft, { activeDeviceId, responsiveEditScope 
               ).join('')}
             </select>
           </div>
-          <div class="form-group">
-            <label class="form-label">Padding (T / R / B / L)</label>
+          <div class="pb-editor-field">
+            <label class="pb-editor-label">Padding (T / R / B / L)</label>
             <div class="pb-column-padding-grid">${paddingInputs}</div>
           </div>
-          <div class="form-group">
-            <label class="form-label">Min height</label>
-            <input type="number" class="form-input" min="0" step="1" value="${escapeAttr(String(column.minHeight ?? ''))}" placeholder="auto" data-column-field="minHeight" data-column-index="${index}" />
+          <div class="pb-editor-field">
+            <label class="pb-editor-label">Min height</label>
+            <input type="number" class="pb-editor-input" min="0" step="1" value="${escapeAttr(String(column.minHeight ?? ''))}" placeholder="auto" data-column-field="minHeight" data-column-index="${index}" />
           </div>
-          <div class="form-group">
+          <div class="pb-editor-field">
             ${
               responsiveEditScope === 'device'
                 ? `
-                  <label class="form-label">Visibility</label>
-                  <select class="form-input" data-column-field="hidden" data-column-index="${index}">
+                  <label class="pb-editor-label">Visibility</label>
+                  <select class="pb-editor-select" data-column-field="hidden" data-column-index="${index}">
                     <option value="inherit" ${
                       Object.prototype.hasOwnProperty.call(column, 'hidden') ? '' : 'selected'
                     }>Inherit global</option>
@@ -229,9 +229,9 @@ function renderColumnEditorContent(draft, { activeDeviceId, responsiveEditScope 
                   </select>
                 `
                 : `
-                  <label style="display: flex; align-items: center; gap: 8px; font-size: 0.9rem;">
+                  <label class="pb-editor-label pb-editor-checkbox">
                     <input type="checkbox" data-column-field="hidden" data-column-index="${index}" ${column.hidden ? 'checked' : ''} />
-                    Hidden
+                    <span>Hidden</span>
                   </label>
                 `
             }
@@ -297,18 +297,18 @@ function renderSectionSettingsContent(section, draft, options = {}) {
       summary: displayLayout || 'Layout',
       copy: 'Adjust spacing for this section.',
       body: `
-        <div class="form-editor">
-          <div class="form-group">
-            <label class="form-label" for="pbEditSectionModuleGap">Module Gap</label>
-            <input type="number" id="pbEditSectionModuleGap" class="form-input" value="${escapeHtml(String(displayDraft.moduleGap ?? ''))}" min="0" step="1" placeholder="16" data-section-setting="moduleGap" />
+        <div class="pb-editor-stack pb-editor-stack--compact">
+          <div class="pb-editor-field">
+            <label class="pb-editor-label" for="pbEditSectionModuleGap">Module Gap</label>
+            <input type="number" id="pbEditSectionModuleGap" class="pb-editor-input" value="${escapeAttr(String(displayDraft.moduleGap ?? ''))}" min="0" step="1" placeholder="16" data-section-setting="moduleGap" />
           </div>
-          <div class="form-group">
-            <label class="form-label" for="pbEditSectionColumnGap">Column Gap</label>
-            <input type="number" id="pbEditSectionColumnGap" class="form-input" value="${escapeHtml(String(displayDraft.columnGap ?? ''))}" min="0" step="1" placeholder="16" data-section-setting="columnGap" />
+          <div class="pb-editor-field">
+            <label class="pb-editor-label" for="pbEditSectionColumnGap">Column Gap</label>
+            <input type="number" id="pbEditSectionColumnGap" class="pb-editor-input" value="${escapeAttr(String(displayDraft.columnGap ?? ''))}" min="0" step="1" placeholder="16" data-section-setting="columnGap" />
           </div>
-          <div class="form-group">
-            <label class="form-label" for="pbEditSectionGap">Section Gap</label>
-            <input type="number" id="pbEditSectionGap" class="form-input" value="${escapeHtml(String(displayDraft.sectionGap ?? ''))}" min="0" step="1" placeholder="24" data-section-setting="sectionGap" />
+          <div class="pb-editor-field">
+            <label class="pb-editor-label" for="pbEditSectionGap">Section Gap</label>
+            <input type="number" id="pbEditSectionGap" class="pb-editor-input" value="${escapeAttr(String(displayDraft.sectionGap ?? ''))}" min="0" step="1" placeholder="24" data-section-setting="sectionGap" />
           </div>
         </div>
       `,

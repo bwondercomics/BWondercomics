@@ -134,6 +134,13 @@ responsive layout authoring, and builder-first architecture are stable enough to
     line with no clipping, and whose label truncates with an ellipsis rather than wrapping.
   - Reorder a block with the move buttons and by dragging the whole card between regions; confirm both
     paths move it and the footer reports unsaved changes until saved.
+  - Check Pages, Blocks, and Layers tabs for compact rows, visible actions, preserved drag affordances,
+    and ellipsis truncation on long page, block, or layer labels.
+  - Check Page Settings, Section Settings, Header Settings, Module Settings, Styles, theme panel
+    backgrounds, and Appearance rows at the 280px rail; native selects/inputs should remain visible,
+    focusable, and bound to their saved values without horizontal overflow.
+  - Resize to ≤720px and confirm the footer action buttons still stack full-width while keeping their
+    Save/Discard/Publish wiring.
   - Resize to a ≤1099px drawer width and confirm the Placement controls still fit without horizontal overflow.
 - [ ] Collapsed-rail behavior (≥1100px)
   - At a wide viewport (the 72px collapse is disabled in the ≤1099px stacked band, which forces the

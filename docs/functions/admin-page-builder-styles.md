@@ -76,8 +76,13 @@ Manages the persistent left-side panel for page navigation and the block/module 
 
 - **Collapsed Mode**: When the shell has `[data-sidebar-mode='collapsed']`, the main body hides and `.pb-sidebar-collapsed-copy` displays its rotated `writing-mode: vertical-rl` text.
 - **Tabs**: `.pb-sidebar-tabs` and `.pb-sidebar-tab` toggle between Pages, Blocks, Layers, Settings, and Styles, utilizing gradient lighting and a box shadow for the active state.
-- **Page List**: Features `.pb-page-item` blocks containing structural badges (`.pb-page-status`) reflecting `published`, `draft`, or `homepage` routing states.
-- **Blocks**: The `.pb-module-palette` container groups descriptor-backed `.pb-module-type` draggable buttons by category; block buttons react to `:hover` and `:active` cursor changes (`grab` and `grabbing`).
+- **Page List**: Features compact `.pb-page-item` rows with a handle, truncating title/meta copy,
+  wrapping structural badges (`.pb-page-status`), and small reader/delete actions for `published`,
+  `draft`, or `homepage` routing states.
+- **Blocks**: The `.pb-module-palette` container groups descriptor-backed blocks, while
+  `.pb-block-group-grid` owns the live compact list layout. Each `.pb-module-type` remains draggable
+  and keyed by `data-module-type`, but renders as an icon-left row with an ellipsis label instead of a
+  tall centered tile.
 
 ---
 
@@ -113,7 +118,9 @@ The right-side properties panel responding dynamically to the active section/mod
 
 ### Principal Components
 
-- **Sticky Regions**: Implements `position: sticky` on `.pb-editor-header` and `.pb-editor-footer` combined with intense background blur `backdrop-filter: blur(18px)` to ensure controls are always available while scrolling property fields.
+- **Sticky Regions**: Implements `position: sticky` on `.pb-editor-header` and `.pb-editor-footer`
+  with compact padding and background blur so controls stay available while scrolling property
+  fields.
 - **Footer Status**: Updates `.pb-editor-footer-status` with dataset states (`success`, `warning`, `danger`) to report API save failures or drafted states.
 - **Empty & Feedback States**: Uses customized `.pb-editor-empty-card` for messaging when no modules are selected.
 - **Structurals**: Features accordion blocks (`.pb-editor-accordion`), draggable sort-blocks (`.pb-header-block`), and the header **placement board** (`.pb-header-layout-grid` → `.pb-header-layout-row` → `.pb-header-region--board` → two-line `.pb-header-layout-card`), whose region grid is single-column at rail width and splits into columns via a container query when space allows.
@@ -126,9 +133,13 @@ The atomic input form fields embedded across the inspector panels.
 
 ### Principal Components
 
-- **Form Base**: `.pb-editor-input`, `.pb-editor-textarea`, and `.pb-editor-select`. On `:focus`, injects the `var(--primary)` outline border and box shadow.
+- **Form Base**: `.pb-editor-input`, `.pb-editor-textarea`, and `.pb-editor-select` use the shared
+  compact density tokens for font, padding, and radius. On `:focus`, they inject the `var(--primary)`
+  outline border and box shadow.
 - **Modifiers**: Distinct inputs like `.pb-editor-textarea--code` which switch layout context to a monospaced font over a 220px block.
-- **Layout Flow**: Combines labels and inputs in horizontal `.pb-editor-field--row` groups with `.pb-editor-hint` text descriptions below complex elements.
+- **Layout Flow**: Combines labels and inputs in compact `.pb-editor-field`,
+  `.pb-editor-field--row`, `.pb-field-row`, and `.pb-editor-checkbox` groups with `.pb-editor-hint`
+  text descriptions below complex elements.
 - **Promo Pickers**: Dedicated slider (`.pb-promo-style-range`) and color picker bounds (`.pb-promo-style-color`) adjusting visual presentation constraints.
 - **Buttons Appearance Controls**: `controls.css` now includes a small button-appearance layer for the buttons module editor:
   - `.pb-button-appearance-card` for nested default/override cards inside the inspector
@@ -139,8 +150,9 @@ The atomic input form fields embedded across the inspector panels.
   patterns for global/device column count, ratios, per-column appearance, padding, alignment,
   min-height, and inherit/visible/hidden state.
 - **Inspector density layer**: a `.page-builder`-scoped token set — `--pb-inspector-font` (~0.78rem),
-  `--pb-control-pad-y`/`--pb-control-pad-x`, `--pb-row-gap`, and `--pb-icon-btn-size` (28px) — drives
-  the compact, icon-first inspector. Reusable components built on it:
+  `--pb-control-pad-y`/`--pb-control-pad-x`, `--pb-row-gap`, `--pb-icon-btn-size` (28px),
+  `--pb-control-radius`, and `--pb-card-radius` — drives the compact, icon-first inspector and base
+  editor controls. Reusable components built on it:
   - `.pb-icon-btn` — 28px square transparent icon button (hover, `:focus-visible` ring via
     `var(--primary)`, and disabled states) that replaces CTA-weight `.btn-secondary` inside inspector menus
   - `.pb-field-row` — label-left (`flex: 0 0 38%`) / control-right row with a truncating label, for
@@ -148,6 +160,9 @@ The atomic input form fields embedded across the inspector panels.
   - `.pb-truncate` and `.pb-sr-only` — shared ellipsis-truncation and visually-hidden utilities
   - `.pb-seg`/`.pb-seg-item` — a segmented radio control ported from GrapesJS `.gjs-radio-item`;
     shipped as a component, but existing `<select>` conversions remain deferred
+- **Scoped action buttons**: footer, section-settings, and compact editor action buttons keep the
+  global `.btn-primary` / `.btn-secondary` classes for wiring and responsive selectors, but
+  `.page-builder` applies tighter padding, smaller type, and reduced radii inside the authoring UI.
 
 ---
 
@@ -166,13 +181,21 @@ Classes related to drag-and-drop structural manipulation and interactive context
 
 ### Theme Customizer
 
-- **Theme Options**: Maps styles for global theme adjustments (colors, layout presets), organizing color pickers in `.pb-theme-color-row` layouts with accompanying `.pb-theme-preset-btn` macro choices.
+- **Theme Options**: Maps styles for global theme adjustments (colors, layout presets), organizing
+  color pickers in `.pb-theme-color-row` layouts with accompanying `.pb-theme-preset-btn` macro
+  choices. Inside `.pb-editor-content`, theme preset buttons, color rows, and panel background asset
+  rows receive compact inspector overrides so the Styles tab fits the 280px rail.
 
 ### Responsive Degrade
 
 - **Sub-1199px**: Flattens out `2-column` and `3-column` controls in the Inspector into a unified `1fr` grid stack.
 - **Sub-1099px**: Relaxes max-height limits on the `.page-builder-sidebar` when stacked in tablet mode.
-- **Sub-720px**: Mobile squashing constraint. Stretches footer action buttons `.btn-primary` and `.btn-secondary` out to `100%` widths, and breaks horizontal layout flows in the inspector down into vertical stacks.
+- **Sub-720px**: Mobile squashing constraint. Stretches footer action buttons `.btn-primary` and
+  `.btn-secondary` out to `100%` widths, and breaks horizontal layout flows in the inspector down
+  into vertical stacks.
+- **Retired no-op palette grids**: responsive grid-template overrides for `.pb-module-palette` are not
+  used because the live block layout is `.pb-block-group-grid`; block compaction lives in
+  `sidebar.css`.
 
 ## 🧭 Maintenance Rule
 
