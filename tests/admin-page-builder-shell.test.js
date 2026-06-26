@@ -298,6 +298,16 @@ async function openBuilderPage(manager) {
   await flushAdminUi(3);
 }
 
+function getInspectorSectionContaining(selector) {
+  const target = typeof selector === 'string' ? document.querySelector(selector) : selector;
+  if (!target) return null;
+  return (
+    Array.from(document.querySelectorAll('.pb-inspector-section')).find((section) =>
+      section.contains(target)
+    ) || null
+  );
+}
+
 function enterPreviewMode() {
   document
     .getElementById('pbViewPreview')
@@ -617,6 +627,50 @@ describe('admin page-builder shell', () => {
     expect(savedConfig.style.headingBgColor).toBe('#123456');
   });
 
+  it('resets open style option groups when switching selected modules', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const feedModule = selectedPage.sections[1].modules.find(
+      (module) => module.moduleType === 'feed'
+    );
+    const buttonsModule = selectedPage.sections[1].modules.find(
+      (module) => module.moduleType === 'buttons'
+    );
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+
+    document
+      .querySelector(`.pb-module[data-module-id="${feedModule.id}"]`)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    document
+      .querySelector('.pb-sidebar-tab[data-tab="styles"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    const feedStyleSection = getInspectorSectionContaining('[data-style-key="headingBgColor"]');
+    expect(feedStyleSection).not.toBeNull();
+    feedStyleSection.open = true;
+
+    document
+      .querySelector(`.pb-module[data-module-id="${buttonsModule.id}"]`)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Buttons Module');
+
+    document
+      .querySelector('.pb-sidebar-tab[data-tab="styles"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Buttons Styles');
+    expect(document.querySelector('.pb-inspector-section[open]')).toBeNull();
+  });
+
   it('keeps normal admin header and nav hidden while the full-page builder is active', async () => {
     const { manager } = await setupPageBuilder({
       fetchPagesResults: [[]],
@@ -748,20 +802,34 @@ describe('admin page-builder shell', () => {
     await flushAdminUi(2);
 
     const content = document.querySelector('.pb-editor-content');
+    const sidebarContent = document.querySelector('.pb-sidebar-content[data-content="inspector"]');
     expect(content).not.toBeNull();
-    content.scrollTop = 420;
+    expect(sidebarContent).not.toBeNull();
 
     const destinationTypeSelect = document.querySelector(
       '.pb-header-nav-input[data-item-key="kind"]'
     );
     expect(destinationTypeSelect).not.toBeNull();
+    const navSection = getInspectorSectionContaining(destinationTypeSelect);
+    expect(navSection).not.toBeNull();
+    navSection.open = true;
+    content.scrollTop = 420;
+    sidebarContent.scrollTop = 315;
+
     destinationTypeSelect.value = 'url';
     destinationTypeSelect.dispatchEvent(new Event('change', { bubbles: true }));
-    await flushAdminUi(1);
+    await flushAdminUi(2);
 
     const nextContent = document.querySelector('.pb-editor-content');
+    const nextNavSection = getInspectorSectionContaining(
+      '.pb-header-nav-input[data-item-key="url"]'
+    );
     expect(nextContent).not.toBe(content);
+    expect(nextNavSection?.open).toBe(true);
     expect(nextContent?.scrollTop).toBe(420);
+    expect(document.querySelector('.pb-sidebar-content[data-content="inspector"]')?.scrollTop).toBe(
+      315
+    );
     expect(document.querySelector('.pb-header-nav-input[data-item-key="url"]')).not.toBeNull();
   });
 
@@ -1525,6 +1593,59 @@ describe('admin page-builder shell', () => {
         }),
       })
     );
+  });
+
+  it('preserves section inspector option state across draft rerenders', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const editableSection = selectedPage.sections[1]; // layout '1-1'
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector(
+        `.pb-section[data-section-id="${editableSection.id}"] [data-action="toggle-section-settings"]`
+      )
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    getInspectorSectionContaining('#pbEditSectionColumnCount').open = true;
+    getInspectorSectionContaining('#pbEditSectionModuleGap').open = true;
+
+    const countSelect = document.getElementById('pbEditSectionColumnCount');
+    countSelect.value = '4';
+    countSelect.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(getInspectorSectionContaining('#pbEditSectionColumnCount')?.open).toBe(true);
+    expect(getInspectorSectionContaining('#pbEditSectionModuleGap')?.open).toBe(true);
+
+    getInspectorSectionContaining('#pbEditSectionModuleGap').open = false;
+
+    const ratioInput = document.querySelector('[data-column-ratio][data-column-index="0"]');
+    ratioInput.value = '2';
+    ratioInput.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(getInspectorSectionContaining('#pbEditSectionColumnCount')?.open).toBe(true);
+    expect(getInspectorSectionContaining('#pbEditSectionModuleGap')?.open).toBe(false);
+
+    const backgroundToggleSelector =
+      '[data-appearance-toggle="true"][data-appearance-scope="section-column"]' +
+      '[data-appearance-key="background.color"][data-item-index="0"]';
+    const backgroundToggle = document.querySelector(backgroundToggleSelector);
+    const backgroundGroup = backgroundToggle.closest('details.pb-appearance-group');
+    backgroundGroup.open = true;
+    backgroundToggle.checked = true;
+    backgroundToggle.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(
+      document.querySelector(backgroundToggleSelector)?.closest('details.pb-appearance-group')?.open
+    ).toBe(true);
   });
 
   it('sends unsaved section layout and appearance drafts to live preview and restores on discard', async () => {

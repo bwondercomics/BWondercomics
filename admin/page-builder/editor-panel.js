@@ -400,7 +400,15 @@ function getPageIdentity(page) {
 function getEditorContextKey(state) {
   const pageKey = getPageIdentity(state.currentPage);
   if (!pageKey) return 'empty';
-  if (state.activeEditorTab === 'theme') return `${pageKey}:theme`;
+  if (state.activeEditorTab === 'theme') {
+    if (state.selectedCanvasSurface === 'page-header') return `${pageKey}:theme:page-header`;
+    if (state.selectedCanvasSurface === 'page-settings') return `${pageKey}:theme:page-settings`;
+    if (state.selectedCanvasSurface === 'section') {
+      return `${pageKey}:theme:section:${state.activeSectionId || 'none'}`;
+    }
+    if (state.selectedModuleId) return `${pageKey}:theme:module:${state.selectedModuleId}`;
+    return `${pageKey}:theme:page`;
+  }
   if (state.selectedCanvasSurface === 'page-header') return `${pageKey}:page-header`;
   if (state.selectedCanvasSurface === 'page-settings') return `${pageKey}:page-settings`;
   if (state.selectedCanvasSurface === 'section') {
@@ -410,13 +418,62 @@ function getEditorContextKey(state) {
 }
 
 export function createEditorPanelRenderer({ el, getState, actions, helpers, deps }) {
+  function normalizeDetailsKeyPart(value) {
+    return String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  }
+
+  function getDetailsSummaryText(details) {
+    const summary = Array.from(details.children || []).find((child) => child.tagName === 'SUMMARY');
+    return summary?.textContent || '';
+  }
+
+  function getDetailsStateKey(details, content) {
+    const explicitKey = details.dataset.inspectorSectionKey;
+    if (explicitKey) return `inspector:${explicitKey}`;
+
+    const parentSection = details.parentElement?.closest('details[data-inspector-section-key]');
+    const parentKey = parentSection?.dataset.inspectorSectionKey || 'root';
+    const scopeRoot = parentSection || content;
+    const scopedDetails = Array.from(scopeRoot?.querySelectorAll('details') || []);
+    const index = Math.max(0, scopedDetails.indexOf(details));
+    const summaryKey = normalizeDetailsKeyPart(getDetailsSummaryText(details)) || 'details';
+    const classKey = normalizeDetailsKeyPart(Array.from(details.classList || []).join(' '));
+    return ['nested', parentKey, index, summaryKey, classKey].filter(Boolean).join(':');
+  }
+
+  function captureEditorDetailsState(content) {
+    const detailsState = new Map();
+    content?.querySelectorAll('details').forEach((details) => {
+      detailsState.set(getDetailsStateKey(details, content), details.open === true);
+    });
+    return detailsState;
+  }
+
+  function restoreEditorDetailsState(content, detailsState) {
+    if (!(detailsState instanceof Map)) return;
+    content?.querySelectorAll('details').forEach((details) => {
+      const stateKey = getDetailsStateKey(details, content);
+      if (detailsState.has(stateKey)) {
+        details.open = detailsState.get(stateKey) === true;
+      }
+    });
+  }
+
   function captureEditorContentScroll() {
     const content = el.pbModuleEditor?.querySelector('.pb-editor-content');
+    const sidebarContent = el.pbModuleEditor?.closest('.pb-sidebar-content');
     if (!content) return null;
     return {
       contextKey: el.pbModuleEditor.dataset.editorContextKey || '',
       scrollLeft: content.scrollLeft,
       scrollTop: content.scrollTop,
+      sidebarScrollLeft: sidebarContent?.scrollLeft || 0,
+      sidebarScrollTop: sidebarContent?.scrollTop || 0,
+      detailsState: captureEditorDetailsState(content),
     };
   }
 
@@ -426,8 +483,26 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
     }
     const content = el.pbModuleEditor?.querySelector('.pb-editor-content');
     if (!content || snapshot?.contextKey !== contextKey) return;
-    content.scrollLeft = snapshot.scrollLeft;
-    content.scrollTop = snapshot.scrollTop;
+    restoreEditorDetailsState(content, snapshot.detailsState);
+
+    const restoreScrollPosition = () => {
+      const currentContent = el.pbModuleEditor?.querySelector('.pb-editor-content');
+      const currentSidebarContent = el.pbModuleEditor?.closest('.pb-sidebar-content');
+      if (!currentContent || el.pbModuleEditor?.dataset.editorContextKey !== contextKey) return;
+      currentContent.scrollLeft = snapshot.scrollLeft;
+      currentContent.scrollTop = snapshot.scrollTop;
+      if (currentSidebarContent) {
+        currentSidebarContent.scrollLeft = snapshot.sidebarScrollLeft || 0;
+        currentSidebarContent.scrollTop = snapshot.sidebarScrollTop || 0;
+      }
+    };
+    restoreScrollPosition();
+
+    const scheduleRestore =
+      typeof requestAnimationFrame === 'function'
+        ? requestAnimationFrame
+        : (callback) => setTimeout(callback, 0);
+    scheduleRestore(restoreScrollPosition);
   }
 
   function renderEditorPanel() {

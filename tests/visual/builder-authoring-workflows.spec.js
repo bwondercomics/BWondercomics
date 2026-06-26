@@ -680,7 +680,6 @@ async function saveActiveDraft(page) {
   await expect(page.locator('.pb-editor-footer-status')).not.toContainText('unsaved');
 }
 
-// Re-opens the Placement <details> after a rerender, which can reset its open state.
 async function openPlacementDetails(page) {
   const card = page.locator('.pb-header-layout-card[data-block-id="brand"]');
   await page
@@ -692,10 +691,17 @@ async function openPlacementDetails(page) {
     });
 }
 
+async function expectPlacementDetailsOpen(page) {
+  const card = page.locator('.pb-header-layout-card[data-block-id="brand"]');
+  const details = page.locator('.pb-inspector-section').filter({ has: card }).first();
+  await expect(details).toHaveJSProperty('open', true);
+}
+
 async function openHeaderPlacement(page) {
   await page.locator('[data-tab="layers"]').click();
   await page.locator('[data-layer-action="select-page-header"]').click();
   await openPlacementDetails(page);
+  await expectPlacementDetailsOpen(page);
   await expect(page.locator('.pb-header-layout-card[data-block-id="brand"]')).toBeVisible();
 }
 
@@ -1205,6 +1211,40 @@ test.describe('builder Phase 12 authoring workflows', () => {
     expect(drawer.buttonsOk, 'move buttons must not clip in the drawer band').toBe(true);
   });
 
+  test('keeps inspector scroll anchored after option rerenders', async ({ page }) => {
+    const state = createWorkflowState();
+    await prepareWorkflowPage(page, state);
+    await page.setViewportSize({ width: 1280, height: 620 });
+    await openBuilder(page);
+
+    await page.locator('[data-tab="layers"]').click();
+    await page.locator('[data-layer-action="select-page-header"]').click();
+    await page.locator('[data-tab="settings"]').click();
+    await openAllInspectorSections(page);
+
+    const content = page.locator('.pb-sidebar-content[data-content="inspector"]');
+    const beforeScroll = await content.evaluate((element) => {
+      element.scrollTop = Math.min(520, element.scrollHeight - element.clientHeight);
+      return element.scrollTop;
+    });
+    expect(
+      beforeScroll,
+      'header settings must be tall enough for scroll regression coverage'
+    ).toBeGreaterThan(80);
+
+    await page.locator('.pb-header-nav-input[data-item-key="kind"]').first().selectOption('url');
+    await expect(page.locator('.pb-header-nav-input[data-item-key="url"]').first()).toBeVisible();
+
+    await expect
+      .poll(async () => content.evaluate((element) => element.scrollTop), { timeout: 2_000 })
+      .toBeGreaterThanOrEqual(beforeScroll - 20);
+    const afterScroll = await content.evaluate((element) => element.scrollTop);
+    expect(
+      afterScroll,
+      'option rerender must not jump the inspector back to the top'
+    ).toBeGreaterThan(40);
+  });
+
   test('keeps the whole sidebar compact across panels and inspector surfaces', async ({ page }) => {
     const state = createWorkflowState();
     await prepareWorkflowPage(page, state);
@@ -1469,7 +1509,7 @@ test.describe('builder Phase 12 authoring workflows', () => {
     await page
       .locator('.pb-header-layout-button[data-block-id="brand"][data-action="move-right"]')
       .click();
-    await openPlacementDetails(page);
+    await expectPlacementDetailsOpen(page);
     await expect(cardUnder('top', 'center', 'brand')).toBeVisible();
     await expect(cardUnder('top', 'left', 'brand')).toHaveCount(0);
     await expect(cardsFor('brand')).toHaveCount(1);
@@ -1479,7 +1519,7 @@ test.describe('builder Phase 12 authoring workflows', () => {
     await page
       .locator('.pb-header-layout-button[data-block-id="brand"][data-action="move-down"]')
       .click();
-    await openPlacementDetails(page);
+    await expectPlacementDetailsOpen(page);
     await expect(cardUnder('middle', 'center', 'brand')).toBeVisible();
     await expect(cardUnder('top', 'center', 'brand')).toHaveCount(0);
     await expect(cardsFor('brand')).toHaveCount(1);
@@ -1491,7 +1531,7 @@ test.describe('builder Phase 12 authoring workflows', () => {
     await statusCard.dispatchEvent('dragstart', { dataTransfer });
     await dropZone.dispatchEvent('dragover', { dataTransfer });
     await dropZone.dispatchEvent('drop', { dataTransfer });
-    await openPlacementDetails(page);
+    await expectPlacementDetailsOpen(page);
     await expect(cardUnder('top', 'left', 'status')).toBeVisible();
     await expect(cardUnder('top', 'right', 'status')).toHaveCount(0);
     await expect(cardsFor('status')).toHaveCount(1);
