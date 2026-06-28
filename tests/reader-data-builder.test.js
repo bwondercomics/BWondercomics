@@ -1003,6 +1003,177 @@ describe('reader builder presentation loading', () => {
     expect(rightColumn?.children.length).toBe(0);
   });
 
+  it('renders panel column appearance/padding/min-height inline in builder mode (alignment excluded)', () => {
+    const builderPage = buildPanelSnapshot({
+      sectionSettings: {
+        columns: [
+          {
+            index: 0,
+            appearance: { background: { color: '#f5f5f5' }, border: { width: 1, color: '#ddd' } },
+            padding: { top: 12, left: 8 },
+            alignment: 'center',
+            minHeight: 200,
+          },
+          { index: 1 },
+        ],
+      },
+    });
+
+    applyBuilderPageToDOM(builderPage, {
+      seriesId: 'battle-bros',
+      previewMode: true,
+      builderEditing: true,
+    });
+
+    const style =
+      document.querySelector('#leftPanel .pb-builder-panel-column')?.getAttribute('style') || '';
+    expect(style).toContain('background: #f5f5f5');
+    expect(style).toContain('border: 1px solid #ddd');
+    expect(style).toContain('padding-top: 12px');
+    expect(style).toContain('padding-left: 8px');
+    expect(style).toContain('min-height: 200px');
+    // Alignment is deliberately excluded for panels: justify-self is grid-only and inert under flex.
+    expect(style).not.toContain('justify-self');
+  });
+
+  it('renders panel column styling on the public wrapper without builder markers', () => {
+    const builderPage = buildPanelSnapshot({
+      sectionSettings: {
+        columns: [
+          {
+            index: 0,
+            appearance: { background: { color: '#f5f5f5' }, border: { width: 1, color: '#ddd' } },
+            padding: { top: 12, left: 8 },
+            alignment: 'center',
+            minHeight: 200,
+          },
+          { index: 1 },
+        ],
+      },
+    });
+
+    applyBuilderPageToDOM(builderPage, { seriesId: 'battle-bros', previewMode: true });
+
+    const publicColumn = document.querySelector('#leftPanel .pb-panel-column');
+    const style = publicColumn?.getAttribute('style') || '';
+    expect(publicColumn).not.toBeNull();
+    expect(style).toContain('background: #f5f5f5');
+    expect(style).toContain('border: 1px solid #ddd');
+    expect(style).toContain('padding-top: 12px');
+    expect(style).toContain('min-height: 200px');
+    expect(style).not.toContain('justify-self');
+    expect(document.querySelector('#leftPanel [data-builder-column-index]')).toBeNull();
+    expect(publicColumn?.querySelector('.pb-module--text')?.textContent).toContain('Left panel');
+  });
+
+  it('collapses a panel whose owned column is hidden in both modes', () => {
+    const builderPage = buildPanelSnapshot({
+      sectionSettings: { columns: [{ index: 0, hidden: true }, { index: 1 }] },
+    });
+
+    applyBuilderPageToDOM(builderPage, {
+      seriesId: 'battle-bros',
+      previewMode: true,
+      builderEditing: true,
+    });
+    expect(
+      document
+        .querySelector('#leftPanel .pb-builder-panel-column')
+        ?.classList.contains('pb-column--hidden')
+    ).toBe(true);
+
+    applyBuilderPageToDOM(builderPage, { seriesId: 'battle-bros', previewMode: true });
+    expect(
+      document.querySelector('#leftPanel .pb-panel-column')?.classList.contains('pb-column--hidden')
+    ).toBe(true);
+  });
+
+  it('floors an empty builder panel column from its settings (40px over authored 0)', () => {
+    const builderPage = buildPanelSnapshot({
+      sectionSettings: {
+        columns: [
+          { index: 0, minHeight: 0 },
+          { index: 1, minHeight: 100 },
+        ],
+      },
+    });
+    builderPage.sections[0].modules = builderPage.sections[0].modules.filter(
+      (mod) => mod.moduleType === 'reader'
+    );
+
+    applyBuilderPageToDOM(builderPage, {
+      seriesId: 'battle-bros',
+      previewMode: true,
+      builderEditing: true,
+    });
+
+    expect(
+      document
+        .querySelector('#leftPanel .pb-builder-panel-column[data-builder-column-index="0"]')
+        ?.getAttribute('style') || ''
+    ).toContain('min-height: 40px');
+    expect(
+      document
+        .querySelector('#rightPanel .pb-builder-panel-column[data-builder-column-index="1"]')
+        ?.getAttribute('style') || ''
+    ).toContain('min-height: 100px');
+  });
+
+  it('styles an empty public panel from its column settings', () => {
+    const builderPage = buildPanelSnapshot({
+      sectionSettings: {
+        columns: [
+          { index: 0, appearance: { border: { width: 1, color: '#ddd' } }, minHeight: 150 },
+          { index: 1 },
+        ],
+      },
+    });
+    builderPage.sections[0].modules = builderPage.sections[0].modules.filter(
+      (mod) => mod.moduleType === 'reader'
+    );
+
+    applyBuilderPageToDOM(builderPage, { seriesId: 'battle-bros', previewMode: true });
+
+    const style =
+      document.querySelector('#leftPanel .pb-panel-column')?.getAttribute('style') || '';
+    expect(style).toContain('border: 1px solid #ddd');
+    expect(style).toContain('min-height: 150px');
+  });
+
+  it('does not leak column 0 styling into a public empty right panel before it exists', () => {
+    const builderPage = buildPanelSnapshot({
+      sectionSettings: {
+        columns: [
+          { index: 0, appearance: { border: { width: 1, color: '#ddd' } }, minHeight: 150 },
+        ],
+      },
+    });
+    builderPage.sections[0].layout = '1';
+    builderPage.sections[0].modules = builderPage.sections[0].modules.filter(
+      (mod) => mod.moduleType === 'reader'
+    );
+
+    applyBuilderPageToDOM(builderPage, { seriesId: 'battle-bros', previewMode: true });
+
+    const rightPanel = document.getElementById('rightPanel');
+    expect(rightPanel?.querySelector('.pb-panel-column')).toBeNull();
+    expect(rightPanel?.innerHTML || '').not.toContain('border: 1px solid #ddd');
+    expect(rightPanel?.innerHTML || '').not.toContain('min-height: 150px');
+    expect(rightPanel?.textContent).toContain('No panel modules.');
+  });
+
+  it('does not floor a public panel column min-height', () => {
+    const builderPage = buildPanelSnapshot({
+      sectionSettings: { columns: [{ index: 0, minHeight: 0 }, { index: 1 }] },
+    });
+
+    applyBuilderPageToDOM(builderPage, { seriesId: 'battle-bros', previewMode: true });
+
+    expect(
+      document.querySelector('#leftPanel .pb-panel-column')?.getAttribute('style') || ''
+    ).toContain('min-height: 0px');
+  });
+
   it('does not emit a droppable right-panel column for a single-column reader section', () => {
     const builderPage = buildPanelSnapshot();
     builderPage.sections[0].layout = '1';

@@ -34,9 +34,14 @@ import { escapeHtml } from '../admin/page-builder/helpers.js';
 import { mergeAppearance, normalizeAppearance } from '../admin/page-builder/appearance-utils.js';
 import { getReaderRuntimeConfig } from '../admin/page-builder/reader-config.js';
 import {
+  getEffectiveColumnSettings,
   getEffectiveModuleConfig,
   isModuleHiddenForDevice,
 } from '../admin/page-builder/responsive-overrides.js';
+import {
+  buildColumnInlineStyle,
+  EDITOR_EMPTY_COLUMN_MIN_HEIGHT,
+} from '../admin/page-builder/shared-renderers.js';
 
 const BUILDER_THEME_CSS_VARS = Object.freeze([
   '--primary',
@@ -882,52 +887,72 @@ function getPanelModuleColumnIndex(item, side) {
   return 0;
 }
 
-// Editor-only panel column wrapper. Shared by the non-empty stack and the empty-panel drop
-// affordance so both emit the same section/column markers the bridge already collects. When
-// `modulesHtml` is empty the inner column is `:empty`, which the editor min-height rule targets to
-// give the empty panel measurable drop geometry.
+// Build one styled panel-column wrapper for a reader-owned column. Builder-editing mode emits the
+// section/column markers the bridge collects and floors empty columns to the editor affordance
+// height; public mode emits the marker-free `.pb-panel-column`. Both carry the same inline column
+// style (background, border, padding, min-height) and the `pb-column--hidden` class, resolved from
+// the column's settings — so panels honor the column menu exactly like normal `.pb-column`s.
+// `includeAlignment` is false: `justify-self` is a CSS Grid property and is inert on the flex-based
+// panel wrapper (a flex alignment semantic is a deliberate follow-up).
 function renderPanelColumnWrapper({
+  section,
   sectionId,
   sectionIndex,
   layout,
   columnIndex,
   modulesHtml = '',
+  builderEditing = false,
+  deviceId,
+  isEmpty = false,
 }) {
-  const sectionAttrs = builderMarkerAttrs(
-    {
-      'data-builder-section-id': sectionId,
-      'data-builder-section-index': sectionIndex,
-      'data-builder-layout': layout,
-    },
-    true
-  );
-  const columnAttrs = builderMarkerAttrs(
-    {
-      'data-builder-column-index': columnIndex,
-    },
-    true
-  );
-  return `
+  const colSettings = section
+    ? getEffectiveColumnSettings(section, columnIndex, { builderEditing, deviceId })
+    : {};
+  const minHeightFloor = builderEditing && isEmpty ? EDITOR_EMPTY_COLUMN_MIN_HEIGHT : 0;
+  const columnStyle = buildColumnInlineStyle(colSettings, {
+    minHeightFloor,
+    includeAlignment: false,
+  });
+  const styleAttr = columnStyle ? ` style="${columnStyle}"` : '';
+  const hiddenClass = colSettings?.hidden === true ? ' pb-column--hidden' : '';
+
+  if (builderEditing) {
+    const sectionAttrs = builderMarkerAttrs(
+      {
+        'data-builder-section-id': sectionId,
+        'data-builder-section-index': sectionIndex,
+        'data-builder-layout': layout,
+      },
+      true
+    );
+    const columnAttrs = builderMarkerAttrs(
+      {
+        'data-builder-column-index': columnIndex,
+      },
+      true
+    );
+    return `
         <div class="pb-builder-panel-section"${sectionAttrs}>
-          <div class="pb-builder-panel-column"${columnAttrs}>${modulesHtml}</div>
+          <div class="pb-builder-panel-column${hiddenClass}"${columnAttrs}${styleAttr}>${modulesHtml}</div>
         </div>
       `;
+  }
+  return `<div class="pb-panel-column${hiddenClass}"${styleAttr}>${modulesHtml}</div>`;
 }
 
-function renderPanelBuilderEditingStack(side, modules, options = {}) {
+// Group panel modules by `${sectionId}:${columnIndex}` and render each group through the styled
+// wrapper. Serves both the builder and public non-empty paths; only marker emission and the
+// renderModule options differ by mode.
+function renderPanelColumnStack(side, modules, { builderEditing = false, deviceId } = {}) {
   const groups = new Map();
   modules.forEach((item) => {
     const sectionIndex = Number.isFinite(Number(item.sectionIndex)) ? Number(item.sectionIndex) : 0;
     const columnIndex = getPanelModuleColumnIndex(item, side);
-    const sectionId = item.section?.id || `section-${sectionIndex}`;
+    const section = item.section || {};
+    const sectionId = section.id || `section-${sectionIndex}`;
     const groupKey = `${sectionId}:${columnIndex}`;
     if (!groups.has(groupKey)) {
-      groups.set(groupKey, {
-        section: item.section || {},
-        sectionIndex,
-        columnIndex,
-        modules: [],
-      });
+      groups.set(groupKey, { section, sectionIndex, columnIndex, modules: [] });
     }
     groups.get(groupKey).modules.push(item.module);
   });
@@ -935,15 +960,21 @@ function renderPanelBuilderEditingStack(side, modules, options = {}) {
   return Array.from(groups.values())
     .map(({ section, sectionIndex, columnIndex, modules: groupModules }) =>
       renderPanelColumnWrapper({
+        section,
         sectionId: section.id,
         sectionIndex,
         layout: String(section.layout || '1'),
         columnIndex,
         modulesHtml: groupModules
           .map((module) =>
-            renderModule(module, { builderEditing: true, deviceId: options.deviceId })
+            builderEditing
+              ? renderModule(module, { builderEditing: true, deviceId })
+              : renderModule(module)
           )
           .join(''),
+        builderEditing,
+        deviceId,
+        isEmpty: false,
       })
     )
     .join('');
@@ -1083,10 +1114,12 @@ export function applyBuilderPageToDOM(page, options = {}) {
   const buildPanelColumn = (side) =>
     readerPanelSection
       ? {
+          section: readerPanelSection,
           sectionId: readerPanelSection.id,
           sectionIndex: readerSectionIndex,
           layout: readerPanelLayout,
           columnIndex: side === 'left' ? 0 : readerPanelColCount - 1,
+          exists: side === 'left' ? true : readerPanelColCount > 1,
           droppable: side === 'left' ? true : readerPanelColCount > 1,
         }
       : null;
@@ -1197,25 +1230,44 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
     // In edit mode, render an empty droppable column marker for reader-owned panels so the panel
     // resolves to the reader section's structural column via the existing column target path. The
     // right panel is only droppable once the section has 2+ columns (`panelColumn.droppable`), which
-    // enforces the right-panel-disabled-until-2-columns invariant at the source.
+    // enforces the right-panel-disabled-until-2-columns invariant at the source. The wrapper also
+    // carries the column's appearance/min-height so an empty panel still shows its authored styling.
     const panelColumn = options.panelColumn;
     if (builderEditing && panelColumn?.droppable) {
       container.innerHTML = renderPanelColumnWrapper({
+        section: panelColumn.section,
         sectionId: panelColumn.sectionId,
         sectionIndex: panelColumn.sectionIndex,
         layout: panelColumn.layout,
         columnIndex: panelColumn.columnIndex,
+        builderEditing: true,
+        deviceId: options.deviceId,
+        isEmpty: true,
       });
       return;
     }
     const hideEmptyText = !!panelBackgrounds?.[side]?.hideEmptyText;
-    container.innerHTML = hideEmptyText ? '' : '<div class="pb-page-empty">No panel modules.</div>';
+    const emptyContent = hideEmptyText ? '' : '<div class="pb-page-empty">No panel modules.</div>';
+    // Public empty panels owned by the reader section still get the styled column wrapper so authored
+    // border/min-height render even with no modules; without a reader-owned column (e.g. no reader
+    // section, or a right panel before the section has 2+ columns) fall back to bare content.
+    container.innerHTML =
+      !builderEditing && panelColumn?.exists
+        ? renderPanelColumnWrapper({
+            section: panelColumn.section,
+            columnIndex: panelColumn.columnIndex,
+            modulesHtml: emptyContent,
+            builderEditing: false,
+            isEmpty: true,
+          })
+        : emptyContent;
     return;
   }
 
-  container.innerHTML = builderEditing
-    ? renderPanelBuilderEditingStack(side, modules, { deviceId: options.deviceId })
-    : modules.map(({ module }) => renderModule(module)).join('');
+  container.innerHTML = renderPanelColumnStack(side, modules, {
+    builderEditing,
+    deviceId: options.deviceId,
+  });
   initEmailForms(container, { previewMode: !!options.previewMode });
   initPromoCarousels(container);
   initEntryGalleryModules(container);

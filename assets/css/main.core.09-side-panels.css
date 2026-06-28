@@ -97,7 +97,8 @@
 }
 
 .panel-builder .pb-builder-panel-section,
-.panel-builder .pb-builder-panel-column {
+.panel-builder .pb-builder-panel-column,
+.panel-builder .pb-panel-column {
   display: flex;
   flex-direction: column;
   gap: var(--pb-panel-gap, 12px);

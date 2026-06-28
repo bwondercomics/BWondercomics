@@ -8,7 +8,11 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { createRenderers } from '../admin/page-builder/shared-renderers.js';
+import {
+  buildColumnInlineStyle,
+  createRenderers,
+  EDITOR_EMPTY_COLUMN_MIN_HEIGHT,
+} from '../admin/page-builder/shared-renderers.js';
 import { getContractFixture } from './helpers/contracts.js';
 
 function makeReaderRenderers() {
@@ -26,6 +30,23 @@ function makePreviewRenderers() {
     showMountPlaceholders: true,
   });
 }
+
+describe('buildColumnInlineStyle export contract', () => {
+  // The reader panel path imports these top-level exports directly; makeReaderRenderers uses the
+  // factory and would not catch a missing/renamed export, so assert them explicitly.
+  it('exports the module-level column-style helper and editor floor constant', () => {
+    expect(typeof buildColumnInlineStyle).toBe('function');
+    expect(EDITOR_EMPTY_COLUMN_MIN_HEIGHT).toBe(40);
+  });
+
+  it('omits justify-self when includeAlignment is false (panel path)', () => {
+    const colSettings = { alignment: 'center', minHeight: 120 };
+    expect(buildColumnInlineStyle(colSettings)).toContain('justify-self: center');
+    const panelStyle = buildColumnInlineStyle(colSettings, { includeAlignment: false });
+    expect(panelStyle).not.toContain('justify-self');
+    expect(panelStyle).toContain('min-height: 120px');
+  });
+});
 
 describe('shared renderer parity', () => {
   it('produces the same CSS class structure for all shared module types', () => {

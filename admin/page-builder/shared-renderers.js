@@ -51,7 +51,47 @@ import {
 // Minimum height (px) given to an empty column in builder-editing mode so it stays a visible drop
 // target even when an authored/responsive min-height is 0. Mirrored by the panel-column affordance
 // fallback in assets/css/main.core.18-page-builder.css.
-const EDITOR_EMPTY_COLUMN_MIN_HEIGHT = 40;
+export const EDITOR_EMPTY_COLUMN_MIN_HEIGHT = 40;
+
+// Build a column's inline style string from its resolved settings. Shared by renderSection (grid
+// columns) and the reader panel path. `includeAlignment` gates the `justify-self` token, which is a
+// CSS Grid property: grid columns set it (default), but flex-based panel wrappers pass false because
+// justify-self is inert on flex items.
+export function buildColumnInlineStyle(
+  colSettings,
+  { minHeightFloor = 0, includeAlignment = true } = {}
+) {
+  const tokens = [];
+  const appearanceStyle = appearanceToInlineStyle(colSettings?.appearance);
+  if (appearanceStyle) tokens.push(appearanceStyle);
+  const padding = colSettings?.padding;
+  if (padding && typeof padding === 'object') {
+    ['top', 'right', 'bottom', 'left'].forEach((side) => {
+      if (padding[side] !== undefined && padding[side] !== null) {
+        tokens.push(`padding-${side}: ${sanitizeNumber(padding[side], 0, 0, 600)}px`);
+      }
+    });
+  }
+  if (includeAlignment) {
+    const alignment = colSettings?.alignment;
+    if (alignment && alignment !== 'stretch') {
+      tokens.push(`justify-self: ${alignmentToJustifySelf(alignment)}`);
+    }
+  }
+  const authoredMinHeight =
+    colSettings?.minHeight !== undefined && colSettings?.minHeight !== null
+      ? sanitizeNumber(colSettings.minHeight, 0, 0, 2000)
+      : null;
+  // In builder-editing mode an empty column is floored to the editor affordance height so it
+  // stays a visible drop target even when an authored/responsive min-height is 0. The floor is
+  // applied after the authored value resolves and never lowers a larger authored min-height.
+  const effectiveMinHeight =
+    minHeightFloor > 0 ? Math.max(authoredMinHeight ?? 0, minHeightFloor) : authoredMinHeight;
+  if (effectiveMinHeight !== null) {
+    tokens.push(`min-height: ${effectiveMinHeight}px`);
+  }
+  return tokens.join('; ');
+}
 
 export function createRenderers({
   resolveImageUrl = /** @type {function(string): string} */ ((path) => path),
@@ -481,37 +521,6 @@ export function createRenderers({
       ? '<div class="pb-module-hidden-placeholder">Hidden on this device</div>'
       : renderer(config, mod, { ...renderOptions, builderEditing: emitMarkers });
     return `<div class="pb-module pb-module--${safeType}${hiddenClass}"${moduleIdAttr}${markerAttrs}>${content}</div>`;
-  }
-
-  function buildColumnInlineStyle(colSettings, { minHeightFloor = 0 } = {}) {
-    const tokens = [];
-    const appearanceStyle = appearanceToInlineStyle(colSettings?.appearance);
-    if (appearanceStyle) tokens.push(appearanceStyle);
-    const padding = colSettings?.padding;
-    if (padding && typeof padding === 'object') {
-      ['top', 'right', 'bottom', 'left'].forEach((side) => {
-        if (padding[side] !== undefined && padding[side] !== null) {
-          tokens.push(`padding-${side}: ${sanitizeNumber(padding[side], 0, 0, 600)}px`);
-        }
-      });
-    }
-    const alignment = colSettings?.alignment;
-    if (alignment && alignment !== 'stretch') {
-      tokens.push(`justify-self: ${alignmentToJustifySelf(alignment)}`);
-    }
-    const authoredMinHeight =
-      colSettings?.minHeight !== undefined && colSettings?.minHeight !== null
-        ? sanitizeNumber(colSettings.minHeight, 0, 0, 2000)
-        : null;
-    // In builder-editing mode an empty column is floored to the editor affordance height so it
-    // stays a visible drop target even when an authored/responsive min-height is 0. The floor is
-    // applied after the authored value resolves and never lowers a larger authored min-height.
-    const effectiveMinHeight =
-      minHeightFloor > 0 ? Math.max(authoredMinHeight ?? 0, minHeightFloor) : authoredMinHeight;
-    if (effectiveMinHeight !== null) {
-      tokens.push(`min-height: ${effectiveMinHeight}px`);
-    }
-    return tokens.join('; ');
   }
 
   function renderSection(section, renderOptions = {}) {
