@@ -42,6 +42,7 @@ import {
   buildColumnInlineStyle,
   EDITOR_EMPTY_COLUMN_MIN_HEIGHT,
 } from '../admin/page-builder/shared-renderers.js';
+import { buildPanelResponsiveCss } from '../admin/page-builder/responsive-css.js';
 
 const BUILDER_THEME_CSS_VARS = Object.freeze([
   '--primary',
@@ -423,30 +424,46 @@ function resolveAssetUrl(path = '') {
   return `/assets/${cleaned}`;
 }
 
-function applyPanelBackgrounds(page) {
-  const backgrounds = page?.meta?.panelBackgrounds || {};
-  const leftPanel = document.getElementById('leftPanel');
-  const rightPanel = document.getElementById('rightPanel');
+function applyPanelBackgroundToPanel(panel, config) {
+  if (!panel) return;
+  PANEL_BACKGROUND_CSS_VARS.forEach((cssVar) => {
+    panel.style.removeProperty(cssVar);
+  });
+  if (!config || !config.path) {
+    return;
+  }
+  const url = resolveAssetUrl(config.path);
+  panel.style.setProperty('--panel-bg-image', `url("${url}")`);
+  panel.style.setProperty('--panel-bg-size', config.fit || 'cover');
+  panel.style.setProperty('--panel-bg-position', config.focus || 'center');
+  if (config.opacity !== undefined && config.opacity !== null) {
+    panel.style.setProperty('--panel-bg-opacity', String(config.opacity));
+  }
+}
 
-  const applyToPanel = (panel, config) => {
-    if (!panel) return;
-    PANEL_BACKGROUND_CSS_VARS.forEach((cssVar) => {
-      panel.style.removeProperty(cssVar);
-    });
-    if (!config || !config.path) {
-      return;
-    }
-    const url = resolveAssetUrl(config.path);
-    panel.style.setProperty('--panel-bg-image', `url("${url}")`);
-    panel.style.setProperty('--panel-bg-size', config.fit || 'cover');
-    panel.style.setProperty('--panel-bg-position', config.focus || 'center');
-    if (config.opacity !== undefined && config.opacity !== null) {
-      panel.style.setProperty('--panel-bg-opacity', String(config.opacity));
-    }
-  };
+// Unconditional clear of both panels' background vars. Safe to call on every page
+// (including no-reader pages, which early-return before the panel render path) so a
+// reader→no-reader navigation never leaves stale --panel-bg-* vars on the shell.
+function clearPanelBackgrounds() {
+  applyPanelBackgroundToPanel(document.getElementById('leftPanel'), null);
+  applyPanelBackgroundToPanel(document.getElementById('rightPanel'), null);
+}
 
-  applyToPanel(leftPanel, backgrounds.left);
-  applyToPanel(rightPanel, backgrounds.right);
+// Apply resolved per-side panel background configs. Phase 2 resolves these from the
+// reader section's column (see resolvePanelColumnBackground); this is called only on
+// the reader path, after the panel columns are known.
+function applyPanelBackgrounds({ left, right } = {}) {
+  applyPanelBackgroundToPanel(document.getElementById('leftPanel'), left);
+  applyPanelBackgroundToPanel(document.getElementById('rightPanel'), right);
+}
+
+// Resolve a side's panel background from the reader section's column, falling back to
+// legacy page.meta.panelBackgrounds[side] for pages not yet migrated to column data.
+function resolvePanelColumnBackground(panelColumn, side, page) {
+  const fallback = page?.meta?.panelBackgrounds?.[side] || null;
+  if (!panelColumn?.exists) return fallback;
+  const colSettings = getEffectiveColumnSettings(panelColumn.section, panelColumn.columnIndex);
+  return colSettings?.panelBackground || fallback;
 }
 
 function resetPanelVisibility() {
@@ -1016,7 +1033,10 @@ export function applyBuilderPageToDOM(page, options = {}) {
 
   // Apply theme first
   applyPageTheme(page);
-  applyPanelBackgrounds(page);
+  // Clear panel art up front so a reader→no-reader navigation (which early-returns
+  // below) can't leave stale vars; the resolved per-side config is applied after the
+  // reader section's panel columns are known.
+  clearPanelBackgrounds();
 
   // Apply effective page header copy.
   const titleEl = document.querySelector('.topbar .title h1');
@@ -1124,17 +1144,27 @@ export function applyBuilderPageToDOM(page, options = {}) {
         }
       : null;
 
+  const leftPanelColumn = buildPanelColumn('left');
+  const rightPanelColumn = buildPanelColumn('right');
+
   renderPanelStack('left', leftModules, panelSpacing, panelBackgrounds, {
     previewMode: !!options.previewMode,
     builderEditing,
     deviceId,
-    panelColumn: buildPanelColumn('left'),
+    panelColumn: leftPanelColumn,
   });
   renderPanelStack('right', rightModules, panelSpacing, panelBackgrounds, {
     previewMode: !!options.previewMode,
     builderEditing,
     deviceId,
-    panelColumn: buildPanelColumn('right'),
+    panelColumn: rightPanelColumn,
+  });
+
+  // Panel background art reads from the reader section's column (Phase 2), with a
+  // fallback to legacy page.meta.panelBackgrounds[side] for un-migrated pages.
+  applyPanelBackgrounds({
+    left: resolvePanelColumnBackground(leftPanelColumn, 'left', page),
+    right: resolvePanelColumnBackground(rightPanelColumn, 'right', page),
   });
 
   // Check panel visibility from section settings (reader-owned: only the reader
@@ -1172,6 +1202,30 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
   const panel = document.getElementById(panelId);
   if (!panel) return;
   const builderEditing = options.builderEditing === true;
+
+  // Phase 2: panel module spacing and empty-state text come from the reader section's
+  // column (panelGap / panelBackground.hideEmptyText), falling back to the legacy
+  // page.meta values (panelSpacing / panelBackgrounds) when the column carries nothing.
+  const panelColumnSettings = options.panelColumn?.exists
+    ? getEffectiveColumnSettings(options.panelColumn.section, options.panelColumn.columnIndex, {
+        builderEditing,
+        deviceId: options.deviceId,
+      })
+    : null;
+
+  // Public panels emit their column's device overrides as scoped @media CSS (the
+  // builder preview already JS-merges the active device branch). This keeps a panel's
+  // responsive hidden/padding/min-height in parity with the preview on the published
+  // page; the wrapper is flex, so a re-shown column uses display:flex (not block).
+  const panelResponsiveCss =
+    !builderEditing && options.panelColumn?.exists
+      ? buildPanelResponsiveCss(
+          options.panelColumn.section,
+          options.panelColumn.columnIndex,
+          `#${panelId} .pb-panel-column`
+        )
+      : '';
+  const panelResponsiveStyleTag = panelResponsiveCss ? `<style>${panelResponsiveCss}</style>` : '';
 
   const legacyRightSelectors = [
     '#rightPanelFeedBar',
@@ -1213,7 +1267,8 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
   panel.classList.toggle('side-panel--empty', isEmptyPanel);
   container.classList.toggle('panel-builder--empty', isEmptyPanel);
 
-  const gapValue = panelSpacing?.[side];
+  const columnGap = panelColumnSettings?.panelGap;
+  const gapValue = columnGap !== undefined && columnGap !== null ? columnGap : panelSpacing?.[side];
   if (gapValue !== undefined && gapValue !== null && gapValue !== '') {
     const parsed = Number(gapValue);
     if (!Number.isNaN(parsed)) {
@@ -1246,13 +1301,16 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
       });
       return;
     }
-    const hideEmptyText = !!panelBackgrounds?.[side]?.hideEmptyText;
+    const columnPanelBackground = panelColumnSettings?.panelBackground;
+    const hideEmptyText = columnPanelBackground
+      ? !!columnPanelBackground.hideEmptyText
+      : !!panelBackgrounds?.[side]?.hideEmptyText;
     const emptyContent = hideEmptyText ? '' : '<div class="pb-page-empty">No panel modules.</div>';
     // Public empty panels owned by the reader section still get the styled column wrapper so authored
     // border/min-height render even with no modules; without a reader-owned column (e.g. no reader
     // section, or a right panel before the section has 2+ columns) fall back to bare content.
     container.innerHTML =
-      !builderEditing && panelColumn?.exists
+      (!builderEditing && panelColumn?.exists
         ? renderPanelColumnWrapper({
             section: panelColumn.section,
             columnIndex: panelColumn.columnIndex,
@@ -1260,14 +1318,15 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
             builderEditing: false,
             isEmpty: true,
           })
-        : emptyContent;
+        : emptyContent) + panelResponsiveStyleTag;
     return;
   }
 
-  container.innerHTML = renderPanelColumnStack(side, modules, {
-    builderEditing,
-    deviceId: options.deviceId,
-  });
+  container.innerHTML =
+    renderPanelColumnStack(side, modules, {
+      builderEditing,
+      deviceId: options.deviceId,
+    }) + panelResponsiveStyleTag;
   initEmailForms(container, { previewMode: !!options.previewMode });
   initPromoCarousels(container);
   initEntryGalleryModules(container);

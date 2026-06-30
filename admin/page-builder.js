@@ -2034,6 +2034,26 @@ function createPageBuilder({
     }
 
     const count = Math.max(1, Math.min(MAX_COLUMNS, Math.round(Number(rawCount) || 1)));
+    // Guard (client mirror of the backend authority): don't reduce the column count
+    // while a to-be-removed column still has modules. The backend rejects this (409),
+    // so surface guidance up front instead of mutating the draft into an unsavable state.
+    const blockedColumns = [
+      ...new Set(
+        (getSectionRecord(activeSectionId)?.modules || [])
+          .map((module) => Number(module.columnIndex) || 0)
+          .filter((index) => index >= count)
+      ),
+    ].sort((a, b) => a - b);
+    if (blockedColumns.length) {
+      setCanvasStatus(
+        `Move or delete the modules in column ${blockedColumns
+          .map((index) => index + 1)
+          .join(', ')} before reducing the column count.`,
+        'warning'
+      );
+      renderEditorPanel();
+      return;
+    }
     const ratios = globalRatios;
     const next = [];
     for (let i = 0; i < count; i++) next.push(ratios[i] ?? 1);
@@ -2158,8 +2178,19 @@ function createPageBuilder({
     const layout = getSectionLayoutFromDraft(activeSectionDraft);
 
     // Layout (column count/ratio) and settings (per-column styling, spacing) save in one
-    // request; the backend rehomes any modules orphaned by a column-count reduction.
-    const updated = await updateSection(activeSectionId, { layout, settings });
+    // request; the backend rejects (409) a column-count reduction that would orphan
+    // modules, which surfaces here as a failed save (the column-count control guards
+    // against this up front).
+    let updateError = '';
+    const updated = await updateSection(
+      activeSectionId,
+      { layout, settings },
+      {
+        onError: (error) => {
+          updateError = error?.message || '';
+        },
+      }
+    );
     if (updated) {
       section.settings = updated.settings || settings;
       section.layout = updated.layout || layout;
@@ -2171,7 +2202,7 @@ function createPageBuilder({
       return true;
     }
 
-    setCanvasStatus('Failed to save section settings.', 'danger');
+    setCanvasStatus(updateError || 'Failed to save section settings.', 'danger');
     renderCanvas();
     return false;
   }

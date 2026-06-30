@@ -1492,18 +1492,24 @@ describe('admin page-builder shell', () => {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await flushAdminUi(3);
 
-    expect(mocks.updateSection).toHaveBeenCalledWith(editableSection.id, {
-      layout: '1-1',
-      settings: {
-        moduleGap: 28,
-        columnGap: 24,
-        panelEnabled: {
-          left: true,
-          right: true,
+    expect(mocks.updateSection).toHaveBeenCalledWith(
+      editableSection.id,
+      {
+        layout: '1-1',
+        settings: {
+          moduleGap: 28,
+          columnGap: 24,
+          panelEnabled: {
+            left: true,
+            right: true,
+          },
+          sectionGap: 40,
         },
-        sectionGap: 40,
       },
-    });
+      expect.objectContaining({
+        onError: expect.any(Function),
+      })
+    );
     expect(
       document.querySelector(
         `.pb-section[data-section-id="${editableSection.id}"] .pb-section-settings-input[data-setting="moduleGap"]`
@@ -1591,6 +1597,9 @@ describe('admin page-builder shell', () => {
             }),
           ]),
         }),
+      }),
+      expect.objectContaining({
+        onError: expect.any(Function),
       })
     );
   });
@@ -1850,6 +1859,9 @@ describe('admin page-builder shell', () => {
             }),
           ]),
         }),
+      }),
+      expect.objectContaining({
+        onError: expect.any(Function),
       })
     );
   });

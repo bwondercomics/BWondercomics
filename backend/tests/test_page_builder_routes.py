@@ -1544,7 +1544,7 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.assertNotIn("javascript:", hydrated_text["config"]["content"])
         self.assertIn("<strong>Safe</strong>", hydrated_text["config"]["content"])
 
-    def test_builder_security_sanitizes_column_settings_and_rehomes_on_shrink(self):
+    def test_builder_security_sanitizes_column_settings_and_rejects_destructive_shrink(self):
         self.seed_contract_series()
         page = page_builder.api_create_page(
             page_builder.CreatePageRequest(slug="columns", title="Columns"),
@@ -1628,8 +1628,35 @@ class PageBuilderRouteTests(BackendRouteTestCase):
             )["module"]
             module_ids.append(module["id"])
 
-        # Shrinking 4 -> 2 columns rehomes out-of-range modules to the last column
-        # atomically instead of dropping or rejecting them.
+        # Shrinking 4 -> 2 columns is rejected (409) while removed columns (2, 3) still
+        # hold modules: the backend is the authority and must not silently rehome or
+        # drop a removed column's content (incl. the panel art/spacing now on the column).
+        rejected = page_builder.api_update_section(
+            section["id"],
+            page_builder.UpdateSectionRequest(layout="1-1"),
+            self.admin_request(f"/api/admin/sections/{section['id']}", "PUT"),
+            self.db,
+        )
+        self.assertEqual(rejected.status_code, 409)
+
+        # Nothing changed: the section keeps its 4-column layout and every module.
+        payload = page_builder.api_get_page(
+            page["id"],
+            self.admin_request(f"/api/admin/pages/{page['id']}"),
+            self.db,
+        )["page"]
+        self.assertEqual(payload["sections"][0]["layout"], "2-1-1-1")
+        modules = payload["sections"][0]["modules"]
+        self.assertEqual({m["id"] for m in modules}, set(module_ids))
+        self.assertEqual(sorted(m["columnIndex"] for m in modules), [0, 1, 2, 3])
+
+        # Clearing the to-be-removed columns' modules lets the same shrink succeed.
+        for module_id in (module_ids[2], module_ids[3]):
+            page_builder.api_delete_module(
+                module_id,
+                self.admin_request(f"/api/admin/modules/{module_id}", "DELETE"),
+                self.db,
+            )
         shrunk = page_builder.api_update_section(
             section["id"],
             page_builder.UpdateSectionRequest(layout="1-1"),
@@ -1643,15 +1670,9 @@ class PageBuilderRouteTests(BackendRouteTestCase):
             self.admin_request(f"/api/admin/pages/{page['id']}"),
             self.db,
         )["page"]
-        modules = payload["sections"][0]["modules"]
-        self.assertEqual({m["id"] for m in modules}, set(module_ids))
-        self.assertTrue(all(0 <= m["columnIndex"] <= 1 for m in modules))
-        merged = [module for module in modules if module["columnIndex"] == 1]
-        self.assertEqual(
-            [module["id"] for module in merged],
-            [module_ids[1], module_ids[2], module_ids[3]],
-        )
-        self.assertEqual([module["sortIndex"] for module in merged], [0, 1, 2])
+        remaining = payload["sections"][0]["modules"]
+        self.assertEqual({m["id"] for m in remaining}, {module_ids[0], module_ids[1]})
+        self.assertTrue(all(0 <= m["columnIndex"] <= 1 for m in remaining))
 
 
 if __name__ == "__main__":

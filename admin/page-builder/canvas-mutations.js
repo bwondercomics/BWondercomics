@@ -294,12 +294,47 @@ export function createCanvasMutations({ getState, actions, deps, helpers }) {
   }
 
   async function changeSectionLayout(sectionId, layout) {
-    const updated = await deps.updateSection(sectionId, { layout });
+    // Guard (client mirror of the backend authority): a column-count reduction that
+    // would orphan a removed column's modules is rejected (409); surface guidance up
+    // front instead of issuing a request that cannot succeed.
+    const target = getSectionRecord(sectionId);
+    const nextColumnCount = String(layout || '1')
+      .split('-')
+      .filter(Boolean).length;
+    const blockedColumns = [
+      ...new Set(
+        (target?.modules || [])
+          .map((module) => Number(module.columnIndex) || 0)
+          .filter((index) => index >= nextColumnCount)
+      ),
+    ].sort((a, b) => a - b);
+    if (blockedColumns.length) {
+      actions.setCanvasStatus(
+        `Move or delete the modules in column ${blockedColumns
+          .map((index) => index + 1)
+          .join(', ')} before reducing the column count.`,
+        'warning'
+      );
+      actions.renderCanvas();
+      return;
+    }
+
+    let updateError = '';
+    const updated = await deps.updateSection(
+      sectionId,
+      { layout },
+      {
+        onError: (error) => {
+          updateError = error?.message || '';
+        },
+      }
+    );
     if (updated) {
       const section = getSectionRecord(sectionId);
       if (section) {
         section.layout = updated.layout || layout;
-        // Reflect any backend module rehoming from a column-count reduction.
+        // Sync module placement the backend returns. It no longer rehomes on shrink
+        // (now rejected above); retained for other layout-edit responses.
         if (Array.isArray(updated.modules) && Array.isArray(section.modules)) {
           const byId = new Map(section.modules.map((module) => [module.id, module]));
           updated.modules.forEach((updatedModule) => {
@@ -311,6 +346,9 @@ export function createCanvasMutations({ getState, actions, deps, helpers }) {
           });
         }
       }
+      actions.renderCanvas();
+    } else if (updateError) {
+      actions.setCanvasStatus(updateError, 'danger');
       actions.renderCanvas();
     }
   }

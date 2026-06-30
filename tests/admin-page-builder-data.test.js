@@ -260,4 +260,29 @@ describe('admin page-builder data layer', () => {
     expect(await reorderSections('page-id', [secondSection.id, section.id])).toBe(true);
     expect(await deleteModule(module.id)).toBe(true);
   });
+
+  it('reports parsed updateSection failures through the optional callback', async () => {
+    const payload = { error: 'Move or delete modules first.' };
+    const fetchMock = vi.fn(async (url, options = {}) => {
+      if (url === '/api/admin/sections/section-id' && options.method === 'PUT') {
+        return jsonResponse(payload, { status: 409, statusText: 'Conflict' });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    const onError = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await updateSection('section-id', { layout: '1' }, { onError })).toBeNull();
+
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        message: payload.error,
+        status: 409,
+        payload,
+      })
+    );
+    expect(getLastPageBuilderDataError()).toMatchObject({
+      message: payload.error,
+    });
+  });
 });

@@ -38,6 +38,17 @@ READER_MODULE_HIDDEN_DEFAULT_DEVICE = "reader_module_hidden_default_device"
 READER_MODULE_WRONG_SOURCE = "reader_module_wrong_source"
 
 
+class ColumnShrinkConflictError(Exception):
+    """Raised when reducing a section's column count would orphan modules.
+
+    The backend is the authority for layout changes — a direct API call must not
+    silently rehome or drop a removed column's content (modules, or the panel
+    background/spacing now stored on the column). A shrink that would leave modules
+    in a to-be-removed column is rejected; the caller must clear them first. An empty
+    removed column is allowed (an intentional collapse).
+    """
+
+
 class PageBuilderValidationError(ValueError):
     """Structured validation failure returned by page-builder admin routes."""
 
@@ -822,21 +833,18 @@ def update_section(db: Session, section_id: str, data: dict[str, Any]) -> dict[s
     previous_column_count = layout_column_count(section.layout)
     next_column_count = layout_column_count(next_layout)
     if "layout" in data and next_column_count < previous_column_count:
-        # Atomically rehome modules whose column no longer exists when the column
-        # count shrinks. Existing modules in the last surviving column retain
-        # precedence; orphaned modules append by original column and sort order.
-        last_column = max(0, next_column_count - 1)
-        destination_modules = sorted(
-            (module for module in section.modules if module.column_index == last_column),
-            key=lambda module: (module.sort_index, str(module.id)),
-        )
-        orphaned_modules = sorted(
-            (module for module in section.modules if module.column_index > last_column),
-            key=lambda module: (module.column_index, module.sort_index, str(module.id)),
-        )
-        for sort_index, module in enumerate(destination_modules + orphaned_modules):
-            module.column_index = last_column
-            module.sort_index = sort_index
+        # Reject a column-count reduction that would orphan modules in a removed
+        # column. Silently rehoming them (the previous behavior) loses the column's
+        # placement and its panel art/spacing; the caller must clear those modules
+        # first. Empty removed columns are allowed (an intentional collapse).
+        orphaned_modules = [
+            module for module in section.modules if module.column_index >= next_column_count
+        ]
+        if orphaned_modules:
+            raise ColumnShrinkConflictError(
+                "Cannot reduce the column count while a to-be-removed column still has "
+                "modules. Move or delete those modules first."
+            )
     if "sectionType" in data:
         section.section_type = validate_section_type(data["sectionType"])
     if "layout" in data:

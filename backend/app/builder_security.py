@@ -583,25 +583,35 @@ def sanitize_theme_meta(raw_theme: Any) -> dict[str, str]:
     return sanitized
 
 
+def _sanitize_panel_background(current: Any) -> dict[str, Any] | None:
+    """Sanitize a single panel background config (path/fit/focus/opacity/hideEmptyText).
+
+    Shared by the legacy per-side ``page.meta.panelBackgrounds`` shape and the
+    column-level ``panelBackground`` field. Returns ``None`` when there is nothing
+    worth persisting (no art and empty text not hidden).
+    """
+    if not isinstance(current, dict):
+        return None
+    path = sanitize_asset_url(current.get("path"))
+    panel = {
+        "opacity": _clamp_float(current.get("opacity"), 0.18),
+        "fit": "contain" if str(current.get("fit") or "").strip().lower() == "contain" else "cover",
+        "focus": sanitize_focus(current.get("focus"), "center"),
+        "hideEmptyText": _coerce_bool(current.get("hideEmptyText"), False),
+    }
+    if path:
+        panel["path"] = path
+    if path or panel["hideEmptyText"]:
+        return panel
+    return None
+
+
 def sanitize_panel_backgrounds(raw_backgrounds: Any) -> dict[str, Any]:
     backgrounds = raw_backgrounds if isinstance(raw_backgrounds, dict) else {}
     sanitized: dict[str, Any] = {}
     for side in ("left", "right"):
-        current = backgrounds.get(side)
-        if not isinstance(current, dict):
-            continue
-        path = sanitize_asset_url(current.get("path"))
-        panel = {
-            "opacity": _clamp_float(current.get("opacity"), 0.18),
-            "fit": "contain"
-            if str(current.get("fit") or "").strip().lower() == "contain"
-            else "cover",
-            "focus": sanitize_focus(current.get("focus"), "center"),
-            "hideEmptyText": _coerce_bool(current.get("hideEmptyText"), False),
-        }
-        if path:
-            panel["path"] = path
-        if path or panel["hideEmptyText"]:
+        panel = _sanitize_panel_background(backgrounds.get(side))
+        if panel is not None:
             sanitized[side] = panel
     return sanitized
 
@@ -1011,6 +1021,15 @@ def sanitize_column_settings(
         result["hidden"] = True
 
     if include_responsive:
+        # Panel-only fields live on the base column entry and are intentionally
+        # non-responsive for now, so they are gated here (responsive branches call
+        # with include_responsive=False).
+        panel_background = _sanitize_panel_background(column.get("panelBackground"))
+        if panel_background is not None:
+            result["panelBackground"] = panel_background
+        panel_gap = _sanitize_optional_clamped_int(column, "panelGap", 0, 240)
+        if panel_gap is not None:
+            result["panelGap"] = panel_gap
         responsive = sanitize_column_responsive(column.get("responsive"))
         if responsive:
             result["responsive"] = responsive

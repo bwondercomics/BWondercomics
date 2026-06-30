@@ -1066,6 +1066,186 @@ describe('reader builder presentation loading', () => {
     expect(publicColumn?.querySelector('.pb-module--text')?.textContent).toContain('Left panel');
   });
 
+  it('applies panel background art from the column panelBackground (Phase 2)', () => {
+    const page = buildPanelSnapshot({
+      sectionSettings: {
+        columns: [
+          {
+            index: 0,
+            panelBackground: {
+              path: 'assets/media/panels/col-left.png',
+              fit: 'contain',
+              focus: 'top',
+              opacity: 0.4,
+            },
+          },
+          { index: 1, panelBackground: { path: 'assets/media/panels/col-right.png' } },
+        ],
+      },
+    });
+
+    applyBuilderPageToDOM(page, { seriesId: 'battle-bros', previewMode: true });
+
+    const leftPanel = document.getElementById('leftPanel');
+    const rightPanel = document.getElementById('rightPanel');
+    expect(leftPanel?.style.getPropertyValue('--panel-bg-image')).toContain(
+      '/assets/media/panels/col-left.png'
+    );
+    expect(leftPanel?.style.getPropertyValue('--panel-bg-size')).toBe('contain');
+    expect(leftPanel?.style.getPropertyValue('--panel-bg-position')).toBe('top');
+    expect(leftPanel?.style.getPropertyValue('--panel-bg-opacity')).toBe('0.4');
+    expect(rightPanel?.style.getPropertyValue('--panel-bg-image')).toContain(
+      '/assets/media/panels/col-right.png'
+    );
+  });
+
+  it('falls back to page.meta panel background when the column has none (Phase 2)', () => {
+    const page = buildPanelSnapshot({
+      meta: { panelBackgrounds: { left: { path: 'assets/media/panels/meta-left.png' } } },
+      sectionSettings: { columns: [{ index: 0 }, { index: 1 }] },
+    });
+
+    applyBuilderPageToDOM(page, { seriesId: 'battle-bros', previewMode: true });
+
+    expect(
+      document.getElementById('leftPanel')?.style.getPropertyValue('--panel-bg-image')
+    ).toContain('/assets/media/panels/meta-left.png');
+  });
+
+  it('prefers the column panelBackground over legacy page.meta (Phase 2)', () => {
+    const page = buildPanelSnapshot({
+      meta: { panelBackgrounds: { left: { path: 'assets/media/panels/meta-left.png' } } },
+      sectionSettings: {
+        columns: [
+          { index: 0, panelBackground: { path: 'assets/media/panels/col-left.png' } },
+          { index: 1 },
+        ],
+      },
+    });
+
+    applyBuilderPageToDOM(page, { seriesId: 'battle-bros', previewMode: true });
+
+    const img =
+      document.getElementById('leftPanel')?.style.getPropertyValue('--panel-bg-image') || '';
+    expect(img).toContain('/assets/media/panels/col-left.png');
+    expect(img).not.toContain('meta-left.png');
+  });
+
+  it('clears panel background vars when navigating from a reader page to a no-reader page (Phase 2)', () => {
+    const readerPage = buildPanelSnapshot({
+      sectionSettings: {
+        columns: [
+          { index: 0, panelBackground: { path: 'assets/media/panels/col-left.png' } },
+          { index: 1 },
+        ],
+      },
+    });
+    applyBuilderPageToDOM(readerPage, { seriesId: 'battle-bros', previewMode: true });
+    expect(
+      document.getElementById('leftPanel')?.style.getPropertyValue('--panel-bg-image')
+    ).toContain('col-left.png');
+
+    const noReaderPage = buildContractFixture('builderPageDraft', {
+      slug: 'about',
+      title: 'About',
+      pageType: 'custom',
+    });
+    applyBuilderPageToDOM(noReaderPage, { seriesId: 'battle-bros' });
+    expect(document.getElementById('leftPanel')?.style.getPropertyValue('--panel-bg-image')).toBe(
+      ''
+    );
+  });
+
+  it('sets --pb-panel-gap from the column panelGap, falling back to page.meta (Phase 2)', () => {
+    const fromColumn = buildPanelSnapshot({
+      meta: { panelSpacing: { left: 99 } },
+      sectionSettings: { columns: [{ index: 0, panelGap: 28 }, { index: 1 }] },
+    });
+    applyBuilderPageToDOM(fromColumn, { seriesId: 'battle-bros', previewMode: true });
+    expect(
+      document.querySelector('#leftPanel .panel-builder')?.style.getPropertyValue('--pb-panel-gap')
+    ).toBe('28px');
+
+    const fromMeta = buildPanelSnapshot({
+      meta: { panelSpacing: { left: 18 } },
+      sectionSettings: { columns: [{ index: 0 }, { index: 1 }] },
+    });
+    applyBuilderPageToDOM(fromMeta, { seriesId: 'battle-bros', previewMode: true });
+    expect(
+      document.querySelector('#leftPanel .panel-builder')?.style.getPropertyValue('--pb-panel-gap')
+    ).toBe('18px');
+  });
+
+  it('hides empty-panel text from the column panelBackground.hideEmptyText (Phase 2)', () => {
+    const page = buildPanelSnapshot({
+      sectionSettings: {
+        columns: [
+          {
+            index: 0,
+            panelBackground: { path: 'assets/media/panels/col-left.png', hideEmptyText: true },
+          },
+          { index: 1 },
+        ],
+      },
+    });
+    // Make the left panel empty so the empty-state path runs.
+    page.sections[0].modules = page.sections[0].modules.filter((m) => m.id !== 'left-panel-text');
+
+    applyBuilderPageToDOM(page, { seriesId: 'battle-bros', previewMode: true });
+
+    expect(document.getElementById('leftPanel')?.textContent || '').not.toContain(
+      'No panel modules.'
+    );
+  });
+
+  it('emits scoped @media panel CSS for column responsive overrides on the public page (Phase 2)', () => {
+    const page = buildPanelSnapshot({
+      sectionSettings: {
+        columns: [
+          {
+            index: 0,
+            responsive: {
+              mobile: { hidden: true, padding: { top: 4 } },
+              tablet: { hidden: false },
+            },
+          },
+          { index: 1 },
+        ],
+      },
+    });
+
+    applyBuilderPageToDOM(page, { seriesId: 'battle-bros', previewMode: true });
+
+    const style = document.querySelector('#leftPanel .panel-builder style')?.textContent || '';
+    expect(style).toContain('@media (max-width: 480px)');
+    expect(style).toContain('#leftPanel .pb-panel-column');
+    expect(style).toContain('display: none');
+    expect(style).toContain('padding-top: 4px');
+    // A re-shown panel column must use flex (panels stack via flex), never block.
+    expect(style).toContain('display: flex');
+    expect(style).not.toContain('display: block');
+  });
+
+  it('does not emit panel responsive CSS without device overrides or in builder mode (Phase 2)', () => {
+    const noOverrides = buildPanelSnapshot({
+      sectionSettings: { columns: [{ index: 0, padding: { top: 10 } }, { index: 1 }] },
+    });
+    applyBuilderPageToDOM(noOverrides, { seriesId: 'battle-bros', previewMode: true });
+    expect(document.querySelector('#leftPanel .panel-builder style')).toBeNull();
+
+    const builderMode = buildPanelSnapshot({
+      sectionSettings: {
+        columns: [{ index: 0, responsive: { mobile: { hidden: true } } }, { index: 1 }],
+      },
+    });
+    applyBuilderPageToDOM(builderMode, {
+      seriesId: 'battle-bros',
+      previewMode: true,
+      builderEditing: true,
+    });
+    expect(document.querySelector('#leftPanel .panel-builder style')).toBeNull();
+  });
+
   it('collapses a panel whose owned column is hidden in both modes', () => {
     const builderPage = buildPanelSnapshot({
       sectionSettings: { columns: [{ index: 0, hidden: true }, { index: 1 }] },

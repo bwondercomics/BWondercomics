@@ -235,16 +235,35 @@ export async function addSection(pageId, sectionType = 'row', layout = '1') {
   }
 }
 
-export async function updateSection(sectionId, data) {
+export async function updateSection(sectionId, data, options = {}) {
+  clearLastPageBuilderDataError();
   try {
     const res = await fetch(`/api/admin/sections/${sectionId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
     });
-    if (!res.ok) throw new Error('Failed to update section');
-    return (await res.json()).section;
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(payload.error || 'Failed to update section');
+      err.code = payload.code || '';
+      err.warnings = payload.warnings || [];
+      err.status = res.status;
+      err.payload = payload;
+      throw err;
+    }
+    return payload.section;
   } catch (err) {
+    rememberPageBuilderDataError(err, 'Failed to update section');
+    if (typeof options?.onError === 'function') {
+      options.onError({
+        message: err?.message || 'Failed to update section',
+        code: err?.code || '',
+        warnings: Array.isArray(err?.warnings) ? err.warnings : [],
+        status: err?.status || 0,
+        payload: err?.payload || null,
+      });
+    }
     console.error('updateSection error:', err);
     return null;
   }

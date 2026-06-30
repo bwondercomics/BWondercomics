@@ -14,6 +14,7 @@ from ..models import User
 from ..page_store import (
     PAGE_SCOPE_GLOBAL,
     PAGE_SCOPE_SERIES,
+    ColumnShrinkConflictError,
     PageBuilderValidationError,
     add_module,
     add_section,
@@ -471,6 +472,8 @@ def api_update_section(
         if not section:
             return JSONResponse(status_code=404, content={"error": "Section not found"})
         return {"section": section}
+    except ColumnShrinkConflictError as e:
+        return JSONResponse(status_code=409, content={"error": str(e)})
     except ValueError as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
 

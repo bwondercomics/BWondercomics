@@ -1,6 +1,8 @@
 # Panel / Column Settings Consolidation Plan
 
-Status: Phase 1 implemented (2026-06-28); Phases 2–4 not started. Planning complete (review findings incorporated).
+Status: Phase 1 implemented (2026-06-28); Phase 2 implemented (2026-06-30, not
+independently shippable until Phase 3 retires the old Theme-editor panel controls);
+Phases 3–4 not started. Planning complete (review findings incorporated).
 Created: 2026-06-26
 
 > Second-pass review (2026-06-28) added four corrections, folded into the phases below. To avoid
@@ -15,7 +17,8 @@ A review pass surfaced five gaps in the first draft; each is now folded into the
 1. **Backend rehomes on shrink (High).** `update_section` ([backend/app/page_store.py:824](../backend/app/page_store.py))
    atomically rehomes orphaned modules when the column count drops, asserted by
    [test_page_builder_routes.py:1631](../backend/tests/test_page_builder_routes.py). A client-only block
-   is bypassable → **Phase 4 now makes the backend the authority** (reject the shrink) and updates that test.
+   is bypassable → **Phase 2 pulled the backend-authority guard forward from Phase 4**
+   (reject the shrink) and updates that test.
 2. **Second runtime panel-hide (High).** `applyReaderModuleShellSettings` ([reader/data.js:646](../reader/data.js))
    hides `#leftPanel` / `#rightPanel` from reader-module `panels.*` (gated by `hasExplicitPanels`),
    independent of `section.settings.panelEnabled` → **Phase 4 now removes both runtime paths and the
@@ -276,21 +279,21 @@ Goal: panel art and module spacing come from the column, not `page.meta`.
 > inert against the now column-first runtime. So either pull the control retarget/removal + dirty-preview
 > plumbing forward into Phase 2, **or treat Phase 2 + Phase 3 as a single non-separable release.**
 
-- [ ] Add `panelBackground` + `panelGap` to the column schema, with sanitize/prune + draft plumbing
+- [x] Add `panelBackground` + `panelGap` to the column schema, with sanitize/prune + draft plumbing
       (see Data Model Changes).
-- [ ] Replace `applyPanelBackgrounds(page)` (`reader/data.js:421`) with a read of the reader section's
+- [x] Replace `applyPanelBackgrounds(page)` (`reader/data.js:421`) with a read of the reader section's
       column `panelBackground` (col 0 → `#leftPanel`, last col → `#rightPanel`), setting the existing
       `--panel-bg-image/size/position/opacity` vars. **Fallback** to `page.meta.panelBackgrounds[side]`.
-- [ ] In `renderPanelStack` (`:1183`), source `--pb-panel-gap` from the column's `panelGap` (fallback
+- [x] In `renderPanelStack` (`:1183`), source `--pb-panel-gap` from the column's `panelGap` (fallback
       `page.meta.panelSpacing[side]`).
-- [ ] Move `hideEmptyText` to `panelBackground.hideEmptyText` (`:1211`), same fallback.
-- [ ] **Public responsive parity (finding #4):** emit scoped `@media` CSS for panel columns by reusing
+- [x] Move `hideEmptyText` to `panelBackground.hideEmptyText` (`:1211`), same fallback.
+- [x] **Public responsive parity (finding #4):** emit scoped `@media` CSS for panel columns by reusing
       `columnDeclarations()` (`responsive-css.js:59`). When `renderPanelStack` runs in public mode and the
       reader section has column responsive overrides (`sectionHasResponsiveOverrides`), emit a scoped
       `<style>` block (mirroring `buildSectionResponsiveCss` at `shared-renderers.js:588`) keyed to the
       panel wrapper, so device-specific hidden/padding/min-height match the builder preview on the
       published page. (Factor the section's `<style>` emission so the panel path can share it.)
-- [ ] **Migration (finding #3) — concrete write path.** Page meta (`saveActiveThemeDraft`→`updatePage`)
+- [x] **Migration (finding #3) — concrete write path.** Page meta (`saveActiveThemeDraft`→`updatePage`)
       and section columns (`saveSectionSettings`→`updateSection`) are separate drafts/endpoints, so there
       is no single client save that sees both. Recommended: a **one-time backend data migration** that, per
       page, reads `page.meta.panelBackgrounds/panelSpacing`, writes them into the reader section's
@@ -304,8 +307,15 @@ Goal: panel art and module spacing come from the column, not `page.meta`.
       idempotent standalone script (mirroring `backend/app/backfill_page_headers.py`) or an Alembic data
       migration, with explicit **dry-run** and **write** modes, and test that entrypoint directly (not
       just the per-section sanitizer).
-- [ ] Tests: background/gap render from column settings; fallback to `page.meta` when the column is
+- [x] Tests: background/gap render from column settings; fallback to `page.meta` when the column is
       absent; backend migration copies legacy meta into the reader-section columns and clears the meta keys.
+
+Completion note (2026-06-30): Phase 2 landed the column-level `panelBackground` / `panelGap`
+contract, runtime column-first reads with legacy `page.meta` fallback, public panel responsive CSS,
+and an idempotent dry-run/write migration script. The destructive-shrink guard from Phase 4 was
+pulled forward into this phase so right-panel column data cannot be silently discarded. Do **not**
+ship/run the migration standalone before Phase 3; the old Theme-editor panel controls still write
+`page.meta` and must be retired in the same release.
 
 ## Phase 3 — Unified click-to-edit Column/Panel inspector; retire scattered UIs
 
@@ -353,13 +363,16 @@ must go, and the block must be enforced where it actually persists (the backend)
 
 **Block destructive ratio reduction (finding #1) — backend is the authority:**
 
-- [ ] In `update_section` (`backend/app/page_store.py:824`), **replace the rehome-on-shrink branch with a
-      rejection** (e.g. HTTP 409/422) when any to-be-removed column still has modules; only allow the
+- [x] **Landed in Phase 2.** In `update_section` (`backend/app/page_store.py:824`), replace the
+      rehome-on-shrink branch with a rejection (e.g. HTTP 409/422) when any to-be-removed column
+      still has modules; only allow the
       shrink when those columns are empty. This is the real enforcement point — a direct API call must not
       silently move content.
-- [ ] Update the backend test that asserts rehoming (`backend/tests/test_page_builder_routes.py:1631`) to
+- [x] **Landed in Phase 2.** Update the backend test that asserts rehoming
+      (`backend/tests/test_page_builder_routes.py:1631`) to
       assert the rejection instead, plus an allowed-shrink case when the columns are empty.
-- [ ] Client guard (UX): in `setActiveSectionColumnCount` (`admin/page-builder.js` ~`:2008`) /
+- [x] **Landed in Phase 2.** Client guard (UX): in `setActiveSectionColumnCount`
+      (`admin/page-builder.js` ~`:2008`) /
       `changeSectionLayout` (`canvas-mutations.js:296`), pre-check and surface guidance ("clear this
       column's modules first") so the user sees the block before the request; treat the backend rejection
       as the source of truth and message it.
