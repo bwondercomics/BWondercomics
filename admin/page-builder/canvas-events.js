@@ -184,6 +184,20 @@ export function createCanvasEventBinder({ el, getState, actions }) {
     });
   }
 
+  function bindColumnActions() {
+    el.pbCanvas.querySelectorAll('.pb-column').forEach((columnEl) => {
+      columnEl.addEventListener('click', (event) => {
+        // Modules, insert bars, and action buttons own their clicks; only a click on the bare
+        // column chrome selects the column/panel (mirrors the preview bridge's module-first rule).
+        if (event.target.closest('.pb-module, .pb-module-insert, [data-action]')) return;
+        const sectionId = columnEl.dataset.sectionId;
+        const columnIndex = Number(columnEl.dataset.columnIndex);
+        if (!sectionId || !Number.isInteger(columnIndex)) return;
+        actions.selectColumn(sectionId, columnIndex);
+      });
+    });
+  }
+
   function bindSectionDeleteActions() {
     el.pbCanvas.querySelectorAll('[data-action="delete-section"]').forEach((button) => {
       button.addEventListener('click', async () => {
@@ -201,6 +215,7 @@ export function createCanvasEventBinder({ el, getState, actions }) {
     bindHeaderSelectionAction();
     bindPageSettingsSelectionAction();
     bindModuleActions();
+    bindColumnActions();
     bindSectionDeleteActions();
   }
 

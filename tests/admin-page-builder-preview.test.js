@@ -61,12 +61,10 @@ describe('admin page-builder editor and preview renderers', () => {
     ).toBe('#00d9ff');
   });
 
-  it('renders grouped theme sections for presets, palette, and panel controls', () => {
+  it('renders grouped theme sections for presets and palette (panel controls moved to the column inspector)', () => {
     const themeHtml = renderThemeEditorContent({
       meta: {
         theme: { primary: '#112233' },
-        panelBackgrounds: { left: { path: 'assets/uploads/left.png', opacity: 0.4 } },
-        panelSpacing: { left: 20 },
       },
     });
     const wrapper = document.createElement('div');
@@ -74,19 +72,17 @@ describe('admin page-builder editor and preview renderers', () => {
 
     expect(themeHtml).toContain('Presets');
     expect(themeHtml).toContain('Color System');
-    expect(themeHtml).toContain('Panel Backgrounds');
-    expect(wrapper.textContent).toContain('Panel Spacing & Empty States');
-    expect(wrapper.querySelectorAll('.pb-inspector-section')).toHaveLength(4);
+    // Panel background/spacing cards were retired from the theme editor in favor of the
+    // click-to-edit Column/Panel inspector.
+    expect(themeHtml).not.toContain('Panel Backgrounds');
+    expect(wrapper.textContent).not.toContain('Panel Spacing');
+    expect(wrapper.querySelector('.pb-panel-bg-path')).toBeNull();
+    expect(wrapper.querySelector('.pb-panel-gap')).toBeNull();
+    expect(wrapper.querySelectorAll('.pb-inspector-section')).toHaveLength(2);
     expect(wrapper.querySelector('.pb-inspector-section[open]')).toBeNull();
     expect(
       wrapper.querySelector('.pb-theme-color-text[data-key="primary"]')?.getAttribute('value')
     ).toBe('#112233');
-    expect(
-      wrapper.querySelector('.pb-panel-bg-path[data-panel="left"]')?.getAttribute('value')
-    ).toBe('assets/uploads/left.png');
-    expect(wrapper.querySelector('.pb-panel-gap[data-panel="left"]')?.getAttribute('value')).toBe(
-      '20'
-    );
   });
 
   it('binds module editor draft flows for generic builder modules', async () => {
@@ -263,7 +259,8 @@ describe('admin page-builder editor and preview renderers', () => {
     expect(seriesReaderWrapper.querySelector('[data-source-key="seriesId"]')).toBeNull();
     expect(seriesReaderWrapper.textContent).toContain('Display And Controls');
     expect(seriesReaderWrapper.textContent).toContain('Stage');
-    expect(seriesReaderWrapper.textContent).toContain('Panels And Comments');
+    expect(seriesReaderWrapper.textContent).toContain('Comments');
+    expect(seriesReaderWrapper.textContent).not.toContain('Show Left Panel');
     expect(seriesReaderWrapper.textContent).not.toContain('Raw Config');
     expect(seriesReaderWrapper.querySelector('option[value="vertical-scroll"]')?.disabled).toBe(
       false

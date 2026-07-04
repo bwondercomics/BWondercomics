@@ -1369,7 +1369,9 @@ test.describe('builder Phase 12 authoring workflows', () => {
     await page.locator('[data-layer-action="select-page-settings"]').click();
     await page.locator('[data-tab="styles"]').click();
     await openAllInspectorSections(page);
-    await expect(page.locator('.pb-panel-bg-path').first()).toBeVisible();
+    await expect(page.locator('.pb-theme-preset-grid').first()).toBeVisible();
+    await expect(page.locator('.pb-theme-color-row').first()).toBeVisible();
+    await expect(page.locator('.pb-panel-bg-path')).toHaveCount(0);
     await assertNoHorizontalOverflow(
       page,
       [
@@ -1378,13 +1380,31 @@ test.describe('builder Phase 12 authoring workflows', () => {
         '.pb-theme-color-row',
         '.pb-theme-color-label',
         '.pb-theme-color-inputs',
-        '.pb-editor-subgrid',
-        '.pb-editor-subcard',
-        '.pb-editor-inline-actions',
-        '.pb-editor-inline-actions > *',
-        '.pb-panel-bg-meta',
       ],
       'Theme styles inspector'
+    );
+
+    await page.locator('[data-tab="layers"]').click();
+    await page
+      .locator(
+        '[data-layer-action="select-column"][data-section-id="phase-12-reader-section"][data-column-index="0"]'
+      )
+      .click();
+    await page.locator('[data-tab="settings"]').click();
+    await openAllInspectorSections(page);
+    await expect(page.locator('.pb-column-panel-bg-path').first()).toBeVisible();
+    await expect(page.locator('[data-column-field="panelGap"]').first()).toBeVisible();
+    await assertNoHorizontalOverflow(
+      page,
+      [
+        '.pb-editor-inline-actions',
+        '.pb-editor-inline-actions > *',
+        '.pb-editor-inline-actions > .pb-column-panel-bg-path',
+        '.pb-column-panel-bg-meta',
+        '.pb-column-panel-legacy-note',
+        '[data-column-field="panelGap"]',
+      ],
+      'Panel column inspector'
     );
 
     await page.setViewportSize({ width: 700, height: 1000 });

@@ -2,7 +2,8 @@
 
 Status: Phase 1 implemented (2026-06-28); Phase 2 implemented (2026-06-30, not
 independently shippable until Phase 3 retires the old Theme-editor panel controls);
-Phases 3–4 not started. Planning complete (review findings incorporated).
+Phase 3 implemented (2026-07-04, release-gated by migration before authors edit migrated panel
+settings); Phase 4 not started. Planning complete (review findings incorporated).
 Created: 2026-06-26
 
 > Second-pass review (2026-06-28) added four corrections, folded into the phases below. To avoid
@@ -272,12 +273,12 @@ column settings are live now.
 
 Goal: panel art and module spacing come from the column, not `page.meta`.
 
-> **[2nd-pass] Shippability:** Phase 2 moves render/data authority to the column, but the old Page
-> Theme panel controls stay live until Phase 3 — they render `page.meta.panelBackgrounds`/`panelSpacing`
-> (`theme-editor.js:55`) and `saveActiveThemeDraft` still writes them to `page.meta`
-> (`draft-manager.js:155`). If Phase 2 ships **alone**, those controls reintroduce legacy meta and look
-> inert against the now column-first runtime. So either pull the control retarget/removal + dirty-preview
-> plumbing forward into Phase 2, **or treat Phase 2 + Phase 3 as a single non-separable release.**
+> **[2nd-pass] Shippability:** Phase 2 moved render/data authority to the column, but the old Page
+> Theme panel controls intentionally stayed live until Phase 3 — they rendered
+> `page.meta.panelBackgrounds`/`panelSpacing` (`theme-editor.js:55`) and `saveActiveThemeDraft` still
+> wrote them to `page.meta` (`draft-manager.js:155`). Phase 3 retired those controls; if Phase 2 is
+> ever isolated from Phase 3, those controls would reintroduce legacy meta and look inert against the
+> column-first runtime. Treat Phase 2 + Phase 3 as a single non-separable release.
 
 - [x] Add `panelBackground` + `panelGap` to the column schema, with sanitize/prune + draft plumbing
       (see Data Model Changes).
@@ -321,18 +322,18 @@ ship/run the migration standalone before Phase 3; the old Theme-editor panel con
 
 Goal: click a column or panel → one menu with everything.
 
-- [ ] Add `selectedColumn` state ({ sectionId, columnIndex }) (`admin/page-builder.js:100`). Change the
+- [x] Add `selectedColumn` state ({ sectionId, columnIndex }) (`admin/page-builder.js:100`). Change the
       `kind === 'column'` branch of `selectCanvasTarget` (`:2294`) to a new
       `selectColumnFromCanvas(sectionId, columnIndex)`; repoint the `selectColumn` alias (`:471`).
-- [ ] Emit a `{ kind:'column', sectionId, columnIndex }` target on click of a `.pb-column` (canvas) or
+- [x] Emit a `{ kind:'column', sectionId, columnIndex }` target on click of a `.pb-column` (canvas) or
       a panel surface, reusing the existing selection channel (`canvas-events.js:174`,
       `preview-manager.js:726`) and the already-emitted markers.
-- [ ] Promote `renderColumnEditorContent` (`editor-panel.js:167`) into the column inspector for the
+- [x] Promote `renderColumnEditorContent` (`editor-panel.js:167`) into the column inspector for the
       selected column, using `renderInspectorSection` (`inspector-sections.js:3`). Add the **relocated**
       background-art + module-spacing controls (moved from `theme-editor.js` `renderPanelSurfaceCard`
       `:78` / `renderPanelSpacingCard` `:107`), reusing `openImagePicker`. Show panel-specific fields
       when the selected column maps to a panel (col 0 or last col of the reader section).
-- [ ] Remove the scattered **UIs only**: delete panel cards from `renderThemeEditorContent`
+- [x] Remove the scattered **UIs only**: delete panel cards from `renderThemeEditorContent`
       (`theme-editor.js:55`) + handlers (`:252`–`347`); delete panel toggles from
       `renderVisibilityControls` (`reader-editor.js:174`).
       **[2nd-pass] Do NOT delete `panels.*` normalization (`reader-config.js:71`) in this phase** —
@@ -340,9 +341,22 @@ Goal: click a column or panel → one menu with everything.
       both runtime readers. Keep the tolerant normalization/emission here; the config emission is deleted
       in Phase 4 (line ~299), **after** all consumers are neutralized. Removing the producer before the
       consumers breaks the reader shell.
-- [ ] Tests: clicking a column/panel selects it and renders the unified inspector; editing each control
+- [x] Tests: clicking a column/panel selects it and renders the unified inspector; editing each control
       (incl. moved bg/spacing) writes the column and updates the rendered panel; theme/reader editors no
       longer render panel controls.
+
+Completion note (2026-07-04): Phase 3 landed unified canvas/layer selection for columns and reader
+panels, a draft-backed Column/Panel inspector with relocated Panel Surface controls, module-to-parent
+column escalation, and removal of the retired Theme/Reader panel UIs. Column-owned
+`panelBackground`/`panelGap` fields are editable from the inspector. Legacy-only
+`page.meta.panelBackgrounds` / `page.meta.panelSpacing` values are display-only fallback marked with
+`data-panel-legacy-fallback="true"` and disabled because section save cannot safely clear page meta.
+Before authors edit migrated panel settings in a release, run
+`python -m backend.app.migrate_panel_settings_to_columns --series <id> --write` for each target
+series. Verification: `npm test -- tests/admin-page-builder-shell.test.js
+tests/admin-page-builder-preview.test.js tests/reader-editor.test.js`,
+`./.venv/bin/python -m unittest backend.tests.test_migrate_panel_settings`, `npm run lint`,
+`npm run format:check`, `npm run test:visual`, and `git diff --check`.
 
 ## Phase 4 — Ratio-driven panel existence
 
@@ -391,7 +405,9 @@ must go, and the block must be enforced where it actually persists (the backend)
 ## Migration & Backward Compatibility
 
 - **Read-time fallback** keeps un-migrated pages correct: column `panelBackground`/`panelGap` fall back
-  to `page.meta.panelBackgrounds`/`panelSpacing[side]` until migrated.
+  to `page.meta.panelBackgrounds`/`panelSpacing[side]` until migrated. In Phase 3 UI, fallback-only
+  fields are visible but disabled; the required release gate before authors edit migrated panel
+  settings is `python -m backend.app.migrate_panel_settings_to_columns --series <id> --write`.
 - **Backend data migration** (Phase 2) copies legacy `page.meta` panel values into the reader section's
   columns and clears the meta keys; it never deletes columns or modules. (A client one-shot dual-save is
   the fallback option if a backend migration is undesirable.)

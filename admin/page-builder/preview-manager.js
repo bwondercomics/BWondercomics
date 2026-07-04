@@ -864,11 +864,11 @@ export function createPreviewManager({ el, getState, actions, deps }) {
     }
 
     if (dirtyScope === 'theme' && activeThemeDraft) {
+      // The theme draft no longer models panel background/spacing (those live on the column now);
+      // preserve any existing page.meta panel keys via the spread as a read-time fallback.
       pageSnapshot.meta = {
         ...(pageSnapshot.meta || {}),
         theme: cloneValue(activeThemeDraft.theme),
-        panelBackgrounds: cloneValue(activeThemeDraft.panelBackgrounds),
-        panelSpacing: cloneValue(activeThemeDraft.panelSpacing),
       };
       return;
     }

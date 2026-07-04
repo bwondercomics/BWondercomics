@@ -77,7 +77,9 @@ Current routing behavior:
 
 Current page-level fields include: `scope` (`series` or `global`), nullable `seriesId`, `slug`,
 `title`, `pageType`, `isPublished`, `isHomepage`, `sortIndex`, and `meta`.
-Current page-level `meta` ownership: `meta.header`, `meta.theme`, `meta.panelBackgrounds`, and `meta.panelSpacing`.
+Current page-level `meta` ownership: `meta.header` and `meta.theme`. Legacy
+`meta.panelBackgrounds` and `meta.panelSpacing` are preserved as read-time fallback until the panel
+settings migration copies them onto columns.
 
 Series route roles are stored in `BuilderPageBinding`; Phase 8 requires the `reader` role for each
 series, and reader bindings must point at a same-series page. A valid bound reader page also needs
@@ -95,17 +97,18 @@ truth for column count and width ratios. `settings.columns[]` holds sparse per-c
 `index` (sanitized appearance, padding, alignment, min-height, hidden, and a per-column `responsive`
 branch); it never carries width. Device track count/ratio rides
 `settings.responsive[device].layout`, is limited to the global structural column count, and reflows
-the stable global column nodes without changing `module.columnIndex`. When a saved global layout
-shrinks, modules already in the last surviving column stay first, orphaned modules append by original
-column/sort order, and the merged destination order is resequenced contiguously in the same
-transaction.
+the stable global column nodes without changing `module.columnIndex`. Reader side-panel surface
+fields also live here as `panelBackground` and `panelGap` on the first/last reader-section columns.
+When a saved global layout shrinks, modules already in the last surviving column stay first,
+orphaned modules append by original column/sort order, and the merged destination order is
+resequenced contiguously in the same transaction.
 
-Panel precedence: reader side panels are reader-owned. They are styled through the reader module's
-`panels` settings and the page-level `meta.panelBackgrounds` / `meta.panelSpacing`, and are fed only
-from the reader module's own section. Generic section columns use the `settings.columns[]` contract;
-the two do not overload each other. On a bound reader page, sections before the reader module render
-into the above-reader content surface and sections after it into the below-reader content surface as
-ordinary page content (not panels).
+Panel precedence: reader side panels are mapped from the reader section's first and last columns.
+Column styling and panel surface fields use the `settings.columns[]` contract. Legacy
+`meta.panelBackgrounds` / `meta.panelSpacing` values remain read-only fallback until migration, while
+reader-module `panels` settings still feed Phase 4 runtime visibility behavior. On a bound reader
+page, sections before the reader module render into the above-reader content surface and sections
+after it into the below-reader content surface as ordinary page content (not panels).
 
 ### Module
 
@@ -527,18 +530,17 @@ Reordering works two ways, both reusing the same handlers: **whole-row drag** be
 
 ## 🎨 Theme Editor (theme-editor.js)
 
-The centralized controller for the visual identity of the page. It manages the global metadata used to theme the reader chrome and panel surfaces.
+The centralized controller for the visual identity of the page. It manages global theme tokens for
+the reader chrome. Panel background art and spacing are edited from the Column/Panel inspector.
 
 **Core Systems**
 
 - **Palette Management**: Synchronizes the `THEME_COLORS` token set with dual UI inputs (Color Picker + Hex Text).
 - **Preset Engine**: Allows for one-click application of pre-defined color schemes (Presets) from the centralized registry.
-- **Surface Engineering**: Manages per-panel background art. Integrates with the image picker to utilize focal point coordinates and object-fit logic for panel backgrounds. Provides direct control over background asset opacity.
-- **Structural Rhythm**: Manages `panelSpacing` (the vertical gap between modules) and toggles for empty-state placeholder visibility.
 
 **Logic & State**
 
-- **`renderThemeEditorContent(...)`**: Constructs the four-section editor stack (Presets, Palette, Surfaces, Spacing).
+- **`renderThemeEditorContent(...)`**: Constructs the two-section editor stack (Presets, Palette).
 - **`bindThemeEditorEvents(...)`**: Orchestrates a "Soft-Draft" lifecycle, staging changes to a `draftMeta` object to ensure smooth performance during color picking.
 - **`cloneThemeDraft(draft)`**: Ensures a deep copy of the theme state to prevent accidental mutations of the working metadata.
 

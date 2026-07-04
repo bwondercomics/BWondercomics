@@ -57,7 +57,10 @@ describe('renderReaderEditor', () => {
     expect(html).toContain('Display And Controls');
     expect(html).toContain('Reader Controls');
     expect(html).toContain('Stage');
-    expect(html).toContain('Panels And Comments');
+    // Panel on/off toggles were retired; panels are styled via the Column/Panel inspector.
+    expect(html).toContain('Comments');
+    expect(html).not.toContain('data-reader-key="panels.left.enabled"');
+    expect(html).not.toContain('data-reader-key="panels.right.enabled"');
     expect(html).toContain('data-reader-key="controls.placement"');
     expect(html).toContain('data-reader-key="stage.maxWidth"');
   });

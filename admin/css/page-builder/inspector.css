@@ -661,7 +661,7 @@
   min-width: 0;
 }
 
-.pb-editor-inline-actions > .pb-panel-bg-path {
+.pb-editor-inline-actions > .pb-column-panel-bg-path {
   padding-inline: 6px;
   font-size: 0.68rem;
 }

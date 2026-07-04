@@ -183,8 +183,8 @@ Classes related to drag-and-drop structural manipulation and interactive context
 
 - **Theme Options**: Maps styles for global theme adjustments (colors, layout presets), organizing
   color pickers in `.pb-theme-color-row` layouts with accompanying `.pb-theme-preset-btn` macro
-  choices. Inside `.pb-editor-content`, theme preset buttons, color rows, and panel background asset
-  rows receive compact inspector overrides so the Styles tab fits the 280px rail.
+  choices. Inside `.pb-editor-content`, theme preset buttons, color rows, and Column/Panel inspector
+  background asset rows receive compact overrides so the 280px rail stays usable.
 
 ### Responsive Degrade
 

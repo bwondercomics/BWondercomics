@@ -298,6 +298,15 @@ async function openBuilderPage(manager) {
   await flushAdminUi(3);
 }
 
+// Per-column styling now lives in the click-to-edit Column/Panel inspector. Selecting a column in
+// the canvas chrome switches the inspector to that column's controls.
+async function selectCanvasColumn(sectionId, columnIndex) {
+  document
+    .querySelector(`.pb-column[data-section-id="${sectionId}"][data-column-index="${columnIndex}"]`)
+    ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  await flushAdminUi(2);
+}
+
 function getInspectorSectionContaining(selector) {
   const target = typeof selector === 'string' ? document.querySelector(selector) : selector;
   if (!target) return null;
@@ -1566,6 +1575,8 @@ describe('admin page-builder shell', () => {
     ratioInput.dispatchEvent(new Event('change', { bubbles: true }));
     await flushAdminUi(2);
 
+    await selectCanvasColumn(editableSection.id, 0);
+
     const backgroundToggle = document.querySelector(
       '[data-appearance-toggle="true"][data-appearance-scope="section-column"][data-appearance-key="background.color"][data-item-index="0"]'
     );
@@ -1642,6 +1653,8 @@ describe('admin page-builder shell', () => {
     expect(getInspectorSectionContaining('#pbEditSectionColumnCount')?.open).toBe(true);
     expect(getInspectorSectionContaining('#pbEditSectionModuleGap')?.open).toBe(false);
 
+    await selectCanvasColumn(editableSection.id, 0);
+
     const backgroundToggleSelector =
       '[data-appearance-toggle="true"][data-appearance-scope="section-column"]' +
       '[data-appearance-key="background.color"][data-item-index="0"]';
@@ -1684,6 +1697,8 @@ describe('admin page-builder shell', () => {
     ratioInput.value = '2';
     ratioInput.dispatchEvent(new Event('change', { bubbles: true }));
     await flushAdminUi(2);
+
+    await selectCanvasColumn(editableSection.id, 0);
 
     const backgroundToggle = document.querySelector(
       '[data-appearance-toggle="true"][data-appearance-scope="section-column"][data-appearance-key="background.color"][data-item-index="0"]'
@@ -1776,7 +1791,6 @@ describe('admin page-builder shell', () => {
     scopeSelect.dispatchEvent(new Event('change', { bubbles: true }));
     await flushAdminUi(2);
 
-    expect(document.querySelectorAll('.pb-column-editor')).toHaveLength(4);
     const countSelect = document.getElementById('pbEditSectionColumnCount');
     expect(
       Array.from(countSelect.options)
@@ -1791,6 +1805,8 @@ describe('admin page-builder shell', () => {
     firstRatio.value = '2';
     firstRatio.dispatchEvent(new Event('change', { bubbles: true }));
     await flushAdminUi(2);
+
+    await selectCanvasColumn(editableSection.id, 0);
 
     const textToggle = document.querySelector(
       '[data-appearance-toggle="true"][data-appearance-scope="section-column"][data-appearance-key="text.color"][data-item-index="0"]'
@@ -1882,6 +1898,8 @@ describe('admin page-builder shell', () => {
       )
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await flushAdminUi(2);
+
+    await selectCanvasColumn(editableSection.id, 0);
 
     const appearanceKeys = Array.from(
       document.querySelectorAll(
@@ -2052,6 +2070,8 @@ describe('admin page-builder shell', () => {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await flushAdminUi(2);
 
+    await selectCanvasColumn(editableSection.id, 0);
+
     const setAppearanceField = async (key, value) => {
       const toggle = document.querySelector(
         `[data-appearance-toggle="true"][data-appearance-scope="section-column"]` +
@@ -2090,6 +2110,225 @@ describe('admin page-builder shell', () => {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await flushAdminUi(2);
     expect(columnRadius()).toBe(14);
+  });
+
+  it('selects a column from the canvas and opens the unified column inspector', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const editableSection = selectedPage.sections[1]; // layout '1-1'
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    await selectCanvasColumn(editableSection.id, 1);
+
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Column 2');
+    expect(
+      document.querySelector('[data-column-field="minHeight"][data-column-index="1"]')
+    ).not.toBeNull();
+    expect(
+      document.querySelector(
+        '[data-appearance-toggle="true"][data-appearance-scope="section-column"][data-item-index="1"]'
+      )
+    ).not.toBeNull();
+    // A normal column keeps its alignment control (only reader panels hide it).
+    expect(
+      document.querySelector('[data-column-field="alignment"][data-column-index="1"]')
+    ).not.toBeNull();
+  });
+
+  it('escalates from a populated module to its parent column via the module inspector', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const feedModule = selectedPage.sections[1].modules.find(
+      (module) => module.moduleType === 'feed'
+    ); // columnIndex 1
+    const { manager } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector(`.pb-module[data-module-id="${feedModule.id}"]`)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Feed Module');
+
+    const parentButton = document.getElementById('pbEditParentColumn');
+    expect(parentButton).not.toBeNull();
+    parentButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Column 2');
+    expect(
+      document.querySelector('[data-column-field="minHeight"][data-column-index="1"]')
+    ).not.toBeNull();
+  });
+
+  it('edits a reader panel column: shows column-owned Panel Surface controls and saves panelGap onto the column', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const readerSection = selectedPage.sections[1]; // layout '1-1' -> left/right panels
+    selectedPage.meta = {
+      ...selectedPage.meta,
+      panelBackgrounds: {},
+      panelSpacing: {},
+    };
+    readerSection.settings = {
+      ...readerSection.settings,
+      columns: [
+        {
+          index: 0,
+          panelBackground: {
+            path: 'media/panels/column-left.png',
+            fit: 'cover',
+            focus: 'center',
+            opacity: 0.5,
+          },
+          panelGap: 14,
+        },
+      ],
+    };
+    // Make it a reader section so column 0/last map to the left/right panels.
+    readerSection.modules = [
+      ...readerSection.modules,
+      {
+        id: 'reader-mod-panel-test',
+        moduleType: 'reader',
+        columnIndex: 0,
+        sortIndex: 0,
+        config: { showComments: false },
+      },
+    ];
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    await selectCanvasColumn(readerSection.id, 0);
+
+    // Panel-specific inspector: labelled as the left panel, exposes the relocated Panel Surface
+    // controls, and hides the (flex-inert) alignment control.
+    expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Left Panel');
+    const bgPath = document.querySelector('.pb-column-panel-bg-path');
+    const bgPick = document.querySelector('.pb-column-panel-bg-pick');
+    expect(bgPath?.value).toBe('media/panels/column-left.png');
+    expect(bgPath?.disabled).toBe(false);
+    expect(bgPath?.dataset.panelLegacyFallback).toBeUndefined();
+    expect(bgPick).not.toBeNull();
+    expect(bgPick?.disabled).toBe(false);
+    expect(
+      document.querySelector('[data-column-field="alignment"][data-column-index="0"]')
+    ).toBeNull();
+
+    const gapInput = document.querySelector(
+      '[data-column-field="panelGap"][data-column-index="0"]'
+    );
+    expect(gapInput).not.toBeNull();
+    gapInput.value = '18';
+    gapInput.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+
+    // Draft-backed: the edit is reflected before saving (the input re-renders from the draft).
+    expect(
+      document
+        .querySelector('[data-column-field="panelGap"][data-column-index="0"]')
+        ?.getAttribute('value')
+    ).toBe('18');
+
+    document
+      .querySelector('[data-action="save-section-settings"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.updateSection).toHaveBeenCalledWith(
+      readerSection.id,
+      expect.objectContaining({
+        settings: expect.objectContaining({
+          columns: expect.arrayContaining([expect.objectContaining({ index: 0, panelGap: 18 })]),
+        }),
+      }),
+      expect.objectContaining({ onError: expect.any(Function) })
+    );
+  });
+
+  it('shows legacy meta-only panel surface values as disabled fallback fields', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const readerSection = selectedPage.sections[1]; // layout '1-1' -> left/right panels
+    selectedPage.meta = {
+      ...selectedPage.meta,
+      panelBackgrounds: {
+        left: {
+          path: 'media/panels/legacy-left.png',
+          fit: 'contain',
+          focus: 'top',
+          opacity: 0.4,
+          hideEmptyText: true,
+        },
+      },
+      panelSpacing: {
+        left: 22,
+      },
+    };
+    readerSection.settings = {
+      ...readerSection.settings,
+      columns: [{ index: 0, padding: { top: 4 } }],
+    };
+    readerSection.modules = [
+      ...readerSection.modules,
+      {
+        id: 'reader-mod-panel-fallback-test',
+        moduleType: 'reader',
+        columnIndex: 0,
+        sortIndex: 0,
+        config: { showComments: false },
+      },
+    ];
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    await selectCanvasColumn(readerSection.id, 0);
+
+    const bgPath = document.querySelector('.pb-column-panel-bg-path');
+    const bgPick = document.querySelector('.pb-column-panel-bg-pick');
+    const bgClear = document.querySelector('.pb-column-panel-bg-clear');
+    const opacity = document.querySelector('.pb-column-panel-bg-opacity');
+    const emptyToggle = document.querySelector('.pb-column-panel-empty-toggle');
+    const gapInput = document.querySelector(
+      '[data-column-field="panelGap"][data-column-index="0"]'
+    );
+
+    expect(bgPath?.value).toBe('media/panels/legacy-left.png');
+    expect(bgPath?.dataset.panelLegacyFallback).toBe('true');
+    expect(bgPath?.disabled).toBe(true);
+    expect(bgPick?.dataset.panelLegacyFallback).toBe('true');
+    expect(bgPick?.disabled).toBe(true);
+    expect(bgClear?.disabled).toBe(true);
+    expect(opacity?.value).toBe('0.4');
+    expect(opacity?.disabled).toBe(true);
+    expect(emptyToggle?.checked).toBe(true);
+    expect(emptyToggle?.disabled).toBe(true);
+    expect(gapInput?.value).toBe('22');
+    expect(gapInput?.dataset.panelLegacyFallback).toBe('true');
+    expect(gapInput?.disabled).toBe(true);
+    expect(document.querySelector('.pb-column-panel-legacy-note')?.textContent).toContain(
+      'migration'
+    );
+
+    gapInput.value = '30';
+    gapInput.dispatchEvent(new Event('change', { bubbles: true }));
+    bgClear.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(mocks.updateSection).not.toHaveBeenCalled();
   });
 
   it('clears selected module state when a module is deleted from the canvas', async () => {
@@ -5612,8 +5851,9 @@ describe('admin page-builder shell', () => {
       text: '#ffffff',
       danger: '#ff3838',
     });
-    expect(resetSnapshot?.page.meta.panelBackgrounds).toEqual({});
-    expect(resetSnapshot?.page.meta.panelSpacing).toEqual({});
+    // The theme reset no longer touches panel meta; the legacy fallback is preserved untouched.
+    expect(resetSnapshot?.page.meta.panelBackgrounds).toEqual(selectedPage.meta.panelBackgrounds);
+    expect(resetSnapshot?.page.meta.panelSpacing).toEqual(selectedPage.meta.panelSpacing);
 
     enterEditMode();
     document

@@ -1,4 +1,4 @@
-import { escapeAttr, escapeHtml } from './helpers.js';
+import { escapeAttr, escapeHtml, formatFocus, normalizeFit, parseFocus } from './helpers.js';
 import { COLUMN_ALIGNMENTS, MAX_COLUMNS, parseLayoutRatios } from './layout-utils.js';
 import {
   getAppearanceInputValue,
@@ -164,31 +164,22 @@ function renderSectionLayoutEditor(draft, { activeDeviceId, responsiveEditScope 
   `;
 }
 
-function renderColumnEditorContent(draft, { activeDeviceId, responsiveEditScope }) {
-  const globalRatios = parseLayoutRatios(draft?.layout || '1');
-  const columnCards = globalRatios
-    .map((_, index) => {
-      const column = getColumnScopeDraft(draft, index, responsiveEditScope, activeDeviceId);
-      const padding = column.padding || {};
-      const alignment = column.alignment || '';
-      const paddingInputs = ['Top', 'Right', 'Bottom', 'Left']
-        .map((side) => {
-          const value = padding[side.toLowerCase()];
-          return `<input type="number" class="pb-editor-input pb-column-padding-input" min="0" step="1" value="${escapeAttr(String(value ?? ''))}" placeholder="${side[0]}" aria-label="Padding ${side}" data-column-field="padding${side}" data-column-index="${index}" />`;
-        })
-        .join('');
-      return `
-        <div class="pb-column-editor" data-column-index="${index}">
-          <div class="pb-column-editor-title">Global Column ${index + 1}</div>
-          ${renderAppearanceControls(
-            column.appearance,
-            'section-column',
-            index,
-            'Appearance',
-            responsiveEditScope === 'device'
-              ? 'Unset fields inherit the global column appearance.'
-              : 'Use the shared sanitized background, text, and border controls.'
-          )}
+// Render the editable controls for a single column, keyed by its index. Reused by the
+// click-to-edit Column/Panel inspector. `includeAlignment` is turned off for reader panels,
+// where the alignment token (`justify-self`) is inert on the flex panel wrapper.
+function renderColumnFields(draft, index, options = {}) {
+  const { activeDeviceId, responsiveEditScope, includeAlignment = true } = options;
+  const column = getColumnScopeDraft(draft, index, responsiveEditScope, activeDeviceId);
+  const padding = column.padding || {};
+  const alignment = column.alignment || '';
+  const paddingInputs = ['Top', 'Right', 'Bottom', 'Left']
+    .map((side) => {
+      const value = padding[side.toLowerCase()];
+      return `<input type="number" class="pb-editor-input pb-column-padding-input" min="0" step="1" value="${escapeAttr(String(value ?? ''))}" placeholder="${side[0]}" aria-label="Padding ${side}" data-column-field="padding${side}" data-column-index="${index}" />`;
+    })
+    .join('');
+  const alignmentField = includeAlignment
+    ? `
           <div class="pb-editor-field">
             <label class="pb-editor-label">Alignment</label>
             <select class="pb-editor-select" data-column-field="alignment" data-column-index="${index}">
@@ -206,7 +197,20 @@ function renderColumnEditorContent(draft, { activeDeviceId, responsiveEditScope 
                   }>${value}</option>`
               ).join('')}
             </select>
-          </div>
+          </div>`
+    : '';
+  return `
+        <div class="pb-column-editor" data-column-index="${index}">
+          ${renderAppearanceControls(
+            column.appearance,
+            'section-column',
+            index,
+            'Appearance',
+            responsiveEditScope === 'device'
+              ? 'Unset fields inherit the global column appearance.'
+              : 'Use the shared sanitized background, text, and border controls.'
+          )}
+          ${alignmentField}
           <div class="pb-editor-field">
             <label class="pb-editor-label">Padding (T / R / B / L)</label>
             <div class="pb-column-padding-grid">${paddingInputs}</div>
@@ -238,12 +242,147 @@ function renderColumnEditorContent(draft, { activeDeviceId, responsiveEditScope 
           </div>
         </div>
       `;
-    })
-    .join('');
+}
 
+// A reader-section column that maps to a side panel: left = column 0; right = last column
+// (only when the section has 2+ columns). Mirrors findPanelModules in reader/data.js. `draft`
+// is optional — falls back to the section record's layout when reading outside a section draft.
+function sectionReaderPanelSide(section, draft, columnIndex) {
+  if (!section || !Array.isArray(section.modules)) return null;
+  if (!section.modules.some((module) => module?.moduleType === 'reader')) return null;
+  const columnCount = parseLayoutRatios(draft?.layout || section.layout || '1').length;
+  const index = Number(columnIndex);
+  if (index === 0) return 'left';
+  if (columnCount >= 2 && index === columnCount - 1) return 'right';
+  return null;
+}
+
+function getLegacyPanelSurface(currentPage, panelSide) {
+  const meta = currentPage?.meta || {};
+  return {
+    panelBackground: meta.panelBackgrounds?.[panelSide],
+    panelGap: meta.panelSpacing?.[panelSide],
+  };
+}
+
+function hasOwnPanelValue(column, key) {
+  return Object.prototype.hasOwnProperty.call(column || {}, key);
+}
+
+// Relocated from the Page Theme editor: background art + module spacing for a reader panel,
+// now written only to the column (section.settings.columns[i]). Legacy page meta is display-only
+// fallback until migration copies it onto the column.
+function renderPanelSurfaceControls(baseColumn, index, legacySurface = {}) {
+  const hasColumnBackground = hasOwnPanelValue(baseColumn, 'panelBackground');
+  const hasColumnGap = hasOwnPanelValue(baseColumn, 'panelGap');
+  const legacyBg =
+    legacySurface.panelBackground && typeof legacySurface.panelBackground === 'object'
+      ? legacySurface.panelBackground
+      : null;
+  const hasLegacyBackground =
+    !hasColumnBackground && !!legacyBg && Object.keys(legacyBg).length > 0;
+  const hasLegacyGap =
+    !hasColumnGap &&
+    legacySurface.panelGap !== undefined &&
+    legacySurface.panelGap !== null &&
+    legacySurface.panelGap !== '';
+  const bg = hasColumnBackground ? baseColumn.panelBackground || {} : legacyBg || {};
+  const opacity = typeof bg.opacity === 'number' ? bg.opacity : 0.18;
+  const gap = hasColumnGap ? baseColumn.panelGap : legacySurface.panelGap;
+  const bgFallbackAttr = hasLegacyBackground ? ' data-panel-legacy-fallback="true"' : '';
+  const bgDisabledAttr = hasLegacyBackground ? ' disabled aria-disabled="true"' : '';
+  const gapFallbackAttr = hasLegacyGap ? ' data-panel-legacy-fallback="true"' : '';
+  const gapDisabledAttr = hasLegacyGap ? ' disabled aria-disabled="true"' : '';
+  const legacyNotice =
+    hasLegacyBackground || hasLegacyGap
+      ? `<small class="pb-editor-hint pb-column-panel-legacy-note" data-panel-legacy-fallback="true">Legacy panel fallback. Run the panel settings migration before editing.</small>`
+      : '';
   return `
-    ${renderSectionLayoutEditor(draft, { activeDeviceId, responsiveEditScope })}
-    <div class="pb-column-editor-list">${columnCards}</div>
+    <div class="pb-editor-field">
+      <label class="pb-editor-label">Background Asset</label>
+      <div class="pb-editor-inline-actions">
+        <input type="text" class="pb-editor-input pb-column-panel-bg-path" data-column-index="${index}" value="${escapeAttr(bg.path || '')}" placeholder="assets/uploads/..." readonly${bgFallbackAttr}${bgDisabledAttr}>
+        <button type="button" class="btn-secondary pb-column-panel-bg-pick" data-column-index="${index}"${bgFallbackAttr}${bgDisabledAttr}>Choose</button>
+        <button type="button" class="btn-secondary pb-column-panel-bg-clear" data-column-index="${index}"${bgFallbackAttr}${bgDisabledAttr}>Clear</button>
+      </div>
+    </div>
+    <div class="pb-editor-field pb-editor-field--row">
+      <label class="pb-editor-label">Opacity</label>
+      <input type="range" class="pb-promo-style-range pb-column-panel-bg-opacity" data-column-index="${index}" min="0" max="1" step="0.05" value="${opacity}"${bgFallbackAttr}${bgDisabledAttr}>
+    </div>
+    <small class="pb-editor-hint pb-column-panel-bg-meta" data-column-index="${index}"${bgFallbackAttr}>Fit: ${normalizeFit(bg.fit || 'cover')} · Focus: ${bg.focus || 'center'} · Opacity: ${opacity}</small>
+    <div class="pb-editor-field">
+      <label class="pb-editor-label">Module Spacing (px)</label>
+      <input type="number" class="pb-editor-input" data-column-field="panelGap" data-column-index="${index}" min="0" step="1" placeholder="12" value="${escapeAttr(String(gap ?? ''))}"${gapFallbackAttr}${gapDisabledAttr}>
+    </div>
+    <div class="pb-editor-field pb-editor-field--row">
+      <label class="pb-editor-label">Hide Empty Text</label>
+      <input type="checkbox" class="pb-column-panel-empty-toggle" data-column-index="${index}" ${bg.hideEmptyText ? 'checked' : ''}${bgFallbackAttr}${bgDisabledAttr}>
+    </div>
+    ${legacyNotice}
+  `;
+}
+
+// The unified click-to-edit Column/Panel inspector for a single selected column. All values
+// read from the section draft (not saved settings) so edits show live.
+function renderColumnInspectorContent(section, draft, columnIndex, options = {}) {
+  if (!section || !draft) return '';
+  const activeDeviceId = options.activeDeviceId;
+  const responsiveEditScope = options.responsiveEditScope === 'device' ? 'device' : 'global';
+  const index = Number(columnIndex) || 0;
+  const panelSide = sectionReaderPanelSide(section, draft, index);
+  const isPanel = panelSide !== null;
+  const baseColumn = getColumnDraft(draft, index);
+  const legacySurface = isPanel ? getLegacyPanelSurface(options.currentPage, panelSide) : {};
+  const displayBackground = hasOwnPanelValue(baseColumn, 'panelBackground')
+    ? baseColumn.panelBackground
+    : legacySurface.panelBackground;
+  const columnCount = parseLayoutRatios(draft.layout || section.layout || '1').length;
+  const label = isPanel
+    ? `${panelSide === 'left' ? 'Left' : 'Right'} Panel`
+    : `Column ${index + 1}`;
+  return `
+    ${renderResponsiveScopeControl({ activeDeviceId, responsiveEditScope })}
+    ${renderInspectorSection({
+      kicker: isPanel ? 'Panel' : 'Column',
+      title: label,
+      summary: `${index + 1} / ${columnCount}`,
+      copy: isPanel
+        ? 'Styling for this reader side panel. Alignment follows the section layout.'
+        : 'Per-column appearance, spacing, and visibility.',
+      open: true,
+      body: renderColumnFields(draft, index, {
+        activeDeviceId,
+        responsiveEditScope,
+        includeAlignment: !isPanel,
+      }),
+    })}
+    ${
+      isPanel
+        ? renderInspectorSection({
+            kicker: 'Panel',
+            title: 'Panel Surface',
+            summary: displayBackground?.path ? 'Image set' : 'No image',
+            copy: 'Background art and module spacing for this panel (applies to all devices).',
+            body: renderPanelSurfaceControls(baseColumn, index, legacySurface),
+          })
+        : ''
+    }
+  `;
+}
+
+// Affordance shown in the module inspector so a click inside a populated column/panel (which
+// selects the module) can escalate to the parent column/panel inspector.
+function renderParentColumnLink(section, columnIndex) {
+  if (!section) return '';
+  const side = sectionReaderPanelSide(section, null, columnIndex);
+  const label = side
+    ? `Edit ${side === 'left' ? 'Left' : 'Right'} Panel`
+    : `Edit Column ${(Number(columnIndex) || 0) + 1}`;
+  return `
+    <div class="pb-editor-parent-link">
+      <button type="button" class="btn-secondary pb-edit-parent-column" id="pbEditParentColumn">${escapeHtml(label)} →</button>
+    </div>
   `;
 }
 
@@ -284,9 +423,9 @@ function renderSectionSettingsContent(section, draft, options = {}) {
           : `${parseLayoutRatios(draft.layout || section.layout || '1').length} cols`,
       copy:
         responsiveEditScope === 'device'
-          ? 'Reflow stable structural columns and author sparse device-specific column styles.'
-          : 'Choose structural column count, ratios, and base per-column styling.',
-      body: renderColumnEditorContent(draft, {
+          ? 'Reflow stable structural columns. Click a column in the canvas to style it.'
+          : 'Choose structural column count and ratios. Click a column or panel to style it.',
+      body: renderSectionLayoutEditor(draft, {
         activeDeviceId,
         responsiveEditScope,
       }),
@@ -609,7 +748,7 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
         contentHtml = renderThemeEditorContent(state.currentPage, state.activeThemeDraft);
         kicker = 'Theme Studio';
         title = 'Page Theme';
-        subtitle = `Tune presets, palette, panel backgrounds, and spacing for ${pageTitle}.`;
+        subtitle = `Tune presets and palette for ${pageTitle}.`;
         footerHtml = renderFooter({
           scope: 'theme',
           actionsHtml: `
@@ -648,6 +787,35 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
           <button class="btn-primary" id="pbSavePageSettings" data-action="save-current" type="button">Save Settings</button>
         `,
       });
+    } else if (state.selectedCanvasSurface === 'column' && state.activeSectionId) {
+      const section = helpers.getSectionRecord(state.activeSectionId);
+      const panelSide = sectionReaderPanelSide(
+        section,
+        state.activeSectionDraft,
+        state.selectedColumnIndex
+      );
+      contentHtml = renderColumnInspectorContent(
+        section,
+        state.activeSectionDraft,
+        state.selectedColumnIndex,
+        {
+          currentPage: state.currentPage,
+          activeDeviceId: state.activeDeviceId,
+          responsiveEditScope: state.responsiveEditScope,
+        }
+      );
+      kicker = panelSide ? 'Panel' : 'Column';
+      title = panelSide
+        ? `${panelSide === 'left' ? 'Left' : 'Right'} Panel`
+        : `Column ${(Number(state.selectedColumnIndex) || 0) + 1}`;
+      subtitle = `Editing a ${panelSide ? 'reader panel' : 'column'} in ${pageTitle}.`;
+      footerHtml = renderFooter({
+        scope: 'section',
+        actionsHtml: `
+          <button class="btn-secondary" id="pbDiscardSectionSettings" data-action="discard-current" type="button">Discard</button>
+          <button class="btn-primary" id="pbSaveSectionSettings" data-action="save-current" type="button">Save Settings</button>
+        `,
+      });
     } else if (state.selectedCanvasSurface === 'section' && state.activeSectionId) {
       const section = helpers.getSectionRecord(state.activeSectionId);
       contentHtml = renderSectionSettingsContent(section, state.activeSectionDraft, {
@@ -665,14 +833,23 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
         `,
       });
     } else {
-      contentHtml = renderModuleEditorContent({
-        currentPage: state.currentPage,
-        selectedModuleId: state.selectedModuleId,
-        draftConfig: selectedModuleRecord ? state.activeModuleDraft : null,
-        pages: state.pages,
-        activeDeviceId: state.activeDeviceId,
-        responsiveEditScope: state.responsiveEditScope,
-      });
+      const moduleSection = selectedModuleRecord
+        ? (state.currentPage.sections || []).find((section) =>
+            (section.modules || []).some((module) => module.id === selectedModuleRecord.id)
+          )
+        : null;
+      contentHtml =
+        (selectedModuleRecord
+          ? renderParentColumnLink(moduleSection, selectedModuleRecord.columnIndex)
+          : '') +
+        renderModuleEditorContent({
+          currentPage: state.currentPage,
+          selectedModuleId: state.selectedModuleId,
+          draftConfig: selectedModuleRecord ? state.activeModuleDraft : null,
+          pages: state.pages,
+          activeDeviceId: state.activeDeviceId,
+          responsiveEditScope: state.responsiveEditScope,
+        });
       kicker = selectedModuleRecord ? 'Selected Module' : 'Module Inspector';
       title = selectedModuleRecord
         ? `${helpers.getModuleLabel(selectedModuleRecord.moduleType)} Module`
@@ -800,10 +977,6 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
         draftMeta: state.activeThemeDraft,
         setDraftMeta: actions.setActiveThemeDraft,
         markDirty: actions.markDirty,
-        openImagePicker: deps.openImagePicker,
-        fetchAssets: deps.fetchAssets,
-        uploadAssetFile: deps.uploadAssetFile,
-        resolveAssetUrl: deps.resolveAssetUrl,
       });
 
       document.getElementById('pbSaveTheme')?.addEventListener('click', async () => {
@@ -865,7 +1038,10 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       document.getElementById('pbDiscardPageSettings')?.addEventListener('click', () => {
         actions.runCommand?.(BUILDER_COMMANDS.DISCARD_DRAFT);
       });
-    } else if (state.selectedCanvasSurface === 'section') {
+    } else if (
+      state.selectedCanvasSurface === 'section' ||
+      state.selectedCanvasSurface === 'column'
+    ) {
       el.pbModuleEditor.querySelectorAll('[data-section-setting]').forEach((input) => {
         input.addEventListener('change', (e) => {
           actions.updateActiveSectionDraftField(
@@ -891,6 +1067,7 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       el.pbModuleEditor.querySelectorAll('[data-column-field]').forEach((input) => {
         input.addEventListener('change', (e) => {
           const target = /** @type {HTMLInputElement} */ (e.target);
+          if (target.disabled || target.dataset.panelLegacyFallback === 'true') return;
           const value = target.type === 'checkbox' ? target.checked : target.value;
           actions.updateActiveSectionColumnField(
             target.dataset.columnIndex,
@@ -959,6 +1136,92 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
         });
       });
 
+      // Relocated panel background controls — write to the selected panel column's non-responsive
+      // panelBackground; module spacing (panelGap) rides the shared [data-column-field] binding above.
+      const buildPanelBackground = (index, patch) => {
+        const current = getColumnDraft(getState().activeSectionDraft, index).panelBackground || {};
+        return {
+          path: current.path || '',
+          fit: normalizeFit(current.fit || 'cover'),
+          focus: current.focus || 'center',
+          opacity: typeof current.opacity === 'number' ? current.opacity : 0.18,
+          hideEmptyText: !!current.hideEmptyText,
+          ...patch,
+        };
+      };
+
+      el.pbModuleEditor.querySelectorAll('.pb-column-panel-bg-pick').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          if (btn.disabled || btn.dataset.panelLegacyFallback === 'true') return;
+          const index = Number(btn.dataset.columnIndex);
+          if (!Number.isInteger(index)) return;
+          const current =
+            getColumnDraft(getState().activeSectionDraft, index).panelBackground || {};
+          const focus = parseFocus(current.focus || 'center');
+          await deps.openImagePicker({
+            title: 'Select panel background',
+            getItems: deps.fetchAssets,
+            allowUpload: true,
+            uploadHandler: deps.uploadAssetFile,
+            resolveSrc: deps.resolveAssetUrl,
+            initialSelection: {
+              path: current.path || '',
+              fit: normalizeFit(current.fit || 'cover'),
+              x: focus.x,
+              y: focus.y,
+            },
+            onApply: ({ item, fit: nextFit, x, y }) => {
+              actions.updateActiveSectionColumnField(
+                index,
+                'panelBackground',
+                buildPanelBackground(index, {
+                  path: item?.path || '',
+                  fit: normalizeFit(nextFit),
+                  focus: formatFocus({ x, y }),
+                })
+              );
+            },
+          });
+        });
+      });
+
+      el.pbModuleEditor.querySelectorAll('.pb-column-panel-bg-clear').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          if (btn.disabled || btn.dataset.panelLegacyFallback === 'true') return;
+          const index = Number(btn.dataset.columnIndex);
+          if (!Number.isInteger(index)) return;
+          actions.updateActiveSectionColumnField(index, 'panelBackground', {});
+        });
+      });
+
+      el.pbModuleEditor.querySelectorAll('.pb-column-panel-bg-opacity').forEach((input) => {
+        input.addEventListener('input', () => {
+          if (input.disabled || input.dataset.panelLegacyFallback === 'true') return;
+          const index = Number(input.dataset.columnIndex);
+          if (!Number.isInteger(index)) return;
+          const opacity = Number.isFinite(parseFloat(input.value)) ? parseFloat(input.value) : 0.18;
+          actions.updateActiveSectionColumnField(
+            index,
+            'panelBackground',
+            buildPanelBackground(index, { opacity }),
+            { rerenderEditor: false }
+          );
+        });
+      });
+
+      el.pbModuleEditor.querySelectorAll('.pb-column-panel-empty-toggle').forEach((input) => {
+        input.addEventListener('change', () => {
+          if (input.disabled || input.dataset.panelLegacyFallback === 'true') return;
+          const index = Number(input.dataset.columnIndex);
+          if (!Number.isInteger(index)) return;
+          actions.updateActiveSectionColumnField(
+            index,
+            'panelBackground',
+            buildPanelBackground(index, { hideEmptyText: input.checked })
+          );
+        });
+      });
+
       document.getElementById('pbSaveSectionSettings')?.addEventListener('click', async () => {
         await actions.runCommand?.(BUILDER_COMMANDS.SAVE_DRAFT);
       });
@@ -990,6 +1253,9 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       });
       document.getElementById('pbDiscardModule')?.addEventListener('click', () => {
         actions.runCommand?.(BUILDER_COMMANDS.DISCARD_DRAFT);
+      });
+      document.getElementById('pbEditParentColumn')?.addEventListener('click', () => {
+        actions.selectParentColumn?.(getState().selectedModuleId);
       });
       document.getElementById('pbDeleteModule')?.addEventListener('click', async () => {
         const { selectedModuleId } = getState();

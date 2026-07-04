@@ -172,22 +172,14 @@ function renderStageControls(config, { deviceOnly = false } = {}) {
 }
 
 function renderVisibilityControls(config) {
+  // Panel existence is driven by the section layout and styled via the Column/Panel inspector
+  // (click a panel in the canvas). Only reader comments remain here.
   return renderInspectorSection({
     kicker: 'Reader',
-    title: 'Panels And Comments',
+    title: 'Comments',
     summary: config.showComments ? 'Comments On' : 'Comments Off',
-    copy: 'Control reader-owned side panels and comments for this module.',
+    copy: 'Toggle reader comments. Side panels are styled by clicking them in the canvas.',
     body: `
-      <div class="pb-editor-field">
-        <label class="pb-editor-label">
-          <input type="checkbox" data-reader-key="panels.left.enabled" ${config.panels.left.enabled ? 'checked' : ''}> Show Left Panel
-        </label>
-      </div>
-      <div class="pb-editor-field">
-        <label class="pb-editor-label">
-          <input type="checkbox" data-reader-key="panels.right.enabled" ${config.panels.right.enabled ? 'checked' : ''}> Show Right Panel
-        </label>
-      </div>
       <div class="pb-editor-field">
         <label class="pb-editor-label">
           <input type="checkbox" data-reader-key="showComments" ${config.showComments ? 'checked' : ''}> Show Comments

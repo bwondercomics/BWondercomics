@@ -99,6 +99,7 @@ function createPageBuilder({
   let pageBindings = { bindings: {}, warnings: [] };
   let selectedModuleId = null;
   let selectedCanvasSurface = null;
+  let selectedColumnIndex = null;
   let activeEditorTab = 'modules';
   let activeSidePanelTab = 'pages';
   let editorResizeBound = false;
@@ -223,6 +224,7 @@ function createPageBuilder({
       activeSidePanelTab,
       selectedCanvasSurface,
       selectedModuleId,
+      selectedColumnIndex,
       activeThemeDraft,
       activeHeaderDraft,
       activePageSettingsDraft,
@@ -266,6 +268,7 @@ function createPageBuilder({
       setActiveSectionColumnCount,
       updateActiveSectionColumnRatio,
       updateActiveSectionColumnField,
+      selectParentColumn: selectParentColumnFromModule,
       setActiveModuleDraft: (nextDraft) => {
         activeModuleDraft = cloneValue(nextDraft);
       },
@@ -407,6 +410,7 @@ function createPageBuilder({
       selectPageHeaderFromCanvas,
       selectPageSettingsFromCanvas,
       selectModule,
+      selectColumn: selectColumnFromCanvas,
       updateActivePageSettingsDraftField: (key, value) => {
         if (!activePageSettingsDraft) return;
         activePageSettingsDraft[key] = value;
@@ -468,10 +472,11 @@ function createPageBuilder({
           selectSectionFromCanvas(sectionId);
           showSidePanelTab('settings');
         },
-        selectColumn: (sectionId) => {
-          selectSectionFromCanvas(sectionId);
+        selectColumn: (sectionId, columnIndex) => {
+          selectColumnFromCanvas(sectionId, columnIndex);
           showSidePanelTab('settings');
         },
+        selectParentColumn: selectParentColumnFromModule,
         selectInspectorTab: (nextTab) => selectInspectorTab(nextTab),
         setActiveSidePanelTab: (nextTab) => {
           activeSidePanelTab = nextTab || activeSidePanelTab;
@@ -528,6 +533,7 @@ function createPageBuilder({
       },
       setSelectedCanvasSurface: (surface) => {
         selectedCanvasSurface = surface;
+        if (surface !== 'column') selectedColumnIndex = null;
       },
       setActiveEditorTab: (nextTab) => {
         activeEditorTab = nextTab;
@@ -1942,6 +1948,7 @@ function createPageBuilder({
 
     draftManager.clearSelectedModuleState();
     selectedCanvasSurface = 'section';
+    selectedColumnIndex = null;
     activeEditorTab = 'modules';
     draftManager.initializeSectionDraft(sectionId);
     setCanvasStatus('', 'neutral');
@@ -2149,6 +2156,22 @@ function createPageBuilder({
         else delete target.padding;
         break;
       }
+      case 'panelBackground': {
+        // Non-responsive: panel background art lives on the global column entry, not a device branch.
+        if (rawValue && typeof rawValue === 'object' && Object.keys(rawValue).length) {
+          entry.panelBackground = cloneValue(rawValue);
+        } else {
+          delete entry.panelBackground;
+        }
+        break;
+      }
+      case 'panelGap': {
+        // Non-responsive: write module spacing to the global column entry.
+        const raw = String(rawValue ?? '').trim();
+        if (raw) entry.panelGap = Math.max(0, Math.round(Number(raw) || 0));
+        else delete entry.panelGap;
+        break;
+      }
       default:
         return;
     }
@@ -2280,6 +2303,7 @@ function createPageBuilder({
       clearInlineEditView('target-switch', 'cancel');
     }
     selectedCanvasSurface = null;
+    selectedColumnIndex = null;
     draftManager.clearActiveSectionState();
     activeEditorTab = 'modules';
     draftManager.initializeModuleDraft(moduleId);
@@ -2313,6 +2337,7 @@ function createPageBuilder({
 
     draftManager.clearSelectedModuleState();
     selectedCanvasSurface = 'section';
+    selectedColumnIndex = null;
     activeEditorTab = 'modules';
     draftManager.initializeSectionDraft(sectionId);
     setCanvasStatus('', 'neutral');
@@ -2320,6 +2345,60 @@ function createPageBuilder({
     renderEditorPanel();
     showSidePanelTab('settings');
     return true;
+  }
+
+  function selectColumnFromCanvas(sectionId, columnIndex) {
+    if (!sectionId || !getSectionRecord(sectionId)) return false;
+    const index = Number(columnIndex);
+    if (!Number.isInteger(index) || index < 0) return false;
+    if (
+      selectedCanvasSurface === 'column' &&
+      activeSectionId === sectionId &&
+      selectedColumnIndex === index
+    ) {
+      return true;
+    }
+    // Switching to a column in a different section behaves like a section switch (guarded);
+    // moving between columns of the already-active section keeps the draft (no save prompt).
+    const sameActiveSection = activeSectionId === sectionId && !!activeSectionDraft;
+    if (!sameActiveSection) {
+      if (dirtyScope === 'section' && activeSectionId !== sectionId) {
+        setCanvasStatus(
+          'Save or discard the current section settings before switching sections.',
+          'warning'
+        );
+        renderCanvas();
+        return false;
+      }
+      if (
+        dirtyScope &&
+        dirtyScope !== 'section' &&
+        !ensureCleanWorkspace('Save or discard your current changes before selecting a column.')
+      ) {
+        renderEditorPanel();
+        return false;
+      }
+      draftManager.clearSelectedModuleState();
+      activeEditorTab = 'modules';
+      draftManager.initializeSectionDraft(sectionId);
+    }
+    const columnCount = parseLayoutRatios(activeSectionDraft?.layout || '1').length;
+    if (index >= columnCount) return false;
+    selectedCanvasSurface = 'column';
+    selectedColumnIndex = index;
+    setCanvasStatus('', 'neutral');
+    renderCanvas();
+    renderEditorPanel();
+    showSidePanelTab('settings');
+    return true;
+  }
+
+  // Escalate from a selected module to its owning column/panel (used by the module inspector's
+  // "Edit parent column" affordance, since a click inside a populated column selects the module).
+  function selectParentColumnFromModule(moduleId) {
+    const location = getModuleLocation(moduleId);
+    if (!location) return false;
+    return selectColumnFromCanvas(location.section.id, Number(location.module.columnIndex) || 0);
   }
 
   function selectCanvasTarget(target) {
@@ -2347,7 +2426,7 @@ function createPageBuilder({
     }
     if (target.kind === 'column' && target.sectionId) {
       clearInlineEditView('target-switch', 'cancel');
-      return selectSectionFromCanvas(target.sectionId);
+      return selectColumnFromCanvas(target.sectionId, target.columnIndex);
     }
     return false;
   }

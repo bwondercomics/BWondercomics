@@ -9,11 +9,12 @@ import {
 } from './header-config.js';
 import { normalizeHeaderNavItems } from './link-utils.js';
 
+// Panel background/spacing now live on the column and are edited in the Column/Panel inspector.
+// The theme draft no longer models page.meta panel keys so theme save/reset never clobber the
+// legacy panelBackgrounds/panelSpacing that still serve as a read-time fallback for un-migrated pages.
 function getDefaultThemeDraft() {
   return {
     theme: Object.fromEntries(THEME_COLORS.map((color) => [color.key, color.default])),
-    panelBackgrounds: {},
-    panelSpacing: {},
   };
 }
 
@@ -25,8 +26,6 @@ export function createDraftManager({ getState, actions, deps }) {
         ...defaults.theme,
         ...(page?.meta?.theme || {}),
       },
-      panelBackgrounds: cloneValue(page?.meta?.panelBackgrounds || {}),
-      panelSpacing: cloneValue(page?.meta?.panelSpacing || {}),
     };
   }
 
@@ -158,8 +157,6 @@ export function createDraftManager({ getState, actions, deps }) {
     const nextMeta = {
       ...(currentPage.meta || {}),
       theme: cloneValue(activeThemeDraft.theme),
-      panelBackgrounds: cloneValue(activeThemeDraft.panelBackgrounds),
-      panelSpacing: cloneValue(activeThemeDraft.panelSpacing),
     };
     const updated = await deps.updatePage(currentPage.id, { meta: nextMeta });
     if (!updated) {
