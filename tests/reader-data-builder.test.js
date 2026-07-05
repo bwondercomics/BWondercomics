@@ -1042,7 +1042,7 @@ describe('reader builder presentation loading', () => {
     expect(rightColumn?.children.length).toBe(0);
   });
 
-  it('renders panel column appearance/padding/min-height inline in builder mode (alignment excluded)', () => {
+  it('renders panel column appearance/padding/min-height/alignment inline in builder mode', () => {
     const builderPage = buildPanelSnapshot({
       sectionSettings: {
         columns: [
@@ -1071,7 +1071,8 @@ describe('reader builder presentation loading', () => {
     expect(style).toContain('padding-top: 12px');
     expect(style).toContain('padding-left: 8px');
     expect(style).toContain('min-height: 200px');
-    // Alignment is deliberately excluded for panels: justify-self is grid-only and inert under flex.
+    // Panels are flex items, so alignment renders as align-self (justify-self is grid-only).
+    expect(style).toContain('align-self: center');
     expect(style).not.toContain('justify-self');
   });
 
@@ -1100,6 +1101,7 @@ describe('reader builder presentation loading', () => {
     expect(style).toContain('border: 1px solid #ddd');
     expect(style).toContain('padding-top: 12px');
     expect(style).toContain('min-height: 200px');
+    expect(style).toContain('align-self: center');
     expect(style).not.toContain('justify-self');
     expect(document.querySelector('#leftPanel [data-builder-column-index]')).toBeNull();
     expect(publicColumn?.querySelector('.pb-module--text')?.textContent).toContain('Left panel');
@@ -1245,7 +1247,7 @@ describe('reader builder presentation loading', () => {
             index: 0,
             responsive: {
               mobile: { hidden: true, padding: { top: 4 } },
-              tablet: { hidden: false },
+              tablet: { hidden: false, alignment: 'end' },
             },
           },
           { index: 1 },
@@ -1263,6 +1265,9 @@ describe('reader builder presentation loading', () => {
     // A re-shown panel column must use flex (panels stack via flex), never block.
     expect(style).toContain('display: flex');
     expect(style).not.toContain('display: block');
+    // Panel alignment in @media uses the flex property, mirroring the inline path.
+    expect(style).toContain('align-self: flex-end');
+    expect(style).not.toContain('justify-self');
   });
 
   it('does not emit panel responsive CSS without device overrides or in builder mode (Phase 2)', () => {

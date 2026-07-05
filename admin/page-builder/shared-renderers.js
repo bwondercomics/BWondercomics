@@ -29,7 +29,7 @@ import {
   shouldOpenLinkInNewTab,
 } from './link-utils.js';
 import { appearanceToInlineStyle, mergeAppearance } from './appearance-utils.js';
-import { alignmentToJustifySelf } from './layout-utils.js';
+import { alignmentToAlignSelf, alignmentToJustifySelf } from './layout-utils.js';
 import { buildSectionResponsiveCss, sectionHasResponsiveOverrides } from './responsive-css.js';
 import {
   getEffectiveModuleConfig,
@@ -54,12 +54,13 @@ import {
 export const EDITOR_EMPTY_COLUMN_MIN_HEIGHT = 40;
 
 // Build a column's inline style string from its resolved settings. Shared by renderSection (grid
-// columns) and the reader panel path. `includeAlignment` gates the `justify-self` token, which is a
-// CSS Grid property: grid columns set it (default), but flex-based panel wrappers pass false because
-// justify-self is inert on flex items.
+// columns) and the reader panel path. `includeAlignment` gates the alignment token entirely;
+// `alignmentProperty` picks which property carries it: grid columns use `justify-self` (default),
+// flex-based panel wrappers pass 'align-self' because justify-self is inert on flex items. Both map
+// the same alignment keywords to the horizontal (cross/inline) axis.
 export function buildColumnInlineStyle(
   colSettings,
-  { minHeightFloor = 0, includeAlignment = true } = {}
+  { minHeightFloor = 0, includeAlignment = true, alignmentProperty = 'justify-self' } = {}
 ) {
   const tokens = [];
   const appearanceStyle = appearanceToInlineStyle(colSettings?.appearance);
@@ -75,7 +76,11 @@ export function buildColumnInlineStyle(
   if (includeAlignment) {
     const alignment = colSettings?.alignment;
     if (alignment && alignment !== 'stretch') {
-      tokens.push(`justify-self: ${alignmentToJustifySelf(alignment)}`);
+      const value =
+        alignmentProperty === 'align-self'
+          ? alignmentToAlignSelf(alignment)
+          : alignmentToJustifySelf(alignment);
+      tokens.push(`${alignmentProperty}: ${value}`);
     }
   }
   const authoredMinHeight =

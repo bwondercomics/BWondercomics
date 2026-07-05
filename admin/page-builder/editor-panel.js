@@ -2,6 +2,7 @@ import { escapeAttr, escapeHtml, formatFocus, normalizeFit, parseFocus } from '.
 import { COLUMN_ALIGNMENTS, MAX_COLUMNS, parseLayoutRatios } from './layout-utils.js';
 import {
   getAppearanceInputValue,
+  getAppearanceLeaf,
   removeAppearanceLeaf,
   renderAppearanceControls,
   setAppearanceLeaf,
@@ -109,7 +110,7 @@ function cloneAppearanceValue(value) {
   return JSON.parse(JSON.stringify(value || {}));
 }
 
-function renderSectionLayoutEditor(draft, { activeDeviceId, responsiveEditScope }) {
+function renderSectionLayoutEditor(draft, { activeDeviceId, responsiveEditScope, section }) {
   const globalRatios = parseLayoutRatios(draft?.layout || '1');
   const deviceLayout =
     responsiveEditScope === 'device'
@@ -133,40 +134,51 @@ function renderSectionLayoutEditor(draft, { activeDeviceId, responsiveEditScope 
     responsiveEditScope === 'device'
       ? `<option value="inherit" ${deviceLayout ? '' : 'selected'}>Inherit global (${globalRatios.length})</option>`
       : '';
+  const widthLabelFor = (index) => {
+    const panelSide = sectionReaderPanelSide(section, draft, index);
+    if (panelSide === 'left') return 'Left panel width';
+    if (panelSide === 'right') return 'Right panel width';
+    return `Column ${index + 1} width`;
+  };
   const ratioInputs = ratios
     .map(
       (ratio, index) => `
         <div class="pb-editor-field">
-          <label class="pb-editor-label">Track ${index + 1} ratio</label>
+          <label class="pb-editor-label">${widthLabelFor(index)}</label>
           <input type="number" class="pb-editor-input" min="1" max="12" step="1" value="${escapeAttr(String(ratio))}" data-column-ratio data-column-index="${index}" />
         </div>
       `
     )
     .join('');
+  const widthHint =
+    count > 1
+      ? `<div class="pb-editor-hint">Widths are proportional shares: 1 / 3 / 1 makes the middle column three times as wide as each side.</div>`
+      : '';
 
   return `
     <div class="pb-editor-stack pb-editor-stack--compact">
       <div class="pb-editor-field">
         <label class="pb-editor-label" for="pbEditSectionColumnCount">${
-          responsiveEditScope === 'device' ? 'Reflow track count' : 'Column count'
+          responsiveEditScope === 'device' ? 'Columns on this device' : 'Column count'
         }</label>
         <select id="pbEditSectionColumnCount" class="pb-editor-select" data-section-column-count>
           ${inheritOption}${countOptions}
         </select>
         <div class="pb-editor-hint">${
           responsiveEditScope === 'device'
-            ? `Choose up to ${globalRatios.length} tracks. Structural columns and module ownership remain global.`
-            : 'Choose 1–6 structural columns and set their width ratios.'
+            ? `Show up to ${globalRatios.length} columns on this device. The columns themselves and which blocks they own stay the same everywhere.`
+            : 'Choose 1–6 columns and set how wide each one is.'
         }</div>
       </div>
       ${ratioInputs}
+      ${widthHint}
     </div>
   `;
 }
 
 // Render the editable controls for a single column, keyed by its index. Reused by the
-// click-to-edit Column/Panel inspector. `includeAlignment` is turned off for reader panels,
-// where the alignment token (`justify-self`) is inert on the flex panel wrapper.
+// click-to-edit Column/Panel inspector. Alignment applies to panels too: the renderer emits
+// `align-self` on the flex panel wrapper and `justify-self` on grid columns.
 function renderColumnFields(draft, index, options = {}) {
   const { activeDeviceId, responsiveEditScope, includeAlignment = true } = options;
   const column = getColumnScopeDraft(draft, index, responsiveEditScope, activeDeviceId);
@@ -208,7 +220,8 @@ function renderColumnFields(draft, index, options = {}) {
             'Appearance',
             responsiveEditScope === 'device'
               ? 'Unset fields inherit the global column appearance.'
-              : 'Use the shared sanitized background, text, and border controls.'
+              : 'Use the shared sanitized background, text, and border controls.',
+            { borderMaster: true }
           )}
           ${alignmentField}
           <div class="pb-editor-field">
@@ -348,13 +361,12 @@ function renderColumnInspectorContent(section, draft, columnIndex, options = {})
       title: label,
       summary: `${index + 1} / ${columnCount}`,
       copy: isPanel
-        ? 'Styling for this reader side panel. Alignment follows the section layout.'
+        ? 'Styling for this reader side panel.'
         : 'Per-column appearance, spacing, and visibility.',
       open: true,
       body: renderColumnFields(draft, index, {
         activeDeviceId,
         responsiveEditScope,
-        includeAlignment: !isPanel,
       }),
     })}
     ${
@@ -420,14 +432,15 @@ function renderSectionSettingsContent(section, draft, options = {}) {
       summary:
         responsiveEditScope === 'device'
           ? `${getBuilderDeviceLabel(activeDeviceId)} reflow`
-          : `${parseLayoutRatios(draft.layout || section.layout || '1').length} cols`,
+          : `${parseLayoutRatios(draft.layout || section.layout || '1').length} columns`,
       copy:
         responsiveEditScope === 'device'
-          ? 'Reflow stable structural columns. Click a column in the canvas to style it.'
-          : 'Choose structural column count and ratios. Click a column or panel to style it.',
+          ? 'Choose how many columns show on this device. Click a column in the canvas to style it.'
+          : 'Choose how many columns this section has and how wide each is. Click a column or panel in the canvas to style it.',
       body: renderSectionLayoutEditor(draft, {
         activeDeviceId,
         responsiveEditScope,
+        section,
       }),
     })}
     ${renderInspectorSection({
@@ -1108,6 +1121,41 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
           );
         });
       });
+
+      // Master border switch: off writes an explicit width 0 (renders `border: none`); on
+      // restores the previous width and fills in style/color defaults so the border is visible.
+      el.pbModuleEditor
+        .querySelectorAll('[data-appearance-border-master="true"]')
+        .forEach((toggle) => {
+          toggle.addEventListener('change', () => {
+            const index = Number(toggle.dataset.itemIndex);
+            if (!Number.isInteger(index)) return;
+            const latestState = getState();
+            const column = getColumnScopeDraft(
+              latestState.activeSectionDraft,
+              index,
+              latestState.responsiveEditScope,
+              latestState.activeDeviceId
+            );
+            const appearance = cloneAppearanceValue(column.appearance);
+            if (toggle.checked) {
+              setAppearanceLeaf(appearance, 'border.width', Number(toggle.dataset.prevWidth) || 2);
+              if (getAppearanceLeaf(appearance, 'border.style') == null) {
+                setAppearanceLeaf(appearance, 'border.style', 'solid');
+              }
+              if (getAppearanceLeaf(appearance, 'border.color') == null) {
+                setAppearanceLeaf(appearance, 'border.color', '#00d9ff');
+              }
+            } else {
+              setAppearanceLeaf(appearance, 'border.width', 0);
+            }
+            actions.updateActiveSectionColumnField(
+              index,
+              'appearance',
+              toSparseAppearance(appearance)
+            );
+          });
+        });
 
       el.pbModuleEditor.querySelectorAll('[data-appearance-input="true"]').forEach((input) => {
         const eventName = input.tagName === 'SELECT' ? 'change' : 'input';

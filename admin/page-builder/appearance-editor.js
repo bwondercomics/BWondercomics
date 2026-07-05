@@ -209,8 +209,33 @@ function renderAppearanceInput(field, scope, index, value, checked, ariaLabel = 
   return `<input type="number" ${commonAttrs} min="${field.min}" max="${field.max}" step="${field.step}" value="${escapeAttr(String(value))}">`;
 }
 
-function renderAppearanceControls(appearance, scope, index = null, title = '', copy = '') {
+function renderAppearanceControls(
+  appearance,
+  scope,
+  index = null,
+  title = '',
+  copy = '',
+  { borderMaster = false } = {}
+) {
   const groupsHtml = APPEARANCE_GROUPS.map((group) => {
+    // Optional master switch for the whole border: off writes an explicit `border.width: 0`
+    // (rendered as `border: none`), on restores the previous width. Pure sugar over the
+    // existing sparse appearance schema — no new stored keys.
+    let masterRow = '';
+    if (borderMaster && group.title === 'Border') {
+      const widthValue = getAppearanceLeaf(appearance, 'border.width');
+      const borderOn = widthValue != null && Number(widthValue) > 0;
+      const prevWidth = borderOn ? Number(widthValue) : 2;
+      const indexAttr = Number.isInteger(index) ? ` data-item-index="${index}"` : '';
+      masterRow = `
+          <div class="pb-editor-field pb-editor-field--row pb-appearance-row">
+            <label class="pb-appearance-toggle">
+              <input type="checkbox" class="pb-appearance-enable" data-appearance-border-master="true" data-appearance-scope="${scope}"${indexAttr} data-prev-width="${prevWidth}" ${borderOn ? 'checked' : ''} aria-label="${escapeAttr(`${title} border on/off`)}">
+              <span title="Show border">Show border</span>
+            </label>
+          </div>
+        `;
+    }
     const fieldsHtml = group.fields
       .map((field) => {
         const value = getAppearanceLeaf(appearance, field.key);
@@ -235,7 +260,7 @@ function renderAppearanceControls(appearance, scope, index = null, title = '', c
       <details class="pb-style-group pb-editor-accordion pb-appearance-group">
         <summary class="pb-style-group-title pb-editor-accordion-toggle">${escapeHtml(group.title)}</summary>
         <div class="pb-editor-accordion-content">
-        ${fieldsHtml}
+        ${masterRow}${fieldsHtml}
         </div>
       </details>
     `;

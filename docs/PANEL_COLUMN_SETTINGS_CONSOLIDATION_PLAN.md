@@ -4,6 +4,11 @@ Status: Phase 1 implemented (2026-06-28); Phase 2 implemented (2026-06-30, not
 independently shippable until Phase 3 retires the old Theme-editor panel controls);
 Phase 3 implemented (2026-07-04, release-gated by migration before authors edit migrated panel
 settings); Phase 4 implemented (2026-07-05). Planning complete (review findings incorporated).
+Release gates closed 2026-07-05: both migrations run with `--write` for `battle-bros`,
+`prisonplanet`, and `02` (0 flagged; DB backed up to `var/backups/db-20260705-143558.sql`) and the
+API container restarted — see Phase 0 of `docs/BUILDER_CUSTOMIZATION_ROADMAP.md`, which also
+implemented the deferred panel-alignment (`align-self`) follow-up. Interactive builder QA on a
+Pyre reader page remains pending.
 Created: 2026-06-26
 
 > Second-pass review (2026-06-28) added four corrections, folded into the phases below. To avoid

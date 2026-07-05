@@ -66,3 +66,17 @@ export function alignmentToJustifySelf(alignment = 'stretch') {
       return 'stretch';
   }
 }
+
+/** CSS align-self value for a column alignment keyword (flex-based panel wrappers). */
+export function alignmentToAlignSelf(alignment = 'stretch') {
+  switch (alignment) {
+    case 'start':
+      return 'flex-start';
+    case 'center':
+      return 'center';
+    case 'end':
+      return 'flex-end';
+    default:
+      return 'stretch';
+  }
+}

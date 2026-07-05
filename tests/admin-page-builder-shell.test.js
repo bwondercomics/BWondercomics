@@ -2212,7 +2212,7 @@ describe('admin page-builder shell', () => {
     await selectCanvasColumn(readerSection.id, 0);
 
     // Panel-specific inspector: labelled as the left panel, exposes the relocated Panel Surface
-    // controls, and hides the (flex-inert) alignment control.
+    // controls, and (since the align-self fix) the alignment control too.
     expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Left Panel');
     const bgPath = document.querySelector('.pb-column-panel-bg-path');
     const bgPick = document.querySelector('.pb-column-panel-bg-pick');
@@ -2223,7 +2223,7 @@ describe('admin page-builder shell', () => {
     expect(bgPick?.disabled).toBe(false);
     expect(
       document.querySelector('[data-column-field="alignment"][data-column-index="0"]')
-    ).toBeNull();
+    ).not.toBeNull();
 
     const gapInput = document.querySelector(
       '[data-column-field="panelGap"][data-column-index="0"]'
@@ -2250,6 +2250,83 @@ describe('admin page-builder shell', () => {
       expect.objectContaining({
         settings: expect.objectContaining({
           columns: expect.arrayContaining([expect.objectContaining({ index: 0, panelGap: 18 })]),
+        }),
+      }),
+      expect.objectContaining({ onError: expect.any(Function) })
+    );
+  });
+
+  it('master border switch writes width 0 when turned off and restores a visible border when turned on', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const readerSection = selectedPage.sections[1]; // layout '1-1' -> left/right panels
+    readerSection.settings = {
+      ...readerSection.settings,
+      columns: [
+        {
+          index: 0,
+          appearance: { border: { width: 3, style: 'dashed', color: '#ff00ea' } },
+        },
+      ],
+    };
+    readerSection.modules = [
+      ...readerSection.modules,
+      {
+        id: 'reader-mod-border-toggle-test',
+        moduleType: 'reader',
+        columnIndex: 0,
+        sortIndex: 0,
+        config: { showComments: false },
+      },
+    ];
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+
+    await openBuilderPage(manager);
+    await selectCanvasColumn(readerSection.id, 0);
+
+    const masterSelector = '[data-appearance-border-master="true"][data-item-index="0"]';
+    const widthSelector =
+      '[data-appearance-input="true"][data-appearance-scope="section-column"][data-appearance-key="border.width"][data-item-index="0"]';
+    let master = document.querySelector(masterSelector);
+    expect(master).not.toBeNull();
+    expect(master.checked).toBe(true);
+    expect(master.dataset.prevWidth).toBe('3');
+
+    // Off: explicit width 0 (renders `border: none`); other border fields are preserved.
+    master.checked = false;
+    master.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+    expect(document.querySelector(widthSelector)?.getAttribute('value')).toBe('0');
+
+    // On again: a visible width comes back (the re-rendered toggle falls back to the
+    // default width once the stored width is 0).
+    master = document.querySelector(masterSelector);
+    expect(master.checked).toBe(false);
+    master.checked = true;
+    master.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(2);
+    expect(document.querySelector(widthSelector)?.getAttribute('value')).toBe('2');
+
+    document
+      .querySelector('[data-action="save-section-settings"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.updateSection).toHaveBeenCalledWith(
+      readerSection.id,
+      expect.objectContaining({
+        settings: expect.objectContaining({
+          columns: expect.arrayContaining([
+            expect.objectContaining({
+              index: 0,
+              appearance: expect.objectContaining({
+                border: expect.objectContaining({ width: 2, style: 'dashed', color: '#ff00ea' }),
+              }),
+            }),
+          ]),
         }),
       }),
       expect.objectContaining({ onError: expect.any(Function) })

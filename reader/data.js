@@ -907,8 +907,8 @@ function getPanelModuleColumnIndex(item, side) {
 // height; public mode emits the marker-free `.pb-panel-column`. Both carry the same inline column
 // style (background, border, padding, min-height) and the `pb-column--hidden` class, resolved from
 // the column's settings — so panels honor the column menu exactly like normal `.pb-column`s.
-// `includeAlignment` is false: `justify-self` is a CSS Grid property and is inert on the flex-based
-// panel wrapper (a flex alignment semantic is a deliberate follow-up).
+// Alignment uses `align-self` here: the panel wrapper is a flex item (column-direction parent), so
+// align-self controls the horizontal axis exactly like justify-self does for grid columns.
 function renderPanelColumnWrapper({
   section,
   sectionId,
@@ -926,7 +926,7 @@ function renderPanelColumnWrapper({
   const minHeightFloor = builderEditing && isEmpty ? EDITOR_EMPTY_COLUMN_MIN_HEIGHT : 0;
   const columnStyle = buildColumnInlineStyle(colSettings, {
     minHeightFloor,
-    includeAlignment: false,
+    alignmentProperty: 'align-self',
   });
   const styleAttr = columnStyle ? ` style="${columnStyle}"` : '';
   const hiddenClass = colSettings?.hidden === true ? ' pb-column--hidden' : '';

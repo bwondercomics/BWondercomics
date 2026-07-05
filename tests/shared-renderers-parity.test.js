@@ -39,12 +39,28 @@ describe('buildColumnInlineStyle export contract', () => {
     expect(EDITOR_EMPTY_COLUMN_MIN_HEIGHT).toBe(40);
   });
 
-  it('omits justify-self when includeAlignment is false (panel path)', () => {
+  it('omits the alignment token entirely when includeAlignment is false', () => {
     const colSettings = { alignment: 'center', minHeight: 120 };
     expect(buildColumnInlineStyle(colSettings)).toContain('justify-self: center');
     const panelStyle = buildColumnInlineStyle(colSettings, { includeAlignment: false });
     expect(panelStyle).not.toContain('justify-self');
+    expect(panelStyle).not.toContain('align-self');
     expect(panelStyle).toContain('min-height: 120px');
+  });
+
+  it('emits align-self instead of justify-self when alignmentProperty is align-self (panel path)', () => {
+    const start = buildColumnInlineStyle(
+      { alignment: 'start' },
+      { alignmentProperty: 'align-self' }
+    );
+    expect(start).toContain('align-self: flex-start');
+    expect(start).not.toContain('justify-self');
+    const end = buildColumnInlineStyle({ alignment: 'end' }, { alignmentProperty: 'align-self' });
+    expect(end).toContain('align-self: flex-end');
+    // stretch is the default and emits no token under either property.
+    expect(
+      buildColumnInlineStyle({ alignment: 'stretch' }, { alignmentProperty: 'align-self' })
+    ).not.toContain('align-self');
   });
 });
 

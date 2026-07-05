@@ -13,7 +13,7 @@
  */
 
 import { appearanceToInlineStyle } from './appearance-utils.js';
-import { alignmentToJustifySelf } from './layout-utils.js';
+import { alignmentToAlignSelf, alignmentToJustifySelf } from './layout-utils.js';
 import { getResponsiveBranch, resolveEffectiveColumnLayout } from './responsive-overrides.js';
 import { sanitizeColor, sanitizeNumber } from './sanitize.js';
 
@@ -56,7 +56,10 @@ function sectionDeclarations(branch) {
   return decls;
 }
 
-function columnDeclarations(branch, { visibleDisplay = 'block' } = {}) {
+function columnDeclarations(
+  branch,
+  { visibleDisplay = 'block', alignmentProperty = 'justify-self' } = {}
+) {
   const decls = [];
   if (Object.prototype.hasOwnProperty.call(branch, 'hidden')) {
     decls.push(branch.hidden === true ? 'display: none' : `display: ${visibleDisplay}`);
@@ -72,7 +75,11 @@ function columnDeclarations(branch, { visibleDisplay = 'block' } = {}) {
     });
   }
   if (branch.alignment) {
-    decls.push(`justify-self: ${alignmentToJustifySelf(branch.alignment)}`);
+    const value =
+      alignmentProperty === 'align-self'
+        ? alignmentToAlignSelf(branch.alignment)
+        : alignmentToJustifySelf(branch.alignment);
+    decls.push(`${alignmentProperty}: ${value}`);
   }
   if (branch.minHeight !== undefined && branch.minHeight !== null) {
     decls.push(`min-height: ${sanitizeNumber(branch.minHeight, 0, 0, 2000)}px`);
@@ -180,7 +187,10 @@ export function buildPanelResponsiveCss(section, columnIndex, scopeSelector) {
       resolveResponsive: true,
     });
     const effectiveColumn = effectiveLayout.columns.find((item) => item.index === index);
-    const decls = columnDeclarations(effectiveColumn?.settings || {}, { visibleDisplay: 'flex' });
+    const decls = columnDeclarations(effectiveColumn?.settings || {}, {
+      visibleDisplay: 'flex',
+      alignmentProperty: 'align-self',
+    });
     if (!decls.length) return;
     blocks.push(
       `@media ${DEVICE_MEDIA[device]} { ${scopeSelector} { ${important(decls.join('; '))}; } }`
