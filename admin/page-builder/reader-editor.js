@@ -40,18 +40,19 @@ function removeNullAppearanceBranches(style = {}) {
 export function normalizeReaderDraftConfig(rawConfig = {}) {
   const source = isObject(rawConfig.source) ? cloneValue(rawConfig.source) : {};
   const normalized = normalizeReaderConfig(rawConfig);
+  // Panel existence is column-driven; `normalizeReaderConfig` no longer emits `panels` /
+  // `showPanels`. Any legacy keys already on `rawConfig` pass through the spread untouched
+  // (tolerated dead data) but are not re-derived here.
   const next = {
     ...cloneValue(rawConfig),
     source,
     displayMode: normalized.displayMode,
-    showPanels: normalized.showPanels,
     showComments: normalized.showComments,
     controls: {
       placement: normalized.controls.placement,
       size: normalized.controls.size,
     },
     stage: normalized.stage,
-    panels: normalized.panels,
   };
   const style = removeNullAppearanceBranches(normalized.controls.style);
   if (Object.keys(style).length) {

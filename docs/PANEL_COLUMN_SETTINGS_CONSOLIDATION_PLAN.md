@@ -3,7 +3,7 @@
 Status: Phase 1 implemented (2026-06-28); Phase 2 implemented (2026-06-30, not
 independently shippable until Phase 3 retires the old Theme-editor panel controls);
 Phase 3 implemented (2026-07-04, release-gated by migration before authors edit migrated panel
-settings); Phase 4 not started. Planning complete (review findings incorporated).
+settings); Phase 4 implemented (2026-07-05). Planning complete (review findings incorporated).
 Created: 2026-06-26
 
 > Second-pass review (2026-06-28) added four corrections, folded into the phases below. To avoid
@@ -365,14 +365,14 @@ must go, and the block must be enforced where it actually persists (the backend)
 
 **Remove runtime panel control (finding #2) — both paths, in a safe order:**
 
-- [ ] Drive `<aside>` visibility from column count (left = always; right = layout has ≥2 columns); remove
+- [x] Drive `<aside>` visibility from column count (left = always; right = layout has ≥2 columns); remove
       the `section.settings.panelEnabled` runtime block + `resetPanelVisibility` (`reader/data.js:1107`–`1126`).
-- [ ] Remove the **second** hide in `applyReaderModuleShellSettings` (`reader/data.js:646`–`649`) and the
+- [x] Remove the **second** hide in `applyReaderModuleShellSettings` (`reader/data.js:646`–`649`) and the
       `hasExplicitPanels` plumbing (`:573`, `:564`) so the reader module no longer hides panels.
-- [ ] Stop emitting `settings.panels` from `normalizeReaderConfig`/`getReaderRuntimeConfig`
+- [x] Stop emitting `settings.panels` from `normalizeReaderConfig`/`getReaderRuntimeConfig`
       (`reader-config.js:71`) **only after** both runtime readers above are gone — order matters, or a
       reader that still reads `settings.panels` breaks. Keep tolerant input parsing for old saved configs.
-- [ ] Sweep other consumers of `settings.panels` / `panelEnabled` (mount + responsive + preview-bridge);
+- [x] Sweep other consumers of `settings.panels` / `panelEnabled` (mount + responsive + preview-bridge);
       grep both keys and neutralize each before deleting the producers.
 
 **Block destructive ratio reduction (finding #1) — backend is the authority:**
@@ -393,14 +393,26 @@ must go, and the block must be enforced where it actually persists (the backend)
 
 **Toggle migration + fallback content:**
 
-- [ ] Migration for the old toggle: for pages with `panelEnabled[side] === false` or reader-module
+- [x] Migration for the old toggle: for pages with `panelEnabled[side] === false` or reader-module
       `panels[side].enabled === false`, reconcile to the ratio — drop the empty trailing column to 1; if it
       has modules, leave it and flag for manual review (never silently delete content).
-- [ ] Note: the static left-panel promo content in `index.html` (`.left-panel-content`) becomes the
-      empty-state fallback for column 0.
-- [ ] Tests: right panel appears/disappears with column count; **backend** rejects reducing a non-empty
+- [x] Note: empty left panels keep the current generic empty-state behavior; the static promo in
+      `index.html` (`.left-panel-content`) is not preserved as a fallback.
+- [x] Tests: right panel appears/disappears with column count; **backend** rejects reducing a non-empty
       column and allows an empty one; neither runtime path hides a panel once removed; migration maps a
       disabled empty panel to a reduced ratio.
+
+Completion note (2026-07-05): Phase 4 made panel existence column-count-driven in the reader runtime
+(`leftPanel` always shown, `rightPanel` shown only when the reader section has 2+ columns), removed both
+legacy runtime hide paths, and stopped emitting reader-runtime `panels` / `showPanels` data while keeping
+old input tolerant. It added `backend.app.migrate_panel_toggles_to_ratio` as a dry-run-first migration:
+disabled empty right panels collapse to layout `1` with reader modules relocated to column 0; disabled
+right panels with authored content are flagged and untouched; disabled left panels are cleared and flagged
+because the left panel now becomes visible. Legacy `showPanels` is treated as a fallback only when an
+explicit `config.panels` object existed, matching the old runtime gate. Verification:
+`./.venv/bin/python -m unittest backend.tests.test_migrate_panel_toggles`,
+`npm test -- tests/reader-config.test.js tests/reader-data-builder.test.js
+tests/responsive-overrides.test.js tests/reader-page-renderer.test.js`, and `git diff --check`.
 
 ## Migration & Backward Compatibility
 

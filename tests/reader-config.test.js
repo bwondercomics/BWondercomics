@@ -11,7 +11,6 @@ describe('normalizeReaderConfig', () => {
   it('fills defaults for an empty config', () => {
     const config = normalizeReaderConfig({});
     expect(config.displayMode).toBe('paged');
-    expect(config.showPanels).toBe(true);
     expect(config.showComments).toBe(true);
     expect(config.controls.placement).toBe('below');
     expect(config.controls.size).toBe('medium');
@@ -23,10 +22,9 @@ describe('normalizeReaderConfig', () => {
       frameBorder: true,
       maxWidth: null,
     });
-    expect(config.panels).toEqual({
-      left: { enabled: true },
-      right: { enabled: true },
-    });
+    // Panel existence is column-driven; the reader config no longer emits panels/showPanels.
+    expect(config.panels).toBeUndefined();
+    expect(config.showPanels).toBeUndefined();
   });
 
   it('coerces unknown keywords back to their defaults', () => {
@@ -85,15 +83,17 @@ describe('normalizeReaderConfig', () => {
     expect(normalizeReaderConfig({ stage: { maxWidth: '500' } }).stage.maxWidth).toBe(500);
   });
 
-  it('derives showPanels from panel enablement and legacy showPanels', () => {
-    expect(normalizeReaderConfig({ showPanels: false }).showPanels).toBe(false);
-    expect(
-      normalizeReaderConfig({ showPanels: false, panels: { left: { enabled: true } } }).showPanels
-    ).toBe(true);
+  it('ignores legacy panels / showPanels input without emitting them', () => {
+    // Old configs may still carry panels/showPanels; normalization tolerates them (never
+    // throws) but never emits them, so nothing downstream can reintroduce a panel toggle.
+    expect(normalizeReaderConfig({ showPanels: false }).showPanels).toBeUndefined();
     expect(
       normalizeReaderConfig({ panels: { left: { enabled: false }, right: { enabled: false } } })
-        .showPanels
-    ).toBe(false);
+        .panels
+    ).toBeUndefined();
+    expect(() =>
+      normalizeReaderConfig({ showPanels: false, panels: { left: { enabled: true } } })
+    ).not.toThrow();
   });
 });
 
@@ -116,18 +116,16 @@ describe('normalizeReaderResponsiveBranch', () => {
     ).toEqual({ stage: { fit: 'width' } });
   });
 
-  // F2: include a panel side only when `enabled` is explicit, and never emit
-  // an empty `panels` object — mirroring the backend's pruned output.
-  it('only includes panel sides with an explicit enabled value', () => {
+  // Panel existence is column-driven, so a responsive branch never emits a `panels`
+  // override, even when legacy input carries one.
+  it('never emits a panels branch', () => {
     expect(normalizeReaderResponsiveBranch({ panels: { left: {} } })).toEqual({});
-    expect(normalizeReaderResponsiveBranch({ panels: { left: { enabled: false } } })).toEqual({
-      panels: { left: { enabled: false } },
-    });
+    expect(normalizeReaderResponsiveBranch({ panels: { left: { enabled: false } } })).toEqual({});
     expect(
       normalizeReaderResponsiveBranch({
         panels: { left: { enabled: false }, right: { enabled: true } },
       })
-    ).toEqual({ panels: { left: { enabled: false }, right: { enabled: true } } });
+    ).toEqual({});
   });
 });
 
@@ -157,6 +155,10 @@ describe('getReaderMountDataAttributes', () => {
     expect(attrs['data-stage-page-gap']).toBe('12');
     expect(attrs['data-stage-frame-border']).toBe('false');
     expect(attrs['data-stage-max-width']).toBe('800');
+    // Panel existence is column-driven — no panel-enablement attributes are emitted.
+    expect(attrs['data-left-panel-enabled']).toBeUndefined();
+    expect(attrs['data-right-panel-enabled']).toBeUndefined();
+    expect(attrs['data-show-panels']).toBeUndefined();
   });
 
   it('emits an empty string for an Auto (null) maxWidth', () => {

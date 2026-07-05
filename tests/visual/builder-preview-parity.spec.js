@@ -869,8 +869,11 @@ async function assertCustomizedPagedReader(target) {
     'false'
   );
   await expect(target.locator('#stageWrap')).toHaveAttribute('data-reader-stage-max-width', '1280');
-  await expect(target.locator('#leftPanel')).toBeHidden();
-  await expect(target.locator('#rightPanel')).toBeHidden();
+  // Panel existence is column-driven (Phase 4): the reader section is 2-column, so both
+  // panels exist and are visible. The legacy reader-module `panels: { enabled: false }`
+  // toggle in this fixture is inert and can no longer hide them.
+  await expect(target.locator('#leftPanel')).toBeVisible();
+  await expect(target.locator('#rightPanel')).toBeVisible();
   await expect(target.locator('#comicCommentsSection')).toBeHidden();
   await expect(target.locator('#commentToggleBtn')).toBeHidden();
 }

@@ -72,18 +72,15 @@ export function normalizeReaderConfig(rawConfig = {}) {
   const config = isObject(rawConfig) ? rawConfig : {};
   const controls = isObject(config.controls) ? config.controls : {};
   const stage = isObject(config.stage) ? config.stage : {};
-  const panels = isObject(config.panels) ? config.panels : {};
-  const legacyPanelsEnabled = coerceBool(config.showPanels, true);
-  const leftPanel = isObject(panels.left) ? panels.left : {};
-  const rightPanel = isObject(panels.right) ? panels.right : {};
-  const leftPanelEnabled = coerceBool(leftPanel.enabled, legacyPanelsEnabled);
-  const rightPanelEnabled = coerceBool(rightPanel.enabled, legacyPanelsEnabled);
   const source = isObject(config.source) ? cloneValue(config.source) : {};
 
+  // Panel existence is driven by the reader section's column ratio, not reader-module
+  // config. Legacy `config.panels` / `config.showPanels` on saved configs are ignored here
+  // (tolerated so old configs still parse) and are no longer emitted, so nothing downstream
+  // can reintroduce a runtime panel toggle.
   return {
     source,
     displayMode: pickKeyword(config.displayMode, READER_DISPLAY_MODES, 'paged'),
-    showPanels: leftPanelEnabled || rightPanelEnabled,
     showComments: coerceBool(config.showComments, true),
     controls: {
       placement: pickKeyword(controls.placement, READER_CONTROLS_PLACEMENTS, 'below'),
@@ -95,10 +92,6 @@ export function normalizeReaderConfig(rawConfig = {}) {
       pageGap: clampInt(stage.pageGap, 8, 0, 64),
       frameBorder: coerceBool(stage.frameBorder, true),
       maxWidth: normalizeStageMaxWidth(stage.maxWidth),
-    },
-    panels: {
-      left: { enabled: leftPanelEnabled },
-      right: { enabled: rightPanelEnabled },
     },
   };
 }
@@ -131,20 +124,6 @@ export function normalizeReaderResponsiveBranch(rawBranch = {}) {
       payload.stage.pageGap = base.stage.pageGap;
     }
   }
-  if (isObject(branch.panels)) {
-    const panelsPayload = {};
-    const left = isObject(branch.panels.left) ? branch.panels.left : null;
-    const right = isObject(branch.panels.right) ? branch.panels.right : null;
-    if (left && Object.prototype.hasOwnProperty.call(left, 'enabled')) {
-      panelsPayload.left = { enabled: base.panels.left.enabled };
-    }
-    if (right && Object.prototype.hasOwnProperty.call(right, 'enabled')) {
-      panelsPayload.right = { enabled: base.panels.right.enabled };
-    }
-    if (Object.keys(panelsPayload).length) {
-      payload.panels = panelsPayload;
-    }
-  }
   return payload;
 }
 
@@ -169,9 +148,6 @@ export function getReaderMountDataAttributes(rawConfig = {}) {
     'data-stage-page-gap': String(config.stage.pageGap),
     'data-stage-frame-border': String(config.stage.frameBorder),
     'data-stage-max-width': config.stage.maxWidth == null ? '' : String(config.stage.maxWidth),
-    'data-left-panel-enabled': String(config.panels.left.enabled),
-    'data-right-panel-enabled': String(config.panels.right.enabled),
-    'data-show-panels': String(config.showPanels),
     'data-show-comments': String(config.showComments),
   };
 }

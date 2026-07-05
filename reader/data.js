@@ -466,11 +466,25 @@ function resolvePanelColumnBackground(panelColumn, side, page) {
   return colSettings?.panelBackground || fallback;
 }
 
-function resetPanelVisibility() {
+// Panel existence follows the reader section's column ratio. The left panel always exists
+// (column 0); the right panel exists only once the section has 2+ columns
+// (rightPanelColumn.exists). Visibility uses the `hidden` attribute (backed by the global
+// `[hidden] { display: none !important }` rule); any stale inline `display` from an earlier
+// snapshot is cleared so `hidden` is the single visibility mechanism.
+function applyPanelExistence(rightPanelColumn) {
   const leftPanel = document.getElementById('leftPanel');
   const rightPanel = document.getElementById('rightPanel');
-  if (leftPanel) leftPanel.style.display = '';
-  if (rightPanel) rightPanel.style.display = '';
+  if (leftPanel) {
+    leftPanel.style.removeProperty('display');
+    setHiddenState(leftPanel, false);
+  }
+  if (rightPanel) {
+    rightPanel.style.removeProperty('display');
+    // With no reader-owned column (e.g. a page with no reader section) keep today's default
+    // of showing the panel; otherwise existence follows the section's column count.
+    const rightExists = rightPanelColumn ? rightPanelColumn.exists === true : true;
+    setHiddenState(rightPanel, !rightExists);
+  }
 }
 
 function hexToRgba(color, opacity) {
@@ -574,37 +588,25 @@ function findEffectiveReaderModule(page, options = {}) {
   return null;
 }
 
-function isPlainObject(value) {
-  return !!value && typeof value === 'object' && !Array.isArray(value);
-}
-
 function resolveReaderModuleShellSettings(page, options = {}) {
   const readerModule = findEffectiveReaderModule(page, options);
   if (!readerModule) {
-    return {
-      settings: getReaderRuntimeConfig({}),
-      hasExplicitPanels: false,
-    };
+    return getReaderRuntimeConfig({});
   }
   const effectiveConfig = getEffectiveModuleConfig(readerModule, {
     builderEditing: options.builderEditing === true,
     deviceId: options.deviceId,
   });
-  return {
-    settings: getReaderRuntimeConfig(effectiveConfig),
-    hasExplicitPanels: isPlainObject(effectiveConfig.panels),
-  };
+  return getReaderRuntimeConfig(effectiveConfig);
 }
 
 export function applyReaderModuleShellSettings(page, options = {}) {
-  const { settings, hasExplicitPanels } = resolveReaderModuleShellSettings(page, options);
+  const settings = resolveReaderModuleShellSettings(page, options);
   const controls = document.getElementById('controls');
   const mainContent = document.getElementById('mainContent');
   const stageWrap = document.getElementById('stageWrap');
   const viewport = document.getElementById('viewport');
   const stage = document.getElementById('stage');
-  const leftPanel = document.getElementById('leftPanel');
-  const rightPanel = document.getElementById('rightPanel');
   const commentsSection = document.getElementById('comicCommentsSection');
   const commentToggle = document.getElementById('commentToggleBtn');
 
@@ -665,10 +667,6 @@ export function applyReaderModuleShellSettings(page, options = {}) {
     viewport.style.setProperty('--reader-stage-page-gap', `${settings.stage.pageGap}px`);
   }
 
-  if (hasExplicitPanels) {
-    setHiddenState(leftPanel, settings.panels.left.enabled === false);
-    setHiddenState(rightPanel, settings.panels.right.enabled === false);
-  }
   setHiddenState(commentsSection, settings.showComments === false);
   setHiddenState(commentToggle, settings.showComments === false);
 }
@@ -1167,26 +1165,10 @@ export function applyBuilderPageToDOM(page, options = {}) {
     right: resolvePanelColumnBackground(rightPanelColumn, 'right', page),
   });
 
-  // Check panel visibility from section settings (reader-owned: only the reader
-  // section's panelEnabled controls the reader panels).
-  resetPanelVisibility();
-  for (const [, section] of panelSections) {
-    const settings = section.settings || {};
-    if (settings.panelEnabled) {
-      const leftPanel = document.getElementById('leftPanel');
-      const rightPanel = document.getElementById('rightPanel');
-      if (leftPanel && settings.panelEnabled.left === false) {
-        leftPanel.style.display = 'none';
-      } else if (leftPanel) {
-        leftPanel.style.display = '';
-      }
-      if (rightPanel && settings.panelEnabled.right === false) {
-        rightPanel.style.display = 'none';
-      } else if (rightPanel) {
-        rightPanel.style.display = '';
-      }
-    }
-  }
+  // Panel existence follows the reader section's column ratio: the left panel always exists
+  // (column 0); the right panel exists only once the section has 2+ columns
+  // (rightPanelColumn.exists). No runtime toggle can hide a panel anymore.
+  applyPanelExistence(rightPanelColumn);
 
   applyReaderModuleShellSettings(page, { builderEditing, deviceId });
 

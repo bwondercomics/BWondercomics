@@ -249,9 +249,11 @@ describe('responsive override utilities', () => {
           frameBorder: true,
           maxWidth: 1200,
         }),
+        // Panels are no longer a merged reader customization: the base value passes through
+        // untouched (the mobile `right: false` override is ignored) as tolerated dead data.
         panels: {
           left: { enabled: true },
-          right: { enabled: false },
+          right: { enabled: true },
         },
       })
     );

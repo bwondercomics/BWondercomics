@@ -850,8 +850,11 @@ describe('reader builder presentation loading', () => {
     expect(
       document.getElementById('stage')?.style.getPropertyValue('--reader-stage-page-gap')
     ).toBe('24px');
-    expect(document.getElementById('leftPanel')?.hidden).toBe(true);
-    expect(document.getElementById('rightPanel')?.hidden).toBe(false);
+    // Panel existence is column-driven and the reader-module `panels` toggle is inert: the
+    // 1-column reader shell always shows the left panel and has no right panel, regardless of
+    // the (legacy, ignored) `panels` config on the module above.
+    expect(document.getElementById('leftPanel')?.hidden).toBe(false);
+    expect(document.getElementById('rightPanel')?.hidden).toBe(true);
     expect(document.getElementById('comicCommentsSection')?.hidden).toBe(true);
     expect(document.getElementById('commentToggleBtn')?.hidden).toBe(true);
   });
@@ -878,6 +881,42 @@ describe('reader builder presentation loading', () => {
     expect(document.querySelector('#rightPanel .pb-module--text')?.textContent).toContain(
       'Right panel'
     );
+  });
+
+  it('drives panel existence from the reader section column count, ignoring legacy panelEnabled', () => {
+    // A 2-column reader section owns both panels. A legacy section.settings.panelEnabled is
+    // now inert: it can no longer hide either panel in public or builder mode.
+    const twoColumn = buildPanelSnapshot({
+      sectionSettings: { panelEnabled: { left: false, right: false } },
+    });
+
+    applyBuilderPageToDOM(twoColumn, { seriesId: 'battle-bros' });
+    expect(document.getElementById('leftPanel')?.hidden).toBe(false);
+    expect(document.getElementById('rightPanel')?.hidden).toBe(false);
+
+    applyBuilderPageToDOM(twoColumn, {
+      seriesId: 'battle-bros',
+      previewMode: true,
+      builderEditing: true,
+    });
+    expect(document.getElementById('leftPanel')?.hidden).toBe(false);
+    expect(document.getElementById('rightPanel')?.hidden).toBe(false);
+
+    // A 1-column reader section keeps the left panel (column 0) but has no right panel,
+    // in both public and builder mode.
+    const oneColumn = buildReaderShellPage();
+
+    applyBuilderPageToDOM(oneColumn, { seriesId: 'battle-bros' });
+    expect(document.getElementById('leftPanel')?.hidden).toBe(false);
+    expect(document.getElementById('rightPanel')?.hidden).toBe(true);
+
+    applyBuilderPageToDOM(oneColumn, {
+      seriesId: 'battle-bros',
+      previewMode: true,
+      builderEditing: true,
+    });
+    expect(document.getElementById('leftPanel')?.hidden).toBe(false);
+    expect(document.getElementById('rightPanel')?.hidden).toBe(true);
   });
 
   it('emits and cleans builder editing markers in the reader shell', () => {
@@ -1544,12 +1583,6 @@ describe('reader builder presentation loading', () => {
 
   it('resets panel background, spacing, and visibility state between snapshots', () => {
     const firstPage = buildPanelSnapshot({
-      sectionSettings: {
-        panelEnabled: {
-          left: true,
-          right: false,
-        },
-      },
       meta: {
         theme: {},
         panelSpacing: {
@@ -1583,6 +1616,12 @@ describe('reader builder presentation loading', () => {
         },
       },
     });
+    // Second snapshot is a single-column reader section, so the right panel must reset to
+    // hidden — existence follows the column count, not any saved toggle.
+    secondPage.sections[0].layout = '1';
+    secondPage.sections[0].modules = secondPage.sections[0].modules.filter(
+      (module) => module.columnIndex === 0
+    );
 
     applyBuilderPageToDOM(firstPage, { seriesId: 'battle-bros' });
 
@@ -1595,7 +1634,8 @@ describe('reader builder presentation loading', () => {
     expect(rightPanel?.style.getPropertyValue('--panel-bg-opacity')).toBe('0.6');
     expect(leftBuilder?.style.getPropertyValue('--pb-panel-gap')).toBe('18px');
     expect(rightBuilder?.style.getPropertyValue('--pb-panel-gap')).toBe('26px');
-    expect(rightPanel?.style.display).toBe('none');
+    // First snapshot is 2-column, so the right panel exists and is shown.
+    expect(rightPanel?.hidden).toBe(false);
 
     applyBuilderPageToDOM(secondPage, { seriesId: 'battle-bros' });
 
@@ -1609,7 +1649,8 @@ describe('reader builder presentation loading', () => {
     expect(rightPanel?.style.getPropertyValue('--panel-bg-opacity')).toBe('');
     expect(leftBuilder?.style.getPropertyValue('--pb-panel-gap')).toBe('');
     expect(rightBuilder?.style.getPropertyValue('--pb-panel-gap')).toBe('');
-    expect(rightPanel?.style.display).toBe('');
+    // Second snapshot is single-column, so the right panel resets to hidden.
+    expect(rightPanel?.hidden).toBe(true);
   });
 
   it('uses first-class page header copy before legacy header-module fallback', () => {

@@ -309,8 +309,9 @@ describe('reader page renderer', () => {
     expect(reader.querySelector('.pb-reader-mount')?.dataset.stagePageGap).toBe('24');
     expect(reader.querySelector('.pb-reader-mount')?.dataset.stageFrameBorder).toBe('false');
     expect(reader.querySelector('.pb-reader-mount')?.dataset.stageMaxWidth).toBe('1280');
-    expect(reader.querySelector('.pb-reader-mount')?.dataset.leftPanelEnabled).toBe('false');
-    expect(reader.querySelector('.pb-reader-mount')?.dataset.rightPanelEnabled).toBe('true');
+    // Panel existence is column-driven — the reader mount no longer emits panel-enabled attrs.
+    expect(reader.querySelector('.pb-reader-mount')?.dataset.leftPanelEnabled).toBeUndefined();
+    expect(reader.querySelector('.pb-reader-mount')?.dataset.rightPanelEnabled).toBeUndefined();
     expect(reader.querySelector('.pb-reader-mount')?.dataset.showComments).toBe('false');
     expect(entryGallery.querySelector('.pb-entry-gallery-mount')?.dataset.sourceMode).toBe(
       'all-series'
