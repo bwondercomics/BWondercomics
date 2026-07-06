@@ -1,7 +1,8 @@
 # Builder Customization Roadmap
 
-Status: Phases 0–1 implemented (2026-07-05; Phase 0 has one manual builder-QA step handed back —
-see its completion note; Phase 1's optional drag-resize handles deferred). Phases 2–7 planned.
+Status: Phases 0–2 implemented (2026-07-05; Phase 0 has one manual builder-QA step handed back;
+Phase 1's optional drag-resize handles and Phase 2's universal module appearance are deferred —
+see the completion notes). Phases 3–7 planned.
 Created: 2026-07-05
 Branch context: `builder-incremental-improvement` — the Panel/Column Settings Consolidation Plan
 (Phases 1–4) is implemented up to HEAD (`c82d986`), but its release gates (data migrations, manual
@@ -459,20 +460,52 @@ movement relies purely on drag.
 
 ### Steps
 
-- [ ] **Universal `config.layout` sub-schema** on every module type:
+- [x] **Universal `config.layout` sub-schema** on every module type:
       `{ widthMode: 'full'|'percent'|'px', width, maxWidth, height: 'auto'|px, align:
 'start'|'center'|'end' }` — one shared sanitizer server-side + one client normalizer;
       defaults reproduce today (full width, auto height).
-- [ ] Apply it as inline style on the `.pb-module` wrapper in `renderModule()` (width/max-width/
-      height; `align` via `align-self`/auto-margins in the column flex/grid context).
 - [ ] **Universal module appearance**: reuse the shared appearance schema (background, border,
       padding) on the module wrapper for types that lack their own (audit per-type editors first
-      to avoid double controls).
-- [ ] Inspector: add a "Layout" accordion to the module editor (base breakpoint first; responsive
+      to avoid double controls). _(Deferred — needs the per-type style-editor audit; see
+      completion note.)_
+- [x] Apply it as inline style on the `.pb-module` wrapper in `renderModule()` (width/max-width/
+      height; `align` via `align-self`/auto-margins in the column flex/grid context).
+- [x] Inspector: add a "Layout" accordion to the module editor (base breakpoint first; responsive
       overrides as a follow-up item, registered like column responsive fields).
-- [ ] **Precision movement**: selected-module toolbar gains up/down (reorder within column) and
+- [x] **Precision movement**: selected-module toolbar gains up/down (reorder within column) and
       left/right (move across columns/panels) actions calling the existing endpoints; respects the
       same eligibility rules as drag (Comic Reader singleton etc.).
+
+### Completed 2026-07-05 (one step deferred)
+
+- **Shared module layout end to end.** `sanitize_module_layout()` in `builder_security.py`
+  (sparse: percent width 5–100 / px width 40–2000, maxWidth 40–2400, height 40–4000, align
+  start/center/end; `None` when nothing authored) attached to every module type through the
+  `with_responsive` hook in `sanitize_module_config`. Renderer: exported
+  `buildModuleLayoutStyle()` in `shared-renderers.js`, applied on the `.pb-module` wrapper in
+  `renderModule()` — alignment uses auto margins so it behaves identically in grid columns and
+  flex panels; px widths and maxWidth are capped at 100% of the column. Modules without a
+  `layout` key emit no style attribute at all (parity-tested).
+- **Layout card in the module inspector** (`module-editor.js`): "Size & Alignment" card rendered
+  for every structured module type (except the Comic Reader, which has stage sizing); collected
+  sparsely into `config.layout` via a new `[data-layout-key]` collector in
+  `collectGenericModuleDraft` (blank/default fields delete their key; an empty layout object is
+  removed).
+- **Toolbar step-moves.** New structural command `builder:move-module-step`
+  (`structural-commands.js`, registered in `commands.js`): ↑/↓ reorder within the column, ←/→
+  append to the adjacent structural column — panels are columns, so this steps blocks into and
+  out of reader panels. Edge positions and unknown directions are clean no-op rejections with a
+  status message; the Comic Reader module is excluded (it owns the viewport). Toolbar buttons in
+  `preview-manager.js` (hidden for the reader module), dispatched like duplicate/delete.
+- **Deferred:** universal module _appearance_ on the wrapper. Several types already carry their
+  own sanitized style systems (promo, buttons, email-signup `config.style`, text alignment);
+  bolting the shared appearance schema on top without the per-type audit would create double
+  controls. It stays an open step of this phase.
+- Tests: wrapper layout emission + absence parity (`tests/shared-renderers-parity.test.js`),
+  backend layout sanitizer clamps/sparseness (`backend/tests/test_builder_security.py`).
+- Verified: `npm run format:check`, `npm run lint`, `npm test` (616 passed, 1 skipped),
+  `npm run test:backend` (OK), `npm run build`, `npm run test:visual` (21 passed); API container
+  restarted for the sanitizer change.
 
 ### Acceptance
 

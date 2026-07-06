@@ -105,6 +105,36 @@ class SanitizeReaderStageFrameFillTest(unittest.TestCase):
         self.assertEqual(sanitize_reader_stage({"frameFill": "wide"})["frameFill"], "hug")
 
 
+class SanitizeModuleLayoutTest(unittest.TestCase):
+    """Builder customization roadmap Phase 2: shared per-module wrapper layout."""
+
+    def test_layout_rides_every_module_type_and_clamps(self):
+        from backend.app.builder_security import sanitize_module_config, sanitize_module_layout
+
+        config = sanitize_module_config(
+            "text",
+            {
+                "content": "<p>hello</p>",
+                "layout": {"widthMode": "percent", "width": 250, "height": 9999, "align": "center"},
+            },
+        )
+        self.assertEqual(config["layout"]["widthMode"], "percent")
+        self.assertEqual(config["layout"]["width"], 100)
+        self.assertEqual(config["layout"]["height"], 4000)
+        self.assertEqual(config["layout"]["align"], "center")
+
+        self.assertIsNone(sanitize_module_layout(None))
+        self.assertIsNone(sanitize_module_layout({}))
+        self.assertIsNone(sanitize_module_layout({"widthMode": "full"}))
+        self.assertIsNone(sanitize_module_layout({"align": "diagonal"}))
+
+    def test_module_without_layout_round_trips_without_key(self):
+        from backend.app.builder_security import sanitize_module_config
+
+        config = sanitize_module_config("text", {"content": "<p>x</p>"})
+        self.assertNotIn("layout", config)
+
+
 class SanitizeSectionMinHeightTest(unittest.TestCase):
     """Builder customization roadmap Phase 1: section-level minHeight."""
 

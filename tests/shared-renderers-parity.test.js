@@ -96,6 +96,39 @@ describe('buildColumnInlineStyle export contract', () => {
     expect(bare).not.toContain('pb-column--has-bg');
   });
 
+  it('emits shared module layout on the wrapper and nothing without it (Phase 2)', () => {
+    const reader = makeReaderRenderers();
+    const section = {
+      id: 'modlayout-sec',
+      layout: '1',
+      sortIndex: 0,
+      settings: {},
+      modules: [
+        {
+          id: 'm1',
+          moduleType: 'text',
+          columnIndex: 0,
+          sortIndex: 0,
+          config: {
+            text: 'a',
+            layout: { widthMode: 'percent', width: 60, height: 240, align: 'center' },
+          },
+        },
+        { id: 'm2', moduleType: 'text', columnIndex: 0, sortIndex: 1, config: { text: 'b' } },
+      ],
+    };
+    const html = reader.renderSection(section, 0);
+    const sized =
+      html.match(/<div class="pb-module pb-module--text"[^>]*data-module-id="m1"[^>]*>/)?.[0] || '';
+    expect(sized).toContain('width: 60%');
+    expect(sized).toContain('height: 240px');
+    expect(sized).toContain('margin-left: auto');
+    expect(sized).toContain('margin-right: auto');
+    const plain =
+      html.match(/<div class="pb-module pb-module--text"[^>]*data-module-id="m2"[^>]*>/)?.[0] || '';
+    expect(plain).not.toContain('style=');
+  });
+
   it('emits align-self instead of justify-self when alignmentProperty is align-self (panel path)', () => {
     const start = buildColumnInlineStyle(
       { alignment: 'start' },

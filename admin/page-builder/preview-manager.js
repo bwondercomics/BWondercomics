@@ -133,6 +133,18 @@ function getToolbarActions(target, currentPage) {
       ['hide-device', 'Hide Device'],
       ['delete', 'Delete'],
     ];
+    // One-step precision moves (drag stays for free placement). The Comic Reader owns
+    // the viewport, so stepping it between columns is not offered.
+    if (target.moduleType !== 'reader') {
+      actions.splice(
+        2,
+        0,
+        ['move-up', '↑'],
+        ['move-down', '↓'],
+        ['move-left', '←'],
+        ['move-right', '→']
+      );
+    }
     if (getPageModuleDuplicateEligibility(currentPage, target.moduleId).allowed) {
       actions.push(['duplicate', 'Duplicate']);
     }
@@ -510,6 +522,18 @@ export function createPreviewManager({ el, getState, actions, deps }) {
             field: 'content',
             value: result?.value,
             reason: 'toolbar',
+          });
+          return;
+        }
+        if (
+          action === 'move-up' ||
+          action === 'move-down' ||
+          action === 'move-left' ||
+          action === 'move-right'
+        ) {
+          await runBuilderCommand('builder:move-module-step', {
+            target,
+            direction: action.slice(5),
           });
           return;
         }

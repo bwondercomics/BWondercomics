@@ -13,6 +13,7 @@ export const BUILDER_STRUCTURAL_COMMANDS = Object.freeze({
   DELETE_SELECTED: 'builder:delete-selected',
   HIDE_ON_DEVICE: 'builder:hide-on-device',
   DUPLICATE_SELECTED: 'builder:duplicate-selected',
+  MOVE_MODULE_STEP: 'builder:move-module-step',
 });
 
 function result(ok, details = {}) {
@@ -368,9 +369,78 @@ export function createStructuralCommandAdapter({ getState, actions, helpers }) {
         return runHideOnDevice(payload);
       case BUILDER_STRUCTURAL_COMMANDS.DUPLICATE_SELECTED:
         return runDuplicateSelected(payload);
+      case BUILDER_STRUCTURAL_COMMANDS.MOVE_MODULE_STEP:
+        return runMoveModuleStep(payload);
       default:
         return result(false, { status: `Unknown command: ${id}` });
     }
+  }
+
+  // One-step toolbar move: up/down reorder within the column; left/right append the
+  // module to the adjacent structural column (panels are columns, so this walks into
+  // and out of reader panels too). The Comic Reader module is excluded — it owns the
+  // viewport, not a panel slot.
+  async function runMoveModuleStep(payload) {
+    const target = payload?.target;
+    const direction = String(payload?.direction || '');
+    if (getTargetKind(target) !== 'module' || !target.moduleId) {
+      return result(false, { status: 'Select a module to move.' });
+    }
+    const { currentPage } = getState();
+    let section = null;
+    let module = null;
+    for (const candidate of currentPage?.sections || []) {
+      module = (candidate.modules || []).find((item) => item.id === target.moduleId) || null;
+      if (module) {
+        section = candidate;
+        break;
+      }
+    }
+    if (!section || !module) {
+      return result(false, { status: 'Module not found on this page.' });
+    }
+    if (String(module.moduleType) === 'reader') {
+      return result(false, { status: 'The Comic Reader cannot be stepped between columns.' });
+    }
+    const columnIndex = Number(module.columnIndex) || 0;
+    const siblings = (section.modules || [])
+      .filter((item) => (Number(item.columnIndex) || 0) === columnIndex)
+      .sort((a, b) => (a.sortIndex || 0) - (b.sortIndex || 0));
+    const position = siblings.findIndex((item) => item.id === module.id);
+    const columnCount = String(section.layout || '1')
+      .split('-')
+      .filter(Boolean).length;
+
+    if (direction === 'up' || direction === 'down') {
+      const insertIndex = direction === 'up' ? position - 1 : position + 1;
+      if (insertIndex < 0 || insertIndex > siblings.length - 1) {
+        return result(false, { status: 'Already at the edge of this column.' });
+      }
+      const moved = await actions.moveModuleToTarget(
+        module.id,
+        section.id,
+        columnIndex,
+        insertIndex
+      );
+      return result(!!moved, moved ? {} : { status: 'Failed to move module.' });
+    }
+    if (direction === 'left' || direction === 'right') {
+      const targetColumn = direction === 'left' ? columnIndex - 1 : columnIndex + 1;
+      if (targetColumn < 0 || targetColumn >= columnCount) {
+        return result(false, { status: 'No column in that direction.' });
+      }
+      const targetSiblings = (section.modules || []).filter(
+        (item) => (Number(item.columnIndex) || 0) === targetColumn && item.id !== module.id
+      );
+      const moved = await actions.moveModuleToTarget(
+        module.id,
+        section.id,
+        targetColumn,
+        targetSiblings.length
+      );
+      return result(!!moved, moved ? {} : { status: 'Failed to move module.' });
+    }
+    return result(false, { status: `Unknown move direction: ${direction}` });
   }
 
   return {

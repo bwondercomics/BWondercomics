@@ -1345,10 +1345,46 @@ def sanitize_promo_item_style(raw_style: Any) -> dict[str, Any]:
     }
 
 
+def sanitize_module_layout(raw: Any) -> dict[str, Any] | None:
+    """Shared per-module layout (width/height/alignment) applied to the .pb-module wrapper.
+
+    Sparse: returns None when nothing is authored; the defaults (full width, auto height,
+    stretch alignment) are implicit so existing modules round-trip unchanged.
+    """
+    if not isinstance(raw, dict):
+        return None
+    result: dict[str, Any] = {}
+    mode = str(raw.get("widthMode") or "").strip().lower()
+    if mode == "percent":
+        width = _sanitize_optional_clamped_int(raw, "width", 5, 100)
+        if width is not None:
+            result["widthMode"] = mode
+            result["width"] = width
+    elif mode == "px":
+        width = _sanitize_optional_clamped_int(raw, "width", 40, 2000)
+        if width is not None:
+            result["widthMode"] = mode
+            result["width"] = width
+    max_width = _sanitize_optional_clamped_int(raw, "maxWidth", 40, 2400)
+    if max_width is not None:
+        result["maxWidth"] = max_width
+    height = _sanitize_optional_clamped_int(raw, "height", 40, 4000)
+    if height is not None:
+        result["height"] = height
+    align = str(raw.get("align") or "").strip().lower()
+    if align in {"start", "center", "end"}:
+        result["align"] = align
+    return result or None
+
+
 def sanitize_module_config(module_type: str, raw_config: Any) -> dict[str, Any]:
     config = raw_config if isinstance(raw_config, dict) else {}
 
     def with_responsive(sanitized: dict[str, Any]) -> dict[str, Any]:
+        # Shared wrapper layout rides every module type's config.
+        layout = sanitize_module_layout(config.get("layout"))
+        if layout:
+            sanitized["layout"] = layout
         responsive = sanitize_module_responsive(module_type, config.get("responsive"))
         if responsive:
             sanitized["responsive"] = responsive

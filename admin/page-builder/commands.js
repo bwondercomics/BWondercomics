@@ -78,6 +78,7 @@ function createDefaultCommands() {
     createStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.DELETE_SELECTED),
     createStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.HIDE_ON_DEVICE),
     createStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.DUPLICATE_SELECTED),
+    createStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.MOVE_MODULE_STEP),
     {
       id: BUILDER_COMMANDS.SELECT,
       enabled: ({ payload }) => !!payload?.target,

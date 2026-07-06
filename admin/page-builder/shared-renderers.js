@@ -105,6 +105,36 @@ export function buildColumnInlineStyle(
   return tokens.join('; ');
 }
 
+// Inline style for a module wrapper's shared `config.layout` (width/height/alignment).
+// Sparse and default-free: modules without a layout key emit no style at all. Alignment
+// uses auto margins, which center/flush blocks in both the grid-column (block) context
+// and the flex panel context.
+export function buildModuleLayoutStyle(layout) {
+  if (!layout || typeof layout !== 'object') return '';
+  const tokens = [];
+  const mode = sanitizeKeyword(layout.widthMode, ['full', 'percent', 'px'], 'full');
+  if (mode === 'percent') {
+    const width = sanitizeNumber(layout.width, 0, 5, 100);
+    if (width) tokens.push(`width: ${width}%`);
+  } else if (mode === 'px') {
+    const width = sanitizeNumber(layout.width, 0, 40, 2000);
+    if (width) tokens.push(`width: ${width}px`, 'max-width: 100%');
+  }
+  if (layout.maxWidth !== undefined && layout.maxWidth !== null && layout.maxWidth !== '') {
+    const maxWidth = sanitizeNumber(layout.maxWidth, 0, 40, 2400);
+    if (maxWidth) tokens.push(`max-width: min(${maxWidth}px, 100%)`);
+  }
+  if (layout.height !== undefined && layout.height !== null && layout.height !== '') {
+    const height = sanitizeNumber(layout.height, 0, 40, 4000);
+    if (height) tokens.push(`height: ${height}px`, 'overflow: hidden');
+  }
+  const align = sanitizeKeyword(layout.align, ['start', 'center', 'end'], '');
+  if (align === 'center') tokens.push('margin-left: auto', 'margin-right: auto');
+  else if (align === 'end') tokens.push('margin-left: auto');
+  else if (align === 'start') tokens.push('margin-right: auto');
+  return tokens.join('; ');
+}
+
 export function createRenderers({
   resolveImageUrl = /** @type {function(string): string} */ ((path) => path),
   getSeriesId = /** @type {function(): string} */ (() => ''),
@@ -545,7 +575,10 @@ export function createRenderers({
     const content = hiddenOnDevice
       ? '<div class="pb-module-hidden-placeholder">Hidden on this device</div>'
       : renderer(config, mod, { ...renderOptions, builderEditing: emitMarkers });
-    return `<div class="pb-module pb-module--${safeType}${hiddenClass}"${moduleIdAttr}${markerAttrs}>${content}</div>`;
+    // Shared wrapper layout (config.layout): width/height/alignment on the .pb-module box.
+    const layoutStyle = hiddenOnDevice ? '' : buildModuleLayoutStyle(config?.layout);
+    const layoutStyleAttr = layoutStyle ? ` style="${layoutStyle}"` : '';
+    return `<div class="pb-module pb-module--${safeType}${hiddenClass}"${moduleIdAttr}${markerAttrs}${layoutStyleAttr}>${content}</div>`;
   }
 
   function renderSection(section, renderOptions = {}) {

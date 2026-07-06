@@ -197,6 +197,33 @@ function collectGenericModuleDraft(root, baseConfig = {}, options = {}) {
     }
   });
 
+  // Shared wrapper layout: [data-layout-key] fields collect into config.layout (sparse —
+  // blank/default values delete their key; an empty layout object is removed entirely).
+  const layoutFields = Array.from(root.querySelectorAll('[data-layout-key]'));
+  if (layoutFields.length > 0 && responsiveEditScope !== 'device') {
+    const layout = cloneConfig(nextConfig.layout || {});
+    layoutFields.forEach((input) => {
+      const key = input.dataset.layoutKey;
+      if (!key) return;
+      const raw = String(input.value ?? '').trim();
+      const isDefault = !raw || (key === 'widthMode' && raw === 'full');
+      if (isDefault) {
+        delete layout[key];
+        return;
+      }
+      if (input.type === 'number') {
+        const parsed = Number.parseInt(raw, 10);
+        if (Number.isFinite(parsed) && parsed > 0) layout[key] = parsed;
+        else delete layout[key];
+      } else {
+        layout[key] = raw;
+      }
+    });
+    if (layout.widthMode === undefined) delete layout.width;
+    if (Object.keys(layout).length) nextConfig.layout = layout;
+    else delete nextConfig.layout;
+  }
+
   const sourceFields = Array.from(root.querySelectorAll('[data-source-key]'));
   if (sourceFields.length > 0 && responsiveEditScope !== 'device') {
     const source = cloneConfig(nextConfig.source || {});
@@ -1238,11 +1265,60 @@ export function renderModuleEditorContent({
     'email-signup',
     'feed',
   ]);
+  // Shared wrapper layout (config.layout): available on every structured module type.
+  if (responsiveEditScope !== 'device' && moduleType !== 'reader') {
+    contentSections.push(renderModuleLayoutCard(config));
+  }
+
   if (MODULES_RETAINING_RAW_CARD.has(moduleType) && responsiveEditScope !== 'device') {
     contentSections.push(renderRawConfigCard(config));
   }
 
   return contentSections.join('');
+}
+
+// Shared "Layout" card: width/height/alignment of the block's wrapper box. Sparse —
+// blank fields mean the stock behavior (full width, auto height). Collected into
+// config.layout by collectGenericModuleDraft via [data-layout-key].
+function renderModuleLayoutCard(config = {}) {
+  const layout = config.layout && typeof config.layout === 'object' ? config.layout : {};
+  const widthMode = ['percent', 'px'].includes(layout.widthMode) ? layout.widthMode : 'full';
+  return renderSectionCard(
+    'Layout',
+    'Size & Alignment',
+    'Resize this block inside its panel or column. Blank fields keep the stock behavior.',
+    `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Width</label>
+        <select class="pb-editor-select" data-layout-key="widthMode">
+          <option value="full" ${widthMode === 'full' ? 'selected' : ''}>Full width</option>
+          <option value="percent" ${widthMode === 'percent' ? 'selected' : ''}>Percent of column</option>
+          <option value="px" ${widthMode === 'px' ? 'selected' : ''}>Fixed (px)</option>
+        </select>
+      </div>
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Width value ${widthMode === 'px' ? '(px)' : '(%)'}</label>
+        <input type="number" class="pb-editor-input" data-layout-key="width" min="5" step="5" placeholder="${widthMode === 'px' ? 'e.g. 320' : 'e.g. 60'}" value="${layout.width ?? ''}">
+      </div>
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Max width (px)</label>
+        <input type="number" class="pb-editor-input" data-layout-key="maxWidth" min="40" step="10" placeholder="none" value="${layout.maxWidth ?? ''}">
+      </div>
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Height (px)</label>
+        <input type="number" class="pb-editor-input" data-layout-key="height" min="40" step="10" placeholder="auto" value="${layout.height ?? ''}">
+      </div>
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Align</label>
+        <select class="pb-editor-select" data-layout-key="align">
+          <option value="" ${!layout.align ? 'selected' : ''}>Stretch (default)</option>
+          <option value="start" ${layout.align === 'start' ? 'selected' : ''}>Left</option>
+          <option value="center" ${layout.align === 'center' ? 'selected' : ''}>Center</option>
+          <option value="end" ${layout.align === 'end' ? 'selected' : ''}>Right</option>
+        </select>
+      </div>
+    `
+  );
 }
 
 function renderStyleManagerEmpty(title, copy) {
