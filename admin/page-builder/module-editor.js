@@ -152,6 +152,32 @@ function renderRawConfigCard(config) {
   );
 }
 
+// Reads the shared Size & Alignment fields ([data-layout-key]) into a sparse layout
+// object. Blank/default values drop their key; returns null when nothing is set (the
+// caller should then delete config.layout entirely). The DOM fields are the source of
+// truth — the card always renders every key with its current value.
+function collectModuleLayoutFromFields(root) {
+  const layoutFields = Array.from(root.querySelectorAll('[data-layout-key]'));
+  if (!layoutFields.length) return null;
+  const layout = {};
+  layoutFields.forEach((input) => {
+    const key = input.dataset.layoutKey;
+    if (!key) return;
+    const raw = String(input.value ?? '').trim();
+    const isDefault =
+      !raw || (key === 'widthMode' && raw === 'full') || (key === 'align' && raw === 'stretch');
+    if (isDefault) return;
+    if (input.type === 'number') {
+      const parsed = Number.parseInt(raw, 10);
+      if (Number.isFinite(parsed) && parsed > 0) layout[key] = parsed;
+    } else {
+      layout[key] = raw;
+    }
+  });
+  if (layout.widthMode === undefined) delete layout.width;
+  return Object.keys(layout).length ? layout : null;
+}
+
 function collectGenericModuleDraft(root, baseConfig = {}, options = {}) {
   const nextConfig = cloneConfig(baseConfig);
   const keyedInputs = Array.from(root.querySelectorAll('[data-key]'));
@@ -199,28 +225,9 @@ function collectGenericModuleDraft(root, baseConfig = {}, options = {}) {
 
   // Shared wrapper layout: [data-layout-key] fields collect into config.layout (sparse —
   // blank/default values delete their key; an empty layout object is removed entirely).
-  const layoutFields = Array.from(root.querySelectorAll('[data-layout-key]'));
-  if (layoutFields.length > 0 && responsiveEditScope !== 'device') {
-    const layout = cloneConfig(nextConfig.layout || {});
-    layoutFields.forEach((input) => {
-      const key = input.dataset.layoutKey;
-      if (!key) return;
-      const raw = String(input.value ?? '').trim();
-      const isDefault = !raw || (key === 'widthMode' && raw === 'full');
-      if (isDefault) {
-        delete layout[key];
-        return;
-      }
-      if (input.type === 'number') {
-        const parsed = Number.parseInt(raw, 10);
-        if (Number.isFinite(parsed) && parsed > 0) layout[key] = parsed;
-        else delete layout[key];
-      } else {
-        layout[key] = raw;
-      }
-    });
-    if (layout.widthMode === undefined) delete layout.width;
-    if (Object.keys(layout).length) nextConfig.layout = layout;
+  if (root.querySelector('[data-layout-key]') && responsiveEditScope !== 'device') {
+    const layout = collectModuleLayoutFromFields(root);
+    if (layout) nextConfig.layout = layout;
     else delete nextConfig.layout;
   }
 
@@ -825,7 +832,7 @@ function bindGenericModuleDraftEvents({
   };
 
   el.pbModuleEditor
-    .querySelectorAll('[data-key], [data-style-key], [data-source-key]')
+    .querySelectorAll('[data-key], [data-style-key], [data-source-key], [data-layout-key]')
     .forEach((input) => {
       const eventName =
         input.type === 'checkbox' || input.tagName === 'SELECT' ? 'change' : 'input';
@@ -1311,7 +1318,7 @@ function renderModuleLayoutCard(config = {}) {
       <div class="pb-editor-field">
         <label class="pb-editor-label">Align</label>
         <select class="pb-editor-select" data-layout-key="align">
-          <option value="" ${!layout.align ? 'selected' : ''}>Stretch (default)</option>
+          <option value="stretch" ${!layout.align ? 'selected' : ''}>Stretch (default)</option>
           <option value="start" ${layout.align === 'start' ? 'selected' : ''}>Left</option>
           <option value="center" ${layout.align === 'center' ? 'selected' : ''}>Center</option>
           <option value="end" ${layout.align === 'end' ? 'selected' : ''}>Right</option>
@@ -1540,11 +1547,53 @@ export function bindModuleEditorEvents({
     return;
   }
 
+  // Shared Size & Alignment card (config.layout) for modules with dedicated editors.
+  // Their binders rebuild the config through type normalizers that do not know about
+  // the shared layout keys, so every commit is routed through a bridge that re-reads
+  // the [data-layout-key] fields. This both makes the card functional for these types
+  // and stops unrelated edits from erasing a saved layout. Generic modules are covered
+  // by collectGenericModuleDraft instead and must not double-bind here.
+  const DEDICATED_EDITOR_TYPES = new Set([
+    'promo',
+    'social',
+    'buttons',
+    'gallery',
+    'video',
+    'divider',
+    'entry-gallery',
+  ]);
+  const useLayoutBridge =
+    DEDICATED_EDITOR_TYPES.has(selectedModule.moduleType) &&
+    !!el.pbModuleEditor.querySelector('[data-layout-key]');
+  let bridgedConfig = cloneConfig(draftConfig || selectedModule.config || {});
+  const applyLayoutFieldsToConfig = (config) => {
+    const nextConfig = cloneConfig(config || {});
+    const layout = collectModuleLayoutFromFields(el.pbModuleEditor);
+    if (layout) nextConfig.layout = layout;
+    else delete nextConfig.layout;
+    return nextConfig;
+  };
+  const layoutAwareSetDraftConfig = (nextConfig) => {
+    bridgedConfig = applyLayoutFieldsToConfig(nextConfig);
+    setDraftConfig(bridgedConfig);
+  };
+  const draftSetter = useLayoutBridge ? layoutAwareSetDraftConfig : setDraftConfig;
+  if (useLayoutBridge) {
+    el.pbModuleEditor.querySelectorAll('[data-layout-key]').forEach((input) => {
+      const eventName = input.tagName === 'SELECT' ? 'change' : 'input';
+      input.addEventListener(eventName, () => {
+        bridgedConfig = applyLayoutFieldsToConfig(bridgedConfig);
+        setDraftConfig(bridgedConfig);
+        markDirty('module');
+      });
+    });
+  }
+
   if (selectedModule.moduleType === 'promo') {
     bindPromoDraftEvents({
       el,
       draftConfig,
-      setDraftConfig,
+      setDraftConfig: draftSetter,
       renderEditorPanel,
       markDirty,
       openImagePicker,
@@ -1560,7 +1609,7 @@ export function bindModuleEditorEvents({
     bindSocialDraftEvents({
       el,
       draftConfig,
-      setDraftConfig,
+      setDraftConfig: draftSetter,
       renderEditorPanel,
       markDirty,
       openImagePicker,
@@ -1574,7 +1623,7 @@ export function bindModuleEditorEvents({
     bindButtonsEditorEvents({
       el,
       draftConfig,
-      setDraftConfig,
+      setDraftConfig: draftSetter,
       renderEditorPanel,
       markDirty,
       pages,
@@ -1588,7 +1637,7 @@ export function bindModuleEditorEvents({
     bindGalleryEditorEvents({
       el,
       draftConfig,
-      setDraftConfig,
+      setDraftConfig: draftSetter,
       renderEditorPanel,
       markDirty,
       openImagePicker,
@@ -1604,7 +1653,7 @@ export function bindModuleEditorEvents({
     bindVideoEditorEvents({
       el,
       draftConfig,
-      setDraftConfig,
+      setDraftConfig: draftSetter,
       markDirty,
       activeDeviceId,
       responsiveEditScope,
@@ -1617,7 +1666,7 @@ export function bindModuleEditorEvents({
     bindDividerEditorEvents({
       el,
       draftConfig,
-      setDraftConfig,
+      setDraftConfig: draftSetter,
       markDirty,
     });
     return;
@@ -1627,7 +1676,7 @@ export function bindModuleEditorEvents({
     bindEntryGalleryEditorEvents({
       el,
       draftConfig,
-      setDraftConfig,
+      setDraftConfig: draftSetter,
       markDirty,
       activeDeviceId,
       responsiveEditScope,

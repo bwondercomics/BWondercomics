@@ -507,6 +507,25 @@ movement relies purely on drag.
   `npm run test:backend` (OK), `npm run build`, `npm run test:visual` (21 passed); API container
   restarted for the sanitizer change.
 
+### Corrective note 2026-07-06 (Size & Alignment card was dead in the editor — fixed)
+
+- User QA found the card "superficial": the render/save/sanitize pipeline was fine, but the
+  editor never collected the fields. Two defects in `module-editor.js`:
+  1. `bindGenericModuleDraftEvents` listened on `[data-key]/[data-style-key]/[data-source-key]`
+     only — `[data-layout-key]` fields had **no listener**, so layout edits on generic modules
+     (text/image/spacer/email-signup/feed) only reached the draft when another field changed.
+  2. Modules with dedicated editors (promo, social, buttons, gallery, video, divider,
+     entry-gallery) never ran the generic collector at all, and some of their normalizers rebuild
+     the config from a fixed shape (`normalizeVideoConfig` → `{url}`), so unrelated edits could
+     **erase** a saved `config.layout`.
+- Fix: layout collection extracted to `collectModuleLayoutFromFields`; the generic binder now
+  listens on `[data-layout-key]`; `bindModuleEditorEvents` routes every dedicated-editor commit
+  through a layout bridge that re-reads the fields (making the card live for those types and
+  layout erasure impossible). The Align select's default option now uses an explicit `stretch`
+  sentinel value instead of `""`.
+- Tests: layout-only edits update the draft for a generic module (feed) and a dedicated-editor
+  module (video); unrelated edits preserve `config.layout` (`tests/admin-page-builder-preview.test.js`).
+
 ### Acceptance
 
 - A block in a panel can be set to 60% width, centered, fixed 240px height; identical in preview

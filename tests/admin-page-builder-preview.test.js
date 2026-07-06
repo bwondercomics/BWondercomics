@@ -148,6 +148,124 @@ describe('admin page-builder editor and preview renderers', () => {
     expect(renderEditorPanel).not.toHaveBeenCalled();
   });
 
+  it('collects Size & Alignment edits into config.layout for generic modules', () => {
+    const feedModule = getContractFixture('builderModules').feed;
+    const currentPage = {
+      sections: [{ id: 'section-1', modules: [feedModule] }],
+    };
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = renderModuleEditorContent({
+      currentPage,
+      selectedModuleId: feedModule.id,
+      draftConfig: feedModule.config,
+    });
+    document.body.innerHTML = '';
+    document.body.appendChild(wrapper);
+    const setDraftConfig = vi.fn();
+    const markDirty = vi.fn();
+
+    bindModuleEditorEvents({
+      el: { pbModuleEditor: wrapper },
+      currentPage,
+      selectedModuleId: feedModule.id,
+      draftConfig: feedModule.config,
+      setDraftConfig,
+      markDirty,
+      renderEditorPanel: vi.fn(),
+      openImagePicker: vi.fn(),
+      fetchAssets: vi.fn(async () => []),
+      uploadAssetFile: vi.fn(async () => ({})),
+    });
+
+    // A layout-only edit must update the draft (regression: the layout fields used to
+    // have no listener, so the Size & Alignment card was dead until another field changed).
+    const widthMode = wrapper.querySelector('[data-layout-key="widthMode"]');
+    const width = wrapper.querySelector('[data-layout-key="width"]');
+    widthMode.value = 'percent';
+    widthMode.dispatchEvent(new Event('change', { bubbles: true }));
+    width.value = '60';
+    width.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(setDraftConfig).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        layout: { widthMode: 'percent', width: 60 },
+      })
+    );
+    expect(markDirty).toHaveBeenCalledWith('module');
+
+    // Resetting every field back to defaults removes config.layout entirely (sparse).
+    widthMode.value = 'full';
+    widthMode.dispatchEvent(new Event('change', { bubbles: true }));
+    width.value = '';
+    width.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(setDraftConfig.mock.lastCall[0].layout).toBeUndefined();
+  });
+
+  it('keeps config.layout working and preserved for modules with dedicated editors', () => {
+    const videoModule = {
+      id: 'module-video-1',
+      moduleType: 'video',
+      columnIndex: 0,
+      sortIndex: 0,
+      config: { url: 'https://www.youtube.com/watch?v=abc123' },
+    };
+    const currentPage = {
+      sections: [{ id: 'section-1', modules: [videoModule] }],
+    };
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = renderModuleEditorContent({
+      currentPage,
+      selectedModuleId: videoModule.id,
+      draftConfig: videoModule.config,
+    });
+    document.body.innerHTML = '';
+    document.body.appendChild(wrapper);
+    const setDraftConfig = vi.fn();
+    const markDirty = vi.fn();
+
+    bindModuleEditorEvents({
+      el: { pbModuleEditor: wrapper },
+      currentPage,
+      selectedModuleId: videoModule.id,
+      draftConfig: videoModule.config,
+      setDraftConfig,
+      markDirty,
+      renderEditorPanel: vi.fn(),
+      openImagePicker: vi.fn(),
+      fetchAssets: vi.fn(async () => []),
+      uploadAssetFile: vi.fn(async () => ({})),
+    });
+
+    // Layout edits reach the draft even though the video editor has its own binder.
+    const widthMode = wrapper.querySelector('[data-layout-key="widthMode"]');
+    const width = wrapper.querySelector('[data-layout-key="width"]');
+    widthMode.value = 'px';
+    widthMode.dispatchEvent(new Event('change', { bubbles: true }));
+    width.value = '320';
+    width.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(setDraftConfig).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        url: 'https://www.youtube.com/watch?v=abc123',
+        layout: { widthMode: 'px', width: 320 },
+      })
+    );
+    expect(markDirty).toHaveBeenCalledWith('module');
+
+    // Regression: editing an unrelated field must not erase the layout (the video
+    // normalizer rebuilds the config as {url} and used to drop unknown keys).
+    const urlInput = wrapper.querySelector('.pb-video-input[data-key="url"]');
+    urlInput.value = 'https://vimeo.com/123456';
+    urlInput.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(setDraftConfig).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        url: 'https://vimeo.com/123456',
+        layout: { widthMode: 'px', width: 320 },
+      })
+    );
+  });
+
   it('renders and binds CMS source controls by page scope', () => {
     const modules = getContractFixture('builderModules');
     const currentPage = {
