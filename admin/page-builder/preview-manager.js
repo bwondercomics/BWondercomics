@@ -58,6 +58,15 @@ function getTargetStyle(targetGeometry) {
 
 function getPlacementGuideStyle(placement, geometry) {
   const rect = geometry?.rect || {};
+  if (placement?.placement === 'header-cell') {
+    // Header drops target a whole 3×3 cell, so the guide is the cell box itself.
+    return [
+      `top: ${Math.max(0, Number(rect.top) || 0)}px`,
+      `left: ${Math.max(0, Number(rect.left) || 0)}px`,
+      `width: ${Math.max(24, Number(rect.width) || 0)}px`,
+      `height: ${Math.max(24, Number(rect.height) || 0)}px`,
+    ].join('; ');
+  }
   if (placement?.target?.surface === 'page-end') {
     return [
       `top: ${Math.max(0, Number(rect.top) || 0)}px`,
@@ -164,6 +173,17 @@ function getToolbarActions(target, currentPage) {
   }
   if (target?.kind === 'page') {
     return [['insert-section-end', 'Add Section']];
+  }
+  if (target?.kind === 'header' && target.blockId) {
+    // Selected header block: drag to any header cell, or step regions/rows one at a time.
+    return [
+      ['settings', 'Settings'],
+      ['move', 'Move'],
+      ['move-up', '↑'],
+      ['move-down', '↓'],
+      ['move-left', '←'],
+      ['move-right', '→'],
+    ];
   }
   return [['settings', 'Settings']];
 }
@@ -531,10 +551,13 @@ export function createPreviewManager({ el, getState, actions, deps }) {
           action === 'move-left' ||
           action === 'move-right'
         ) {
-          await runBuilderCommand('builder:move-module-step', {
-            target,
-            direction: action.slice(5),
-          });
+          await runBuilderCommand(
+            target.kind === 'header' ? 'builder:move-header-block' : 'builder:move-module-step',
+            {
+              target,
+              direction: action.slice(5),
+            }
+          );
           return;
         }
         if (action === 'insert-before' || action === 'insert-after') {
@@ -575,9 +598,10 @@ export function createPreviewManager({ el, getState, actions, deps }) {
         const target = selectedGeometry?.target;
         if (!target) return;
         const result = runBuilderCommand('builder:drag-start', {
-          source: target.kind,
+          source: target.kind === 'header' ? 'header-block' : target.kind,
           moduleId: target.moduleId,
           sectionId: target.sectionId,
+          blockId: target.blockId,
           originTarget: target,
         });
         if (result?.ok === false) {
@@ -586,11 +610,19 @@ export function createPreviewManager({ el, getState, actions, deps }) {
         }
         if (event.dataTransfer) {
           event.dataTransfer.effectAllowed = 'move';
-          event.dataTransfer.setData('text/plain', target.moduleId || target.sectionId || '');
+          event.dataTransfer.setData(
+            'text/plain',
+            target.moduleId || target.sectionId || target.blockId || ''
+          );
+        }
+        if (target.kind === 'header') {
+          // Ask the preview to reveal the 3×3 header drop cells for this drag.
+          postTargetAction(BUILDER_PREVIEW_TARGET_ACTIONS.HEADER_DRAG_START);
         }
         renderPreviewTargetOverlay();
       });
       button.addEventListener('dragend', () => {
+        postTargetAction(BUILDER_PREVIEW_TARGET_ACTIONS.HEADER_DRAG_END);
         runBuilderCommand('builder:drag-end');
         renderPreviewTargetOverlay();
       });

@@ -1,8 +1,8 @@
 # Builder Customization Roadmap
 
-Status: Phases 0–3 implemented (2026-07-05; deferred items — Phase 0 manual builder QA, Phase 1
-drag-resize handles, Phase 2 universal module appearance, Phase 3 button typography/labels — are
-tracked in the completion notes). Phases 4–7 planned.
+Status: Phases 0–4 implemented (Phase 4 closed 2026-07-06: on-canvas drag + toolbar arrows
+shipped, placement board retired). Deferred items are tracked in the completion notes.
+Phases 5–7 planned.
 Created: 2026-07-05
 Branch context: `builder-incremental-improvement` — the Panel/Column Settings Consolidation Plan
 (Phases 1–4) is implemented up to HEAD (`c82d986`), but its release gates (data migrations, manual
@@ -646,23 +646,78 @@ gradient end-color and direction but render even when the background type is Sol
 
 ### Steps
 
-- [ ] Emit per-block edit-mode markers in the header
+- [x] Emit per-block edit-mode markers in the header
       (`data-builder-header-block="brand|patron|status|entryControls|nav"`) from
       `header-layout.js`; extend the bridge to collect/measure them and post
       `{ kind:'header-block', blockId }` targets.
-- [ ] Click a header block in the live canvas → selects it; inspector shows that block's settings
+- [x] Click a header block in the live canvas → selects it; inspector shows that block's settings
       (placement + per-block settings that exist today; appearance arrives in Phase 5).
-- [ ] On-canvas **drag between rows/regions** with insertion guides, reusing the strict
+- [x] On-canvas **drag between rows/regions** with insertion guides, reusing the strict
       drop-resolution rules (no nearest-snap; invalid pointer position = clean no-op — the
       incremental plan's Item 1 contract). Drops call the existing `moveBlockToPlacement` model
       code and save through the existing header draft.
-- [ ] Selected-block toolbar arrows (left/right region, up/down row) reusing
-      `moveBlockAcrossRegions/Rows`, disabled at edges exactly as the board buttons are today.
-- [ ] Retire the placement board UI once canvas parity is confirmed (same session, after the
+- [x] Selected-block toolbar arrows (left/right region, up/down row) reusing
+      `moveBlockAcrossRegions/Rows`; edges resolve as clean status no-ops (same contract as the
+      module step-move arrows).
+- [x] Retire the placement board UI once canvas parity is confirmed (same session, after the
       above ships); the saved `layoutRows` schema does not change.
-- [ ] **Gradient UX fix** in `appearance-editor.js` (benefits every appearance user): show
+- [x] **Gradient UX fix** in `appearance-editor.js` (benefits every appearance user): show
       Secondary Color + Angle only when Background type = Gradient; relabel "Gradient end color"
       and "Direction (degrees)"; when type = Solid they are hidden, not dead.
+
+### Progress note 2026-07-05 (selection + gradient shipped; drag/arrows/board remain)
+
+- **Gradient UX**: appearance fields gained a `visibleWhen` predicate; "Gradient End Color" and
+  "Direction (degrees)" render only when Background type = Gradient, everywhere appearance is
+  edited. Hidden values persist (sparse leafs untouched). Three tests updated to the conditional
+  contract (`tests/header-appearance.test.js`, `tests/admin-page-builder-shell.test.js`,
+  `tests/visual/builder-authoring-workflows.spec.js`).
+- **Header block selection on the canvas**: `header-layout.js` marks each placed block with
+  `data-builder-header-block` in edit mode; `reader/preview-bridge.js` collects/measures those
+  markers and posts HEADER targets carrying `blockId`; `selectCanvasTarget` (`page-builder.js`)
+  opens the header editor and highlights + scrolls to that block's placement card
+  (`.is-canvas-selected`, `admin/css/page-builder/inspector.css`). Clicking a block in the
+  preview now maps 1:1 to its card — the "which card is which" guesswork is gone.
+- **Remaining** (unchecked above): on-canvas drag between rows/regions, selected-block toolbar
+  arrows, and the board retirement (explicitly contingent on drag parity). The board stays
+  until then.
+- Verified: `npm test` (618 passed, 1 skipped), `npm run lint`, `npm run format:check`,
+  `npm run build`, `npm run test:visual` (21 passed). No backend changes in this slice.
+
+### Completion note 2026-07-06 (drag + arrows shipped, board retired — phase closed)
+
+- **Selected-block toolbar arrows**: selecting a header block on the canvas now shows a toolbar
+  with ↑↓←→ + a draggable Move handle. Arrows dispatch the new structural command
+  `builder:move-header-block` (`structural-commands.js`, registered in `commands.js`), which
+  calls `stepHeaderBlockPlacement` in `page-builder.js` — edge moves come back as clean status
+  rejections. Moves mutate the **header draft** (`markDirty('header')`), so they follow the
+  normal save/discard lifecycle and preview instantly.
+- **On-canvas drag between rows/regions**: in edit mode `header-layout.js` renders all 3×3
+  cells (`data-builder-header-cell` + `data-builder-header-row`); the bridge collects/measures
+  them as HEADER targets carrying `rowId`/`region`. `resolveLiveDropPlacement` gained a
+  dedicated `header-block` source that resolves **only** to a cell containing the pointer (no
+  nearest-snap; dead space = clean no-op), producing the new `header-cell` placement. Drops call
+  `moveHeaderBlockToCell` → `moveBlockToPlacement` through the header draft. The drop guide is
+  the whole cell box (`.pb-preview-drop-guide--header-cell`).
+- **Visual parity preserved**: empty rows/cells are `display: none` at rest and revealed only
+  while a header drag is active, via new bridge target actions
+  `header-drag-start`/`header-drag-end` (`preview-contract.js`) toggling
+  `html[data-builder-header-dragging]` inside the iframe. The at-rest edit preview stays
+  pixel-identical to the published page (`builder-preview-parity` suite still green).
+- **Board retired**: `renderPlacementEditor` + its drag/button handlers are gone from
+  `header-editor.js`; the pure placement model (`findBlockPlacement`, `moveBlockToPlacement`,
+  `moveBlockAcrossRegions/Rows`) is now exported and canvas-driven. Canvas click-to-select
+  highlights the block's **Parts** row (`data-block-id` on `.pb-header-toggle-row`); Parts copy
+  points at the on-canvas workflow. Board-only CSS removed from `inspector.css`/`responsive.css`.
+  The saved `layoutRows` schema is unchanged; no backend changes.
+- Tests: board DOM tests rewritten as model-function tests (`tests/header-appearance.test.js`),
+  new bridge cell-collection test, header-cell placement tests
+  (`tests/live-drop-placement.test.js`), structural command tests (arrows + drag/drop contract),
+  edit-mode cell rendering test, and a rewritten Playwright workflow test that moves a block by
+  arrows and by drag onto a revealed empty cell, then saves and checks `layoutRows`.
+- Verified: `npm test` (625 passed, 1 skipped), `npm run lint`, `npm run format:check`,
+  `npm run build`, `npm run test:visual` (20 passed). Manual QA on a real page (drag feel,
+  hidden-block behavior) is the user's follow-up.
 
 ### Acceptance
 

@@ -4,6 +4,10 @@ import { appearanceToInlineStyle } from '../admin/page-builder/appearance-utils.
 import { renderCanvasSnapshot } from '../admin/page-builder/canvas-renderer.js';
 import {
   bindHeaderEditorEvents,
+  findBlockPlacement,
+  moveBlockAcrossRegions,
+  moveBlockAcrossRows,
+  moveBlockToPlacement,
   renderHeaderEditorContent,
 } from '../admin/page-builder/header-editor.js';
 import {
@@ -530,7 +534,7 @@ describe('header appearance', () => {
     expect(renderEditorPanel).toHaveBeenCalledTimes(2);
   });
 
-  it('keeps link editing, item moves, and placement controls working', () => {
+  it('keeps link editing and item moves working', () => {
     const { wrapper, setDraftState, renderEditorPanel } = mountHeaderEditor({
       draftState: {
         header: {
@@ -581,16 +585,10 @@ describe('header appearance', () => {
       .querySelector('.pb-header-nav-item[data-item-index="0"] [data-action="move-down"]')
       ?.dispatchEvent(new Event('click', { bubbles: true }));
     expect(setDraftState.mock.lastCall[0].header.nav.items[0].id).toBe('reader');
-
-    wrapper
-      .querySelector('.pb-header-layout-button[data-action="move-right"][data-block-id="brand"]')
-      ?.dispatchEvent(new Event('click', { bubbles: true }));
-    expect(setDraftState.mock.lastCall[0].header.layoutRows.top.center).toContain('brand');
-    expect(setDraftState.mock.lastCall[0].header.regions.center).toContain('brand');
-    expect(renderEditorPanel).toHaveBeenCalledTimes(2);
+    expect(renderEditorPanel).toHaveBeenCalledTimes(1);
   });
 
-  it('names and describes placement card groups without changing move control semantics', () => {
+  it('retires the placement board and marks Parts rows for canvas click-to-select', () => {
     const { wrapper } = mountHeaderEditor({
       draftState: {
         header: {
@@ -602,49 +600,17 @@ describe('header appearance', () => {
       },
     });
 
-    const cards = Array.from(wrapper.querySelectorAll('.pb-header-layout-card'));
-    expect(cards).toHaveLength(5);
+    // The abstract placement board is gone; placement is edited on the live canvas.
+    expect(wrapper.querySelector('.pb-header-layout-card')).toBeNull();
+    expect(wrapper.querySelector('.pb-header-layout-button')).toBeNull();
+    expect(wrapper.querySelector('.pb-header-region--board')).toBeNull();
 
-    cards.forEach((card) => {
-      expect(card.getAttribute('role')).toBe('group');
-
-      const labelId = card.getAttribute('aria-labelledby');
-      const descriptionId = card.getAttribute('aria-describedby');
-      expect(labelId).toBeTruthy();
-      expect(descriptionId).toBeTruthy();
-      expect(wrapper.querySelector(`#${labelId}`)).not.toBeNull();
-      expect(wrapper.querySelector(`#${descriptionId}`)).not.toBeNull();
-    });
-
-    const brandCard = wrapper.querySelector('.pb-header-layout-card[data-block-id="brand"]');
-    const statusCard = wrapper.querySelector('.pb-header-layout-card[data-block-id="status"]');
-    expect(brandCard?.getAttribute('aria-labelledby')).toBe('pb-header-placement-brand-label');
-    expect(brandCard?.getAttribute('aria-describedby')).toBe('pb-header-placement-brand-state');
-    expect(wrapper.querySelector('#pb-header-placement-brand-label')?.textContent).toBe(
-      'Logo / Title / Subtitle'
+    // Each Parts row carries the block id so a canvas click can highlight it.
+    const rows = Array.from(wrapper.querySelectorAll('.pb-header-toggle-row[data-block-id]'));
+    expect(rows).toHaveLength(5);
+    expect(rows.map((row) => row.dataset.blockId)).toEqual(
+      expect.arrayContaining(['brand', 'patron', 'status', 'entryControls', 'nav'])
     );
-    expect(wrapper.querySelector('#pb-header-placement-brand-state')?.textContent).toBe('Visible');
-    expect(wrapper.querySelector('#pb-header-placement-status-state')?.textContent).toBe(
-      'Hidden on this page'
-    );
-    expect(
-      statusCard?.querySelector('.pb-header-layout-card-state')?.getAttribute('aria-hidden')
-    ).toBe('true');
-
-    const expectedBrandButtons = [
-      ['move-left', 'Move Logo / Title / Subtitle left', true],
-      ['move-right', 'Move Logo / Title / Subtitle right', false],
-      ['move-up', 'Move Logo / Title / Subtitle up', true],
-      ['move-down', 'Move Logo / Title / Subtitle down', false],
-    ];
-    expectedBrandButtons.forEach(([action, accessibleName, disabled]) => {
-      const button = brandCard?.querySelector(`[data-action="${action}"]`);
-      expect(button?.getAttribute('aria-label')).toBe(accessibleName);
-      expect(button?.disabled).toBe(disabled);
-    });
-
-    const navCard = wrapper.querySelector('.pb-header-layout-card[data-block-id="nav"]');
-    expect(navCard?.querySelector('[data-action="move-right"]')?.disabled).toBe(true);
   });
 
   it('saves and clears seriesId for header builder-page link targets', () => {
@@ -679,85 +645,66 @@ describe('header appearance', () => {
   });
 
   it('moves a header block down into an empty row without requiring another block above it', () => {
-    const { wrapper, setDraftState } = mountHeaderEditor({
-      draftState: {
-        header: {
-          layoutRows: {
-            top: {
-              left: ['brand'],
-              center: ['patron', 'status'],
-              right: ['entryControls', 'nav'],
-            },
-            middle: {
-              left: [],
-              center: [],
-              right: [],
-            },
-            bottom: {
-              left: [],
-              center: [],
-              right: [],
-            },
-          },
-          nav: { items: [] },
+    const header = {
+      layoutRows: {
+        top: {
+          left: ['brand'],
+          center: ['patron', 'status'],
+          right: ['entryControls', 'nav'],
         },
-        copy: {
-          title: 'Header Title',
-          subtitle: '',
-          subtitles: [],
-        },
+        middle: { left: [], center: [], right: [] },
+        bottom: { left: [], center: [], right: [] },
       },
-    });
+      nav: { items: [] },
+    };
 
-    wrapper
-      .querySelector('.pb-header-layout-button[data-action="move-down"][data-block-id="brand"]')
-      ?.dispatchEvent(new Event('click', { bubbles: true }));
-
-    const header = setDraftState.mock.lastCall[0].header;
-    expect(header.layoutRows.top.left).not.toContain('brand');
-    expect(header.layoutRows.middle.left).toContain('brand');
-    expect(header.regions.left).toContain('brand');
+    const moved = moveBlockAcrossRows(header, 'brand', 1);
+    expect(moved.layoutRows.top.left).not.toContain('brand');
+    expect(moved.layoutRows.middle.left).toContain('brand');
+    expect(moved.regions.left).toContain('brand');
   });
 
   it('moves header blocks left and right without changing their row', () => {
-    const { wrapper, setDraftState } = mountHeaderEditor({
-      draftState: {
-        header: {
-          layoutRows: {
-            top: {
-              left: ['patron', 'status'],
-              center: [],
-              right: ['entryControls', 'nav'],
-            },
-            middle: {
-              left: ['brand'],
-              center: [],
-              right: [],
-            },
-            bottom: {
-              left: [],
-              center: [],
-              right: [],
-            },
-          },
-          nav: { items: [] },
+    const header = {
+      layoutRows: {
+        top: {
+          left: ['patron', 'status'],
+          center: [],
+          right: ['entryControls', 'nav'],
         },
-        copy: {
-          title: 'Header Title',
-          subtitle: '',
-          subtitles: [],
-        },
+        middle: { left: ['brand'], center: [], right: [] },
+        bottom: { left: [], center: [], right: [] },
       },
-    });
+      nav: { items: [] },
+    };
 
-    wrapper
-      .querySelector('.pb-header-layout-button[data-action="move-right"][data-block-id="brand"]')
-      ?.dispatchEvent(new Event('click', { bubbles: true }));
+    const moved = moveBlockAcrossRegions(header, 'brand', 1);
+    expect(moved.layoutRows.middle.left).not.toContain('brand');
+    expect(moved.layoutRows.middle.center).toContain('brand');
+    expect(moved.layoutRows.top.center).not.toContain('brand');
+  });
 
-    const header = setDraftState.mock.lastCall[0].header;
-    expect(header.layoutRows.middle.left).not.toContain('brand');
-    expect(header.layoutRows.middle.center).toContain('brand');
-    expect(header.layoutRows.top.center).not.toContain('brand');
+  it('moves a header block straight to any row/region cell and reports its placement', () => {
+    const header = {
+      layoutRows: {
+        top: {
+          left: ['brand'],
+          center: ['patron', 'status'],
+          right: ['entryControls', 'nav'],
+        },
+        middle: { left: [], center: [], right: [] },
+        bottom: { left: [], center: [], right: [] },
+      },
+      nav: { items: [] },
+    };
+
+    expect(findBlockPlacement(header, 'brand')).toEqual({ rowId: 'top', region: 'left' });
+
+    // Drag contract: a drop lands the block exactly in the chosen cell (appended last).
+    const moved = moveBlockToPlacement(header, 'brand', 'bottom', 'center');
+    expect(moved.layoutRows.top.left).not.toContain('brand');
+    expect(moved.layoutRows.bottom.center).toContain('brand');
+    expect(findBlockPlacement(moved, 'brand')).toEqual({ rowId: 'bottom', region: 'center' });
   });
 
   it('applies merged author nav link appearance, keeps admin link untouched, and toggles topbar shell state on scroll', () => {
@@ -912,6 +859,64 @@ describe('header appearance', () => {
     ).toBeNull();
     expect(document.querySelector('.topbar-layout-row .nav-links')).toBeNull();
     expect(document.querySelector('.topbar-stash .nav-links')?.style.display).toBe('none');
+  });
+
+  it('renders every 3×3 header cell with drop markers in builder edit mode only', () => {
+    createHeaderDom();
+
+    const header = normalizeHeaderConfig({
+      layoutRows: {
+        top: { left: ['brand'], center: [], right: [] },
+        middle: { left: [], center: [], right: [] },
+        bottom: { left: [], center: [], right: [] },
+      },
+      nav: { items: [] },
+    });
+    const headerState = {
+      header,
+      copy: { title: 'Reader', subtitle: '', subtitles: [] },
+    };
+
+    applySharedHeaderLayout(null, {
+      headerState,
+      builderEditing: true,
+      page: { id: 'page-1' },
+    });
+
+    // All 3 rows × 3 regions exist as measurable drop cells, empty ones included.
+    expect(document.querySelectorAll('.topbar-layout-row')).toHaveLength(3);
+    const cells = document.querySelectorAll('.topbar-region[data-builder-header-cell]');
+    expect(cells).toHaveLength(9);
+    const bottomCenter = document.querySelector(
+      '.topbar-layout-row[data-row="bottom"] .topbar-region[data-region="center"]'
+    );
+    expect(bottomCenter?.getAttribute('data-builder-header-row')).toBe('bottom');
+
+    // Empty rows/cells carry the parity markers (hidden at rest, shown during drags);
+    // populated ones do not, so the at-rest edit preview matches the published layout.
+    expect(document.querySelectorAll('.topbar-layout-row--builder-empty')).toHaveLength(2);
+    document.querySelectorAll('.topbar-region[data-builder-header-cell]').forEach((cell) => {
+      expect(cell.classList.contains('topbar-region--builder-empty')).toBe(
+        cell.children.length === 0
+      );
+    });
+    const brandCell = document.querySelector(
+      '.topbar-layout-row[data-row="top"] .topbar-region[data-region="left"]'
+    );
+    expect(brandCell?.classList.contains('topbar-region--builder-empty')).toBe(false);
+    expect(
+      document
+        .querySelector(
+          '.topbar-layout-row[data-row="top"] .topbar-region[data-region="left"] > .brand'
+        )
+        ?.getAttribute('data-builder-header-block')
+    ).toBe('brand');
+
+    // Published rendering: no cells, empty rows/regions skipped, markers removed.
+    applySharedHeaderLayout(null, { headerState });
+    expect(document.querySelector('[data-builder-header-cell]')).toBeNull();
+    expect(document.querySelectorAll('.topbar-layout-row')).toHaveLength(1);
+    expect(document.querySelector('.brand')?.hasAttribute('data-builder-header-block')).toBe(false);
   });
 
   it('clears shell appearance data, classes, and controlled inline styles when a later page has no appearance', () => {
@@ -1080,17 +1085,12 @@ describe('header appearance', () => {
   it('keeps appearance select controls as native <select> (no segmented-control swap)', () => {
     const { wrapper } = mountHeaderEditor();
 
-    const secondaryColorToggle = wrapper.querySelector(
-      '[data-appearance-toggle="true"][data-appearance-key="background.secondaryColor"]'
-    );
-    expect(secondaryColorToggle).not.toBeNull();
-    expect(secondaryColorToggle.nextElementSibling).not.toBeNull();
+    // Gradient-only fields (end color / direction) are hidden while the type is Solid.
     expect(
-      secondaryColorToggle
-        .closest('.pb-appearance-toggle')
-        .querySelector('span')
-        .getAttribute('title')
-    ).toBe('Secondary Color');
+      wrapper.querySelector(
+        '[data-appearance-toggle="true"][data-appearance-key="background.secondaryColor"]'
+      )
+    ).toBeNull();
 
     const typeControl = wrapper.querySelector(
       '[data-appearance-input="true"][data-appearance-key="background.type"]'

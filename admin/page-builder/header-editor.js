@@ -30,24 +30,7 @@ import {
   pruneEmptyResponsiveOverrides,
 } from './responsive-overrides.js';
 
-// Eye-off glyph for the "hidden on this page" state. Paired with visually-hidden
-// descriptive text on the placement card (see renderPlacementEditor).
-const EYE_OFF_ICON =
-  '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" focusable="false">' +
-  '<path d="M1.5 8 Q8 2 14.5 8 Q8 14 1.5 8 Z" fill="none" stroke="currentColor" stroke-width="1.2"/>' +
-  '<circle cx="8" cy="8" r="1.9" fill="currentColor"/>' +
-  '<line x1="3" y1="3" x2="13" y2="13" stroke="currentColor" stroke-width="1.2"/>' +
-  '</svg>';
-
-function getRegionLabel(region) {
-  return String(region || '').replace(/^\w/, (char) => char.toUpperCase());
-}
-
-function getRowLabel(rowId) {
-  return String(rowId || '').replace(/^\w/, (char) => char.toUpperCase());
-}
-
-function findBlockPlacement(header, blockId) {
+export function findBlockPlacement(header, blockId) {
   for (const rowId of HEADER_ROW_ORDER) {
     for (const region of HEADER_REGION_ORDER) {
       if ((header.layoutRows?.[rowId]?.[region] || []).includes(blockId)) {
@@ -245,7 +228,7 @@ function renderPartsEditor(header) {
     const actionId = escapeAttr(`pb-header-part-${block.id}-action`);
     const descriptionId = escapeAttr(`pb-header-part-${block.id}-description`);
     return `
-      <label class="pb-header-toggle-row pb-field-row">
+      <label class="pb-header-toggle-row pb-field-row" data-block-id="${escapeAttr(block.id)}">
         <span class="pb-header-toggle-text">
           <span class="pb-header-toggle-label pb-truncate" title="${escapeAttr(block.label)}">${escapeHtml(block.label)}</span>
           <span id="${descriptionId}" class="pb-header-toggle-help pb-truncate" title="${escapeAttr(block.description)}">${escapeHtml(block.description)}</span>
@@ -265,79 +248,8 @@ function renderPartsEditor(header) {
     kicker: 'Parts',
     title: 'Header Parts',
     summary: `${visibleCount} visible`,
-    copy: 'Turn built-in header parts on or off for this page.',
+    copy: 'Turn built-in header parts on or off for this page. To move a part, click it in the preview and drag it (or use the toolbar arrows).',
     body: `<div class="pb-header-toggle-list">${partsHtml}</div>`,
-  });
-}
-
-function renderPlacementEditor(header) {
-  const board = HEADER_ROW_ORDER.map((rowId, rowIndex) => {
-    const rowCells = HEADER_REGION_ORDER.map((region) => {
-      const blockIds = header.layoutRows?.[rowId]?.[region] || [];
-      const regionBlocks = blockIds
-        .map((blockId) => {
-          const block = HEADER_BLOCK_DEFS.find((item) => item.id === blockId);
-          const enabled = header.blocks?.[blockId]?.enabled !== false;
-          const label = block?.label || blockId;
-          const labelAttr = escapeAttr(label);
-          const idAttr = escapeAttr(blockId);
-          const labelIdAttr = escapeAttr(`pb-header-placement-${blockId}-label`);
-          const stateIdAttr = escapeAttr(`pb-header-placement-${blockId}-state`);
-          const stateMarkup = enabled
-            ? `<span id="${stateIdAttr}" class="pb-sr-only">Visible</span>`
-            : `<span class="pb-header-layout-card-state" aria-hidden="true" title="Hidden on this page">${EYE_OFF_ICON}</span><span id="${stateIdAttr}" class="pb-sr-only">Hidden on this page</span>`;
-          // Whole card stays draggable (unchanged); the grip is a visual cue only.
-          return `
-            <div
-              class="pb-header-layout-card ${enabled ? '' : 'is-disabled'}"
-              data-block-id="${idAttr}"
-              draggable="true"
-              role="group"
-              aria-labelledby="${labelIdAttr}"
-              aria-describedby="${stateIdAttr}"
-            >
-              <div class="pb-header-layout-card-head">
-                <span class="pb-header-layout-card-drag-handle" aria-hidden="true">⠿</span>
-                <span id="${labelIdAttr}" class="pb-header-layout-card-label pb-truncate" title="${labelAttr}">${escapeHtml(label)}</span>
-                ${stateMarkup}
-              </div>
-              <div class="pb-header-layout-actions" role="group" aria-label="Move ${labelAttr}">
-                <button type="button" class="pb-icon-btn pb-header-layout-button" data-action="move-left" data-block-id="${idAttr}" aria-label="Move ${labelAttr} left" title="Move left" ${region === 'left' ? 'disabled' : ''}>◀</button>
-                <button type="button" class="pb-icon-btn pb-header-layout-button" data-action="move-right" data-block-id="${idAttr}" aria-label="Move ${labelAttr} right" title="Move right" ${region === 'right' ? 'disabled' : ''}>▶</button>
-                <button type="button" class="pb-icon-btn pb-header-layout-button" data-action="move-up" data-block-id="${idAttr}" aria-label="Move ${labelAttr} up" title="Move up" ${rowIndex === 0 ? 'disabled' : ''}>▲</button>
-                <button type="button" class="pb-icon-btn pb-header-layout-button" data-action="move-down" data-block-id="${idAttr}" aria-label="Move ${labelAttr} down" title="Move down" ${rowIndex === HEADER_ROW_ORDER.length - 1 ? 'disabled' : ''}>▼</button>
-              </div>
-            </div>
-          `;
-        })
-        .join('');
-
-      return `
-        <div
-          class="pb-header-region pb-header-region--board"
-          data-row="${rowId}"
-          data-region="${region}"
-        >
-          <div class="pb-header-region-title">${escapeHtml(getRegionLabel(region))}</div>
-          ${regionBlocks || '<div class="pb-editor-help pb-header-region-empty">Drop blocks here</div>'}
-        </div>
-      `;
-    }).join('');
-
-    return `
-      <div class="pb-header-layout-row" data-row="${rowId}">
-        <div class="pb-header-layout-row-title">${escapeHtml(getRowLabel(rowId))}</div>
-        <div class="pb-header-layout-row-cells">${rowCells}</div>
-      </div>
-    `;
-  }).join('');
-
-  return renderInspectorSection({
-    kicker: 'Placement',
-    title: 'Placement',
-    summary: '3 rows',
-    copy: 'Drag blocks between cells, or use the buttons below each block.',
-    body: `<div class="pb-header-layout-grid">${board}</div>`,
   });
 }
 
@@ -536,13 +448,15 @@ export function renderHeaderEditorContent({
     }),
     renderCopyEditor(copy),
     renderPartsEditor(header),
-    renderPlacementEditor(header),
     renderNavigationEditor(header, pages),
     renderShellAppearanceEditor(header),
   ].join('');
 }
 
-function moveBlockToPlacement(header, blockId, nextRowId, nextRegion) {
+// Placement model API: these pure functions are the single mutation path for header block
+// placement. They are driven from the live canvas (toolbar arrows + on-canvas drag) via
+// page-builder.js; the old abstract placement board that used to call them is retired.
+export function moveBlockToPlacement(header, blockId, nextRowId, nextRegion) {
   const nextHeader = normalizeHeaderConfig(cloneValue(header), normalizeHeaderNavItems);
   HEADER_ROW_ORDER.forEach((rowId) => {
     HEADER_REGION_ORDER.forEach((region) => {
@@ -556,7 +470,7 @@ function moveBlockToPlacement(header, blockId, nextRowId, nextRegion) {
   return normalizeHeaderConfig(nextHeader, normalizeHeaderNavItems);
 }
 
-function moveBlockAcrossRegions(header, blockId, direction) {
+export function moveBlockAcrossRegions(header, blockId, direction) {
   const placement = findBlockPlacement(
     normalizeHeaderConfig(header, normalizeHeaderNavItems),
     blockId
@@ -570,7 +484,7 @@ function moveBlockAcrossRegions(header, blockId, direction) {
   return moveBlockToPlacement(header, blockId, placement.rowId, nextRegion);
 }
 
-function moveBlockAcrossRows(header, blockId, direction) {
+export function moveBlockAcrossRows(header, blockId, direction) {
   const placement = findBlockPlacement(
     normalizeHeaderConfig(header, normalizeHeaderNavItems),
     blockId
@@ -801,87 +715,6 @@ export function bindHeaderEditorEvents({
         Number.isInteger(index) ? `[data-item-index="${index}"]` : '',
       ].join('')
     );
-
-  // ── Placement board: drag-and-drop ────────────────────────────────────
-  let draggedBlockId = null;
-
-  el.pbModuleEditor.querySelectorAll('.pb-header-layout-card').forEach((card) => {
-    card.addEventListener('dragstart', (event) => {
-      draggedBlockId = card.dataset.blockId || null;
-      if (!draggedBlockId) {
-        event.preventDefault();
-        return;
-      }
-      event.dataTransfer.effectAllowed = 'move';
-      // Defer class so the card isn't invisible before the drag image is captured.
-      requestAnimationFrame(() => card.classList.add('is-dragging'));
-    });
-
-    card.addEventListener('dragend', () => {
-      card.classList.remove('is-dragging');
-      el.pbModuleEditor.querySelectorAll('.pb-header-region--board').forEach((zone) => {
-        zone.classList.remove('is-drag-over');
-      });
-      draggedBlockId = null;
-    });
-  });
-
-  el.pbModuleEditor.querySelectorAll('.pb-header-region--board').forEach((zone) => {
-    zone.addEventListener('dragover', (event) => {
-      if (!draggedBlockId) return;
-      event.preventDefault();
-      event.dataTransfer.dropEffect = 'move';
-    });
-
-    zone.addEventListener('dragenter', (event) => {
-      if (!draggedBlockId) return;
-      event.preventDefault();
-      zone.classList.add('is-drag-over');
-    });
-
-    zone.addEventListener('dragleave', (event) => {
-      // Only remove the class when we leave the zone itself, not a child element.
-      if (!zone.contains(/** @type {Node} */ (event.relatedTarget))) {
-        zone.classList.remove('is-drag-over');
-      }
-    });
-
-    zone.addEventListener('drop', (event) => {
-      event.preventDefault();
-      zone.classList.remove('is-drag-over');
-      const targetRowId = zone.dataset.row;
-      const targetRegion = zone.dataset.region;
-      if (!draggedBlockId || !targetRowId || !targetRegion) return;
-      const nextState = cloneValue(state);
-      nextState.header = moveBlockToPlacement(
-        nextState.header,
-        draggedBlockId,
-        targetRowId,
-        targetRegion
-      );
-      draggedBlockId = null;
-      commit(nextState, { rerenderEditor: true, rerenderCanvas: true });
-    });
-  });
-
-  el.pbModuleEditor.querySelectorAll('.pb-header-layout-button').forEach((button) => {
-    button.addEventListener('click', () => {
-      const blockId = button.dataset.blockId;
-      const action = button.dataset.action;
-      if (!blockId || !action) return;
-      const nextState = cloneValue(state);
-      if (action === 'move-left') {
-        nextState.header = moveBlockAcrossRegions(nextState.header, blockId, -1);
-      } else if (action === 'move-right') {
-        nextState.header = moveBlockAcrossRegions(nextState.header, blockId, 1);
-      } else if (action === 'move-up') {
-        nextState.header = moveBlockAcrossRows(nextState.header, blockId, -1);
-      } else if (action === 'move-down') {
-        nextState.header = moveBlockAcrossRows(nextState.header, blockId, 1);
-      }
-      commit(nextState, { rerenderEditor: true, rerenderCanvas: true });
-    });
-  });
 
   document.getElementById('pbHeaderAddNavItem')?.addEventListener('click', () => {
     const nextState = cloneValue(state);

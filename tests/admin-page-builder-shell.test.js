@@ -1910,7 +1910,6 @@ describe('admin page-builder shell', () => {
       expect.arrayContaining([
         'background.type',
         'background.color',
-        'background.secondaryColor',
         'background.opacity',
         'text.color',
         'border.width',
@@ -1920,6 +1919,9 @@ describe('admin page-builder shell', () => {
         'border.radius',
       ])
     );
+    // Gradient-only fields are hidden while the background type is Solid (the default).
+    expect(appearanceKeys).not.toContain('background.secondaryColor');
+    expect(appearanceKeys).not.toContain('background.angle');
 
     const setAppearanceField = async (key, value, inputKind = '') => {
       const toggleSelector =
@@ -2677,7 +2679,8 @@ describe('admin page-builder shell', () => {
 
     expect(document.getElementById('pbEditorTitle')?.textContent).toContain('Header Settings');
     expect(document.getElementById('pbSaveHeader')).not.toBeNull();
-    expect(document.querySelector('.pb-header-region--board[data-region="left"]')).not.toBeNull();
+    // Placement board retired: block placement is edited on the live canvas instead.
+    expect(document.querySelector('.pb-header-region--board')).toBeNull();
     expect(document.querySelector('[data-copy-key="title"]')).not.toBeNull();
     expect(document.querySelector('.pb-header-block-input[data-block-id="brand"]')).not.toBeNull();
     expect(document.body.textContent).not.toContain('Hide on this page');
@@ -6194,7 +6197,7 @@ describe('Phase 6 Step 3 — header editor UX upgrades', () => {
     expect(document.getElementById('pbHeaderRawConfig')).toBeNull();
   });
 
-  it('renders placement board cards with draggable="true"', async () => {
+  it('replaces the placement board with canvas-marked Parts rows', async () => {
     const selectedPage = getContractFixture('builderPage');
     const { manager } = await setupPageBuilder({
       fetchPagesResults: [[selectedPage]],
@@ -6212,8 +6215,9 @@ describe('Phase 6 Step 3 — header editor UX upgrades', () => {
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     await flushAdminUi(2);
 
-    const cards = document.querySelectorAll('.pb-header-layout-card[draggable="true"]');
-    expect(cards.length).toBeGreaterThan(0);
+    expect(document.querySelector('.pb-header-layout-card')).toBeNull();
+    const rows = document.querySelectorAll('.pb-header-toggle-row[data-block-id]');
+    expect(rows.length).toBe(5);
   });
 
   it('canvas preview shows block-specific chip content for patron, status, and entryControls', async () => {
@@ -6260,7 +6264,7 @@ describe('Phase 6 Step 3 — header editor UX upgrades', () => {
     expect(document.querySelectorAll('.pb-page-header-region')).toHaveLength(1);
   });
 
-  it('placement board section description reflects drag-first workflow copy', async () => {
+  it('header parts section copy points at the on-canvas placement workflow', async () => {
     const selectedPage = getContractFixture('builderPage');
     const { manager } = await setupPageBuilder({
       fetchPagesResults: [[selectedPage]],
@@ -6281,7 +6285,7 @@ describe('Phase 6 Step 3 — header editor UX upgrades', () => {
     const sectionCopies = Array.from(document.querySelectorAll('.pb-editor-section-copy')).map(
       (el) => el.textContent?.trim()
     );
-    expect(sectionCopies.some((t) => t?.includes('Drag blocks between cells'))).toBe(true);
+    expect(sectionCopies.some((t) => t?.includes('click it in the preview'))).toBe(true);
   });
 });
 

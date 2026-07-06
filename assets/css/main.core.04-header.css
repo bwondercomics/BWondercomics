@@ -60,6 +60,31 @@ header.topbar.topbar--scrolled {
   justify-content: flex-end;
 }
 
+/* Builder edit mode only: every 3×3 header cell renders (even empty) as a drop zone
+   for on-canvas header block drags. Empty rows/cells are hidden until a drag starts
+   so the at-rest edit preview stays pixel-identical to the published page; the
+   attributes never exist outside builder editing. */
+.topbar-layout-row--builder-empty,
+.topbar-region--builder-empty {
+  display: none;
+}
+
+html[data-builder-header-dragging] .topbar-layout-row--builder-empty {
+  display: flex;
+}
+
+html[data-builder-header-dragging] .topbar-region--builder-empty {
+  display: flex;
+}
+
+html[data-builder-header-dragging] .topbar-region[data-builder-header-cell] {
+  min-height: 36px;
+  min-width: 48px;
+  border-radius: 6px;
+  outline: 1px dashed rgba(255, 255, 255, 0.28);
+  outline-offset: -2px;
+}
+
 .header-actions {
   display: flex;
   align-items: center;

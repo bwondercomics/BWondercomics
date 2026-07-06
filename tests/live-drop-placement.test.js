@@ -405,4 +405,71 @@ describe('resolveLiveDropPlacement', () => {
 
     expect(placement).toBeNull();
   });
+
+  it('resolves header block drags to the 3×3 cell under the pointer', () => {
+    const page = buildPage();
+    const cellTarget = {
+      kind: 'header',
+      key: 'header-cell:page-1:top:center',
+      pageId: page.id,
+      surface: 'page-header',
+      rowId: 'top',
+      region: 'center',
+    };
+
+    const placement = resolveLiveDropPlacement({
+      page,
+      targets: [geometry(cellTarget, { top: 0, left: 260, right: 520, bottom: 52 })],
+      point: { x: 300, y: 20 },
+      dragState: { source: 'header-block', blockId: 'brand' },
+    });
+
+    expect(placement).toEqual(
+      expect.objectContaining({
+        placement: LIVE_DROP_PLACEMENTS.HEADER_CELL,
+        rowId: 'top',
+        region: 'center',
+      })
+    );
+  });
+
+  it('returns null for header block drops outside any header cell (no nearest snap)', () => {
+    const page = buildPage();
+    const cellTarget = {
+      kind: 'header',
+      key: 'header-cell:page-1:top:center',
+      pageId: page.id,
+      surface: 'page-header',
+      rowId: 'top',
+      region: 'center',
+    };
+    // A header-block target and the page-header surface both contain the point,
+    // but neither is a cell — the drop must be a clean no-op, never a snap.
+    const blockTarget = {
+      kind: 'header',
+      key: 'header:page-1:brand',
+      pageId: page.id,
+      surface: 'page-header',
+      blockId: 'brand',
+    };
+    const headerSurfaceTarget = {
+      kind: 'header',
+      key: 'header:page-1',
+      pageId: page.id,
+      surface: 'page-header',
+    };
+
+    const placement = resolveLiveDropPlacement({
+      page,
+      targets: [
+        geometry(headerSurfaceTarget, { top: 0, left: 0, right: 800, bottom: 60 }),
+        geometry(blockTarget, { top: 0, left: 0, right: 200, bottom: 52 }),
+        geometry(cellTarget, { top: 0, left: 260, right: 520, bottom: 52 }),
+      ],
+      point: { x: 100, y: 20 },
+      dragState: { source: 'header-block', blockId: 'brand' },
+    });
+
+    expect(placement).toBeNull();
+  });
 });

@@ -44,6 +44,11 @@ export const BUILDER_PREVIEW_TARGET_ACTIONS = Object.freeze({
   REFRESH_TARGETS: 'refresh-targets',
   CLEAR_HOVER: 'clear-hover',
   SCROLL_INTO_VIEW: 'scroll-into-view',
+  // Header block drag lifecycle: the preview reveals the 3×3 header drop cells only
+  // while a drag is active, so the at-rest edit preview stays pixel-identical to the
+  // published page (the visual-parity contract).
+  HEADER_DRAG_START: 'header-drag-start',
+  HEADER_DRAG_END: 'header-drag-end',
 });
 
 export const BUILDER_PREVIEW_SOURCES = Object.freeze({

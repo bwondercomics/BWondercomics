@@ -40,6 +40,8 @@ let targetSequence = 0;
 
 const TARGET_SELECTOR = [
   '[data-builder-module-id]',
+  '[data-builder-header-block]',
+  '[data-builder-header-cell]',
   '[data-builder-surface="page-header"]',
   '[data-builder-surface="page-end"]',
   '[data-builder-column-index]',
@@ -154,6 +156,35 @@ function buildTargetRef(element, snapshot = activePreviewContext?.snapshot) {
     };
   }
 
+  if (element.matches('[data-builder-header-block]')) {
+    // A specific header block (brand/patron/status/entryControls/nav). Selecting it opens
+    // the header editor with that block highlighted — same HEADER kind, plus blockId.
+    const blockId = element.getAttribute('data-builder-header-block') || '';
+    return {
+      kind: BUILDER_PREVIEW_TARGET_KINDS.HEADER,
+      key: `header:${pageId}:${blockId}`,
+      pageId,
+      surface: 'page-header',
+      blockId,
+    };
+  }
+
+  if (element.matches('[data-builder-header-cell]')) {
+    // A 3×3 header cell (row × region). Cells exist only in edit mode and are used as
+    // drop geometry for on-canvas header block drags; clicking one selects the header.
+    const rowId = normalizeText(element.getAttribute('data-builder-header-row'));
+    const region = normalizeText(element.dataset.region);
+    if (!rowId || !region) return null;
+    return {
+      kind: BUILDER_PREVIEW_TARGET_KINDS.HEADER,
+      key: `header-cell:${pageId}:${rowId}:${region}`,
+      pageId,
+      surface: 'page-header',
+      rowId,
+      region,
+    };
+  }
+
   if (element.matches('[data-builder-surface="page-header"]')) {
     return {
       kind: BUILDER_PREVIEW_TARGET_KINDS.HEADER,
@@ -212,7 +243,11 @@ function getTargetLabel(target) {
   if (target.kind === BUILDER_PREVIEW_TARGET_KINDS.MODULE) {
     return target.moduleType ? `${target.moduleType} module` : 'Module';
   }
-  if (target.kind === BUILDER_PREVIEW_TARGET_KINDS.HEADER) return 'Page header';
+  if (target.kind === BUILDER_PREVIEW_TARGET_KINDS.HEADER) {
+    if (target.blockId) return 'Header block';
+    if (target.rowId) return 'Header cell';
+    return 'Page header';
+  }
   if (target.kind === BUILDER_PREVIEW_TARGET_KINDS.PAGE && target.surface === 'page-end') {
     return 'Page end';
   }
@@ -265,6 +300,7 @@ function findTargetFromEventTarget(rawTarget, snapshot = activePreviewContext?.s
     if (element.matches?.('[data-builder-surface="page-end"]')) return null;
     if (
       element.matches?.('[data-builder-module-id]') ||
+      element.matches?.('[data-builder-header-block]') ||
       element.matches?.('[data-builder-surface="page-header"]')
     ) {
       return buildTargetRef(element, snapshot);
@@ -289,6 +325,8 @@ function collectBuilderTargetElements() {
     .querySelectorAll(
       [
         '[data-builder-surface="page-header"]',
+        '[data-builder-header-block]',
+        '[data-builder-header-cell]',
         '[data-builder-surface="page-end"]',
         '[data-builder-section-id]',
         '[data-builder-column-index]',
@@ -904,6 +942,19 @@ export function startPreviewTargetBridge(
       const element = findElementForTarget(message.target);
       element?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
       scheduleTargets('scroll-into-view');
+      return;
+    }
+    if (
+      message.action === BUILDER_PREVIEW_TARGET_ACTIONS.HEADER_DRAG_START ||
+      message.action === BUILDER_PREVIEW_TARGET_ACTIONS.HEADER_DRAG_END
+    ) {
+      // Reveal (or hide) the 3×3 header drop cells while a header block drag is
+      // active, then re-measure so the parent gets the visible cell geometry.
+      document.documentElement.toggleAttribute(
+        'data-builder-header-dragging',
+        message.action === BUILDER_PREVIEW_TARGET_ACTIONS.HEADER_DRAG_START
+      );
+      scheduleTargets('header-drag');
     }
   };
 
@@ -948,6 +999,7 @@ export function startPreviewTargetBridge(
       scheduledFrame = null;
     }
     stopInlineEdit('bridge-cleanup', 'cancel', false);
+    document.documentElement.removeAttribute('data-builder-header-dragging');
     observer?.disconnect();
     document.removeEventListener('pointermove', handlePointerMove, true);
     document.removeEventListener('click', handleClick, true);

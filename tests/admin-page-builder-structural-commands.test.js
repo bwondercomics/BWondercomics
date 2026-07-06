@@ -236,4 +236,117 @@ describe('page-builder structural commands', () => {
     );
     expect(renderCanvas).toHaveBeenCalled();
   });
+
+  function createHeaderMoveAdapter({ stepHeaderBlockPlacement, moveHeaderBlockToCell } = {}) {
+    const page = buildPage();
+    let liveDragState = null;
+    const ensureCleanWorkspace = vi.fn(() => {
+      throw new Error('header block moves must not require a clean workspace');
+    });
+    const requestFreshTargets = vi.fn();
+    const adapter = createStructuralCommandAdapter({
+      getState: () => ({
+        currentPage: page,
+        liveDragState,
+        activeInsertTarget: null,
+        selectedTarget: null,
+      }),
+      actions: {
+        ensureCleanWorkspace,
+        setLiveDragState: (nextState) => {
+          liveDragState = nextState;
+        },
+        clearLiveDragState: () => {
+          liveDragState = null;
+        },
+        setActiveInsertTarget: vi.fn(),
+        setCanvasStatus: vi.fn(),
+        renderCanvas: vi.fn(),
+        requestFreshTargets,
+        selectModule: vi.fn(),
+        showSidePanelTab: vi.fn(),
+        canMoveHeaderBlocks: () => true,
+        stepHeaderBlockPlacement,
+        moveHeaderBlockToCell,
+      },
+      helpers: {
+        getModuleLabel: () => 'Text',
+        getSectionCount: () => page.sections.length,
+      },
+    });
+    return { adapter, requestFreshTargets, getDragState: () => liveDragState };
+  }
+
+  it('steps a selected header block through the header draft placement action', async () => {
+    const stepHeaderBlockPlacement = vi.fn(() => ({ ok: true }));
+    const { adapter, requestFreshTargets } = createHeaderMoveAdapter({ stepHeaderBlockPlacement });
+
+    expect(
+      adapter.runCommand(BUILDER_STRUCTURAL_COMMANDS.MOVE_HEADER_BLOCK, {
+        target: { kind: 'header', key: 'header:page-1:brand', pageId: 'page-1', blockId: 'brand' },
+        direction: 'right',
+      })
+    ).toEqual({ ok: true });
+    expect(stepHeaderBlockPlacement).toHaveBeenCalledWith('brand', 'right');
+    expect(requestFreshTargets).toHaveBeenCalled();
+
+    // Edge rejections pass straight through as clean no-ops.
+    stepHeaderBlockPlacement.mockReturnValueOnce({ ok: false, status: 'Already in the top row.' });
+    expect(
+      adapter.runCommand(BUILDER_STRUCTURAL_COMMANDS.MOVE_HEADER_BLOCK, {
+        target: { kind: 'header', key: 'header:page-1:brand', pageId: 'page-1', blockId: 'brand' },
+        direction: 'up',
+      })
+    ).toEqual({ ok: false, status: 'Already in the top row.' });
+  });
+
+  it('drags a header block onto a header cell and rejects drops anywhere else', async () => {
+    const moveHeaderBlockToCell = vi.fn(() => ({ ok: true }));
+    const { adapter, getDragState } = createHeaderMoveAdapter({ moveHeaderBlockToCell });
+    const cellTarget = {
+      target: {
+        kind: 'header',
+        key: 'header-cell:page-1:bottom:right',
+        pageId: 'page-1',
+        surface: 'page-header',
+        rowId: 'bottom',
+        region: 'right',
+      },
+      rect: { top: 80, left: 500, right: 800, bottom: 130, width: 300, height: 50 },
+      visible: true,
+      order: 1,
+      label: 'Header cell',
+    };
+
+    expect(
+      adapter.runCommand(BUILDER_STRUCTURAL_COMMANDS.DRAG_START, {
+        source: 'header-block',
+        blockId: 'entryControls',
+      })
+    ).toMatchObject({ ok: true });
+    expect(getDragState()).toMatchObject({ effect: 'move-header-block', blockId: 'entryControls' });
+
+    // Drop outside every cell: clean no-op, no mutation.
+    await expect(
+      adapter.runCommand(BUILDER_STRUCTURAL_COMMANDS.DROP, {
+        targets: [cellTarget],
+        point: { x: 10, y: 10 },
+      })
+    ).resolves.toEqual({ ok: false, status: 'No valid drop target.' });
+    expect(moveHeaderBlockToCell).not.toHaveBeenCalled();
+
+    // Restart the drag (a failed drop clears drag state) and drop inside the cell.
+    adapter.runCommand(BUILDER_STRUCTURAL_COMMANDS.DRAG_START, {
+      source: 'header-block',
+      blockId: 'entryControls',
+    });
+    await expect(
+      adapter.runCommand(BUILDER_STRUCTURAL_COMMANDS.DROP, {
+        targets: [cellTarget],
+        point: { x: 600, y: 100 },
+      })
+    ).resolves.toMatchObject({ ok: true });
+    expect(moveHeaderBlockToCell).toHaveBeenCalledWith('entryControls', 'bottom', 'right');
+    expect(getDragState()).toBeNull();
+  });
 });

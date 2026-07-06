@@ -9,6 +9,7 @@ export const LIVE_DROP_PLACEMENTS = Object.freeze({
   SECTION_BEFORE: 'section-before',
   SECTION_AFTER: 'section-after',
   PAGE_END: 'page-end',
+  HEADER_CELL: 'header-cell',
 });
 
 const TARGET_PRIORITY = Object.freeze({
@@ -201,8 +202,31 @@ function resolveEmptyPagePlacement({ page, dragState }) {
   });
 }
 
+// Header block drags only resolve against the 3×3 header cells the edit-mode preview
+// exposes; the pointer must be inside a cell rect (no nearest-snap — same contract as
+// module drops). Anywhere else, including header dead space, resolves to null.
+function resolveHeaderCellPlacement({ targets = [], point = {} }) {
+  const cellGeometry =
+    targets.find(
+      (item) =>
+        item?.visible !== false &&
+        item?.target?.kind === 'header' &&
+        item.target.rowId &&
+        item.target.region &&
+        rectContains(item.rect, point)
+    ) || null;
+  if (!cellGeometry) return null;
+  return buildPlacement(cellGeometry, LIVE_DROP_PLACEMENTS.HEADER_CELL, {
+    rowId: cellGeometry.target.rowId,
+    region: cellGeometry.target.region,
+  });
+}
+
 export function resolveLiveDropPlacement({ page, targets = [], point = {}, dragState = {} } = {}) {
   if (!page || !dragState?.source) return null;
+  if (dragState.source === 'header-block') {
+    return resolveHeaderCellPlacement({ targets, point });
+  }
   if (!isAllowedModuleDrag(page, dragState)) return null;
 
   const geometry = getCandidateTarget(targets, point);

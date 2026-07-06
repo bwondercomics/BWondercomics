@@ -352,104 +352,6 @@
   margin-top: 8px;
 }
 
-.pb-header-layout-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  /* Lets the region grid respond to the inspector's real width rather than the
-     viewport, so it stays single-column in the ~280px rail. */
-  container-type: inline-size;
-}
-
-.pb-header-layout-row {
-  padding: 8px 7px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  border-radius: var(--pb-card-radius);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.pb-header-layout-row-title {
-  margin-bottom: 8px;
-  font-size: 0.74rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: rgba(255, 255, 255, 0.68);
-}
-
-.pb-header-layout-row-cells {
-  display: grid;
-  /* Single column at rail width so each card gets the full row; only split into
-     columns once the inspector is genuinely wide enough to hold them. */
-  grid-template-columns: minmax(0, 1fr);
-  gap: 8px;
-}
-
-@container (min-width: 520px) {
-  .pb-header-layout-row-cells {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-}
-
-.pb-header-region {
-  min-height: 160px;
-  padding: 9px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: var(--pb-card-radius);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-/* In the board, drop horizontal padding so cards span the available row width;
-   keep a transparent 1px border so the drag-over highlight doesn't shift layout. */
-.pb-header-region--board {
-  min-height: 0;
-  padding: 2px 0 0;
-  border-color: transparent;
-  background: transparent;
-}
-
-.pb-header-region-title {
-  margin-bottom: 8px;
-  font-size: 0.72rem;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: rgba(255, 255, 255, 0.62);
-}
-
-.pb-header-block {
-  padding: 8px 9px;
-  border-radius: var(--pb-card-radius);
-  border: 1px solid rgba(0, 217, 255, 0.22);
-  background: rgba(0, 217, 255, 0.08);
-  cursor: grab;
-}
-
-.pb-header-block + .pb-header-drop-zone {
-  margin-top: 8px;
-}
-
-.pb-header-block-body {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.pb-header-drop-zone {
-  margin-bottom: 8px;
-  padding: 7px;
-  border: 1px dashed rgba(255, 255, 255, 0.18);
-  border-radius: var(--pb-card-radius);
-  color: rgba(255, 255, 255, 0.42);
-  font-size: 0.78rem;
-  text-align: center;
-}
-
-.pb-header-drop-zone.active {
-  border-color: rgba(0, 217, 255, 0.75);
-  background: rgba(0, 217, 255, 0.12);
-  color: #baf9ff;
-}
-
 .pb-header-toggle-list {
   display: flex;
   flex-direction: column;
@@ -492,101 +394,6 @@
   align-items: center;
   margin: 0;
   cursor: pointer;
-}
-
-.pb-header-layout-card {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  padding: 8px;
-  border-radius: var(--pb-card-radius);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.pb-header-layout-card + .pb-header-layout-card {
-  margin-top: 6px;
-}
-
-.pb-header-layout-card.is-disabled {
-  opacity: 0.6;
-  border-color: rgba(255, 255, 255, 0.05);
-}
-
-/* Line 1: grip + truncating label + state indicator. */
-.pb-header-layout-card-head {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.pb-header-layout-card-label {
-  flex: 1 1 auto;
-  font-size: var(--pb-inspector-font);
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.9);
-}
-
-.pb-header-layout-card-state {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-/* Line 2: four compact icon move buttons on one row. */
-.pb-header-layout-actions {
-  display: flex;
-  gap: 5px;
-}
-
-.pb-header-layout-card-drag-handle {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 6px;
-  color: rgba(255, 255, 255, 0.4);
-  font-size: 0.95rem;
-  cursor: grab;
-  user-select: none;
-  transition: color 0.12s ease;
-}
-
-.pb-header-layout-card-drag-handle:hover {
-  color: rgba(0, 217, 255, 0.8);
-}
-
-.pb-header-layout-card[draggable='true'] {
-  cursor: default;
-}
-
-.pb-header-layout-card.is-dragging {
-  opacity: 0.38;
-  border-style: dashed;
-}
-
-.pb-header-region--board.is-drag-over {
-  border-color: rgba(0, 217, 255, 0.55);
-  background: rgba(0, 217, 255, 0.07);
-}
-
-.pb-header-region-empty {
-  padding: 9px;
-  border: 1px dashed rgba(255, 255, 255, 0.14);
-  border-radius: var(--pb-card-radius);
-  text-align: center;
-  transition:
-    border-color 0.12s ease,
-    background 0.12s ease;
-}
-
-.pb-header-region--board.is-drag-over .pb-header-region-empty {
-  border-color: rgba(0, 217, 255, 0.5);
-  background: rgba(0, 217, 255, 0.06);
-  color: #baf9ff;
 }
 
 .pb-editor-summary {
@@ -772,4 +579,11 @@
 
 .pb-column-padding-input {
   text-align: center;
+}
+
+/* Header block clicked on the live canvas: highlight its Parts row so the inspector
+   maps 1:1 to the preview (edit-in-place selection). */
+.pb-header-toggle-row.is-canvas-selected {
+  outline: 2px solid var(--primary, #00d9ff);
+  outline-offset: 2px;
 }

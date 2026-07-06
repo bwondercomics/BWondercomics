@@ -21,8 +21,7 @@
   .pb-editor-subgrid,
   .pb-theme-preset-grid,
   .pb-section-settings-grid,
-  .pb-inline-picker-grid,
-  .pb-header-layout-row-cells {
+  .pb-inline-picker-grid {
     grid-template-columns: 1fr;
   }
 

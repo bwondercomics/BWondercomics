@@ -276,6 +276,70 @@ describe('reader preview bridge', () => {
     });
   });
 
+  it('collects header blocks and 3×3 header cells as edit-mode targets', async () => {
+    setPreviewUrl();
+    // Edit-mode header markup: header-layout.js renders every row/region cell (marked
+    // data-builder-header-cell) and marks each placed block with data-builder-header-block.
+    document.body.innerHTML = `
+      <div class="viewerWrap" data-builder-page-id="page-1">
+        <header class="topbar" data-builder-page-id="page-1" data-builder-surface="page-header">
+          <div class="topbar-layout">
+            <div class="topbar-layout-row" data-row="top">
+              <div class="topbar-region" data-region="left" data-builder-header-cell="true" data-builder-header-row="top">
+                <div class="brand" data-builder-header-block="brand"></div>
+              </div>
+              <div class="topbar-region" data-region="center" data-builder-header-cell="true" data-builder-header-row="top"></div>
+              <div class="topbar-region" data-region="right" data-builder-header-cell="true" data-builder-header-row="top"></div>
+            </div>
+          </div>
+        </header>
+      </div>
+    `;
+    const rects = new Map([
+      ['.viewerWrap', { top: 0, left: 0, right: 800, bottom: 600, width: 800, height: 600 }],
+      ['header', { top: 0, left: 0, right: 800, bottom: 60, width: 800, height: 60 }],
+      ['[data-region="left"]', { top: 4, left: 0, right: 260, bottom: 56, width: 260, height: 52 }],
+      [
+        '[data-region="center"]',
+        { top: 4, left: 270, right: 530, bottom: 56, width: 260, height: 52 },
+      ],
+      [
+        '[data-region="right"]',
+        { top: 4, left: 540, right: 800, bottom: 56, width: 260, height: 52 },
+      ],
+      ['.brand', { top: 8, left: 8, right: 200, bottom: 52, width: 192, height: 44 }],
+    ]);
+    rects.forEach((rect, selector) => {
+      document.querySelector(selector).getBoundingClientRect = () => rect;
+    });
+
+    const { collectPreviewTargets } = await import('../reader/preview-bridge.js');
+    const targets = collectPreviewTargets(buildSnapshot({ options: { builderEditing: true } }));
+
+    const blockTarget = targets.find((item) => item.target.key === 'header:page-1:brand');
+    expect(blockTarget).toMatchObject({
+      target: { kind: 'header', surface: 'page-header', blockId: 'brand' },
+      label: 'Header block',
+    });
+
+    const cellKeys = targets
+      .filter((item) => item.target.rowId)
+      .map((item) => item.target.key)
+      .sort();
+    expect(cellKeys).toEqual([
+      'header-cell:page-1:top:center',
+      'header-cell:page-1:top:left',
+      'header-cell:page-1:top:right',
+    ]);
+    const centerCell = targets.find((item) => item.target.key === 'header-cell:page-1:top:center');
+    expect(centerCell).toMatchObject({
+      target: { kind: 'header', rowId: 'top', region: 'center', surface: 'page-header' },
+      rect: { top: 4, left: 270, width: 260, height: 52 },
+      visible: true,
+      label: 'Header cell',
+    });
+  });
+
   it('emits hover/select target messages and blocks iframe interactions while editing', async () => {
     setPreviewUrl();
     vi.stubGlobal('requestAnimationFrame', (callback) => {

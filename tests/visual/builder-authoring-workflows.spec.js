@@ -680,29 +680,54 @@ async function saveActiveDraft(page) {
   await expect(page.locator('.pb-editor-footer-status')).not.toContainText('unsaved');
 }
 
-async function openPlacementDetails(page) {
-  const card = page.locator('.pb-header-layout-card[data-block-id="brand"]');
+async function openHeaderPartsSection(page) {
+  const brandToggle = page.locator('.pb-header-block-input[data-block-id="brand"]');
   await page
     .locator('.pb-inspector-section')
-    .filter({ has: card })
+    .filter({ has: brandToggle })
     .first()
     .evaluate((section) => {
       section.open = true;
     });
 }
 
-async function expectPlacementDetailsOpen(page) {
-  const card = page.locator('.pb-header-layout-card[data-block-id="brand"]');
-  const details = page.locator('.pb-inspector-section').filter({ has: card }).first();
-  await expect(details).toHaveJSProperty('open', true);
-}
-
-async function openHeaderPlacement(page) {
+async function openHeaderSettings(page) {
   await page.locator('[data-tab="layers"]').click();
   await page.locator('[data-layer-action="select-page-header"]').click();
-  await openPlacementDetails(page);
-  await expectPlacementDetailsOpen(page);
-  await expect(page.locator('.pb-header-layout-card[data-block-id="brand"]')).toBeVisible();
+  await openHeaderPartsSection(page);
+  await expect(page.locator('.pb-header-toggle-row[data-block-id="brand"]')).toBeVisible();
+}
+
+// Clicks a header block inside the live preview iframe, selecting it in the builder
+// (opens header settings + shows the selected-target toolbar with move arrows).
+async function selectHeaderBlockOnCanvas(page, blockId) {
+  const frame = await getPreviewFrame(page);
+  await page.waitForSelector('.pb-preview-frame[data-target-count]');
+  await frame.locator(`[data-builder-header-block="${blockId}"]`).click();
+  await expect(page.locator('.pb-preview-target-toolbar')).toBeVisible();
+  return frame;
+}
+
+// Resolves parent-page coordinates for the center of a 3×3 header cell rendered
+// inside the (possibly scaled) preview iframe.
+async function getHeaderCellDropPoint(page, rowId, region) {
+  return page.locator('.pb-preview-frame').evaluate(
+    (frame, cell) => {
+      const iframe = frame.querySelector('.pb-preview-iframe');
+      const target = iframe?.contentDocument?.querySelector(
+        `.topbar-region[data-builder-header-row="${cell.rowId}"][data-region="${cell.region}"]`
+      );
+      if (!iframe || !target) return null;
+      const frameRect = frame.getBoundingClientRect();
+      const targetRect = target.getBoundingClientRect();
+      const scale = Number(frame.dataset.previewScale || '1') || 1;
+      return {
+        clientX: frameRect.left + (targetRect.left + targetRect.width / 2) * scale,
+        clientY: frameRect.top + (targetRect.top + targetRect.height / 2) * scale,
+      };
+    },
+    { rowId, region }
+  );
 }
 
 async function openAllInspectorSections(page) {
@@ -817,12 +842,9 @@ test.describe('builder Phase 12 authoring workflows', () => {
     await expect(appearanceControl).toBeVisible();
 
     const geometry = await appearanceSection.evaluate((section) => {
-      const keys = [
-        'background.type',
-        'background.angle',
-        'background.secondaryColor',
-        'background.opacity',
-      ];
+      // Gradient-only fields (angle / end color) are hidden while the type is Solid,
+      // so measure the always-visible background rows instead.
+      const keys = ['background.type', 'background.color', 'background.opacity'];
       return keys.map((key) => {
         const input = section.querySelector(
           `[data-appearance-input="true"][data-appearance-scope="shell-top"][data-appearance-key="${key}"]`
@@ -859,20 +881,9 @@ test.describe('builder Phase 12 authoring workflows', () => {
     await prepareWorkflowPage(page, state);
     await openBuilder(page);
 
-    await page.locator('[data-tab="layers"]').click();
-    await page.locator('[data-layer-action="select-page-header"]').click();
-    const visiblePlacementCard = page.locator('.pb-header-layout-card[data-block-id="brand"]');
-    const hiddenPlacementCard = page.locator('.pb-header-layout-card[data-block-id="status"]');
-    await page
-      .locator('.pb-inspector-section')
-      .filter({ has: visiblePlacementCard })
-      .evaluate((section) => {
-        section.open = true;
-      });
-    await expect(visiblePlacementCard).toHaveAccessibleName('Logo / Title / Subtitle');
-    await expect(visiblePlacementCard).toHaveAccessibleDescription('Visible');
-    await expect(hiddenPlacementCard).toHaveAccessibleName('Status Message');
-    await expect(hiddenPlacementCard).toHaveAccessibleDescription('Hidden on this page');
+    await openHeaderSettings(page);
+    await expect(page.locator('.pb-header-block-input[data-block-id="brand"]')).toBeChecked();
+    await expect(page.locator('.pb-header-block-input[data-block-id="status"]')).not.toBeChecked();
 
     await expect(page.locator('.pb-page-item.active')).toContainText('Reader');
     expect(state.pageBindings.reader.pageId).toBe(state.seriesPages[0].id);
@@ -1101,11 +1112,11 @@ test.describe('builder Phase 12 authoring workflows', () => {
     await expect(page.locator('.pb-page-item.active')).toContainText('Site Feed');
   });
 
-  test('keeps the placement editor within the 280px rail without clipping', async ({ page }) => {
+  test('keeps the header inspector within the 280px rail without clipping', async ({ page }) => {
     const state = createWorkflowState();
     await prepareWorkflowPage(page, state);
     await openBuilder(page);
-    await openHeaderPlacement(page);
+    await openHeaderSettings(page);
 
     const layout = page.locator('.page-builder-layout');
     const sidebar = page.locator('.page-builder-sidebar');
@@ -1116,62 +1127,27 @@ test.describe('builder Phase 12 authoring workflows', () => {
     await expect(layout).toHaveAttribute('data-sidebar-mode', 'expanded');
     expect(await sidebarWidth(), 'expanded desktop sidebar must render at 280px').toBe(280);
 
-    // Measure overflow with rendered geometry (acceptance: scrollWidth <= clientWidth), scoped to
-    // the Placement menu — the headline case — plus the per-card move cluster and each move button.
-    const measurePlacement = () =>
-      page.locator('.pb-header-layout-grid').evaluate((grid) => {
+    // Measure overflow with rendered geometry (acceptance: scrollWidth <= clientWidth) on the
+    // header Parts rows — the placement board is retired, so Parts is the block-level surface.
+    const measureParts = () =>
+      page.locator('.pb-header-toggle-list').evaluate((list) => {
         const fits = (el) => el.scrollWidth <= el.clientWidth + 1;
-        const cards = Array.from(grid.querySelectorAll('.pb-header-layout-card'));
-        const rows = Array.from(grid.querySelectorAll('.pb-header-layout-row'));
-        const actions = Array.from(grid.querySelectorAll('.pb-header-layout-actions'));
-        const buttons = Array.from(grid.querySelectorAll('.pb-header-layout-button'));
-        const label = grid.querySelector('.pb-header-layout-card-label');
+        const rows = Array.from(list.querySelectorAll('.pb-header-toggle-row'));
+        const label = list.querySelector('.pb-header-toggle-label');
         const labelStyle = label ? getComputedStyle(label) : null;
-        // The arrow is a bare text node, so clipping is measured at the button (its 28px content box).
-        const clustersOneLine = actions.every((cluster) => {
-          const tops = Array.from(cluster.querySelectorAll('.pb-header-layout-button')).map((b) =>
-            Math.round(b.getBoundingClientRect().top)
-          );
-          return new Set(tops).size === 1;
-        });
         return {
-          cardCount: cards.length,
-          buttonCount: buttons.length,
-          cardsOk: cards.every(fits),
+          rowCount: rows.length,
           rowsOk: rows.every(fits),
-          actionsOk: actions.every(fits),
-          buttonsOk: buttons.every(fits),
-          clustersOneLine,
           labelWhiteSpace: labelStyle ? labelStyle.whiteSpace : null,
           labelTextOverflow: labelStyle ? labelStyle.textOverflow : null,
         };
       });
 
-    const rail = await measurePlacement();
-    expect(rail.cardCount).toBeGreaterThan(0);
-    expect(rail.buttonCount).toBe(rail.cardCount * 4);
-    expect(rail.cardsOk, 'cards must not overflow the 280px rail').toBe(true);
-    expect(rail.rowsOk, 'rows must not overflow the 280px rail').toBe(true);
-    expect(rail.actionsOk, 'move clusters must not overflow the 280px rail').toBe(true);
-    expect(rail.buttonsOk, 'move buttons must not clip their glyph').toBe(true);
-    expect(rail.clustersOneLine, 'each move cluster must sit on a single line').toBe(true);
+    const rail = await measureParts();
+    expect(rail.rowCount).toBe(5);
+    expect(rail.rowsOk, 'parts rows must not overflow the 280px rail').toBe(true);
     expect(rail.labelWhiteSpace, 'label must truncate, not wrap').toBe('nowrap');
     expect(rail.labelTextOverflow, 'label must use ellipsis').toBe('ellipsis');
-
-    // Representative breadth so "no inspector menu overflows" is backed by more than Placement.
-    const brandToggle = page.locator('.pb-header-block-input[data-block-id="brand"]');
-    await page
-      .locator('.pb-inspector-section')
-      .filter({ has: brandToggle })
-      .first()
-      .evaluate((section) => {
-        section.open = true;
-      });
-    const partsRowFits = await page
-      .locator('.pb-header-toggle-row.pb-field-row')
-      .first()
-      .evaluate((row) => row.scrollWidth <= row.clientWidth + 1);
-    expect(partsRowFits, 'parts toggle row must not overflow the rail').toBe(true);
 
     const appearanceControl = page.locator(
       '[data-appearance-input="true"][data-appearance-scope="shell-top"][data-appearance-key="background.type"]'
@@ -1204,11 +1180,9 @@ test.describe('builder Phase 12 authoring workflows', () => {
     expect(await sidebarWidth(), 'stacked drawer must render at min(360px, 100vw - 32px)').toBe(
       360
     );
-    await openPlacementDetails(page);
-    const drawer = await measurePlacement();
-    expect(drawer.cardsOk, 'cards must not overflow the drawer band').toBe(true);
-    expect(drawer.rowsOk, 'rows must not overflow the drawer band').toBe(true);
-    expect(drawer.buttonsOk, 'move buttons must not clip in the drawer band').toBe(true);
+    await openHeaderPartsSection(page);
+    const drawer = await measureParts();
+    expect(drawer.rowsOk, 'parts rows must not overflow the drawer band').toBe(true);
   });
 
   test('keeps inspector scroll anchored after option rerenders', async ({ page }) => {
@@ -1447,21 +1421,19 @@ test.describe('builder Phase 12 authoring workflows', () => {
     });
   });
 
-  test('hides collapsed-rail controls from layout and restores the placement inspector', async ({
+  test('hides collapsed-rail controls from layout and restores the header inspector', async ({
     page,
   }) => {
     const state = createWorkflowState();
     await prepareWorkflowPage(page, state);
     await openBuilder(page);
-    await openHeaderPlacement(page);
+    await openHeaderSettings(page);
 
     const layout = page.locator('.page-builder-layout');
     const sidebar = page.locator('.page-builder-sidebar');
     const sidebarBody = page.locator('#pbSidebarBody');
     const toolbarToggle = page.locator('#pbToggleSidebar');
-    const moveRight = page.locator(
-      '.pb-header-layout-button[data-block-id="brand"][data-action="move-right"]'
-    );
+    const brandToggle = page.locator('.pb-header-block-input[data-block-id="brand"]');
     const sidebarWidth = () =>
       sidebar.evaluate((element) => Math.round(element.getBoundingClientRect().width));
 
@@ -1469,15 +1441,15 @@ test.describe('builder Phase 12 authoring workflows', () => {
     await expect(layout).toHaveAttribute('data-sidebar-mode', 'expanded');
     expect(await sidebarWidth(), 'expanded sidebar must render at 280px').toBe(280);
 
-    await moveRight.focus();
-    await expect(moveRight).toBeFocused();
+    await brandToggle.focus();
+    await expect(brandToggle).toBeFocused();
     await toolbarToggle.click();
 
     await expect(layout).toHaveAttribute('data-sidebar-mode', 'collapsed');
     await expect(toolbarToggle).toHaveAttribute('aria-expanded', 'false');
     expect(await sidebarWidth(), 'collapsed sidebar must render at 72px').toBe(72);
     await expect(sidebarBody).toBeHidden();
-    await expect(moveRight).toBeHidden();
+    await expect(brandToggle).toBeHidden();
 
     await expect(toolbarToggle).toBeFocused();
     await page.keyboard.press('Tab');
@@ -1491,186 +1463,93 @@ test.describe('builder Phase 12 authoring workflows', () => {
     await expect(toolbarToggle).toHaveAttribute('aria-expanded', 'true');
     expect(await sidebarWidth(), 'restored sidebar must render at 280px').toBe(280);
     await expect(sidebarBody).toBeVisible();
-    await openPlacementDetails(page);
-    await expect(page.locator('.pb-header-layout-card[data-block-id="brand"]')).toBeVisible();
-    await expect(moveRight).toBeVisible();
-    await moveRight.focus();
-    await expect(moveRight).toBeFocused();
+    await openHeaderPartsSection(page);
+    await expect(page.locator('.pb-header-toggle-row[data-block-id="brand"]')).toBeVisible();
+    await expect(brandToggle).toBeVisible();
+    await brandToggle.focus();
+    await expect(brandToggle).toBeFocused();
   });
 
-  test('reorders placement blocks by both drag and the icon move buttons', async ({ page }) => {
+  test('moves header blocks on the canvas by toolbar arrows and drag onto header cells', async ({
+    page,
+  }) => {
     const state = createWorkflowState();
     await prepareWorkflowPage(page, state);
     await openBuilder(page);
-    await openHeaderPlacement(page);
+
+    // Click the brand block in the live preview: selects it, opens header settings,
+    // and highlights its Parts row (edit-in-place mapping).
+    const frame = await selectHeaderBlockOnCanvas(page, 'brand');
+    await openHeaderPartsSection(page);
+    await expect(
+      page.locator('.pb-header-toggle-row[data-block-id="brand"].is-canvas-selected')
+    ).toBeVisible();
 
     const headerStatus = page.locator(
       '.pb-editor-footer[data-scope="header"] [data-editor-status]'
     );
-    const cardUnder = (row, region, blockId) =>
-      page.locator(
-        `.pb-header-region--board[data-row="${row}"][data-region="${region}"] ` +
-          `.pb-header-layout-card[data-block-id="${blockId}"]`
+    const blockInCell = (row, region, blockId) =>
+      frame.locator(
+        `.topbar-region[data-builder-header-row="${row}"][data-region="${region}"] ` +
+          `[data-builder-header-block="${blockId}"]`
       );
-    const cardsFor = (blockId) =>
-      page.locator(`.pb-header-layout-card[data-block-id="${blockId}"]`);
+    const toolbarAction = (action) =>
+      page.locator(`.pb-preview-target-toolbar [data-preview-target-action="${action}"]`);
 
-    // Disabled edge is inert: brand sits in top/left, so move-left is disabled and nothing is dirty.
-    const disabledLeft = page.locator(
-      '.pb-header-layout-button[data-block-id="brand"][data-action="move-left"]'
-    );
-    await expect(disabledLeft).toBeDisabled();
-    await disabledLeft.evaluate((button) => button.click());
-    await expect(cardUnder('top', 'left', 'brand')).toBeVisible();
-    await expect(cardsFor('brand')).toHaveCount(1);
+    // Edge move is a clean no-op: brand starts in top/left, so left has nowhere to go.
+    await expect(blockInCell('top', 'left', 'brand')).toBeVisible();
+    await toolbarAction('move-left').click();
+    await expect(blockInCell('top', 'left', 'brand')).toBeVisible();
     await expect(headerStatus).not.toContainText('unsaved changes');
 
-    // Move button (horizontal): brand left -> center (moveBlockAcrossRegions).
-    await page
-      .locator('.pb-header-layout-button[data-block-id="brand"][data-action="move-right"]')
-      .click();
-    await expectPlacementDetailsOpen(page);
-    await expect(cardUnder('top', 'center', 'brand')).toBeVisible();
-    await expect(cardUnder('top', 'left', 'brand')).toHaveCount(0);
-    await expect(cardsFor('brand')).toHaveCount(1);
+    // Toolbar arrow (horizontal): brand left -> center (moveBlockAcrossRegions).
+    await toolbarAction('move-right').click();
+    await expect(blockInCell('top', 'center', 'brand')).toBeVisible();
+    await expect(blockInCell('top', 'left', 'brand')).toHaveCount(0);
     await expect(headerStatus).toContainText('unsaved changes');
 
-    // Move button (vertical): brand top -> middle, same region (moveBlockAcrossRows).
-    await page
-      .locator('.pb-header-layout-button[data-block-id="brand"][data-action="move-down"]')
-      .click();
-    await expectPlacementDetailsOpen(page);
-    await expect(cardUnder('middle', 'center', 'brand')).toBeVisible();
-    await expect(cardUnder('top', 'center', 'brand')).toHaveCount(0);
-    await expect(cardsFor('brand')).toHaveCount(1);
+    // Toolbar arrow (vertical): brand top -> middle, same region (moveBlockAcrossRows).
+    await toolbarAction('move-down').click();
+    await expect(blockInCell('middle', 'center', 'brand')).toBeVisible();
+    await expect(blockInCell('top', 'center', 'brand')).toHaveCount(0);
 
-    // Whole-row drag: status (top/right) -> top/left board, reusing the DataTransfer dispatch pattern.
-    const statusCard = page.locator('.pb-header-layout-card[data-block-id="status"]');
-    const dropZone = page.locator('.pb-header-region--board[data-row="top"][data-region="left"]');
+    // On-canvas drag: toolbar Move handle -> bottom/right header cell, with the cell
+    // drop guide shown while hovering (moveBlockToPlacement through the header draft).
     const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
-    await statusCard.dispatchEvent('dragstart', { dataTransfer });
-    await dropZone.dispatchEvent('dragover', { dataTransfer });
-    await dropZone.dispatchEvent('drop', { dataTransfer });
-    await expectPlacementDetailsOpen(page);
-    await expect(cardUnder('top', 'left', 'status')).toBeVisible();
-    await expect(cardUnder('top', 'right', 'status')).toHaveCount(0);
-    await expect(cardsFor('status')).toHaveCount(1);
+    await toolbarAction('move').dispatchEvent('dragstart', { dataTransfer });
+    await expect(page.locator('.pb-preview-target-overlay')).toHaveClass(/is-live-dragging/);
+    // Empty cells are hidden at rest (visual parity) and revealed once the drag starts.
+    await expect(
+      frame.locator('.topbar-region[data-builder-header-row="bottom"][data-region="right"]')
+    ).toBeVisible();
+    const dropPoint = await getHeaderCellDropPoint(page, 'bottom', 'right');
+    expect(dropPoint, 'bottom/right header cell must be measurable in edit mode').not.toBeNull();
+    await page.locator('.pb-preview-target-overlay').dispatchEvent('dragover', {
+      dataTransfer,
+      clientX: dropPoint.clientX,
+      clientY: dropPoint.clientY,
+    });
+    await expect(page.locator('.pb-preview-drop-guide--header-cell')).toBeVisible();
+    await page.locator('.pb-preview-target-overlay').dispatchEvent('drop', {
+      dataTransfer,
+      clientX: dropPoint.clientX,
+      clientY: dropPoint.clientY,
+    });
+    await expect(blockInCell('bottom', 'right', 'brand')).toBeVisible();
+    await expect(blockInCell('middle', 'center', 'brand')).toHaveCount(0);
 
     // Persist once and confirm the moves reach saved page state (moves are draft-only until save).
     await page.locator('#pbSaveHeader').click();
     await expect(headerStatus).not.toContainText('unsaved changes');
     await waitForState(page, () => {
       const rows = state.seriesPages[0].meta.header.layoutRows;
+      if (!rows) return false;
       const placements = Object.values(rows).flatMap((row) => Object.values(row).flat());
       return (
-        rows.middle.center.includes('brand') &&
-        rows.top.left.includes('status') &&
+        rows.bottom.right.includes('brand') &&
         !rows.top.left.includes('brand') &&
-        !rows.top.center.includes('brand') &&
-        !rows.top.right.includes('status') &&
-        placements.filter((blockId) => blockId === 'brand').length === 1 &&
-        placements.filter((blockId) => blockId === 'status').length === 1
+        placements.filter((blockId) => blockId === 'brand').length === 1
       );
     });
-  });
-
-  test('exposes accessible names, a focus ring, and AA contrast on placement controls', async ({
-    page,
-  }) => {
-    const state = createWorkflowState();
-    await prepareWorkflowPage(page, state);
-    await openBuilder(page);
-    await openHeaderPlacement(page);
-
-    // Accessible names on the move cluster and every direction button.
-    await expect(
-      page.locator('.pb-header-layout-card[data-block-id="brand"] .pb-header-layout-actions')
-    ).toHaveAttribute('aria-label', 'Move Logo / Title / Subtitle');
-    const directionNames = [
-      ['move-left', 'Move Logo / Title / Subtitle left'],
-      ['move-right', 'Move Logo / Title / Subtitle right'],
-      ['move-up', 'Move Logo / Title / Subtitle up'],
-      ['move-down', 'Move Logo / Title / Subtitle down'],
-    ];
-    for (const [action, name] of directionNames) {
-      await expect(
-        page.locator(`.pb-header-layout-button[data-block-id="brand"][data-action="${action}"]`)
-      ).toHaveAccessibleName(name);
-    }
-
-    // Focus-visible ring: keyboard-tab ONTO an enabled button (programmatic focus alone does not
-    // trigger :focus-visible). nav sits in top/center, so move-left -> move-right are both enabled.
-    const navLeft = page.locator(
-      '.pb-header-layout-button[data-block-id="nav"][data-action="move-left"]'
-    );
-    const navRight = page.locator(
-      '.pb-header-layout-button[data-block-id="nav"][data-action="move-right"]'
-    );
-    await navLeft.focus();
-    await page.keyboard.press('Tab');
-    await expect(navRight).toBeFocused();
-    const ring = await navRight.evaluate((el) => {
-      const style = getComputedStyle(el);
-      return {
-        outlineStyle: style.outlineStyle,
-        outlineWidth: parseFloat(style.outlineWidth) || 0,
-      };
-    });
-    expect(ring.outlineStyle).not.toBe('none');
-    expect(ring.outlineWidth).toBeGreaterThanOrEqual(2);
-
-    // WCAG AA contrast (>= 4.5:1) for the visible normal-size text: label, an enabled move-button
-    // glyph (disabled buttons are opacity 0.3 and exempt), and the region title (0.72rem => 4.5:1).
-    const contrast = await page.locator('.pb-header-layout-grid').evaluate((grid) => {
-      const parse = (str) => {
-        const match = str && str.match(/rgba?\(([^)]+)\)/);
-        if (!match) return { r: 0, g: 0, b: 0, a: 0 };
-        const parts = match[1].split(',').map((value) => parseFloat(value.trim()));
-        return { r: parts[0], g: parts[1], b: parts[2], a: parts[3] === undefined ? 1 : parts[3] };
-      };
-      const over = (fg, bg) => ({
-        r: fg.r * fg.a + bg.r * (1 - fg.a),
-        g: fg.g * fg.a + bg.g * (1 - fg.a),
-        b: fg.b * fg.a + bg.b * (1 - fg.a),
-        a: 1,
-      });
-      const luminance = ({ r, g, b }) => {
-        const channel = (value) => {
-          const c = value / 255;
-          return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
-        };
-        return 0.2126 * channel(r) + 0.7152 * channel(g) + 0.0722 * channel(b);
-      };
-      const ratioFor = (el) => {
-        const chain = [];
-        for (let node = el; node; node = node.parentElement) {
-          chain.push(parse(getComputedStyle(node).backgroundColor));
-        }
-        let baseIndex = chain.findIndex((color) => color.a >= 1);
-        if (baseIndex === -1) {
-          chain.push({ r: 26, g: 26, b: 46, a: 1 }); // --bg-panel #1a1a2e fallback
-          baseIndex = chain.length - 1;
-        }
-        let background = chain[baseIndex];
-        for (let i = baseIndex - 1; i >= 0; i--) {
-          if (chain[i].a > 0) background = over(chain[i], background);
-        }
-        const foreground = over(parse(getComputedStyle(el).color), background);
-        const high = Math.max(luminance(foreground), luminance(background));
-        const low = Math.min(luminance(foreground), luminance(background));
-        return (high + 0.05) / (low + 0.05);
-      };
-      const enabledButton = Array.from(grid.querySelectorAll('.pb-header-layout-button')).find(
-        (button) => !button.disabled
-      );
-      return {
-        label: ratioFor(grid.querySelector('.pb-header-layout-card-label')),
-        button: ratioFor(enabledButton),
-        regionTitle: ratioFor(grid.querySelector('.pb-header-region-title')),
-      };
-    });
-    expect(contrast.label, 'card label contrast').toBeGreaterThanOrEqual(4.5);
-    expect(contrast.button, 'enabled move-button glyph contrast').toBeGreaterThanOrEqual(4.5);
-    expect(contrast.regionTitle, 'region title contrast').toBeGreaterThanOrEqual(4.5);
   });
 });

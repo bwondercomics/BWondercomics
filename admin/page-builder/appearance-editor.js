@@ -23,18 +23,23 @@ const APPEARANCE_GROUPS = [
       },
       {
         key: 'background.secondaryColor',
-        label: 'Secondary Color',
+        label: 'Gradient End Color',
         inputType: 'color',
         defaultValue: '#ffed00',
+        // Only meaningful for gradients; hidden (not dead) when the type is Solid.
+        visibleWhen: (appearance) =>
+          getAppearanceLeaf(appearance, 'background.type') === 'gradient',
       },
       {
         key: 'background.angle',
-        label: 'Angle',
+        label: 'Direction (degrees)',
         inputType: 'number',
         defaultValue: 135,
         min: 0,
         max: 360,
         step: 1,
+        visibleWhen: (appearance) =>
+          getAppearanceLeaf(appearance, 'background.type') === 'gradient',
       },
       {
         key: 'background.opacity',
@@ -237,6 +242,7 @@ function renderAppearanceControls(
         `;
     }
     const fieldsHtml = group.fields
+      .filter((field) => !field.visibleWhen || field.visibleWhen(appearance))
       .map((field) => {
         const value = getAppearanceLeaf(appearance, field.key);
         const checked = value != null;

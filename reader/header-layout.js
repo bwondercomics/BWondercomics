@@ -213,20 +213,44 @@ export function applySharedHeaderLayout(pageConfig = null, options = {}) {
       });
       return { region, blockIds };
     });
-    if (!rowRegions.some(({ blockIds }) => blockIds.length > 0)) return;
+    // Published pages skip empty rows/regions. In builder edit mode every 3×3 cell is
+    // rendered (marked data-builder-header-cell) so the bridge can measure it as a drop
+    // target for on-canvas header block drags — including currently-empty cells. Empty
+    // rows/cells stay display:none until a header drag starts (CSS keyed off the
+    // html[data-builder-header-dragging] flag) so the at-rest preview keeps pixel
+    // parity with the published page.
+    const rowHasBlocks = rowRegions.some(({ blockIds }) => blockIds.length > 0);
+    if (!builderEditing && !rowHasBlocks) return;
 
     const rowNode = document.createElement('div');
     rowNode.className = 'topbar-layout-row';
     rowNode.dataset.row = rowId;
+    if (builderEditing && !rowHasBlocks) {
+      rowNode.classList.add('topbar-layout-row--builder-empty');
+    }
 
     rowRegions.forEach(({ region, blockIds }) => {
-      if (!blockIds.length) return;
+      if (!builderEditing && !blockIds.length) return;
       const regionNode = document.createElement('div');
       regionNode.className = 'topbar-region';
       regionNode.dataset.region = region;
+      if (builderEditing) {
+        regionNode.setAttribute('data-builder-header-cell', 'true');
+        regionNode.setAttribute('data-builder-header-row', rowId);
+        if (!blockIds.length) {
+          regionNode.classList.add('topbar-region--builder-empty');
+        }
+      }
       blockIds.forEach((blockId) => {
         const blockEl = blocks[blockId];
         blockEl.style.display = '';
+        // Edit-mode marker: lets the builder bridge target this specific header block
+        // (click → header editor opens with the block's Parts row highlighted).
+        if (builderEditing) {
+          blockEl.setAttribute('data-builder-header-block', blockId);
+        } else {
+          blockEl.removeAttribute('data-builder-header-block');
+        }
         regionNode.appendChild(blockEl);
       });
       rowNode.appendChild(regionNode);

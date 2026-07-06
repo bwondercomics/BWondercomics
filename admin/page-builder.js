@@ -20,7 +20,18 @@ import {
   renderPageStatusBadges,
   resolveAssetUrl,
 } from './page-builder/helpers.js';
-import { createEffectivePageHeader, createPageHeaderMeta } from './page-builder/header-config.js';
+import {
+  HEADER_REGION_ORDER,
+  HEADER_ROW_ORDER,
+  createEffectivePageHeader,
+  createPageHeaderMeta,
+} from './page-builder/header-config.js';
+import {
+  findBlockPlacement,
+  moveBlockAcrossRegions,
+  moveBlockAcrossRows,
+  moveBlockToPlacement,
+} from './page-builder/header-editor.js';
 import { createBuilderKeymapManager } from './page-builder/keymaps.js';
 import {
   SIDEBAR_MODE_KEY,
@@ -640,6 +651,9 @@ function createPageBuilder({
       selectSection: selectSectionFromCanvas,
       showSidePanelTab,
       requestFreshTargets: () => previewManager.requestTargetRefresh?.(),
+      canMoveHeaderBlocks,
+      stepHeaderBlockPlacement,
+      moveHeaderBlockToCell,
     },
     helpers: {
       getModuleLabel,
@@ -2434,6 +2448,66 @@ function createPageBuilder({
     return selectColumnFromCanvas(location.section.id, Number(location.module.columnIndex) || 0);
   }
 
+  // ── Header block placement from the live canvas ─────────────────────────
+  // Toolbar arrows and on-canvas drops mutate the header draft (same save/discard
+  // lifecycle as the header editor); nothing is written until the draft is saved.
+
+  function canMoveHeaderBlocks() {
+    if (!currentPage) return false;
+    if (!dirtyScope || dirtyScope === 'header') return true;
+    setEditorStatus('Save or discard your current changes before moving header blocks.', 'warning');
+    return false;
+  }
+
+  function commitHeaderPlacementDraft(draft, nextHeader) {
+    activeHeaderDraft = { ...cloneValue(draft), header: cloneValue(nextHeader) };
+    markDirty('header');
+    renderEditorPanel();
+    previewManager.requestTargetRefresh?.();
+    return { ok: true };
+  }
+
+  function stepHeaderBlockPlacement(blockId, direction) {
+    if (!blockId || !canMoveHeaderBlocks()) return { ok: false };
+    const draft = activeHeaderDraft || draftManager.normalizeHeaderDraft(currentPage);
+    const placement = findBlockPlacement(draft.header, blockId);
+    if (direction === 'left' || direction === 'right') {
+      const regionIndex = HEADER_REGION_ORDER.indexOf(placement.region);
+      const nextRegion = HEADER_REGION_ORDER[regionIndex + (direction === 'left' ? -1 : 1)];
+      if (!nextRegion) {
+        return { ok: false, status: `Already in the ${placement.region} region.` };
+      }
+      return commitHeaderPlacementDraft(
+        draft,
+        moveBlockAcrossRegions(draft.header, blockId, direction === 'left' ? -1 : 1)
+      );
+    }
+    if (direction === 'up' || direction === 'down') {
+      const rowIndex = HEADER_ROW_ORDER.indexOf(placement.rowId);
+      const nextRowId = HEADER_ROW_ORDER[rowIndex + (direction === 'up' ? -1 : 1)];
+      if (!nextRowId) {
+        return { ok: false, status: `Already in the ${placement.rowId} row.` };
+      }
+      return commitHeaderPlacementDraft(
+        draft,
+        moveBlockAcrossRows(draft.header, blockId, direction === 'up' ? -1 : 1)
+      );
+    }
+    return { ok: false, status: `Unknown move direction: ${direction}` };
+  }
+
+  function moveHeaderBlockToCell(blockId, rowId, region) {
+    if (!blockId || !canMoveHeaderBlocks()) return { ok: false };
+    if (!HEADER_ROW_ORDER.includes(rowId) || !HEADER_REGION_ORDER.includes(region)) {
+      return { ok: false, status: 'That header cell does not exist.' };
+    }
+    const draft = activeHeaderDraft || draftManager.normalizeHeaderDraft(currentPage);
+    return commitHeaderPlacementDraft(
+      draft,
+      moveBlockToPlacement(draft.header, blockId, rowId, region)
+    );
+  }
+
   function selectCanvasTarget(target) {
     if (!target || typeof target !== 'object') return false;
     if (target.kind === 'module') {
@@ -2445,6 +2519,23 @@ function createPageBuilder({
       clearInlineEditView('target-switch', 'cancel');
       const accepted = selectPageHeaderFromCanvas();
       if (accepted) showSidePanelTab('settings');
+      // Clicking a specific header block on the canvas highlights its Parts row in the
+      // header editor so the inspector maps 1:1 to what was clicked (edit-in-place).
+      if (accepted && target.blockId) {
+        window.setTimeout(() => {
+          const editorRoot = el.pbModuleEditor || document;
+          editorRoot
+            .querySelectorAll('.pb-header-toggle-row.is-canvas-selected')
+            .forEach((row) => row.classList.remove('is-canvas-selected'));
+          const row = editorRoot.querySelector(
+            `.pb-header-toggle-row[data-block-id="${target.blockId}"]`
+          );
+          if (row) {
+            row.classList.add('is-canvas-selected');
+            row.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+          }
+        }, 0);
+      }
       return accepted;
     }
     if (target.kind === 'page') {

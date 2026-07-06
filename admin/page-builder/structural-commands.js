@@ -14,6 +14,7 @@ export const BUILDER_STRUCTURAL_COMMANDS = Object.freeze({
   HIDE_ON_DEVICE: 'builder:hide-on-device',
   DUPLICATE_SELECTED: 'builder:duplicate-selected',
   MOVE_MODULE_STEP: 'builder:move-module-step',
+  MOVE_HEADER_BLOCK: 'builder:move-header-block',
 });
 
 function result(ok, details = {}) {
@@ -205,10 +206,25 @@ export function createStructuralCommandAdapter({ getState, actions, helpers }) {
   }
 
   function runDragStart(payload = {}) {
+    const source = payload.source;
+    // Header block placement edits go through the header draft, so an already-dirty
+    // header draft is fine here; page-builder guards against other dirty scopes.
+    if (source === 'header-block') {
+      if (!payload.blockId) return result(false, { status: 'Unsupported drag source.' });
+      if (actions.canMoveHeaderBlocks?.() === false) return result(false);
+      setDragState({
+        dragId: `drag-${Date.now().toString(36)}`,
+        source,
+        effect: 'move-header-block',
+        blockId: payload.blockId,
+        originTarget: payload.originTarget || null,
+        currentPlacement: null,
+      });
+      return result(true);
+    }
     if (!ensureClean('Save or discard your current changes before dragging structure.')) {
       return result(false);
     }
-    const source = payload.source;
     if (source === 'block' && payload.moduleType) {
       setDragState({
         dragId: `drag-${Date.now().toString(36)}`,
@@ -278,6 +294,8 @@ export function createStructuralCommandAdapter({ getState, actions, helpers }) {
       commandResult = await runMove({ moduleId: dragState.moduleId, placement });
     } else if (dragState.effect === 'move-section') {
       commandResult = await runMoveSection({ sectionId: dragState.sectionId, placement });
+    } else if (dragState.effect === 'move-header-block') {
+      commandResult = runMoveHeaderBlockDrop({ blockId: dragState.blockId, placement });
     } else {
       commandResult = result(false);
     }
@@ -371,6 +389,8 @@ export function createStructuralCommandAdapter({ getState, actions, helpers }) {
         return runDuplicateSelected(payload);
       case BUILDER_STRUCTURAL_COMMANDS.MOVE_MODULE_STEP:
         return runMoveModuleStep(payload);
+      case BUILDER_STRUCTURAL_COMMANDS.MOVE_HEADER_BLOCK:
+        return runMoveHeaderBlock(payload);
       default:
         return result(false, { status: `Unknown command: ${id}` });
     }
@@ -441,6 +461,39 @@ export function createStructuralCommandAdapter({ getState, actions, helpers }) {
       return result(!!moved, moved ? {} : { status: 'Failed to move module.' });
     }
     return result(false, { status: `Unknown move direction: ${direction}` });
+  }
+
+  // One-step toolbar move for a selected header block: left/right walk the regions,
+  // up/down walk the rows. Placement mutations run through the header draft
+  // (page-builder.stepHeaderBlockPlacement), so edges come back as clean rejections.
+  function runMoveHeaderBlock(payload) {
+    const target = payload?.target;
+    const direction = String(payload?.direction || '');
+    const blockId = target?.blockId || payload?.blockId || '';
+    if (getTargetKind(target) !== 'header' || !blockId) {
+      return result(false, { status: 'Select a header block to move.' });
+    }
+    if (!['up', 'down', 'left', 'right'].includes(direction)) {
+      return result(false, { status: `Unknown move direction: ${direction}` });
+    }
+    const moved = actions.stepHeaderBlockPlacement?.(blockId, direction);
+    if (moved?.ok) actions.requestFreshTargets();
+    return moved || result(false, { status: 'Header block moves are unavailable.' });
+  }
+
+  // Canvas drop for a dragged header block: only a header cell placement is valid;
+  // anything else (dead space, non-header targets) is a clean no-op.
+  function runMoveHeaderBlockDrop({ blockId, placement }) {
+    if (!blockId || placement?.placement !== LIVE_DROP_PLACEMENTS.HEADER_CELL) {
+      return result(false, { status: 'No valid drop target.' });
+    }
+    const moved = actions.moveHeaderBlockToCell?.(blockId, placement.rowId, placement.region);
+    if (!moved?.ok) {
+      return moved || result(false, { status: 'Header block moves are unavailable.' });
+    }
+    actions.clearLiveDragState();
+    actions.requestFreshTargets();
+    return result(true, { status: 'Header block moved.' });
   }
 
   return {
