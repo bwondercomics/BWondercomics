@@ -201,3 +201,17 @@ body[data-reader-display-mode='vertical-scroll'] #fitBtn,
 body[data-reader-display-mode='vertical-scroll'] #fullscreenBtn {
   display: none !important;
 }
+
+/* Builder glow toggle (reader module controls.style.glow = false): strips the neon
+   box/text shadows from the bar, buttons, and the page indicator. Colors and borders
+   are unaffected — style those via the Controls appearance cards. */
+.controls[data-reader-controls-glow='off'],
+.controls[data-reader-controls-glow='off'] .btn,
+.controls[data-reader-controls-glow='off'] .btn:hover,
+.controls[data-reader-controls-glow='off'] .btn:active,
+.controls[data-reader-controls-glow='off'] .btn.primary,
+.controls[data-reader-controls-glow='off'] .btn.primary:hover,
+.controls[data-reader-controls-glow='off'] .status {
+  box-shadow: none;
+  text-shadow: none;
+}

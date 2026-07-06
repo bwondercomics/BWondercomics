@@ -52,6 +52,27 @@ describe('normalizeReaderConfig', () => {
     expect(config.stage.fit).toBe('width');
   });
 
+  it('normalizes endOfEntry (on by default, copy trimmed) and the controls bar slot (Phase 3)', () => {
+    const defaults = normalizeReaderConfig({});
+    expect(defaults.endOfEntry).toEqual({ enabled: true, title: '', body: '' });
+    expect(defaults.controls.style.bar.appearance).toBe(null);
+
+    const custom = normalizeReaderConfig({
+      endOfEntry: { enabled: false, title: 'Done!', body: 'Thanks for reading.' },
+      controls: { style: { bar: { appearance: { background: { color: '#101020' } } } } },
+    });
+    expect(custom.endOfEntry.enabled).toBe(false);
+    expect(custom.endOfEntry.title).toBe('Done!');
+    expect(custom.controls.style.bar.appearance.background.color).toBe('#101020');
+  });
+
+  it('normalizes controls glow (on by default, off preserved)', () => {
+    expect(normalizeReaderConfig({}).controls.style.glow).toBe(true);
+    expect(
+      normalizeReaderConfig({ controls: { style: { glow: false } } }).controls.style.glow
+    ).toBe(false);
+  });
+
   it('normalizes stage.frameFill (hug default, fill preserved, junk coerced)', () => {
     expect(normalizeReaderConfig({}).stage.frameFill).toBe('hug');
     expect(normalizeReaderConfig({ stage: { frameFill: 'fill' } }).stage.frameFill).toBe('fill');

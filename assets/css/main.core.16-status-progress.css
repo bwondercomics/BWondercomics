@@ -1,9 +1,18 @@
 /* ==================== STATUS & PROGRESS ==================== */
+/* The page indicator consumes the same builder vars as the reader buttons (Controls
+   Defaults appearance); the stock yellow look is the fallback for every token. */
 .status {
   padding: 8px 16px;
-  background: linear-gradient(135deg, rgba(255, 237, 0, 0.15), rgba(255, 237, 0, 0.08));
-  border: 3px solid var(--accent);
-  color: var(--accent);
+  background: var(
+    --reader-control-bg,
+    linear-gradient(135deg, rgba(255, 237, 0, 0.15), rgba(255, 237, 0, 0.08))
+  );
+  border: var(--reader-control-border, 3px solid var(--accent));
+  border-width: var(--reader-control-border-width, 3px);
+  border-style: var(--reader-control-border-style, solid);
+  border-color: var(--reader-control-border-color, var(--accent));
+  border-radius: var(--reader-control-border-radius, 0);
+  color: var(--reader-control-color, var(--accent));
   font-family: 'Bebas Neue';
   font-weight: 900;
   text-transform: uppercase;

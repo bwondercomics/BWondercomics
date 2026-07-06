@@ -68,10 +68,27 @@ export function restartEntry() {
 
 export function showEndOfEntry() {
   const overlay = document.getElementById('entryEndOverlay');
-  if (overlay) {
+  if (!overlay) return;
+  // Builder pages can disable the popup (reader module endOfEntry.enabled). Completion
+  // still counts for progress; only the overlay is suppressed.
+  if (overlay.dataset.readerEndOfEntry === 'off') {
     markEntryComplete();
-    overlay.classList.add('active');
+    return;
   }
+  // Optional authored copy overrides the dynamic default text at show time (applied
+  // last so it wins over the per-entry defaults set during entry load).
+  const customTitle = overlay.dataset.readerEndTitle;
+  const customBody = overlay.dataset.readerEndBody;
+  if (customTitle) {
+    const heading = overlay.querySelector('.entry-end-content h2');
+    if (heading) heading.textContent = customTitle;
+  }
+  if (customBody) {
+    const body = overlay.querySelector('.entry-end-content p');
+    if (body) body.textContent = customBody;
+  }
+  markEntryComplete();
+  overlay.classList.add('active');
 }
 
 export function hideEndOfEntry() {

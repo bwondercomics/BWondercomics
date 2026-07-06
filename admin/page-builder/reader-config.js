@@ -63,9 +63,14 @@ function normalizeReaderControlsStyle(rawStyle = {}) {
     source.primary && isObject(source.primary)
       ? normalizeAppearance(source.primary.appearance)
       : null;
+  const bar =
+    source.bar && isObject(source.bar) ? normalizeAppearance(source.bar.appearance) : null;
   return {
     defaults: { appearance: defaults },
     primary: { appearance: primary },
+    bar: { appearance: bar },
+    // Neon box/text shadows on the bar, buttons, and page indicator. On = stock look.
+    glow: coerceBool(source.glow, true),
   };
 }
 
@@ -79,10 +84,19 @@ export function normalizeReaderConfig(rawConfig = {}) {
   // config. Legacy `config.panels` / `config.showPanels` on saved configs are ignored here
   // (tolerated so old configs still parse) and are no longer emitted, so nothing downstream
   // can reintroduce a runtime panel toggle.
+  const endOfEntry = isObject(config.endOfEntry) ? config.endOfEntry : {};
+
   return {
     source,
     displayMode: pickKeyword(config.displayMode, READER_DISPLAY_MODES, 'paged'),
     showComments: coerceBool(config.showComments, true),
+    // Completion popup shown after the last page: on by default (stock behavior);
+    // optional title/body replace the dynamic default copy.
+    endOfEntry: {
+      enabled: coerceBool(endOfEntry.enabled, true),
+      title: String(endOfEntry.title || '').slice(0, 120),
+      body: String(endOfEntry.body || '').slice(0, 300),
+    },
     controls: {
       placement: pickKeyword(controls.placement, READER_CONTROLS_PLACEMENTS, 'below'),
       size: pickKeyword(controls.size, READER_CONTROLS_SIZES, 'medium'),

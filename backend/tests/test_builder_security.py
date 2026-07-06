@@ -105,6 +105,32 @@ class SanitizeReaderStageFrameFillTest(unittest.TestCase):
         self.assertEqual(sanitize_reader_stage({"frameFill": "wide"})["frameFill"], "hug")
 
 
+class SanitizeReaderEndOfEntryAndBarTest(unittest.TestCase):
+    """Builder customization roadmap Phase 3: completion popup + controls bar slot."""
+
+    def test_end_of_entry_defaults_and_overrides(self):
+        from backend.app.builder_security import sanitize_module_config
+
+        config = sanitize_module_config("reader", {})
+        self.assertEqual(config["endOfEntry"], {"enabled": True, "title": "", "body": ""})
+
+        config = sanitize_module_config(
+            "reader", {"endOfEntry": {"enabled": False, "title": "Done!", "body": "x" * 999}}
+        )
+        self.assertFalse(config["endOfEntry"]["enabled"])
+        self.assertEqual(config["endOfEntry"]["title"], "Done!")
+        self.assertEqual(len(config["endOfEntry"]["body"]), 300)
+
+    def test_controls_bar_appearance_slot(self):
+        from backend.app.builder_security import sanitize_reader_controls_style
+
+        style = sanitize_reader_controls_style(
+            {"bar": {"appearance": {"background": {"color": "#101020"}}}}
+        )
+        self.assertEqual(style["bar"]["appearance"]["background"]["color"], "#101020")
+        self.assertNotIn("defaults", style)
+
+
 class SanitizeModuleLayoutTest(unittest.TestCase):
     """Builder customization roadmap Phase 2: shared per-module wrapper layout."""
 

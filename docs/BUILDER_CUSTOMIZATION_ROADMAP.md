@@ -1,8 +1,8 @@
 # Builder Customization Roadmap
 
-Status: Phases 0–2 implemented (2026-07-05; Phase 0 has one manual builder-QA step handed back;
-Phase 1's optional drag-resize handles and Phase 2's universal module appearance are deferred —
-see the completion notes). Phases 3–7 planned.
+Status: Phases 0–3 implemented (2026-07-05; deferred items — Phase 0 manual builder QA, Phase 1
+drag-resize handles, Phase 2 universal module appearance, Phase 3 button typography/labels — are
+tracked in the completion notes). Phases 4–7 planned.
 Created: 2026-07-05
 Branch context: `builder-incremental-improvement` — the Panel/Column Settings Consolidation Plan
 (Phases 1–4) is implemented up to HEAD (`c82d986`), but its release gates (data migrations, manual
@@ -547,7 +547,7 @@ typography, and label text are hardcoded; the end-of-entry popup cannot be disab
 
 ### Steps
 
-- [ ] **Controls bar appearance**: `config.controls.bar.appearance` (background + opacity, border,
+- [x] **Controls bar appearance**: `config.controls.bar.appearance` (background + opacity, border,
       radius) applied to `.controls` via CSS vars / inline style at mount. Transparency = the
       appearance schema's existing background opacity.
 - [ ] **Button typography**: extend the shared appearance schema with an optional **text group**
@@ -560,10 +560,52 @@ typography, and label text are hardcoded; the end-of-entry popup cannot be disab
 - [ ] **Custom labels**: `config.controls.labels { prev, next, help, fit, zoomIn, zoomOut,
 fullscreen }` (length-capped, sanitized); applied at mount; defaults = current hardcoded
       text so unset pages are unchanged.
-- [ ] **End-of-entry popup**: `config.endOfEntry = { enabled: true, title?, body?, appearance? }`.
+- [x] **End-of-entry popup**: `config.endOfEntry = { enabled: true, title?, body?, appearance? }`.
       `showEndOfEntry()` consults the resolved reader shell settings and no-ops when disabled;
       appearance applies to `.entry-end-content`; text fields override the dynamic defaults.
       Builder UI: a "Completion Popup" accordion in the reader editor.
+
+### Completed 2026-07-05 (typography, labels, and granular padding deferred)
+
+- **Controls bar appearance** (`config.controls.style.bar.appearance`): third slot alongside
+  defaults/primary in `normalizeReaderControlsStyle` (`reader-config.js`),
+  `sanitize_reader_controls_style` (`builder_security.py`), the reader editor's appearance
+  section ("Controls Bar", scope `readerControlsBar` — mapping added in
+  `resolveAppearanceTarget` and `removeNullAppearanceBranches`), applied inline on `#controls`
+  with clear-then-apply in `applyReaderModuleShellSettings` (`reader/data.js`). Background
+  opacity = bar transparency.
+- **Completion popup** (`config.endOfEntry { enabled: true, title, body }`): normalized in
+  `reader-config.js`, sanitized via `_sanitize_reader_end_of_entry` (`builder_security.py`),
+  "Completion Popup" section in the reader editor (toggle + optional title/message), applied as
+  data attributes on `#entryEndOverlay`, and honored by `showEndOfEntry()`
+  (`reader/controls.js`) — disabled still records entry completion, only the overlay is
+  suppressed; custom copy is applied at show time so it wins over the per-entry defaults.
+- **Deferred** (open steps above): button typography (`--reader-control-font-*` + appearance
+  text group), custom button labels, and granular padding beyond the size presets — the shared
+  appearance text-group extension is a prerequisite for the header/entry-selector phases and
+  should land with them.
+- Tests: `tests/reader-config.test.js` (endOfEntry defaults/overrides + bar slot),
+  `backend/tests/test_builder_security.py` (popup sanitizer + bar appearance slot).
+- Verified: `npm run format:check`, `npm run lint`, `npm test` (617 passed, 1 skipped),
+  `npm run test:backend` (OK), `npm run build`, `npm run test:visual` (21 passed); API
+  container restarted for the sanitizer changes.
+
+**Follow-up (2026-07-05, from user QA — indicator/glow/bar-text):**
+
+- The **page indicator** (`.status`, `main.core.16-status-progress.css`) now consumes the same
+  `--reader-control-*` vars as the buttons, so "Controls Defaults" styles it too (stock yellow
+  look preserved as fallbacks). Note: "Primary Control" intentionally targets only the FIT
+  button (`.btn.primary`); "Controls Defaults" targets every other button + the indicator.
+- New **Neon Glow toggle** (`controls.style.glow`, default true): off strips the box/text
+  shadows from the bar, buttons, and indicator via
+  `.controls[data-reader-controls-glow='off']` rules (`main.core.15-controls.css`). Plumbed
+  through `reader-config.js`, the reader editor checkbox, `sanitize_reader_controls_style`
+  (sparse: only `false` persists), and `applyReaderModuleShellSettings`.
+- Clarified in the editor hint: the bar card's text color has no visible consumers (buttons and
+  the indicator carry their own text colors from Controls Defaults) — button/indicator text
+  color belongs to Controls Defaults.
+- Verified: `npm test` (618 passed, 1 skipped), `npm run test:backend` (OK), lint/format,
+  `npm run build`, `npm run test:visual` (21 passed); API restarted.
 
 ### Acceptance
 

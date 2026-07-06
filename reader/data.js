@@ -718,7 +718,21 @@ export function applyReaderModuleShellSettings(page, options = {}) {
       settings.controls.style.primary.appearance,
       'primary'
     );
+    // The bar itself (the .controls container): inline appearance with clear-then-apply,
+    // same controlled-props pattern as the panel shell.
+    applyPanelShellAppearance(controls, settings.controls.style.bar?.appearance || null);
+    controls.classList.remove('side-panel--custom-chrome');
+    controls.dataset.readerControlsGlow = settings.controls.style.glow === false ? 'off' : 'on';
     setHiddenState(controls, settings.controls.placement === 'hidden');
+  }
+
+  // End-of-entry completion popup: data attrs consumed by reader/controls.js at show time.
+  const entryEndOverlay = document.getElementById('entryEndOverlay');
+  if (entryEndOverlay) {
+    entryEndOverlay.dataset.readerEndOfEntry =
+      settings.endOfEntry?.enabled === false ? 'off' : 'on';
+    entryEndOverlay.dataset.readerEndTitle = settings.endOfEntry?.title || '';
+    entryEndOverlay.dataset.readerEndBody = settings.endOfEntry?.body || '';
   }
 
   [viewport, stageWrap].forEach((element) => {

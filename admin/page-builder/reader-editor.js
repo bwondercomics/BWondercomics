@@ -32,8 +32,11 @@ function removeNullAppearanceBranches(style = {}) {
   const next = {};
   const defaults = toSparseAppearance(style.defaults?.appearance);
   const primary = toSparseAppearance(style.primary?.appearance);
+  const bar = toSparseAppearance(style.bar?.appearance);
   if (defaults) next.defaults = { appearance: defaults };
   if (primary) next.primary = { appearance: primary };
+  if (bar) next.bar = { appearance: bar };
+  if (style.glow === false) next.glow = false;
   return Object.keys(next).length ? next : {};
 }
 
@@ -205,6 +208,12 @@ function renderControlsAppearance(config) {
     summary: config.controls.style.defaults.appearance ? 'Custom' : 'Default',
     copy: 'Use sparse appearance overrides for reader buttons.',
     body: `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">
+          <input type="checkbox" data-reader-key="controls.style.glow" ${config.controls.style.glow !== false ? 'checked' : ''}> Neon Glow
+        </label>
+        <div class="pb-editor-hint">The box/text glow on the bar, buttons, and page counter. Controls Defaults styles every button and the page counter; Primary Control styles the FIT button.</div>
+      </div>
       ${renderAppearanceControls(
         config.controls.style.defaults.appearance,
         'readerControlsDefaults',
@@ -219,6 +228,39 @@ function renderControlsAppearance(config) {
         'Primary Control',
         'Optional appearance applied to the primary reader control.'
       )}
+      ${renderAppearanceControls(
+        config.controls.style.bar.appearance,
+        'readerControlsBar',
+        null,
+        'Controls Bar',
+        'Optional appearance for the toolbar container itself (background + opacity for transparency, border, radius).'
+      )}
+    `,
+  });
+}
+
+function renderEndOfEntryControls(config) {
+  const endOfEntry = config.endOfEntry || {};
+  const enabled = endOfEntry.enabled !== false;
+  return renderInspectorSection({
+    kicker: 'Reader',
+    title: 'Completion Popup',
+    summary: enabled ? 'Popup On' : 'Popup Off',
+    copy: 'The overlay shown after the last page of an entry.',
+    body: `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">
+          <input type="checkbox" data-reader-key="endOfEntry.enabled" ${enabled ? 'checked' : ''}> Show Completion Popup
+        </label>
+      </div>
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Custom Title (optional)</label>
+        <input type="text" class="pb-editor-input" maxlength="120" data-reader-key="endOfEntry.title" placeholder="Entry complete" value="${escapeAttr(endOfEntry.title || '')}">
+      </div>
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Custom Message (optional)</label>
+        <input type="text" class="pb-editor-input" maxlength="300" data-reader-key="endOfEntry.body" placeholder="Ready for more?" value="${escapeAttr(endOfEntry.body || '')}">
+      </div>
     `,
   });
 }
@@ -234,6 +276,7 @@ export function renderReaderEditor(config = {}, { deviceOnly = false } = {}) {
   }
   return [
     renderLayoutControls(normalized),
+    renderEndOfEntryControls(normalized),
     renderControlsAppearance(normalized),
     renderStageControls(normalized),
     renderVisibilityControls(normalized),
@@ -332,7 +375,12 @@ export function bindReaderEditorEvents({
     nextConfig.controls.style = isObject(nextConfig.controls.style)
       ? nextConfig.controls.style
       : {};
-    const key = scope === 'readerControlsPrimary' ? 'primary' : 'defaults';
+    const key =
+      scope === 'readerControlsPrimary'
+        ? 'primary'
+        : scope === 'readerControlsBar'
+          ? 'bar'
+          : 'defaults';
     if (!isObject(nextConfig.controls.style[key])) {
       nextConfig.controls.style[key] = {};
     }

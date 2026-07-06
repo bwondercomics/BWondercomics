@@ -836,11 +836,13 @@ def _sanitize_reader_stage_max_width(value: Any) -> int | None:
 def sanitize_reader_controls_style(raw: Any) -> dict[str, Any]:
     style = raw if isinstance(raw, dict) else {}
     result: dict[str, Any] = {}
-    for key in ("defaults", "primary"):
+    for key in ("defaults", "primary", "bar"):
         branch = style.get(key) if isinstance(style.get(key), dict) else {}
         appearance = sanitize_appearance(branch.get("appearance"))
         if appearance is not None:
             result[key] = {"appearance": appearance}
+    if style.get("glow") is False:
+        result["glow"] = False
     return result
 
 
@@ -852,6 +854,16 @@ def sanitize_reader_controls(raw: Any) -> dict[str, Any]:
         ),
         "size": _sanitize_reader_keyword(controls.get("size"), READER_CONTROLS_SIZES, "medium"),
         "style": sanitize_reader_controls_style(controls.get("style")),
+    }
+
+
+def _sanitize_reader_end_of_entry(raw: Any) -> dict[str, Any]:
+    """End-of-entry completion popup: on by default; optional title/body copy overrides."""
+    end = raw if isinstance(raw, dict) else {}
+    return {
+        "enabled": _coerce_bool(end.get("enabled"), True),
+        "title": _coerce_string(end.get("title"), "", 120),
+        "body": _coerce_string(end.get("body"), "", 300),
     }
 
 
@@ -1547,6 +1559,7 @@ def sanitize_module_config(module_type: str, raw_config: Any) -> dict[str, Any]:
             "showComments": _coerce_bool(config.get("showComments"), True),
             "controls": sanitize_reader_controls(config.get("controls")),
             "stage": sanitize_reader_stage(config.get("stage")),
+            "endOfEntry": _sanitize_reader_end_of_entry(config.get("endOfEntry")),
         }
         if isinstance(config.get("panels"), dict):
             sanitized["panels"] = sanitize_reader_panels(
