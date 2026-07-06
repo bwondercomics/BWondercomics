@@ -57,13 +57,20 @@ export const EDITOR_EMPTY_COLUMN_MIN_HEIGHT = 40;
 // columns) and the reader panel path. `includeAlignment` gates the alignment token entirely;
 // `alignmentProperty` picks which property carries it: grid columns use `justify-self` (default),
 // flex-based panel wrappers pass 'align-self' because justify-self is inert on flex items. Both map
-// the same alignment keywords to the horizontal (cross/inline) axis.
+// the same alignment keywords to the horizontal (cross/inline) axis. `includeAppearance` is false
+// on the panel path: a panel's appearance styles the `<aside>` shell (the visible panel), not the
+// inner content wrapper.
 export function buildColumnInlineStyle(
   colSettings,
-  { minHeightFloor = 0, includeAlignment = true, alignmentProperty = 'justify-self' } = {}
+  {
+    minHeightFloor = 0,
+    includeAlignment = true,
+    alignmentProperty = 'justify-self',
+    includeAppearance = true,
+  } = {}
 ) {
   const tokens = [];
-  const appearanceStyle = appearanceToInlineStyle(colSettings?.appearance);
+  const appearanceStyle = includeAppearance ? appearanceToInlineStyle(colSettings?.appearance) : '';
   if (appearanceStyle) tokens.push(appearanceStyle);
   const padding = colSettings?.padding;
   if (padding && typeof padding === 'object') {
@@ -127,6 +134,19 @@ export function createRenderers({
     const raw = sanitizeAssetUrl(path || '');
     if (!raw) return '';
     return resolveImageUrl(raw);
+  }
+
+  // Background art layer for a grid column. Reader panels get their art on the aside shell
+  // (via --panel-bg-* vars) instead; this covers every other column. Rendered under the
+  // modules, pointer-events off, using the same fit/focus/opacity contract as panels.
+  function renderColumnBackgroundLayer(panelBackground) {
+    const url = panelBackground?.path ? resolveModuleImageUrl(panelBackground.path) : '';
+    if (!url) return '';
+    const fit = sanitizeKeyword(panelBackground.fit, ['cover', 'contain'], 'cover');
+    const focus = String(panelBackground.focus || 'center').replace(/[^a-z0-9% -]/gi, '');
+    const rawOpacity = Number(panelBackground.opacity);
+    const opacity = Number.isFinite(rawOpacity) ? Math.min(1, Math.max(0, rawOpacity)) : 0.18;
+    return `<div class="pb-column-bg" aria-hidden="true" style="background-image: url('${escapeAttr(url)}'); background-size: ${fit}; background-position: ${focus || 'center'}; opacity: ${opacity};"></div>`;
   }
 
   function normalizeSourceConfig(config = {}) {
@@ -558,6 +578,13 @@ export function createRenderers({
     if (settings.sectionGap !== undefined && settings.sectionGap !== null) {
       style += `--pb-section-gap: ${sanitizeNumber(settings.sectionGap, 0, 0, 600)}px;`;
     }
+    if (
+      settings.minHeight !== undefined &&
+      settings.minHeight !== null &&
+      settings.minHeight !== ''
+    ) {
+      style += `min-height: ${sanitizeNumber(settings.minHeight, 0, 0, 2000)}px;`;
+    }
 
     // Group modules by their stable global structural column. Responsive layouts
     // only change grid tracks; they never rewrite or clamp module ownership.
@@ -580,6 +607,8 @@ export function createRenderers({
       });
       const hidden = colSettings?.hidden === true;
       const hiddenClass = hidden ? ' pb-column--hidden' : '';
+      const columnBg = renderColumnBackgroundLayer(colSettings?.panelBackground);
+      const bgClass = columnBg ? ' pb-column--has-bg' : '';
       const columnMarkerAttrs = builderMarkerAttrs(
         {
           'data-builder-column-index': colIdx,
@@ -587,7 +616,7 @@ export function createRenderers({
         emitMarkers
       );
       const styleAttr = columnStyle ? ` style="${columnStyle}"` : '';
-      columnsHtml += `<div class="pb-column${hiddenClass}"${columnMarkerAttrs}${styleAttr}>${modulesHtml}</div>`;
+      columnsHtml += `<div class="pb-column${hiddenClass}${bgClass}"${columnMarkerAttrs}${styleAttr}>${columnBg}${modulesHtml}</div>`;
     }
 
     const sectionMarkerAttrs = builderMarkerAttrs(

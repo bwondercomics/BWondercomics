@@ -1042,7 +1042,7 @@ describe('reader builder presentation loading', () => {
     expect(rightColumn?.children.length).toBe(0);
   });
 
-  it('renders panel column appearance/padding/min-height/alignment inline in builder mode', () => {
+  it('renders panel layout on the wrapper and appearance on the aside shell in builder mode', () => {
     const builderPage = buildPanelSnapshot({
       sectionSettings: {
         columns: [
@@ -1066,14 +1066,19 @@ describe('reader builder presentation loading', () => {
 
     const style =
       document.querySelector('#leftPanel .pb-builder-panel-column')?.getAttribute('style') || '';
-    expect(style).toContain('background: #f5f5f5');
-    expect(style).toContain('border: 1px solid #ddd');
     expect(style).toContain('padding-top: 12px');
     expect(style).toContain('padding-left: 8px');
     expect(style).toContain('min-height: 200px');
     // Panels are flex items, so alignment renders as align-self (justify-self is grid-only).
     expect(style).toContain('align-self: center');
     expect(style).not.toContain('justify-self');
+    // Appearance paints the aside shell (the visible panel), not an inner box.
+    expect(style).not.toContain('background: #f5f5f5');
+    expect(style).not.toContain('border: 1px solid #ddd');
+    const shell = document.getElementById('leftPanel');
+    expect(shell?.getAttribute('style') || '').toContain('background: #f5f5f5');
+    expect(shell?.getAttribute('style') || '').toContain('border: 1px solid #ddd');
+    expect(shell?.classList.contains('side-panel--custom-chrome')).toBe(true);
   });
 
   it('renders panel column styling on the public wrapper without builder markers', () => {
@@ -1097,12 +1102,15 @@ describe('reader builder presentation loading', () => {
     const publicColumn = document.querySelector('#leftPanel .pb-panel-column');
     const style = publicColumn?.getAttribute('style') || '';
     expect(publicColumn).not.toBeNull();
-    expect(style).toContain('background: #f5f5f5');
-    expect(style).toContain('border: 1px solid #ddd');
     expect(style).toContain('padding-top: 12px');
     expect(style).toContain('min-height: 200px');
     expect(style).toContain('align-self: center');
     expect(style).not.toContain('justify-self');
+    // Appearance paints the aside shell on the public page too.
+    expect(style).not.toContain('background: #f5f5f5');
+    const publicShellStyle = document.getElementById('leftPanel')?.getAttribute('style') || '';
+    expect(publicShellStyle).toContain('background: #f5f5f5');
+    expect(publicShellStyle).toContain('border: 1px solid #ddd');
     expect(document.querySelector('#leftPanel [data-builder-column-index]')).toBeNull();
     expect(publicColumn?.querySelector('.pb-module--text')?.textContent).toContain('Left panel');
   });
@@ -1247,7 +1255,11 @@ describe('reader builder presentation loading', () => {
             index: 0,
             responsive: {
               mobile: { hidden: true, padding: { top: 4 } },
-              tablet: { hidden: false, alignment: 'end' },
+              tablet: {
+                hidden: false,
+                alignment: 'end',
+                appearance: { background: { color: '#123456' } },
+              },
             },
           },
           { index: 1 },
@@ -1268,6 +1280,8 @@ describe('reader builder presentation loading', () => {
     // Panel alignment in @media uses the flex property, mirroring the inline path.
     expect(style).toContain('align-self: flex-end');
     expect(style).not.toContain('justify-self');
+    // Responsive appearance targets the aside shell, not the wrapper.
+    expect(style).toMatch(/#leftPanel \{ background: #123456 !important; \}/);
   });
 
   it('does not emit panel responsive CSS without device overrides or in builder mode (Phase 2)', () => {
@@ -1360,8 +1374,37 @@ describe('reader builder presentation loading', () => {
 
     const style =
       document.querySelector('#leftPanel .pb-panel-column')?.getAttribute('style') || '';
-    expect(style).toContain('border: 1px solid #ddd');
     expect(style).toContain('min-height: 150px');
+    // Appearance styles the aside shell, even for an empty panel.
+    expect(document.getElementById('leftPanel')?.getAttribute('style') || '').toContain(
+      'border: 1px solid #ddd'
+    );
+  });
+
+  it('shares shell width by the reader section ratio with 3+ columns, cleared otherwise (Phase 1)', () => {
+    const wide = buildPanelSnapshot({});
+    wide.sections[0].layout = '1-3-1';
+    applyBuilderPageToDOM(wide, { seriesId: 'battle-bros', previewMode: true });
+
+    const wrap = document.querySelector('.viewerWrap');
+    expect(wrap?.getAttribute('data-pb-shell-weights')).toBe('1-3-1');
+    expect(wrap?.style.getPropertyValue('--pb-shell-left-weight')).toBe('1');
+    expect(wrap?.style.getPropertyValue('--pb-shell-center-weight')).toBe('3');
+    expect(wrap?.style.getPropertyValue('--pb-shell-right-weight')).toBe('1');
+
+    // Middle weights sum into the center share.
+    const multi = buildPanelSnapshot({});
+    multi.sections[0].layout = '2-1-1-2';
+    applyBuilderPageToDOM(multi, { seriesId: 'battle-bros', previewMode: true });
+    expect(wrap?.getAttribute('data-pb-shell-weights')).toBe('2-1-1-2');
+    expect(wrap?.style.getPropertyValue('--pb-shell-center-weight')).toBe('2');
+
+    // Fewer than 3 columns: stock fixed panel widths, no weights.
+    const narrow = buildPanelSnapshot({});
+    narrow.sections[0].layout = '1-1';
+    applyBuilderPageToDOM(narrow, { seriesId: 'battle-bros', previewMode: true });
+    expect(wrap?.getAttribute('data-pb-shell-weights')).toBeNull();
+    expect(wrap?.style.getPropertyValue('--pb-shell-left-weight')).toBe('');
   });
 
   it('does not leak column 0 styling into a public empty right panel before it exists', () => {

@@ -31,7 +31,11 @@ import {
   resolvePageHeaderState,
 } from '../admin/page-builder/header-config.js';
 import { escapeHtml } from '../admin/page-builder/helpers.js';
-import { mergeAppearance, normalizeAppearance } from '../admin/page-builder/appearance-utils.js';
+import {
+  appearanceToInlineStyle,
+  mergeAppearance,
+  normalizeAppearance,
+} from '../admin/page-builder/appearance-utils.js';
 import { getReaderRuntimeConfig } from '../admin/page-builder/reader-config.js';
 import {
   getEffectiveColumnSettings,
@@ -447,6 +451,77 @@ function applyPanelBackgroundToPanel(panel, config) {
 function clearPanelBackgrounds() {
   applyPanelBackgroundToPanel(document.getElementById('leftPanel'), null);
   applyPanelBackgroundToPanel(document.getElementById('rightPanel'), null);
+  applyPanelShellAppearance(document.getElementById('leftPanel'), null);
+  applyPanelShellAppearance(document.getElementById('rightPanel'), null);
+  applyPanelShellWeights(null);
+}
+
+const PANEL_SHELL_WEIGHT_VARS = Object.freeze([
+  '--pb-shell-left-weight',
+  '--pb-shell-center-weight',
+  '--pb-shell-right-weight',
+]);
+
+// Share the shell row proportionally between the left panel, the reader area, and the right
+// panel from the reader section's column weights. Only meaningful when the layout has 3+
+// columns (left / middle / right all exist); with fewer, the stock fixed panel width applies.
+// The CSS lives in main.core.09-side-panels.css, gated to the side-by-side (landscape)
+// layout so the aspect-ratio reflow keeps its own widths, and the 250px panel floor remains.
+function applyPanelShellWeights(layout) {
+  const wrap = document.querySelector('.viewerWrap');
+  if (!wrap) return;
+  const ratios = String(layout || '')
+    .split('-')
+    .map((part) => Number(part))
+    .filter((num) => Number.isFinite(num) && num > 0);
+  if (ratios.length < 3) {
+    wrap.removeAttribute('data-pb-shell-weights');
+    PANEL_SHELL_WEIGHT_VARS.forEach((cssVar) => wrap.style.removeProperty(cssVar));
+    return;
+  }
+  const centerWeight = ratios.slice(1, -1).reduce((sum, num) => sum + num, 0);
+  wrap.setAttribute('data-pb-shell-weights', ratios.join('-'));
+  wrap.style.setProperty('--pb-shell-left-weight', String(ratios[0]));
+  wrap.style.setProperty('--pb-shell-center-weight', String(centerWeight));
+  wrap.style.setProperty('--pb-shell-right-weight', String(ratios[ratios.length - 1]));
+}
+
+// The style properties a panel column's appearance may set on the `<aside>` shell. Cleared
+// before every apply so removing a setting restores the stock chrome (same pattern as the
+// header's controlled topbar props).
+const PANEL_SHELL_APPEARANCE_PROPS = Object.freeze([
+  'background',
+  'color',
+  'border',
+  'border-width',
+  'border-style',
+  'border-color',
+  'border-radius',
+]);
+
+// Apply a panel column's appearance to the `<aside>` shell — the element the user sees as
+// "the panel" (stock chrome: 4px primary border + dark gradient). The inner column wrapper
+// keeps layout styling only (padding/min-height/alignment); painting appearance there just
+// draws a box inside the panel. `side-panel--custom-chrome` hides the decorative ::before
+// strip so a custom border/background is not visually polluted by the stock accent bar.
+function applyPanelShellAppearance(panel, appearance) {
+  if (!panel) return;
+  PANEL_SHELL_APPEARANCE_PROPS.forEach((prop) => panel.style.removeProperty(prop));
+  const styleText = appearance ? appearanceToInlineStyle(appearance) : '';
+  let applied = false;
+  if (styleText) {
+    styleText.split(';').forEach((token) => {
+      const separator = token.indexOf(':');
+      if (separator === -1) return;
+      const prop = token.slice(0, separator).trim();
+      const value = token.slice(separator + 1).trim();
+      if (value && PANEL_SHELL_APPEARANCE_PROPS.includes(prop)) {
+        panel.style.setProperty(prop, value);
+        applied = true;
+      }
+    });
+  }
+  panel.classList.toggle('side-panel--custom-chrome', applied);
 }
 
 // Apply resolved per-side panel background configs. Phase 2 resolves these from the
@@ -649,6 +724,7 @@ export function applyReaderModuleShellSettings(page, options = {}) {
   [viewport, stageWrap].forEach((element) => {
     if (!element) return;
     element.dataset.readerStageFit = settings.stage.fit;
+    element.dataset.readerStageFrameFill = settings.stage.frameFill || 'hug';
     element.dataset.readerStageFrameBorder = String(settings.stage.frameBorder);
     element.dataset.readerStageMaxWidth =
       settings.stage.maxWidth == null ? '' : String(settings.stage.maxWidth);
@@ -904,11 +980,13 @@ function getPanelModuleColumnIndex(item, side) {
 
 // Build one styled panel-column wrapper for a reader-owned column. Builder-editing mode emits the
 // section/column markers the bridge collects and floors empty columns to the editor affordance
-// height; public mode emits the marker-free `.pb-panel-column`. Both carry the same inline column
-// style (background, border, padding, min-height) and the `pb-column--hidden` class, resolved from
-// the column's settings — so panels honor the column menu exactly like normal `.pb-column`s.
-// Alignment uses `align-self` here: the panel wrapper is a flex item (column-direction parent), so
-// align-self controls the horizontal axis exactly like justify-self does for grid columns.
+// height; public mode emits the marker-free `.pb-panel-column`. Both carry the same inline layout
+// style (padding, min-height, alignment) and the `pb-column--hidden` class, resolved from the
+// column's settings. Appearance (background/border/text) is deliberately NOT painted here — it
+// styles the `<aside>` shell via applyPanelShellAppearance, because the shell is what the user
+// sees as "the panel". Alignment uses `align-self`: the panel wrapper is a flex item
+// (column-direction parent), so align-self controls the horizontal axis exactly like justify-self
+// does for grid columns.
 function renderPanelColumnWrapper({
   section,
   sectionId,
@@ -927,6 +1005,7 @@ function renderPanelColumnWrapper({
   const columnStyle = buildColumnInlineStyle(colSettings, {
     minHeightFloor,
     alignmentProperty: 'align-self',
+    includeAppearance: false,
   });
   const styleAttr = columnStyle ? ` style="${columnStyle}"` : '';
   const hiddenClass = colSettings?.hidden === true ? ' pb-column--hidden' : '';
@@ -1170,6 +1249,11 @@ export function applyBuilderPageToDOM(page, options = {}) {
   // (rightPanelColumn.exists). No runtime toggle can hide a panel anymore.
   applyPanelExistence(rightPanelColumn);
 
+  // Panel width follows the same ratio: with 3+ columns the shell row shares its width
+  // proportionally (left panel / reader area / right panel). Uses the stable structural
+  // layout, matching panel existence.
+  applyPanelShellWeights(readerPanelLayout);
+
   applyReaderModuleShellSettings(page, { builderEditing, deviceId });
 
   logger.log('✓ Applied page builder config to DOM');
@@ -1195,17 +1279,21 @@ function renderPanelStack(side, modules, panelSpacing = {}, panelBackgrounds = {
       })
     : null;
 
+  // The column's appearance styles the aside shell itself — the visible panel — overriding
+  // the stock chrome. Unset appearance restores the defaults (clear-then-apply).
+  applyPanelShellAppearance(panel, panelColumnSettings?.appearance || null);
+
   // Public panels emit their column's device overrides as scoped @media CSS (the
   // builder preview already JS-merges the active device branch). This keeps a panel's
   // responsive hidden/padding/min-height in parity with the preview on the published
   // page; the wrapper is flex, so a re-shown column uses display:flex (not block).
+  // Appearance branches target the aside shell, everything else the column wrapper.
   const panelResponsiveCss =
     !builderEditing && options.panelColumn?.exists
-      ? buildPanelResponsiveCss(
-          options.panelColumn.section,
-          options.panelColumn.columnIndex,
-          `#${panelId} .pb-panel-column`
-        )
+      ? buildPanelResponsiveCss(options.panelColumn.section, options.panelColumn.columnIndex, {
+          wrapperSelector: `#${panelId} .pb-panel-column`,
+          shellSelector: `#${panelId}`,
+        })
       : '';
   const panelResponsiveStyleTag = panelResponsiveCss ? `<style>${panelResponsiveCss}</style>` : '';
 

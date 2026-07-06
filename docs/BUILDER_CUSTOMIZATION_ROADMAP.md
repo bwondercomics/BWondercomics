@@ -1,7 +1,7 @@
 # Builder Customization Roadmap
 
-Status: Phase 0 implemented (2026-07-05; one manual builder-QA step handed back — see the Phase 0
-completion note). Phases 1–7 planned.
+Status: Phases 0–1 implemented (2026-07-05; Phase 0 has one manual builder-QA step handed back —
+see its completion note; Phase 1's optional drag-resize handles deferred). Phases 2–7 planned.
 Created: 2026-07-05
 Branch context: `builder-incremental-improvement` — the Panel/Column Settings Consolidation Plan
 (Phases 1–4) is implemented up to HEAD (`c82d986`), but its release gates (data migrations, manual
@@ -301,6 +301,22 @@ builder on a Pyre reader page, click each panel/column, change each control, sav
 published page (the consolidation plan's manual Verification list). Everything automatable was
 automated; this last look is human.
 
+**Follow-up fix (2026-07-05, from user QA — "border draws a useless cube inside the panel"):**
+panel appearance was painting the inner column wrapper instead of the panel the user actually
+sees. The column's appearance (background, border, radius, text color) now styles the
+`<aside class="side-panel">` shell itself, overriding the stock chrome (4px primary border + dark
+gradient) with clear-then-apply semantics — unset values restore the defaults, so pages without
+authored appearance are pixel-identical. While custom chrome is set, the decorative `::before`
+accent strip is hidden (`side-panel--custom-chrome`, `main.core.09-side-panels.css`). The inner
+wrapper keeps layout styling only (padding / min-height / alignment / gap). Public responsive
+`@media` appearance branches are likewise scoped to the aside — `buildPanelResponsiveCss` now
+takes `{ wrapperSelector, shellSelector }` (`responsive-css.js`); the builder preview gets the
+same result via the device-merged settings. Implementation: `applyPanelShellAppearance()` in
+`reader/data.js` (applied in `renderPanelStack`, cleared unconditionally with the panel background
+vars); `buildColumnInlineStyle` gained `includeAppearance` (false on the panel path). Verified:
+`npm test` (611 passed, 1 skipped), `npm run build`, `npm run test:visual` (21 passed).
+Note: panel **width** is still fixed shell CSS — that is Phase 1, not a bug in this fix.
+
 ---
 
 ## Phase 1 — Panel & section sizing (Size: M)
@@ -322,22 +338,87 @@ give the reader more/less room deliberately, and no way to make a section taller
 
 ### Steps
 
-- [ ] **Panel width weights**: in the Section inspector (and mirrored in the Column/Panel
+- [x] **Panel width weights**: in the Section inspector (and mirrored in the Column/Panel
       inspector for the selected column), show one numeric weight input per column (integer 1–12),
       writing the joined `section.layout` string. Reader sections: changing left/right panel
       weights resizes the panels around the reader — call this out in the UI copy.
-- [ ] Keep the existing column-count control; count changes append weight-1 columns / are blocked
+- [x] Keep the existing column-count control; count changes append weight-1 columns / are blocked
       by the existing non-empty-shrink rejection (backend authority already in place).
-- [ ] **Section min-height**: new `section.settings.minHeight` (px, optional, responsive-capable)
+- [x] **Section min-height**: new `section.settings.minHeight` (px, optional, responsive-capable)
       — sanitize client+server, emit on `.pb-section` / the section wrapper in `renderSection`,
       add to the section inspector. Panels/columns already have per-column `minHeight`; with
       Phase 0 alignment they can now be shorter than the section.
-- [ ] **Background framing for all columns**: the column schema already carries
+- [x] **Background framing for all columns**: the column schema already carries
       `panelBackground { path, fit, focus, opacity }` — ensure the inspector exposes
       image + fit + focus + opacity for _every_ column, not only reader panels (rename the UI
       group "Background image").
-- [ ] _(Optional, separate commit, may defer)_ Drag-resize gutter handles on the live canvas that
+- [ ] _(Optional, deferred)_ Drag-resize gutter handles on the live canvas that
       write the same weights (editor-only overlay; must not affect public CSS).
+
+### Completed 2026-07-05
+
+- **Reader panel widths are now ratio-driven.** The width inputs already wrote `section.layout`,
+  but the reader shell ignored them (fixed `.side-panel` CSS: 20vw, clamped 250–400px). Now, when
+  the reader section has **3+ columns**, `applyPanelShellWeights()` (`reader/data.js`) sets
+  `--pb-shell-left/center/right-weight` vars + `data-pb-shell-weights` on `.viewerWrap`, and a
+  rule in `main.core.09-side-panels.css` shares the row proportionally between the left panel,
+  the reader area, and the right panel (middle weights sum into the center). Gated to the
+  side-by-side landscape layout via `@media (min-aspect-ratio: 7/5)` — the aspect-ratio reflow in
+  `main.responsive.css` keeps its own widths — and the 250px panel `min-width` floor remains.
+  With 1–2 columns the stock fixed width applies (there is no center track to weigh against).
+  Existing `1-3-1` pages keep essentially the same proportions (≈20% per panel); expect a few px
+  drift versus the old viewport-relative `20vw`.
+- **Section min-height** end to end: `settings.minHeight` (0–2000, base + per-device) — inspector
+  input in the section Spacing panel, draft plumbing (`page-builder.js`), responsive field
+  registry, inline emission in `renderSection`, `@media` emission (`responsive-css.js`), and
+  backend sanitizer (`builder_security.py`, base + responsive branch).
+- **Background image framing on every column**: the surface section of the Column/Panel inspector
+  now renders for all columns (titled "Background Image" for non-panels; the panel-only module
+  spacing / empty-text fields stay panel-scoped). Normal grid columns render the art as a
+  `.pb-column-bg` layer under the modules (fit/focus/opacity inline, CSS in
+  `main.core.18-page-builder.css`); reader panels keep their aside-shell art. Existing event
+  bindings were already column-generic.
+- UI copy: reader-section width hint calls out that 3+ column weights resize the panels around
+  the reader.
+- Tests: shell-weight apply/clear cases (`tests/reader-data-builder.test.js`), section min-height
+  inline + `@media` and column background layer cases (`tests/shared-renderers-parity.test.js`),
+  backend min-height clamps (`backend/tests/test_builder_security.py`).
+- Verified: `npm run format:check`, `npm run lint`, `npm test` (614 passed, 1 skipped),
+  `npm run test:backend` (OK), `ruff format --check` (clean), `npm run build`,
+  `npm run test:visual` (21 passed); API container restarted for the sanitizer change.
+- Deferred: drag-resize gutter handles (optional step, unchanged scope).
+
+**Follow-up refinements (2026-07-05, from user QA):**
+
+- **Percent-based widths.** Integer weights were too coarse (1→2 doubled a panel). The width
+  inputs now edit each column as a **percent of the row** (5% steps, clamped 5–90); on change the
+  other columns renormalize proportionally so the weights always sum to 100
+  (`updateActiveSectionColumnRatio` in `page-builder.js`). Stored layouts are now percent-scale
+  weight strings (e.g. `40-20-20-20`); `MAX_COLUMN_RATIO` raised 12 → 100 on both sides
+  (`layout-utils.js`, `builder_security.py`) — legacy ratios like `1-3-1` remain valid and
+  display as their percent equivalents. Newly added columns get an average share instead of a
+  1-weight sliver. Device-scope reflow edits use the same percent semantics.
+- **Stage frame fill.** In Dynamic Frame fit, tall pages are height-bound, so widening the reader
+  column only stretched the controls while the frame hugged the pages. New reader stage option
+  **Frame Width: Hug Pages (default) / Fill Column** (`stage.frameFill`): under `fill`, the pages
+  container spans the reader column like the controls do (pages stay centered at their
+  height-limited size). Plumbed through `reader-config.js` (normalize + mount attrs),
+  `reader-editor.js` (Stage select), `builder_security.py` (`sanitize_reader_stage`), runtime
+  attr in `reader/data.js`, and the frame computation in `reader/transform.js`. Default `hug`
+  keeps existing pages pixel-identical. Note: making the _pages themselves_ larger than the
+  screen height allows is a different trade — that's the existing Fit Width stage mode
+  (vertical scrolling), not a frame option.
+- Tests updated to the percent semantics (shell suite) plus new frameFill normalization
+  (frontend + backend). Verified: full gate — `npm test` (615 passed, 1 skipped),
+  `npm run test:backend` (OK), lint/format, `npm run build`, `npm run test:visual` (21 passed);
+  API container restarted for the sanitizer changes.
+- **Preview frame refit fix (same day):** the dynamic page frame only re-fit on window `resize`
+  or page turns, so editing panel weights in the live builder preview resized the column without
+  the frame following (published pages were correct — the frame computes after load). Added a
+  `ResizeObserver` on `#mainContent` (`reader/app.js`) funneling into the same debounced reflow,
+  so the frame refits whenever the reader column changes width — in the preview and in any live
+  reflow without a window resize. Verified: `npm test` (615 passed), `npm run build`,
+  `npm run test:visual` (21 passed).
 
 ### Acceptance
 

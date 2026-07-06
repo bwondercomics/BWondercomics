@@ -18,6 +18,7 @@ describe('normalizeReaderConfig', () => {
     expect(config.controls.style.primary.appearance).toBe(null);
     expect(config.stage).toEqual({
       fit: 'dynamic-frame',
+      frameFill: 'hug',
       pageGap: 8,
       frameBorder: true,
       maxWidth: null,
@@ -49,6 +50,12 @@ describe('normalizeReaderConfig', () => {
     expect(config.controls.placement).toBe('overlay');
     expect(config.controls.size).toBe('large');
     expect(config.stage.fit).toBe('width');
+  });
+
+  it('normalizes stage.frameFill (hug default, fill preserved, junk coerced)', () => {
+    expect(normalizeReaderConfig({}).stage.frameFill).toBe('hug');
+    expect(normalizeReaderConfig({ stage: { frameFill: 'fill' } }).stage.frameFill).toBe('fill');
+    expect(normalizeReaderConfig({ stage: { frameFill: 'wide' } }).stage.frameFill).toBe('hug');
   });
 
   it('clamps pageGap into [0, 64]', () => {

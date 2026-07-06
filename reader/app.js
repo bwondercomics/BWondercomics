@@ -914,7 +914,7 @@ import { publishReaderShellState, resolveReaderShellState } from './shell-state.
 
     // Handle window resize and orientation changes
     let resizeTimeout;
-    window.addEventListener('resize', () => {
+    const scheduleReaderReflow = () => {
       if (!isReaderShellInteractive()) return;
       // Debounce resize events to avoid excessive re-renders
       clearTimeout(resizeTimeout);
@@ -922,7 +922,16 @@ import { publishReaderShellState, resolveReaderShellState } from './shell-state.
         render();
         if (previewMode) emitPreviewMetrics('resize');
       }, 150);
-    });
+    };
+    window.addEventListener('resize', scheduleReaderReflow);
+    // The reader column can change width without a window resize — the builder editing
+    // panel weights in the live preview, or a panel appearing/disappearing. Watch the
+    // content wrapper so the dynamic page frame refits then too (the window listener
+    // alone left the preview's frame stale until a page turn).
+    const mainContentEl = document.getElementById('mainContent');
+    if (typeof ResizeObserver === 'function' && mainContentEl) {
+      new ResizeObserver(scheduleReaderReflow).observe(mainContentEl);
+    }
 
     // Shortcuts overlay buttons
     const shortcutsClose = document.getElementById('shortcutsClose');

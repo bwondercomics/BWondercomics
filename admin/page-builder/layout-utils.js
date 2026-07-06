@@ -10,7 +10,9 @@
  */
 
 export const MAX_COLUMNS = 6;
-export const MAX_COLUMN_RATIO = 12;
+// 100 so percent-style weight strings (e.g. '20-60-20') are valid; legacy small
+// ratios like '1-3-1' remain a strict subset.
+export const MAX_COLUMN_RATIO = 100;
 export const COLUMN_ALIGNMENTS = ['stretch', 'start', 'center', 'end'];
 
 export function parseLayoutRatios(layout = '1') {

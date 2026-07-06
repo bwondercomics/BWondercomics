@@ -4,6 +4,7 @@ export const READER_DISPLAY_MODES = Object.freeze(['paged', 'vertical-scroll']);
 export const READER_CONTROLS_PLACEMENTS = Object.freeze(['above', 'below', 'overlay', 'hidden']);
 export const READER_CONTROLS_SIZES = Object.freeze(['compact', 'medium', 'large']);
 export const READER_STAGE_FITS = Object.freeze(['dynamic-frame', 'width', 'height', 'natural']);
+export const READER_STAGE_FRAME_FILLS = Object.freeze(['hug', 'fill']);
 export const READER_STAGE_MAX_WIDTH_MIN = 320;
 export const READER_STAGE_MAX_WIDTH_MAX = 2400;
 
@@ -89,6 +90,9 @@ export function normalizeReaderConfig(rawConfig = {}) {
     },
     stage: {
       fit: pickKeyword(stage.fit, READER_STAGE_FITS, 'dynamic-frame'),
+      // 'hug' = the dynamic frame wraps the pages (stock); 'fill' = the frame spans the
+      // reader column so the pages container scales with the column and controls.
+      frameFill: pickKeyword(stage.frameFill, READER_STAGE_FRAME_FILLS, 'hug'),
       pageGap: clampInt(stage.pageGap, 8, 0, 64),
       frameBorder: coerceBool(stage.frameBorder, true),
       maxWidth: normalizeStageMaxWidth(stage.maxWidth),
@@ -145,6 +149,7 @@ export function getReaderMountDataAttributes(rawConfig = {}) {
     'data-controls-placement': config.controls.placement,
     'data-controls-size': config.controls.size,
     'data-stage-fit': config.stage.fit,
+    'data-stage-frame-fill': config.stage.frameFill,
     'data-stage-page-gap': String(config.stage.pageGap),
     'data-stage-frame-border': String(config.stage.frameBorder),
     'data-stage-max-width': config.stage.maxWidth == null ? '' : String(config.stage.maxWidth),

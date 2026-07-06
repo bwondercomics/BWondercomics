@@ -33,6 +33,36 @@
   z-index: 1;
 }
 
+/* When a builder page styles the panel shell (custom background/border from the Column/Panel
+   inspector), drop the stock accent strip so the authored chrome stands alone. */
+.side-panel.side-panel--custom-chrome::before {
+  display: none;
+}
+
+/* Ratio-driven shell widths: when a builder reader page has 3+ columns, the panels and the
+   reader area share the row proportionally (left / center / right weights from the reader
+   section's stable layout, set as CSS vars by reader/data.js). Gated to the side-by-side
+   landscape layout — the aspect-ratio reflow in main.responsive.css keeps its own widths —
+   and the 250px panel min-width floor still applies. */
+@media (min-aspect-ratio: 7/5) {
+  .viewerWrap[data-pb-shell-weights] > .side-panel.left {
+    flex: var(--pb-shell-left-weight, 1) 1 0%;
+    width: auto;
+    max-width: none;
+  }
+
+  .viewerWrap[data-pb-shell-weights] > .side-panel.right {
+    flex: var(--pb-shell-right-weight, 1) 1 0%;
+    width: auto;
+    max-width: none;
+  }
+
+  .viewerWrap[data-pb-shell-weights] > .viewer-content-wrapper {
+    flex: var(--pb-shell-center-weight, 3) 1 0%;
+    min-width: 0;
+  }
+}
+
 .side-panel.left,
 .side-panel.right {
   height: 100%;

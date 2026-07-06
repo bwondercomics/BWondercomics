@@ -11,6 +11,7 @@ export const SECTION_RESPONSIVE_FIELDS = Object.freeze([
   'paddingTop',
   'paddingBottom',
   'backgroundColor',
+  'minHeight',
 ]);
 
 function isPlainObject(value) {

@@ -199,7 +199,14 @@ export function fitOnPageFrame() {
 
   state.lastOnPageFrame = frame;
   el.viewport.classList.add('dynamic-frame');
-  el.viewport.style.setProperty('--on-page-frame-width', `${frame.width}px`);
+  // 'fill': the frame spans the full reader column (pages stay centered inside), so the
+  // container scales with the column and controls. 'hug' (default) wraps the pages.
+  const fillFrame =
+    el.viewport.dataset.readerStageFrameFill === 'fill' && availableWidth > frame.width;
+  el.viewport.style.setProperty(
+    '--on-page-frame-width',
+    `${fillFrame ? availableWidth : frame.width}px`
+  );
   el.viewport.style.setProperty('--on-page-frame-height', `${frame.height}px`);
   return frame;
 }

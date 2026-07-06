@@ -112,6 +112,27 @@ body[data-reader-shell='inactive'] #statusPanel {
   display: none;
 }
 
+/* Authored column background art: an absolutely-positioned layer under the modules
+   (fit/focus/opacity are emitted inline by the shared renderer). Reader panels render
+   their art on the aside shell instead. */
+.pb-column--has-bg {
+  position: relative;
+  overflow: hidden;
+}
+
+.pb-column--has-bg > .pb-column-bg {
+  position: absolute;
+  inset: 0;
+  background-repeat: no-repeat;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.pb-column--has-bg > .pb-module {
+  position: relative;
+  z-index: 1;
+}
+
 /* Editor-only: give empty reader-panel columns measurable geometry so they are droppable in the
    live canvas. Empty structural .pb-column elements get an equivalent inline min-height floor from
    the shared renderer (which also overrides any authored min-height: 0); panel columns carry no

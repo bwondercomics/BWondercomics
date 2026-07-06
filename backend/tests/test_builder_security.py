@@ -94,5 +94,33 @@ class SanitizeColumnPanelFieldsTest(unittest.TestCase):
         self.assertIn("path", col0["panelBackground"])
 
 
+class SanitizeReaderStageFrameFillTest(unittest.TestCase):
+    """Reader stage frameFill: 'hug' (default) wraps pages, 'fill' spans the column."""
+
+    def test_frame_fill_defaults_and_keywords(self):
+        from backend.app.builder_security import sanitize_reader_stage
+
+        self.assertEqual(sanitize_reader_stage({})["frameFill"], "hug")
+        self.assertEqual(sanitize_reader_stage({"frameFill": "fill"})["frameFill"], "fill")
+        self.assertEqual(sanitize_reader_stage({"frameFill": "wide"})["frameFill"], "hug")
+
+
+class SanitizeSectionMinHeightTest(unittest.TestCase):
+    """Builder customization roadmap Phase 1: section-level minHeight."""
+
+    def test_clamps_base_and_responsive_min_height(self):
+        result = sanitize_section_settings(
+            {"minHeight": 5000, "responsive": {"mobile": {"minHeight": -5}}},
+            layout="1-1",
+        )
+        self.assertEqual(result["minHeight"], 2000)
+        self.assertEqual(result["responsive"]["mobile"]["minHeight"], 0)
+
+    def test_absent_or_empty_min_height_is_dropped(self):
+        self.assertNotIn("minHeight", sanitize_section_settings({}, layout="1"))
+        self.assertNotIn("minHeight", sanitize_section_settings({"minHeight": ""}, layout="1"))
+        self.assertNotIn("minHeight", sanitize_section_settings({"minHeight": None}, layout="1"))
+
+
 if __name__ == "__main__":
     unittest.main()

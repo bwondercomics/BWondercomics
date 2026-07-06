@@ -1872,14 +1872,16 @@ function createPageBuilder({
     // Layout is a top-level section field, not a setting; saveSectionSettings reads it
     // separately from the draft and sends it atomically alongside settings.
     delete settings.layout;
-    ['moduleGap', 'columnGap', 'sectionGap', 'paddingTop', 'paddingBottom'].forEach((key) => {
-      const value = settings?.[key];
-      if (value !== '' && value !== null && value !== undefined) {
-        settings[key] = value;
-      } else {
-        delete settings[key];
+    ['moduleGap', 'columnGap', 'sectionGap', 'paddingTop', 'paddingBottom', 'minHeight'].forEach(
+      (key) => {
+        const value = settings?.[key];
+        if (value !== '' && value !== null && value !== undefined) {
+          settings[key] = value;
+        } else {
+          delete settings[key];
+        }
       }
-    });
+    );
     if (!settings.backgroundColor) {
       delete settings.backgroundColor;
     }
@@ -1960,7 +1962,11 @@ function createPageBuilder({
     if (!activeSectionDraft || !key) return;
     const raw = String(rawValue ?? '').trim();
     let value = raw;
-    if (['moduleGap', 'columnGap', 'sectionGap', 'paddingTop', 'paddingBottom'].includes(key)) {
+    if (
+      ['moduleGap', 'columnGap', 'sectionGap', 'paddingTop', 'paddingBottom', 'minHeight'].includes(
+        key
+      )
+    ) {
       value = raw ? Math.max(0, Math.round(Number(raw) || 0)) : '';
     }
     if (responsiveEditScope === 'device' && isSectionResponsiveField(key)) {
@@ -2062,8 +2068,14 @@ function createPageBuilder({
       return;
     }
     const ratios = globalRatios;
+    // Appended columns get an average share of the existing weights (not weight 1, which
+    // would be a sliver under percent-scale weight strings like '20-60-20').
+    const appendWeight = Math.max(
+      1,
+      Math.round(ratios.reduce((sum, r) => sum + r, 0) / ratios.length)
+    );
     const next = [];
-    for (let i = 0; i < count; i++) next.push(ratios[i] ?? 1);
+    for (let i = 0; i < count; i++) next.push(ratios[i] ?? appendWeight);
     activeSectionDraft.layout = ratiosToLayout(next);
     if (Array.isArray(activeSectionDraft.columns)) {
       activeSectionDraft.columns = activeSectionDraft.columns.filter(
@@ -2075,6 +2087,9 @@ function createPageBuilder({
     renderEditorPanel();
   }
 
+  // `rawValue` is the column's requested width as a PERCENT of the row (the inspector
+  // inputs work in percent steps). The other columns renormalize proportionally so the
+  // weights always sum to 100 — finer control than stepping small integer ratios.
   function updateActiveSectionColumnRatio(rawIndex, rawValue) {
     if (!activeSectionDraft) return;
     const index = Number(rawIndex);
@@ -2082,9 +2097,27 @@ function createPageBuilder({
       responsiveEditScope === 'device'
         ? activeSectionDraft.responsive?.[activeDeviceId]?.layout
         : null;
-    const ratios = parseLayoutRatios(branchLayout || activeSectionDraft.layout || '1');
-    if (!Number.isInteger(index) || index < 0 || index >= ratios.length) return;
-    ratios[index] = Math.max(1, Math.min(12, Math.round(Number(rawValue) || 1)));
+    const current = parseLayoutRatios(branchLayout || activeSectionDraft.layout || '1');
+    if (!Number.isInteger(index) || index < 0 || index >= current.length) return;
+    if (current.length === 1) return; // a single column is always the full row
+    const requested = Math.round(Number(rawValue) || 0);
+    const clamped = Math.max(5, Math.min(90, requested));
+    const oldOtherTotal = current.reduce((sum, r, i) => (i === index ? sum : sum + r), 0);
+    const otherBudget = 100 - clamped;
+    const ratios = current.map((r, i) => {
+      if (i === index) return clamped;
+      const share = oldOtherTotal > 0 ? r / oldOtherTotal : 1 / (current.length - 1);
+      return Math.max(1, Math.round(share * otherBudget));
+    });
+    // Fix rounding drift so the weights sum to exactly 100 (adjust the widest other column).
+    const drift = 100 - ratios.reduce((sum, r) => sum + r, 0);
+    if (drift !== 0) {
+      let adjust = -1;
+      ratios.forEach((r, i) => {
+        if (i !== index && (adjust === -1 || r > ratios[adjust])) adjust = i;
+      });
+      if (adjust !== -1) ratios[adjust] = Math.max(1, ratios[adjust] + drift);
+    }
     if (responsiveEditScope === 'device') {
       setResponsiveOverrideValue(
         activeSectionDraft,

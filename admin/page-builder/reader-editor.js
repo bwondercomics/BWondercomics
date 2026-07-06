@@ -158,6 +158,14 @@ function renderStageControls(config, { deviceOnly = false } = {}) {
           ? ''
           : `
       <div class="pb-editor-field">
+        <label class="pb-editor-label">Frame Width</label>
+        <select class="pb-editor-select" data-reader-key="stage.frameFill">
+          <option value="hug" ${config.stage.frameFill !== 'fill' ? 'selected' : ''}>Hug Pages</option>
+          <option value="fill" ${config.stage.frameFill === 'fill' ? 'selected' : ''}>Fill Column</option>
+        </select>
+        <div class="pb-editor-hint">Fill Column makes the pages container span the reader column (like the controls) instead of wrapping the pages.</div>
+      </div>
+      <div class="pb-editor-field">
         <label class="pb-editor-label">
           <input type="checkbox" data-reader-key="stage.frameBorder" ${config.stage.frameBorder ? 'checked' : ''}> Show Page Frame Border
         </label>

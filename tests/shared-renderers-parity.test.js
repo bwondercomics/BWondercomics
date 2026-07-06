@@ -48,6 +48,54 @@ describe('buildColumnInlineStyle export contract', () => {
     expect(panelStyle).toContain('min-height: 120px');
   });
 
+  it('emits section min-height inline and in device @media (Phase 1)', () => {
+    const reader = makeReaderRenderers();
+    const section = {
+      id: 'minheight-sec',
+      layout: '1-1',
+      sortIndex: 0,
+      settings: { minHeight: 900, responsive: { mobile: { minHeight: 400 } } },
+      modules: [],
+    };
+    const html = reader.renderSection(section, 0);
+    expect(html).toContain('min-height: 900px');
+    expect(html).toMatch(/@media \(max-width: 480px\)[^}]*min-height: 400px !important/);
+    // Without the key, no min-height token is emitted at all.
+    const plain = reader.renderSection({ ...section, id: 'plain-sec', settings: {} }, 0);
+    expect(plain).not.toContain('min-height');
+  });
+
+  it('renders a framed background layer for a column with panelBackground (Phase 1)', () => {
+    const reader = makeReaderRenderers();
+    const section = {
+      id: 'colbg-sec',
+      layout: '1-1',
+      sortIndex: 0,
+      settings: {
+        columns: [
+          {
+            index: 0,
+            panelBackground: { path: 'media/tex.png', fit: 'contain', focus: 'top', opacity: 0.5 },
+          },
+        ],
+      },
+      modules: [
+        { id: 'm1', moduleType: 'text', columnIndex: 0, sortIndex: 0, config: { text: 'a' } },
+      ],
+    };
+    const html = reader.renderSection(section, 0);
+    expect(html).toContain('pb-column--has-bg');
+    expect(html).toContain('pb-column-bg');
+    expect(html).toContain("background-image: url('/media/tex.png')");
+    expect(html).toContain('background-size: contain');
+    expect(html).toContain('background-position: top');
+    expect(html).toContain('opacity: 0.5');
+    // Columns without art render exactly as before (no layer, no marker class).
+    const bare = reader.renderSection({ ...section, id: 'bare-sec', settings: {} }, 0);
+    expect(bare).not.toContain('pb-column-bg');
+    expect(bare).not.toContain('pb-column--has-bg');
+  });
+
   it('emits align-self instead of justify-self when alignmentProperty is align-self (panel path)', () => {
     const start = buildColumnInlineStyle(
       { alignment: 'start' },

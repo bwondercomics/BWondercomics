@@ -1539,7 +1539,7 @@ describe('admin page-builder shell', () => {
       fetchPageResult: selectedPage,
       updateSectionResult: {
         id: editableSection.id,
-        layout: '2-1-1-1',
+        layout: '40-20-20-20',
         settings: { columns: [{ index: 0, appearance: { background: { color: '#123456' } } }] },
       },
       useRealEditors: true,
@@ -1568,10 +1568,10 @@ describe('admin page-builder shell', () => {
     // Four column cards now render.
     expect(document.querySelectorAll('[data-column-ratio]').length).toBe(4);
 
-    // Widen the first column and give it a background through the shared
-    // sanitized appearance editor.
+    // Widen the first column (widths are percents of the row; the others renormalize)
+    // and give it a background through the shared sanitized appearance editor.
     const ratioInput = document.querySelector('[data-column-ratio][data-column-index="0"]');
-    ratioInput.value = '2';
+    ratioInput.value = '40';
     ratioInput.dispatchEvent(new Event('change', { bubbles: true }));
     await flushAdminUi(2);
 
@@ -1599,7 +1599,7 @@ describe('admin page-builder shell', () => {
     expect(mocks.updateSection).toHaveBeenCalledWith(
       editableSection.id,
       expect.objectContaining({
-        layout: '2-1-1-1',
+        layout: '40-20-20-20',
         settings: expect.objectContaining({
           columns: expect.arrayContaining([
             expect.objectContaining({
@@ -1694,7 +1694,7 @@ describe('admin page-builder shell', () => {
     await flushAdminUi(2);
 
     const ratioInput = document.querySelector('[data-column-ratio][data-column-index="0"]');
-    ratioInput.value = '2';
+    ratioInput.value = '40';
     ratioInput.dispatchEvent(new Event('change', { bubbles: true }));
     await flushAdminUi(2);
 
@@ -1718,7 +1718,7 @@ describe('admin page-builder shell', () => {
       (section) => section.id === editableSection.id
     );
     expect(draftSnapshot.source).toBe('working');
-    expect(draftSection.layout).toBe('2-1-1-1');
+    expect(draftSection.layout).toBe('40-20-20-20');
     expect(draftSection.settings.columns[0].appearance.background.color).toBe('#123456');
     expect(editableSection.layout).toBe('1-1');
     expect(mocks.updateSection).not.toHaveBeenCalled();
@@ -1753,7 +1753,7 @@ describe('admin page-builder shell', () => {
         ...editableSection,
         settings: {
           ...editableSection.settings,
-          responsive: { mobile: { layout: '2-1-1' } },
+          responsive: { mobile: { layout: '50-25-25' } },
           columns: [
             {
               index: 0,
@@ -1802,7 +1802,7 @@ describe('admin page-builder shell', () => {
     await flushAdminUi(2);
 
     const firstRatio = document.querySelector('[data-column-ratio][data-column-index="0"]');
-    firstRatio.value = '2';
+    firstRatio.value = '50';
     firstRatio.dispatchEvent(new Event('change', { bubbles: true }));
     await flushAdminUi(2);
 
@@ -1857,7 +1857,7 @@ describe('admin page-builder shell', () => {
         settings: expect.objectContaining({
           responsive: {
             mobile: {
-              layout: '2-1-1',
+              layout: '50-25-25',
             },
           },
           columns: expect.arrayContaining([

@@ -136,23 +136,34 @@ function renderSectionLayoutEditor(draft, { activeDeviceId, responsiveEditScope,
       : '';
   const widthLabelFor = (index) => {
     const panelSide = sectionReaderPanelSide(section, draft, index);
-    if (panelSide === 'left') return 'Left panel width';
-    if (panelSide === 'right') return 'Right panel width';
-    return `Column ${index + 1} width`;
+    if (panelSide === 'left') return 'Left panel width (%)';
+    if (panelSide === 'right') return 'Right panel width (%)';
+    return `Column ${index + 1} width (%)`;
   };
-  const ratioInputs = ratios
-    .map(
-      (ratio, index) => `
+  // Widths are edited as percents of the row (finer control than raw integer ratios);
+  // the change handler renormalizes the other columns so the weights sum to 100.
+  const ratioTotal = ratios.reduce((sum, ratio) => sum + ratio, 0) || 1;
+  const ratioInputs =
+    count > 1
+      ? ratios
+          .map(
+            (ratio, index) => `
         <div class="pb-editor-field">
           <label class="pb-editor-label">${widthLabelFor(index)}</label>
-          <input type="number" class="pb-editor-input" min="1" max="12" step="1" value="${escapeAttr(String(ratio))}" data-column-ratio data-column-index="${index}" />
+          <input type="number" class="pb-editor-input" min="5" max="90" step="5" value="${escapeAttr(String(Math.round((ratio / ratioTotal) * 100)))}" data-column-ratio data-column-index="${index}" />
         </div>
       `
-    )
-    .join('');
+          )
+          .join('')
+      : '';
+  const isReaderSection = sectionReaderPanelSide(section, draft, 0) === 'left';
   const widthHint =
     count > 1
-      ? `<div class="pb-editor-hint">Widths are proportional shares: 1 / 3 / 1 makes the middle column three times as wide as each side.</div>`
+      ? `<div class="pb-editor-hint">${
+          isReaderSection
+            ? 'Each width is a percent of the whole row (5% steps); the other columns adjust to keep 100%. With 3+ columns this resizes the side panels around the reader.'
+            : 'Each width is a percent of the whole row (5% steps); the other columns adjust to keep 100%.'
+        }</div>`
       : '';
 
   return `
@@ -285,7 +296,12 @@ function hasOwnPanelValue(column, key) {
 // Relocated from the Page Theme editor: background art + module spacing for a reader panel,
 // now written only to the column (section.settings.columns[i]). Legacy page meta is display-only
 // fallback until migration copies it onto the column.
-function renderPanelSurfaceControls(baseColumn, index, legacySurface = {}) {
+function renderPanelSurfaceControls(
+  baseColumn,
+  index,
+  legacySurface = {},
+  { isPanel = true } = {}
+) {
   const hasColumnBackground = hasOwnPanelValue(baseColumn, 'panelBackground');
   const hasColumnGap = hasOwnPanelValue(baseColumn, 'panelGap');
   const legacyBg =
@@ -324,6 +340,9 @@ function renderPanelSurfaceControls(baseColumn, index, legacySurface = {}) {
       <input type="range" class="pb-promo-style-range pb-column-panel-bg-opacity" data-column-index="${index}" min="0" max="1" step="0.05" value="${opacity}"${bgFallbackAttr}${bgDisabledAttr}>
     </div>
     <small class="pb-editor-hint pb-column-panel-bg-meta" data-column-index="${index}"${bgFallbackAttr}>Fit: ${normalizeFit(bg.fit || 'cover')} · Focus: ${bg.focus || 'center'} · Opacity: ${opacity}</small>
+    ${
+      isPanel
+        ? `
     <div class="pb-editor-field">
       <label class="pb-editor-label">Module Spacing (px)</label>
       <input type="number" class="pb-editor-input" data-column-field="panelGap" data-column-index="${index}" min="0" step="1" placeholder="12" value="${escapeAttr(String(gap ?? ''))}"${gapFallbackAttr}${gapDisabledAttr}>
@@ -332,6 +351,9 @@ function renderPanelSurfaceControls(baseColumn, index, legacySurface = {}) {
       <label class="pb-editor-label">Hide Empty Text</label>
       <input type="checkbox" class="pb-column-panel-empty-toggle" data-column-index="${index}" ${bg.hideEmptyText ? 'checked' : ''}${bgFallbackAttr}${bgDisabledAttr}>
     </div>
+    `
+        : ''
+    }
     ${legacyNotice}
   `;
 }
@@ -369,17 +391,15 @@ function renderColumnInspectorContent(section, draft, columnIndex, options = {})
         responsiveEditScope,
       }),
     })}
-    ${
-      isPanel
-        ? renderInspectorSection({
-            kicker: 'Panel',
-            title: 'Panel Surface',
-            summary: displayBackground?.path ? 'Image set' : 'No image',
-            copy: 'Background art and module spacing for this panel (applies to all devices).',
-            body: renderPanelSurfaceControls(baseColumn, index, legacySurface),
-          })
-        : ''
-    }
+    ${renderInspectorSection({
+      kicker: isPanel ? 'Panel' : 'Column',
+      title: isPanel ? 'Panel Surface' : 'Background Image',
+      summary: displayBackground?.path ? 'Image set' : 'No image',
+      copy: isPanel
+        ? 'Background art and module spacing for this panel (applies to all devices).'
+        : 'Background art for this column, framed by fit, focus, and opacity (applies to all devices).',
+      body: renderPanelSurfaceControls(baseColumn, index, legacySurface, { isPanel }),
+    })}
   `;
 }
 
@@ -461,6 +481,11 @@ function renderSectionSettingsContent(section, draft, options = {}) {
           <div class="pb-editor-field">
             <label class="pb-editor-label" for="pbEditSectionGap">Section Gap</label>
             <input type="number" id="pbEditSectionGap" class="pb-editor-input" value="${escapeAttr(String(displayDraft.sectionGap ?? ''))}" min="0" step="1" placeholder="24" data-section-setting="sectionGap" />
+          </div>
+          <div class="pb-editor-field">
+            <label class="pb-editor-label" for="pbEditSectionMinHeight">Min Height (px)</label>
+            <input type="number" id="pbEditSectionMinHeight" class="pb-editor-input" value="${escapeAttr(String(displayDraft.minHeight ?? ''))}" min="0" step="1" placeholder="auto" data-section-setting="minHeight" />
+            <div class="pb-editor-hint">Make the section taller than its content. Panels and columns can then sit shorter inside it (column min-height + alignment).</div>
           </div>
         </div>
       `,

@@ -45,7 +45,9 @@ READER_STAGE_MAX_WIDTH_MAX = 2400
 ALLOWED_LAYOUTS = {"1", "1-1", "1-2", "2-1", "1-1-1", "1-3-1"}
 LAYOUT_COLUMN_COUNTS = {layout: len(layout.split("-")) for layout in ALLOWED_LAYOUTS}
 MAX_COLUMNS = 6
-MAX_COLUMN_RATIO = 12
+# 100 so percent-style weight strings (e.g. "20-60-20") are valid; legacy small
+# ratios like "1-3-1" remain a strict subset. Mirrors admin/page-builder/layout-utils.js.
+MAX_COLUMN_RATIO = 100
 COLUMN_ALIGNMENTS = {"stretch", "start", "center", "end"}
 ALLOWED_SECTION_TYPES = {"row"}
 BUILDER_DEVICE_IDS = ("desktop", "tablet", "mobile")
@@ -779,6 +781,8 @@ def sanitize_section_responsive(raw: Any, *, max_columns: int = MAX_COLUMNS) -> 
         for key in ("paddingTop", "paddingBottom", "moduleGap", "columnGap", "sectionGap"):
             if key in branch:
                 branch_payload[key] = _clamp_int(branch.get(key), 0, 0, 600)
+        if "minHeight" in branch and branch.get("minHeight") not in (None, ""):
+            branch_payload["minHeight"] = _clamp_int(branch.get("minHeight"), 0, 0, 2000)
         # Per-device column count/ratio rides the layout field above. Per-device column
         # *styling* lives on each column's own responsive branch (columns[i].responsive),
         # so it is not duplicated here.
@@ -855,6 +859,7 @@ def sanitize_reader_stage(raw: Any) -> dict[str, Any]:
     stage = raw if isinstance(raw, dict) else {}
     return {
         "fit": _sanitize_reader_keyword(stage.get("fit"), READER_STAGE_FITS, "dynamic-frame"),
+        "frameFill": _sanitize_reader_keyword(stage.get("frameFill"), {"hug", "fill"}, "hug"),
         "pageGap": _clamp_int(stage.get("pageGap"), 8, 0, 64),
         "frameBorder": _coerce_bool(stage.get("frameBorder"), True),
         "maxWidth": _sanitize_reader_stage_max_width(stage.get("maxWidth")),
@@ -1092,6 +1097,9 @@ def sanitize_section_settings(raw_settings: Any, layout: Any = "1") -> dict[str,
     for key in ("paddingTop", "paddingBottom", "moduleGap", "columnGap", "sectionGap"):
         if key in settings:
             sanitized[key] = _clamp_int(settings.get(key), 0, 0, 600)
+
+    if "minHeight" in settings and settings.get("minHeight") not in (None, ""):
+        sanitized["minHeight"] = _clamp_int(settings.get("minHeight"), 0, 0, 2000)
 
     columns = _sanitize_column_list(settings.get("columns"), column_count)
     if columns:

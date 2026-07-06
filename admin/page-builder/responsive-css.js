@@ -53,18 +53,21 @@ function sectionDeclarations(branch) {
     const cssVar = `--pb-${key.replace('Gap', '')}-gap`;
     decls.push(`${cssVar}: ${sanitizeNumber(branch[key], 0, 0, 600)}px`);
   });
+  if (branch.minHeight !== undefined && branch.minHeight !== null && branch.minHeight !== '') {
+    decls.push(`min-height: ${sanitizeNumber(branch.minHeight, 0, 0, 2000)}px`);
+  }
   return decls;
 }
 
 function columnDeclarations(
   branch,
-  { visibleDisplay = 'block', alignmentProperty = 'justify-self' } = {}
+  { visibleDisplay = 'block', alignmentProperty = 'justify-self', includeAppearance = true } = {}
 ) {
   const decls = [];
   if (Object.prototype.hasOwnProperty.call(branch, 'hidden')) {
     decls.push(branch.hidden === true ? 'display: none' : `display: ${visibleDisplay}`);
   }
-  const appearanceStyle = appearanceToInlineStyle(branch.appearance);
+  const appearanceStyle = includeAppearance ? appearanceToInlineStyle(branch.appearance) : '';
   if (appearanceStyle) decls.push(appearanceStyle);
   const padding = branch.padding;
   if (isPlainObject(padding)) {
@@ -167,13 +170,16 @@ export function buildSectionResponsiveCss(section, scopeSelector) {
  * mirrors buildSectionResponsiveCss for one column but (a) targets the panel wrapper
  * selector directly and (b) emits `display: flex` (not block) when a device override
  * makes a hidden column visible again, so module stacking/gap survive the override.
+ * Appearance (background/border/text) styles the panel's `<aside>` shell, not the inner
+ * wrapper — mirroring the inline path — so those declarations are scoped to
+ * `shellSelector` while layout declarations stay on `wrapperSelector`.
  *
  * @param {Object} section        - Builder section that owns the panel (the reader section)
  * @param {number} columnIndex    - The panel's structural column index (0 = left, last = right)
- * @param {string} scopeSelector  - CSS selector targeting the panel column wrapper
+ * @param {Object} selectors      - { wrapperSelector, shellSelector }
  * @returns {string} CSS text (no <style> wrapper), or '' when nothing to emit.
  */
-export function buildPanelResponsiveCss(section, columnIndex, scopeSelector) {
+export function buildPanelResponsiveCss(section, columnIndex, { wrapperSelector, shellSelector }) {
   const index = Number(columnIndex);
   const column = (section?.settings?.columns || []).find((col) => Number(col?.index) === index);
   if (!isPlainObject(column)) return '';
@@ -187,14 +193,23 @@ export function buildPanelResponsiveCss(section, columnIndex, scopeSelector) {
       resolveResponsive: true,
     });
     const effectiveColumn = effectiveLayout.columns.find((item) => item.index === index);
-    const decls = columnDeclarations(effectiveColumn?.settings || {}, {
+    const wrapperDecls = columnDeclarations(effectiveColumn?.settings || {}, {
       visibleDisplay: 'flex',
       alignmentProperty: 'align-self',
+      includeAppearance: false,
     });
-    if (!decls.length) return;
-    blocks.push(
-      `@media ${DEVICE_MEDIA[device]} { ${scopeSelector} { ${important(decls.join('; '))}; } }`
-    );
+    const shellStyle = shellSelector
+      ? appearanceToInlineStyle(effectiveColumn?.settings?.appearance)
+      : '';
+    const rules = [];
+    if (wrapperDecls.length) {
+      rules.push(`${wrapperSelector} { ${important(wrapperDecls.join('; '))}; }`);
+    }
+    if (shellStyle) {
+      rules.push(`${shellSelector} { ${important(shellStyle)}; }`);
+    }
+    if (!rules.length) return;
+    blocks.push(`@media ${DEVICE_MEDIA[device]} { ${rules.join(' ')} }`);
   });
 
   return blocks.join('\n');
