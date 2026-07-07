@@ -41,6 +41,60 @@ export function findBlockPlacement(header, blockId) {
   return { rowId: 'top', region: 'left' };
 }
 
+// Brand block content (Phase 5): custom logo letters or an image, plus logo styling.
+// Blank fields keep the built-in BWC logo untouched.
+function renderBrandEditor(header) {
+  const brand = header.brand || {};
+  return renderInspectorSection({
+    kicker: 'Brand',
+    title: 'Logo',
+    summary: brand.logoImage ? 'Custom image' : brand.logoText || 'BWC',
+    copy: 'Swap the logo letters or use an image. Leave blank to keep the built-in logo.',
+    body: `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Logo Letters</label>
+        <input type="text" class="pb-editor-input pb-header-brand-input" data-brand-key="logoText" maxlength="24" placeholder="BWC" value="${escapeAttr(brand.logoText || '')}">
+      </div>
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Logo Image Path</label>
+        <input type="text" class="pb-editor-input pb-header-brand-input" data-brand-key="logoImage" placeholder="media/logo.png" value="${escapeAttr(brand.logoImage || '')}">
+        <p class="pb-editor-help">An uploaded asset path (from the Media library). When set, the image replaces the logo letters.</p>
+      </div>
+      ${renderAppearanceControls(
+        brand.logoAppearance,
+        'brand-logo',
+        null,
+        'Logo Styling',
+        'Background, border, and text color of the logo box.'
+      )}
+    `,
+  });
+}
+
+// Per-block styling (Phase 5): one sparse appearance group per header part, applied
+// inline on the block wrapper at layout time (the Entry Picker maps to its CSS vars).
+function renderBlockStylingEditor(header) {
+  const styledCount = HEADER_BLOCK_DEFS.filter(
+    (block) => !!header.blocks?.[block.id]?.appearance
+  ).length;
+  const groups = HEADER_BLOCK_DEFS.map((block) =>
+    renderAppearanceControls(
+      header.blocks?.[block.id]?.appearance,
+      `block-${block.id}`,
+      null,
+      block.label,
+      `Styling for the ${block.label} block on this page.`
+    )
+  ).join('');
+  return renderInspectorSection({
+    kicker: 'Styling',
+    title: 'Block Styling',
+    summary: styledCount ? `${styledCount} customized` : 'Default',
+    copy: 'Style each header part individually. Blocks without custom styling keep the stock look.',
+    body: `<div class="pb-appearance-stack">${groups}</div>`,
+  });
+}
+
 function renderCopyEditor(copy) {
   return renderInspectorSection({
     kicker: 'Header',
@@ -447,7 +501,9 @@ export function renderHeaderEditorContent({
       responsiveEditScope: scope,
     }),
     renderCopyEditor(copy),
+    renderBrandEditor(header),
     renderPartsEditor(header),
+    renderBlockStylingEditor(header),
     renderNavigationEditor(header, pages),
     renderShellAppearanceEditor(header),
   ].join('');
@@ -603,6 +659,25 @@ export function bindHeaderEditorEvents({
     });
   });
 
+  // Brand logo content: sparse — blank fields drop their key, an empty brand object
+  // drops entirely (the built-in BWC markup is the fallback).
+  el.pbModuleEditor.querySelectorAll('.pb-header-brand-input').forEach((input) => {
+    input.addEventListener('input', () => {
+      const key = input.dataset.brandKey;
+      if (!key) return;
+      const nextState = cloneValue(state);
+      const brand = isObject(nextState.header.brand) ? nextState.header.brand : {};
+      const value = String(input.value || '').trim();
+      if (value) {
+        brand[key] = value;
+      } else {
+        delete brand[key];
+      }
+      nextState.header.brand = Object.keys(brand).length ? brand : null;
+      commit(nextState, { rerenderCanvas: true });
+    });
+  });
+
   const ensureHeaderAppearanceRoot = (nextState) => {
     if (!isObject(nextState.header.appearance)) {
       nextState.header.appearance = {};
@@ -641,6 +716,41 @@ export function bindHeaderEditorEvents({
     if (scope === 'nav-item') {
       if (useDeviceAppearance) return null;
       return Number.isInteger(index) ? nextState.header.nav.items[index] : null;
+    }
+    // Logo styling lives on header.brand.logoAppearance (global scope only).
+    if (scope === 'brand-logo') {
+      if (useDeviceAppearance) return null;
+      return {
+        appearance: nextState.header.brand?.logoAppearance,
+        setAppearance(appearance) {
+          if (appearance) {
+            if (!isObject(nextState.header.brand)) nextState.header.brand = {};
+            nextState.header.brand.logoAppearance = appearance;
+          } else if (isObject(nextState.header.brand)) {
+            delete nextState.header.brand.logoAppearance;
+            if (!Object.keys(nextState.header.brand).length) {
+              nextState.header.brand = null;
+            }
+          }
+        },
+      };
+    }
+    // Per-block styling lives on header.blocks[blockId].appearance (global scope only).
+    if (scope.startsWith('block-')) {
+      if (useDeviceAppearance) return null;
+      const blockId = scope.slice('block-'.length);
+      const block = nextState.header.blocks?.[blockId];
+      if (!block) return null;
+      return {
+        appearance: block.appearance,
+        setAppearance(appearance) {
+          if (appearance) {
+            block.appearance = appearance;
+          } else {
+            delete block.appearance;
+          }
+        },
+      };
     }
     const key = SHELL_APPEARANCE_SCOPE_TO_KEY[scope];
     if (!key) return null;

@@ -315,6 +315,14 @@ html[data-builder-header-dragging] .topbar-region[data-builder-header-cell] {
   animation: glitchText 8s infinite;
 }
 
+/* Custom logo image (builder header brand settings); fills the same 50px logo box. */
+.logo .logo-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
 .title h1 {
   margin: 0;
   font-size: 28px;

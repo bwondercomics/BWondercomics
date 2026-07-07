@@ -3,11 +3,13 @@ import {
   HEADER_REGION_ORDER,
   HEADER_ROW_ORDER,
   normalizeHeaderConfig,
+  resolveHeaderBlockAppearance,
   resolveHeaderNavItemAppearance,
   resolveHeaderShellScrolledAppearance,
   resolveHeaderShellTopAppearance,
   resolvePageHeaderState,
 } from '../admin/page-builder/header-config.js';
+import { sanitizeAssetUrl } from '../admin/page-builder/sanitize.js';
 import {
   normalizeHeaderNavItems,
   resolveLinkTargetHref,
@@ -31,6 +33,134 @@ const CONTROLLED_TOPBAR_STYLE_PROPS = [
   'border-color',
   'border-radius',
 ];
+
+// Per-block appearance (Phase 5) uses the same controlled-props discipline as the
+// topbar shell: only these inline properties are ever set/cleared, so scripted styles
+// (display toggling during stash/placement) are never clobbered.
+const CONTROLLED_BLOCK_STYLE_PROPS = CONTROLLED_TOPBAR_STYLE_PROPS;
+
+// The entry picker's chrome lives on inner elements (trigger, menu, options), so its
+// block appearance is delivered as CSS variables consumed by
+// assets/css/main.core.05-entry-select.css instead of direct inline properties.
+const ENTRY_SELECT_STYLE_VARS = [
+  '--entry-select-bg',
+  '--entry-select-text',
+  '--entry-select-border-width',
+  '--entry-select-border-style',
+  '--entry-select-border-color',
+  '--entry-select-radius',
+];
+
+function parseInlineStyleTokens(inlineStyle = '') {
+  return String(inlineStyle || '')
+    .split(';')
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .map((token) => {
+      const separatorIndex = token.indexOf(':');
+      if (separatorIndex === -1) return null;
+      return {
+        property: token.slice(0, separatorIndex).trim(),
+        value: token.slice(separatorIndex + 1).trim(),
+      };
+    })
+    .filter((entry) => entry && entry.property && entry.value);
+}
+
+function clearControlledProps(element, props) {
+  if (!element) return;
+  props.forEach((prop) => {
+    element.style.removeProperty(prop);
+  });
+  if (!element.getAttribute('style')?.trim()) {
+    element.removeAttribute('style');
+  }
+}
+
+// Standard block styling: clear-then-apply the controlled props from the shared
+// appearance schema's inline style.
+function applyBlockAppearanceStyle(element, appearance) {
+  if (!element) return;
+  clearControlledProps(element, CONTROLLED_BLOCK_STYLE_PROPS);
+  const inlineStyle = appearanceToInlineStyle(appearance);
+  if (!inlineStyle) return;
+  parseInlineStyleTokens(inlineStyle).forEach(({ property, value }) => {
+    if (CONTROLLED_BLOCK_STYLE_PROPS.includes(property)) {
+      element.style.setProperty(property, value);
+    }
+  });
+}
+
+// Entry picker styling: translate the appearance inline tokens into the CSS vars the
+// entry-select stylesheet consumes (defaults there equal today's hardcoded look).
+function applyEntryControlsAppearance(element, appearance) {
+  if (!element) return;
+  clearControlledProps(element, ENTRY_SELECT_STYLE_VARS);
+  const inlineStyle = appearanceToInlineStyle(appearance);
+  if (!inlineStyle) return;
+  parseInlineStyleTokens(inlineStyle).forEach(({ property, value }) => {
+    if (property === 'background') {
+      element.style.setProperty('--entry-select-bg', value);
+    } else if (property === 'color') {
+      element.style.setProperty('--entry-select-text', value);
+    } else if (property === 'border-radius') {
+      element.style.setProperty('--entry-select-radius', value);
+    } else if (property === 'border-color') {
+      element.style.setProperty('--entry-select-border-color', value);
+    } else if (property === 'border-width') {
+      element.style.setProperty('--entry-select-border-width', value);
+    } else if (property === 'border-style') {
+      element.style.setProperty('--entry-select-border-style', value);
+    } else if (property === 'border') {
+      if (value === 'none') {
+        element.style.setProperty('--entry-select-border-width', '0px');
+        return;
+      }
+      // appearanceToInlineStyle emits "border: <width>px <style> <color>".
+      const parts = value.split(' ').filter(Boolean);
+      if (parts.length >= 3) {
+        element.style.setProperty('--entry-select-border-width', parts[0]);
+        element.style.setProperty('--entry-select-border-style', parts[1]);
+        element.style.setProperty('--entry-select-border-color', parts.slice(2).join(' '));
+      }
+    }
+  });
+}
+
+function applyHeaderBlockAppearance(blockId, element, headerConfig) {
+  const appearance = resolveHeaderBlockAppearance(headerConfig, blockId);
+  if (blockId === 'entryControls') {
+    applyEntryControlsAppearance(element, appearance);
+    return;
+  }
+  applyBlockAppearanceStyle(element, appearance);
+}
+
+// Brand logo content (Phase 5): swap the hardcoded "BWC" letters for custom text or an
+// image; unset pages restore the original markup captured on first run.
+function applyBrandLogo(brandEl, brand) {
+  const logo = brandEl?.querySelector('.logo');
+  if (!logo) return;
+  if (logo.dataset.pbDefaultLogoText === undefined) {
+    logo.dataset.pbDefaultLogoText = logo.textContent || '';
+  }
+  const logoImage = sanitizeAssetUrl(brand?.logoImage || '');
+  const logoText = String(brand?.logoText || '').trim();
+  if (logoImage) {
+    logo.replaceChildren();
+    const img = document.createElement('img');
+    img.className = 'logo-image';
+    img.src =
+      logoImage.startsWith('/') || /^https?:\/\//i.test(logoImage)
+        ? logoImage
+        : `/assets/${logoImage.replace(/^assets\//, '')}`;
+    img.alt = logoText || logo.dataset.pbDefaultLogoText || 'Logo';
+    logo.appendChild(img);
+  } else {
+    logo.textContent = logoText || logo.dataset.pbDefaultLogoText;
+  }
+  applyBlockAppearanceStyle(logo, brand?.logoAppearance);
+}
 
 let activeAppearanceTopbar = null;
 let activeTopAppearance = null;
@@ -200,6 +330,14 @@ export function applySharedHeaderLayout(pageConfig = null, options = {}) {
     node.style.display = 'none';
     scaffold.stash.appendChild(node);
   });
+
+  // Per-block styling + brand logo content (Phase 5). Applied to every block element
+  // (placed or stashed) so styles clear correctly when a page removes them.
+  Object.entries(blocks).forEach(([blockId, node]) => {
+    if (!node) return;
+    applyHeaderBlockAppearance(blockId, node, headerConfig);
+  });
+  applyBrandLogo(blocks.brand, headerConfig.brand);
 
   renderNavItems(blocks.nav, headerConfig, seriesId);
 

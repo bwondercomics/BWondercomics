@@ -235,8 +235,35 @@ function normalizeBlocks(rawBlocks = {}, rawNav = {}) {
     blocks[id] = {
       enabled: block?.enabled !== undefined ? block.enabled !== false : enabledFallback,
     };
+    // Sparse per-block styling (Phase 5): only present when the page customized it.
+    const appearance = normalizeAppearance(block?.appearance);
+    if (appearance) {
+      blocks[id].appearance = appearance;
+    }
   });
   return blocks;
+}
+
+// Brand block content (Phase 5): custom logo letters, optional logo image, and logo
+// styling. Sparse — null means "use the built-in BWC markup untouched".
+function normalizeHeaderBrand(rawBrand = null) {
+  const source =
+    rawBrand && typeof rawBrand === 'object' && !Array.isArray(rawBrand) ? rawBrand : {};
+  const logoText = String(source.logoText || '')
+    .trim()
+    .slice(0, 24);
+  const logoImage = String(source.logoImage || '').trim();
+  const logoAppearance = normalizeAppearance(source.logoAppearance);
+  if (!logoText && !logoImage && !logoAppearance) return null;
+  const brand = {};
+  if (logoText) brand.logoText = logoText;
+  if (logoImage) brand.logoImage = logoImage;
+  if (logoAppearance) brand.logoAppearance = logoAppearance;
+  return brand;
+}
+
+function resolveHeaderBlockAppearance(header = null, blockId = '') {
+  return normalizeAppearance(header?.blocks?.[blockId]?.appearance);
 }
 
 function normalizeHeaderShellAppearance(rawAppearance = null) {
@@ -277,6 +304,7 @@ function normalizeHeaderConfig(rawConfig = null, normalizeNavItems = (items) => 
     layoutRows,
     regions: flattenLayoutRows(layoutRows),
     blocks,
+    brand: normalizeHeaderBrand(config.brand),
     nav: {
       items: normalizeNavItems(config.nav?.items || defaults.nav.items),
     },
@@ -356,6 +384,7 @@ function createPageHeaderMeta(
     layoutRows: layout.layoutRows,
     regions: layout.regions,
     blocks: layout.blocks,
+    brand: layout.brand,
     nav: layout.nav,
     appearance: layout.appearance,
   };
@@ -594,9 +623,11 @@ export {
   getLegacyHeaderModuleCopy,
   getPageHeaderSource,
   normalizeLayoutRows,
+  normalizeHeaderBrand,
   normalizeHeaderConfig,
   normalizeHeaderCopy,
   normalizeHeaderOverrides,
+  resolveHeaderBlockAppearance,
   resolveHeaderNavItemAppearance,
   resolvePageHeaderState,
   resolveHeaderShellScrolledAppearance,

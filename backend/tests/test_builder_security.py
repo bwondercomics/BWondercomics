@@ -2,6 +2,7 @@ import unittest
 
 from backend.app.builder_security import (
     sanitize_column_settings,
+    sanitize_header_meta,
     sanitize_section_settings,
 )
 
@@ -176,6 +177,95 @@ class SanitizeSectionMinHeightTest(unittest.TestCase):
         self.assertNotIn("minHeight", sanitize_section_settings({}, layout="1"))
         self.assertNotIn("minHeight", sanitize_section_settings({"minHeight": ""}, layout="1"))
         self.assertNotIn("minHeight", sanitize_section_settings({"minHeight": None}, layout="1"))
+
+
+class SanitizeHeaderMetaPhase5Test(unittest.TestCase):
+    """Builder customization roadmap Phase 5: layoutRows persistence, brand, block styling."""
+
+    def test_layout_rows_round_trip_across_rows(self):
+        # Regression: layoutRows used to be dropped, collapsing multi-row headers to
+        # the top row on every save.
+        result = sanitize_header_meta(
+            {
+                "version": 3,
+                "layoutRows": {
+                    "top": {"left": ["brand"], "center": [], "right": []},
+                    "middle": {"left": [], "center": ["status"], "right": []},
+                    "bottom": {"left": [], "center": [], "right": ["nav"]},
+                },
+            }
+        )
+        self.assertEqual(result["layoutRows"]["top"]["left"], ["brand"])
+        self.assertEqual(result["layoutRows"]["middle"]["center"], ["status"])
+        self.assertEqual(result["layoutRows"]["bottom"]["right"], ["nav"])
+        # Unplaced blocks fall back to their default cells; regions mirror the rows.
+        self.assertEqual(result["layoutRows"]["top"]["center"], ["patron"])
+        self.assertEqual(result["layoutRows"]["top"]["right"], ["entryControls"])
+        self.assertEqual(result["regions"]["right"], ["entryControls", "nav"])
+
+    def test_layout_rows_drop_junk_and_duplicates(self):
+        result = sanitize_header_meta(
+            {
+                "layoutRows": {
+                    "top": {"left": ["brand", "junk", "brand"], "center": ["brand"], "right": []},
+                }
+            }
+        )
+        placements = [
+            block_id
+            for row in result["layoutRows"].values()
+            for cell in row.values()
+            for block_id in cell
+        ]
+        self.assertEqual(placements.count("brand"), 1)
+        self.assertNotIn("junk", placements)
+        self.assertEqual(sorted(placements), ["brand", "entryControls", "nav", "patron", "status"])
+
+    def test_legacy_regions_populate_top_row(self):
+        result = sanitize_header_meta(
+            {"regions": {"left": ["nav"], "center": [], "right": ["brand"]}}
+        )
+        self.assertEqual(result["layoutRows"]["top"]["left"][0], "nav")
+        self.assertIn("brand", result["layoutRows"]["top"]["right"])
+        self.assertEqual(result["layoutRows"]["middle"], {"left": [], "center": [], "right": []})
+
+    def test_brand_logo_fields_sanitized_and_sparse(self):
+        result = sanitize_header_meta(
+            {
+                "brand": {
+                    "logoText": "  PYRE  ",
+                    "logoImage": "media/logo.png",
+                    "logoAppearance": {"background": {"color": "#112233"}},
+                }
+            }
+        )
+        self.assertEqual(result["brand"]["logoText"], "PYRE")
+        self.assertTrue(result["brand"]["logoImage"].endswith("logo.png"))
+        self.assertEqual(result["brand"]["logoAppearance"]["background"]["color"], "#112233")
+
+        empty = sanitize_header_meta({"brand": {"logoText": "", "logoImage": ""}})
+        self.assertNotIn("brand", empty)
+
+        unsafe = sanitize_header_meta({"brand": {"logoImage": "javascript:alert(1)"}})
+        self.assertNotIn("brand", unsafe)
+
+    def test_per_block_appearance_sparse(self):
+        result = sanitize_header_meta(
+            {
+                "blocks": {
+                    "entryControls": {
+                        "enabled": True,
+                        "appearance": {"border": {"color": "#ff0000", "width": 2}},
+                    },
+                    "brand": {"enabled": False},
+                }
+            }
+        )
+        self.assertEqual(
+            result["blocks"]["entryControls"]["appearance"]["border"]["color"], "#ff0000"
+        )
+        self.assertFalse(result["blocks"]["brand"]["enabled"])
+        self.assertNotIn("appearance", result["blocks"]["brand"])
 
 
 if __name__ == "__main__":

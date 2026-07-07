@@ -62,6 +62,14 @@ SECTION_RESPONSIVE_FIELDS = {
 }
 HEADER_BLOCK_IDS = {"brand", "patron", "status", "entryControls", "nav"}
 HEADER_REGIONS = ("left", "center", "right")
+HEADER_ROWS = ("top", "middle", "bottom")
+HEADER_DEFAULT_ROW_PLACEMENTS = {
+    "brand": ("top", "left"),
+    "patron": ("top", "center"),
+    "status": ("top", "center"),
+    "entryControls": ("top", "right"),
+    "nav": ("top", "right"),
+}
 
 TEXT_HTML_TAGS = {
     "p",
@@ -476,12 +484,87 @@ def sanitize_html_fragment(value: Any, mode: str = "text") -> str:
     return parser.get_html()
 
 
-def _sanitize_header_blocks(blocks: Any) -> dict[str, dict[str, bool]]:
+def _sanitize_header_blocks(blocks: Any) -> dict[str, dict[str, Any]]:
     source = blocks if isinstance(blocks, dict) else {}
-    return {
-        block_id: {"enabled": _coerce_bool((source.get(block_id) or {}).get("enabled"), True)}
-        for block_id in HEADER_BLOCK_IDS
+    sanitized: dict[str, dict[str, Any]] = {}
+    for block_id in HEADER_BLOCK_IDS:
+        raw_block = source.get(block_id) or {}
+        block_payload: dict[str, Any] = {
+            "enabled": _coerce_bool(raw_block.get("enabled"), True),
+        }
+        # Sparse per-block styling (Phase 5): shared appearance schema.
+        appearance = sanitize_appearance(
+            raw_block.get("appearance") if isinstance(raw_block, dict) else None
+        )
+        if appearance is not None:
+            block_payload["appearance"] = appearance
+        sanitized[block_id] = block_payload
+    return sanitized
+
+
+def _sanitize_header_brand(raw_brand: Any) -> dict[str, Any] | None:
+    """Brand block content (Phase 5): logo letters, image, styling. Sparse."""
+    brand = raw_brand if isinstance(raw_brand, dict) else {}
+    logo_text = _coerce_string(brand.get("logoText"), "", 24)
+    logo_image = sanitize_asset_url(brand.get("logoImage"))
+    logo_appearance = sanitize_appearance(brand.get("logoAppearance"))
+    payload: dict[str, Any] = {}
+    if logo_text:
+        payload["logoText"] = logo_text
+    if logo_image:
+        payload["logoImage"] = logo_image
+    if logo_appearance is not None:
+        payload["logoAppearance"] = logo_appearance
+    return payload or None
+
+
+def _sanitize_header_layout_rows(layout_rows: Any, regions: dict[str, list[str]]) -> dict:
+    """Sanitize the 3-row placement grid, mirroring the client's normalizeLayoutRows.
+
+    Every block lands exactly once; unknown ids are dropped; blocks missing from the
+    payload fall back to their default cell. When no layoutRows are provided, the
+    already-sanitized flat regions populate the top row (legacy shape).
+    """
+    source = layout_rows if isinstance(layout_rows, dict) else None
+    rows: dict[str, dict[str, list[str]]] = {
+        row_id: {region: [] for region in HEADER_REGIONS} for row_id in HEADER_ROWS
     }
+    seen: set[str] = set()
+
+    if source is not None:
+        for row_id in HEADER_ROWS:
+            raw_row = source.get(row_id) if isinstance(source.get(row_id), dict) else {}
+            for region in HEADER_REGIONS:
+                items = raw_row.get(region)
+                if not isinstance(items, list):
+                    continue
+                for item in items:
+                    block_id = str(item or "").strip()
+                    if block_id in HEADER_BLOCK_IDS and block_id not in seen:
+                        rows[row_id][region].append(block_id)
+                        seen.add(block_id)
+    else:
+        for region in HEADER_REGIONS:
+            for block_id in regions.get(region, []):
+                if block_id not in seen:
+                    rows["top"][region].append(block_id)
+                    seen.add(block_id)
+
+    for block_id in ("brand", "patron", "status", "entryControls", "nav"):
+        if block_id in seen:
+            continue
+        row_id, region = HEADER_DEFAULT_ROW_PLACEMENTS[block_id]
+        rows[row_id][region].append(block_id)
+
+    return rows
+
+
+def _flatten_header_layout_rows(layout_rows: dict) -> dict[str, list[str]]:
+    regions: dict[str, list[str]] = {region: [] for region in HEADER_REGIONS}
+    for row_id in HEADER_ROWS:
+        for region in HEADER_REGIONS:
+            regions[region].extend(layout_rows.get(row_id, {}).get(region, []))
+    return regions
 
 
 def _sanitize_header_regions(regions: Any) -> dict[str, list[str]]:
@@ -536,6 +619,15 @@ def sanitize_header_meta(raw_header: Any) -> dict[str, Any]:
             "items": sanitize_header_nav_items((header.get("nav") or {}).get("items")),
         },
     }
+    # Persist the 3-row placement grid and keep the flat regions in sync with it.
+    # (layoutRows used to be silently dropped here, collapsing multi-row headers
+    # back to the top row on every save.)
+    layout_rows = _sanitize_header_layout_rows(header.get("layoutRows"), sanitized["regions"])
+    sanitized["layoutRows"] = layout_rows
+    sanitized["regions"] = _flatten_header_layout_rows(layout_rows)
+    brand = _sanitize_header_brand(header.get("brand"))
+    if brand is not None:
+        sanitized["brand"] = brand
     appearance = sanitize_header_shell_appearance(header.get("appearance"))
     if appearance is not None:
         sanitized["appearance"] = appearance

@@ -1,8 +1,8 @@
 # Builder Customization Roadmap
 
-Status: Phases 0–4 implemented (Phase 4 closed 2026-07-06: on-canvas drag + toolbar arrows
-shipped, placement board retired). Deferred items are tracked in the completion notes.
-Phases 5–7 planned.
+Status: Phases 0–5 implemented (Phase 5 closed 2026-07-07: brand logo, per-block styling,
+entry-picker vars; includes a corrective backend fix persisting header layoutRows). Deferred
+items are tracked in the completion notes. Phases 6–7 planned.
 Created: 2026-07-05
 Branch context: `builder-incremental-improvement` — the Panel/Column Settings Consolidation Plan
 (Phases 1–4) is implemented up to HEAD (`c82d986`), but its release gates (data migrations, manual
@@ -778,18 +778,52 @@ entry selector's colors live in hardcoded CSS. Fine for BWC, unusable for anyone
 
 ### Steps
 
-- [ ] **Brand block content**: `meta.header.brand = { logoText (default "BWC"), logoImage?,
+- [x] **Brand block content**: `meta.header.brand = { logoText (default "BWC"), logoImage?,
 logoAppearance? }` alongside the existing title/subtitle keys (extend, never rename).
       Runtime: `header-layout.js` swaps logo text / renders the image; hardcoded markup stays as
       the fallback for unset pages.
-- [ ] **Per-block appearance**: `meta.header.blocks[blockId].appearance` (shared schema incl. the
-      Phase-3 text group) applied as inline style on each block wrapper at layout time — the same
-      mechanism nav items already use.
-- [ ] **Entry selector**: convert `main.core.05-entry-select.css` hardcoded colors/borders/fonts
-      to CSS vars whose defaults equal the current values; the `entryControls` block appearance
-      sets those vars (trigger, menu, options, locked state).
-- [ ] Sanitizers + normalization + draft plumbing for every new `meta.header` field; tolerant of
+- [x] **Per-block appearance**: `meta.header.blocks[blockId].appearance` (shared schema; the
+      Phase-3 text group remains a Phase-3 deferred item — the schema's text color is included)
+      applied as controlled inline props on each block wrapper at layout time.
+- [x] **Entry selector**: convert `main.core.05-entry-select.css` hardcoded colors/borders to
+      CSS vars whose defaults equal the current values (`--entry-select-bg/text/border-*/radius`);
+      the `entryControls` block appearance sets those vars (trigger, menu, options).
+- [x] Sanitizers + normalization + draft plumbing for every new `meta.header` field; tolerant of
       unknown keys as the page-meta path already is.
+
+### Completion note 2026-07-07 (phase implemented)
+
+- **Brand logo**: `meta.header.brand { logoText (≤24 chars), logoImage (asset path),
+logoAppearance }`, normalized sparsely in `header-config.js` (`normalizeHeaderBrand`), edited
+  in a new "Logo" inspector card (`header-editor.js`, `.pb-header-brand-input`), applied by
+  `applyBrandLogo` in `header-layout.js` (captures the built-in "BWC" letters on first run and
+  restores them for unset pages; image path renders `<img class="logo-image">` inside the 50px
+  logo box — new rule in `main.core.04-header.css`).
+- **Per-block styling**: `meta.header.blocks[blockId].appearance` (shared schema), edited under
+  a new "Block Styling" section (one appearance group per block, scopes `block-<id>` +
+  `brand-logo` wired into `resolveAppearanceTarget`). Runtime applies via controlled-props
+  clear-then-apply on each block element (same discipline as the topbar shell), so scripted
+  display toggling is never clobbered and removed styling clears on the next page.
+- **Entry picker**: `main.core.05-entry-select.css` chrome converted to
+  `--entry-select-bg/text/border-width/border-style/border-color/radius` with defaults equal to
+  the previous hardcoded values (pixel parity for untouched pages, verified by the visual
+  parity suite). The `entryControls` block appearance is delivered as these vars
+  (`applyEntryControlsAppearance`) instead of inline props so the trigger, menu, options, and
+  dropdown arrow all pick it up.
+- **Backend**: `sanitize_header_meta` gained `brand`, per-block `appearance`, and —
+  **corrective** — `layoutRows` persistence (`_sanitize_header_layout_rows`, mirroring the
+  client normalizer; regions kept in sync by flattening). layoutRows was previously dropped
+  entirely on save, silently collapsing multi-row header placements back to the top row — the
+  Phase 4 canvas moves would not have survived a real save/reload without this.
+- Tests: backend layoutRows round-trip/junk/legacy-regions + brand + block appearance
+  (`backend/tests/test_builder_security.py`); runtime logo swap/fallback + inline block props +
+  entry vars + clear-on-next-page; editor brand/block-appearance commits
+  (`tests/header-appearance.test.js`).
+- Verified: `npm test` (630 passed, 1 skipped), `npm run test:backend` (117), `npm run lint`,
+  `npm run format:check`, `npm run format:py`/`lint:py`, `npm run build`, `npm run test:visual`
+  (20 passed — parity intact), API container restarted and live sanitizer smoke-checked.
+- Deferred: image-picker UI for the logo (path input for now); menu/option hover colors beyond
+  the schema slots; the appearance text group (font size/weight) stays with Phase 3.
 
 ### Acceptance
 

@@ -1,10 +1,17 @@
 /* ==================== CHAPTER SELECT ==================== */
+/* Builder-styleable chrome (Phase 5): the entryControls header block sets these vars
+   inline; every default below equals the previous hardcoded value, so pages without
+   custom styling render pixel-identically. */
 select#entry,
 .entry-select-trigger {
-  background: linear-gradient(135deg, rgba(0, 217, 255, 0.15), rgba(255, 0, 234, 0.15));
-  color: var(--text);
-  border: 3px solid var(--primary);
-  border-radius: 8px;
+  background: var(
+    --entry-select-bg,
+    linear-gradient(135deg, rgba(0, 217, 255, 0.15), rgba(255, 0, 234, 0.15))
+  );
+  color: var(--entry-select-text, var(--text));
+  border: var(--entry-select-border-width, 3px) var(--entry-select-border-style, solid)
+    var(--entry-select-border-color, var(--primary));
+  border-radius: var(--entry-select-radius, 8px);
   padding: 10px 16px;
   min-width: 180px;
   min-height: 44px;
@@ -67,13 +74,13 @@ select#entry option {
   height: 0;
   border-left: 5px solid transparent;
   border-right: 5px solid transparent;
-  border-top: 6px solid var(--text);
+  border-top: 6px solid var(--entry-select-text, var(--text));
   margin-left: auto;
   opacity: 0.8;
 }
 
 .entry-select-name {
-  color: var(--text);
+  color: var(--entry-select-text, var(--text));
   text-transform: uppercase;
   letter-spacing: 1px;
   font-family: 'Bebas Neue', sans-serif;
@@ -99,8 +106,8 @@ select#entry option {
   max-height: 260px;
   overflow-y: auto;
   background: rgba(10, 10, 18, 0.96);
-  border: 2px solid var(--primary);
-  border-radius: 8px;
+  border: 2px solid var(--entry-select-border-color, var(--primary));
+  border-radius: var(--entry-select-radius, 8px);
   padding: 6px;
   display: none;
   flex-direction: column;
@@ -123,7 +130,7 @@ select#entry option {
   border-radius: 6px;
   border: none;
   background: transparent;
-  color: var(--text);
+  color: var(--entry-select-text, var(--text));
   font-family: 'Bebas Neue', sans-serif;
   font-size: 0.95rem;
   text-transform: uppercase;
@@ -137,7 +144,7 @@ select#entry option {
 .entry-option:hover,
 .entry-option.is-selected {
   background: rgba(0, 217, 255, 0.18);
-  color: var(--text);
+  color: var(--entry-select-text, var(--text));
 }
 
 .entry-option--locked {
@@ -174,9 +181,13 @@ select#entry option {
   display: inline-flex;
   align-items: stretch;
   gap: 0;
-  border: 3px solid var(--primary);
-  border-radius: 8px;
-  background: linear-gradient(135deg, rgba(0, 217, 255, 0.15), rgba(255, 0, 234, 0.15));
+  border: var(--entry-select-border-width, 3px) var(--entry-select-border-style, solid)
+    var(--entry-select-border-color, var(--primary));
+  border-radius: var(--entry-select-radius, 8px);
+  background: var(
+    --entry-select-bg,
+    linear-gradient(135deg, rgba(0, 217, 255, 0.15), rgba(255, 0, 234, 0.15))
+  );
   box-shadow:
     0 4px 0 rgba(0, 0, 0, 0.3),
     0 0 16px rgba(0, 217, 255, 0.35),

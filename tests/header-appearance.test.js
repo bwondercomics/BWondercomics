@@ -92,7 +92,7 @@ function getAppearanceControl(wrapper, { scope, key, kind, index = null }) {
 function createHeaderDom() {
   document.body.innerHTML = `
     <header class="topbar" id="topbar">
-      <div class="brand"><div class="title"><h1>Battle Bros</h1></div></div>
+      <div class="brand"><div class="logo">BWC</div><div class="title"><h1>Battle Bros</h1></div></div>
       <div class="nav-links">
         <a id="adminNavLink" class="nav-link admin-link" href="/admin">Admin</a>
       </div>
@@ -917,6 +917,116 @@ describe('header appearance', () => {
     expect(document.querySelector('[data-builder-header-cell]')).toBeNull();
     expect(document.querySelectorAll('.topbar-layout-row')).toHaveLength(1);
     expect(document.querySelector('.brand')?.hasAttribute('data-builder-header-block')).toBe(false);
+  });
+
+  it('applies brand logo text, image, and styling with fallback restore (Phase 5)', () => {
+    createHeaderDom();
+    const headerState = (brand) => ({
+      header: normalizeHeaderConfig({ brand, nav: { items: [] } }),
+      copy: { title: 'Reader', subtitle: '', subtitles: [] },
+    });
+
+    // Custom letters + logo styling.
+    applySharedHeaderLayout(null, {
+      headerState: headerState({
+        logoText: 'PYRE',
+        logoAppearance: { background: { color: '#112233' }, border: { radius: 12 } },
+      }),
+    });
+    const logo = document.querySelector('.logo');
+    expect(logo?.textContent).toBe('PYRE');
+    expect(logo?.style.getPropertyValue('background')).toBe('#112233');
+    expect(logo?.style.getPropertyValue('border-radius')).toBe('12px');
+
+    // Logo image replaces the letters; alt falls back to the text.
+    applySharedHeaderLayout(null, {
+      headerState: headerState({ logoImage: 'media/logo.png' }),
+    });
+    const img = document.querySelector('.logo .logo-image');
+    expect(img?.getAttribute('src')).toBe('/assets/media/logo.png');
+    expect(document.querySelector('.logo')?.style.getPropertyValue('background')).toBe('');
+
+    // Unset pages restore the built-in letters and clear styling.
+    applySharedHeaderLayout(null, { headerState: headerState(null) });
+    expect(document.querySelector('.logo')?.textContent).toBe('BWC');
+    expect(document.querySelector('.logo .logo-image')).toBeNull();
+  });
+
+  it('applies per-block appearance inline and entry picker styling as CSS vars (Phase 5)', () => {
+    createHeaderDom();
+    const headerState = (blocks) => ({
+      header: normalizeHeaderConfig({ blocks, nav: { items: [] } }),
+      copy: { title: 'Reader', subtitle: '', subtitles: [] },
+    });
+
+    applySharedHeaderLayout(null, {
+      headerState: headerState({
+        status: {
+          enabled: true,
+          appearance: {
+            background: { color: '#221133' },
+            text: { color: '#ffffff' },
+            border: { width: 2, color: '#00d9ff', radius: 6 },
+          },
+        },
+        entryControls: {
+          enabled: true,
+          appearance: {
+            background: { color: '#101020' },
+            text: { color: '#ffee00' },
+            border: { width: 1, color: '#ff00ea', radius: 4 },
+          },
+        },
+      }),
+    });
+
+    // Standard block: controlled inline props on the wrapper.
+    const status = document.getElementById('statusPanel');
+    expect(status?.style.getPropertyValue('background')).toBe('#221133');
+    expect(status?.style.getPropertyValue('color')).toBe('#ffffff');
+    expect(status?.style.getPropertyValue('border')).toContain('2px');
+
+    // Entry picker: CSS vars consumed by main.core.05-entry-select.css, not inline props.
+    const entry = document.querySelector('.entry-controls');
+    expect(entry?.style.getPropertyValue('--entry-select-bg')).toBe('#101020');
+    expect(entry?.style.getPropertyValue('--entry-select-text')).toBe('#ffee00');
+    expect(entry?.style.getPropertyValue('--entry-select-border-width')).toBe('1px');
+    expect(entry?.style.getPropertyValue('--entry-select-border-color')).toBe('#ff00ea');
+    expect(entry?.style.getPropertyValue('--entry-select-radius')).toBe('4px');
+    expect(entry?.style.getPropertyValue('background')).toBe('');
+
+    // A later page without block styling clears everything.
+    applySharedHeaderLayout(null, { headerState: headerState({}) });
+    expect(status?.style.getPropertyValue('background')).toBe('');
+    expect(entry?.style.getPropertyValue('--entry-select-bg')).toBe('');
+  });
+
+  it('commits brand content and per-block appearance from the header editor (Phase 5)', () => {
+    const { wrapper, setDraftState } = mountHeaderEditor();
+
+    const logoTextInput = wrapper.querySelector(
+      '.pb-header-brand-input[data-brand-key="logoText"]'
+    );
+    logoTextInput.value = 'PYRE';
+    logoTextInput.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(setDraftState.mock.lastCall[0].header.brand).toEqual({ logoText: 'PYRE' });
+
+    const blockToggle = getAppearanceControl(wrapper, {
+      scope: 'block-status',
+      key: 'background.color',
+      kind: 'toggle',
+    });
+    expect(blockToggle).not.toBeNull();
+    blockToggle.checked = true;
+    blockToggle.dispatchEvent(new Event('change', { bubbles: true }));
+    expect(
+      setDraftState.mock.lastCall[0].header.blocks.status.appearance?.background?.color
+    ).toBeTruthy();
+
+    // Clearing the logo text drops the brand object entirely (sparse).
+    logoTextInput.value = '';
+    logoTextInput.dispatchEvent(new Event('input', { bubbles: true }));
+    expect(setDraftState.mock.lastCall[0].header.brand).toBeNull();
   });
 
   it('clears shell appearance data, classes, and controlled inline styles when a later page has no appearance', () => {
