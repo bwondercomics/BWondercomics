@@ -1591,6 +1591,35 @@ describe('reader builder presentation loading', () => {
     expect(document.querySelector('#leftPanel .pb-divider')).not.toBeNull();
   });
 
+  it('renders shell-chrome blocks in panels and hides the fixed shell buttons (Phase 6)', () => {
+    const buildAccountPanelPage = () => {
+      const page = buildPanelSnapshot();
+      const readerModule = page.sections[0].modules.find((mod) => mod.moduleType === 'reader');
+      page.sections[0].modules = [
+        readerModule,
+        {
+          id: 'left-panel-account',
+          moduleType: 'account',
+          columnIndex: 0,
+          sortIndex: 0,
+          config: { iconColor: '#ff0000' },
+        },
+      ];
+      return page;
+    };
+
+    // A dropped account module renders in the panel and hides the fixed gear button.
+    applyBuilderPageToDOM(buildAccountPanelPage(), { seriesId: 'battle-bros', previewMode: true });
+    expect(document.querySelector('#leftPanel .pb-account-btn')).not.toBeNull();
+    expect(document.getElementById('userSettingsBtn')?.style.display).toBe('none');
+    // No links-grid module on this page: the fixed 9-dot button stays untouched.
+    expect(document.getElementById('linksGridBtn')?.style.display).toBe('');
+
+    // Navigating to a page without the module restores the fixed gear (zero-change default).
+    applyBuilderPageToDOM(buildPanelSnapshot(), { seriesId: 'battle-bros', previewMode: true });
+    expect(document.getElementById('userSettingsBtn')?.style.display).toBe('');
+  });
+
   it('keeps PANEL_MODULE_TYPES in sync with insertable section-column modules', () => {
     // Anything droppable into a section column (the live-drop gate) but absent from the panel
     // render set would persist on a panel drop and then vanish on render. Reader is intentionally

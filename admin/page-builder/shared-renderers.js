@@ -411,6 +411,43 @@ export function createRenderers({
       return `<hr class="pb-divider pb-divider--${style}" style="${colorStyle}" />`;
     },
 
+    // Shell chrome as blocks (Phase 6). Same gear / 9-dot markup as the fixed shell
+    // buttons but with module-scoped classes (the shell classes are absolutely
+    // positioned). Behavior binds by class delegation (user-settings.js / feed-panel.js),
+    // so every instance opens the same overlay / links view.
+    account: (config) => {
+      const iconColor = sanitizeColor(config.iconColor);
+      const appearanceStyle = appearanceToInlineStyle(config.appearance);
+      const styleTokens = [appearanceStyle, iconColor ? `color: ${iconColor}` : '']
+        .filter(Boolean)
+        .join('; ');
+      const styleAttr = styleTokens ? ` style="${escapeAttr(styleTokens)}"` : '';
+      return `
+        <div class="pb-account">
+          <button type="button" class="pb-account-btn" aria-label="Account settings"${styleAttr}>
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94s-.02-.63-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.08 7.08 0 0 0-1.63-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.58.23-1.12.54-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.75 8.84a.5.5 0 0 0 .12.64l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32c.14.24.43.34.69.22l2.39-.96c.5.4 1.05.71 1.63.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.58-.23 1.12-.54 1.63-.94l2.39.96c.26.12.55.02.69-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5a3.5 3.5 0 1 1 0-7 3.5 3.5 0 0 1 0 7z"/>
+            </svg>
+          </button>
+        </div>
+      `;
+    },
+
+    'links-grid': (config) => {
+      const iconColor = sanitizeColor(config.iconColor);
+      const appearanceStyle = appearanceToInlineStyle(config.appearance);
+      const styleTokens = [appearanceStyle, iconColor ? `color: ${iconColor}` : '']
+        .filter(Boolean)
+        .join('; ');
+      const styleAttr = styleTokens ? ` style="${escapeAttr(styleTokens)}"` : '';
+      const dots = '<span></span>'.repeat(9);
+      return `
+        <div class="pb-links-grid">
+          <button type="button" class="pb-links-grid-btn" aria-label="Show links"${styleAttr}>${dots}</button>
+        </div>
+      `;
+    },
+
     reader: (config) => {
       const readerAttrs = getReaderMountDataAttributes(config);
       const inner = showMountPlaceholders

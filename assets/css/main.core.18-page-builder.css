@@ -874,6 +874,77 @@ body[data-reader-shell='inactive'] #statusPanel {
   transform: scale(1.2);
 }
 
+/* Shell chrome as blocks (Phase 6): same look as the fixed shell gear / 9-dot buttons
+   (main.core.07-user-settings.css / main.core.10b-right-panel-feed.css) but statically
+   positioned so they flow inside panels and columns. */
+.pb-account,
+.pb-links-grid {
+  display: flex;
+  justify-content: center;
+}
+
+.pb-account-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 237, 0, 0.6);
+  background: rgba(10, 10, 18, 0.75);
+  color: var(--accent, #ffed00);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(255, 237, 0, 0.2);
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    border-color 0.2s ease;
+}
+
+.pb-account-btn:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 237, 0, 0.9);
+  box-shadow: 0 0 22px rgba(255, 237, 0, 0.35);
+}
+
+.pb-account-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.pb-links-grid-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 2px solid rgba(0, 217, 255, 0.5);
+  background: rgba(10, 10, 18, 0.75);
+  color: var(--primary, #00d9ff);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, 1fr);
+  gap: 4px;
+  padding: 8px;
+  cursor: pointer;
+  box-shadow: 0 0 14px rgba(0, 217, 255, 0.2);
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.pb-links-grid-btn:hover {
+  transform: translateY(-2px);
+  border-color: rgba(0, 217, 255, 0.9);
+  box-shadow: 0 0 20px rgba(0, 217, 255, 0.35);
+}
+
+.pb-links-grid-btn span {
+  width: 100%;
+  height: 100%;
+  border-radius: 2px;
+  background: currentColor;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .pb-layout--1-1,

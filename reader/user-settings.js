@@ -32,15 +32,20 @@ import { API } from './constants.js';
   const commentsLimit = 15;
   let currentUser = null;
 
-  if (!overlay || !openBtn) return;
+  // Triggers bind by class delegation so builder-placed `account` modules
+  // (.pb-account-btn) open the same overlay as the fixed shell gear; the id-bound
+  // shell button is optional.
+  if (!overlay) return;
   const previewFlag = String(
     new URLSearchParams(window.location.search || '').get('builderPreview') || ''
   )
     .trim()
     .toLowerCase();
   if (['1', 'true', 'yes'].includes(previewFlag)) {
-    openBtn.disabled = true;
-    openBtn.setAttribute('aria-disabled', 'true');
+    if (openBtn) {
+      openBtn.disabled = true;
+      openBtn.setAttribute('aria-disabled', 'true');
+    }
     return;
   }
 
@@ -360,7 +365,11 @@ import { API } from './constants.js';
     overlay.setAttribute('aria-hidden', 'true');
   }
 
-  openBtn.addEventListener('click', showOverlay);
+  document.addEventListener('click', (event) => {
+    if (event.target.closest?.('.user-settings-btn, .pb-account-btn')) {
+      showOverlay();
+    }
+  });
   if (closeBtn) closeBtn.addEventListener('click', hideOverlay);
   overlay.addEventListener('click', (event) => {
     if (event.target === overlay) hideOverlay();

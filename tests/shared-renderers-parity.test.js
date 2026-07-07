@@ -185,6 +185,39 @@ describe('shared renderer parity', () => {
     });
   });
 
+  it('renders shell-chrome blocks with delegated trigger classes and styling (Phase 6)', () => {
+    const accountModule = {
+      id: 'module-account-1',
+      moduleType: 'account',
+      columnIndex: 0,
+      sortIndex: 0,
+      config: { iconColor: '#ff0000' },
+    };
+    const linksModule = {
+      id: 'module-links-1',
+      moduleType: 'links-grid',
+      columnIndex: 0,
+      sortIndex: 0,
+      config: { appearance: { border: { width: 1, color: '#00ff00' } } },
+    };
+
+    [makeReaderRenderers(), makePreviewRenderers()].forEach((renderers) => {
+      const accountEl = document.createElement('div');
+      accountEl.innerHTML = renderers.renderModule(accountModule);
+      const gearBtn = accountEl.querySelector('.pb-module--account .pb-account-btn');
+      expect(gearBtn).not.toBeNull();
+      expect(gearBtn.getAttribute('style')).toContain('color: #ff0000');
+      expect(gearBtn.querySelector('svg path')).not.toBeNull();
+
+      const linksEl = document.createElement('div');
+      linksEl.innerHTML = renderers.renderModule(linksModule);
+      const linksBtn = linksEl.querySelector('.pb-module--links-grid .pb-links-grid-btn');
+      expect(linksBtn).not.toBeNull();
+      expect(linksBtn.querySelectorAll('span')).toHaveLength(9);
+      expect(linksBtn.getAttribute('style')).toContain('border: 1px solid #00ff00');
+    });
+  });
+
   it('renders the same full page structure for reader and preview options', () => {
     const page = getContractFixture('builderPage');
     const reader = makeReaderRenderers();

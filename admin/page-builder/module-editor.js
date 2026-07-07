@@ -1244,6 +1244,28 @@ export function renderModuleEditorContent({
       contentSections.push(renderEntryGalleryEditor(config));
       break;
 
+    // Shell chrome as blocks (Phase 6): the gear / 9-dot buttons keep their live
+    // behavior (same overlays as the fixed shell buttons) and expose icon color here;
+    // deeper styling is available via the raw config `appearance` key.
+    case 'account':
+    case 'links-grid':
+      contentSections.push(
+        renderSectionCard(
+          'Behavior',
+          moduleType === 'account' ? 'Account Settings Button' : 'Links Grid Button',
+          moduleType === 'account'
+            ? 'Opens the same Account Settings overlay as the built-in gear button. Placing this block hides the fixed shell button on this page.'
+            : 'Returns the right panel to its links view, like the built-in 9-dot button. Placing this block hides the fixed shell button on this page.',
+          `
+          <div class="pb-editor-field pb-editor-field--row">
+            <label class="pb-editor-label">Icon Color</label>
+            <input type="color" class="pb-promo-style-color" data-key="iconColor" value="${escapeAttr(config.iconColor || (moduleType === 'account' ? '#ffed00' : '#00d9ff'))}">
+          </div>
+        `
+        )
+      );
+      break;
+
     default:
       contentSections.push(
         renderSectionCard(
@@ -1271,6 +1293,8 @@ export function renderModuleEditorContent({
     'spacer',
     'email-signup',
     'feed',
+    'account',
+    'links-grid',
   ]);
   // Shared wrapper layout (config.layout): available on every structured module type.
   if (responsiveEditScope !== 'device' && moduleType !== 'reader') {

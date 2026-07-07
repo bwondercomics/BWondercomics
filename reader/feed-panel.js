@@ -233,7 +233,6 @@ export function initRightPanelFeed() {
   const feedPanel = document.getElementById('rightPanelFeed');
   const feedBody = document.getElementById('rightPanelFeedBody');
   const exitBtn = document.getElementById('feedExitBtn');
-  const linksBtn = document.getElementById('linksGridBtn');
 
   if (!rightPanel || !headingBtn || !feedPanel || !feedBody) return;
 
@@ -263,7 +262,13 @@ export function initRightPanelFeed() {
   });
 
   if (exitBtn) exitBtn.addEventListener('click', () => setMode(false));
-  if (linksBtn) linksBtn.addEventListener('click', () => setMode(false));
+  // Links buttons bind by class delegation so builder-placed `links-grid` modules
+  // (.pb-links-grid-btn) behave like the fixed shell 9-dot button.
+  document.addEventListener('click', (event) => {
+    if (event.target.closest?.('.links-grid-btn, .pb-links-grid-btn')) {
+      setMode(false);
+    }
+  });
 }
 
 export function initFeedModules(container) {

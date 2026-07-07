@@ -1,8 +1,10 @@
 # Builder Customization Roadmap
 
-Status: Phases 0–5 implemented (Phase 5 closed 2026-07-07: brand logo, per-block styling,
-entry-picker vars; includes a corrective backend fix persisting header layoutRows). Deferred
-items are tracked in the completion notes. Phases 6–7 planned.
+Status: Phases 0–6 implemented (Phase 6 closed 2026-07-07: account gear + links grid are
+placeable modules with delegated behavior and zero-change shell defaults). Deferred items are
+tracked in the completion notes. Phase 7 rescoped 2026-07-07: Fast Start and the palette stay;
+element-over-palette precedence already holds — the phase is now a small regression-test +
+copy pass.
 Created: 2026-07-05
 Branch context: `builder-incremental-improvement` — the Panel/Column Settings Consolidation Plan
 (Phases 1–4) is implemented up to HEAD (`c82d986`), but its release gates (data migrations, manual
@@ -21,10 +23,10 @@ Related docs:
 ## Purpose
 
 Make the three main page elements — **panels (columns)**, the **reader**, and the **header** — and
-the blocks inside them fully customizable from the builder, retire the confusing global theming
-("Fast Start" presets, palette-drives-everything), and convert remaining hardcoded reader-shell
-chrome into placeable blocks. All of it without changing how any existing published page renders
-(battle-bros, prison planet, Pyre).
+the blocks inside them fully customizable from the builder, keep the global theming ("Fast Start"
+presets + palette) as defaults that element-level colors override (scope revised 2026-07-07), and
+convert remaining hardcoded reader-shell chrome into placeable blocks. All of it without changing
+how any existing published page renders (battle-bros, prison planet, Pyre).
 
 Terminology used throughout: a **panel is a column** (official since the consolidation plan — left
 panel = reader-section column 0; right panel = last column, exists iff the layout has ≥2 columns).
@@ -32,25 +34,25 @@ panel = reader-section column 0; right panel = last column, exists iff the layou
 
 ## Traceability: request → phase
 
-| Request                                                                                  | Phase                                                                         |
-| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| "Section column settings do nothing" (column count, track ratio, gaps, spacing)          | 0 (verify + fix), 1 (real width control)                                      |
-| Panel border color / thickness / roundness / transparency / on-off                       | 0 (exists since consolidation — verify + add explicit toggle)                 |
-| Panel background image + framing                                                         | 0 (verify), 1 (expose framing on all columns)                                 |
-| Panel size vs neighbors; make reader take more/less space                                | 1                                                                             |
-| Section longer; panels shorter than the section                                          | 0 (alignment), 1 (section min-height)                                         |
-| Add another section below with more columns                                              | Already works (`+ Add Section` insert bars) — confirmed in the Phase 0 matrix |
-| Resize blocks and move them more freely                                                  | 2                                                                             |
-| Reader controls: text style/color, button shape/size/colors, bar background/transparency | 3                                                                             |
-| Turn the end-of-entry popup on/off (and style it)                                        | 3                                                                             |
-| Header block movement "borderline nonsensical"                                           | 4                                                                             |
-| Secondary color / angle confusion in background settings                                 | 4                                                                             |
-| Custom logo letters (not static "BWC"), custom header text                               | 5                                                                             |
-| Entry selector customizable like everything else                                         | 5                                                                             |
-| Gear (Account Settings) button becomes a block instead of fixed right-panel chrome       | 6                                                                             |
-| Remove "Fast Start"; palette only drives the page background                             | 7                                                                             |
-| Columns-vs-panels naming confusion                                                       | 0                                                                             |
-| Nothing breaks on existing pages                                                         | Compatibility rules + every phase's gates                                     |
+| Request                                                                                              | Phase                                                                         |
+| ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| "Section column settings do nothing" (column count, track ratio, gaps, spacing)                      | 0 (verify + fix), 1 (real width control)                                      |
+| Panel border color / thickness / roundness / transparency / on-off                                   | 0 (exists since consolidation — verify + add explicit toggle)                 |
+| Panel background image + framing                                                                     | 0 (verify), 1 (expose framing on all columns)                                 |
+| Panel size vs neighbors; make reader take more/less space                                            | 1                                                                             |
+| Section longer; panels shorter than the section                                                      | 0 (alignment), 1 (section min-height)                                         |
+| Add another section below with more columns                                                          | Already works (`+ Add Section` insert bars) — confirmed in the Phase 0 matrix |
+| Resize blocks and move them more freely                                                              | 2                                                                             |
+| Reader controls: text style/color, button shape/size/colors, bar background/transparency             | 3                                                                             |
+| Turn the end-of-entry popup on/off (and style it)                                                    | 3                                                                             |
+| Header block movement "borderline nonsensical"                                                       | 4                                                                             |
+| Secondary color / angle confusion in background settings                                             | 4                                                                             |
+| Custom logo letters (not static "BWC"), custom header text                                           | 5                                                                             |
+| Entry selector customizable like everything else                                                     | 5                                                                             |
+| Gear (Account Settings) button becomes a block instead of fixed right-panel chrome                   | 6                                                                             |
+| Palette is defaults only; element color options override it (Fast Start stays — rescoped 2026-07-07) | 7                                                                             |
+| Columns-vs-panels naming confusion                                                                   | 0                                                                             |
+| Nothing breaks on existing pages                                                                     | Compatibility rules + every phase's gates                                     |
 
 ## Confirmed decisions (2026-07-05 session)
 
@@ -59,7 +61,7 @@ panel = reader-section column 0; right panel = last column, exists iff the layou
 | Header fix direction  | **Edit in place on the live canvas.** Keep the 5 fixed blocks and the saved `layoutRows` model; retire the abstract placement board. (Header-as-a-real-section was considered and rejected — bigger rewrite, migration risk.) |
 | "Gear options button" | The **Account Settings** button — `#userSettingsBtn` (`index.html:392`), the SVG gear at the bottom of the right `<aside>` that opens the account overlay (`reader/user-settings.js`). Becomes a placeable module.            |
 | GrapesJS              | **Architecture reference only**, never a dependency (AGENTS.md standing rule).                                                                                                                                                |
-| Theme scope           | Palette editing is removed from the UI; a Page Background control replaces it. Existing `meta.theme` tokens keep being applied at runtime so old pages render identically.                                                    |
+| Theme scope           | **Revised 2026-07-07:** Fast Start presets and palette editing stay. The palette provides defaults; any element-level color option overrides it (verified — this already holds by architecture, see Phase 7).                 |
 
 ## GrapesJS reference mapping (architecture reference only)
 
@@ -861,19 +863,54 @@ blocks.
 
 ### Steps
 
-- [ ] New module types **`account`** and **`links-grid`** with config
+- [x] New module types **`account`** and **`links-grid`** with config
       `{ appearance?, iconColor? }` (gear keeps its yellow default): sanitizers, renderers
       (emitting the same gear/9-dot button markup with a stable class), picker entries,
       `PANEL_MODULE_TYPES` additions + drift-guard test update.
-- [ ] Refactor `user-settings.js` (and links-grid wiring) from id-bound to **delegated/class-based
+- [x] Refactor `user-settings.js` (and links-grid wiring) from id-bound to **delegated/class-based
       binding** so module-rendered instances anywhere on the page open the same overlays; multiple
       instances are allowed and all open the same overlay.
-- [ ] **Shell coordination with zero-change default**: when the rendered page contains an
+- [x] **Shell coordination with zero-change default**: when the rendered page contains an
       `account` module, hide the hardcoded shell button (same for `links-grid`); pages without the
       module keep today's fixed buttons. No migration required.
-- [ ] Follow-up note (out of scope here): the remaining hardcoded right/left-panel content (book
+- [x] Follow-up note (out of scope here): the remaining hardcoded right/left-panel content (book
       promo, comicnet list, banner) can be recreated with existing `promo` / `html` / `image`
-      modules; document the recipe rather than adding module types.
+      modules; document the recipe rather than adding module types. **Recipe**: book promo →
+      `promo` module (one item, image + link); comicnet list → `html` module (copy the shell
+      markup, swap links); banner art → `image` module or the panel's background-image setting.
+
+### Completion note 2026-07-07 (phase implemented)
+
+- **Module types**: `account` (gear → Account Settings overlay) and `links-grid` (9-dot →
+  right-panel links view) registered end to end — descriptors + picker entries
+  (`module-descriptors.js`, category "special"), shared renderers emitting the shell markup
+  with module-scoped classes `pb-account-btn` / `pb-links-grid-btn` (`shared-renderers.js`;
+  the shell classes are absolutely positioned, so the module CSS in
+  `main.core.18-page-builder.css` replicates the 44px look statically), `PANEL_MODULE_TYPES`
+  additions (drift-guard consciously satisfied), backend sanitizer branches
+  (`iconColor` color + sparse `appearance` via the shared schema).
+- **Behavior binding**: `user-settings.js` now binds triggers by class delegation
+  (`.user-settings-btn, .pb-account-btn`) with the overlay as the only hard requirement;
+  `feed-panel.js` likewise delegates `.links-grid-btn, .pb-links-grid-btn`. Every instance
+  opens the same overlay / links view; builder previews stay inert (`builderPreview` early
+  return unchanged).
+- **Shell coordination**: `syncShellChromeModules` in `reader/data.js` hides the fixed
+  `#userSettingsBtn` / `#linksGridBtn` (inline display, which also beats the feed-mode CSS)
+  when the rendered page places the matching module, and restores them on pages without it —
+  zero-change default, no migration.
+- **Editor**: both types get a structured settings card (behavior copy + Icon Color) through
+  the generic draft binder, the shared Size & Alignment card, and a raw-config card for the
+  optional `appearance` key (a structured appearance UI remains the Phase 2 deferred item).
+- Tests: renderer parity (classes, icon color, appearance style, 9 dots), panel render +
+  shell-button hide/restore (`tests/reader-data-builder.test.js`), delegated overlay open
+  without the shell button (`tests/reader-user-settings.test.js`, new), module links-grid
+  click exits feed mode (`tests/reader-feed-panel.test.js`), backend registration/round-trip
+  (`backend/tests/test_builder_security.py`).
+- Verified: `npm test` (633 passed, 1 skipped), `npm run test:backend` (120), `npm run lint`,
+  `npm run format:check`, `format:py`/`lint:py`, `npm run build`, `npm run test:visual` (20
+  passed; one flaky parity run passed on retry), API container restarted + live sanitizer
+  smoke-checked. **Manual QA (user)**: place the gear in a panel, verify login + a settings
+  change through the module-rendered button on a live page.
 
 ### Acceptance
 
@@ -897,57 +934,58 @@ gate + manual account-flow QA.
 
 ---
 
-## Phase 7 — Theme scope reduction: palette → page background only (Size: M — **last; depends on 3–6**)
+## Phase 7 — Palette precedence: element colors override the theme (Size: S — reduced scope 2026-07-07)
 
-### Problem
+### Scope change (2026-07-07 session)
 
-"Fast Start" presets and the 7-token palette repaint header, panels, reader, and text globally —
-the user wants those surfaces controlled only by their own settings, with the global system
-reduced to the page background. This must not change how any existing page looks.
+The original phase removed Fast Start and reduced the palette to a page-background control. The
+user revised this: **keep Fast Start and palette editing exactly as they are** — the requirement
+is only that any individual module/element color option overrides the palette.
 
-### Where
+**Verified 2026-07-07: this precedence already holds by architecture.** `applyPageTheme`
+(`reader/data.js` ~:405) writes `page.meta.theme` as CSS variables on the document root; the
+stylesheets consume them as _defaults_ (`var(--token, fallback)` chains). Every per-element color
+control built in Phases 0–6 applies as inline styles or inline CSS vars **on the element**
+(panel/column appearance, section/column backgrounds, header shell + per-block styling, logo box,
+entry-picker vars, reader-control vars, module style systems, gear/links icon color), and inline
+styles always beat stylesheet var lookups. No color rule uses `!important`. So: palette = defaults,
+customized elements win, later palette edits only repaint uncustomized surfaces.
 
-- `theme-editor.js` (presets card ~:60, palette card ~:34), `constants.js`
-  (`THEME_PRESETS` ~:40, `THEME_COLORS` ~:30), `draft-manager.js` theme draft (~:154), runtime
-  CSS-var application of `page.meta.theme`, `assets/css/variables.css` +
-  `main.core.18-page-builder.css` `var(--token, fallback)` chains.
+### Problem (remaining)
+
+The precedence contract is implicit — nothing guards it, and a few surfaces still have **no
+individual color control**, so the palette is their only knob: the title `h1` gradient text
+(`main.core.04-header.css` ~:318), the COVERS button (hardcoded cyan, not even palette —
+`main.core.05-entry-select.css` `.entry-covers-btn`), the status cursor, and reader-button
+typography (the Phase 3 deferred item).
 
 ### Steps
 
-- [ ] Remove the **Fast Start presets** card + handlers + `THEME_PRESETS`.
-- [ ] Replace the **Palette / Color System** card with a **Page Background** card editing
-      `page.meta.pageBackground = { type: solid|gradient|image, color, secondaryColor?, angle?,
-image?, fit?, opacity? }` (reuse the appearance background group + image picker), applied to
-      the page surface (body / `.pb-page`) in both preview and public mount. Sanitizer included.
-- [ ] **Keep applying `page.meta.theme` tokens as CSS vars at load, unchanged** — existing pages
-      keep their exact colors. The palette becomes legacy-frozen: still sanitized, persisted, and
-      applied; no longer editable in the UI. Do **not** touch the `var(--primary, fallback)`
-      chains in CSS.
-- [ ] Sweep builder UI copy: element styling lives on the element (panels → Column/Panel
-      inspector, reader → reader editor, header → block inspector); the theme tab is only "Page
-      Background".
-- [ ] Documentation: mark `meta.theme` legacy in `docs/API_REFERENCE.md` /
-      `docs/SYSTEM_OVERVIEW.md` where the theme is described.
+- [ ] **Precedence regression test**: apply a page theme (e.g. `primary`) and an element-level
+      color to the same surface (a panel border or the entry picker), assert the element value
+      wins in the rendered DOM and survives a theme change (extend
+      `tests/reader-data-builder.test.js` theme tests).
+- [ ] **Builder copy note**: one line in the theme tab ("Palette colors are defaults — anything
+      styled on an element keeps its own colors."), so authors understand why a preset doesn't
+      repaint customized elements.
+- [ ] Fold the **no-control surfaces** into the deferred backlog rather than this phase: title
+      gradient styling and COVERS button color (candidates for the Phase 5 brand/entry-picker
+      editors), reader-button typography (already tracked as the Phase 3 deferred item).
 
 ### Acceptance
 
-- Presets gone; palette inputs gone; Page Background editable (solid/gradient/image) and visible
-  on the published page.
-- battle-bros, prison planet, and Pyre pages render **pixel-identical** before/after (visual gate
-  - manual) since their `meta.theme` still applies.
-- Every surface the palette used to drive is stylable through the per-element controls built in
-  Phases 0–6 (spot-check one of each: panel, reader button, header block, module).
+- The regression test fails if any future change makes palette application clobber an
+  element-level color (e.g. someone applies theme tokens as inline element styles or adds
+  `!important` color rules).
+- Fast Start presets and the palette editor keep working unchanged.
 
 ### Risk & rollback
 
-Medium — the risk is _perceived_ regression (an author expecting palette edits). Mitigated by
-sequencing last and by the legacy-frozen application. Rollback: restore the palette card; nothing
-about storage changed.
+Low — test + copy only; no behavior changes. Rollback: remove the test/copy.
 
 ### Test plan
 
-Theme-editor render tests (cards removed/replaced), pageBackground sanitizer + apply tests,
-`npm run test:visual` before/after comparison on all three series, standard gate.
+The new precedence regression test, `npm test`, standard gate (no visual-suite impact expected).
 
 ---
 

@@ -163,6 +163,19 @@ describe('reader feed and latest panels', () => {
       .getElementById('feedExitBtn')
       ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     expect(document.getElementById('rightPanel')?.classList.contains('feed-mode')).toBe(false);
+
+    // Phase 6: a builder-placed links-grid module button (class-delegated, anywhere in
+    // the DOM) exits feed mode exactly like the fixed shell 9-dot button.
+    document
+      .getElementById('latestHeadingBtn')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushReaderUi(1);
+    expect(document.getElementById('rightPanel')?.classList.contains('feed-mode')).toBe(true);
+    const moduleLinksBtn = document.createElement('button');
+    moduleLinksBtn.className = 'pb-links-grid-btn';
+    document.body.appendChild(moduleLinksBtn);
+    moduleLinksBtn.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(document.getElementById('rightPanel')?.classList.contains('feed-mode')).toBe(false);
   });
 
   it('renders latest previews with truncation, fallback images, and optional media links', () => {

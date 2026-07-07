@@ -26,6 +26,8 @@ ALLOWED_MODULE_TYPES = {
     "feed",
     "media-gallery",
     "html",
+    "account",
+    "links-grid",
 }
 
 CMS_SOURCE_ACTIVE_PAGE_SERIES = "active-page-series"
@@ -1699,5 +1701,13 @@ def sanitize_module_config(module_type: str, raw_config: Any) -> dict[str, Any]:
 
     if module_type == "html":
         return with_responsive({"code": sanitize_html_fragment(config.get("code"), "html")})
+
+    if module_type in {"account", "links-grid"}:
+        # Shell chrome as blocks (Phase 6): the gear / 9-dot buttons.
+        sanitized = {"iconColor": sanitize_color(config.get("iconColor"))}
+        appearance = sanitize_appearance(config.get("appearance"))
+        if appearance is not None:
+            sanitized["appearance"] = appearance
+        return with_responsive(sanitized)
 
     return with_responsive({})

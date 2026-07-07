@@ -1,8 +1,10 @@
 import unittest
 
 from backend.app.builder_security import (
+    ALLOWED_MODULE_TYPES,
     sanitize_column_settings,
     sanitize_header_meta,
+    sanitize_module_config,
     sanitize_section_settings,
 )
 
@@ -266,6 +268,33 @@ class SanitizeHeaderMetaPhase5Test(unittest.TestCase):
         )
         self.assertFalse(result["blocks"]["brand"]["enabled"])
         self.assertNotIn("appearance", result["blocks"]["brand"])
+
+
+class SanitizeShellChromeModulesTest(unittest.TestCase):
+    """Builder customization roadmap Phase 6: account gear + links grid as modules."""
+
+    def test_types_are_registered(self):
+        self.assertIn("account", ALLOWED_MODULE_TYPES)
+        self.assertIn("links-grid", ALLOWED_MODULE_TYPES)
+
+    def test_account_and_links_grid_config_round_trip(self):
+        for module_type in ("account", "links-grid"):
+            result = sanitize_module_config(
+                module_type,
+                {
+                    "iconColor": "#ff0000",
+                    "appearance": {"border": {"width": 2, "color": "#00ff00"}},
+                    "junk": "<script>alert(1)</script>",
+                },
+            )
+            self.assertEqual(result["iconColor"], "#ff0000")
+            self.assertEqual(result["appearance"]["border"]["color"], "#00ff00")
+            self.assertNotIn("junk", result)
+
+    def test_empty_config_stays_sparse(self):
+        result = sanitize_module_config("account", {})
+        self.assertEqual(result.get("iconColor"), "")
+        self.assertNotIn("appearance", result)
 
 
 if __name__ == "__main__":

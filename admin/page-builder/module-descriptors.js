@@ -291,6 +291,31 @@ const MODULE_DESCRIPTOR_DEFS = [
     appearanceSectors: [],
     preview: (config = {}) => config.code?.slice(0, 30) || 'Empty HTML',
   },
+  // Shell chrome as blocks (roadmap Phase 6): the Account Settings gear and the 9-dot
+  // links button, placeable in any panel/column. When a page places one, the hardcoded
+  // shell button hides; pages without the module keep today's fixed buttons.
+  {
+    type: 'account',
+    label: 'Account',
+    icon: '⚙',
+    category: 'special',
+    defaultConfig: { iconColor: '' },
+    editorKind: 'account',
+    responsiveOverrides: HIDDEN_ONLY_RESPONSIVE_FIELDS,
+    appearanceSectors: [],
+    preview: () => 'Account Settings button',
+  },
+  {
+    type: 'links-grid',
+    label: 'Links Grid',
+    icon: '\u{1F533}',
+    category: 'special',
+    defaultConfig: { iconColor: '' },
+    editorKind: 'links-grid',
+    responsiveOverrides: HIDDEN_ONLY_RESPONSIVE_FIELDS,
+    appearanceSectors: [],
+    preview: () => 'Links grid button',
+  },
 ];
 
 function normalizeDescriptor(definition) {

@@ -103,6 +103,8 @@ export const PANEL_MODULE_TYPES = new Set([
   'media-gallery',
   'gallery',
   'video',
+  'account',
+  'links-grid',
 ]);
 
 function resolveHeaderPageForDevice(page, { builderEditing = false, deviceId = '' } = {}) {
@@ -1093,6 +1095,27 @@ function renderPanelColumnStack(side, modules, { builderEditing = false, deviceI
  * Updates header, panels, and other elements based on module config.
  * @param {Object} page - The page data from the builder API
  */
+function pageHasModuleType(page, moduleType) {
+  return (page?.sections || []).some((section) =>
+    (section.modules || []).some((mod) => mod?.moduleType === moduleType)
+  );
+}
+
+// Shell chrome as blocks (Phase 6): when a page places an `account` or `links-grid`
+// module, the corresponding fixed shell button hides; pages without the module keep
+// today's fixed buttons (zero-change default). Inline display beats the feed-mode CSS
+// rule that would otherwise re-show the links button.
+function syncShellChromeModules(page) {
+  const gearBtn = document.getElementById('userSettingsBtn');
+  if (gearBtn) {
+    gearBtn.style.display = pageHasModuleType(page, 'account') ? 'none' : '';
+  }
+  const linksBtn = document.getElementById('linksGridBtn');
+  if (linksBtn) {
+    linksBtn.style.display = pageHasModuleType(page, 'links-grid') ? 'none' : '';
+  }
+}
+
 export function applyBuilderPageToDOM(page, options = {}) {
   const builderEditing = options.builderEditing === true;
   const deviceId = options.deviceId;
@@ -1100,6 +1123,7 @@ export function applyBuilderPageToDOM(page, options = {}) {
     resolveReaderShellState(page, { builderEditing, deviceId })
   );
   applyReaderShellDomState(shellState);
+  syncShellChromeModules(page);
 
   if (!page || !page.sections) {
     syncReaderShellBuilderMarkers(null, false, { shellActive: false });
