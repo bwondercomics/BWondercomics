@@ -90,7 +90,10 @@ export function onFullscreenChange() {
     });
   } else {
     document.body.classList.remove('fullscreen-active');
-    if (el.fullscreenBtn) el.fullscreenBtn.textContent = 'FULL';
+    // Restore the authored label when the page customized it (data-reader-label).
+    if (el.fullscreenBtn) {
+      el.fullscreenBtn.textContent = el.fullscreenBtn.dataset.readerLabel || 'FULL';
+    }
     if (el.topbar) el.topbar.classList.remove('hidden');
     if (el.controls) el.controls.classList.remove('hidden');
 

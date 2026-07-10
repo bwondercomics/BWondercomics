@@ -31,9 +31,14 @@ function optionList(options, selected, labels = {}) {
 function removeNullAppearanceBranches(style = {}) {
   const next = {};
   const defaults = toSparseAppearance(style.defaults?.appearance);
+  const defaultsPadding = style.defaults?.padding;
   const primary = toSparseAppearance(style.primary?.appearance);
   const bar = toSparseAppearance(style.bar?.appearance);
-  if (defaults) next.defaults = { appearance: defaults };
+  if (defaults || defaultsPadding != null) {
+    next.defaults = {};
+    if (defaults) next.defaults.appearance = defaults;
+    if (defaultsPadding != null) next.defaults.padding = defaultsPadding;
+  }
   if (primary) next.primary = { appearance: primary };
   if (bar) next.bar = { appearance: bar };
   if (style.glow === false) next.glow = false;
@@ -60,6 +65,10 @@ export function normalizeReaderDraftConfig(rawConfig = {}) {
   const style = removeNullAppearanceBranches(normalized.controls.style);
   if (Object.keys(style).length) {
     next.controls.style = style;
+  }
+  // Custom button labels: sparse — only authored labels persist.
+  if (Object.keys(normalized.controls.labels || {}).length) {
+    next.controls.labels = normalized.controls.labels;
   }
   next.responsive = pruneEmptyResponsiveOverrides(next.responsive);
   if (!Object.keys(next.responsive).length) {
@@ -130,7 +139,43 @@ function renderLayoutControls(config) {
           })}
         </select>
       </div>
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Button Padding (px)</label>
+        <input type="number" class="pb-editor-input" data-reader-key="controls.style.defaults.padding" min="0" max="48" placeholder="Preset default" value="${config.controls.style.defaults.padding == null ? '' : escapeAttr(String(config.controls.style.defaults.padding))}">
+        <div class="pb-editor-hint">Horizontal padding of every control button. Blank keeps the size preset's padding.</div>
+      </div>
     `,
+  });
+}
+
+// Custom button labels (Phase 3): sparse — blank fields keep the built-in text.
+const READER_CONTROL_LABEL_FIELDS = [
+  ['prev', 'Previous Page', '< BACK'],
+  ['next', 'Next Page', 'NEXT >'],
+  ['help', 'Help', 'HELP ?'],
+  ['fit', 'Fit (primary)', 'FIT'],
+  ['zoomOut', 'Zoom Out', '- ZOOM'],
+  ['zoomIn', 'Zoom In', '+ ZOOM'],
+  ['fullscreen', 'Fullscreen', 'FULL'],
+];
+
+function renderControlsLabels(config) {
+  const labels = config.controls.labels || {};
+  const customized = Object.keys(labels).length;
+  const fields = READER_CONTROL_LABEL_FIELDS.map(
+    ([key, label, placeholder]) => `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">${label}</label>
+        <input type="text" class="pb-editor-input" maxlength="24" data-reader-key="controls.labels.${key}" placeholder="${escapeAttr(placeholder)}" value="${escapeAttr(labels[key] || '')}">
+      </div>
+    `
+  ).join('');
+  return renderInspectorSection({
+    kicker: 'Reader',
+    title: 'Button Labels',
+    summary: customized ? `${customized} customized` : 'Default',
+    copy: 'Rename the reader control buttons. Blank fields keep the built-in text (the fullscreen button still shows EXIT while fullscreen).',
+    body: fields,
   });
 }
 
@@ -278,6 +323,7 @@ export function renderReaderEditor(config = {}, { deviceOnly = false } = {}) {
     renderLayoutControls(normalized),
     renderEndOfEntryControls(normalized),
     renderControlsAppearance(normalized),
+    renderControlsLabels(normalized),
     renderStageControls(normalized),
     renderVisibilityControls(normalized),
   ].join('');

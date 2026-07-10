@@ -55,10 +55,8 @@ function normalizeStageMaxWidth(value) {
 
 function normalizeReaderControlsStyle(rawStyle = {}) {
   const source = isObject(rawStyle) ? rawStyle : {};
-  const defaults =
-    source.defaults && isObject(source.defaults)
-      ? normalizeAppearance(source.defaults.appearance)
-      : null;
+  const defaultsSource = isObject(source.defaults) ? source.defaults : {};
+  const defaults = normalizeAppearance(defaultsSource.appearance);
   const primary =
     source.primary && isObject(source.primary)
       ? normalizeAppearance(source.primary.appearance)
@@ -66,12 +64,45 @@ function normalizeReaderControlsStyle(rawStyle = {}) {
   const bar =
     source.bar && isObject(source.bar) ? normalizeAppearance(source.bar.appearance) : null;
   return {
-    defaults: { appearance: defaults },
+    defaults: {
+      appearance: defaults,
+      // Horizontal button padding in px; null = the size preset's padding.
+      padding:
+        defaultsSource.padding === null ||
+        defaultsSource.padding === undefined ||
+        defaultsSource.padding === ''
+          ? null
+          : clampInt(defaultsSource.padding, null, 0, 48),
+    },
     primary: { appearance: primary },
     bar: { appearance: bar },
     // Neon box/text shadows on the bar, buttons, and page indicator. On = stock look.
     glow: coerceBool(source.glow, true),
   };
+}
+
+// Custom reader-button labels (Phase 3): sparse — only authored labels persist; the
+// hardcoded button text stays the default for unset keys.
+export const READER_CONTROL_LABEL_KEYS = Object.freeze([
+  'prev',
+  'next',
+  'help',
+  'fit',
+  'zoomIn',
+  'zoomOut',
+  'fullscreen',
+]);
+
+function normalizeReaderControlsLabels(rawLabels = {}) {
+  const source = isObject(rawLabels) ? rawLabels : {};
+  const labels = {};
+  READER_CONTROL_LABEL_KEYS.forEach((key) => {
+    const value = String(source[key] || '')
+      .trim()
+      .slice(0, 24);
+    if (value) labels[key] = value;
+  });
+  return labels;
 }
 
 export function normalizeReaderConfig(rawConfig = {}) {
@@ -101,6 +132,7 @@ export function normalizeReaderConfig(rawConfig = {}) {
       placement: pickKeyword(controls.placement, READER_CONTROLS_PLACEMENTS, 'below'),
       size: pickKeyword(controls.size, READER_CONTROLS_SIZES, 'medium'),
       style: normalizeReaderControlsStyle(controls.style),
+      labels: normalizeReaderControlsLabels(controls.labels),
     },
     stage: {
       fit: pickKeyword(stage.fit, READER_STAGE_FITS, 'dynamic-frame'),

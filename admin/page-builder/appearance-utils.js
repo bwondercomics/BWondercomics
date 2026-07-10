@@ -2,6 +2,8 @@ import { sanitizeColor, sanitizeKeyword, sanitizeNumber } from './sanitize.js';
 
 const BACKGROUND_TYPES = ['solid', 'gradient'];
 const BORDER_STYLES = ['solid', 'dashed', 'dotted'];
+const TEXT_WEIGHTS = ['400', '500', '600', '700', '800', '900'];
+const TEXT_TRANSFORMS = ['none', 'uppercase', 'lowercase', 'capitalize'];
 const HEX_COLOR_WITHOUT_ALPHA_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 function isObject(value) {
@@ -40,6 +42,12 @@ function createAppearanceShape(background = {}, text = {}, border = {}) {
     },
     text: {
       color: normalizeColor(text, 'color'),
+      // Phase 3 typography extension: optional font tokens for text-bearing surfaces.
+      size: normalizeNumber(text, 'size', 8, 72, true),
+      weight: hasOwn(text, 'weight')
+        ? sanitizeKeyword(String(text.weight ?? ''), TEXT_WEIGHTS, '') || null
+        : null,
+      transform: normalizeKeyword(text, 'transform', TEXT_TRANSFORMS),
     },
     border: {
       width: normalizeNumber(border, 'width', 0, 20, true),
@@ -62,6 +70,9 @@ function hasStoredValues(appearance) {
     background.angle,
     background.opacity,
     text.color,
+    text.size,
+    text.weight,
+    text.transform,
     border.width,
     border.style,
     border.color,
@@ -117,7 +128,7 @@ function isAppearanceEmpty(appearance) {
   const text = normalized.text || {};
   const border = normalized.border || {};
   const hasBackground = !!(background.color || background.secondaryColor);
-  const hasText = !!text.color;
+  const hasText = !!text.color || text.size != null || !!text.weight || !!text.transform;
   const hasBorder = border.width != null || !!border.color || border.radius != null;
   return !hasBackground && !hasText && !hasBorder;
 }
@@ -142,6 +153,9 @@ function mergeAppearance(base, override) {
     },
     text: {
       color: mergeLeaf(normalizedBase.text.color, normalizedOverride.text.color),
+      size: mergeLeaf(normalizedBase.text.size, normalizedOverride.text.size),
+      weight: mergeLeaf(normalizedBase.text.weight, normalizedOverride.text.weight),
+      transform: mergeLeaf(normalizedBase.text.transform, normalizedOverride.text.transform),
     },
     border: {
       width: mergeLeaf(normalizedBase.border.width, normalizedOverride.border.width),
@@ -180,6 +194,15 @@ function appearanceToInlineStyle(appearance) {
 
   if (text.color) {
     tokens.push(`color: ${text.color}`);
+  }
+  if (text.size != null) {
+    tokens.push(`font-size: ${text.size}px`);
+  }
+  if (text.weight) {
+    tokens.push(`font-weight: ${text.weight}`);
+  }
+  if (text.transform) {
+    tokens.push(`text-transform: ${text.transform}`);
   }
 
   const hasBorderWidth = border.width != null;

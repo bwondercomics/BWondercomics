@@ -1515,6 +1515,9 @@ test.describe('builder Phase 12 authoring workflows', () => {
 
     // On-canvas drag: toolbar Move handle -> bottom/right header cell, with the cell
     // drop guide shown while hovering (moveBlockToPlacement through the header draft).
+    const targetSequenceBeforeHeaderDrag = await page
+      .locator('.pb-preview-frame')
+      .evaluate((frame) => Number(frame.dataset.targetSequence || '-1'));
     const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
     await toolbarAction('move').dispatchEvent('dragstart', { dataTransfer });
     await expect(page.locator('.pb-preview-target-overlay')).toHaveClass(/is-live-dragging/);
@@ -1522,6 +1525,10 @@ test.describe('builder Phase 12 authoring workflows', () => {
     await expect(
       frame.locator('.topbar-region[data-builder-header-row="bottom"][data-region="right"]')
     ).toBeVisible();
+    await page.waitForFunction((previousSequence) => {
+      const previewFrame = document.querySelector('.pb-preview-frame');
+      return Number(previewFrame?.dataset.targetSequence || '-1') > previousSequence;
+    }, targetSequenceBeforeHeaderDrag);
     const dropPoint = await getHeaderCellDropPoint(page, 'bottom', 'right');
     expect(dropPoint, 'bottom/right header cell must be measurable in edit mode').not.toBeNull();
     await page.locator('.pb-preview-target-overlay').dispatchEvent('dragover', {

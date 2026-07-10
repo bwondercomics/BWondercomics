@@ -138,6 +138,9 @@ describe('admin page-builder link utilities', () => {
       },
       text: {
         color: '#ffffff',
+        size: null,
+        weight: null,
+        transform: null,
       },
       border: {
         width: null,
@@ -181,6 +184,9 @@ describe('admin page-builder link utilities', () => {
       },
       text: {
         color: null,
+        size: null,
+        weight: null,
+        transform: null,
       },
       border: {
         width: 2,
@@ -217,6 +223,9 @@ describe('admin page-builder link utilities', () => {
         },
         text: {
           color: null,
+          size: null,
+          weight: null,
+          transform: null,
         },
         border: {
           width: null,

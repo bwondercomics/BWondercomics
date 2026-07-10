@@ -66,6 +66,31 @@ describe('normalizeReaderConfig', () => {
     expect(custom.controls.style.bar.appearance.background.color).toBe('#101020');
   });
 
+  it('normalizes button padding and custom labels sparsely (Phase 3)', () => {
+    const defaults = normalizeReaderConfig({});
+    expect(defaults.controls.style.defaults.padding).toBe(null);
+    expect(defaults.controls.labels).toEqual({});
+
+    const custom = normalizeReaderConfig({
+      controls: {
+        style: { defaults: { padding: 999 } },
+        labels: {
+          prev: '  BACKWARD  ',
+          next: 'ONWARD',
+          fit: 'x'.repeat(60),
+          junkKey: 'nope',
+          help: '',
+        },
+      },
+    });
+    expect(custom.controls.style.defaults.padding).toBe(48);
+    expect(custom.controls.labels).toEqual({
+      prev: 'BACKWARD',
+      next: 'ONWARD',
+      fit: 'x'.repeat(24),
+    });
+  });
+
   it('normalizes controls glow (on by default, off preserved)', () => {
     expect(normalizeReaderConfig({}).controls.style.glow).toBe(true);
     expect(

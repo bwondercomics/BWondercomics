@@ -779,6 +779,20 @@ def sanitize_appearance(raw: Any) -> dict[str, Any] | None:
         },
         "text": {
             "color": sanitize_color(text.get("color")) or None if "color" in text else None,
+            # Phase 3 typography extension: optional font tokens.
+            "size": _sanitize_optional_clamped_int(text, "size", 8, 72),
+            "weight": (
+                str(text.get("weight") or "").strip()
+                if str(text.get("weight") or "").strip()
+                in {"400", "500", "600", "700", "800", "900"}
+                else None
+            ),
+            "transform": (
+                str(text.get("transform") or "").strip().lower()
+                if str(text.get("transform") or "").strip().lower()
+                in {"none", "uppercase", "lowercase", "capitalize"}
+                else None
+            ),
         },
         "border": {
             "width": _sanitize_optional_clamped_int(border, "width", 0, 20),
@@ -798,6 +812,9 @@ def sanitize_appearance(raw: Any) -> dict[str, Any] | None:
             result["background"]["angle"],
             result["background"]["opacity"],
             result["text"]["color"],
+            result["text"]["size"],
+            result["text"]["weight"],
+            result["text"]["transform"],
             result["border"]["width"],
             result["border"]["style"],
             result["border"]["color"],
@@ -927,28 +944,60 @@ def _sanitize_reader_stage_max_width(value: Any) -> int | None:
     return max(READER_STAGE_MAX_WIDTH_MIN, min(READER_STAGE_MAX_WIDTH_MAX, number))
 
 
+READER_CONTROL_LABEL_KEYS = (
+    "prev",
+    "next",
+    "help",
+    "fit",
+    "zoomIn",
+    "zoomOut",
+    "fullscreen",
+)
+
+
 def sanitize_reader_controls_style(raw: Any) -> dict[str, Any]:
     style = raw if isinstance(raw, dict) else {}
     result: dict[str, Any] = {}
     for key in ("defaults", "primary", "bar"):
         branch = style.get(key) if isinstance(style.get(key), dict) else {}
+        branch_payload: dict[str, Any] = {}
         appearance = sanitize_appearance(branch.get("appearance"))
         if appearance is not None:
-            result[key] = {"appearance": appearance}
+            branch_payload["appearance"] = appearance
+        if key == "defaults" and branch.get("padding") not in (None, ""):
+            # Horizontal button padding in px (Phase 3); sparse.
+            branch_payload["padding"] = _clamp_int(branch.get("padding"), 0, 0, 48)
+        if branch_payload:
+            result[key] = branch_payload
     if style.get("glow") is False:
         result["glow"] = False
     return result
 
 
+def _sanitize_reader_controls_labels(raw: Any) -> dict[str, str]:
+    """Custom reader-button labels (Phase 3): sparse, length-capped."""
+    labels = raw if isinstance(raw, dict) else {}
+    sanitized: dict[str, str] = {}
+    for key in READER_CONTROL_LABEL_KEYS:
+        value = _coerce_string(labels.get(key), "", 24)
+        if value:
+            sanitized[key] = value
+    return sanitized
+
+
 def sanitize_reader_controls(raw: Any) -> dict[str, Any]:
     controls = raw if isinstance(raw, dict) else {}
-    return {
+    sanitized = {
         "placement": _sanitize_reader_keyword(
             controls.get("placement"), READER_CONTROLS_PLACEMENTS, "below"
         ),
         "size": _sanitize_reader_keyword(controls.get("size"), READER_CONTROLS_SIZES, "medium"),
         "style": sanitize_reader_controls_style(controls.get("style")),
     }
+    labels = _sanitize_reader_controls_labels(controls.get("labels"))
+    if labels:
+        sanitized["labels"] = labels
+    return sanitized
 
 
 def _sanitize_reader_end_of_entry(raw: Any) -> dict[str, Any]:

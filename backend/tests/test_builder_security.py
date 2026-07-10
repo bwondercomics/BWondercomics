@@ -270,6 +270,78 @@ class SanitizeHeaderMetaPhase5Test(unittest.TestCase):
         self.assertNotIn("appearance", result["blocks"]["brand"])
 
 
+class SanitizeReaderControlsTypographyTest(unittest.TestCase):
+    """Builder customization roadmap Phase 3 finish: typography, padding, labels."""
+
+    def test_appearance_text_group_tokens(self):
+        result = sanitize_module_config(
+            "reader",
+            {
+                "controls": {
+                    "style": {
+                        "defaults": {
+                            "appearance": {
+                                "text": {"size": 18, "weight": 900, "transform": "UPPERCASE"}
+                            }
+                        }
+                    }
+                }
+            },
+        )
+        text = result["controls"]["style"]["defaults"]["appearance"]["text"]
+        self.assertEqual(text["size"], 18)
+        self.assertEqual(text["weight"], "900")
+        self.assertEqual(text["transform"], "uppercase")
+
+        junk = sanitize_module_config(
+            "reader",
+            {
+                "controls": {
+                    "style": {
+                        "defaults": {
+                            "appearance": {"text": {"size": 9999, "weight": "heavy"}}
+                        }
+                    }
+                }
+            },
+        )
+        text = junk["controls"]["style"]["defaults"]["appearance"]["text"]
+        self.assertEqual(text["size"], 72)
+        self.assertIsNone(text["weight"])
+
+    def test_defaults_padding_sparse_and_clamped(self):
+        result = sanitize_module_config(
+            "reader",
+            {"controls": {"style": {"defaults": {"padding": 999}}}},
+        )
+        self.assertEqual(result["controls"]["style"]["defaults"]["padding"], 48)
+        self.assertNotIn("appearance", result["controls"]["style"]["defaults"])
+
+        empty = sanitize_module_config("reader", {"controls": {"style": {"defaults": {}}}})
+        self.assertNotIn("defaults", empty["controls"]["style"])
+
+    def test_labels_sparse_capped_and_key_filtered(self):
+        result = sanitize_module_config(
+            "reader",
+            {
+                "controls": {
+                    "labels": {
+                        "prev": "  BACKWARD  ",
+                        "fit": "x" * 60,
+                        "junk": "nope",
+                        "help": "",
+                    }
+                }
+            },
+        )
+        self.assertEqual(
+            result["controls"]["labels"], {"prev": "BACKWARD", "fit": "x" * 24}
+        )
+
+        unlabeled = sanitize_module_config("reader", {"controls": {}})
+        self.assertNotIn("labels", unlabeled["controls"])
+
+
 class SanitizeShellChromeModulesTest(unittest.TestCase):
     """Builder customization roadmap Phase 6: account gear + links grid as modules."""
 

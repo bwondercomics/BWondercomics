@@ -73,6 +73,10 @@ const READER_CONTROL_STYLE_VARS = Object.freeze([
   '--reader-control-border-style',
   '--reader-control-border-color',
   '--reader-control-border-radius',
+  '--reader-control-font-size',
+  '--reader-control-font-weight',
+  '--reader-control-text-transform',
+  '--reader-control-padding-x',
   '--reader-primary-control-bg',
   '--reader-primary-control-color',
   '--reader-primary-control-border',
@@ -80,6 +84,9 @@ const READER_CONTROL_STYLE_VARS = Object.freeze([
   '--reader-primary-control-border-style',
   '--reader-primary-control-border-color',
   '--reader-primary-control-border-radius',
+  '--reader-primary-control-font-size',
+  '--reader-primary-control-font-weight',
+  '--reader-primary-control-text-transform',
 ]);
 
 const HEX_COLOR_WITHOUT_ALPHA_RE = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
@@ -499,6 +506,9 @@ const PANEL_SHELL_APPEARANCE_PROPS = Object.freeze([
   'border-style',
   'border-color',
   'border-radius',
+  'font-size',
+  'font-weight',
+  'text-transform',
 ]);
 
 // Apply a panel column's appearance to the `<aside>` shell — the element the user sees as
@@ -628,10 +638,17 @@ function applyReaderControlAppearanceVars(element, appearance, prefix) {
     `${baseVar}-border-style`,
     `${baseVar}-border-color`,
     `${baseVar}-border-radius`,
+    `${baseVar}-font-size`,
+    `${baseVar}-font-weight`,
+    `${baseVar}-text-transform`,
   ].forEach((cssVar) => element.style.removeProperty(cssVar));
 
   if (backgroundValue) element.style.setProperty(`${baseVar}-bg`, backgroundValue);
   if (text.color) element.style.setProperty(`${baseVar}-color`, text.color);
+  // Phase 3 typography: font tokens from the appearance text group.
+  if (text.size != null) element.style.setProperty(`${baseVar}-font-size`, `${text.size}px`);
+  if (text.weight) element.style.setProperty(`${baseVar}-font-weight`, text.weight);
+  if (text.transform) element.style.setProperty(`${baseVar}-text-transform`, text.transform);
   if (borderValue) element.style.setProperty(`${baseVar}-border`, borderValue);
   if (border.width != null) {
     element.style.setProperty(`${baseVar}-border-width`, `${border.width}px`);
@@ -675,6 +692,37 @@ function resolveReaderModuleShellSettings(page, options = {}) {
     deviceId: options.deviceId,
   });
   return getReaderRuntimeConfig(effectiveConfig);
+}
+
+// Custom reader-button labels (Phase 3). The hardcoded markup text is captured once per
+// button and restored when a page has no custom label; `data-reader-label` also lets the
+// runtime writers that toggle text (fullscreen FULL/EXIT) restore the authored label.
+const READER_CONTROL_LABEL_BUTTONS = Object.freeze({
+  prev: 'prevBtn',
+  next: 'nextBtn',
+  help: 'helpBtn',
+  fit: 'fitBtn',
+  zoomIn: 'zoomIn',
+  zoomOut: 'zoomOut',
+  fullscreen: 'fullscreenBtn',
+});
+
+function applyReaderControlLabels(labels = {}) {
+  Object.entries(READER_CONTROL_LABEL_BUTTONS).forEach(([key, id]) => {
+    const button = document.getElementById(id);
+    if (!button) return;
+    if (button.dataset.readerDefaultLabel === undefined) {
+      button.dataset.readerDefaultLabel = button.textContent.trim();
+    }
+    const custom = String(labels?.[key] || '').trim();
+    if (custom) {
+      button.dataset.readerLabel = custom;
+      button.textContent = custom;
+    } else {
+      delete button.dataset.readerLabel;
+      button.textContent = button.dataset.readerDefaultLabel;
+    }
+  });
 }
 
 export function applyReaderModuleShellSettings(page, options = {}) {
@@ -725,6 +773,12 @@ export function applyReaderModuleShellSettings(page, options = {}) {
     applyPanelShellAppearance(controls, settings.controls.style.bar?.appearance || null);
     controls.classList.remove('side-panel--custom-chrome');
     controls.dataset.readerControlsGlow = settings.controls.style.glow === false ? 'off' : 'on';
+    // Granular horizontal button padding (Phase 3); null keeps the size preset's padding.
+    const paddingX = settings.controls.style.defaults?.padding;
+    if (paddingX != null) {
+      controls.style.setProperty('--reader-control-padding-x', `${paddingX}px`);
+    }
+    applyReaderControlLabels(settings.controls.labels);
     setHiddenState(controls, settings.controls.placement === 'hidden');
   }
 

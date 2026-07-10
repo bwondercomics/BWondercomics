@@ -14,8 +14,9 @@
   border-radius: var(--reader-control-border-radius, 0);
   color: var(--reader-control-color, var(--accent));
   font-family: 'Bebas Neue';
-  font-weight: 900;
-  text-transform: uppercase;
+  font-weight: var(--reader-control-font-weight, 900);
+  font-size: var(--reader-control-font-size, 1rem);
+  text-transform: var(--reader-control-text-transform, uppercase);
   box-shadow:
     0 4px 0 rgba(0, 0, 0, 0.3),
     0 0 15px rgba(255, 237, 0, 0.3);

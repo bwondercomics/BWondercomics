@@ -38,6 +38,9 @@ describe('appearance utilities', () => {
       },
       text: {
         color: null,
+        size: null,
+        weight: null,
+        transform: null,
       },
       border: {
         width: 0,
@@ -73,6 +76,9 @@ describe('appearance utilities', () => {
       },
       text: {
         color: '#ffffff',
+        size: null,
+        weight: null,
+        transform: null,
       },
       border: {
         width: null,
@@ -101,6 +107,9 @@ describe('appearance utilities', () => {
       },
       text: {
         color: '#ffed00',
+        size: null,
+        weight: null,
+        transform: null,
       },
       border: {
         width: null,
@@ -148,6 +157,9 @@ describe('appearance utilities', () => {
       },
       text: {
         color: '#ffffff',
+        size: null,
+        weight: null,
+        transform: null,
       },
       border: {
         width: 2,
@@ -173,6 +185,27 @@ describe('appearance utilities', () => {
     expect(appearanceToInlineStyle(appearance)).toBe(
       'background: #ff0000; color: #ffffff; border: 2px solid #00d9ff; border-radius: 8px'
     );
+  });
+
+  it('normalizes and emits the typography text group (Phase 3): size, weight, transform', () => {
+    const appearance = normalizeAppearance({
+      text: { size: 18, weight: 700, transform: 'uppercase' },
+    });
+    expect(appearance.text).toEqual({
+      color: null,
+      size: 18,
+      weight: '700',
+      transform: 'uppercase',
+    });
+    expect(appearanceToInlineStyle(appearance)).toBe(
+      'font-size: 18px; font-weight: 700; text-transform: uppercase'
+    );
+
+    // Junk values drop; a typography-only appearance still counts as stored values.
+    expect(
+      normalizeAppearance({ text: { size: 9999, weight: 'heavy', transform: 'wavy' } })?.text
+    ).toEqual({ color: null, size: 72, weight: null, transform: null });
+    expect(normalizeAppearance({ text: { weight: 'heavy', transform: 'wavy' } })).toBeNull();
   });
 
   it('appearanceToInlineStyle emits gradient CSS and converts hex colors to rgba when opacity is present', () => {

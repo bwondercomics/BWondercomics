@@ -75,7 +75,7 @@ export function renderThemeEditorContent(currentPage, draftMeta = null) {
       ${renderSectionCard(
         'Palette',
         'Color System',
-        'Primary reader tokens for chrome, accents, and panel surfaces.',
+        'Primary reader tokens for chrome, accents, and panel surfaces. Palette colors are defaults — anything styled directly on an element (panel, block, header part, reader control) keeps its own colors.',
         `<div class="pb-theme-colors">${colorsHtml}</div>`
       )}
     </div>

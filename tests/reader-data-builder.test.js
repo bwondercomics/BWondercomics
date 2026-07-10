@@ -1633,6 +1633,90 @@ describe('reader builder presentation loading', () => {
     expect(missing).toEqual([]);
   });
 
+  it('applies control typography, padding, and custom labels with restore (Phase 3)', () => {
+    const buildTypographyPage = () => {
+      const page = buildPanelSnapshot();
+      const readerModule = page.sections[0].modules.find((mod) => mod.moduleType === 'reader');
+      readerModule.config = {
+        ...readerModule.config,
+        controls: {
+          placement: 'below',
+          size: 'medium',
+          style: {
+            defaults: {
+              appearance: { text: { size: 18, weight: '900', transform: 'none' } },
+              padding: 24,
+            },
+            primary: { appearance: { text: { size: 22 } } },
+          },
+          labels: { prev: 'BACKWARD', fullscreen: 'CINEMA' },
+        },
+      };
+      return page;
+    };
+
+    applyBuilderPageToDOM(buildTypographyPage(), { seriesId: 'battle-bros', previewMode: true });
+
+    const controls = document.getElementById('controls');
+    expect(controls?.style.getPropertyValue('--reader-control-font-size')).toBe('18px');
+    expect(controls?.style.getPropertyValue('--reader-control-font-weight')).toBe('900');
+    expect(controls?.style.getPropertyValue('--reader-control-text-transform')).toBe('none');
+    expect(controls?.style.getPropertyValue('--reader-primary-control-font-size')).toBe('22px');
+    expect(controls?.style.getPropertyValue('--reader-control-padding-x')).toBe('24px');
+    expect(document.getElementById('prevBtn')?.textContent).toBe('BACKWARD');
+    expect(document.getElementById('fullscreenBtn')?.textContent).toBe('CINEMA');
+    expect(document.getElementById('fullscreenBtn')?.dataset.readerLabel).toBe('CINEMA');
+    // Unlabeled buttons keep their built-in text.
+    expect(document.getElementById('nextBtn')?.textContent?.trim()).toBe('NEXT >');
+
+    // A page without customization restores stock typography and labels.
+    applyBuilderPageToDOM(buildPanelSnapshot(), { seriesId: 'battle-bros', previewMode: true });
+    expect(controls?.style.getPropertyValue('--reader-control-font-size')).toBe('');
+    expect(controls?.style.getPropertyValue('--reader-control-padding-x')).toBe('');
+    expect(document.getElementById('prevBtn')?.textContent?.trim()).toBe('< BACK');
+    expect(document.getElementById('fullscreenBtn')?.dataset.readerLabel).toBeUndefined();
+  });
+
+  it('keeps element-level colors over the palette across theme changes (Phase 7 precedence)', () => {
+    // The palette contract: theme tokens are document-root CSS variables that stylesheets
+    // consume as defaults; element-level colors apply inline ON the element and must win.
+    // This test fails if palette application ever starts clobbering element colors (e.g.
+    // theme tokens written as inline element styles).
+    const buildThemedPage = (primary) => {
+      const page = getContractFixture('builderPage');
+      page.meta.theme = { ...(page.meta.theme || {}), primary };
+      page.meta.header = {
+        ...(page.meta.header || {}),
+        blocks: {
+          ...(page.meta.header?.blocks || {}),
+          // Element-level color on the entry picker, whose stylesheet default is
+          // literally var(--entry-select-border-color, var(--primary)).
+          entryControls: { enabled: true, appearance: { border: { width: 2, color: '#ff00ea' } } },
+          // Status block left untouched: it must keep following the palette.
+          status: { enabled: true },
+        },
+      };
+      return page;
+    };
+
+    applyBuilderPageToDOM(buildThemedPage('#123456'), { seriesId: 'battle-bros' });
+
+    const entryControls = document.querySelector('.entry-controls');
+    expect(document.documentElement.style.getPropertyValue('--primary')).toBe('#123456');
+    expect(entryControls?.style.getPropertyValue('--entry-select-border-color')).toBe('#ff00ea');
+    // Uncustomized surfaces carry no inline color, so they keep resolving to the palette.
+    expect(document.getElementById('statusPanel')?.style.getPropertyValue('border-color')).toBe('');
+
+    // Changing the palette repaints defaults only; the element-level color is untouched.
+    applyBuilderPageToDOM(buildThemedPage('#654321'), { seriesId: 'battle-bros' });
+    expect(document.documentElement.style.getPropertyValue('--primary')).toBe('#654321');
+    expect(
+      document
+        .querySelector('.entry-controls')
+        ?.style.getPropertyValue('--entry-select-border-color')
+    ).toBe('#ff00ea');
+  });
+
   it('clears stale page theme variables before applying the next snapshot', () => {
     const themedPage = getContractFixture('builderPage');
     const defaultThemePage = getContractFixture('builderPage');
@@ -1870,6 +1954,9 @@ describe('reader builder presentation loading', () => {
         },
         text: {
           color: null,
+          size: null,
+          weight: null,
+          transform: null,
         },
         border: {
           width: null,
@@ -1890,6 +1977,9 @@ describe('reader builder presentation loading', () => {
         },
         text: {
           color: '#ffffff',
+          size: null,
+          weight: null,
+          transform: null,
         },
         border: {
           width: null,

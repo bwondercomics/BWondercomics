@@ -32,6 +32,9 @@ const CONTROLLED_TOPBAR_STYLE_PROPS = [
   'border-style',
   'border-color',
   'border-radius',
+  'font-size',
+  'font-weight',
+  'text-transform',
 ];
 
 // Per-block appearance (Phase 5) uses the same controlled-props discipline as the

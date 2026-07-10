@@ -1,10 +1,11 @@
 # Builder Customization Roadmap
 
-Status: Phases 0–6 implemented (Phase 6 closed 2026-07-07: account gear + links grid are
-placeable modules with delegated behavior and zero-change shell defaults). Deferred items are
-tracked in the completion notes. Phase 7 rescoped 2026-07-07: Fast Start and the palette stay;
-element-over-palette precedence already holds — the phase is now a small regression-test +
-copy pass.
+Status: **All phases (0–7) implemented, no phase-step work remaining** (Phase 3's deferred
+typography/padding/labels closed 2026-07-08 — the shared appearance text group now exists for
+every appearance editor). Remaining deferred backlog in the completion notes: Phase 2
+module-appearance audit, Phase 5 logo image picker, Phase 7 palette-only surfaces (title
+gradient, COVERS button — both now partially reachable via the text group), plus per-phase
+manual QA.
 Created: 2026-07-05
 Branch context: `builder-incremental-improvement` — the Panel/Column Settings Consolidation Plan
 (Phases 1–4) is implemented up to HEAD (`c82d986`), but its release gates (data migrations, manual
@@ -571,14 +572,14 @@ typography, and label text are hardcoded; the end-of-entry popup cannot be disab
 - [x] **Controls bar appearance**: `config.controls.bar.appearance` (background + opacity, border,
       radius) applied to `.controls` via CSS vars / inline style at mount. Transparency = the
       appearance schema's existing background opacity.
-- [ ] **Button typography**: extend the shared appearance schema with an optional **text group**
+- [x] **Button typography**: extend the shared appearance schema with an optional **text group**
       (font size, weight, transform, color) — reused later by header/entry-selector phases. Wire
       `controls.style.defaults/primary` text tokens to new `--reader-control-font-*` vars consumed
       by `main.core.15-controls.css`.
-- [ ] **Granular shape/size**: `controls.style.defaults.padding` (+ radius already available via
-      border.radius); keep compact/medium/large presets as quick-set buttons that fill the same
-      fields.
-- [ ] **Custom labels**: `config.controls.labels { prev, next, help, fit, zoomIn, zoomOut,
+- [x] **Granular shape/size**: `controls.style.defaults.padding` (+ radius already available via
+      border.radius); the compact/medium/large size select stays and provides the padding/font
+      fallbacks (the preset rules are now var-driven, so explicit values always win).
+- [x] **Custom labels**: `config.controls.labels { prev, next, help, fit, zoomIn, zoomOut,
 fullscreen }` (length-capped, sanitized); applied at mount; defaults = current hardcoded
       text so unset pages are unchanged.
 - [x] **End-of-entry popup**: `config.endOfEntry = { enabled: true, title?, body?, appearance? }`.
@@ -586,7 +587,44 @@ fullscreen }` (length-capped, sanitized); applied at mount; defaults = current h
       appearance applies to `.entry-end-content`; text fields override the dynamic defaults.
       Builder UI: a "Completion Popup" accordion in the reader editor.
 
-### Completed 2026-07-05 (typography, labels, and granular padding deferred)
+### Completion note 2026-07-08 (typography, padding, labels shipped — phase closed)
+
+- **Shared appearance text group** (used by every appearance editor, not just the reader):
+  `text.size` (8–72 px), `text.weight` (400–900 keyword), `text.transform`
+  (none/uppercase/lowercase/capitalize) added to `appearance-utils.js` (normalize/merge/
+  inline-style emission), the editor field group (`appearance-editor.js`), and
+  `sanitize_appearance` (`builder_security.py`). Controlled-props appliers extended so the new
+  inline tokens clear correctly (panel shell + controls bar in `reader/data.js`, header
+  shell/blocks/logo in `reader/header-layout.js`) — header blocks and the logo got typography
+  styling for free.
+- **Reader control fonts**: `applyReaderControlAppearanceVars` now emits
+  `--reader-control-font-size/-font-weight/-text-transform` (+ primary variants, which fall
+  back to the defaults' values); `main.core.15-controls.css` and the page indicator
+  (`main.core.16-status-progress.css`) consume them with stock fallbacks. The
+  compact/medium/large preset rules are var-driven too, so an explicit font size wins over
+  the preset instead of being overridden by its higher-specificity rule.
+- **Granular padding**: `controls.style.defaults.padding` (0–48 px, sparse) →
+  `--reader-control-padding-x`, consumed by `.btn`/`.btn.primary` at every preset size;
+  "Button Padding (px)" input in the reader editor (blank = preset default). Draft plumbing
+  preserves it (`removeNullAppearanceBranches` restructured).
+- **Custom labels**: `controls.labels { prev, next, help, fit, zoomIn, zoomOut, fullscreen }`
+  (≤24 chars, sparse; `_sanitize_reader_controls_labels`), "Button Labels" section in the
+  reader editor, applied at mount by `applyReaderControlLabels` (`reader/data.js`) with
+  first-run capture of the hardcoded text for restore; `reader/fullscreen.js` restores the
+  authored label (via `data-reader-label`) instead of hardcoded "FULL" when exiting
+  fullscreen.
+- Tests: appearance text-group normalize/emit + junk clamps (`tests/appearance-utils.test.js`),
+  labels/padding normalization (`tests/reader-config.test.js`), end-to-end mount apply/restore
+  (`tests/reader-data-builder.test.js`), backend typography/padding/labels
+  (`backend/tests/test_builder_security.py`); existing exact-shape appearance assertions
+  updated for the new text leafs.
+- Verified: `npm test` (637 passed, 1 skipped), `npm run test:backend` (123), `npm run lint`,
+  `npm run format:check`, `format:py`/`lint:py`, `npm run build`, `npm run test:visual` (20
+  passed; one flaky run passed clean on the rerun). API container restarted + live sanitizer
+  smoke-checked. Manual check for the user: restyle a button font + rename a label on a live
+  page and save/reload.
+
+### Completed 2026-07-05 (typography, labels, and granular padding deferred — since closed above)
 
 - **Controls bar appearance** (`config.controls.style.bar.appearance`): third slot alongside
   defaults/primary in `normalizeReaderControlsStyle` (`reader-config.js`),
@@ -961,16 +999,33 @@ typography (the Phase 3 deferred item).
 
 ### Steps
 
-- [ ] **Precedence regression test**: apply a page theme (e.g. `primary`) and an element-level
+- [x] **Precedence regression test**: apply a page theme (e.g. `primary`) and an element-level
       color to the same surface (a panel border or the entry picker), assert the element value
       wins in the rendered DOM and survives a theme change (extend
       `tests/reader-data-builder.test.js` theme tests).
-- [ ] **Builder copy note**: one line in the theme tab ("Palette colors are defaults — anything
+- [x] **Builder copy note**: one line in the theme tab ("Palette colors are defaults — anything
       styled on an element keeps its own colors."), so authors understand why a preset doesn't
       repaint customized elements.
-- [ ] Fold the **no-control surfaces** into the deferred backlog rather than this phase: title
+- [x] Fold the **no-control surfaces** into the deferred backlog rather than this phase: title
       gradient styling and COVERS button color (candidates for the Phase 5 brand/entry-picker
       editors), reader-button typography (already tracked as the Phase 3 deferred item).
+
+### Completion note 2026-07-07 (phase implemented — all roadmap phases closed)
+
+- **Precedence regression test** ("keeps element-level colors over the palette across theme
+  changes", `tests/reader-data-builder.test.js`): themes `--primary` on the document root,
+  styles the entry picker's border at the element level, asserts the inline element value wins
+  and survives a palette change while an uncustomized block (status) keeps following the
+  palette. Fails if palette application ever clobbers element colors (inline theme writes on
+  elements, `!important` color rules).
+- **Theme tab copy**: the Palette / Color System card now states the contract — palette colors
+  are defaults; anything styled directly on an element keeps its own colors
+  (`theme-editor.js`). Fast Start presets and palette editing unchanged.
+- **Deferred backlog** (palette-only surfaces, candidates for future slices): title `h1`
+  gradient styling (brand editor), COVERS button color (entry-picker editor — hardcoded cyan
+  today, not even palette-driven), reader-button typography (Phase 3 deferred).
+- Verified: `npm test` (634 passed, 1 skipped), `npm run lint`, `npm run format:check`,
+  `npm run build`, `npm run test:visual` (20 passed). No backend changes.
 
 ### Acceptance
 
