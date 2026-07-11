@@ -1,5 +1,14 @@
+{
+	# UDP/443 is published by LiveKit TURN in this stack, so do not
+	# advertise HTTP/3 from Caddy unless UDP/443 is moved back to Caddy.
+	servers {
+		protocols h1 h2
+	}
+}
+
 bwondercomics.com {
 	encode gzip
+	header Alt-Svc "clear"
 	reverse_proxy /api/* bwondercomics-api:8000
 	reverse_proxy /.well-known/openid-configuration bwondercomics-api:8000
 	reverse_proxy /.well-known/jwks.json bwondercomics-api:8000
@@ -13,7 +22,7 @@ bwondercomics.com {
 
 	@site_branding_pages path / /index.html /feed.html /comics.html /media.html /manifest.json
 	reverse_proxy @site_branding_pages bwondercomics-api:8000
-	
+
 	handle /comics/* {
 		root * /srv/bwondercomics
 		file_server
@@ -56,6 +65,7 @@ bwondercomics.com {
 
 chat.bwondercomics.com {
 	encode gzip
+	header Alt-Svc "clear"
 
 	@chat_sso_bootstrap path /sso/bootstrap
 	handle @chat_sso_bootstrap {

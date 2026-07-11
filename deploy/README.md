@@ -99,8 +99,30 @@ Notes:
 
 - Restarting `bwondercomics-api` is required because uvicorn is not running with hot reload.
 - Restarting `caddy` is required if the Caddyfile changed or if the exact-path branding proxy routes were not active yet.
+- Caddy is intentionally configured for HTTP/1.1 and HTTP/2 only and sends `Alt-Svc: clear` because UDP/443 is published by LiveKit TURN. Re-enable HTTP/3 only if UDP/443 is moved back to Caddy.
 - Origin HTML/manifest responses use `Cache-Control: no-store`, so the change is visible on the next request. Social platforms may still hold a cached preview.
 - Only `public` media can be used for branding. Invalid or protected paths fall back to `assets/banner1.png` for OG and `assets/boywondericon.png` for favicon.
+
+## Dynamic DNS
+
+The domain uses Namecheap Dynamic DNS so `bwondercomics.com` can follow the router's dynamic WAN IP.
+
+- Config: `deploy/namecheap-ddns.env`
+- Updater script: `deploy/namecheap-ddns.sh`
+- Installed systemd units: `/etc/systemd/system/namecheap-ddns.service` and `/etc/systemd/system/namecheap-ddns.timer`
+
+The timer runs 2 minutes after boot and then every 10 minutes. If devices outside the server still
+hit an old IP after a reboot, check:
+
+```bash
+systemctl status namecheap-ddns.timer --no-pager
+systemctl status namecheap-ddns.service --no-pager
+dig A bwondercomics.com @dns1.registrar-servers.com +short
+dig A bwondercomics.com @1.1.1.1 +noall +answer
+```
+
+The authoritative Namecheap answer should match the server's current public IPv4. Recursive
+resolvers can continue serving an older cached answer until that record's TTL expires.
 
 ## Firewall (UFW)
 

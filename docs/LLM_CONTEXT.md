@@ -83,7 +83,7 @@ All services are running in the live stack:
 - Backup script: `deploy/bwondercomics-backup.sh`
 - DB-only compose file: `deploy/bwondercomics-db-compose.yml`
 - Fail2ban config lives in `deploy/fail2ban/`
-- Namecheap DDNS env files in `deploy/namecheap-ddns.env*`
+- Namecheap DDNS uses `deploy/namecheap-ddns.sh` with `deploy/namecheap-ddns.env*`; the installed `namecheap-ddns.timer` runs it 2 minutes after boot and then every 10 minutes.
 
 Note: Some older docs reference `/srv/bwondercomics`; the live repo is `/srv/bw-quality`.
 
@@ -181,6 +181,7 @@ Vite proxies these to the API (so data.json/series.json work):
 - Proxies `/api/*` to `bwondercomics-api:8000`
 - Proxies `/data.json`, `/series.json`, `/page-config.json`, `/media.json`, `/series/*` to the API
 - Proxies `/`, `/index.html`, `/feed.html`, `/comics.html`, `/media.html`, and `/manifest.json` to the API so FastAPI can inject site branding into crawler-visible HTML and the web manifest
+- Caddy is intentionally limited to HTTP/1.1 and HTTP/2 and sends `Alt-Svc: clear`. UDP/443 is reserved for LiveKit TURN, so do not re-enable HTTP/3 unless UDP/443 is moved back to Caddy.
 
 #### Serves static:
 
