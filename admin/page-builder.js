@@ -56,6 +56,7 @@ import {
   validateReaderBindingPage,
 } from './page-builder/reader-binding-validation.js';
 import {
+  validateBuilderRuntimeContract,
   isSectionResponsiveField,
   pruneEmptyResponsiveOverrides,
   setResponsiveOverrideValue,
@@ -66,6 +67,7 @@ import {
   fetchSeriesPages,
   fetchGlobalPages,
   fetchPage,
+  fetchPageBuilderRuntime,
   createScopedPage,
   deletePage,
   updatePage,
@@ -81,6 +83,7 @@ import {
   addModule,
   updateModule,
   moveModule,
+  saveModulePlacements,
   reorderModules,
   deleteModule,
   reorderScopedPages,
@@ -140,6 +143,7 @@ function createPageBuilder({
   let activeDeviceId = BUILDER_DEVICE_ORDER[0];
   /** @type {'global'|'device'} */
   let responsiveEditScope = 'global';
+  let builderRuntime = validateBuilderRuntimeContract(null);
   /** @type {'builder'|'designer'} */
   let activeEntrypoint = 'builder';
   /** @type {''|'header'} */
@@ -171,6 +175,7 @@ function createPageBuilder({
       activeThemeDraft,
       activeHeaderDraft,
       activePageSettingsDraft,
+      builderRuntime,
     }),
     actions: {
       getSelectedModuleRecord,
@@ -212,10 +217,12 @@ function createPageBuilder({
       renderEditorPanel: () => renderEditorPanel(),
       renderPageList: () => renderPageList(),
       syncDesignerRoute: (mode) => syncDesignerRoute(mode),
+      requestTargetRefresh: () => previewManager.requestTargetRefresh?.(),
     },
     deps: {
       updateModule,
       updatePage,
+      saveModulePlacements,
     },
   });
 
@@ -246,6 +253,7 @@ function createPageBuilder({
       activeDeviceId,
       previewWidth: activeDeviceId,
       responsiveEditScope,
+      builderRuntime,
       dirtyScope,
     }),
     actions: {
@@ -328,8 +336,10 @@ function createPageBuilder({
   const canvasMutations = createCanvasMutations({
     getState: () => ({
       currentPage,
+      dirtyScope,
     }),
     actions: {
+      ensureCleanWorkspace,
       setActiveInsertTarget: (target) => {
         activeInsertTarget = target;
       },
@@ -341,6 +351,7 @@ function createPageBuilder({
         draftManager.clearActiveSectionState();
         selectedCanvasSurface = null;
         dirtyScope = null;
+        draftManager.clearStructureDraft();
         activeInsertTarget = null;
         liveDragState = null;
         clearInlineEditView('mutation-reconciliation', 'cancel');
@@ -642,6 +653,8 @@ function createPageBuilder({
       insertModuleAt: canvasMutations.insertModuleAt,
       duplicateModuleAfter: canvasMutations.duplicateModuleAfter,
       moveModuleToTarget: canvasMutations.moveModuleToTarget,
+      stageModuleMoveStep: (moduleId, direction) =>
+        draftManager.stageStructureMove(moduleId, direction),
       insertSectionAt: canvasMutations.insertSectionAt,
       reorderSectionToIndex: canvasMutations.reorderSectionToIndex,
       deleteModuleFromCanvas,
@@ -1051,11 +1064,11 @@ function createPageBuilder({
   }
 
   function canSaveCurrentDraft() {
-    return isDraftHistoryScope(dirtyScope);
+    return isDraftHistoryScope(dirtyScope) || dirtyScope === 'structure';
   }
 
   function canDiscardCurrentDraft() {
-    return isDraftHistoryScope(dirtyScope);
+    return isDraftHistoryScope(dirtyScope) || dirtyScope === 'structure';
   }
 
   async function saveCurrentDraft() {
@@ -1070,6 +1083,7 @@ function createPageBuilder({
     else if (scope === 'theme') saved = await draftManager.saveActiveThemeDraft();
     else if (scope === 'page-settings') saved = await draftManager.saveActivePageSettingsDraft();
     else if (scope === 'section') saved = await saveSectionSettings();
+    else if (scope === 'structure') saved = await draftManager.saveStructureDraft();
     return saved ? { ok: true } : { ok: false, status: 'Failed to save draft.' };
   }
 
@@ -1084,6 +1098,7 @@ function createPageBuilder({
     else if (scope === 'theme') draftManager.discardActiveThemeDraft();
     else if (scope === 'page-settings') draftManager.discardActivePageSettingsDraft();
     else if (scope === 'section') discardSectionSettings();
+    else if (scope === 'structure') draftManager.discardStructureDraft();
     return { ok: true };
   }
 
@@ -1132,6 +1147,8 @@ function createPageBuilder({
       setEditorStatus('Unsaved page settings. Save or discard before switching.', 'warning');
     } else if (scope === 'section') {
       setCanvasStatus('Unsaved section settings. Save or discard before switching.', 'warning');
+    } else if (scope === 'structure') {
+      setEditorStatus('Unsaved module moves. Save or discard before switching.', 'warning');
     }
     if (isDraftHistoryScope(scope)) {
       draftUndoStack?.record(scope);
@@ -1356,14 +1373,21 @@ function createPageBuilder({
     if (!footer) return;
 
     const footerScope = footer.dataset.scope;
-    const isDirty = dirtyScope === footerScope;
+    const isDirty =
+      dirtyScope === footerScope || (dirtyScope === 'structure' && footerScope === 'module');
     const statusEl = footer.querySelector('[data-editor-status]');
     const saveBtn = footer.querySelector('[data-action="save-current"]');
     const discardBtn = footer.querySelector('[data-action="discard-current"]');
     const undoBtn = footer.querySelector('[data-action="undo-current"]');
     const redoBtn = footer.querySelector('[data-action="redo-current"]');
 
-    if (saveBtn) saveBtn.disabled = !isDirty;
+    const moduleSaveBlocked = footerScope === 'module' && builderRuntime?.compatible !== true;
+    if (saveBtn) {
+      saveBtn.disabled = !isDirty || moduleSaveBlocked;
+      saveBtn.title = moduleSaveBlocked
+        ? 'Restart or update the builder API before saving module changes.'
+        : '';
+    }
     if (discardBtn) discardBtn.disabled = !isDirty;
     if (undoBtn) undoBtn.disabled = !canUndoDraft();
     if (redoBtn) redoBtn.disabled = !canRedoDraft();
@@ -1384,9 +1408,13 @@ function createPageBuilder({
         'page-settings': 'Page settings have unsaved changes.',
         section: 'Section settings have unsaved changes.',
         module: 'Module draft has unsaved changes.',
+        structure: 'Module moves have unsaved changes.',
       };
-      if (isDirty) {
-        message = dirtyMessages[footerScope] || dirtyMessages.module;
+      if (editorStatus.message && editorStatus.type === 'danger') {
+        message = editorStatus.message;
+        type = 'danger';
+      } else if (isDirty) {
+        message = dirtyMessages[dirtyScope] || dirtyMessages[footerScope] || dirtyMessages.module;
         type = 'warning';
       } else if (editorStatus.message) {
         message = editorStatus.message;
@@ -1433,6 +1461,7 @@ function createPageBuilder({
     activeHeaderDraft = currentPage ? draftManager.normalizeHeaderDraft(currentPage) : null;
     draftManager.initializePageSettingsDraft();
     draftManager.clearActiveSectionState();
+    draftManager.clearStructureDraft();
     dirtyScope = null;
     editorStatus = { type: 'neutral', message: '' };
     canvasStatus = { type: 'neutral', message: '' };
@@ -1662,6 +1691,15 @@ function createPageBuilder({
   }
 
   async function hideModuleOnCurrentDevice(moduleId) {
+    if (builderRuntime?.compatible !== true) {
+      setCanvasStatus(
+        'Builder API restart required before responsive module changes can be saved.',
+        'danger'
+      );
+      renderCanvas();
+      renderEditorPanel();
+      return false;
+    }
     const module = getSelectedModuleRecord(moduleId);
     if (!module) return false;
     const invalidation = getReaderBindingInvalidationWarning(currentPage, {
@@ -2334,7 +2372,8 @@ function createPageBuilder({
       dirtyScope === 'module' ||
       dirtyScope === 'theme' ||
       dirtyScope === 'header' ||
-      dirtyScope === 'section'
+      dirtyScope === 'section' ||
+      dirtyScope === 'structure'
     ) {
       const sameModule = dirtyScope === 'module' && selectedModuleId === moduleId;
       if (!sameModule) {
@@ -2614,6 +2653,7 @@ function createPageBuilder({
 
   function renderCanvas() {
     if (!el.pbCanvas) return;
+    pageActions.syncPublicationActions();
     renderLayerTree();
     syncCanvasModeUi();
 
@@ -2774,6 +2814,7 @@ function createPageBuilder({
     }
     setActiveNav(el.btnDesigner);
 
+    builderRuntime = validateBuilderRuntimeContract(await fetchPageBuilderRuntime());
     await pageActions.loadPages();
     renderModulePalette();
 
@@ -2939,11 +2980,11 @@ function createPageBuilder({
     });
 
     el.pbSaveDraft?.addEventListener('click', async () => {
-      await pageActions.updatePublishState(false);
+      await pageActions.savePage();
     });
 
     el.pbPublish?.addEventListener('click', async () => {
-      await pageActions.updatePublishState(true);
+      await pageActions.updatePublishState(currentPage?.isPublished !== true);
     });
 
     // ── View toggle (Edit / Preview) ──────────────────────────────────────────

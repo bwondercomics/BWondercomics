@@ -198,7 +198,7 @@ function renderColumnFields(draft, index, options = {}) {
   const paddingInputs = ['Top', 'Right', 'Bottom', 'Left']
     .map((side) => {
       const value = padding[side.toLowerCase()];
-      return `<input type="number" class="pb-editor-input pb-column-padding-input" min="0" step="1" value="${escapeAttr(String(value ?? ''))}" placeholder="${side[0]}" aria-label="Padding ${side}" data-column-field="padding${side}" data-column-index="${index}" />`;
+      return `<label class="pb-column-padding-field"><span>${side}</span><input type="number" class="pb-editor-input pb-column-padding-input" min="0" step="1" value="${escapeAttr(String(value ?? ''))}" placeholder="0" aria-label="Padding ${side}" data-column-field="padding${side}" data-column-index="${index}" /></label>`;
     })
     .join('');
   const alignmentField = includeAlignment
@@ -236,7 +236,7 @@ function renderColumnFields(draft, index, options = {}) {
           )}
           ${alignmentField}
           <div class="pb-editor-field">
-            <label class="pb-editor-label">Padding (T / R / B / L)</label>
+            <label class="pb-editor-label">Padding</label>
             <div class="pb-column-padding-grid">${paddingInputs}</div>
           </div>
           <div class="pb-editor-field">
@@ -566,6 +566,19 @@ function renderShell({
       </div>
       <div class="pb-editor-content">${contentHtml}</div>
       ${footerHtml}
+    </div>
+  `;
+}
+
+function renderBuilderRuntimeWarning(runtime) {
+  if (runtime?.compatible === true) return '';
+  const version = runtime?.contractVersion
+    ? `Loaded API contract ${runtime.contractVersion}; expected ${runtime.expectedContractVersion}.`
+    : 'The responsive builder API contract is unavailable.';
+  return `
+    <div class="pb-runtime-warning" role="alert" data-builder-runtime-warning>
+      <strong>Builder API restart required.</strong>
+      <span>${escapeHtml(version)} Module saves are blocked so responsive drafts cannot be discarded.</span>
     </div>
   `;
 }
@@ -912,7 +925,7 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       kicker,
       title,
       subtitle,
-      contentHtml,
+      contentHtml: `${renderBuilderRuntimeWarning(state.builderRuntime)}${contentHtml}`,
       footerHtml,
     });
     restoreEditorContentScroll(scrollSnapshot, editorContextKey);

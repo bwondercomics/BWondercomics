@@ -112,8 +112,19 @@ async function setupPageBuilder({
   reorderModulesResult = true,
   reorderSectionsResult = true,
   updatePageResult = null,
+  saveModulePlacementsResult = null,
   updatePageBindingsResult = undefined,
   pageBuilderDataError = null,
+  pageBuilderRuntimeResult = {
+    contractVersion: 1,
+    processStartedAt: '2026-07-14T10:00:00+00:00',
+    capabilities: [
+      'responsive-module-round-trip',
+      'responsive-feed-layout',
+      'responsive-reader-controls',
+      'responsive-public-media-css',
+    ],
+  },
   updateModuleResult = undefined,
   useRealEditors = false,
   viewportWidth = 1600,
@@ -138,6 +149,7 @@ async function setupPageBuilder({
   const fetchPage = vi.fn(async (...args) =>
     typeof fetchPageResult === 'function' ? fetchPageResult(...args) : fetchPageResult
   );
+  const fetchPageBuilderRuntime = vi.fn(async () => pageBuilderRuntimeResult);
   const createPage = vi.fn(async () => createPageResult);
   const createScopedPage = vi.fn(async () => createPageResult);
   const deletePage = vi.fn(async () => deletePageResult);
@@ -155,6 +167,7 @@ async function setupPageBuilder({
         ...data,
       }
   );
+  const saveModulePlacements = vi.fn(async () => saveModulePlacementsResult || fetchPageResult);
   const addSection = vi.fn(async () => ({
     id: 'new-section-id',
     layout: '1',
@@ -202,12 +215,14 @@ async function setupPageBuilder({
     fetchSeriesPages,
     fetchGlobalPages,
     fetchPage,
+    fetchPageBuilderRuntime,
     createPage,
     createScopedPage,
     deletePage,
     reorderPages,
     reorderScopedPages,
     updatePage,
+    saveModulePlacements,
     getLastPageBuilderDataError,
     fetchPageBindings,
     updatePageBindings,
@@ -267,6 +282,7 @@ async function setupPageBuilder({
       createScopedPage,
       deletePage,
       fetchPage,
+      fetchPageBuilderRuntime,
       fetchPages,
       fetchSeriesPages,
       fetchGlobalPages,
@@ -279,6 +295,7 @@ async function setupPageBuilder({
       updateSection,
       updateModule,
       updatePage,
+      saveModulePlacements,
       getLastPageBuilderDataError,
       updatePageBindings,
       deleteSection,
@@ -2502,7 +2519,7 @@ describe('admin page-builder shell', () => {
     );
   });
 
-  it('renders page status details and supports explicit draft/publish actions', async () => {
+  it('preserves publication on Save Page and uses explicit publish-state actions', async () => {
     const selectedPage = getContractFixture('builderPage');
     const { manager, mocks } = await setupPageBuilder({
       fetchPagesResults: [[selectedPage]],
@@ -2536,7 +2553,29 @@ describe('admin page-builder shell', () => {
 
     expect(mocks.updatePage).toHaveBeenCalledWith(
       selectedPage.id,
+      expect.objectContaining({ isPublished: true })
+    );
+    expect(document.getElementById('pbPageTitle')?.textContent).toContain('Published');
+    expect(document.getElementById('pbPageTitle')?.textContent).toContain(
+      'Published page. Open Reader matches the public reader.'
+    );
+    expect(document.querySelector('.pb-open-reader-link')?.getAttribute('href')).not.toContain(
+      'draft=1'
+    );
+    expect(document.querySelector('.pb-open-reader-link')?.textContent).toContain('Open Reader');
+    expect(document.getElementById('pbSaveDraft')?.textContent).toBe('Save Page');
+    expect(document.getElementById('pbPublish')?.textContent).toBe('Unpublish');
+
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    document.getElementById('pbPublish')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.updatePage).toHaveBeenCalledWith(
+      selectedPage.id,
       expect.objectContaining({ isPublished: false })
+    );
+    expect(window.confirm).toHaveBeenCalledWith(
+      'Unpublish this page? It will no longer be public.'
     );
     expect(document.getElementById('pbPageTitle')?.textContent).toContain('Draft');
     expect(document.getElementById('pbPageTitle')?.textContent).toContain(
@@ -2548,22 +2587,7 @@ describe('admin page-builder shell', () => {
     expect(document.querySelector('.pb-open-reader-link')?.textContent).toContain(
       'Open Draft Preview'
     );
-
-    document.getElementById('pbPublish')?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-    await flushAdminUi(3);
-
-    expect(mocks.updatePage).toHaveBeenCalledWith(
-      selectedPage.id,
-      expect.objectContaining({ isPublished: true })
-    );
-    expect(document.getElementById('pbPageTitle')?.textContent).toContain('Published');
-    expect(document.getElementById('pbPageTitle')?.textContent).toContain(
-      'Published page. Open Reader matches the public reader.'
-    );
-    expect(document.querySelector('.pb-open-reader-link')?.getAttribute('href')).not.toContain(
-      'draft=1'
-    );
-    expect(document.querySelector('.pb-open-reader-link')?.textContent).toContain('Open Reader');
+    expect(document.getElementById('pbPublish')?.textContent).toBe('Publish');
   });
 
   it('blocks page-header selection while section settings have unsaved changes', async () => {
@@ -2613,7 +2637,7 @@ describe('admin page-builder shell', () => {
     );
   });
 
-  it('persists a normalized v3 page header on explicit draft saves for legacy pages', async () => {
+  it('persists a normalized v3 page header without changing publication state', async () => {
     const legacyPage = getContractFixture('builderPage');
     delete legacyPage.meta.header;
     const { manager, mocks } = await setupPageBuilder({
@@ -2638,7 +2662,7 @@ describe('admin page-builder shell', () => {
     expect(mocks.updatePage).toHaveBeenCalledWith(
       legacyPage.id,
       expect.objectContaining({
-        isPublished: false,
+        isPublished: true,
         meta: expect.objectContaining({
           header: expect.objectContaining({
             version: 3,
@@ -3013,7 +3037,6 @@ describe('admin page-builder shell', () => {
         ?.querySelector('[data-width="desktop"]')
         ?.classList.contains('pb-width-toggle--active')
     ).toBe(false);
-
     // Switch to mobile
     widthToggles
       ?.querySelector('[data-width="mobile"]')
@@ -3029,7 +3052,10 @@ describe('admin page-builder shell', () => {
     expect(getPreviewIframe()?.style.height).toBe('812px');
     const mobileSnapshot = requestCurrentPreviewSnapshot();
     expect(mobileSnapshot?.options.deviceId).toBe('mobile');
-    expect(mobileSnapshot?.options.viewport).toMatchObject({ id: 'mobile', width: 375 });
+    expect(mobileSnapshot?.options.viewport).toMatchObject({
+      id: 'mobile',
+      width: 375,
+    });
 
     // Back to desktop
     widthToggles
@@ -3107,6 +3133,221 @@ describe('admin page-builder shell', () => {
     deviceScopeSelect.dispatchEvent(new Event('change', { bubbles: true }));
     await flushAdminUi(1);
     expect(document.querySelector('[data-key="alignment"]')?.value).toBe('right');
+  });
+
+  it('round-trips Spacer, Feed, and Reader overrides across Tablet and Phone saves', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const section = selectedPage.sections.find((item) => item.layout === '1-1');
+    const spacerModule = section.modules.find((module) => module.moduleType === 'spacer');
+    const feedModule = section.modules.find((module) => module.moduleType === 'feed');
+    const readerModule = {
+      ...getContractFixture('builderModules').reader,
+      id: 'responsive-reader-module',
+      columnIndex: 0,
+      sortIndex: 80,
+      config: {
+        ...getContractFixture('builderModules').reader.config,
+        controls: {
+          ...getContractFixture('builderModules').reader.config.controls,
+          style: { defaults: { padding: 10 } },
+        },
+      },
+    };
+    section.modules.push(readerModule);
+    const globalSpacerHeight = spacerModule.config.height;
+    const globalFeedLayout = { widthMode: 'percent', width: 100, align: 'start' };
+    feedModule.config.layout = globalFeedLayout;
+
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+    });
+    await openBuilderPage(manager);
+    document
+      .querySelector('.pb-sidebar-tab[data-tab="layers"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+
+    const selectModule = async (moduleId) => {
+      document
+        .querySelector(`.pb-layer-item--module[data-module-id="${moduleId}"]`)
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await flushAdminUi(1);
+    };
+    const ensureDeviceScope = async () => {
+      const scope = document.querySelector('[data-responsive-edit-scope]');
+      if (scope.value !== 'device') {
+        scope.value = 'device';
+        scope.dispatchEvent(new Event('change', { bubbles: true }));
+        await flushAdminUi(1);
+      }
+    };
+    const saveModule = async () => {
+      document
+        .getElementById('pbSaveModule')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await flushAdminUi(2);
+    };
+
+    for (const scenario of [
+      {
+        device: 'tablet',
+        spacerHeight: 180,
+        feedWidth: 70,
+        feedAlign: 'center',
+        readerPadding: 22,
+      },
+      {
+        device: 'mobile',
+        spacerHeight: 96,
+        feedWidth: 90,
+        feedAlign: 'end',
+        readerPadding: 30,
+      },
+    ]) {
+      document
+        .querySelector(`[data-width="${scenario.device}"]`)
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await flushAdminUi(1);
+
+      await selectModule(spacerModule.id);
+      await ensureDeviceScope();
+      const spacerHeight = document.querySelector('[data-key="height"]');
+      spacerHeight.value = String(scenario.spacerHeight);
+      spacerHeight.dispatchEvent(new Event('input', { bubbles: true }));
+      await saveModule();
+
+      await selectModule(feedModule.id);
+      await ensureDeviceScope();
+      const widthMode = document.querySelector('[data-layout-key="widthMode"]');
+      const width = document.querySelector('[data-layout-key="width"]');
+      const align = document.querySelector('[data-layout-key="align"]');
+      widthMode.value = 'percent';
+      widthMode.dispatchEvent(new Event('change', { bubbles: true }));
+      width.value = String(scenario.feedWidth);
+      width.dispatchEvent(new Event('input', { bubbles: true }));
+      align.value = scenario.feedAlign;
+      align.dispatchEvent(new Event('change', { bubbles: true }));
+      await saveModule();
+
+      await selectModule(readerModule.id);
+      await ensureDeviceScope();
+      const readerPadding = document.querySelector(
+        '[data-reader-key="controls.style.defaults.padding"]'
+      );
+      readerPadding.value = String(scenario.readerPadding);
+      readerPadding.dispatchEvent(new Event('input', { bubbles: true }));
+      await saveModule();
+    }
+
+    expect(spacerModule.config.height).toBe(globalSpacerHeight);
+    expect(spacerModule.config.responsive).toEqual({
+      tablet: { height: 180 },
+      mobile: { height: 96 },
+    });
+    expect(feedModule.config.layout).toEqual(globalFeedLayout);
+    expect(feedModule.config.responsive).toEqual({
+      tablet: { layout: { widthMode: 'percent', width: 70, align: 'center' } },
+      mobile: { layout: { widthMode: 'percent', width: 90, align: 'end' } },
+    });
+    expect(readerModule.config.controls.style.defaults.padding).toBe(10);
+    expect(readerModule.config.responsive).toEqual({
+      tablet: { controls: { style: { defaults: { padding: 22 } } } },
+      mobile: { controls: { style: { defaults: { padding: 30 } } } },
+    });
+    expect(mocks.updateModule).toHaveBeenCalledTimes(6);
+
+    await manager.showPageBuilderSection();
+    document
+      .querySelector('.pb-page-item')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+    document
+      .querySelector('.pb-sidebar-tab[data-tab="layers"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+    document
+      .querySelector('[data-width="mobile"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await selectModule(readerModule.id);
+    await ensureDeviceScope();
+    expect(
+      document.querySelector('[data-reader-key="controls.style.defaults.padding"]')?.value
+    ).toBe('30');
+  });
+
+  it('keeps a responsive draft dirty when the API drops its device branch', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const spacerModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'spacer');
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+      updateModuleResult: (moduleId, data) => ({
+        id: moduleId,
+        config: { ...data.config, responsive: undefined },
+      }),
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector(`.pb-module[data-module-id="${spacerModule.id}"]`)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+    document
+      .querySelector('[data-width="mobile"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    const scope = document.querySelector('[data-responsive-edit-scope]');
+    scope.value = 'device';
+    scope.dispatchEvent(new Event('change', { bubbles: true }));
+    await flushAdminUi(1);
+    const height = document.querySelector('[data-key="height"]');
+    height.value = '96';
+    height.dispatchEvent(new Event('input', { bubbles: true }));
+
+    document
+      .getElementById('pbSaveModule')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(2);
+
+    expect(mocks.updateModule).toHaveBeenCalledOnce();
+    expect(spacerModule.config.responsive).toBeUndefined();
+    expect(document.querySelector('.pb-editor-footer-status')?.textContent).toContain(
+      'dropped responsive module settings'
+    );
+    expect(document.getElementById('pbSaveModule')?.disabled).toBe(false);
+    expect(document.querySelector('[data-key="height"]')?.value).toBe('96');
+  });
+
+  it('blocks module saves when the loaded API contract is incompatible', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const spacerModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'spacer');
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+      useRealEditors: true,
+      pageBuilderRuntimeResult: null,
+    });
+
+    await openBuilderPage(manager);
+    document
+      .querySelector(`.pb-module[data-module-id="${spacerModule.id}"]`)
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(1);
+    const height = document.querySelector('[data-key="height"]');
+    height.value = '120';
+    height.dispatchEvent(new Event('input', { bubbles: true }));
+
+    expect(document.querySelector('[data-builder-runtime-warning]')?.textContent).toContain(
+      'Builder API restart required'
+    );
+    expect(document.getElementById('pbSaveModule')?.disabled).toBe(true);
+    expect(mocks.updateModule).not.toHaveBeenCalled();
   });
 
   it('keeps global-only module controls out of current-device scope', async () => {
@@ -3748,6 +3989,105 @@ describe('admin page-builder shell', () => {
         field: 'content',
       }),
       window.location.origin
+    );
+  });
+
+  it('keeps popup arrow moves draft-only until Save and restores them on Discard', async () => {
+    const selectedPage = getContractFixture('builderPage');
+    const textModule = selectedPage.sections
+      .flatMap((section) => section.modules || [])
+      .find((module) => module.moduleType === 'text');
+    const textSection = selectedPage.sections.find((section) =>
+      (section.modules || []).some((module) => module.id === textModule.id)
+    );
+    const { manager, mocks } = await setupPageBuilder({
+      fetchPagesResults: [[selectedPage]],
+      fetchPageResult: selectedPage,
+    });
+
+    await openBuilderPage(manager);
+    enterPreviewMode();
+
+    const selectTextTarget = async () => {
+      const frame = getPreviewFrame();
+      const iframeWindow = attachPreviewIframeWindow();
+      const target = {
+        kind: 'module',
+        key: `module:${textModule.id}`,
+        pageId: selectedPage.id,
+        sectionId: textSection.id,
+        columnIndex: textModule.columnIndex,
+        moduleId: textModule.id,
+        moduleType: textModule.moduleType,
+      };
+      const expected = {
+        previewSession: frame.dataset.previewSession,
+        seriesId: 'battle-bros',
+        pageId: selectedPage.id,
+        pageSlug: selectedPage.slug,
+      };
+      const geometry = {
+        target,
+        rect: { top: 48, left: 32, right: 272, bottom: 148, width: 240, height: 100 },
+        visible: true,
+        order: 0,
+        label: 'Text module',
+      };
+      dispatchPreviewMessageFromIframe(
+        buildPreviewTargetMessage(
+          BUILDER_PREVIEW_MESSAGE_TYPES.TARGETS,
+          { sequence: 3, targets: [geometry] },
+          expected
+        ),
+        iframeWindow
+      );
+      dispatchPreviewMessageFromIframe(
+        buildPreviewTargetMessage(
+          BUILDER_PREVIEW_MESSAGE_TYPES.TARGET_SELECT,
+          { sequence: 3, target },
+          expected
+        ),
+        iframeWindow
+      );
+      await flushAdminUi(2);
+      return getPreviewFrame();
+    };
+
+    let frame = await selectTextTarget();
+    frame
+      .querySelector('[data-preview-target-action="move-down"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.saveModulePlacements).not.toHaveBeenCalled();
+    expect(document.querySelector('[data-editor-status]')?.textContent).toContain(
+      'Module moves have unsaved changes.'
+    );
+    document
+      .querySelector('[data-action="discard-current"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+    expect(mocks.saveModulePlacements).not.toHaveBeenCalled();
+
+    frame = await selectTextTarget();
+    frame
+      .querySelector('[data-preview-target-action="move-down"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+    document
+      .querySelector('[data-action="save-current"]')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    await flushAdminUi(3);
+
+    expect(mocks.saveModulePlacements).toHaveBeenCalledWith(
+      selectedPage.id,
+      expect.arrayContaining([
+        expect.objectContaining({
+          moduleId: textModule.id,
+          sectionId: textSection.id,
+          sortIndex: 1,
+        }),
+      ])
     );
   });
 
@@ -6693,7 +7033,10 @@ describe('Phase 10 — command, keymap, and draft undo foundation', () => {
       })
     );
     expect(textModule.config.content).toBe(originalContent);
-    expect(document.querySelector('.pb-editor-footer-status')?.textContent).toContain('unsaved');
+    expect(document.querySelector('.pb-editor-footer-status')?.textContent).toContain(
+      'Failed to save module.'
+    );
+    expect(document.querySelector('.pb-editor-footer-status')?.dataset.status).toBe('danger');
     expect(document.querySelector('[data-action="save-current"]')?.disabled).toBe(false);
   });
 

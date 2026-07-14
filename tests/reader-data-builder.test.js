@@ -1247,7 +1247,7 @@ describe('reader builder presentation loading', () => {
     );
   });
 
-  it('emits scoped @media panel CSS for column responsive overrides on the public page (Phase 2)', () => {
+  it('emits root-device panel CSS for column responsive overrides on the public page (Phase 2)', () => {
     const page = buildPanelSnapshot({
       sectionSettings: {
         columns: [
@@ -1270,14 +1270,15 @@ describe('reader builder presentation loading', () => {
     applyBuilderPageToDOM(page, { seriesId: 'battle-bros', previewMode: true });
 
     const style = document.querySelector('#leftPanel .panel-builder style')?.textContent || '';
-    expect(style).toContain('@media (max-width: 480px)');
+    expect(style).toContain('@media (max-aspect-ratio: 7/5) and (max-width: 480px)');
+    expect(style).toContain('@media (max-aspect-ratio: 7/5) and (min-width: 481px)');
     expect(style).toContain('#leftPanel .pb-panel-column');
     expect(style).toContain('display: none');
     expect(style).toContain('padding-top: 4px');
     // A re-shown panel column must use flex (panels stack via flex), never block.
     expect(style).toContain('display: flex');
     expect(style).not.toContain('display: block');
-    // Panel alignment in @media uses the flex property, mirroring the inline path.
+    // Responsive panel alignment uses the flex property, mirroring the inline path.
     expect(style).toContain('align-self: flex-end');
     expect(style).not.toContain('justify-self');
     // Responsive appearance targets the aside shell, not the wrapper.
@@ -1812,6 +1813,114 @@ describe('reader builder presentation loading', () => {
     expect(rightBuilder?.style.getPropertyValue('--pb-panel-gap')).toBe('');
     // Second snapshot is single-column, so the right panel resets to hidden.
     expect(rightPanel?.hidden).toBe(true);
+  });
+
+  it('collapses an authored hidden panel shell and maps the reader-column border to the viewport', () => {
+    const hiddenPanelPage = buildPanelSnapshot({
+      sectionSettings: {
+        columns: [{ index: 0, hidden: true }, { index: 1 }],
+      },
+    });
+    applyBuilderPageToDOM(hiddenPanelPage, { seriesId: 'battle-bros', previewMode: true });
+    expect(document.getElementById('leftPanel')?.hidden).toBe(true);
+    expect(document.getElementById('rightPanel')?.hidden).toBe(false);
+
+    const borderedStagePage = buildPanelSnapshot({
+      sectionSettings: {
+        columns: [
+          {
+            index: 0,
+            appearance: { border: { width: 4, style: 'dashed', color: '#ff00ea', radius: 12 } },
+          },
+          { index: 1 },
+        ],
+      },
+    });
+    applyBuilderPageToDOM(borderedStagePage, { seriesId: 'battle-bros', previewMode: true });
+    const viewport = document.getElementById('viewport');
+    expect(viewport?.style.getPropertyValue('border')).toBe('4px dashed #ff00ea');
+    expect(viewport?.dataset.readerStageColumnBorder).toBe('true');
+    expect(document.getElementById('stageWrap')?.dataset.readerStageFrameBorder).toBe('true');
+
+    applyBuilderPageToDOM(buildPanelSnapshot(), { seriesId: 'battle-bros', previewMode: true });
+    expect(viewport?.style.getPropertyValue('border')).toBe('');
+    expect(viewport?.dataset.readerStageColumnBorder).toBe('false');
+  });
+
+  it('applies Phone reader-control padding in the edit preview and emits its public device rule', () => {
+    const page = buildPanelSnapshot();
+    const readerModule = page.sections[0].modules.find((module) => module.moduleType === 'reader');
+    readerModule.config = {
+      ...readerModule.config,
+      controls: {
+        ...(readerModule.config.controls || {}),
+        style: { defaults: { padding: 10 } },
+      },
+      responsive: {
+        mobile: { controls: { style: { defaults: { padding: 26 } } } },
+      },
+    };
+
+    applyBuilderPageToDOM(page, {
+      seriesId: 'battle-bros',
+      previewMode: true,
+      builderEditing: true,
+      deviceId: 'mobile',
+    });
+
+    expect(
+      document.getElementById('controls')?.style.getPropertyValue('--reader-control-padding-x')
+    ).toBe('26px');
+    expect(document.getElementById('builder-reader-controls-responsive-css')).toBeNull();
+
+    applyBuilderPageToDOM(page, {
+      seriesId: 'battle-bros',
+      previewMode: true,
+    });
+
+    expect(
+      document.getElementById('builder-reader-controls-responsive-css')?.textContent
+    ).toContain(
+      '@media (max-aspect-ratio: 7/5) and (max-width: 480px) { #controls { --reader-control-padding-x: 26px !important'
+    );
+  });
+
+  it('emits public device rules for a reader-column border branch', () => {
+    const page = buildPanelSnapshot({
+      sectionSettings: {
+        columns: [
+          {
+            index: 0,
+            responsive: {
+              tablet: {
+                appearance: { border: { width: 3, style: 'solid', color: '#00d9ff' } },
+              },
+            },
+          },
+          { index: 1 },
+        ],
+      },
+    });
+
+    applyBuilderPageToDOM(page, { seriesId: 'battle-bros', previewMode: true });
+
+    const css = document.getElementById('builder-reader-controls-responsive-css')?.textContent;
+    expect(css).toContain(
+      '@media (max-aspect-ratio: 7/5) and (min-width: 481px) { #viewport { border: 3px solid #00d9ff !important; }'
+    );
+    expect(css).toContain('#viewport .page { border-width: 0 !important; }');
+
+    // Builder edit mode resolves the branch in JS instead; the style tag is removed.
+    applyBuilderPageToDOM(page, {
+      seriesId: 'battle-bros',
+      previewMode: true,
+      builderEditing: true,
+      deviceId: 'tablet',
+    });
+    expect(document.getElementById('builder-reader-controls-responsive-css')).toBeNull();
+    expect(document.getElementById('viewport')?.style.getPropertyValue('border')).toBe(
+      '3px solid #00d9ff'
+    );
   });
 
   it('uses first-class page header copy before legacy header-module fallback', () => {

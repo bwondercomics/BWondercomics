@@ -48,7 +48,7 @@ describe('buildColumnInlineStyle export contract', () => {
     expect(panelStyle).toContain('min-height: 120px');
   });
 
-  it('emits section min-height inline and in device @media (Phase 1)', () => {
+  it('emits section min-height inline and in the public device scope (Phase 1)', () => {
     const reader = makeReaderRenderers();
     const section = {
       id: 'minheight-sec',
@@ -59,7 +59,7 @@ describe('buildColumnInlineStyle export contract', () => {
     };
     const html = reader.renderSection(section, 0);
     expect(html).toContain('min-height: 900px');
-    expect(html).toMatch(/@media \(max-width: 480px\)[^}]*min-height: 400px !important/);
+    expect(html).toMatch(/@media[^}]*max-width: 480px[^}]*min-height: 400px !important/);
     // Without the key, no min-height token is emitted at all.
     const plain = reader.renderSection({ ...section, id: 'plain-sec', settings: {} }, 0);
     expect(plain).not.toContain('min-height');
@@ -882,7 +882,7 @@ describe('shared renderer parity', () => {
     ).toBe(true);
   });
 
-  it('emits scoped @media CSS so device overrides apply on the public runtime', () => {
+  it('emits ratio-banded CSS so overrides apply on the public runtime', () => {
     const page = {
       id: 'page-public-responsive',
       sections: [
@@ -910,10 +910,10 @@ describe('shared renderer parity', () => {
     expect(section?.getAttribute('data-pb-section')).toBe('sec-pub-resp');
     const css = wrapper.querySelector('style')?.textContent || '';
     // Per-device layout change becomes a grid-template-columns override at phone width.
-    expect(css).toContain('@media (max-width: 480px)');
+    expect(css).toContain('@media (max-aspect-ratio: 7/5) and (max-width: 480px)');
     expect(css).toContain('grid-template-columns: 1fr !important');
-    // Per-column tablet hide and mobile background land in the right banded queries.
-    expect(css).toContain('@media (min-width: 481px) and (max-width: 768px)');
+    // Per-column tablet hide and mobile background land in the right media bands.
+    expect(css).toContain('@media (max-aspect-ratio: 7/5) and (min-width: 481px)');
     expect(css).toContain('.pb-column:nth-child(1) { display: none !important');
     expect(css).toContain('.pb-column:nth-child(2)');
     expect(css).toContain('background: #222 !important');

@@ -16,6 +16,25 @@ export function getLastPageBuilderDataError() {
   return lastPageBuilderDataError;
 }
 
+export async function fetchPageBuilderRuntime() {
+  try {
+    const res = await fetch('/api/admin/page-builder/runtime', {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const error = new Error(payload.error || 'Builder API compatibility check failed');
+      error.status = res.status;
+      throw error;
+    }
+    return payload;
+  } catch (err) {
+    console.error('fetchPageBuilderRuntime error:', err);
+    return null;
+  }
+}
+
 export async function fetchPages(seriesId) {
   return fetchSeriesPages(seriesId);
 }
@@ -306,15 +325,23 @@ export async function addModule(
 }
 
 export async function updateModule(moduleId, data) {
+  clearLastPageBuilderDataError();
   try {
     const res = await fetch(`/api/admin/modules/${moduleId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
+      credentials: 'same-origin',
     });
-    if (!res.ok) throw new Error('Failed to update module');
-    return (await res.json()).module;
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const error = new Error(payload.error || 'Failed to update module');
+      error.code = payload.code || '';
+      throw error;
+    }
+    return payload.module || null;
   } catch (err) {
+    rememberPageBuilderDataError(err, 'Failed to update module');
     console.error('updateModule error:', err);
     return null;
   }
@@ -331,6 +358,29 @@ export async function moveModule(moduleId, targetSectionId, columnIndex, sortInd
     return (await res.json()).module;
   } catch (err) {
     console.error('moveModule error:', err);
+    return null;
+  }
+}
+
+export async function saveModulePlacements(pageId, placements) {
+  clearLastPageBuilderDataError();
+  try {
+    const res = await fetch(`/api/admin/pages/${pageId}/modules/placements`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ placements }),
+      credentials: 'same-origin',
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(payload.error || 'Failed to save module placements');
+      err.code = payload.code || '';
+      throw err;
+    }
+    return payload.page || null;
+  } catch (err) {
+    rememberPageBuilderDataError(err, 'Failed to save module placements');
+    console.error('saveModulePlacements error:', err);
     return null;
   }
 }

@@ -349,4 +349,74 @@ describe('page-builder structural commands', () => {
     expect(moveHeaderBlockToCell).toHaveBeenCalledWith('entryControls', 'bottom', 'right');
     expect(getDragState()).toBeNull();
   });
+
+  it('routes popup arrow moves to the draft staging action instead of an immediate move', async () => {
+    const page = buildPage();
+    const stageModuleMoveStep = vi.fn(() => ({ ok: true, status: 'Module move staged.' }));
+    const moveModuleToTarget = vi.fn();
+    const adapter = createStructuralCommandAdapter({
+      getState: () => ({
+        currentPage: page,
+        liveDragState: null,
+        activeInsertTarget: null,
+        selectedTarget: { kind: 'module', moduleId: 'module-1' },
+      }),
+      actions: {
+        ensureCleanWorkspace: () => true,
+        setLiveDragState: vi.fn(),
+        clearLiveDragState: vi.fn(),
+        setActiveInsertTarget: vi.fn(),
+        setCanvasStatus: vi.fn(),
+        renderCanvas: vi.fn(),
+        stageModuleMoveStep,
+        moveModuleToTarget,
+        requestFreshTargets: vi.fn(),
+        selectModule: vi.fn(),
+        showSidePanelTab: vi.fn(),
+      },
+      helpers: { getModuleLabel: () => 'Text', getSectionCount: () => page.sections.length },
+    });
+
+    await expect(
+      adapter.runCommand(BUILDER_STRUCTURAL_COMMANDS.MOVE_MODULE_STEP, {
+        target: { kind: 'module', moduleId: 'module-1' },
+        direction: 'down',
+      })
+    ).resolves.toMatchObject({ ok: true, status: 'Module move staged.' });
+    expect(stageModuleMoveStep).toHaveBeenCalledWith('module-1', 'down');
+    expect(moveModuleToTarget).not.toHaveBeenCalled();
+  });
+
+  it('does not run immediate structural moves while the workspace is dirty', async () => {
+    const page = buildPage();
+    const ensureCleanWorkspace = vi.fn(() => false);
+    const moveModuleToTarget = vi.fn();
+    const adapter = createStructuralCommandAdapter({
+      getState: () => ({ currentPage: page, liveDragState: null, activeInsertTarget: null }),
+      actions: {
+        ensureCleanWorkspace,
+        setLiveDragState: vi.fn(),
+        clearLiveDragState: vi.fn(),
+        setActiveInsertTarget: vi.fn(),
+        setCanvasStatus: vi.fn(),
+        renderCanvas: vi.fn(),
+        moveModuleToTarget,
+        requestFreshTargets: vi.fn(),
+        selectModule: vi.fn(),
+        showSidePanelTab: vi.fn(),
+      },
+      helpers: { getModuleLabel: () => 'Text', getSectionCount: () => page.sections.length },
+    });
+
+    await expect(
+      adapter.runCommand(BUILDER_STRUCTURAL_COMMANDS.MOVE, {
+        moduleId: 'module-1',
+        placement: { sectionId: 'section-1', columnIndex: 0, insertIndex: 1 },
+      })
+    ).resolves.toEqual({ ok: false });
+    expect(ensureCleanWorkspace).toHaveBeenCalledWith(
+      'Save or discard your current changes before moving a module.'
+    );
+    expect(moveModuleToTarget).not.toHaveBeenCalled();
+  });
 });

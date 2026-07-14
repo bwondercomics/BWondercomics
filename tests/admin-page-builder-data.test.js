@@ -10,6 +10,7 @@ import {
   deleteSection,
   fetchGlobalPages,
   fetchPage,
+  fetchPageBuilderRuntime,
   fetchPages,
   fetchPageBindings,
   fetchSeriesPages,
@@ -90,6 +91,22 @@ describe('admin page-builder data layer', () => {
         body: JSON.stringify({ slug: 'reader', title: 'Reader' }),
       })
     );
+  });
+
+  it('loads the no-store builder runtime contract', async () => {
+    const runtime = {
+      contractVersion: 1,
+      processStartedAt: '2026-07-14T10:00:00+00:00',
+      capabilities: ['responsive-module-round-trip'],
+    };
+    const fetchMock = vi.fn(async () => jsonResponse(runtime));
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await fetchPageBuilderRuntime()).toEqual(runtime);
+    expect(fetchMock).toHaveBeenCalledWith('/api/admin/page-builder/runtime', {
+      cache: 'no-store',
+      credentials: 'same-origin',
+    });
   });
 
   it('uses explicit scope endpoints for global pages and page bindings', async () => {

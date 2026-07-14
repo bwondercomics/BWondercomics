@@ -1,11 +1,9 @@
 # Builder Customization Roadmap
 
-Status: **All phases (0–7) implemented, no phase-step work remaining** (Phase 3's deferred
-typography/padding/labels closed 2026-07-08 — the shared appearance text group now exists for
-every appearance editor). Remaining deferred backlog in the completion notes: Phase 2
-module-appearance audit, Phase 5 logo image picker, Phase 7 palette-only surfaces (title
-gradient, COVERS button — both now partially reachable via the text group), plus per-phase
-manual QA.
+Status: **Phases 0–7 implemented; 0.8.5 QA corrective closeout pending** (updated 2026-07-14).
+The six corrective contracts are implemented, but their release checkboxes remain open until the
+authenticated physical-device and published-page QA below passes. Header glow is a separate
+0.8.5 follow-up.
 Created: 2026-07-05
 Branch context: `builder-incremental-improvement` — the Panel/Column Settings Consolidation Plan
 (Phases 1–4) is implemented up to HEAD (`c82d986`), but its release gates (data migrations, manual
@@ -1041,6 +1039,90 @@ Low — test + copy only; no behavior changes. Rollback: remove the test/copy.
 ### Test plan
 
 The new precedence regression test, `npm test`, standard gate (no visual-suite impact expected).
+
+---
+
+## 0.8.5 QA corrective closeout (opened 2026-07-14)
+
+Authenticated QA on Pyre found six corrective bugs/UX contract gaps. They are release-blocking
+corrections to the completed roadmap, not new product directions. Do not bump to `0.8.5` or merge
+this branch to `main` until every required checkbox is verified in the builder and public page.
+
+### Required corrections
+
+- [ ] **Panel Hidden hides the panel shell.** Effective reader-panel visibility applies to the
+      owning `<aside>` and collapses its layout space. The builder/layers path remains available
+      so the panel can be selected and restored.
+- [ ] **Reader-column border styles the reader frame.** The Comic Reader module's owning-column
+      border applies to the outer viewport. An authored border suppresses the stock page-frame
+      border; clearing it restores `stage.frameBorder`. Column text/background do not style the
+      reader stage.
+- [ ] **Column/Panel padding inputs stay readable.** Top, Right, Bottom, and Left use labelled
+      two-column number inputs that preserve keyboard entry, bounds, and accessible names.
+- [ ] **Reader controls support sparse Tablet/Phone appearance and padding.** Device branches
+      retain only `hidden` and the supported control-bar/default/primary appearance and button
+      padding. Editor, client normalization, backend sanitation, preview merge, save response,
+      page refetch, and public output must agree.
+- [ ] **Feed wrapper layout works per device and publicly.** Tablet/Phone branches may override
+      Feed width, max width, height, and alignment without changing the Desktop/global fallback.
+- [ ] **Arrow moves and publication actions have explicit persistence.** Popup-arrow module moves
+      remain in a page-wide structure draft until Save; Discard restores the captured placement
+      set. The atomic placements endpoint validates the full page before updating. **Save Page**
+      preserves publication state; only Publish or confirmed Unpublish changes visibility.
+
+### Implemented responsive contract
+
+- One fixed builder preview exists per authoring scope: Desktop `1920×1080`, Tablet `768×1024`,
+  and Phone `375×812`. Selecting a preview chooses the matching sparse JSON branch; preview size
+  is not saved page data.
+- Public portrait/stacked layout uses the Phone branch at widths `<=480px` and Tablet otherwise.
+  Viewports wider than the original `7/5` aspect-ratio boundary return to Desktop layout, including
+  phones and tablets rotated to landscape.
+- Portrait Tablet/Phone readers use stable width containment and do not enter the circular dynamic
+  frame calculation. Landscape/Desktop keeps the established bounded-parent dynamic sizing.
+- Public Section, Column, Panel, Spacer, Feed, reader-control, and reader-stage overrides share the
+  same ratio-banded media contract. The fixed preview dimensions naturally select the matching
+  band; public pages switch bands on resize or orientation without a second JavaScript classifier.
+- Authenticated `GET /api/admin/page-builder/runtime` reports the responsive contract version,
+  process start time, and capabilities with `Cache-Control: no-store`. The builder blocks module
+  saves against an incompatible API while preserving the dirty draft.
+- After a module PUT, the builder compares the allowed responsive branch returned by the API with
+  the branch it sent. A dropped or changed branch remains dirty and surfaces an incompatibility
+  error instead of reporting a successful save.
+- Public page API responses use `Cache-Control: no-store`; `/admin/*` revalidates through Caddy so
+  an old admin script or backend process cannot silently masquerade as the current contract.
+
+### Separate 0.8.5 follow-up
+
+- [ ] **Add header glow authoring.** Add a small header-specific control for top-bar and individual
+      block glow, using controlled CSS variables and the stock glow as the unset default. Preserve
+      keyboard focus indication; do not expand this into a generic arbitrary-shadow editor.
+
+### Verification and closeout
+
+- Automated coverage must include panel-shell collapse, reader border precedence/restoration,
+  narrow padding controls, distinct saved Desktop/Tablet/Phone Spacer/Feed/reader values, public
+  computed styles, structure Save/Discard, atomic placement rollback, and publication-state
+  preservation.
+- Run `npm run format:check`, `npm run lint`, `npm test`, `npm run format:py:check`,
+  `npm run lint:py`, `npm run test:backend`, `npm run build`, and `npm run test:visual` on the final
+  tree. Record only the final results here; superseded intermediate builds are not release proof.
+- Rebuild the public bundle, restart the API after Python contract changes, and reload Caddy only
+  when its configuration changed. Verify the authenticated runtime contract belongs to that same
+  deployment generation.
+- On physical Phone and Tablet hardware, save distinct responsive values, reload the builder, and
+  verify the published Pyre page in portrait. Rotate each device and confirm it returns to Desktop
+  layout. Navigate multiple comic pages and scroll for at least five seconds; the reader must fit
+  the screen without progressive shrinkage or size changes caused by browser chrome.
+- Verify panel hide/unhide, reader border, arrow Save/Discard, Save Page, Publish/Unpublish, and
+  header glow on Pyre. Close each checkbox only after its corresponding manual check passes, then
+  refresh `docs/ROADMAP_TO_1.0.md` §2.1 before the version bump and merge.
+
+Automated verification on 2026-07-14: `npm run lint`, `npm test` (657 passed, 1 skipped),
+`npm run format:py:check`, `npm run lint:py`, `npm run test:backend` (125 passed), `npm run build`,
+and `npm run test:visual` (21 passed). `npm run format:check` checks every task file clean but remains
+blocked by the pre-existing untracked `docs/POLISH_BACKLOG_PLAN.md`, which this pass did not edit.
+The physical-device and authenticated Pyre checks above remain open.
 
 ---
 

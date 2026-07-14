@@ -205,7 +205,9 @@ const MODULE_DESCRIPTOR_DEFS = [
     },
     editorKind: 'reader',
     duplicatable: false,
-    responsiveOverrides: ['hidden', 'displayMode', 'controls', 'stage', 'panels', 'showComments'],
+    // Only device visibility and control styling survive per device — the public runtime
+    // applies displayMode/placement/size/stage/comments at mount and cannot vary them.
+    responsiveOverrides: ['hidden', 'controls'],
     appearanceSectors: [],
     requiredContext: [],
     sourceModes: [SOURCE_ACTIVE_PAGE_SERIES, SOURCE_SPECIFIC_SERIES],
@@ -257,7 +259,7 @@ const MODULE_DESCRIPTOR_DEFS = [
       },
     },
     editorKind: 'feed',
-    responsiveOverrides: HIDDEN_ONLY_RESPONSIVE_FIELDS,
+    responsiveOverrides: ['hidden', 'layout'],
     appearanceSectors: ['feed-style'],
     sourceModes: [SOURCE_SITE],
     preview: (config = {}) => `Feed (limit ${config.limit || 0})`,

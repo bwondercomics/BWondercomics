@@ -3,6 +3,14 @@ import { parseLayoutRatios, ratiosToGridTemplate, ratiosToLayout } from './layou
 import { getModuleResponsiveOverrides } from './module-descriptors.js';
 import { normalizeReaderResponsiveBranch } from './reader-config.js';
 
+export const BUILDER_RESPONSIVE_CONTRACT_VERSION = 1;
+export const BUILDER_RESPONSIVE_CAPABILITIES = Object.freeze([
+  'responsive-module-round-trip',
+  'responsive-feed-layout',
+  'responsive-reader-controls',
+  'responsive-public-media-css',
+]);
+
 export const SECTION_RESPONSIVE_FIELDS = Object.freeze([
   'layout',
   'moduleGap',
@@ -71,6 +79,62 @@ export function getResponsiveBranch(source, deviceId) {
 
 export function getModuleResponsiveFields(moduleType) {
   return Object.freeze(getModuleResponsiveOverrides(moduleType));
+}
+
+function getModuleResponsiveContractBranch(moduleType, branch) {
+  if (!isPlainObject(branch)) return {};
+  const allowed = getModuleResponsiveFields(moduleType);
+  const contract = {};
+  allowed.forEach((key) => {
+    if (!Object.prototype.hasOwnProperty.call(branch, key)) return;
+    contract[key] = cloneValue(branch[key]);
+  });
+  return pruneEmptyObjects(contract) || {};
+}
+
+export function getModuleResponsiveContract(moduleType, config) {
+  const responsive = isPlainObject(config?.responsive) ? config.responsive : {};
+  const contract = {};
+  BUILDER_DEVICE_ORDER.forEach((deviceId) => {
+    const branch = getModuleResponsiveContractBranch(moduleType, responsive[deviceId]);
+    if (Object.keys(branch).length) contract[deviceId] = branch;
+  });
+  return contract;
+}
+
+function sortContractValue(value) {
+  if (Array.isArray(value)) return value.map((item) => sortContractValue(item));
+  if (!isPlainObject(value)) return value;
+  return Object.fromEntries(
+    Object.keys(value)
+      .sort()
+      .map((key) => [key, sortContractValue(value[key])])
+  );
+}
+
+export function moduleResponsiveContractMatches(moduleType, expectedConfig, actualConfig) {
+  return (
+    JSON.stringify(sortContractValue(getModuleResponsiveContract(moduleType, expectedConfig))) ===
+    JSON.stringify(sortContractValue(getModuleResponsiveContract(moduleType, actualConfig)))
+  );
+}
+
+export function validateBuilderRuntimeContract(runtime) {
+  const capabilities = Array.isArray(runtime?.capabilities) ? runtime.capabilities : [];
+  const missingCapabilities = BUILDER_RESPONSIVE_CAPABILITIES.filter(
+    (capability) => !capabilities.includes(capability)
+  );
+  const compatible =
+    Number(runtime?.contractVersion) === BUILDER_RESPONSIVE_CONTRACT_VERSION &&
+    missingCapabilities.length === 0;
+  return {
+    compatible,
+    contractVersion: Number(runtime?.contractVersion) || 0,
+    expectedContractVersion: BUILDER_RESPONSIVE_CONTRACT_VERSION,
+    processStartedAt: String(runtime?.processStartedAt || ''),
+    capabilities,
+    missingCapabilities,
+  };
 }
 
 export function isModuleResponsiveField(moduleType, key) {
@@ -225,19 +289,15 @@ function mergeButtonsResponsiveConfig(baseConfig, branch) {
   return nextConfig;
 }
 
+// Only control styling merges per device — the same contract the public runtime emits
+// as scoped CSS (see normalizeReaderResponsiveBranch). Preview must not resolve fields
+// the published page cannot honor.
 function mergeReaderResponsiveConfig(baseConfig, branch) {
   const nextConfig = cloneValue(baseConfig || {}) || {};
   const safeBranch = normalizeReaderResponsiveBranch(branch);
-  ['displayMode', 'showComments'].forEach((key) => {
-    if (Object.prototype.hasOwnProperty.call(safeBranch, key)) {
-      nextConfig[key] = cloneValue(safeBranch[key]);
-    }
-  });
-  ['controls', 'stage', 'panels'].forEach((key) => {
-    if (isPlainObject(safeBranch[key])) {
-      nextConfig[key] = mergePlainObject(nextConfig[key] || {}, safeBranch[key]);
-    }
-  });
+  if (isPlainObject(safeBranch.controls)) {
+    nextConfig.controls = mergePlainObject(nextConfig.controls || {}, safeBranch.controls);
+  }
   return nextConfig;
 }
 

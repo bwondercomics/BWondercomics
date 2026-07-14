@@ -225,10 +225,14 @@ function collectGenericModuleDraft(root, baseConfig = {}, options = {}) {
 
   // Shared wrapper layout: [data-layout-key] fields collect into config.layout (sparse —
   // blank/default values delete their key; an empty layout object is removed entirely).
-  if (root.querySelector('[data-layout-key]') && responsiveEditScope !== 'device') {
+  if (root.querySelector('[data-layout-key]')) {
     const layout = collectModuleLayoutFromFields(root);
-    if (layout) nextConfig.layout = layout;
-    else delete nextConfig.layout;
+    if (responsiveEditScope === 'device' && isModuleResponsiveField(moduleType, 'layout')) {
+      setResponsiveOverrideValue(nextConfig, activeDeviceId, 'layout', layout);
+    } else if (responsiveEditScope !== 'device') {
+      if (layout) nextConfig.layout = layout;
+      else delete nextConfig.layout;
+    }
   }
 
   const sourceFields = Array.from(root.querySelectorAll('[data-source-key]'));
@@ -360,6 +364,9 @@ function renderSpacerHeightCard(config = {}) {
 
 function renderDeviceModuleOverrideSections(moduleType, config, pages) {
   const responsiveFields = getModuleDescriptor(moduleType).responsiveOverrides || [];
+  if (responsiveFields.includes('layout')) {
+    return [renderModuleLayoutCard(config)];
+  }
   if (responsiveFields.includes('alignment')) {
     return [renderTextAlignmentCard(config)];
   }
@@ -1555,7 +1562,11 @@ export function bindModuleEditorEvents({
       });
       return;
     }
-    if (selectedModule.moduleType === 'text' || selectedModule.moduleType === 'spacer') {
+    if (
+      selectedModule.moduleType === 'text' ||
+      selectedModule.moduleType === 'spacer' ||
+      selectedModule.moduleType === 'feed'
+    ) {
       bindGenericModuleDraftEvents({
         el,
         currentPage,

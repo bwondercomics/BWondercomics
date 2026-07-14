@@ -1099,3 +1099,70 @@ def reorder_modules(db: Session, section_id: str, column_index: int, module_ids:
 
     db.commit()
     return True
+
+
+def save_module_placements(
+    db: Session, page_id: str, placements: list[dict[str, Any]]
+) -> dict[str, Any] | None:
+    """Atomically replace every module placement on one page.
+
+    Validation is deliberately completed before any ORM fields change: a malformed batch
+    cannot persist a partial arrow-move draft. The list must describe each current module once.
+    """
+    try:
+        pid = uuid.UUID(page_id)
+    except ValueError:
+        return None
+    page = _load_page_model_with_content(db, pid)
+    if not page:
+        return None
+    if not isinstance(placements, list):
+        raise ValueError("Placements must be a list")
+
+    sections_by_id = {section.id: section for section in page.sections}
+    modules_by_id = {module.id: module for section in page.sections for module in section.modules}
+    if len(placements) != len(modules_by_id):
+        raise ValueError("Placements must include every page module exactly once")
+
+    validated: list[tuple[BuilderModule, BuilderSection, int, int]] = []
+    seen_modules: set[uuid.UUID] = set()
+    seen_positions: set[tuple[uuid.UUID, int, int]] = set()
+    for placement in placements:
+        if not isinstance(placement, dict):
+            raise ValueError("Each placement must be an object")
+        try:
+            module_id = uuid.UUID(str(placement.get("moduleId") or ""))
+            section_id = uuid.UUID(str(placement.get("sectionId") or ""))
+        except ValueError as exc:
+            raise ValueError("Placement moduleId and sectionId must be valid IDs") from exc
+        if module_id in seen_modules:
+            raise ValueError("Placements contain a duplicate module")
+        module = modules_by_id.get(module_id)
+        if not module:
+            raise ValueError("Placement module does not belong to this page")
+        section = sections_by_id.get(section_id)
+        if not section:
+            raise ValueError("Placement section does not belong to this page")
+        column_index = validate_column_index(
+            placement.get("columnIndex"), validate_layout(section.layout)
+        )
+        sort_index = validate_sort_index(placement.get("sortIndex"))
+        position = (section_id, column_index, sort_index)
+        if position in seen_positions:
+            raise ValueError("Placements contain a duplicate position")
+        seen_modules.add(module_id)
+        seen_positions.add(position)
+        validated.append((module, section, column_index, sort_index))
+
+    if seen_modules != set(modules_by_id):
+        raise ValueError("Placements must include every page module exactly once")
+
+    now = _now()
+    for module, section, column_index, sort_index in validated:
+        module.section_id = section.id
+        module.column_index = column_index
+        module.sort_index = sort_index
+        module.updated_at = now
+    page.updated_at = now
+    db.commit()
+    return _serialize_page_with_sections(page)

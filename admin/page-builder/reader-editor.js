@@ -70,6 +70,17 @@ export function normalizeReaderDraftConfig(rawConfig = {}) {
   if (Object.keys(normalized.controls.labels || {}).length) {
     next.controls.labels = normalized.controls.labels;
   }
+  // Re-normalize every device branch, not only the one being edited: legacy branches may
+  // carry fields the responsive contract no longer supports (displayMode, placement, size,
+  // stage, comments). The backend prunes them on save, so the draft must match or the
+  // round-trip comparison would report a false mismatch.
+  if (isObject(next.responsive)) {
+    const responsive = {};
+    Object.entries(next.responsive).forEach(([deviceId, branch]) => {
+      responsive[deviceId] = normalizeReaderResponsiveBranch(branch);
+    });
+    next.responsive = responsive;
+  }
   next.responsive = pruneEmptyResponsiveOverrides(next.responsive);
   if (!Object.keys(next.responsive).length) {
     delete next.responsive;
@@ -179,7 +190,7 @@ function renderControlsLabels(config) {
   });
 }
 
-function renderStageControls(config, { deviceOnly = false } = {}) {
+function renderStageControls(config) {
   return renderInspectorSection({
     kicker: 'Reader',
     title: 'Stage',
@@ -201,10 +212,6 @@ function renderStageControls(config, { deviceOnly = false } = {}) {
         <label class="pb-editor-label">Page Gap (px)</label>
         <input type="number" class="pb-editor-input" data-reader-key="stage.pageGap" min="0" max="64" value="${escapeAttr(String(config.stage.pageGap))}">
       </div>
-      ${
-        deviceOnly
-          ? ''
-          : `
       <div class="pb-editor-field">
         <label class="pb-editor-label">Frame Width</label>
         <select class="pb-editor-select" data-reader-key="stage.frameFill">
@@ -222,8 +229,6 @@ function renderStageControls(config, { deviceOnly = false } = {}) {
         <label class="pb-editor-label">Max Stage Width (px)</label>
         <input type="number" class="pb-editor-input" data-reader-key="stage.maxWidth" min="320" max="2400" placeholder="Auto" value="${config.stage.maxWidth == null ? '' : escapeAttr(String(config.stage.maxWidth))}">
       </div>
-    `
-      }
     `,
   });
 }
@@ -246,19 +251,23 @@ function renderVisibilityControls(config) {
   });
 }
 
-function renderControlsAppearance(config) {
+function renderControlsAppearance(config, { deviceOnly = false } = {}) {
   return renderInspectorSection({
     kicker: 'Appearance',
     title: 'Reader Controls',
     summary: config.controls.style.defaults.appearance ? 'Custom' : 'Default',
     copy: 'Use sparse appearance overrides for reader buttons.',
     body: `
-      <div class="pb-editor-field">
+      ${
+        deviceOnly
+          ? ''
+          : `<div class="pb-editor-field">
         <label class="pb-editor-label">
           <input type="checkbox" data-reader-key="controls.style.glow" ${config.controls.style.glow !== false ? 'checked' : ''}> Neon Glow
         </label>
         <div class="pb-editor-hint">The box/text glow on the bar, buttons, and page counter. Controls Defaults styles every button and the page counter; Primary Control styles the FIT button.</div>
-      </div>
+      </div>`
+      }
       ${renderAppearanceControls(
         config.controls.style.defaults.appearance,
         'readerControlsDefaults',
@@ -310,13 +319,33 @@ function renderEndOfEntryControls(config) {
   });
 }
 
+// Device scope offers only what the published page can vary per device: button padding
+// and control appearance (emitted as root-device-scoped CSS). Display mode, controls
+// placement/size, stage, and comments apply at mount and are global-only, so their
+// editors render solely in the global scope.
+function renderDeviceButtonControls(config) {
+  const padding = config.controls.style.defaults.padding;
+  return renderInspectorSection({
+    kicker: 'Reader',
+    title: 'Buttons',
+    summary: padding == null ? 'Inherited padding' : `${padding}px padding`,
+    copy: 'Only button padding and control styling can vary per device. Display mode, controls placement and size, stage, and comments are global settings.',
+    body: `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Button Padding (px)</label>
+        <input type="number" class="pb-editor-input" data-reader-key="controls.style.defaults.padding" min="0" max="48" placeholder="Inherited" value="${padding == null ? '' : escapeAttr(String(padding))}">
+        <div class="pb-editor-hint">Horizontal padding of every control button on this device. Blank inherits the global value.</div>
+      </div>
+    `,
+  });
+}
+
 export function renderReaderEditor(config = {}, { deviceOnly = false } = {}) {
   const normalized = normalizeReaderConfig(config);
   if (deviceOnly) {
     return [
-      renderLayoutControls(normalized),
-      renderStageControls(normalized, { deviceOnly: true }),
-      renderVisibilityControls(normalized),
+      renderDeviceButtonControls(normalized),
+      renderControlsAppearance(normalized, { deviceOnly: true }),
     ].join('');
   }
   return [
@@ -344,6 +373,11 @@ export function bindReaderEditorEvents({
   const commit = (nextConfig, rerender = false) => {
     if (!useDeviceScope) {
       syncSourceFields(nextConfig);
+    }
+    if (useDeviceScope && isObject(nextConfig.responsive?.[activeDeviceId])) {
+      nextConfig.responsive[activeDeviceId] = normalizeReaderResponsiveBranch(
+        nextConfig.responsive[activeDeviceId]
+      );
     }
     config = normalizeReaderDraftConfig(nextConfig);
     setDraftConfig(config);
@@ -406,7 +440,6 @@ export function bindReaderEditorEvents({
             : {};
         nextConfig.responsive[activeDeviceId] = branch;
         setReaderPathValue(branch, key, value);
-        nextConfig.responsive[activeDeviceId] = normalizeReaderResponsiveBranch(branch);
       } else {
         setReaderPathValue(nextConfig, key, value);
       }
@@ -414,12 +447,18 @@ export function bindReaderEditorEvents({
     });
   });
 
-  if (useDeviceScope) return;
-
   const resolveAppearanceTarget = (nextConfig, scope) => {
-    nextConfig.controls = isObject(nextConfig.controls) ? nextConfig.controls : {};
-    nextConfig.controls.style = isObject(nextConfig.controls.style)
-      ? nextConfig.controls.style
+    let scopeConfig = nextConfig;
+    if (useDeviceScope) {
+      nextConfig.responsive = isObject(nextConfig.responsive) ? nextConfig.responsive : {};
+      nextConfig.responsive[activeDeviceId] = isObject(nextConfig.responsive[activeDeviceId])
+        ? nextConfig.responsive[activeDeviceId]
+        : {};
+      scopeConfig = nextConfig.responsive[activeDeviceId];
+    }
+    scopeConfig.controls = isObject(scopeConfig.controls) ? scopeConfig.controls : {};
+    scopeConfig.controls.style = isObject(scopeConfig.controls.style)
+      ? scopeConfig.controls.style
       : {};
     const key =
       scope === 'readerControlsPrimary'
@@ -427,10 +466,10 @@ export function bindReaderEditorEvents({
         : scope === 'readerControlsBar'
           ? 'bar'
           : 'defaults';
-    if (!isObject(nextConfig.controls.style[key])) {
-      nextConfig.controls.style[key] = {};
+    if (!isObject(scopeConfig.controls.style[key])) {
+      scopeConfig.controls.style[key] = {};
     }
-    return nextConfig.controls.style[key];
+    return scopeConfig.controls.style[key];
   };
 
   el.pbModuleEditor.querySelectorAll('[data-appearance-toggle="true"]').forEach((input) => {

@@ -151,22 +151,57 @@ describe('normalizeReaderConfig', () => {
 });
 
 describe('normalizeReaderResponsiveBranch', () => {
-  it('keeps only explicitly present keys', () => {
+  // A device branch keeps only what the PUBLIC runtime can vary per device: the hidden
+  // flag and control styling. Everything else applies at mount and is global-only —
+  // retaining it would preview settings the published page ignores.
+  it('keeps the device visibility flag', () => {
     expect(normalizeReaderResponsiveBranch({})).toEqual({});
-    expect(normalizeReaderResponsiveBranch({ displayMode: 'vertical-scroll' })).toEqual({
-      displayMode: 'vertical-scroll',
-    });
-    expect(normalizeReaderResponsiveBranch({ controls: { placement: 'overlay' } })).toEqual({
-      controls: { placement: 'overlay' },
-    });
+    expect(normalizeReaderResponsiveBranch({ hidden: true })).toEqual({ hidden: true });
+    expect(normalizeReaderResponsiveBranch({ hidden: false })).toEqual({ hidden: false });
+    expect(normalizeReaderResponsiveBranch({ hidden: 'junk' })).toEqual({ hidden: false });
   });
 
-  it('drops device-unsafe stage fields, keeping only fit and pageGap', () => {
+  it('drops global-only fields: displayMode, placement/size, stage, and comments', () => {
+    expect(normalizeReaderResponsiveBranch({ displayMode: 'vertical-scroll' })).toEqual({});
+    expect(normalizeReaderResponsiveBranch({ showComments: false })).toEqual({});
+    expect(
+      normalizeReaderResponsiveBranch({ controls: { placement: 'overlay', size: 'compact' } })
+    ).toEqual({});
     expect(
       normalizeReaderResponsiveBranch({
-        stage: { fit: 'width', frameBorder: false, maxWidth: 500 },
+        stage: { fit: 'width', pageGap: 24, frameBorder: false, maxWidth: 500 },
       })
-    ).toEqual({ stage: { fit: 'width' } });
+    ).toEqual({});
+  });
+
+  it('keeps only focused reader-control appearance and padding overrides', () => {
+    expect(
+      normalizeReaderResponsiveBranch({
+        controls: {
+          labels: { next: 'NEXT NOW' },
+          style: {
+            glow: false,
+            defaults: {
+              padding: 12,
+              appearance: { background: { color: '#101020' } },
+            },
+            primary: { appearance: { border: { width: 2, color: '#00d9ff' } } },
+            bar: { appearance: { background: { color: '#222222' } } },
+          },
+        },
+      })
+    ).toEqual({
+      controls: {
+        style: {
+          defaults: {
+            padding: 12,
+            appearance: { background: { color: '#101020' } },
+          },
+          primary: { appearance: { border: { width: 2, color: '#00d9ff' } } },
+          bar: { appearance: { background: { color: '#222222' } } },
+        },
+      },
+    });
   });
 
   // Panel existence is column-driven, so a responsive branch never emits a `panels`

@@ -2,8 +2,8 @@
 
 Status: Audit complete; roadmap active
 Created: 2026-07-07 (repo-only + live-host audit at commit `cdc84f8`, branch `builder-incremental-improvement`)
-Updated: 2026-07-07 after builder customization Phase 6 landed; original evidence anchors still
-point at the audit commit unless a later note says otherwise.
+Updated: 2026-07-14 after the 0.8.5 responsive authoring contract repair; original evidence
+anchors still point at the audit commit unless a later note says otherwise.
 
 Labels used throughout: **[C:code]** confirmed from code/docs · **[C:live]** confirmed on this host ·
 **[I]** inferred · **[V]** needs live/admin verification.
@@ -34,8 +34,9 @@ gating are competently hardened.
 2. **The 1.0.0 definition says "subscriptions"; the store plan explicitly excludes them.** This is
    the single scope decision that most changes the schedule (see §2.2 — recommendation: ship
    one-time purchases + the existing premium-code system as the subscription bridge).
-3. **Builder module-level responsive controls are dead on published pages** — a real parity break
-   that the test suite currently _asserts as correct_ (details §2.1).
+3. **Builder 0.8.5 release QA is still open** — the responsive save/public contract is repaired
+   and regression-tested, but authenticated Pyre save/reload checks and the header-glow follow-up
+   remain before merge (details §2.1).
 4. **Operational trust is currently broken in three places** [C:live]: all backups live on the
    same disk as the database (the 916G archive drive is mounted and _empty_), the diagnostics
    snapshot is a month stale (June 4) because the refresh timer was never installed, and the ops
@@ -50,10 +51,10 @@ gating are competently hardened.
 it), single-disk data loss, and scope creep in the builder (Phases 5–7 are where "close to done"
 can quietly become two more months).
 
-**Shortest credible path:** finish the builder with the module-responsive parity fix, the remaining
-trimmed Phase 3 work, the small Phase 7 precedence/copy pass, and the safety net work → merge to
-main + one-day ops hardening → Stripe-Checkout-only store per the existing plan → freeze everything
-else at "verify + polish" level. Media redesign, PayPal, and social expansion all land post-1.0.
+**Shortest credible path:** finish the builder's authenticated 0.8.5 QA, header glow, and safety
+net work → merge to main + one-day ops hardening → Stripe-Checkout-only store per the existing
+plan → freeze everything else at "verify + polish" level. Media redesign, PayPal, and social
+expansion all land post-1.0.
 
 ---
 
@@ -61,13 +62,27 @@ else at "verify + polish" level. Media redesign, PayPal, and social expansion al
 
 ### 2.1 Page builder (priority 1)
 
-**Current state.** Phases 0–6 of `docs/BUILDER_CUSTOMIZATION_ROADMAP.md` are implemented and
+**Current state.** Phases 0–7 of `docs/BUILDER_CUSTOMIZATION_ROADMAP.md` are implemented and
 verified (panel/column consolidation closed, panel widths, module layout card, reader controls
 bar + end-of-entry popup, header edit-in-place with the placement board retired, header/logo and
 entry-picker customization, and account/links shell chrome as placeable blocks) [C:code+docs].
-Phase 7 is now a reduced palette-precedence regression/copy pass, not palette retirement. Deferred
-stragglers: universal module appearance (Phase 2), button typography/custom labels/granular
-padding (Phase 3), drag-resize gutters (Phase 1, optional).
+Deferred stragglers: universal module appearance (Phase 2), drag-resize gutters (Phase 1,
+optional), and the 0.8.5 header-glow follow-up.
+
+**0.8.5 corrective pass (implemented; final manual release QA pending).** The builder's focused
+responsive/public contract now covers reader-control default/primary/bar appearance and padding,
+plus Feed wrapper size/alignment, with sparse Tablet/Phone branches rendered as public device CSS
+from one ratio-banded media contract. Reader-panel `Hidden` collapses the real side shell;
+the reader-owning column border targets the outer stage and takes precedence over the stock page
+frame. Popup-arrow moves are draft-first and batch-save atomically. Save Page preserves publication
+state; only explicit Publish/confirmed-Unpublish changes visibility. The builder verifies a
+versioned authenticated API contract before module saves and keeps a draft dirty if the save
+response drops an allowed responsive branch. Spacer height, Feed layout, and reader-control
+appearance/padding have save/refetch plus preview/public coverage. Authoring uses one fixed preview
+for each Desktop, Tablet, and Phone branch. Portrait Tablet/Phone readers stay on stable width
+containment; rotating past the established `7/5` aspect-ratio boundary returns to Desktop layout
+and its bounded-parent dynamic frame. This deliberately does **not** claim generic responsive
+support for every future module field. Header glow remains the separate follow-up.
 
 **What works — and is worth trusting:**
 
@@ -86,19 +101,13 @@ padding (Phase 3), drag-resize gutters (Phase 1, optional).
 
 **What is broken or risky:**
 
-1. **Module-level responsive overrides never apply on the published page.**
-   `getEffectiveModuleConfig` and `isModuleHiddenForDevice` both early-return unless
-   `builderEditing` (`admin/page-builder/responsive-overrides.js:248`, `:269`), and the public
-   `@media` emission covers sections/columns/panels only
-   (`admin/page-builder/responsive-css.js`). Meanwhile the editor happily offers "Hidden on
-   Mobile" and per-device fields for most module types
-   (`admin/page-builder/module-editor.js:443`,
-   `admin/page-builder/module-descriptors.js:53-278`). The parity test _asserts the broken
-   behavior_ — public render keeps the mobile-hidden spacer visible
-   (`tests/shared-renderers-parity.test.js:348`). Same class of gap for per-device header
-   appearance (`reader/data.js:108-109`). **[C:code]** — an author hides a block on phone,
-   preview confirms it, phones still show it. This is the exact "dead control / parity" failure
-   mode, and it should be the first builder fix.
+1. **The responsive module contract is intentionally allowlisted and deployment-sensitive.**
+   Existing hidden/text/gallery/button rules plus Spacer height, Feed layout, and reader controls
+   emit public ratio-banded CSS; preview resolves the selected branch in JavaScript. New responsive
+   fields must be registered across the editor, client/backend normalizers, runtime capability
+   contract, preview, public emitter, and round-trip tests. Because the admin source and public
+   bundle can update without reloading the FastAPI process, backend changes require an API restart;
+   the builder now blocks saves when `/api/admin/page-builder/runtime` is incompatible. **[C:code]**
 2. **No safety net on live pages.** There is no page revision/version model
    (`backend/app/models.py:483-618` — nothing but the four builder tables), saves write directly
    to the published record, and module/section deletes are permanent behind a `confirm()`
@@ -118,24 +127,21 @@ padding (Phase 3), drag-resize gutters (Phase 1, optional).
    intentionally retained after the 2026-07-07 scope revision. The remaining Phase 7 work is to
    guard and explain element-over-palette precedence.
 
-**What's missing** (from the roadmap, verified against code): the module-responsive parity fix,
-Phase 3 remainder (button typography, custom labels, padding), Phase 7's palette-precedence
-regression test + builder copy note, per-save page snapshots, and the pending manual QA passes.
+**What's missing** (from the roadmap, verified against code): authenticated Pyre
+Desktop/Tablet/Phone closeout QA for 0.8.5, header glow, per-save page snapshots, and the earlier
+manual drag/authoring passes.
 
 **1.0.0 scope recommendation:**
 
-- **In:** the module-responsive parity fix (emit module-level `@media` rules or per-device classes
-  on the public path — mirror what columns already do, then fix the parity test to assert real
-  parity); the Phase 3 remainder (small, closes "reader controls customization"); Phase 7's
-  precedence regression/copy pass; per-save page snapshots (S-sized safety net); the two pending
-  manual QA passes.
+- **In:** finish the 0.8.5 authenticated responsive QA and header-glow follow-up; per-save page
+  snapshots (S-sized safety net); the two pending manual QA passes.
 - **Defer/cut:** universal module appearance (needs the per-type audit; button/promo/email already
   have their own styling), drag-resize gutters, any new module types before the store's.
 - **Blockers/dependencies:** none external. Merge to `main` before starting store work.
-- **Tests/QA:** add public-path assertions for every module-responsive field (invert the current
-  parity expectations); a backend test that a saved page round-trips byte-identical through
-  sanitize (drift guard); keep the visual suite mandatory for Phases 5/7. Manual: the handed-back
-  Pyre pass; one full authoring session per series on a phone.
+- **Tests/QA:** keep backend update/refetch, builder save/reload, negative dropped-branch, and
+  preview/public real-width coverage aligned with every newly allowed responsive field. Keep the
+  visual suite mandatory for responsive and header work. Manual: the handed-back Pyre pass; one
+  full authoring session per series on a phone.
 - **Definition of done:** every control visible in the inspector provably changes the _published_
   page (the Phase-0 matrix philosophy, extended to modules); Phases 3/5/7 closed with completion
   notes; no dead controls; snapshots restorable from the admin; all gates green.
@@ -417,14 +423,12 @@ compete with feature time meaningfully.
 
 **NOW — finish before moving on**
 
-1. _Builder:_ module/header responsive **parity fix** + invert the parity tests (§2.1 item 1).
+1. _Builder:_ complete authenticated Pyre responsive save/reload/public-width QA and header glow.
 2. _Builder:_ per-save page JSON snapshots + restore (safety net for live editing).
-3. _Builder:_ Phase 3 remainder → Phase 7 (trimmed as scoped above; Phases 5–6 are already
-   implemented).
-4. _Builder:_ the two pending manual QA passes (Pyre interactive pass; header drag feel).
-5. _Process:_ merge `builder-incremental-improvement` → `main`; adopt "main = deployed" from here
+3. _Builder:_ complete the remaining manual authoring/header-drag QA.
+4. _Process:_ merge `builder-incremental-improvement` → `main`; adopt "main = deployed" from here
    on.
-6. _Ops track (parallel, ~1 day):_ point nightly backups (DB dump + weekly `backup-files`) at
+5. _Ops track (parallel, ~1 day):_ point nightly backups (DB dump + weekly `backup-files`) at
    `/mnt/archive`; run one **restore drill** into a scratch Postgres and write down the steps;
    install diagnostics-refresh timer + ops worker (or disable ops deliberately); pin `umami`
    image; add Caddy security headers (HSTS, `X-Content-Type-Options`, `Referrer-Policy`,
@@ -432,17 +436,17 @@ compete with feature time meaningfully.
 
 **NEXT — required for 1.0.0**
 
-7. _Store:_ Stripe-Checkout-only build per the plan's Phases 1→7, with the checklist in §2.2
+6. _Store:_ Stripe-Checkout-only build per the plan's Phases 1→7, with the checklist in §2.2
    (provider-neutral order columns; subscriptions bridged via premium codes). This is the
    schedule's center of mass.
-8. _Users:_ password change + admin password set; `/api/email/subscribe` hardening.
-9. _Analytics:_ visitor-session retention job; `/api/track/visitor` rate limit; one
+7. _Users:_ password change + admin password set; `/api/email/subscribe` hardening.
+8. _Analytics:_ visitor-session retention job; `/api/track/visitor` rate limit; one
    metrics-correctness pass; `store_checkout_start` event.
-10. _Diagnostics:_ snapshot-age banner; hide Preview Changes tab.
-11. _Polish (the 0.8.5 items, last):_ entry/chapter terminology sweep, new-reader "start here"
+9. _Diagnostics:_ snapshot-age banner; hide Preview Changes tab.
+10. _Polish (the 0.8.5 items, last):_ entry/chapter terminology sweep, new-reader "start here"
     flow, one real mobile pass of reader + daily-use admin flows, media.html token alignment
     (direction A).
-12. _Release:_ full DoD gate (§4), tag `1.0.0`.
+11. _Release:_ full DoD gate (§4), tag `1.0.0`.
 
 **LATER — post-1.0.0**
 
@@ -588,6 +592,5 @@ Only things that change the plan:
 
 ## Immediate next steps
 
-In priority order: answer open questions 1–3, then start with the builder responsive-parity fix
-(the highest-value pure-code item, fully scoped by this audit), with the backup retarget as the
-parallel one-hour ops fix.
+In priority order: answer open questions 1–3, close the authenticated builder 0.8.5 QA and header
+glow, then add page snapshots, with the backup retarget as the parallel one-hour ops fix.

@@ -1116,7 +1116,8 @@ test.describe('builder preview visual parity', () => {
         '/admin/index.html?view=designer&series=battle-bros&page=vertical-reader&surface=header'
       );
       await expect(adminPage.locator('#pageBuilderSection')).toBeVisible();
-      await waitForPreviewReady(adminPage, 'desktop');
+      await adminPage.locator(`#pbWidthToggles [data-width="${viewportId}"]`).click();
+      await waitForPreviewReady(adminPage, viewportId);
 
       const previewFrame = await getPreviewFrame(adminPage);
       await assertVerticalReader(previewFrame);
@@ -1179,7 +1180,10 @@ test.describe('builder preview visual parity', () => {
 
       expect(previewState).toEqual(publicState);
       await waitForAssets(previewFrame);
-      await lockScreenshotViewport(previewFrame, viewport);
+      await lockScreenshotViewport(previewFrame, {
+        ...viewport,
+        captureHeight: viewport.height + 1,
+      });
       const adminPreviewScreenshot = await previewFrame
         .locator(VISUAL_CAPTURE_SELECTOR)
         .screenshot({
@@ -1305,7 +1309,10 @@ test.describe('builder preview visual parity', () => {
         expect(metrics.metricsHasOverflow).toBe('false');
       }
 
-      await lockScreenshotViewport(previewFrame, viewport);
+      await lockScreenshotViewport(previewFrame, {
+        ...viewport,
+        captureHeight: viewport.height + 1,
+      });
       const previewScreenshot = await previewFrame.locator(VISUAL_CAPTURE_SELECTOR).screenshot({
         animations: 'disabled',
         scale: 'css',

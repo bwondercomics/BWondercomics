@@ -53,6 +53,13 @@ MAX_COLUMN_RATIO = 100
 COLUMN_ALIGNMENTS = {"stretch", "start", "center", "end"}
 ALLOWED_SECTION_TYPES = {"row"}
 BUILDER_DEVICE_IDS = ("desktop", "tablet", "mobile")
+BUILDER_RESPONSIVE_CONTRACT_VERSION = 1
+BUILDER_RESPONSIVE_CAPABILITIES = (
+    "responsive-module-round-trip",
+    "responsive-feed-layout",
+    "responsive-reader-controls",
+    "responsive-public-media-css",
+)
 SECTION_RESPONSIVE_FIELDS = {
     "layout",
     "moduleGap",
@@ -1032,48 +1039,36 @@ def sanitize_reader_panels(raw: Any, *, show_panels: bool = True) -> dict[str, A
 
 
 def sanitize_reader_responsive_branch(branch: dict[str, Any]) -> dict[str, Any]:
+    # Mirrors the client's normalizeReaderResponsiveBranch: a reader device branch keeps
+    # only control styling (the public runtime emits it as root-device-scoped CSS vars).
+    # displayMode, controls placement/size, stage, comments, and the legacy panel toggles
+    # are global-only — they apply at mount and cannot vary per device, so persisting them
+    # here would let the builder preview settings the published page ignores.
     branch_payload: dict[str, Any] = {}
-    if "displayMode" in branch:
-        branch_payload["displayMode"] = _sanitize_reader_keyword(
-            branch.get("displayMode"), READER_DISPLAY_MODES, "paged"
-        )
-    if "showComments" in branch:
-        branch_payload["showComments"] = _coerce_bool(branch.get("showComments"), True)
     controls = branch.get("controls") if isinstance(branch.get("controls"), dict) else {}
-    if controls:
-        controls_payload: dict[str, Any] = {}
-        if "placement" in controls:
-            controls_payload["placement"] = _sanitize_reader_keyword(
-                controls.get("placement"), READER_CONTROLS_PLACEMENTS, "below"
-            )
-        if "size" in controls:
-            controls_payload["size"] = _sanitize_reader_keyword(
-                controls.get("size"), READER_CONTROLS_SIZES, "medium"
-            )
-        if controls_payload:
-            branch_payload["controls"] = controls_payload
-    stage = branch.get("stage") if isinstance(branch.get("stage"), dict) else {}
-    if stage:
-        stage_payload: dict[str, Any] = {}
-        if "fit" in stage:
-            stage_payload["fit"] = _sanitize_reader_keyword(
-                stage.get("fit"), READER_STAGE_FITS, "dynamic-frame"
-            )
-        if "pageGap" in stage:
-            stage_payload["pageGap"] = _clamp_int(stage.get("pageGap"), 8, 0, 64)
-        if stage_payload:
-            branch_payload["stage"] = stage_payload
-    panels = branch.get("panels") if isinstance(branch.get("panels"), dict) else {}
-    if panels:
-        panels_payload: dict[str, Any] = {}
-        left = panels.get("left") if isinstance(panels.get("left"), dict) else {}
-        right = panels.get("right") if isinstance(panels.get("right"), dict) else {}
-        if "enabled" in left:
-            panels_payload["left"] = {"enabled": _coerce_bool(left.get("enabled"), True)}
-        if "enabled" in right:
-            panels_payload["right"] = {"enabled": _coerce_bool(right.get("enabled"), True)}
-        if panels_payload:
-            branch_payload["panels"] = panels_payload
+    style = controls.get("style") if isinstance(controls.get("style"), dict) else {}
+    if style:
+        style_payload: dict[str, Any] = {}
+        defaults = style.get("defaults") if isinstance(style.get("defaults"), dict) else {}
+        if defaults:
+            defaults_payload: dict[str, Any] = {}
+            if "appearance" in defaults:
+                appearance = sanitize_appearance(defaults.get("appearance"))
+                if appearance:
+                    defaults_payload["appearance"] = appearance
+            if "padding" in defaults:
+                defaults_payload["padding"] = _clamp_int(defaults.get("padding"), 0, 0, 48)
+            if defaults_payload:
+                style_payload["defaults"] = defaults_payload
+        for key in ("primary", "bar"):
+            candidate = style.get(key) if isinstance(style.get(key), dict) else {}
+            if "appearance" not in candidate:
+                continue
+            appearance = sanitize_appearance(candidate.get("appearance"))
+            if appearance:
+                style_payload[key] = {"appearance": appearance}
+        if style_payload:
+            branch_payload["controls"] = {"style": style_payload}
     return _prune_empty_dicts(branch_payload)
 
 
@@ -1101,6 +1096,10 @@ def sanitize_module_responsive(module_type: str, raw: Any) -> dict[str, Any]:
             branch_payload.update(sanitize_buttons_responsive_branch(branch))
         elif module_type == "reader":
             branch_payload.update(sanitize_reader_responsive_branch(branch))
+        elif module_type == "feed":
+            layout = sanitize_module_layout(branch.get("layout"))
+            if layout:
+                branch_payload["layout"] = layout
         branch_payload = _prune_empty_dicts(branch_payload)
         if branch_payload:
             sanitized[device_id] = branch_payload

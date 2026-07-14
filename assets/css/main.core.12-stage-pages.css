@@ -54,6 +54,12 @@
   border-width: 0;
 }
 
+/* The reader module's owning column can author the outer stage border. When present it
+   replaces the stock border around individual comic pages, avoiding a double frame. */
+.viewport[data-reader-stage-column-border='true'] .page {
+  border-width: 0;
+}
+
 .stageWrap[data-reader-stage-fit='width'] .page img {
   width: 100%;
   height: auto;

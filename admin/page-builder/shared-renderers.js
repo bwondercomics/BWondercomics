@@ -30,7 +30,12 @@ import {
 } from './link-utils.js';
 import { appearanceToInlineStyle, mergeAppearance } from './appearance-utils.js';
 import { alignmentToAlignSelf, alignmentToJustifySelf } from './layout-utils.js';
-import { buildSectionResponsiveCss, sectionHasResponsiveOverrides } from './responsive-css.js';
+import {
+  buildFeedLayoutResponsiveCss,
+  buildModuleResponsiveCss,
+  buildSectionResponsiveCss,
+  sectionHasResponsiveOverrides,
+} from './responsive-css.js';
 import {
   getEffectiveModuleConfig,
   getEffectiveSectionSettings,
@@ -387,12 +392,14 @@ export function createRenderers({
           const inlineStyle = appearanceToInlineStyle(
             mergeAppearance(defaultsAppearance, btn.appearance)
           );
+          const buttonId = String(btn.id || '').replace(/[^a-zA-Z0-9_-]/g, '');
+          const buttonIdAttr = buttonId ? ` data-button-id="${buttonId}"` : '';
 
           if (!inlineStyle) {
-            return `<a href="${href}" class="pb-btn pb-btn--${style}" ${target}>${text}</a>`;
+            return `<a href="${href}" class="pb-btn pb-btn--${style}"${buttonIdAttr} ${target}>${text}</a>`;
           }
 
-          return `<a href="${href}" class="pb-btn pb-btn--${style}" style="${inlineStyle}" ${target}>${text}</a>`;
+          return `<a href="${href}" class="pb-btn pb-btn--${style}"${buttonIdAttr} style="${inlineStyle}" ${target}>${text}</a>`;
         })
         .filter(Boolean)
         .join('');
@@ -613,9 +620,25 @@ export function createRenderers({
       ? '<div class="pb-module-hidden-placeholder">Hidden on this device</div>'
       : renderer(config, mod, { ...renderOptions, builderEditing: emitMarkers });
     // Shared wrapper layout (config.layout): width/height/alignment on the .pb-module box.
-    const layoutStyle = hiddenOnDevice ? '' : buildModuleLayoutStyle(config?.layout);
+    let layoutStyle = hiddenOnDevice ? '' : buildModuleLayoutStyle(config?.layout);
+    // Feed mode normally grows this wrapper to fill its panel. Once the author supplies a
+    // layout, preserve its size and alignment instead of letting that stock flex rule win.
+    if (type === 'feed' && layoutStyle) {
+      layoutStyle = `${layoutStyle}; flex: 0 1 auto`;
+    }
     const layoutStyleAttr = layoutStyle ? ` style="${layoutStyle}"` : '';
-    return `<div class="pb-module pb-module--${safeType}${hiddenClass}"${moduleIdAttr}${markerAttrs}${layoutStyleAttr}>${content}</div>`;
+    const responsiveScope = `.pb-module[data-module-id="${String(mod?.id || '').replace(/[^a-zA-Z0-9_-]/g, '')}"]`;
+    const responsiveCss =
+      mod?.id && !emitMarkers
+        ? [
+            buildFeedLayoutResponsiveCss(mod, responsiveScope),
+            buildModuleResponsiveCss(mod, responsiveScope),
+          ]
+            .filter(Boolean)
+            .join('\n')
+        : '';
+    const responsiveStyleTag = responsiveCss ? `<style>${responsiveCss}</style>` : '';
+    return `${responsiveStyleTag}<div class="pb-module pb-module--${safeType}${hiddenClass}"${moduleIdAttr}${markerAttrs}${layoutStyleAttr}>${content}</div>`;
   }
 
   function renderSection(section, renderOptions = {}) {

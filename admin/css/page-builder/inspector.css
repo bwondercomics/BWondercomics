@@ -573,12 +573,41 @@
 
 .pb-column-padding-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
 }
 
+.pb-column-padding-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 11px;
+}
+
 .pb-column-padding-input {
-  text-align: center;
+  min-width: 72px;
+  text-align: left;
+}
+
+.pb-runtime-warning {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 91, 110, 0.75);
+  border-radius: 8px;
+  background: rgba(83, 13, 29, 0.72);
+  color: #ffe9ed;
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.pb-runtime-warning strong {
+  color: #ff9aaa;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 /* Header block clicked on the live canvas: highlight its Parts row so the inspector

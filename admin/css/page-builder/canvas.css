@@ -17,47 +17,46 @@
 }
 
 .pb-page-title {
-  flex: 1 1 340px;
+  flex: 1 1 240px;
   min-width: 0;
   color: rgba(255, 255, 255, 0.5);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .pb-page-title-main {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
-  gap: 14px;
+  align-items: center;
+  gap: 8px;
   width: 100%;
-  flex-wrap: wrap;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+/* Keep the compact builder title on one row even when the general narrow-canvas rules stack
+   page titles elsewhere. */
+.pb-builder-toolbar .pb-page-title-main {
+  flex-direction: row;
+  align-items: center;
 }
 
 .pb-page-title-copy {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  flex: 1 1 auto;
   min-width: 0;
-  gap: 2px;
+  gap: 6px;
 }
 
-.pb-page-title-label {
-  font-size: 0.68rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.45);
+.pb-page-title-label,
+.pb-page-title-meta {
+  display: none;
 }
 
 .pb-page-title-name {
-  font-size: 0.98rem;
+  font-size: 0.86rem;
   font-weight: 700;
   color: #fff;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.pb-page-title-meta {
-  font-size: 0.74rem;
-  color: rgba(255, 255, 255, 0.62);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -67,36 +66,25 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 4px;
+  flex-wrap: nowrap;
   min-width: 0;
+  flex: 0 0 auto;
+}
+
+.pb-builder-toolbar .pb-page-title-actions {
+  justify-content: flex-end;
 }
 
 .pb-page-title-badges {
   display: flex;
   align-items: center;
   gap: 4px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .pb-page-title-note {
-  margin-top: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  font-size: 0.76rem;
-  line-height: 1.45;
-  color: rgba(255, 255, 255, 0.78);
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.pb-page-title-note[data-status='warning'] {
-  color: #ffd279;
-  background: rgba(255, 184, 76, 0.12);
-  border-color: rgba(255, 184, 76, 0.35);
+  display: none;
 }
 
 .pb-canvas-header-actions {
@@ -127,15 +115,17 @@
 .pb-open-reader-link {
   display: inline-flex;
   align-items: center;
-  padding: 6px 10px;
+  min-height: 30px;
+  padding: 5px 8px;
   border-radius: 999px;
   border: 1px solid rgba(0, 217, 255, 0.35);
   color: var(--primary);
   text-decoration: none;
-  font-size: 0.75rem;
+  font-size: 0.68rem;
   font-weight: 600;
   letter-spacing: 0.02em;
   transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
 .pb-open-reader-link:hover {

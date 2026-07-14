@@ -77,11 +77,20 @@ describe('renderReaderEditor', () => {
     );
   });
 
-  it('omits appearance and global-only stage fields in deviceOnly scope', () => {
+  it('offers only button padding and control appearance in deviceOnly scope', () => {
     const html = renderReaderEditor({}, { deviceOnly: true });
-    expect(html).toContain('Display And Controls');
-    expect(html).toContain('data-reader-key="stage.pageGap"');
-    expect(html).not.toContain('Reader Controls');
+    expect(html).toContain('Reader Controls');
+    expect(html).toContain('data-reader-key="controls.style.defaults.padding"');
+    // Global-only fields must not be authorable per device: the published page applies
+    // them at mount and cannot vary them, so offering them here would preview settings
+    // the public page ignores.
+    expect(html).not.toContain('data-reader-key="displayMode"');
+    expect(html).not.toContain('data-reader-key="controls.placement"');
+    expect(html).not.toContain('data-reader-key="controls.size"');
+    expect(html).not.toContain('data-reader-key="stage.fit"');
+    expect(html).not.toContain('data-reader-key="stage.pageGap"');
+    expect(html).not.toContain('data-reader-key="showComments"');
+    expect(html).not.toContain('data-reader-key="controls.style.glow"');
     expect(html).not.toContain('data-reader-key="stage.frameBorder"');
     expect(html).not.toContain('data-reader-key="stage.maxWidth"');
   });
@@ -129,14 +138,16 @@ describe('bindReaderEditorEvents', () => {
       responsiveEditScope: 'device',
     });
 
-    const placement = wrapper.querySelector('[data-reader-key="controls.placement"]');
-    placement.value = 'overlay';
-    placement.dispatchEvent(new Event('change', { bubbles: true }));
+    const padding = wrapper.querySelector('[data-reader-key="controls.style.defaults.padding"]');
+    padding.value = '30';
+    padding.dispatchEvent(new Event('input', { bubbles: true }));
 
     const committed = setDraftConfig.mock.lastCall[0];
-    expect(committed.responsive.mobile).toEqual({ controls: { placement: 'overlay' } });
+    expect(committed.responsive.mobile).toEqual({
+      controls: { style: { defaults: { padding: 30 } } },
+    });
     // Device overrides must not leak into the base config.
-    expect(committed.controls.placement).toBe('below');
+    expect(committed.controls.style?.defaults?.padding).toBeUndefined();
   });
 
   it('syncs source fields into config.source in global scope', () => {

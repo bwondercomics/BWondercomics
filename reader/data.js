@@ -46,7 +46,11 @@ import {
   buildColumnInlineStyle,
   EDITOR_EMPTY_COLUMN_MIN_HEIGHT,
 } from '../admin/page-builder/shared-renderers.js';
-import { buildPanelResponsiveCss } from '../admin/page-builder/responsive-css.js';
+import {
+  buildPanelResponsiveCss,
+  buildReaderControlsResponsiveCss,
+  buildReaderStageResponsiveCss,
+} from '../admin/page-builder/responsive-css.js';
 
 const BUILDER_THEME_CSS_VARS = Object.freeze([
   '--primary',
@@ -511,6 +515,14 @@ const PANEL_SHELL_APPEARANCE_PROPS = Object.freeze([
   'text-transform',
 ]);
 
+const READER_STAGE_BORDER_PROPS = Object.freeze([
+  'border',
+  'border-width',
+  'border-style',
+  'border-color',
+  'border-radius',
+]);
+
 // Apply a panel column's appearance to the `<aside>` shell — the element the user sees as
 // "the panel" (stock chrome: 4px primary border + dark gradient). The inner column wrapper
 // keeps layout styling only (padding/min-height/alignment); painting appearance there just
@@ -558,19 +570,36 @@ function resolvePanelColumnBackground(panelColumn, side, page) {
 // (rightPanelColumn.exists). Visibility uses the `hidden` attribute (backed by the global
 // `[hidden] { display: none !important }` rule); any stale inline `display` from an earlier
 // snapshot is cleared so `hidden` is the single visibility mechanism.
-function applyPanelExistence(rightPanelColumn) {
+function applyPanelExistence(
+  { left: leftPanelColumn, right: rightPanelColumn } = {},
+  options = {}
+) {
   const leftPanel = document.getElementById('leftPanel');
   const rightPanel = document.getElementById('rightPanel');
+  const isHidden = (panelColumn) => {
+    if (!panelColumn?.exists) return true;
+    const settings = getEffectiveColumnSettings(
+      panelColumn.section,
+      panelColumn.columnIndex,
+      options
+    );
+    return settings?.hidden === true;
+  };
   if (leftPanel) {
     leftPanel.style.removeProperty('display');
-    setHiddenState(leftPanel, false);
+    // A hidden panel column hides the actual shell, not merely its inner content. This lets
+    // the reader shell reflow and gives the reader viewport the released horizontal space.
+    setHiddenState(leftPanel, leftPanelColumn ? isHidden(leftPanelColumn) : false);
   }
   if (rightPanel) {
     rightPanel.style.removeProperty('display');
     // With no reader-owned column (e.g. a page with no reader section) keep today's default
     // of showing the panel; otherwise existence follows the section's column count.
     const rightExists = rightPanelColumn ? rightPanelColumn.exists === true : true;
-    setHiddenState(rightPanel, !rightExists);
+    setHiddenState(
+      rightPanel,
+      !rightExists || (rightPanelColumn ? isHidden(rightPanelColumn) : false)
+    );
   }
 }
 
@@ -694,6 +723,79 @@ function resolveReaderModuleShellSettings(page, options = {}) {
   return getReaderRuntimeConfig(effectiveConfig);
 }
 
+// The reader module's owning section + structural column: the reader has no normal
+// rendered `.pb-column`, so its column settings target the reader viewport instead.
+function findReaderColumnContext(page, options = {}) {
+  const readerModule = findEffectiveReaderModule(page, options);
+  if (!readerModule) return null;
+  const section = (page?.sections || []).find((candidate) =>
+    (candidate?.modules || []).some((module) => module?.id === readerModule.id)
+  );
+  if (!section) return null;
+  const columnIndex = Number(readerModule.columnIndex);
+  return {
+    readerModule,
+    section,
+    columnIndex: Number.isInteger(columnIndex) ? columnIndex : 0,
+  };
+}
+
+// A reader has no normal rendered `.pb-column`: its owning structural column maps to the
+// reader viewport. Only the column border is meaningful there; backgrounds and text would
+// incorrectly paint or recolor the comic stage.
+function resolveReaderStageBorder(page, options = {}) {
+  const context = findReaderColumnContext(page, options);
+  if (!context) return '';
+  const settings = getEffectiveColumnSettings(context.section, context.columnIndex, options);
+  const border = normalizeAppearance({ border: settings?.appearance?.border || {} })?.border;
+  return border ? appearanceToInlineStyle({ border }) : '';
+}
+
+function applyReaderStageBorder(viewport, page, options = {}) {
+  if (!viewport) return;
+  READER_STAGE_BORDER_PROPS.forEach((prop) => viewport.style.removeProperty(prop));
+  const styleText = resolveReaderStageBorder(page, options);
+  let applied = false;
+  styleText.split(';').forEach((token) => {
+    const separator = token.indexOf(':');
+    if (separator === -1) return;
+    const prop = token.slice(0, separator).trim();
+    const value = token.slice(separator + 1).trim();
+    if (value && READER_STAGE_BORDER_PROPS.includes(prop)) {
+      viewport.style.setProperty(prop, value);
+      applied = true;
+    }
+  });
+  viewport.dataset.readerStageColumnBorder = String(applied);
+}
+
+function applyReaderControlsResponsiveCss(page, options = {}) {
+  const styleId = 'builder-reader-controls-responsive-css';
+  let style = document.getElementById(styleId);
+  let css = '';
+  if (options.builderEditing !== true) {
+    const context = findReaderColumnContext(page, options);
+    css = [
+      buildReaderControlsResponsiveCss(context?.readerModule || null),
+      // Device branches of the reader column's border have no rendered `.pb-column`
+      // to receive panel/section CSS, so they get their own viewport-scoped rules.
+      context ? buildReaderStageResponsiveCss(context.section, context.columnIndex) : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+  if (!css) {
+    style?.remove();
+    return;
+  }
+  if (!style) {
+    style = document.createElement('style');
+    style.id = styleId;
+    document.head.append(style);
+  }
+  style.textContent = css;
+}
+
 // Custom reader-button labels (Phase 3). The hardcoded markup text is captured once per
 // button and restored when a page has no custom label; `data-reader-label` also lets the
 // runtime writers that toggle text (fullscreen FULL/EXIT) restore the authored label.
@@ -811,6 +913,7 @@ export function applyReaderModuleShellSettings(page, options = {}) {
   // so expose the page gap on the viewport too for the strip to inherit.
   if (viewport) {
     viewport.style.setProperty('--reader-stage-page-gap', `${settings.stage.pageGap}px`);
+    applyReaderStageBorder(viewport, page, options);
   }
 
   setHiddenState(commentsSection, settings.showComments === false);
@@ -1339,7 +1442,10 @@ export function applyBuilderPageToDOM(page, options = {}) {
   // Panel existence follows the reader section's column ratio: the left panel always exists
   // (column 0); the right panel exists only once the section has 2+ columns
   // (rightPanelColumn.exists). No runtime toggle can hide a panel anymore.
-  applyPanelExistence(rightPanelColumn);
+  applyPanelExistence(
+    { left: leftPanelColumn, right: rightPanelColumn },
+    { builderEditing, deviceId }
+  );
 
   // Panel width follows the same ratio: with 3+ columns the shell row shares its width
   // proportionally (left panel / reader area / right panel). Uses the stable structural
@@ -1347,6 +1453,7 @@ export function applyBuilderPageToDOM(page, options = {}) {
   applyPanelShellWeights(readerPanelLayout);
 
   applyReaderModuleShellSettings(page, { builderEditing, deviceId });
+  applyReaderControlsResponsiveCss(page, { builderEditing, deviceId });
 
   logger.log('✓ Applied page builder config to DOM');
   return shellState;

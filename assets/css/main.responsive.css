@@ -34,6 +34,13 @@
     min-height: 50vh;
   }
 
+  /* Containment must not follow mobile browser chrome while the document scrolls.
+     `dvh` changes as the address bar expands/collapses; `svh` is the stable visible floor. */
+  .page img {
+    max-height: calc(100vh - 150px);
+    max-height: calc(100svh - 150px);
+  }
+
   .controls {
     margin: 12px 0 12px 0;
     padding: 12px 8px;
@@ -258,12 +265,12 @@
   .btn {
     height: 40px;
     min-width: 40px;
-    padding: 0 8px;
+    padding: 0 var(--reader-control-padding-x, 8px);
     font-size: 12px;
   }
 
   .btn.primary {
-    padding: 0 10px;
+    padding: 0 var(--reader-control-padding-x, 10px);
   }
 
   .status {
@@ -294,6 +301,22 @@
   }
 }
 
+/* Tablet portrait uses width fit without the Phone image-height cap. Landscape leaves this band
+   and returns to the established Desktop dynamic-frame path. */
+@media (min-width: 481px) and (max-aspect-ratio: 7/5) {
+  .stageWrap[data-reader-stage-fit='dynamic-frame'] .stage,
+  .stageWrap[data-reader-stage-fit='dynamic-frame'] .page {
+    width: 100%;
+    max-height: none;
+  }
+
+  .stageWrap[data-reader-stage-fit='dynamic-frame'] .page img {
+    width: 100%;
+    height: auto;
+    max-height: none;
+  }
+}
+
 @media (max-width: 620px) {
   .status-panel {
     display: none !important;
@@ -308,7 +331,7 @@
 
 /* ==================== MOBILE HEADER LAYOUT ==================== */
 
-@media (max-width: 768px) {
+@media (max-aspect-ratio: 7/5) {
   header.topbar {
     position: relative;
     display: flex;

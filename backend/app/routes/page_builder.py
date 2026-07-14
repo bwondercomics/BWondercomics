@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
+from ..builder_security import (
+    BUILDER_RESPONSIVE_CAPABILITIES,
+    BUILDER_RESPONSIVE_CONTRACT_VERSION,
+)
 from ..db import get_db
 from ..models import User
 from ..page_store import (
@@ -37,6 +42,7 @@ from ..page_store import (
     reorder_pages,
     reorder_scoped_pages,
     reorder_sections,
+    save_module_placements,
     update_module,
     update_page,
     update_page_bindings,
@@ -46,6 +52,7 @@ from ..security import get_current_user
 from ..validation import is_admin_role
 
 router = APIRouter()
+PAGE_BUILDER_PROCESS_STARTED_AT = datetime.now(timezone.utc).isoformat()
 
 
 def _require_admin(request: Request, db: Session) -> User | None:
@@ -56,6 +63,26 @@ def _require_admin(request: Request, db: Session) -> User | None:
 
 
 # Page endpoints
+
+
+@router.get("/api/admin/page-builder/runtime")
+def api_page_builder_runtime(request: Request, db: Session = Depends(get_db)):
+    """Report the responsive builder contract loaded by this API process."""
+    if not _require_admin(request, db):
+        return JSONResponse(
+            status_code=403,
+            content={"error": "Admin access required"},
+            headers={"Cache-Control": "no-store"},
+        )
+
+    return JSONResponse(
+        content={
+            "contractVersion": BUILDER_RESPONSIVE_CONTRACT_VERSION,
+            "processStartedAt": PAGE_BUILDER_PROCESS_STARTED_AT,
+            "capabilities": list(BUILDER_RESPONSIVE_CAPABILITIES),
+        },
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 class CreatePageRequest(BaseModel):
@@ -540,6 +567,19 @@ class ReorderModulesRequest(BaseModel):
     module_ids: list[str] = Field(alias="moduleIds")
 
 
+class ModulePlacementRequest(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    module_id: str = Field(alias="moduleId")
+    section_id: str = Field(alias="sectionId")
+    column_index: int = Field(alias="columnIndex")
+    sort_index: int = Field(alias="sortIndex")
+
+
+class SaveModulePlacementsRequest(BaseModel):
+    placements: list[ModulePlacementRequest]
+
+
 @router.post("/api/admin/sections/{section_id}/modules")
 def api_add_module(
     section_id: str,
@@ -635,37 +675,89 @@ def api_reorder_modules(
         return JSONResponse(status_code=400, content={"error": str(e)})
 
 
+@router.post("/api/admin/pages/{page_id}/modules/placements")
+def api_save_module_placements(
+    page_id: str,
+    payload: SaveModulePlacementsRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Atomically save a full-page module-placement draft."""
+    if not _require_admin(request, db):
+        return JSONResponse(status_code=403, content={"error": "Admin access required"})
+
+    try:
+        page = save_module_placements(
+            db,
+            page_id,
+            [placement.model_dump(by_alias=True) for placement in payload.placements],
+        )
+        if not page:
+            return JSONResponse(status_code=404, content={"error": "Page not found"})
+        return {"page": page}
+    except ValueError as e:
+        db.rollback()
+        return JSONResponse(status_code=400, content={"error": str(e)})
+
+
 # Public endpoint for page rendering
 
 
 @router.get("/api/pages/home/{series_id}")
-def api_public_homepage(series_id: str, db: Session = Depends(get_db)):
+def api_public_homepage(series_id: str, db: Session = Depends(get_db), response: Response = None):
     """Get the effective published homepage page for public rendering."""
     page = get_homepage_page(db, series_id, published_only=True)
     if not page:
-        return JSONResponse(status_code=404, content={"error": "Page not found"})
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Page not found"},
+            headers={"Cache-Control": "no-store"},
+        )
 
+    if response is not None:
+        response.headers["Cache-Control"] = "no-store"
     return {"page": page}
 
 
 @router.get("/api/pages/global/by-slug/{slug}")
-def api_public_global_page(slug: str, db: Session = Depends(get_db)):
+def api_public_global_page(slug: str, db: Session = Depends(get_db), response: Response = None):
     """Get a published global page for public rendering."""
     page = get_global_page_by_slug(db, slug)
     if not page or not page.get("isPublished"):
-        return JSONResponse(status_code=404, content={"error": "Page not found"})
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Page not found"},
+            headers={"Cache-Control": "no-store"},
+        )
 
+    if response is not None:
+        response.headers["Cache-Control"] = "no-store"
     return {"page": page}
 
 
 @router.get("/api/pages/{series_id}/{slug}")
-def api_public_page(series_id: str, slug: str, db: Session = Depends(get_db)):
+def api_public_page(
+    series_id: str,
+    slug: str,
+    db: Session = Depends(get_db),
+    response: Response = None,
+):
     """Get a published page for public rendering."""
     page = get_page_by_slug(db, series_id, slug)
     if not page:
-        return JSONResponse(status_code=404, content={"error": "Page not found"})
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Page not found"},
+            headers={"Cache-Control": "no-store"},
+        )
 
     if not page.get("isPublished"):
-        return JSONResponse(status_code=404, content={"error": "Page not found"})
+        return JSONResponse(
+            status_code=404,
+            content={"error": "Page not found"},
+            headers={"Cache-Control": "no-store"},
+        )
 
+    if response is not None:
+        response.headers["Cache-Control"] = "no-store"
     return {"page": page}

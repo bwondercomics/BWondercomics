@@ -33,6 +33,7 @@ function createDraftManagerHarness({ updateModule, updatePage } = {}) {
       pageType: 'reader',
       isHomepage: false,
     },
+    builderRuntime: { compatible: true },
   };
   const actions = {
     buildNormalizedPageMeta: vi.fn(() => ({ header: {} })),

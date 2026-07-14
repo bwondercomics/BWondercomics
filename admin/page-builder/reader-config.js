@@ -16,6 +16,14 @@ function isObject(value) {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
 
+function toSparseObject(value) {
+  if (!isObject(value)) return value == null ? undefined : value;
+  const entries = Object.entries(value)
+    .map(([key, item]) => [key, toSparseObject(item)])
+    .filter(([, item]) => item !== undefined);
+  return entries.length ? Object.fromEntries(entries) : undefined;
+}
+
 function pickKeyword(value, allowed, fallback) {
   const normalized = String(value || '').trim();
   return allowed.includes(normalized) ? normalized : fallback;
@@ -146,32 +154,47 @@ export function normalizeReaderConfig(rawConfig = {}) {
   };
 }
 
+// A reader device branch keeps only fields the PUBLIC runtime can honor per device:
+// the visibility flag (emitted as scoped display CSS) and control-button styling
+// (emitted as scoped --reader-control-* CSS vars plus padding). Display mode, controls
+// placement/size, stage, and comments are global-only — the published page applies them
+// as data attributes/JS at mount, which cannot vary by device, so retaining them here
+// would preview settings the public page ignores.
 export function normalizeReaderResponsiveBranch(rawBranch = {}) {
   const branch = isObject(rawBranch) ? rawBranch : {};
   const base = normalizeReaderConfig(branch);
   const payload = {};
-  if (Object.prototype.hasOwnProperty.call(branch, 'displayMode')) {
-    payload.displayMode = base.displayMode;
-  }
-  if (Object.prototype.hasOwnProperty.call(branch, 'showComments')) {
-    payload.showComments = base.showComments;
+  if (Object.prototype.hasOwnProperty.call(branch, 'hidden')) {
+    payload.hidden = branch.hidden === true;
   }
   if (isObject(branch.controls)) {
-    payload.controls = {};
-    if (Object.prototype.hasOwnProperty.call(branch.controls, 'placement')) {
-      payload.controls.placement = base.controls.placement;
-    }
-    if (Object.prototype.hasOwnProperty.call(branch.controls, 'size')) {
-      payload.controls.size = base.controls.size;
-    }
-  }
-  if (isObject(branch.stage)) {
-    payload.stage = {};
-    if (Object.prototype.hasOwnProperty.call(branch.stage, 'fit')) {
-      payload.stage.fit = base.stage.fit;
-    }
-    if (Object.prototype.hasOwnProperty.call(branch.stage, 'pageGap')) {
-      payload.stage.pageGap = base.stage.pageGap;
+    const rawStyle = isObject(branch.controls.style) ? branch.controls.style : {};
+    if (Object.keys(rawStyle).length) {
+      const style = {};
+      if (isObject(rawStyle.defaults)) {
+        const defaults = {};
+        if (Object.prototype.hasOwnProperty.call(rawStyle.defaults, 'appearance')) {
+          const appearance = toSparseObject(base.controls.style.defaults.appearance);
+          if (appearance) defaults.appearance = appearance;
+        }
+        if (Object.prototype.hasOwnProperty.call(rawStyle.defaults, 'padding')) {
+          const padding = base.controls.style.defaults.padding;
+          if (padding != null) defaults.padding = padding;
+        }
+        if (Object.keys(defaults).length) style.defaults = defaults;
+      }
+      ['primary', 'bar'].forEach((key) => {
+        if (
+          !isObject(rawStyle[key]) ||
+          !Object.prototype.hasOwnProperty.call(rawStyle[key], 'appearance')
+        ) {
+          return;
+        }
+        const appearance = toSparseObject(base.controls.style[key].appearance);
+        if (appearance) style[key] = { appearance };
+      });
+      // Glow is intentionally global-only for this focused responsive scope.
+      if (Object.keys(style).length) payload.controls = { style };
     }
   }
   return payload;

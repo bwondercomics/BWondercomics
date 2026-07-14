@@ -103,6 +103,26 @@ Notes:
 - Origin HTML/manifest responses use `Cache-Control: no-store`, so the change is visible on the next request. Social platforms may still hold a cached preview.
 - Only `public` media can be used for branding. Invalid or protected paths fall back to `assets/banner1.png` for OG and `assets/boywondericon.png` for favicon.
 
+## Builder responsive deployment checklist
+
+Builder device editing is a cross-process contract: the source-served admin, FastAPI sanitizer,
+saved page JSON, and built public bundle must be deployed as one generation. For changes to that
+contract:
+
+1. Run `./scripts/frontend-build.sh` so `dist/` contains the matching renderer and responsive
+   rules.
+2. Restart `bwondercomics-api`; uvicorn does not hot-reload Python sanitizer or route changes.
+3. Reload/restart Caddy when `deploy/Caddyfile` changed. `/admin/*` must continue to return
+   `Cache-Control: no-cache, must-revalidate` so source-served admin JavaScript is revalidated.
+4. In an authenticated admin session, verify `GET /api/admin/page-builder/runtime` returns the
+   expected contract version, current process start time, and responsive capabilities with
+   `Cache-Control: no-store`.
+5. Save and reload distinct Tablet and Phone values, then verify the public page in portrait and
+   landscape. Portrait must use the selected device branch; rotating past `7/5` must return to
+   Desktop layout. Confirm public page API responses use `Cache-Control: no-store` and the reader
+   stays screen-fit and stable while scrolling and navigating pages. An **API restart required**
+   warning is a deployment failure; do not discard the preserved draft to work around it.
+
 ## Dynamic DNS
 
 The domain uses Namecheap Dynamic DNS so `bwondercomics.com` can follow the router's dynamic WAN IP.

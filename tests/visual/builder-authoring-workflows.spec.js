@@ -10,13 +10,16 @@ const fixtures = getContractFixtures();
 const VISUAL_BASE_URL =
   process.env.PLAYWRIGHT_VISUAL_BASE_URL ||
   `http://127.0.0.1:${process.env.PLAYWRIGHT_VISUAL_PORT || '3107'}`;
-const PLACEHOLDER_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAACAAAAAYCAIAAAD7G0uFAAAAOElEQVR4nO3NQQEAAAgDINc/9K3hApIgqnSze7MzAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAD4G29yACUvxiZ5AAAAAElFTkSuQmCC',
-  'base64'
+const PLACEHOLDER_IMAGE = Buffer.from(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900" viewBox="0 0 600 900">' +
+    '<rect width="600" height="900" fill="#15172a"/><path d="M0 0L600 900M600 0L0 900" stroke="#00d9ff" stroke-width="12"/></svg>'
 );
 const FIXED_NOW = '2026-05-11T12:00:00.000Z';
 const SERIES_ID = 'battle-bros';
 const TEXT_MODULE_ID = 'fffffff1-ffff-4fff-8fff-ffffffffff02';
+const SPACER_MODULE_ID = 'fffffff1-ffff-4fff-8fff-ffffffffff0b';
+const FEED_MODULE_ID = 'fffffff1-ffff-4fff-8fff-ffffffffff0e';
+const READER_MODULE_ID = 'phase-12-reader-module';
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -45,7 +48,8 @@ function isDeterministicImageRequest(pathname) {
   return (
     pathname.startsWith('/media/') ||
     pathname.startsWith('/assets/media/') ||
-    pathname.startsWith('/api/protected/') ||
+    pathname.startsWith('/protected/') ||
+    pathname.startsWith('/api/protected') ||
     ((pathname.startsWith('/assets/') ||
       pathname.startsWith('/comics/') ||
       pathname.startsWith('/com1cshare/')) &&
@@ -216,8 +220,8 @@ async function installWorkflowRoutes(page, state) {
     if (isDeterministicImageRequest(pathname)) {
       await route.fulfill({
         status: 200,
-        contentType: 'image/png',
-        body: PLACEHOLDER_PNG,
+        contentType: 'image/svg+xml',
+        body: PLACEHOLDER_IMAGE,
       });
       return;
     }
@@ -255,6 +259,22 @@ async function installWorkflowRoutes(page, state) {
 
     if (pathname === '/media.json') {
       await route.fulfill(json(fixtures.mediaItems || []));
+      return;
+    }
+
+    if (pathname === '/api/admin/page-builder/runtime') {
+      await route.fulfill(
+        json({
+          contractVersion: 1,
+          processStartedAt: FIXED_NOW,
+          capabilities: [
+            'responsive-module-round-trip',
+            'responsive-feed-layout',
+            'responsive-reader-controls',
+            'responsive-public-media-css',
+          ],
+        })
+      );
       return;
     }
 
@@ -642,6 +662,116 @@ async function waitForPreviewReady(page, viewportId = '') {
   await page.waitForSelector(selector, { timeout: 15_000 });
 }
 
+async function sampleReaderFrame(
+  target,
+  durationMs = 5_000,
+  intervalMs = 1_000,
+  expectedDynamic = null
+) {
+  await expect
+    .poll(() =>
+      target
+        .locator('#leftImg')
+        .evaluate((image) => image.complete && image.naturalWidth > 0 && image.naturalHeight > 0)
+    )
+    .toBe(true);
+  if (expectedDynamic === true) {
+    await expect(target.locator('#viewport')).toHaveClass(/dynamic-frame/);
+  } else if (expectedDynamic === false) {
+    await expect(target.locator('#viewport')).not.toHaveClass(/dynamic-frame/);
+  }
+
+  return target.locator('#viewport').evaluate(
+    async (viewport, options) => {
+      const samples = [];
+      const readFrame = () => {
+        const box = viewport.getBoundingClientRect();
+        samples.push({ width: box.width, height: box.height });
+      };
+      readFrame();
+      const sampleCount = Math.ceil(options.durationMs / options.intervalMs);
+      for (let index = 0; index < sampleCount; index += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, options.intervalMs));
+        readFrame();
+      }
+      return samples;
+    },
+    { durationMs, intervalMs }
+  );
+}
+
+function expectStableReaderFrame(samples, context) {
+  expect(samples.length, `${context} should provide repeated frame samples`).toBeGreaterThan(1);
+  // The image load may schedule one explicit reflow. Treat the first reading as the settling
+  // point, then require every reading across the remaining four seconds to stay within one pixel.
+  const settledSamples = samples.slice(1);
+  const widths = settledSamples.map((sample) => sample.width);
+  const heights = settledSamples.map((sample) => sample.height);
+  expect(Math.min(...widths), `${context} frame width should remain usable`).toBeGreaterThan(100);
+  expect(Math.min(...heights), `${context} frame height should remain usable`).toBeGreaterThan(100);
+  expect(
+    Math.max(...widths) - Math.min(...widths),
+    `${context} frame width should not progressively shrink`
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.max(...heights) - Math.min(...heights),
+    `${context} frame height should not progressively shrink`
+  ).toBeLessThanOrEqual(1);
+}
+
+async function readReaderWidthFit(target) {
+  return target.locator('#viewport').evaluate((viewport) => {
+    const stage = viewport.querySelector('#stage');
+    const leftPage = viewport.querySelector('#leftPage');
+    const rightPage = viewport.querySelector('#rightPage');
+    const leftImage = viewport.querySelector('#leftImg');
+    const rightVisible = rightPage && getComputedStyle(rightPage).display !== 'none';
+    const stageStyle = stage ? getComputedStyle(stage) : null;
+    const stageGap = Number.parseFloat(stageStyle?.columnGap || stageStyle?.gap || '0') || 0;
+    return {
+      frameInnerWidth: viewport.clientWidth,
+      stageWidth: stage?.getBoundingClientRect().width || 0,
+      pagesWidth:
+        (leftPage?.getBoundingClientRect().width || 0) +
+        (rightVisible ? rightPage.getBoundingClientRect().width + stageGap : 0),
+      leftImageWidth: leftImage?.getBoundingClientRect().width || 0,
+      leftPageContentWidth: leftPage?.clientWidth || 0,
+      rightVisible: Boolean(rightVisible),
+    };
+  });
+}
+
+function expectTabletWidthFit(geometry, context) {
+  expect(
+    Math.abs(geometry.stageWidth - geometry.frameInnerWidth),
+    `${context} stage should fill the reader frame`
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(geometry.pagesWidth - geometry.stageWidth),
+    `${context} comic pages should fill the stage width`
+  ).toBeLessThanOrEqual(1);
+  expect(
+    Math.abs(geometry.leftImageWidth - geometry.leftPageContentWidth),
+    `${context} comic art should fill its page content width`
+  ).toBeLessThanOrEqual(1);
+}
+
+async function readReaderControlGeometry(target) {
+  return target.locator('#controls').evaluate((controls) => {
+    const box = controls.getBoundingClientRect();
+    const buttons = Array.from(controls.querySelectorAll('button'));
+    const buttonRows = new Set(
+      buttons.map((button) => Math.round(button.getBoundingClientRect().top))
+    );
+    return {
+      width: box.width,
+      height: box.height,
+      buttonRows: buttonRows.size,
+      paddingLeft: Number.parseFloat(getComputedStyle(buttons[0]).paddingLeft) || 0,
+    };
+  });
+}
+
 async function openInspectorField(page, selector) {
   const field = page.locator(selector).first();
   const details = page.locator('.pb-inspector-section').filter({ has: field }).first();
@@ -680,6 +810,14 @@ async function saveActiveDraft(page) {
   await expect(page.locator('.pb-editor-footer-status')).not.toContainText('unsaved');
 }
 
+async function selectLayerModule(page, moduleId) {
+  await page.locator('[data-tab="layers"]').click();
+  await page.locator(`[data-layer-action="select-module"][data-module-id="${moduleId}"]`).click();
+  await expect(
+    page.locator(`[data-layer-action="select-module"][data-module-id="${moduleId}"]`)
+  ).toHaveClass(/active/);
+}
+
 async function openHeaderPartsSection(page) {
   const brandToggle = page.locator('.pb-header-block-input[data-block-id="brand"]');
   await page
@@ -711,23 +849,15 @@ async function selectHeaderBlockOnCanvas(page, blockId) {
 // Resolves parent-page coordinates for the center of a 3×3 header cell rendered
 // inside the (possibly scaled) preview iframe.
 async function getHeaderCellDropPoint(page, rowId, region) {
-  return page.locator('.pb-preview-frame').evaluate(
-    (frame, cell) => {
-      const iframe = frame.querySelector('.pb-preview-iframe');
-      const target = iframe?.contentDocument?.querySelector(
-        `.topbar-region[data-builder-header-row="${cell.rowId}"][data-region="${cell.region}"]`
-      );
-      if (!iframe || !target) return null;
-      const frameRect = frame.getBoundingClientRect();
-      const targetRect = target.getBoundingClientRect();
-      const scale = Number(frame.dataset.previewScale || '1') || 1;
-      return {
-        clientX: frameRect.left + (targetRect.left + targetRect.width / 2) * scale,
-        clientY: frameRect.top + (targetRect.top + targetRect.height / 2) * scale,
-      };
-    },
-    { rowId, region }
-  );
+  const frame = await getPreviewFrame(page);
+  const box = await frame
+    .locator(`.topbar-region[data-builder-header-row="${rowId}"][data-region="${region}"]`)
+    .boundingBox();
+  if (!box) return null;
+  return {
+    clientX: box.x + box.width / 2,
+    clientY: box.y + box.height / 2,
+  };
 }
 
 async function openAllInspectorSections(page) {
@@ -873,14 +1003,39 @@ test.describe('builder Phase 12 authoring workflows', () => {
     });
   });
 
-  test('opens a bound series reader page, switches exact device widths, and restores chrome preview', async ({
+  test('opens a bound series reader page, switches fixed device previews, and restores chrome preview', async ({
     page,
-  }) => {
+  }, testInfo) => {
+    testInfo.setTimeout(90_000);
+    const resizeErrors = [];
+    page.on('pageerror', (error) => {
+      if (/ResizeObserver loop/i.test(error.message)) resizeErrors.push(error.message);
+    });
     const state = createWorkflowState();
     state.seriesPages[0].meta.header.blocks.status.enabled = false;
     await prepareWorkflowPage(page, state);
     await openBuilder(page);
 
+    await page.setViewportSize({ width: 1440, height: 900 });
+    const toolbarGeometry = await page.locator('#pbBuilderToolbar').evaluate((toolbar) => {
+      const controls = Array.from(
+        toolbar.querySelectorAll(
+          '#pbToggleSidebar, .pb-page-title-main, #pbAddPage, #pbViewToggles, #pbWidthToggles, .pb-builder-toolbar-group--publish, #pbExitBuilder'
+        )
+      ).map((element) => element.getBoundingClientRect());
+      const toolbarRect = toolbar.getBoundingClientRect();
+      const actions = toolbar.querySelector('.pb-builder-toolbar-actions');
+      return {
+        height: toolbarRect.height,
+        centerSpread:
+          Math.max(...controls.map((rect) => rect.top + rect.height / 2)) -
+          Math.min(...controls.map((rect) => rect.top + rect.height / 2)),
+        actionsFit: actions ? actions.scrollWidth <= actions.clientWidth + 1 : false,
+      };
+    });
+    expect(toolbarGeometry.height).toBeLessThanOrEqual(52);
+    expect(toolbarGeometry.centerSpread).toBeLessThanOrEqual(1);
+    expect(toolbarGeometry.actionsFit).toBe(true);
     await openHeaderSettings(page);
     await expect(page.locator('.pb-header-block-input[data-block-id="brand"]')).toBeChecked();
     await expect(page.locator('.pb-header-block-input[data-block-id="status"]')).not.toBeChecked();
@@ -925,7 +1080,17 @@ test.describe('builder Phase 12 authoring workflows', () => {
       expect(
         Math.abs((iframeBox?.height || 0) - viewport.height * frameScale.scale)
       ).toBeLessThanOrEqual(2);
+      if (viewportId !== 'desktop') {
+        expectStableReaderFrame(
+          await sampleReaderFrame(previewFrame, 5_000, 1_000, false),
+          `${viewport.label} preview`
+        );
+      }
+      if (viewportId === 'tablet') {
+        expectTabletWidthFit(await readReaderWidthFit(previewFrame), `${viewport.label} preview`);
+      }
     }
+    expect(resizeErrors).toEqual([]);
 
     await selectTextModule(page);
     const beforeChrome = await page.locator('.pb-preview-frame').evaluate((frame) => ({
@@ -1033,6 +1198,245 @@ test.describe('builder Phase 12 authoring workflows', () => {
     await expect(page.locator('[data-key="content"]')).toHaveValue(/Inline browser save/);
     expect(state.textModule()?.config.content).toContain('Inline browser save');
     expect(state.textModule()?.config.content).not.toContain('Inline browser discard');
+  });
+
+  test('round-trips Spacer, Feed, and reader controls through matching preview and public devices', async ({
+    page,
+  }, testInfo) => {
+    testInfo.setTimeout(75_000);
+    const resizeErrors = [];
+    page.on('pageerror', (error) => {
+      if (/ResizeObserver loop/i.test(error.message)) resizeErrors.push(error.message);
+    });
+    const state = createWorkflowState();
+    const readerModule = state.findModule(READER_MODULE_ID).module;
+    const feedModule = state.findModule(FEED_MODULE_ID).module;
+    const spacerModule = state.findModule(SPACER_MODULE_ID).module;
+    readerModule.config.controls = { style: { defaults: { padding: 10 } } };
+    feedModule.config.layout = { widthMode: 'percent', width: 100, align: 'start' };
+
+    await prepareWorkflowPage(page, state);
+    await openBuilder(page);
+
+    const deviceScenarios = [
+      {
+        deviceId: 'tablet',
+        spacerHeight: 180,
+        feedWidth: 70,
+        feedAlign: 'center',
+        readerPadding: 22,
+      },
+      {
+        deviceId: 'mobile',
+        spacerHeight: 96,
+        feedWidth: 90,
+        feedAlign: 'end',
+        readerPadding: 30,
+      },
+    ];
+    const previewControlGeometry = new Map();
+
+    for (const scenario of deviceScenarios) {
+      await page.locator(`#pbWidthToggles [data-width="${scenario.deviceId}"]`).click();
+      await waitForPreviewReady(page, scenario.deviceId);
+
+      await selectLayerModule(page, SPACER_MODULE_ID);
+      const spacerScope = await openInspectorField(page, '[data-responsive-edit-scope]');
+      if ((await spacerScope.inputValue()) !== 'device') {
+        await spacerScope.selectOption('device');
+      }
+      await (
+        await openInspectorField(page, '[data-key="height"]')
+      ).fill(String(scenario.spacerHeight));
+      await saveActiveDraft(page);
+
+      await selectLayerModule(page, FEED_MODULE_ID);
+      const feedScope = await openInspectorField(page, '[data-responsive-edit-scope]');
+      if ((await feedScope.inputValue()) !== 'device') {
+        await feedScope.selectOption('device');
+      }
+      await (
+        await openInspectorField(page, '[data-layout-key="widthMode"]')
+      ).selectOption('percent');
+      await (
+        await openInspectorField(page, '[data-layout-key="width"]')
+      ).fill(String(scenario.feedWidth));
+      await (
+        await openInspectorField(page, '[data-layout-key="align"]')
+      ).selectOption(scenario.feedAlign);
+      await saveActiveDraft(page);
+
+      await selectLayerModule(page, READER_MODULE_ID);
+      const readerScope = await openInspectorField(page, '[data-responsive-edit-scope]');
+      if ((await readerScope.inputValue()) !== 'device') {
+        await readerScope.selectOption('device');
+      }
+      await (
+        await openInspectorField(page, '[data-reader-key="controls.style.defaults.padding"]')
+      ).fill(String(scenario.readerPadding));
+      await saveActiveDraft(page);
+
+      const previewFrame = await getPreviewFrame(page);
+      await expect(
+        previewFrame.locator(`[data-builder-module-id="${SPACER_MODULE_ID}"] .pb-spacer`)
+      ).toHaveCSS('height', `${scenario.spacerHeight}px`);
+      const previewFeed = await previewFrame
+        .locator(`[data-builder-module-id="${FEED_MODULE_ID}"]`)
+        .evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          const parentBox = element.parentElement?.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return {
+            flexGrow: style.flexGrow,
+            marginLeft: Number.parseFloat(style.marginLeft) || 0,
+            marginRight: Number.parseFloat(style.marginRight) || 0,
+            widthRatio: parentBox?.width ? box.width / parentBox.width : 0,
+          };
+        });
+      expect(previewFeed.flexGrow).toBe('0');
+      expect(previewFeed.widthRatio).toBeCloseTo(scenario.feedWidth / 100, 1);
+      if (scenario.feedAlign === 'center') {
+        expect(Math.abs(previewFeed.marginLeft - previewFeed.marginRight)).toBeLessThan(2);
+      } else {
+        expect(previewFeed.marginLeft).toBeGreaterThan(previewFeed.marginRight);
+      }
+      await expect
+        .poll(() =>
+          previewFrame
+            .locator('#controls')
+            .evaluate((element) =>
+              getComputedStyle(element).getPropertyValue('--reader-control-padding-x').trim()
+            )
+        )
+        .toBe(`${scenario.readerPadding}px`);
+      await expect(previewFrame.locator('#prevBtn')).toHaveCSS(
+        'padding-left',
+        `${scenario.readerPadding}px`
+      );
+      previewControlGeometry.set(scenario.deviceId, await readReaderControlGeometry(previewFrame));
+    }
+
+    expect(spacerModule.config.height).toBe(64);
+    expect(spacerModule.config.responsive).toEqual({
+      tablet: { height: 180 },
+      mobile: { height: 96 },
+    });
+    expect(feedModule.config.layout).toEqual({
+      widthMode: 'percent',
+      width: 100,
+      align: 'start',
+    });
+    expect(feedModule.config.responsive).toEqual({
+      tablet: { layout: { widthMode: 'percent', width: 70, align: 'center' } },
+      mobile: { layout: { widthMode: 'percent', width: 90, align: 'end' } },
+    });
+    expect(readerModule.config.controls.style.defaults.padding).toBe(10);
+    expect(readerModule.config.responsive.tablet.controls.style.defaults.padding).toBe(22);
+    expect(readerModule.config.responsive.mobile.controls.style.defaults.padding).toBe(30);
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await waitForPreviewReady(page);
+    await page.locator('#pbWidthToggles [data-width="mobile"]').click();
+    await waitForPreviewReady(page, 'mobile');
+    await selectLayerModule(page, READER_MODULE_ID);
+    await (await openInspectorField(page, '[data-responsive-edit-scope]')).selectOption('device');
+    await expect(
+      await openInspectorField(page, '[data-reader-key="controls.style.defaults.padding"]')
+    ).toHaveValue('30');
+
+    for (const scenario of deviceScenarios.map((item) => ({
+      ...item,
+      viewport: PREVIEW_VIEWPORTS[item.deviceId],
+    }))) {
+      await page.setViewportSize(scenario.viewport);
+      await gotoAppPage(page, `/index.html?series=${SERIES_ID}&page=reader`);
+      const publicSpacer = page.locator(
+        `.pb-module[data-module-id="${SPACER_MODULE_ID}"] .pb-spacer`
+      );
+      await expect(publicSpacer).toHaveCSS('height', `${scenario.spacerHeight}px`);
+      const publicFeed = await page
+        .locator(`.pb-module[data-module-id="${FEED_MODULE_ID}"]`)
+        .evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          const parentBox = element.parentElement?.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return {
+            flexGrow: style.flexGrow,
+            marginLeft: Number.parseFloat(style.marginLeft) || 0,
+            marginRight: Number.parseFloat(style.marginRight) || 0,
+            widthRatio: parentBox?.width ? box.width / parentBox.width : 0,
+          };
+        });
+      expect(publicFeed.flexGrow).toBe('0');
+      expect(publicFeed.widthRatio).toBeCloseTo(scenario.feedWidth / 100, 1);
+      if (scenario.feedAlign === 'center') {
+        expect(Math.abs(publicFeed.marginLeft - publicFeed.marginRight)).toBeLessThan(2);
+      } else {
+        expect(publicFeed.marginLeft).toBeGreaterThan(publicFeed.marginRight);
+      }
+      await expect
+        .poll(() =>
+          page
+            .locator('#controls')
+            .evaluate((element) =>
+              getComputedStyle(element).getPropertyValue('--reader-control-padding-x').trim()
+            )
+        )
+        .toBe(`${scenario.readerPadding}px`);
+      await expect(page.locator('#prevBtn')).toHaveCSS(
+        'padding-left',
+        `${scenario.readerPadding}px`
+      );
+      const publicGeometry = await readReaderControlGeometry(page);
+      const previewGeometry = previewControlGeometry.get(scenario.deviceId);
+      expect(Math.abs(publicGeometry.width - previewGeometry.width)).toBeLessThanOrEqual(1);
+      expect(Math.abs(publicGeometry.height - previewGeometry.height)).toBeLessThanOrEqual(1);
+      expect(publicGeometry.buttonRows).toBe(previewGeometry.buttonRows);
+      expect(publicGeometry.paddingLeft).toBe(previewGeometry.paddingLeft);
+      expectStableReaderFrame(
+        await sampleReaderFrame(page, 5_000, 1_000, false),
+        `${scenario.deviceId} public page`
+      );
+      if (scenario.deviceId === 'tablet') {
+        expectTabletWidthFit(await readReaderWidthFit(page), `${scenario.deviceId} public page`);
+      }
+    }
+
+    // The Tablet media band is ratio-based rather than capped at the 768px preview width.
+    await page.setViewportSize({ width: 820, height: 1180 });
+    await gotoAppPage(page, `/index.html?series=${SERIES_ID}&page=reader`);
+    await expect(
+      page.locator(`.pb-module[data-module-id="${SPACER_MODULE_ID}"] .pb-spacer`)
+    ).toHaveCSS('height', '180px');
+    await expect(page.locator('#prevBtn')).toHaveCSS('padding-left', '22px');
+    expectTabletWidthFit(await readReaderWidthFit(page), '820px Tablet public page');
+
+    await page.setViewportSize({ width: 1180, height: 820 });
+    await expect
+      .poll(() =>
+        page.locator('#rightPage').evaluate((element) => getComputedStyle(element).display)
+      )
+      .not.toBe('none');
+    const landscapeShell = await page.locator('.viewerWrap').evaluate((wrap) => {
+      const reader = wrap.querySelector('#mainContent');
+      const leftPanel = wrap.querySelector('.side-panel.left');
+      const rightPanel = wrap.querySelector('.side-panel.right');
+      const boxes = [leftPanel, reader, rightPanel]
+        .filter(Boolean)
+        .map((element) => element.getBoundingClientRect())
+        .filter((box) => box.width > 0 && box.height > 0);
+      return {
+        wrapWidth: wrap.getBoundingClientRect().width,
+        readerWidth: reader?.getBoundingClientRect().width || 0,
+        flexWrap: getComputedStyle(wrap).flexWrap,
+        topSpread:
+          Math.max(...boxes.map((box) => box.top)) - Math.min(...boxes.map((box) => box.top)),
+      };
+    });
+    expect(landscapeShell.readerWidth / landscapeShell.wrapWidth).toBeLessThan(0.8);
+    expect(landscapeShell.flexWrap).toBe('nowrap');
+    expect(landscapeShell.topSpread).toBeLessThanOrEqual(1);
+    expect(resizeErrors).toEqual([]);
   });
 
   test('persists live block drops and creates a global Feed template page', async ({ page }) => {
@@ -1531,12 +1935,18 @@ test.describe('builder Phase 12 authoring workflows', () => {
     }, targetSequenceBeforeHeaderDrag);
     const dropPoint = await getHeaderCellDropPoint(page, 'bottom', 'right');
     expect(dropPoint, 'bottom/right header cell must be measurable in edit mode').not.toBeNull();
-    await page.locator('.pb-preview-target-overlay').dispatchEvent('dragover', {
-      dataTransfer,
-      clientX: dropPoint.clientX,
-      clientY: dropPoint.clientY,
-    });
-    await expect(page.locator('.pb-preview-drop-guide--header-cell')).toBeVisible();
+    // A real pointer emits repeated dragover events. Poll the synthetic event too so a target-list
+    // refresh racing the first event under parallel Playwright load cannot make this test flaky.
+    await expect
+      .poll(async () => {
+        await page.locator('.pb-preview-target-overlay').dispatchEvent('dragover', {
+          dataTransfer,
+          clientX: dropPoint.clientX,
+          clientY: dropPoint.clientY,
+        });
+        return page.locator('.pb-preview-drop-guide--header-cell').count();
+      })
+      .toBe(1);
     await page.locator('.pb-preview-target-overlay').dispatchEvent('drop', {
       dataTransfer,
       clientX: dropPoint.clientX,

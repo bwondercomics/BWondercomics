@@ -201,6 +201,57 @@ describe('admin page-builder editor and preview renderers', () => {
     expect(setDraftConfig.mock.lastCall[0].layout).toBeUndefined();
   });
 
+  it('collects Feed Size & Alignment into the active device branch', () => {
+    const feedModule = getContractFixture('builderModules').feed;
+    const currentPage = {
+      sections: [{ id: 'section-1', modules: [feedModule] }],
+    };
+    const wrapper = document.createElement('div');
+    wrapper.innerHTML = renderModuleEditorContent({
+      currentPage,
+      selectedModuleId: feedModule.id,
+      draftConfig: feedModule.config,
+      activeDeviceId: 'tablet',
+      responsiveEditScope: 'device',
+    });
+    document.body.innerHTML = '';
+    document.body.appendChild(wrapper);
+    const setDraftConfig = vi.fn();
+
+    bindModuleEditorEvents({
+      el: { pbModuleEditor: wrapper },
+      currentPage,
+      selectedModuleId: feedModule.id,
+      draftConfig: feedModule.config,
+      setDraftConfig,
+      markDirty: vi.fn(),
+      renderEditorPanel: vi.fn(),
+      openImagePicker: vi.fn(),
+      fetchAssets: vi.fn(async () => []),
+      uploadAssetFile: vi.fn(async () => ({})),
+      activeDeviceId: 'tablet',
+      responsiveEditScope: 'device',
+    });
+
+    const widthMode = wrapper.querySelector('[data-layout-key="widthMode"]');
+    const width = wrapper.querySelector('[data-layout-key="width"]');
+    const align = wrapper.querySelector('[data-layout-key="align"]');
+    widthMode.value = 'percent';
+    widthMode.dispatchEvent(new Event('change', { bubbles: true }));
+    width.value = '60';
+    width.dispatchEvent(new Event('input', { bubbles: true }));
+    align.value = 'center';
+    align.dispatchEvent(new Event('change', { bubbles: true }));
+
+    expect(setDraftConfig).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        responsive: {
+          tablet: { layout: { widthMode: 'percent', width: 60, align: 'center' } },
+        },
+      })
+    );
+  });
+
   it('keeps config.layout working and preserved for modules with dedicated editors', () => {
     const videoModule = {
       id: 'module-video-1',

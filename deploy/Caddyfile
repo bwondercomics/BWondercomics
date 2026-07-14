@@ -45,6 +45,7 @@ bwondercomics.com {
 	}
 
 	handle /admin/* {
+		header Cache-Control "no-cache, must-revalidate"
 		root * /srv/bwondercomics/root
 		file_server
 	}

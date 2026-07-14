@@ -1,4 +1,14 @@
 export function createPageActions({ el, getState, actions, deps }) {
+  function syncPublicationActions() {
+    const { currentPage } = getState();
+    if (el.pbSaveDraft) el.pbSaveDraft.textContent = 'Save Page';
+    if (!el.pbPublish) return;
+    const isPublished = currentPage?.isPublished === true;
+    el.pbPublish.textContent = isPublished ? 'Unpublish' : 'Publish';
+    el.pbPublish.classList.toggle('btn-danger', isPublished);
+    el.pbPublish.classList.toggle('btn-primary', !isPublished);
+  }
+
   function setPageActionState(activeButton, busyText) {
     const buttons = [el.pbSaveDraft, el.pbPublish].filter(Boolean);
     const original = new Map(buttons.map((button) => [button, button.textContent]));
@@ -30,7 +40,7 @@ export function createPageActions({ el, getState, actions, deps }) {
     };
   }
 
-  async function updatePublishState(isPublished) {
+  async function persistPage({ isPublished, activeButton, busyText, successMessage, successType }) {
     const { currentPage } = getState();
     if (!currentPage) return;
     if (
@@ -41,13 +51,9 @@ export function createPageActions({ el, getState, actions, deps }) {
       return;
     }
 
-    const activeButton = isPublished ? el.pbPublish : el.pbSaveDraft;
     if (!activeButton) return;
 
-    const releaseButtons = setPageActionState(
-      activeButton,
-      isPublished ? 'Publishing...' : 'Saving...'
-    );
+    const releaseButtons = setPageActionState(activeButton, busyText);
 
     try {
       const nextMeta = actions.buildNormalizedPageMeta(currentPage);
@@ -69,22 +75,46 @@ export function createPageActions({ el, getState, actions, deps }) {
       actions.renderPageList();
       actions.renderCanvas();
       actions.renderEditorPanel();
-      actions.setEditorStatus(
-        isPublished
-          ? 'Page published. The public page now matches the saved builder page.'
-          : 'Draft saved. Preview uses the draft until you publish.',
-        isPublished ? 'success' : 'warning'
-      );
-      releaseButtons(activeButton, isPublished ? 'Published' : 'Draft Saved');
+      actions.setEditorStatus(successMessage, successType);
+      releaseButtons();
+      syncPublicationActions();
     } catch (err) {
       console.error('Page status update error:', err);
       releaseButtons();
-      actions.setEditorStatus(
-        err?.message || (isPublished ? 'Failed to publish changes.' : 'Failed to save draft.'),
-        'danger'
-      );
+      actions.setEditorStatus(err?.message || 'Failed to save page changes.', 'danger');
       actions.renderEditorPanel();
     }
+  }
+
+  async function savePage() {
+    const { currentPage } = getState();
+    return persistPage({
+      isPublished: currentPage?.isPublished === true,
+      activeButton: el.pbSaveDraft,
+      busyText: 'Saving...',
+      successMessage: 'Page saved. Its publication state is unchanged.',
+      successType: 'success',
+    });
+  }
+
+  async function updatePublishState(isPublished) {
+    const { currentPage } = getState();
+    if (!currentPage) return;
+    if (
+      isPublished === false &&
+      !window.confirm('Unpublish this page? It will no longer be public.')
+    ) {
+      return;
+    }
+    return persistPage({
+      isPublished,
+      activeButton: el.pbPublish,
+      busyText: isPublished ? 'Publishing...' : 'Unpublishing...',
+      successMessage: isPublished
+        ? 'Page published. The public page now matches the saved builder page.'
+        : 'Page unpublished. Its saved draft remains available in the builder.',
+      successType: 'success',
+    });
   }
 
   async function loadPages() {
@@ -210,6 +240,8 @@ export function createPageActions({ el, getState, actions, deps }) {
     reorderSidebarPages,
     selectPage,
     updatePublishState,
+    savePage,
+    syncPublicationActions,
     uploadAssetFile,
   };
 }

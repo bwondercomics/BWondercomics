@@ -294,6 +294,14 @@ export function createCanvasMutations({ getState, actions, deps, helpers }) {
   }
 
   async function changeSectionLayout(sectionId, layout) {
+    if (
+      actions.ensureCleanWorkspace &&
+      !actions.ensureCleanWorkspace(
+        'Save or discard your current changes before changing section layout.'
+      )
+    ) {
+      return;
+    }
     // Guard (client mirror of the backend authority): a column-count reduction that
     // would orphan a removed column's modules is rejected (409); surface guidance up
     // front instead of issuing a request that cannot succeed.

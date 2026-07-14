@@ -6,6 +6,7 @@ from uuid import UUID
 os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///tmp/bw-quality-route-tests.db")
 
 from sqlalchemy import select
+from fastapi import Response
 
 from backend.app.builder_security import sanitize_module_config
 from backend.app.routes import page_builder
@@ -132,6 +133,191 @@ class PageBuilderRouteTests(BackendRouteTestCase):
             self.db,
         )
         self.assertEqual(deleted, {"status": "success"})
+
+    def test_atomic_module_placements_validate_full_page_and_rollback_invalid_batches(self):
+        self.seed_contract_series()
+        page = page_builder.api_create_series_page(
+            "battle-bros",
+            page_builder.CreatePageRequest(slug="placements", title="Placements"),
+            self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
+            self.db,
+        )["page"]
+        section = page_builder.api_add_section(
+            page["id"],
+            page_builder.CreateSectionRequest(sectionType="row", layout="1-1"),
+            self.admin_request(f"/api/admin/pages/{page['id']}/sections", "POST"),
+            self.db,
+        )["section"]
+        first = page_builder.api_add_module(
+            section["id"],
+            page_builder.CreateModuleRequest(moduleType="text", columnIndex=0, config={}),
+            self.admin_request(f"/api/admin/sections/{section['id']}/modules", "POST"),
+            self.db,
+        )["module"]
+        second = page_builder.api_add_module(
+            section["id"],
+            page_builder.CreateModuleRequest(moduleType="text", columnIndex=0, config={}),
+            self.admin_request(f"/api/admin/sections/{section['id']}/modules", "POST"),
+            self.db,
+        )["module"]
+
+        saved = page_builder.api_save_module_placements(
+            page["id"],
+            page_builder.SaveModulePlacementsRequest(
+                placements=[
+                    {
+                        "moduleId": first["id"],
+                        "sectionId": section["id"],
+                        "columnIndex": 1,
+                        "sortIndex": 0,
+                    },
+                    {
+                        "moduleId": second["id"],
+                        "sectionId": section["id"],
+                        "columnIndex": 0,
+                        "sortIndex": 0,
+                    },
+                ]
+            ),
+            self.admin_request(f"/api/admin/pages/{page['id']}/modules/placements", "POST"),
+            self.db,
+        )
+        saved_modules = saved["page"]["sections"][0]["modules"]
+        self.assertEqual(
+            {
+                (module["id"], module["columnIndex"], module["sortIndex"])
+                for module in saved_modules
+            },
+            {(first["id"], 1, 0), (second["id"], 0, 0)},
+        )
+
+        invalid = page_builder.api_save_module_placements(
+            page["id"],
+            page_builder.SaveModulePlacementsRequest(
+                placements=[
+                    {
+                        "moduleId": first["id"],
+                        "sectionId": section["id"],
+                        "columnIndex": 0,
+                        "sortIndex": 0,
+                    },
+                    {
+                        "moduleId": second["id"],
+                        "sectionId": section["id"],
+                        "columnIndex": 0,
+                        "sortIndex": 0,
+                    },
+                ]
+            ),
+            self.admin_request(f"/api/admin/pages/{page['id']}/modules/placements", "POST"),
+            self.db,
+        )
+        self.assertEqual(invalid.status_code, 400)
+        stored = self.db.scalars(
+            select(BuilderModule).where(BuilderModule.section_id == UUID(section["id"]))
+        ).all()
+        self.assertEqual(
+            {(str(module.id), module.column_index, module.sort_index) for module in stored},
+            {(first["id"], 1, 0), (second["id"], 0, 0)},
+        )
+
+    def test_responsive_runtime_and_module_round_trip_contract(self):
+        self.seed_contract_series()
+        runtime = page_builder.api_page_builder_runtime(
+            self.admin_request("/api/admin/page-builder/runtime"), self.db
+        )
+        runtime_payload = json_body(runtime)
+        self.assertEqual(runtime.status_code, 200)
+        self.assertEqual(runtime.headers["cache-control"], "no-store")
+        self.assertEqual(runtime_payload["contractVersion"], 1)
+        self.assertIn("responsive-module-round-trip", runtime_payload["capabilities"])
+        self.assertTrue(runtime_payload["processStartedAt"])
+
+        unauthorized = page_builder.api_page_builder_runtime(
+            build_request("/api/admin/page-builder/runtime"), self.db
+        )
+        self.assertEqual(unauthorized.status_code, 403)
+        self.assertEqual(unauthorized.headers["cache-control"], "no-store")
+
+        page = page_builder.api_create_series_page(
+            "battle-bros",
+            page_builder.CreatePageRequest(slug="responsive-contract", title="Responsive"),
+            self.admin_request("/api/admin/pages/series/battle-bros", "POST"),
+            self.db,
+        )["page"]
+        section = page_builder.api_add_section(
+            page["id"],
+            page_builder.CreateSectionRequest(sectionType="row", layout="1"),
+            self.admin_request(f"/api/admin/pages/{page['id']}/sections", "POST"),
+            self.db,
+        )["section"]
+        cases = [
+            (
+                "spacer",
+                {
+                    "height": 40,
+                    "responsive": {
+                        "tablet": {"height": 180},
+                        "mobile": {"height": 96},
+                    },
+                },
+            ),
+            (
+                "feed",
+                {
+                    "limit": 5,
+                    "layout": {"widthMode": "percent", "width": 100, "align": "start"},
+                    "responsive": {
+                        "tablet": {
+                            "layout": {"widthMode": "percent", "width": 70, "align": "center"}
+                        },
+                        "mobile": {"layout": {"widthMode": "percent", "width": 90, "align": "end"}},
+                    },
+                },
+            ),
+            (
+                "reader",
+                {
+                    "source": {"mode": "active-page-series"},
+                    "controls": {"style": {"defaults": {"padding": 10}}},
+                    "responsive": {
+                        "tablet": {"controls": {"style": {"defaults": {"padding": 22}}}},
+                        "mobile": {"controls": {"style": {"defaults": {"padding": 30}}}},
+                    },
+                },
+            ),
+        ]
+
+        expected_responsive = {}
+        for index, (module_type, config) in enumerate(cases):
+            created = page_builder.api_add_module(
+                section["id"],
+                page_builder.CreateModuleRequest(
+                    moduleType=module_type,
+                    columnIndex=0,
+                    sortIndex=index,
+                    config={},
+                ),
+                self.admin_request(f"/api/admin/sections/{section['id']}/modules", "POST"),
+                self.db,
+            )["module"]
+            updated = page_builder.api_update_module(
+                created["id"],
+                page_builder.UpdateModuleRequest(config=config),
+                self.admin_request(f"/api/admin/modules/{created['id']}", "PUT"),
+                self.db,
+            )["module"]
+            self.assertEqual(updated["config"]["responsive"], config["responsive"])
+            expected_responsive[module_type] = config["responsive"]
+
+        saved_page = page_builder.api_get_page(
+            page["id"], self.admin_request(f"/api/admin/pages/{page['id']}"), self.db
+        )["page"]
+        saved_modules = saved_page["sections"][0]["modules"]
+        for module in saved_modules:
+            self.assertEqual(
+                module["config"]["responsive"], expected_responsive[module["moduleType"]]
+            )
 
     def test_page_scopes_global_routes_and_reader_bindings(self):
         self.seed_contract_series()
@@ -796,7 +982,11 @@ class PageBuilderRouteTests(BackendRouteTestCase):
                     "mobile": {
                         "hidden": True,
                         "displayMode": "vertical-scroll",
-                        "controls": {"placement": "hidden", "size": "compact", "style": "drop"},
+                        "controls": {
+                            "placement": "hidden",
+                            "size": "compact",
+                            "style": {"defaults": {"padding": 27}},
+                        },
                         "stage": {"fit": "height", "pageGap": -8, "maxWidth": 900},
                         "panels": {"left": {"enabled": False}, "right": {"enabled": True}},
                         "showComments": True,
@@ -834,17 +1024,16 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.assertTrue(reader["panels"]["left"]["enabled"])
         self.assertFalse(reader["panels"]["right"]["enabled"])
 
+        # Device branches keep only what the public runtime can vary per device: the
+        # visibility flag and control styling. displayMode, placement/size, stage,
+        # comments, and legacy panel toggles are global-only and pruned on save.
         mobile = reader["responsive"]["mobile"]
-        self.assertTrue(mobile["hidden"])
-        self.assertEqual(mobile["displayMode"], "vertical-scroll")
-        self.assertEqual(mobile["controls"], {"placement": "hidden", "size": "compact"})
-        self.assertEqual(mobile["stage"], {"fit": "height", "pageGap": 0})
-        self.assertEqual(mobile["panels"], {"left": {"enabled": False}, "right": {"enabled": True}})
-        self.assertTrue(mobile["showComments"])
-        self.assertNotIn("showPanels", mobile)
-        self.assertEqual(reader["responsive"]["tablet"]["displayMode"], "paged")
-        self.assertEqual(reader["responsive"]["tablet"]["controls"]["placement"], "below")
-        self.assertEqual(reader["responsive"]["tablet"]["controls"]["size"], "medium")
+        self.assertEqual(
+            mobile,
+            {"hidden": True, "controls": {"style": {"defaults": {"padding": 27}}}},
+        )
+        # The tablet branch authored only global-only fields, so nothing survives.
+        self.assertNotIn("tablet", reader["responsive"])
 
     def test_reader_stage_rejects_non_integer_strings_like_the_client(self):
         # F1: crafted, non-integer stage values must fall back identically on the
@@ -947,7 +1136,10 @@ class PageBuilderRouteTests(BackendRouteTestCase):
         self.seed_builder_page("builderPage")
         self.seed_builder_page("builderPageDraft")
 
-        published = page_builder.api_public_page("battle-bros", "reader", self.db)
+        public_response = Response()
+        published = page_builder.api_public_page(
+            "battle-bros", "reader", self.db, response=public_response
+        )
         draft = page_builder.api_public_page("battle-bros", "about", self.db)
         missing = page_builder.api_public_page("battle-bros", "missing", self.db)
         admin_draft = page_builder.api_get_page_by_slug_admin(
@@ -965,6 +1157,7 @@ class PageBuilderRouteTests(BackendRouteTestCase):
 
         self.assertEqual(published["page"]["slug"], "reader")
         self.assertEqual(published["page"]["pageType"], "reader")
+        self.assertEqual(public_response.headers["Cache-Control"], "no-store")
         self.assertEqual(draft.status_code, 404)
         self.assertEqual(json_body(draft)["error"], "Page not found")
         self.assertEqual(missing.status_code, 404)

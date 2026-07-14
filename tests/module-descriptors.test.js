@@ -91,14 +91,11 @@ describe('page-builder module descriptors', () => {
     expect(getModuleLabel('entry-gallery')).toBe('Entries');
     expect(getModulePreview('text', { content: '<p>Hello Builder</p>' })).toBe('Hello Builder');
     expect(getModuleResponsiveFields('buttons')).toEqual(['hidden', 'defaults', 'buttons']);
-    expect(getModuleResponsiveFields('reader')).toEqual([
-      'hidden',
-      'displayMode',
-      'controls',
-      'stage',
-      'panels',
-      'showComments',
-    ]);
+    // Reader device branches keep only what the public runtime can vary per device:
+    // visibility and control styling. Global-only fields (displayMode, stage, panels,
+    // comments) were removed from this registry deliberately — see the roadmap's
+    // 2026-07-14 audit-corrections note before re-adding any.
+    expect(getModuleResponsiveFields('reader')).toEqual(['hidden', 'controls']);
     expect(getModuleResponsiveOverrides('text')).toEqual(['hidden', 'alignment']);
     expect(getModuleResponsiveOverrides('media-gallery')).toEqual(['hidden', 'columns']);
     expect(getModuleSourceModes('reader')).toEqual(['active-page-series', 'specific-series']);

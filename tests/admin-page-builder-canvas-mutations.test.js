@@ -40,6 +40,8 @@ function createHarness({
   reorderModules = vi.fn(async () => true),
   deleteModule = vi.fn(async () => true),
   fetchPage = vi.fn(async () => null),
+  updateSection = vi.fn(async () => null),
+  ensureCleanWorkspace = null,
 } = {}) {
   const state = { page };
   const setCanvasStatus = vi.fn();
@@ -59,6 +61,7 @@ function createHarness({
   const mutations = createCanvasMutations({
     getState: () => ({ currentPage: state.page }),
     actions: {
+      ...(ensureCleanWorkspace ? { ensureCleanWorkspace } : {}),
       setActiveInsertTarget: vi.fn(),
       setCanvasStatus,
       renderCanvas,
@@ -72,7 +75,7 @@ function createHarness({
       moveModule: vi.fn(),
       addSection: vi.fn(),
       reorderSections: vi.fn(),
-      updateSection: vi.fn(),
+      updateSection,
     },
     helpers: {
       getDefaultConfig: vi.fn(() => ({})),
@@ -88,6 +91,7 @@ function createHarness({
     reorderModules,
     deleteModule,
     fetchPage,
+    updateSection,
     setCanvasStatus,
     renderCanvas,
     replaceCurrentPageAfterMutationFailure,
@@ -230,5 +234,19 @@ describe('page-builder canvas mutations', () => {
       'The duplicate Text module was created, but ordering and recovery failed. Reload the page before continuing.',
       'danger'
     );
+  });
+
+  it('blocks direct section-layout persistence while a structure draft is dirty', async () => {
+    const ensureCleanWorkspace = vi.fn(() => false);
+    const updateSection = vi.fn(async () => ({ layout: '1-1' }));
+    const harness = createHarness({ ensureCleanWorkspace, updateSection });
+
+    await harness.mutations.changeSectionLayout('section-1', '1-1');
+
+    expect(ensureCleanWorkspace).toHaveBeenCalledWith(
+      'Save or discard your current changes before changing section layout.'
+    );
+    expect(updateSection).not.toHaveBeenCalled();
+    expect(harness.state.page.sections[0].layout).toBe('1');
   });
 });
