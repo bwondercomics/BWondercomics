@@ -1,5 +1,5 @@
-import { BUILDER_DEVICE_ORDER, getBuilderDevice } from './preview-contract.js';
-import { isModuleHiddenForDevice } from './responsive-overrides.js';
+import { BUILDER_DEVICE_ORDER, getBuilderDevice } from '../../shared/page-builder/preview-contract.js';
+import { isModuleHiddenForDevice } from '../../shared/page-builder/responsive-overrides.js';
 
 export const READER_BINDING_DEFAULT_DEVICE = BUILDER_DEVICE_ORDER[0];
 export const READER_BINDING_WARNING_CODES = Object.freeze({

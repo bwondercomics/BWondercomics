@@ -1,4 +1,4 @@
-import { getModuleDescriptor } from './module-descriptors.js';
+import { getModuleDescriptor } from '../../shared/page-builder/module-descriptors.js';
 
 export const LIVE_DROP_PLACEMENTS = Object.freeze({
   BEFORE: 'before',

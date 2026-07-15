@@ -1,8 +1,8 @@
 import { LAYOUT_OPTIONS } from './constants.js';
-import { layoutColumnCount, layoutToGridTemplate } from './layout-utils.js';
-import { appearanceToInlineStyle } from './appearance-utils.js';
-import { escapeAttr, escapeHtml } from './helpers.js';
-import { getInsertableModuleDescriptors } from './module-descriptors.js';
+import { layoutColumnCount, layoutToGridTemplate } from '../../shared/page-builder/layout-utils.js';
+import { appearanceToInlineStyle } from '../../shared/page-builder/appearance-utils.js';
+import { escapeAttr, escapeHtml } from '../../shared/page-builder/helpers.js';
+import { getInsertableModuleDescriptors } from '../../shared/page-builder/module-descriptors.js';
 import {
   HEADER_BLOCK_DEFS,
   HEADER_REGION_ORDER,
@@ -11,8 +11,8 @@ import {
   resolveHeaderNavItemAppearance,
   resolveHeaderShellTopAppearance,
   resolvePageHeaderState,
-} from './header-config.js';
-import { normalizeHeaderNavItems } from './link-utils.js';
+} from '../../shared/page-builder/header-config.js';
+import { normalizeHeaderNavItems } from '../../shared/page-builder/link-utils.js';
 
 const INSERTABLE_MODULE_TYPES = getInsertableModuleDescriptors();
 

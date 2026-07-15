@@ -7,7 +7,7 @@ import {
   setAppearanceLeaf,
   toSparseAppearance,
 } from './appearance-editor.js';
-import { escapeAttr, escapeHtml } from './helpers.js';
+import { escapeAttr, escapeHtml } from '../../shared/page-builder/helpers.js';
 import {
   HEADER_BLOCK_DEFS,
   HEADER_REGION_ORDER,
@@ -15,20 +15,20 @@ import {
   cloneValue,
   normalizeHeaderConfig,
   normalizeHeaderCopy,
-} from './header-config.js';
+} from '../../shared/page-builder/header-config.js';
 import {
   isBuilderPageTargetMissing,
   normalizeHeaderNavItem,
   normalizeHeaderNavItems,
   normalizeLinkTarget,
-} from './link-utils.js';
+} from '../../shared/page-builder/link-utils.js';
 import { renderInspectorSection } from './inspector-sections.js';
 import {
   getBuilderDeviceLabel,
   getResponsiveBranch,
   normalizeBuilderDeviceId,
   pruneEmptyResponsiveOverrides,
-} from './responsive-overrides.js';
+} from '../../shared/page-builder/responsive-overrides.js';
 
 export function findBlockPlacement(header, blockId) {
   for (const rowId of HEADER_ROW_ORDER) {

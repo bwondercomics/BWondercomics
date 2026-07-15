@@ -1,4 +1,4 @@
-import { escapeAttr } from './helpers.js';
+import { escapeAttr } from '../../shared/page-builder/helpers.js';
 import { renderInspectorSection } from './inspector-sections.js';
 
 function normalizeVideoConfig(config = {}) {
@@ -41,3 +41,10 @@ export function bindVideoEditorEvents({ el, draftConfig, setDraftConfig, markDir
     });
   });
 }
+
+// Registry entry for the module editor (see module-editor-registry.js for the contract).
+export const videoModuleEditor = {
+  usesLayoutBridge: true,
+  renderContent: ({ config }) => [renderVideoEditor(config)],
+  bindEvents: bindVideoEditorEvents,
+};

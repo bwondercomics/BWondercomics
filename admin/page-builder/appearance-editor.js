@@ -1,5 +1,5 @@
-import { escapeAttr, escapeHtml } from './helpers.js';
-import { normalizeAppearance } from './appearance-utils.js';
+import { escapeAttr, escapeHtml } from '../../shared/page-builder/helpers.js';
+import { normalizeAppearance } from '../../shared/page-builder/appearance-utils.js';
 
 const APPEARANCE_GROUPS = [
   {

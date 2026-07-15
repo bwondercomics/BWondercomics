@@ -8,7 +8,7 @@ import {
   syncAppearanceColorInputs,
   toSparseAppearance,
 } from './appearance-editor.js';
-import { escapeAttr, escapeHtml } from './helpers.js';
+import { escapeAttr, escapeHtml } from '../../shared/page-builder/helpers.js';
 import { renderInspectorSection } from './inspector-sections.js';
 import {
   READER_CONTROLS_PLACEMENTS,
@@ -16,8 +16,8 @@ import {
   READER_STAGE_FITS,
   normalizeReaderConfig,
   normalizeReaderResponsiveBranch,
-} from './reader-config.js';
-import { pruneEmptyResponsiveOverrides } from './responsive-overrides.js';
+} from '../../shared/page-builder/reader-config.js';
+import { pruneEmptyResponsiveOverrides } from '../../shared/page-builder/responsive-overrides.js';
 
 function optionList(options, selected, labels = {}) {
   return options
@@ -524,3 +524,15 @@ export function bindReaderEditorEvents({
     });
   });
 }
+
+// Registry entry for the module editor (see module-editor-registry.js for the contract).
+export const readerModuleEditor = {
+  omitsLayoutCard: true,
+  renderContent: ({ config, currentPage, pages, moduleType, shared }) => [
+    shared.renderCmsSourceCard(moduleType, config, currentPage, pages),
+    renderReaderEditor(config),
+  ],
+  renderDeviceOverrides: ({ config }) => [renderReaderEditor(config, { deviceOnly: true })],
+  bindEvents: bindReaderEditorEvents,
+  bindDeviceEvents: bindReaderEditorEvents,
+};

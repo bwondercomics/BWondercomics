@@ -1,6 +1,6 @@
-import { escapeAttr, escapeHtml } from './helpers.js';
+import { escapeAttr, escapeHtml } from '../../shared/page-builder/helpers.js';
 import { renderInspectorSection } from './inspector-sections.js';
-import { setResponsiveOverrideValue } from './responsive-overrides.js';
+import { setResponsiveOverrideValue } from '../../shared/page-builder/responsive-overrides.js';
 
 function cloneValue(value) {
   return JSON.parse(JSON.stringify(value ?? null));
@@ -208,3 +208,13 @@ export function bindGalleryEditorEvents({
 export function cloneGalleryConfig(config = {}) {
   return cloneValue(normalizeGalleryConfig(config));
 }
+
+// Registry entry for the module editor (see module-editor-registry.js for the contract).
+export const galleryModuleEditor = {
+  usesLayoutBridge: true,
+  renderContent: ({ config }) => [renderGalleryEditor(config)],
+  renderDeviceOverrides: ({ config, responsiveFields }) =>
+    responsiveFields.includes('columns') ? [renderGalleryEditor(config, { deviceOnly: true })] : [],
+  bindEvents: bindGalleryEditorEvents,
+  bindDeviceEvents: bindGalleryEditorEvents,
+};

@@ -1,4 +1,4 @@
-import { cloneValue, escapeAttr, escapeHtml } from './helpers.js';
+import { cloneValue, escapeAttr, escapeHtml } from '../../shared/page-builder/helpers.js';
 import { getPageModuleDuplicateEligibility } from './module-eligibility.js';
 import {
   BUILDER_PREVIEW_MESSAGE_TYPES,
@@ -14,7 +14,7 @@ import {
   getPreviewViewport,
   isBuilderDeviceId,
   validatePreviewEnvelope,
-} from './preview-contract.js';
+} from '../../shared/page-builder/preview-contract.js';
 
 const TARGET_STALE_TIMEOUT_MS = 1500;
 const PREVIEW_SCALE_PRECISION = 4;

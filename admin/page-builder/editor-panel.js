@@ -1,5 +1,5 @@
-import { escapeAttr, escapeHtml, formatFocus, normalizeFit, parseFocus } from './helpers.js';
-import { COLUMN_ALIGNMENTS, MAX_COLUMNS, parseLayoutRatios } from './layout-utils.js';
+import { escapeAttr, escapeHtml, formatFocus, normalizeFit, parseFocus } from '../../shared/page-builder/helpers.js';
+import { COLUMN_ALIGNMENTS, MAX_COLUMNS, parseLayoutRatios } from '../../shared/page-builder/layout-utils.js';
 import {
   getAppearanceInputValue,
   getAppearanceLeaf,
@@ -22,7 +22,7 @@ import {
   getBuilderDeviceLabel,
   getEffectiveSectionLayout,
   getEffectiveSectionSettings,
-} from './responsive-overrides.js';
+} from '../../shared/page-builder/responsive-overrides.js';
 import { bindThemeEditorEvents, renderThemeEditorContent } from './theme-editor.js';
 import { renderInspectorSection } from './inspector-sections.js';
 
@@ -753,7 +753,7 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
       if (state.selectedCanvasSurface === 'page-header') {
         contentHtml = renderHeaderEditorContent({
           draftState: state.activeHeaderDraft,
-          pages: state.pages,
+          pages: state.linkablePages,
           activeDeviceId: state.activeDeviceId,
           responsiveEditScope: state.responsiveEditScope,
           mode: 'styles',
@@ -773,7 +773,7 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
           currentPage: state.currentPage,
           selectedModuleId: state.selectedModuleId,
           draftConfig: state.activeModuleDraft,
-          pages: state.pages,
+          pages: state.linkablePages,
           activeDeviceId: state.activeDeviceId,
           responsiveEditScope: state.responsiveEditScope,
         });
@@ -812,7 +812,7 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
     } else if (state.selectedCanvasSurface === 'page-header') {
       contentHtml = renderHeaderEditorContent({
         draftState: state.activeHeaderDraft,
-        pages: state.pages,
+        pages: state.linkablePages,
         activeDeviceId: state.activeDeviceId,
         responsiveEditScope: state.responsiveEditScope,
       });
@@ -897,7 +897,7 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
           currentPage: state.currentPage,
           selectedModuleId: state.selectedModuleId,
           draftConfig: selectedModuleRecord ? state.activeModuleDraft : null,
-          pages: state.pages,
+          pages: state.linkablePages,
           activeDeviceId: state.activeDeviceId,
           responsiveEditScope: state.responsiveEditScope,
         });
@@ -1011,7 +1011,7 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
         },
         markDirty: actions.markDirty,
         renderEditorPanel,
-        pages: state.pages,
+        pages: state.linkablePages,
         activeDeviceId: state.activeDeviceId,
         responsiveEditScope: state.responsiveEditScope,
       });
@@ -1326,7 +1326,7 @@ export function createEditorPanelRenderer({ el, getState, actions, helpers, deps
         },
         markDirty: actions.markDirty,
         renderEditorPanel,
-        pages: state.pages,
+        pages: state.linkablePages,
         openImagePicker: deps.openImagePicker,
         fetchAssets: deps.fetchAssets,
         uploadAssetFile: deps.uploadAssetFile,

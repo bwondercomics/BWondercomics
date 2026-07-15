@@ -15,7 +15,7 @@
     "test:watch": "node ./node_modules/vitest/vitest.mjs",
     "test:ui": "node ./node_modules/vitest/vitest.mjs --ui",
     "test:coverage": "node ./node_modules/vitest/vitest.mjs run --coverage",
-    "lint": "eslint reader/ admin/",
+    "lint": "eslint reader/ admin/ shared/",
     "lint:fix": "eslint --fix reader/ admin/",
     "lint:py": "./.venv/bin/python -m ruff check backend/app backend/alembic",
     "format": "node ./node_modules/prettier/bin/prettier.cjs --write '**/*.{js,html,css,md}'",

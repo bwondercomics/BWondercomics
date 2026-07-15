@@ -1,4 +1,4 @@
-import { escapeAttr, escapeHtml, resolveAssetUrl } from './helpers.js';
+import { escapeAttr, escapeHtml, resolveAssetUrl } from '../../shared/page-builder/helpers.js';
 import { renderInspectorSection } from './inspector-sections.js';
 
 export function generateSocialButtonId() {
@@ -16,14 +16,6 @@ export function getDefaultSocialButtonStyle() {
     borderRadius: 8,
   };
 }
-
-const sanitizeButton = (btn = {}) => ({
-  id: btn.id || generateSocialButtonId(),
-  icon: btn.icon || '',
-  text: btn.text || '',
-  url: btn.url || '',
-  style: btn.style || getDefaultSocialButtonStyle(),
-});
 
 export function renderSocialEditor(config) {
   const buttons = config.buttons || [];
@@ -125,171 +117,139 @@ export function renderSocialEditor(config) {
   });
 }
 
-export function bindSocialEditorEvents({
+function cloneConfig(config = {}) {
+  return JSON.parse(JSON.stringify(config || {}));
+}
+
+function normalizeSocialButton(button = {}) {
+  return {
+    id: button.id || generateSocialButtonId(),
+    icon: button.icon || '',
+    text: button.text || '',
+    url: button.url || '',
+    style: {
+      ...getDefaultSocialButtonStyle(),
+      ...(button.style || {}),
+    },
+  };
+}
+
+function normalizeSocialConfig(config = {}) {
+  return {
+    ...cloneConfig(config),
+    buttons: (config.buttons || []).map(normalizeSocialButton),
+  };
+}
+
+function bindSocialDraftEvents({
   el,
-  currentPage,
-  selectedModuleId,
-  updateModule,
-  renderCanvas,
+  draftConfig,
+  setDraftConfig,
   renderEditorPanel,
+  markDirty,
   openImagePicker,
   fetchAssets,
   uploadAssetFile,
 }) {
-  if (!currentPage || !selectedModuleId) return;
+  let config = normalizeSocialConfig(draftConfig);
 
-  let selectedModule = null;
-  for (const section of currentPage?.sections || []) {
-    const found = (section.modules || []).find((m) => m.id === selectedModuleId);
-    if (found) {
-      selectedModule = found;
-      break;
+  const commit = (nextConfig, rerenderEditor = false) => {
+    config = normalizeSocialConfig(nextConfig);
+    setDraftConfig(config);
+    markDirty('module');
+    if (rerenderEditor) {
+      renderEditorPanel();
     }
-  }
-  if (!selectedModule || selectedModule.moduleType !== 'social') return;
+  };
 
-  const config = { ...(selectedModule.config || {}) };
-  const buttons = [...(config.buttons || [])].map(sanitizeButton);
-
-  async function saveSocialConfig(newConfig, rerenderEditor = false) {
-    const merged = {
-      ...config,
-      ...newConfig,
-      buttons: (newConfig.buttons || buttons).map(sanitizeButton),
-    };
-    const updated = await updateModule(selectedModuleId, { config: merged });
-    if (updated) {
-      selectedModule.config = updated.config;
-      Object.assign(config, updated.config);
-      buttons.length = 0;
-      buttons.push(...(updated.config.buttons || []).map(sanitizeButton));
-      renderCanvas();
-      if (rerenderEditor) {
-        renderEditorPanel();
-      }
-    }
-  }
-
-  // Add button
   document.getElementById('pbSocialAddButton')?.addEventListener('click', () => {
-    buttons.push(sanitizeButton());
-    saveSocialConfig({ ...config, buttons }, true);
+    const nextConfig = normalizeSocialConfig(config);
+    nextConfig.buttons.push(normalizeSocialButton());
+    commit(nextConfig, true);
   });
 
-  // Per-item events
   el.pbModuleEditor.querySelectorAll('.pb-social-item').forEach((itemEl) => {
     const index = parseInt(itemEl.dataset.itemIndex, 10);
 
     itemEl.querySelector('[data-action="remove"]')?.addEventListener('click', () => {
-      buttons.splice(index, 1);
-      saveSocialConfig({ ...config, buttons }, true);
+      const nextConfig = normalizeSocialConfig(config);
+      nextConfig.buttons.splice(index, 1);
+      commit(nextConfig, true);
     });
 
     itemEl.querySelector('[data-action="move-up"]')?.addEventListener('click', () => {
-      if (index > 0) {
-        [buttons[index - 1], buttons[index]] = [buttons[index], buttons[index - 1]];
-        saveSocialConfig({ ...config, buttons }, true);
-      }
+      if (index <= 0) return;
+      const nextConfig = normalizeSocialConfig(config);
+      [nextConfig.buttons[index - 1], nextConfig.buttons[index]] = [
+        nextConfig.buttons[index],
+        nextConfig.buttons[index - 1],
+      ];
+      commit(nextConfig, true);
     });
 
     itemEl.querySelector('[data-action="move-down"]')?.addEventListener('click', () => {
-      if (index < buttons.length - 1) {
-        [buttons[index], buttons[index + 1]] = [buttons[index + 1], buttons[index]];
-        saveSocialConfig({ ...config, buttons }, true);
-      }
+      if (index >= config.buttons.length - 1) return;
+      const nextConfig = normalizeSocialConfig(config);
+      [nextConfig.buttons[index], nextConfig.buttons[index + 1]] = [
+        nextConfig.buttons[index + 1],
+        nextConfig.buttons[index],
+      ];
+      commit(nextConfig, true);
     });
 
-    // Image picker for icon
     itemEl.querySelector('.pb-social-icon-pick')?.addEventListener('click', async () => {
-      const current = buttons[index] || {};
+      const current = config.buttons[index] || {};
       await openImagePicker({
         title: 'Select button icon',
         getItems: fetchAssets,
         allowUpload: true,
         uploadHandler: uploadAssetFile,
-        resolveSrc: resolveAssetUrl,
         showEditor: false,
         initialSelection: { path: current.icon || '' },
         onApply: ({ item }) => {
-          if (!buttons[index]) return;
-          buttons[index].icon = item?.path || '';
-          // Update icon input and preview
-          const iconInput = itemEl.querySelector('[data-item-key="icon"]');
-          if (iconInput) iconInput.value = buttons[index].icon;
-          const preview = itemEl.querySelector('.pb-social-icon-preview');
-          if (preview) {
-            const src = resolveAssetUrl(buttons[index].icon);
-            preview.innerHTML = `Current: <img src="${escapeAttr(src)}" alt="" style="width:24px;height:24px;object-fit:contain;vertical-align:middle;">`;
-          }
-          saveSocialConfig({ ...config, buttons });
+          const nextConfig = normalizeSocialConfig(config);
+          if (!nextConfig.buttons[index]) return;
+          nextConfig.buttons[index].icon = item?.path || '';
+          commit(nextConfig, true);
         },
       });
     });
   });
 
-  // Field changes (icon, text, url)
   el.pbModuleEditor.querySelectorAll('.pb-social-input').forEach((input) => {
-    input.addEventListener('change', () => {
+    const eventName = input.tagName === 'SELECT' ? 'change' : 'input';
+    input.addEventListener(eventName, () => {
       const index = parseInt(input.dataset.itemIndex, 10);
       const key = input.dataset.itemKey;
-      if (buttons[index] && key) {
-        buttons[index][key] = input.value;
-        saveSocialConfig({ ...config, buttons });
-      }
+      const nextConfig = normalizeSocialConfig(config);
+      if (!nextConfig.buttons[index] || !key) return;
+      nextConfig.buttons[index][key] = input.value;
+      commit(nextConfig);
     });
   });
 
-  // Style changes
   el.pbModuleEditor
     .querySelectorAll('.pb-social-style-input, .pb-social-style-color, .pb-social-style-range')
     .forEach((input) => {
-      input.addEventListener('change', () => {
+      const eventName = input.type === 'range' ? 'input' : 'change';
+      input.addEventListener(eventName, () => {
         const index = parseInt(input.dataset.itemIndex, 10);
         const key = input.dataset.styleKey;
-        if (buttons[index] && key) {
-          if (!buttons[index].style) buttons[index].style = getDefaultSocialButtonStyle();
-          if (input.type === 'range' || input.type === 'number') {
-            buttons[index].style[key] = parseFloat(input.value);
-          } else {
-            buttons[index].style[key] = input.value;
-          }
-          saveSocialConfig({ ...config, buttons });
+        const nextConfig = normalizeSocialConfig(config);
+        if (!nextConfig.buttons[index] || !key) return;
+        if (input.type === 'range' || input.type === 'number') {
+          nextConfig.buttons[index].style[key] = parseFloat(input.value);
+        } else {
+          nextConfig.buttons[index].style[key] = input.value;
         }
+        commit(nextConfig);
       });
     });
 }
 
-export function collectSocialConfig(el) {
-  const buttons = [];
-  el.pbModuleEditor.querySelectorAll('.pb-social-item').forEach((itemEl) => {
-    const btn = {
-      id: generateSocialButtonId(),
-      icon: '',
-      text: '',
-      url: '',
-      style: getDefaultSocialButtonStyle(),
-    };
-
-    itemEl.querySelectorAll('.pb-social-input').forEach((input) => {
-      const key = input.dataset.itemKey;
-      if (key) btn[key] = input.value;
-    });
-
-    itemEl
-      .querySelectorAll('.pb-social-style-input, .pb-social-style-color, .pb-social-style-range')
-      .forEach((input) => {
-        const key = input.dataset.styleKey;
-        if (key) {
-          if (input.type === 'range' || input.type === 'number') {
-            btn.style[key] = parseFloat(input.value);
-          } else {
-            btn.style[key] = input.value;
-          }
-        }
-      });
-
-    buttons.push(btn);
-  });
-
-  return { buttons };
-}
+// Registry entry for the module editor (see module-editor-registry.js for the contract).
+export const socialModuleEditor = {
+  usesLayoutBridge: true,
+  renderContent: ({ config }) => [renderSocialEditor(config)],
+  bindEvents: bindSocialDraftEvents,
+};

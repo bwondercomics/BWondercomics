@@ -1,4 +1,4 @@
-import { isModuleTypeDuplicatable } from './module-descriptors.js';
+import { isModuleTypeDuplicatable } from '../../shared/page-builder/module-descriptors.js';
 
 export function findPageModuleLocation(page, moduleId) {
   if (!moduleId) return null;

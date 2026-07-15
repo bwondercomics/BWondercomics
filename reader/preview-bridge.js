@@ -11,8 +11,8 @@ import {
   getPreviewViewport,
   isPreviewViewportId,
   validatePreviewEnvelope,
-} from '../admin/page-builder/preview-contract.js';
-import { sanitizeBuilderHtml, sanitizeHref } from '../admin/page-builder/sanitize.js';
+} from '../shared/page-builder/preview-contract.js';
+import { sanitizeBuilderHtml, sanitizeHref } from '../shared/page-builder/sanitize.js';
 import { CONFIG } from './config.js';
 import {
   getActiveSeriesId,

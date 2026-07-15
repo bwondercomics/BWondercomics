@@ -5,7 +5,7 @@ import {
   getReaderRuntimeConfig,
   normalizeReaderConfig,
   normalizeReaderResponsiveBranch,
-} from '../admin/page-builder/reader-config.js';
+} from '../shared/page-builder/reader-config.js';
 
 describe('normalizeReaderConfig', () => {
   it('fills defaults for an empty config', () => {

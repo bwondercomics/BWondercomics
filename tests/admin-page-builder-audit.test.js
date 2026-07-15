@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { auditPageFallbacks, auditPagesFallbacks } from '../admin/page-builder/header-config.js';
+import { auditPageFallbacks, auditPagesFallbacks } from '../shared/page-builder/header-config.js';
 import { buildContractFixture, getContractFixture } from './helpers/contracts.js';
 
 /**

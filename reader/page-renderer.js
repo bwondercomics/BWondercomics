@@ -3,14 +3,14 @@
  * Fetches page config from the API and renders modules to HTML.
  *
  * Module HTML output is provided by the shared renderer factory in
- * admin/page-builder/shared-renderers.js. This file owns the reader-specific
+ * shared/page-builder/shared-renderers.js. This file owns the reader-specific
  * runtime layer: fetching, mounting, live email forms, and promo carousels.
  */
 
 import { getActiveSeriesId } from './series.js';
 import { logger } from './logger.js';
-import { createRenderers } from '../admin/page-builder/shared-renderers.js';
-import { escapeHtml } from '../admin/page-builder/helpers.js';
+import { createRenderers } from '../shared/page-builder/shared-renderers.js';
+import { escapeHtml } from '../shared/page-builder/helpers.js';
 import { initEntryGalleryModules } from './entry-gallery-module.js';
 import { initMediaGalleryModules } from './media-gallery-module.js';
 

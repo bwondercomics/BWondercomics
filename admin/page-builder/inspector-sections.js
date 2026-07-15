@@ -1,4 +1,4 @@
-import { escapeAttr, escapeHtml } from './helpers.js';
+import { escapeAttr, escapeHtml } from '../../shared/page-builder/helpers.js';
 
 function renderInspectorSection({
   kicker = '',
@@ -39,4 +39,9 @@ function renderInspectorSection({
   `;
 }
 
-export { renderInspectorSection };
+// Shorthand card used across the module editor files: the title doubles as the summary.
+function renderInspectorCard(kicker, title, copy, body) {
+  return renderInspectorSection({ kicker, title, summary: title, copy, body });
+}
+
+export { renderInspectorCard, renderInspectorSection };

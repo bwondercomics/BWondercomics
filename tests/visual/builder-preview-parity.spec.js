@@ -4,7 +4,7 @@ import {
   PREVIEW_MEDIA_QUERIES,
   PREVIEW_VIEWPORT_ORDER,
   PREVIEW_VIEWPORTS,
-} from '../../admin/page-builder/preview-contract.js';
+} from '../../shared/page-builder/preview-contract.js';
 import { getContractFixtures } from '../helpers/contracts.js';
 
 const fixtures = getContractFixtures();

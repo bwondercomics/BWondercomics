@@ -5,7 +5,7 @@ import {
   getDefaultConfig,
   getModuleLabel,
   getModulePreview,
-} from '../admin/page-builder/helpers.js';
+} from '../shared/page-builder/helpers.js';
 import {
   getInsertableModuleDescriptors,
   getModuleDefaultConfig,
@@ -15,8 +15,8 @@ import {
   getModuleSourceModes,
   getModuleStyleSectors,
   isModuleTypeDuplicatable,
-} from '../admin/page-builder/module-descriptors.js';
-import { getModuleResponsiveFields } from '../admin/page-builder/responsive-overrides.js';
+} from '../shared/page-builder/module-descriptors.js';
+import { getModuleResponsiveFields } from '../shared/page-builder/responsive-overrides.js';
 
 describe('page-builder module descriptors', () => {
   it('provides one descriptor for every compatibility module type', () => {

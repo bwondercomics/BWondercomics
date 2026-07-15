@@ -29,28 +29,28 @@ import { publishReaderShellState, resolveReaderShellState } from './shell-state.
 import {
   createEffectivePageHeader,
   resolvePageHeaderState,
-} from '../admin/page-builder/header-config.js';
-import { escapeHtml } from '../admin/page-builder/helpers.js';
+} from '../shared/page-builder/header-config.js';
+import { escapeHtml } from '../shared/page-builder/helpers.js';
 import {
   appearanceToInlineStyle,
   mergeAppearance,
   normalizeAppearance,
-} from '../admin/page-builder/appearance-utils.js';
-import { getReaderRuntimeConfig } from '../admin/page-builder/reader-config.js';
+} from '../shared/page-builder/appearance-utils.js';
+import { getReaderRuntimeConfig } from '../shared/page-builder/reader-config.js';
 import {
   getEffectiveColumnSettings,
   getEffectiveModuleConfig,
   isModuleHiddenForDevice,
-} from '../admin/page-builder/responsive-overrides.js';
+} from '../shared/page-builder/responsive-overrides.js';
 import {
   buildColumnInlineStyle,
   EDITOR_EMPTY_COLUMN_MIN_HEIGHT,
-} from '../admin/page-builder/shared-renderers.js';
+} from '../shared/page-builder/shared-renderers.js';
 import {
   buildPanelResponsiveCss,
   buildReaderControlsResponsiveCss,
   buildReaderStageResponsiveCss,
-} from '../admin/page-builder/responsive-css.js';
+} from '../shared/page-builder/responsive-css.js';
 
 const BUILDER_THEME_CSS_VARS = Object.freeze([
   '--primary',

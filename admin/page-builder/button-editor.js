@@ -7,14 +7,17 @@ import {
   syncAppearanceColorInputs,
   toSparseAppearance,
 } from './appearance-editor.js';
-import { escapeAttr, escapeHtml } from './helpers.js';
+import { escapeAttr, escapeHtml } from '../../shared/page-builder/helpers.js';
 import { renderInspectorSection } from './inspector-sections.js';
-import { pruneEmptyResponsiveOverrides } from './responsive-overrides.js';
+import {
+  getBuilderDeviceLabel,
+  pruneEmptyResponsiveOverrides,
+} from '../../shared/page-builder/responsive-overrides.js';
 import {
   isBuilderPageTargetMissing,
   normalizeButtonsConfig,
   normalizeLinkTarget,
-} from './link-utils.js';
+} from '../../shared/page-builder/link-utils.js';
 
 function removeAppearanceProperty(source = {}) {
   const next = { ...source };
@@ -460,3 +463,43 @@ export function bindButtonsEditorEvents({
 export function cloneButtonsConfig(config = {}) {
   return cloneValue(normalizeButtonsDraftConfig(config));
 }
+
+// Scope switch shown at the top of the buttons style tab (the only style tab with a
+// device scope): mirrors the inspector's global/device edit-scope control.
+function renderStyleScopeCard({ activeDeviceId, responsiveEditScope }) {
+  const deviceLabel = getBuilderDeviceLabel(activeDeviceId);
+  return renderInspectorSection({
+    kicker: 'Device',
+    title: 'Style Scope',
+    summary: 'Style Scope',
+    copy: responsiveEditScope === 'device' ? deviceLabel : 'Global',
+    body: `
+      <div class="pb-editor-field">
+        <label class="pb-editor-label">Scope</label>
+        <select class="pb-editor-select" data-responsive-edit-scope data-responsive-device-id="${escapeAttr(activeDeviceId)}">
+          <option value="global" ${responsiveEditScope === 'global' ? 'selected' : ''}>Global</option>
+          <option value="device" ${responsiveEditScope === 'device' ? 'selected' : ''}>Current Device (${escapeHtml(deviceLabel)})</option>
+        </select>
+      </div>
+    `,
+  });
+}
+
+// Registry entry for the module editor (see module-editor-registry.js for the contract).
+export const buttonsModuleEditor = {
+  usesLayoutBridge: true,
+  styleUsesDeviceScope: true,
+  renderContent: ({ config, pages }) => [renderButtonsEditor(config, pages)],
+  renderDeviceOverrides: ({ config, pages, responsiveFields }) =>
+    responsiveFields.includes('defaults')
+      ? [renderButtonsEditor(config, pages, { deviceOnly: true })]
+      : [],
+  bindEvents: bindButtonsEditorEvents,
+  bindDeviceEvents: bindButtonsEditorEvents,
+  renderStyle: ({ config, pages, activeDeviceId, styleScope }) => [
+    renderStyleScopeCard({ activeDeviceId, responsiveEditScope: styleScope }),
+    renderButtonsEditor(config, pages, { deviceOnly: styleScope === 'device', styleOnly: true }),
+  ],
+  bindStyle: (ctx) =>
+    bindButtonsEditorEvents({ ...ctx, responsiveEditScope: ctx.styleScope, styleOnly: true }),
+};

@@ -1,5 +1,5 @@
 import { renderInspectorSection } from './inspector-sections.js';
-import { setResponsiveOverrideValue } from './responsive-overrides.js';
+import { setResponsiveOverrideValue } from '../../shared/page-builder/responsive-overrides.js';
 
 function normalizeEntryGalleryConfig(config = {}) {
   return {
@@ -95,3 +95,18 @@ export function bindEntryGalleryEditorEvents({
     });
   });
 }
+
+// Registry entry for the module editor (see module-editor-registry.js for the contract).
+export const entryGalleryModuleEditor = {
+  usesLayoutBridge: true,
+  renderContent: ({ config, currentPage, pages, moduleType, shared }) => [
+    shared.renderCmsSourceCard(moduleType, config, currentPage, pages),
+    renderEntryGalleryEditor(config),
+  ],
+  renderDeviceOverrides: ({ config, responsiveFields }) =>
+    responsiveFields.includes('columns')
+      ? [renderEntryGalleryEditor(config, { deviceOnly: true })]
+      : [],
+  bindEvents: bindEntryGalleryEditorEvents,
+  bindDeviceEvents: bindEntryGalleryEditorEvents,
+};

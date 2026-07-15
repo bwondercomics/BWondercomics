@@ -1,4 +1,4 @@
-import { cloneValue } from './helpers.js';
+import { cloneValue } from '../../shared/page-builder/helpers.js';
 
 const DEFAULT_HISTORY_LIMIT = 50;
 

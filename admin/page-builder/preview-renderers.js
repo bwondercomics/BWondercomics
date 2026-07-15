@@ -10,9 +10,9 @@
  * backward compatibility with tests and any existing call sites.
  */
 
-import { resolveAssetUrl } from './helpers.js';
-import { createRenderers } from './shared-renderers.js';
-import { sanitizeAssetUrl } from './sanitize.js';
+import { resolveAssetUrl } from '../../shared/page-builder/helpers.js';
+import { createRenderers } from '../../shared/page-builder/shared-renderers.js';
+import { sanitizeAssetUrl } from '../../shared/page-builder/sanitize.js';
 
 // Module-level series ID used for button link resolution in the preview.
 // The builder shell calls setPreviewSeriesId(id) when a series is active.

@@ -1,4 +1,4 @@
-import { getModuleDescriptors } from './module-descriptors.js';
+import { getModuleDescriptors } from '../../shared/page-builder/module-descriptors.js';
 
 export {
   MAX_COLUMNS,
@@ -9,7 +9,7 @@ export {
   ratiosToLayout,
   layoutToGridTemplate,
   alignmentToJustifySelf,
-} from './layout-utils.js';
+} from '../../shared/page-builder/layout-utils.js';
 
 export const MODULE_TYPES = getModuleDescriptors().map(({ type, label, icon, category }) => ({
   type,

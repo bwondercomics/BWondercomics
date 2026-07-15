@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, beforeAll, vi } from 'vitest';
-import { PREVIEW_VIEWPORTS } from '../admin/page-builder/preview-contract.js';
+import { PREVIEW_VIEWPORTS } from '../shared/page-builder/preview-contract.js';
 
 // Mock the dependencies
 vi.mock('../reader/config.js', () => ({

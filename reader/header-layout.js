@@ -1,4 +1,4 @@
-import { appearanceToInlineStyle } from '../admin/page-builder/appearance-utils.js';
+import { appearanceToInlineStyle } from '../shared/page-builder/appearance-utils.js';
 import {
   HEADER_REGION_ORDER,
   HEADER_ROW_ORDER,
@@ -8,13 +8,13 @@ import {
   resolveHeaderShellScrolledAppearance,
   resolveHeaderShellTopAppearance,
   resolvePageHeaderState,
-} from '../admin/page-builder/header-config.js';
-import { sanitizeAssetUrl } from '../admin/page-builder/sanitize.js';
+} from '../shared/page-builder/header-config.js';
+import { sanitizeAssetUrl } from '../shared/page-builder/sanitize.js';
 import {
   normalizeHeaderNavItems,
   resolveLinkTargetHref,
   shouldOpenLinkInNewTab,
-} from '../admin/page-builder/link-utils.js';
+} from '../shared/page-builder/link-utils.js';
 
 const BLOCK_SELECTORS = {
   brand: '.brand',

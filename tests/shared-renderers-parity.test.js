@@ -12,7 +12,7 @@ import {
   buildColumnInlineStyle,
   createRenderers,
   EDITOR_EMPTY_COLUMN_MIN_HEIGHT,
-} from '../admin/page-builder/shared-renderers.js';
+} from '../shared/page-builder/shared-renderers.js';
 import { getContractFixture } from './helpers/contracts.js';
 
 function makeReaderRenderers() {

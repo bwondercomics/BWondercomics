@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { appearanceToInlineStyle } from '../admin/page-builder/appearance-utils.js';
+import { appearanceToInlineStyle } from '../shared/page-builder/appearance-utils.js';
 import { renderCanvasSnapshot } from '../admin/page-builder/canvas-renderer.js';
 import {
   bindHeaderEditorEvents,
@@ -16,7 +16,7 @@ import {
   resolveHeaderNavItemAppearance,
   resolveHeaderShellScrolledAppearance,
   resolveHeaderShellTopAppearance,
-} from '../admin/page-builder/header-config.js';
+} from '../shared/page-builder/header-config.js';
 import { applySharedHeaderLayout } from '../reader/header-layout.js';
 
 function mountHeaderEditor({

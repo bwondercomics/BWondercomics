@@ -1,4 +1,4 @@
-import { escapeAttr, escapeHtml, resolveAssetUrl } from './helpers.js';
+import { escapeAttr, escapeHtml } from '../../shared/page-builder/helpers.js';
 import { renderInspectorSection } from './inspector-sections.js';
 
 export function generatePromoItemId() {
@@ -220,80 +220,60 @@ export function renderPromoEditor(config) {
     `;
 }
 
-export function bindPromoEditorEvents({
+function cloneConfig(config = {}) {
+  return JSON.parse(JSON.stringify(config || {}));
+}
+
+function normalizePromoItem(item = {}) {
+  return {
+    id: item.id || generatePromoItemId(),
+    image: item.image || '',
+    linkUrl: item.linkUrl || '',
+    imageFit: item.imageFit === 'contain' ? 'contain' : 'cover',
+    topText: item.topText || '',
+    bottomText: item.bottomText || '',
+    textPosition: item.textPosition === 'outside' ? 'outside' : 'overlay',
+    style: {
+      ...getDefaultPromoItemStyle(),
+      ...(item.style || {}),
+    },
+  };
+}
+
+function normalizePromoConfig(config = {}) {
+  return {
+    ...cloneConfig(config),
+    items: (config.items || []).map(normalizePromoItem),
+    autoRotate: config.autoRotate !== false,
+    interval: config.interval || 5000,
+    showNavigation: config.showNavigation !== false,
+    showIndicators: config.showIndicators !== false,
+    height: config.height || 400,
+    transition: config.transition || 'fade',
+  };
+}
+
+function bindPromoDraftEvents({
   el,
-  currentPage,
-  selectedModuleId,
-  updateModule,
-  renderCanvas,
+  draftConfig,
+  setDraftConfig,
   renderEditorPanel,
+  markDirty,
   openImagePicker,
   fetchAssets,
   uploadAssetFile,
 }) {
-  if (!currentPage || !selectedModuleId) return;
+  let config = normalizePromoConfig(draftConfig);
+  const items = config.items;
 
-  // Find the selected module
-  let selectedModule = null;
-  for (const section of currentPage?.sections || []) {
-    const found = (section.modules || []).find((m) => m.id === selectedModuleId);
-    if (found) {
-      selectedModule = found;
-      break;
+  const commit = (nextConfig, rerenderEditor = false) => {
+    config = normalizePromoConfig(nextConfig);
+    setDraftConfig(config);
+    markDirty('module');
+    if (rerenderEditor) {
+      renderEditorPanel();
     }
-  }
-  if (!selectedModule || selectedModule.moduleType !== 'promo') return;
-
-  const config = { ...(selectedModule.config || {}) };
-
-  const sanitizeItem = (item = {}) => ({
-    id: item.id || generatePromoItemId(),
-    image: item.image || '',
-    imageFit: item.imageFit === 'contain' ? 'contain' : 'cover',
-    topText: item.topText || '',
-    bottomText: item.bottomText || '',
-    textPosition: item.textPosition || 'overlay',
-    style: item.style || getDefaultPromoItemStyle(),
-  });
-
-  const items = [...(config.items || [])].map(sanitizeItem);
-
-  // Helper to save and re-render
-  // rerenderEditor: true for structural changes (add/remove/move), false for field edits
-  async function savePromoConfig(newConfig, rerenderEditor = false) {
-    // Merge with existing config to preserve all settings
-    const merged = {
-      ...config,
-      ...newConfig,
-      items: (newConfig.items || items).map(sanitizeItem),
-    };
-    const updated = await updateModule(selectedModuleId, { config: merged });
-    if (updated) {
-      selectedModule.config = updated.config;
-      // Update local references so subsequent saves include all data
-      Object.assign(config, updated.config);
-      items.length = 0;
-      items.push(...(updated.config.items || []).map(sanitizeItem));
-      renderCanvas();
-      if (rerenderEditor) {
-        renderEditorPanel();
-      }
-    }
-  }
-
-  // Add item button
-  document.getElementById('pbPromoAddItem')?.addEventListener('click', () => {
-    items.push({
-      id: generatePromoItemId(),
-      image: '',
-      imageFit: 'cover',
-      topText: '',
-      bottomText: '',
-      textPosition: 'overlay',
-      style: getDefaultPromoItemStyle(),
-    });
-    savePromoConfig({ ...config, items }, true);
-  });
+  };
 
   const updatePromoImageUi = (itemEl, item) => {
     const imageInput = itemEl.querySelector('[data-item-key="image"]');
@@ -302,200 +282,152 @@ export function bindPromoEditorEvents({
     if (meta) meta.textContent = item.image ? 'Image selected' : 'No image selected';
   };
 
-  // Remove/move buttons on items
+  document.getElementById('pbPromoAddItem')?.addEventListener('click', () => {
+    const nextConfig = normalizePromoConfig(config);
+    nextConfig.items.push(normalizePromoItem());
+    commit(nextConfig, true);
+  });
+
   el.pbModuleEditor.querySelectorAll('.pb-promo-item').forEach((itemEl) => {
     const index = parseInt(itemEl.dataset.itemIndex, 10);
 
     itemEl.querySelector('[data-action="remove"]')?.addEventListener('click', () => {
-      items.splice(index, 1);
-      savePromoConfig({ ...config, items }, true);
+      const nextConfig = normalizePromoConfig(config);
+      nextConfig.items.splice(index, 1);
+      commit(nextConfig, true);
     });
 
     itemEl.querySelector('[data-action="move-up"]')?.addEventListener('click', () => {
-      if (index > 0) {
-        [items[index - 1], items[index]] = [items[index], items[index - 1]];
-        savePromoConfig({ ...config, items }, true);
-      }
+      if (index <= 0) return;
+      const nextConfig = normalizePromoConfig(config);
+      [nextConfig.items[index - 1], nextConfig.items[index]] = [
+        nextConfig.items[index],
+        nextConfig.items[index - 1],
+      ];
+      commit(nextConfig, true);
     });
 
     itemEl.querySelector('[data-action="move-down"]')?.addEventListener('click', () => {
-      if (index < items.length - 1) {
-        [items[index], items[index + 1]] = [items[index + 1], items[index]];
-        savePromoConfig({ ...config, items }, true);
-      }
+      if (index >= items.length - 1) return;
+      const nextConfig = normalizePromoConfig(config);
+      [nextConfig.items[index], nextConfig.items[index + 1]] = [
+        nextConfig.items[index + 1],
+        nextConfig.items[index],
+      ];
+      commit(nextConfig, true);
     });
 
     itemEl.querySelector('.pb-promo-pick')?.addEventListener('click', async () => {
-      const current = items[index] || {};
+      const current = config.items[index] || {};
       await openImagePicker({
         title: 'Select promo image',
         getItems: fetchAssets,
         allowUpload: true,
         uploadHandler: uploadAssetFile,
-        resolveSrc: resolveAssetUrl,
         showEditor: false,
-        initialSelection: {
-          path: current.image || '',
-        },
+        initialSelection: { path: current.image || '' },
         onApply: ({ item }) => {
-          if (!items[index]) return;
-          items[index].image = item?.path || '';
-          updatePromoImageUi(itemEl, items[index]);
-          savePromoConfig({ ...config, items });
+          const nextConfig = normalizePromoConfig(config);
+          if (!nextConfig.items[index]) return;
+          nextConfig.items[index].image = item?.path || '';
+          updatePromoImageUi(itemEl, nextConfig.items[index]);
+          commit(nextConfig);
         },
       });
     });
 
     itemEl.querySelector('.pb-promo-clear')?.addEventListener('click', () => {
-      if (!items[index]) return;
-      items[index].image = '';
-      updatePromoImageUi(itemEl, items[index]);
-      savePromoConfig({ ...config, items });
+      const nextConfig = normalizePromoConfig(config);
+      if (!nextConfig.items[index]) return;
+      nextConfig.items[index].image = '';
+      updatePromoImageUi(itemEl, nextConfig.items[index]);
+      commit(nextConfig);
     });
   });
 
-  // Item field changes (image, topText, bottomText, textPosition)
   el.pbModuleEditor.querySelectorAll('.pb-promo-input').forEach((input) => {
-    input.addEventListener('change', () => {
+    const eventName = input.tagName === 'SELECT' ? 'change' : 'input';
+    input.addEventListener(eventName, () => {
       const index = parseInt(input.dataset.itemIndex, 10);
       const key = input.dataset.itemKey;
-      if (items[index]) {
-        items[index][key] = input.value;
-        savePromoConfig({ ...config, items });
-      }
+      const nextConfig = normalizePromoConfig(config);
+      if (!nextConfig.items[index] || !key) return;
+      nextConfig.items[index][key] = input.value;
+      commit(nextConfig);
     });
   });
 
-  // Style changes
   el.pbModuleEditor
     .querySelectorAll('.pb-promo-style-input, .pb-promo-style-color, .pb-promo-style-range')
     .forEach((input) => {
-      input.addEventListener('change', () => {
+      const eventName = input.type === 'range' || input.type === 'checkbox' ? 'input' : 'change';
+      input.addEventListener(eventName, () => {
         const index = parseInt(input.dataset.itemIndex, 10);
         const key = input.dataset.styleKey;
-        if (items[index]) {
-          if (!items[index].style) items[index].style = getDefaultPromoItemStyle();
-          if (input.type === 'checkbox') {
-            items[index].style[key] = input.checked;
-          } else if (input.type === 'range') {
-            items[index].style[key] = parseFloat(input.value);
-          } else {
-            items[index].style[key] = input.value;
-          }
-          savePromoConfig({ ...config, items });
+        const nextConfig = normalizePromoConfig(config);
+        if (!nextConfig.items[index] || !key) return;
+        if (input.type === 'checkbox') {
+          nextConfig.items[index].style[key] = input.checked;
+        } else if (input.type === 'range') {
+          nextConfig.items[index].style[key] = parseFloat(input.value);
+        } else {
+          nextConfig.items[index].style[key] = input.value;
         }
+        commit(nextConfig);
       });
     });
 
-  // Auto-rotate toggle
   const autoRotateCheckbox = document.getElementById('pbPromoAutoRotate');
   const intervalField = document.getElementById('pbPromoIntervalField');
   autoRotateCheckbox?.addEventListener('change', () => {
     if (intervalField) {
       intervalField.style.display = autoRotateCheckbox.checked ? '' : 'none';
     }
-    savePromoConfig({ ...config, items, autoRotate: autoRotateCheckbox.checked });
+    const nextConfig = normalizePromoConfig(config);
+    nextConfig.autoRotate = autoRotateCheckbox.checked;
+    commit(nextConfig);
   });
 
-  // Interval input
   const intervalInput = document.getElementById('pbPromoInterval');
-  intervalInput?.addEventListener('change', () => {
-    const seconds = parseFloat(/** @type {HTMLInputElement} */ (intervalInput).value) || 5;
-    savePromoConfig({ ...config, items, interval: seconds * 1000 });
+  intervalInput?.addEventListener('input', () => {
+    const nextConfig = normalizePromoConfig(config);
+    const seconds = parseFloat(intervalInput.value) || 5;
+    nextConfig.interval = seconds * 1000;
+    commit(nextConfig);
   });
 
-  // Show navigation checkbox
-  const showNavCheckbox = /** @type {HTMLInputElement} */ (
-    document.getElementById('pbPromoShowNav')
-  );
+  const showNavCheckbox = document.getElementById('pbPromoShowNav');
   showNavCheckbox?.addEventListener('change', () => {
-    savePromoConfig({ ...config, items, showNavigation: showNavCheckbox.checked });
+    const nextConfig = normalizePromoConfig(config);
+    nextConfig.showNavigation = showNavCheckbox.checked;
+    commit(nextConfig);
   });
 
-  // Show indicators checkbox
-  const showIndicatorsCheckbox = /** @type {HTMLInputElement} */ (
-    document.getElementById('pbPromoShowIndicators')
-  );
+  const showIndicatorsCheckbox = document.getElementById('pbPromoShowIndicators');
   showIndicatorsCheckbox?.addEventListener('change', () => {
-    savePromoConfig({ ...config, items, showIndicators: showIndicatorsCheckbox.checked });
+    const nextConfig = normalizePromoConfig(config);
+    nextConfig.showIndicators = showIndicatorsCheckbox.checked;
+    commit(nextConfig);
   });
 
-  // Height input
   const heightInput = document.getElementById('pbPromoHeight');
-  heightInput?.addEventListener('change', () => {
-    const height = parseInt(/** @type {HTMLInputElement} */ (heightInput).value, 10) || 400;
-    savePromoConfig({ ...config, items, height });
+  heightInput?.addEventListener('input', () => {
+    const nextConfig = normalizePromoConfig(config);
+    nextConfig.height = parseInt(heightInput.value, 10) || 400;
+    commit(nextConfig);
   });
 
-  // Transition select
   const transitionSelect = document.getElementById('pbPromoTransition');
   transitionSelect?.addEventListener('change', () => {
-    savePromoConfig({
-      ...config,
-      items,
-      transition: /** @type {HTMLSelectElement} */ (transitionSelect).value,
-    });
+    const nextConfig = normalizePromoConfig(config);
+    nextConfig.transition = transitionSelect.value || 'fade';
+    commit(nextConfig);
   });
 }
 
-export function collectPromoConfig(el) {
-  // Collect carousel settings and items for saving
-  const items = [];
-  el.pbModuleEditor.querySelectorAll('.pb-promo-item').forEach((itemEl) => {
-    const item = {
-      id: generatePromoItemId(),
-      image: '',
-      linkUrl: '',
-      imageFit: 'cover',
-      topText: '',
-      bottomText: '',
-      textPosition: 'overlay',
-      style: getDefaultPromoItemStyle(),
-    };
-
-    // Get basic fields
-    itemEl.querySelectorAll('.pb-promo-input').forEach((input) => {
-      const key = input.dataset.itemKey;
-      if (input.tagName === 'TEXTAREA') {
-        item[key] = input.value;
-      } else if (input.tagName === 'SELECT') {
-        item[key] = input.value;
-      } else {
-        item[key] = input.value;
-      }
-    });
-
-    // Get style fields
-    itemEl
-      .querySelectorAll('.pb-promo-style-input, .pb-promo-style-color, .pb-promo-style-range')
-      .forEach((input) => {
-        const key = input.dataset.styleKey;
-        if (input.type === 'checkbox') {
-          item.style[key] = input.checked;
-        } else if (input.type === 'range') {
-          item.style[key] = parseFloat(input.value);
-        } else {
-          item.style[key] = input.value;
-        }
-      });
-
-    items.push(item);
-  });
-
-  const autoRotate = document.getElementById('pbPromoAutoRotate')?.checked ?? true;
-  const interval = parseFloat(document.getElementById('pbPromoInterval')?.value || 5) * 1000;
-  const showNavigation = document.getElementById('pbPromoShowNav')?.checked ?? true;
-  const showIndicators = document.getElementById('pbPromoShowIndicators')?.checked ?? true;
-  const height = parseInt(document.getElementById('pbPromoHeight')?.value || 400, 10);
-  const transition = document.getElementById('pbPromoTransition')?.value || 'fade';
-
-  return {
-    items,
-    autoRotate,
-    interval,
-    showNavigation,
-    showIndicators,
-    height,
-    transition,
-  };
-}
+// Registry entry for the module editor (see module-editor-registry.js for the contract).
+export const promoModuleEditor = {
+  usesLayoutBridge: true,
+  renderContent: ({ config }) => [renderPromoEditor(config)],
+  bindEvents: bindPromoDraftEvents,
+};

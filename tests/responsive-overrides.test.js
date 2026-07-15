@@ -14,7 +14,7 @@ import {
   getModuleResponsiveContract,
   moduleResponsiveContractMatches,
   validateBuilderRuntimeContract,
-} from '../admin/page-builder/responsive-overrides.js';
+} from '../shared/page-builder/responsive-overrides.js';
 import {
   buildFeedLayoutResponsiveCss,
   buildModuleResponsiveCss,
@@ -22,7 +22,7 @@ import {
   buildReaderControlsResponsiveCss,
   buildReaderStageResponsiveCss,
   buildSectionResponsiveCss,
-} from '../admin/page-builder/responsive-css.js';
+} from '../shared/page-builder/responsive-css.js';
 
 describe('responsive override utilities', () => {
   it('validates the loaded API contract and compares only allowed module overrides', () => {

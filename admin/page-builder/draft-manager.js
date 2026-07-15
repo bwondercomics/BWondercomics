@@ -1,14 +1,16 @@
 import { THEME_COLORS } from './constants.js';
-import { cloneValue } from './helpers.js';
+import { cloneValue } from '../../shared/page-builder/helpers.js';
 import {
   createDefaultHeaderConfig,
   createEffectivePageHeader,
   getPageHeaderSource,
   normalizeHeaderConfig,
   normalizeHeaderCopy,
-} from './header-config.js';
-import { normalizeHeaderNavItems } from './link-utils.js';
-import { moduleResponsiveContractMatches } from './responsive-overrides.js';
+} from '../../shared/page-builder/header-config.js';
+import { normalizeHeaderNavItems } from '../../shared/page-builder/link-utils.js';
+import { BUILDER_DEVICE_ORDER } from '../../shared/page-builder/preview-contract.js';
+import { moduleResponsiveContractMatches } from '../../shared/page-builder/responsive-overrides.js';
+import { createDraftUndoStack } from './undo-stack.js';
 
 // Panel background/spacing now live on the column and are edited in the Column/Panel inspector.
 // The theme draft no longer models page.meta panel keys so theme save/reset never clobber the
@@ -19,8 +21,286 @@ function getDefaultThemeDraft() {
   };
 }
 
+const DRAFT_HISTORY_SCOPES = ['module', 'header', 'theme', 'page-settings', 'section'];
+
+function isDraftHistoryScope(scope) {
+  return DRAFT_HISTORY_SCOPES.includes(scope);
+}
+
+function isResponsiveDraftHistoryScope(scope) {
+  return scope === 'module' || scope === 'header' || scope === 'section';
+}
+
 export function createDraftManager({ getState, actions, deps }) {
   let structureSnapshot = null;
+
+  // Draft ownership: the manager holds the draft objects, which module/section they
+  // belong to, the dirty scope, and the undo history. The shell store exposes these
+  // through read-only getters; every write goes through the manager API.
+  const drafts = {
+    module: null,
+    theme: null,
+    header: null,
+    'page-settings': null,
+    section: null,
+  };
+  let moduleDraftId = null;
+  let activeSectionId = null;
+  let dirtyScope = null;
+
+  function getDraft(scope) {
+    return drafts[scope] ?? null;
+  }
+
+  function setDraft(scope, value) {
+    if (!(scope in drafts)) return;
+    drafts[scope] = cloneValue(value);
+  }
+
+  function getModuleDraftId() {
+    return moduleDraftId;
+  }
+
+  function setModuleDraftId(nextDraftId) {
+    moduleDraftId = nextDraftId ?? null;
+  }
+
+  function setModuleDraft(moduleId, config) {
+    moduleDraftId = moduleId ?? null;
+    drafts.module = cloneValue(config || {}) || {};
+  }
+
+  function getActiveSectionId() {
+    return activeSectionId;
+  }
+
+  function getDirtyScope() {
+    return dirtyScope;
+  }
+
+  // Bare dirty reset with no UI side effects (page switch/reset paths); interactive
+  // flows use clearDirty.
+  function resetDirty() {
+    dirtyScope = null;
+  }
+
+  // ── Draft history scopes and keys ─────────────────────────────────────────
+
+  function getVisibleDraftScope() {
+    const s = getState();
+    if (!s.currentPage) return '';
+    if (s.activeEditorTab === 'theme') {
+      if (s.selectedCanvasSurface === 'page-header') return 'header';
+      if (s.selectedModuleId) return 'module';
+      return 'theme';
+    }
+    if (s.selectedCanvasSurface === 'page-header') return 'header';
+    if (s.selectedCanvasSurface === 'page-settings') return 'page-settings';
+    if (s.selectedCanvasSurface === 'section') return 'section';
+    if (s.selectedModuleId) return 'module';
+    return '';
+  }
+
+  function getDraftCommandScope() {
+    return dirtyScope || getVisibleDraftScope();
+  }
+
+  function getDraftHistoryResponsiveContext(scope) {
+    if (!isResponsiveDraftHistoryScope(scope)) return '';
+    const s = getState();
+    const editScope = s.responsiveEditScope === 'device' ? 'device' : 'global';
+    if (editScope === 'device') {
+      return `:${editScope}:${s.activeDeviceId || BUILDER_DEVICE_ORDER[0]}`;
+    }
+    return `:${editScope}`;
+  }
+
+  function getDraftHistoryKey(scope) {
+    const s = getState();
+    if (!s.currentPage?.id || !isDraftHistoryScope(scope)) return '';
+    const responsiveContext = getDraftHistoryResponsiveContext(scope);
+    if (scope === 'module') {
+      const moduleId = moduleDraftId || s.selectedModuleId;
+      return moduleId ? `${s.currentPage.id}:module:${moduleId}${responsiveContext}` : '';
+    }
+    if (scope === 'section') {
+      return activeSectionId
+        ? `${s.currentPage.id}:section:${activeSectionId}${responsiveContext}`
+        : '';
+    }
+    return `${s.currentPage.id}:${scope}${responsiveContext}`;
+  }
+
+  // ── Snapshots and undo history ─────────────────────────────────────────────
+
+  function getDraftSnapshot(scope) {
+    if (!isDraftHistoryScope(scope)) return null;
+    return cloneValue(drafts[scope]);
+  }
+
+  function setDraftSnapshot(scope, snapshot) {
+    if (!isDraftHistoryScope(scope)) return false;
+    if (scope === 'module') {
+      moduleDraftId = getState().selectedModuleId || moduleDraftId;
+    }
+    drafts[scope] = cloneValue(snapshot);
+    return true;
+  }
+
+  function applyDraftHistorySnapshot(scope, snapshot, meta = {}) {
+    if (!setDraftSnapshot(scope, snapshot)) return;
+    dirtyScope = meta.dirty ? scope : null;
+    if (scope === 'section') {
+      actions.setCanvasStatus?.(
+        meta.dirty ? 'Section settings have unsaved changes.' : 'Section settings restored.',
+        meta.dirty ? 'warning' : 'neutral'
+      );
+    } else {
+      actions.setEditorStatus(
+        meta.dirty ? 'Draft has unsaved changes.' : 'Draft restored to saved state.',
+        meta.dirty ? 'warning' : 'neutral'
+      );
+    }
+    if (scope === 'module') {
+      actions.syncInlineDraftFromHistory?.(snapshot, meta.reason || 'draft-history');
+    }
+    actions.renderCanvas();
+    actions.renderEditorPanel();
+  }
+
+  const draftUndoStack = createDraftUndoStack({
+    getKey: getDraftHistoryKey,
+    getSnapshot: getDraftSnapshot,
+    applySnapshot: applyDraftHistorySnapshot,
+    onChange: () => actions.updateEditorFooterUi?.(),
+  });
+
+  function resetDraftHistory(scope) {
+    draftUndoStack.reset(scope);
+    actions.updateEditorFooterUi?.();
+  }
+
+  function clearDraftHistory() {
+    draftUndoStack.clear();
+  }
+
+  function resetVisibleResponsiveDraftHistory() {
+    const scope = getVisibleDraftScope();
+    if (!isResponsiveDraftHistoryScope(scope)) return;
+    resetDraftHistory(scope);
+  }
+
+  // ── Dirty tracking ─────────────────────────────────────────────────────────
+
+  function markDirty(scope, options = {}) {
+    dirtyScope = scope;
+    if (scope === 'module') {
+      actions.setEditorStatus('Unsaved module changes. Save or discard before switching.', 'warning');
+    } else if (scope === 'header') {
+      actions.setEditorStatus('Unsaved header changes. Save or discard before switching.', 'warning');
+    } else if (scope === 'theme') {
+      actions.setEditorStatus('Unsaved theme changes. Save or discard before switching.', 'warning');
+    } else if (scope === 'page-settings') {
+      actions.setEditorStatus('Unsaved page settings. Save or discard before switching.', 'warning');
+    } else if (scope === 'section') {
+      actions.setCanvasStatus?.('Unsaved section settings. Save or discard before switching.', 'warning');
+    } else if (scope === 'structure') {
+      actions.setEditorStatus('Unsaved module moves. Save or discard before switching.', 'warning');
+    }
+    if (isDraftHistoryScope(scope)) {
+      draftUndoStack.record(scope);
+    }
+    actions.updateEditorFooterUi?.();
+    // Inline-iframe edits already reflect the change in the preview; echoing the draft
+    // back would fight the caret, so only the snapshot state refreshes.
+    if (options.fromInlineIframe) {
+      actions.refreshPreviewSnapshot?.();
+      return;
+    }
+    const s = getState();
+    if (scope === 'module' && s.inlineEditState?.moduleId === (moduleDraftId || s.selectedModuleId)) {
+      actions.syncInlineEditToPreview?.('side-panel');
+      actions.refreshPreviewSnapshot?.();
+      return;
+    }
+    actions.refreshLiveCanvas?.();
+  }
+
+  function clearDirty(scope = null) {
+    if (!scope || dirtyScope === scope) {
+      dirtyScope = null;
+    }
+    if (isDraftHistoryScope(scope || getVisibleDraftScope())) {
+      draftUndoStack.reset(scope || getVisibleDraftScope());
+    }
+    actions.updateEditorFooterUi?.();
+    actions.refreshLiveCanvas?.();
+  }
+
+  // ── Command-facing draft operations ────────────────────────────────────────
+
+  function canSaveCurrentDraft() {
+    return isDraftHistoryScope(dirtyScope) || dirtyScope === 'structure';
+  }
+
+  function canDiscardCurrentDraft() {
+    return isDraftHistoryScope(dirtyScope) || dirtyScope === 'structure';
+  }
+
+  async function saveCurrentDraft() {
+    const scope = dirtyScope;
+    if (!canSaveCurrentDraft()) return { ok: false, status: 'No dirty draft to save.' };
+    if (scope === 'module' && getState().inlineEditState) {
+      actions.clearInlineEditView?.('save', 'commit');
+    }
+    let saved = false;
+    if (scope === 'module') saved = await saveActiveModuleDraft();
+    else if (scope === 'header') saved = await saveActiveHeaderDraft();
+    else if (scope === 'theme') saved = await saveActiveThemeDraft();
+    else if (scope === 'page-settings') saved = await saveActivePageSettingsDraft();
+    else if (scope === 'section') saved = await actions.saveSectionSettings?.();
+    else if (scope === 'structure') saved = await saveStructureDraft();
+    return saved ? { ok: true } : { ok: false, status: 'Failed to save draft.' };
+  }
+
+  function discardCurrentDraft() {
+    const scope = dirtyScope;
+    if (!canDiscardCurrentDraft()) return { ok: false, status: 'No dirty draft to discard.' };
+    if (scope === 'module' && getState().inlineEditState) {
+      actions.clearInlineEditView?.('discard', 'cancel');
+    }
+    if (scope === 'module') discardActiveModuleDraft();
+    else if (scope === 'header') discardActiveHeaderDraft();
+    else if (scope === 'theme') discardActiveThemeDraft();
+    else if (scope === 'page-settings') discardActivePageSettingsDraft();
+    else if (scope === 'section') actions.discardSectionSettings?.();
+    else if (scope === 'structure') discardStructureDraft();
+    return { ok: true };
+  }
+
+  function canUndoDraft() {
+    const scope = getDraftCommandScope();
+    return isDraftHistoryScope(scope) && draftUndoStack.canUndo(scope) === true;
+  }
+
+  function canRedoDraft() {
+    const scope = getDraftCommandScope();
+    return isDraftHistoryScope(scope) && draftUndoStack.canRedo(scope) === true;
+  }
+
+  function undoDraft() {
+    const scope = getDraftCommandScope();
+    if (!isDraftHistoryScope(scope)) return { ok: false, status: 'No draft selected.' };
+    return draftUndoStack.undo(scope) || { ok: false, status: 'No draft history available.' };
+  }
+
+  function redoDraft() {
+    const scope = getDraftCommandScope();
+    if (!isDraftHistoryScope(scope)) return { ok: false, status: 'No draft selected.' };
+    return draftUndoStack.redo(scope) || { ok: false, status: 'No draft history available.' };
+  }
+
+  // ── Structure draft (staged module moves) ──────────────────────────────────
 
   function collectModulePlacements(page = getState().currentPage) {
     return (page?.sections || []).flatMap((section) =>
@@ -127,7 +407,7 @@ export function createDraftManager({ getState, actions, deps }) {
       ).length;
     }
     normalizeModulePlacements(page);
-    actions.markDirty('structure');
+    markDirty('structure');
     actions.renderCanvas();
     actions.renderEditorPanel();
     actions.requestTargetRefresh?.();
@@ -141,7 +421,7 @@ export function createDraftManager({ getState, actions, deps }) {
     if (!savedPage) return false;
     actions.syncPageSummary(savedPage);
     clearStructureDraft();
-    actions.clearDirty('structure');
+    clearDirty('structure');
     actions.renderPageList();
     actions.renderCanvas();
     actions.renderEditorPanel();
@@ -152,11 +432,13 @@ export function createDraftManager({ getState, actions, deps }) {
     if (!structureSnapshot) return;
     restoreModulePlacements(structureSnapshot);
     clearStructureDraft();
-    actions.clearDirty('structure');
+    clearDirty('structure');
     actions.renderCanvas();
     actions.renderEditorPanel();
     actions.requestTargetRefresh?.();
   }
+
+  // ── Draft normalization and initialization ─────────────────────────────────
 
   function normalizeThemeDraft(page) {
     const defaults = getDefaultThemeDraft();
@@ -185,22 +467,21 @@ export function createDraftManager({ getState, actions, deps }) {
 
   function initializeModuleDraft(moduleId = getState().selectedModuleId) {
     const module = actions.getSelectedModuleRecord(moduleId);
-    actions.setActiveModuleDraftId(module?.id || null);
-    actions.setActiveModuleDraft(module ? cloneValue(module.config || {}) : null);
-    actions.resetDraftHistory?.('module');
+    moduleDraftId = module?.id || null;
+    drafts.module = module ? cloneValue(module.config || {}) : null;
+    resetDraftHistory('module');
   }
 
   function initializeThemeDraft() {
     const { currentPage } = getState();
-    actions.setActiveThemeDraft(
-      currentPage ? normalizeThemeDraft(currentPage) : getDefaultThemeDraft()
-    );
-    actions.resetDraftHistory?.('theme');
+    setDraft('theme', currentPage ? normalizeThemeDraft(currentPage) : getDefaultThemeDraft());
+    resetDraftHistory('theme');
   }
 
   function initializeHeaderDraft() {
     const { currentPage } = getState();
-    actions.setActiveHeaderDraft(
+    setDraft(
+      'header',
       currentPage
         ? normalizeHeaderDraft(currentPage)
         : {
@@ -210,12 +491,13 @@ export function createDraftManager({ getState, actions, deps }) {
             responsive: {},
           }
     );
-    actions.resetDraftHistory?.('header');
+    resetDraftHistory('header');
   }
 
   function initializePageSettingsDraft() {
     const { currentPage } = getState();
-    actions.setActivePageSettingsDraft(
+    setDraft(
+      'page-settings',
       currentPage
         ? {
             slug: currentPage.slug || '',
@@ -225,15 +507,15 @@ export function createDraftManager({ getState, actions, deps }) {
           }
         : null
     );
-    actions.resetDraftHistory?.('page-settings');
+    resetDraftHistory('page-settings');
   }
 
   function initializeSectionDraft(sectionId) {
     const section = actions.getSectionRecord(sectionId);
     if (!section) return;
     const settings = section.settings || {};
-    actions.setActiveSectionId(sectionId);
-    actions.setActiveSectionDraft({
+    activeSectionId = sectionId;
+    setDraft('section', {
       ...cloneValue(settings),
       // Layout (column count + ratios) lives at the section top level but is edited
       // alongside settings so column count/ratio and per-column styling save atomically.
@@ -242,24 +524,27 @@ export function createDraftManager({ getState, actions, deps }) {
       columnGap: settings.columnGap ?? '',
       sectionGap: settings.sectionGap ?? '',
     });
-    actions.resetDraftHistory?.('section');
+    resetDraftHistory('section');
   }
 
   function clearSelectedModuleState() {
     actions.setSelectedModuleId(null);
-    actions.setActiveModuleDraftId(null);
-    actions.setActiveModuleDraft(null);
-    actions.resetDraftHistory?.('module');
+    moduleDraftId = null;
+    drafts.module = null;
+    resetDraftHistory('module');
   }
 
   function clearActiveSectionState() {
-    actions.setActiveSectionId(null);
-    actions.setActiveSectionDraft(null);
-    actions.clearDirty('section');
+    activeSectionId = null;
+    drafts.section = null;
+    clearDirty('section');
   }
 
+  // ── Explicit save/discard per scope ────────────────────────────────────────
+
   async function saveActiveModuleDraft() {
-    const { activeModuleDraft, builderRuntime } = getState();
+    const activeModuleDraft = drafts.module;
+    const { builderRuntime } = getState();
     const selectedModule = actions.getSelectedModuleRecord();
     if (!selectedModule || !activeModuleDraft) return false;
     if (builderRuntime?.compatible !== true) {
@@ -293,9 +578,9 @@ export function createDraftManager({ getState, actions, deps }) {
       return false;
     }
     selectedModule.config = updated.config;
-    actions.setActiveModuleDraftId(selectedModule.id);
-    actions.setActiveModuleDraft(cloneValue(updated.config));
-    actions.clearDirty('module');
+    moduleDraftId = selectedModule.id;
+    drafts.module = cloneValue(updated.config);
+    clearDirty('module');
     actions.setEditorStatus('Module saved.', 'success');
     actions.renderCanvas();
     actions.renderEditorPanel();
@@ -305,15 +590,16 @@ export function createDraftManager({ getState, actions, deps }) {
   function discardActiveModuleDraft() {
     const selectedModule = actions.getSelectedModuleRecord();
     if (!selectedModule) return;
-    actions.setActiveModuleDraftId(selectedModule.id);
-    actions.setActiveModuleDraft(cloneValue(selectedModule.config || {}));
-    actions.clearDirty('module');
+    moduleDraftId = selectedModule.id;
+    drafts.module = cloneValue(selectedModule.config || {});
+    clearDirty('module');
     actions.setEditorStatus('Module changes discarded.', 'neutral');
     actions.renderEditorPanel();
   }
 
   async function saveActiveThemeDraft() {
-    const { currentPage, activeThemeDraft } = getState();
+    const { currentPage } = getState();
+    const activeThemeDraft = drafts.theme;
     if (!currentPage || !activeThemeDraft) return false;
     const nextMeta = {
       ...(currentPage.meta || {}),
@@ -326,8 +612,8 @@ export function createDraftManager({ getState, actions, deps }) {
       return false;
     }
     actions.syncPageSummary(updated);
-    actions.setActiveThemeDraft(normalizeThemeDraft(getState().currentPage));
-    actions.clearDirty('theme');
+    setDraft('theme', normalizeThemeDraft(getState().currentPage));
+    clearDirty('theme');
     actions.setEditorStatus('Theme saved.', 'success');
     actions.renderCanvas();
     actions.renderEditorPanel();
@@ -335,20 +621,21 @@ export function createDraftManager({ getState, actions, deps }) {
   }
 
   function discardActiveThemeDraft() {
-    actions.setActiveThemeDraft(normalizeThemeDraft(getState().currentPage));
-    actions.clearDirty('theme');
+    setDraft('theme', normalizeThemeDraft(getState().currentPage));
+    clearDirty('theme');
     actions.setEditorStatus('Theme changes discarded.', 'neutral');
     actions.renderEditorPanel();
   }
 
   function resetActiveThemeDraft() {
-    actions.setActiveThemeDraft(getDefaultThemeDraft());
-    actions.markDirty('theme');
+    setDraft('theme', getDefaultThemeDraft());
+    markDirty('theme');
     actions.renderEditorPanel();
   }
 
   async function saveActiveHeaderDraft() {
-    const { currentPage, activeHeaderDraft } = getState();
+    const { currentPage } = getState();
+    const activeHeaderDraft = drafts.header;
     if (!currentPage || !activeHeaderDraft) return false;
 
     try {
@@ -362,8 +649,8 @@ export function createDraftManager({ getState, actions, deps }) {
       }
 
       actions.syncPageSummary(updatedPage);
-      actions.setActiveHeaderDraft(normalizeHeaderDraft(updatedPage));
-      actions.clearDirty('header');
+      setDraft('header', normalizeHeaderDraft(updatedPage));
+      clearDirty('header');
       actions.setEditorStatus('Page header saved.', 'success');
       actions.renderCanvas();
       actions.renderEditorPanel();
@@ -377,15 +664,16 @@ export function createDraftManager({ getState, actions, deps }) {
   }
 
   function discardActiveHeaderDraft() {
-    actions.setActiveHeaderDraft(normalizeHeaderDraft(getState().currentPage));
-    actions.clearDirty('header');
+    setDraft('header', normalizeHeaderDraft(getState().currentPage));
+    clearDirty('header');
     actions.setEditorStatus('Page header changes discarded.', 'neutral');
     actions.renderCanvas();
     actions.renderEditorPanel();
   }
 
   async function saveActivePageSettingsDraft() {
-    const { currentPage, activePageSettingsDraft } = getState();
+    const { currentPage } = getState();
+    const activePageSettingsDraft = drafts['page-settings'];
     if (!currentPage || !activePageSettingsDraft) return false;
     try {
       const updatedPage = await deps.updatePage(currentPage.id, {
@@ -403,7 +691,7 @@ export function createDraftManager({ getState, actions, deps }) {
 
       actions.syncPageSummary(updatedPage);
       initializePageSettingsDraft();
-      actions.clearDirty('page-settings');
+      clearDirty('page-settings');
       actions.setEditorStatus('Page settings saved.', 'success');
       actions.renderPageList();
       actions.renderCanvas();
@@ -420,34 +708,56 @@ export function createDraftManager({ getState, actions, deps }) {
 
   function discardActivePageSettingsDraft() {
     initializePageSettingsDraft();
-    actions.clearDirty('page-settings');
+    clearDirty('page-settings');
     actions.setEditorStatus('Page settings discarded.', 'neutral');
     actions.renderCanvas();
     actions.renderEditorPanel();
   }
 
   return {
+    canDiscardCurrentDraft,
+    canRedoDraft,
+    canSaveCurrentDraft,
+    canUndoDraft,
     clearActiveSectionState,
+    clearDirty,
+    clearDraftHistory,
     clearSelectedModuleState,
     clearStructureDraft,
     discardActiveHeaderDraft,
     discardActiveModuleDraft,
     discardActivePageSettingsDraft,
     discardActiveThemeDraft,
+    discardCurrentDraft,
+    discardStructureDraft,
+    getActiveSectionId,
+    getDirtyScope,
+    getDraft,
+    getModuleDraftId,
+    getVisibleDraftScope,
     initializeHeaderDraft,
     initializeModuleDraft,
     initializePageSettingsDraft,
     initializeSectionDraft,
     initializeThemeDraft,
+    markDirty,
     normalizeHeaderDraft,
     normalizeThemeDraft,
+    redoDraft,
     resetActiveThemeDraft,
+    resetDirty,
+    resetDraftHistory,
+    resetVisibleResponsiveDraftHistory,
     saveActiveHeaderDraft,
     saveActiveModuleDraft,
     saveActivePageSettingsDraft,
     saveActiveThemeDraft,
+    saveCurrentDraft,
     saveStructureDraft,
+    setDraft,
+    setModuleDraft,
+    setModuleDraftId,
     stageStructureMove,
-    discardStructureDraft,
+    undoDraft,
   };
 }

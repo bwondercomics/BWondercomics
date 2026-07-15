@@ -9,7 +9,7 @@ import {
   buildPreviewInlineEditMessage,
   buildPreviewMetricsMessage,
   buildPreviewTargetMessage,
-} from '../admin/page-builder/preview-contract.js';
+} from '../shared/page-builder/preview-contract.js';
 import { buildContractFixture, getContractFixture } from './helpers/contracts.js';
 import { flushAdminUi, mountAdminDom, stubAdminGlobals } from './helpers/admin-fixture.js';
 

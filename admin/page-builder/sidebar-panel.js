@@ -1,6 +1,6 @@
-import { getInsertableModuleDescriptors } from './module-descriptors.js';
+import { getInsertableModuleDescriptors } from '../../shared/page-builder/module-descriptors.js';
 import { BUILDER_STRUCTURAL_COMMANDS } from './structural-commands.js';
-import { escapeAttr, escapeHtml } from './helpers.js';
+import { escapeAttr, escapeHtml } from '../../shared/page-builder/helpers.js';
 
 const INSERTABLE_MODULE_TYPES = getInsertableModuleDescriptors();
 

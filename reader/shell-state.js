@@ -1,4 +1,4 @@
-import { isModuleHiddenForDevice } from '../admin/page-builder/responsive-overrides.js';
+import { isModuleHiddenForDevice } from '../shared/page-builder/responsive-overrides.js';
 
 const READER_SHELL_STATE_KEY = '__BW_READER_SHELL_STATE__';
 

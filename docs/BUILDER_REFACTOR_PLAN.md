@@ -1,6 +1,50 @@
 # Builder Refactor Plan — Structural Cleanup of the Page Builder
 
-Status: **Proposed — not started** (audit recorded 2026-07-14).
+Status: **Phases A–E applied in the working tree (uncommitted, 2026-07-14/15); F–G not
+started** (audit recorded 2026-07-14).
+
+- Phase A note: the store was added as a plain object (open question 1's proposed default);
+  `previewWidth`, `selectedTarget`, `builderOpen`, and `linkablePages` are computed getters on
+  the store; `editor-panel.js` now reads `state.linkablePages` where its bag previously
+  supplied `pages`.
+- Phase B note: draft-manager now owns the five drafts plus `activeModuleDraftId` and
+  `activeSectionId`, the dirty scope, and the undo stack (constructed internally from
+  `undo-stack.js`, whose contract is unchanged). The store exposes them as read-only getters,
+  so all `state.*` reads still work; writes go through the manager API. The shell keeps thin
+  delegates (`markDirty`, `clearDirty`, save/discard/undo/redo) so no factory wiring contract
+  changed. Shell-owned side effects (footer UI, inline-edit sync, preview snapshot refresh,
+  section save/discard) are draft-manager actions. `markDirty(scope, { fromInlineIframe })`
+  absorbs the old `markInlineModuleDraftDirty` variant.
+- Phase C note: all four slices extracted, full suite green after each —
+  `inline-edit.js` (227 lines, owns `inlineEditState`), `chrome-mode.js` (240, owns
+  `canvasMode`/`editorChromeMode`/restore state), `section-settings-editor.js` (421, mutates
+  the manager-owned section draft in place), `selection.js` (388; selection fields stay raw
+  on the store because several bags write them — the controller writes via setter actions).
+  **Deviation:** the shell landed at ~1,790 lines, not the ~800 this phase targeted — the
+  four slices removed ~1,010 lines but ~640 lines of factory wiring bags plus bootstrap
+  (`initPageBuilder`), page templates, reader-binding updates, delete flows, and canvas
+  render orchestration remain. The ~800 figure was optimistic; remaining candidates if
+  further shrink is wanted: page-template application, reader-binding update flow, the
+  add-page modal block inside `initPageBuilder`, and the canvas render trio.
+- Phase D note: `module-editor.js` went 1,747 → 807 lines and dispatches through
+  `module-editor-registry.js` (entry contract documented there); no editor-kind switches
+  remain. Nine new editor files (`header-module-editor`, `text-editor`, `image-editor`,
+  `spacer-editor`, `html-editor`, `email-signup-editor`, `feed-editor`,
+  `media-gallery-editor`, `shell-chrome-editor`) plus entries added to the eight existing
+  ones. The stranded promo/social draft binders moved into their editor files, and the
+  **dead legacy binders** there (`bindPromoEditorEvents`/`collectPromoConfig`,
+  `bindSocialEditorEvents`/`collectSocialConfig` — pre-draft-lifecycle, zero consumers)
+  were deleted. Small deviation from the acceptance wording: adding a module type touches
+  descriptor + editor file **+ one registration line** in the registry map.
+  `inspector-sections.js` gained the `renderInspectorCard` shorthand the new files share.
+- Phase E note: the recomputed closure matched the audit exactly (13 files) and moved to
+  `shared/page-builder/`; 57 importers across `admin/`, `reader/`, and `tests/` were
+  rewritten mechanically. `tests/shared-kernel-boundary.test.js` now enforces both
+  boundaries (shared→admin/reader and reader→admin). The lint script gained `shared/`.
+  Verified with the full vitest suite, `npm run build`, and both visual specs (21
+  playwright tests) against the running backend. Other docs' file references to
+  `admin/page-builder/<kernel file>` paths (e.g. the polish backlog's reading map) are
+  now stale — re-verify per those docs' own instructions.
 Created: 2026-07-14
 Branch context: audit performed on `builder-incremental-improvement` with the Builder
 Customization Roadmap closeout work still uncommitted in the working tree. **Every phase here

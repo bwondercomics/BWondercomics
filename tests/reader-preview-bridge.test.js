@@ -5,7 +5,7 @@ import {
   BUILDER_PREVIEW_SNAPSHOT_VERSION,
   buildPreviewInlineEditMessage,
   buildPreviewSnapshotMessage,
-} from '../admin/page-builder/preview-contract.js';
+} from '../shared/page-builder/preview-contract.js';
 
 function setPreviewUrl() {
   window.happyDOM.setURL(

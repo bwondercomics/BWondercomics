@@ -1,4 +1,4 @@
-import { escapeAttr } from './helpers.js';
+import { escapeAttr } from '../../shared/page-builder/helpers.js';
 import { renderInspectorSection } from './inspector-sections.js';
 
 function normalizeDividerConfig(config = {}) {
@@ -54,3 +54,10 @@ export function bindDividerEditorEvents({ el, draftConfig, setDraftConfig, markD
     });
   });
 }
+
+// Registry entry for the module editor (see module-editor-registry.js for the contract).
+export const dividerModuleEditor = {
+  usesLayoutBridge: true,
+  renderContent: ({ config }) => [renderDividerEditor(config)],
+  bindEvents: bindDividerEditorEvents,
+};

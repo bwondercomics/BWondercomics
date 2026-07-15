@@ -5,7 +5,7 @@ import {
   isAppearanceEmpty,
   mergeAppearance,
   normalizeAppearance,
-} from '../admin/page-builder/appearance-utils.js';
+} from '../shared/page-builder/appearance-utils.js';
 
 describe('appearance utilities', () => {
   it('normalizeAppearance returns null for nullish and empty input', () => {

@@ -10,8 +10,8 @@ import {
   resolveBuilderPageReaderSeriesId,
   PANEL_MODULE_TYPES,
 } from '../reader/data.js';
-import { resolvePageHeaderState } from '../admin/page-builder/header-config.js';
-import { getInsertableModuleDescriptors } from '../admin/page-builder/module-descriptors.js';
+import { resolvePageHeaderState } from '../shared/page-builder/header-config.js';
+import { getInsertableModuleDescriptors } from '../shared/page-builder/module-descriptors.js';
 import { buildContractFixture, getContractFixture } from './helpers/contracts.js';
 import { flushReaderUi, mountReaderDom, stubReaderGlobals } from './helpers/reader-fixture.js';
 

@@ -1,4 +1,4 @@
-import { auditPagesFallbacks } from './header-config.js';
+import { auditPagesFallbacks } from '../../shared/page-builder/header-config.js';
 
 function normalizeRequiredString(value) {
   return String(value ?? '').trim();

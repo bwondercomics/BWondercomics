@@ -27,7 +27,7 @@ import {
   validatePreviewTargetGeometry,
   validatePreviewTargetRef,
   validatePreviewInlineEditPayload,
-} from '../admin/page-builder/preview-contract.js';
+} from '../shared/page-builder/preview-contract.js';
 
 describe('admin page-builder preview contract', () => {
   it('defines ordered viewport presets with iframe dimensions', () => {

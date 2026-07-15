@@ -8,7 +8,7 @@ import {
   normalizeHeaderNavItem,
   resolveLinkTargetHref,
   shouldOpenLinkInNewTab,
-} from '../admin/page-builder/link-utils.js';
+} from '../shared/page-builder/link-utils.js';
 
 describe('admin page-builder link utilities', () => {
   it('normalizes unsafe urls to safe inert targets', () => {
