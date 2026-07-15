@@ -1,4 +1,6 @@
-const TEXT_TAGS = new Set([
+// Exported for the JS<->Python parity fixture (tests/builder-config-parity.test.js);
+// these allowlists must stay in lockstep with backend/app/builder_security/html.py.
+export const TEXT_TAGS = new Set([
   'p',
   'br',
   'strong',
@@ -19,7 +21,7 @@ const TEXT_TAGS = new Set([
   'h4',
 ]);
 
-const HTML_TAGS = new Set([
+export const HTML_TAGS = new Set([
   ...TEXT_TAGS,
   'div',
   'span',

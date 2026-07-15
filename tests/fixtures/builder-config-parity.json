@@ -1,0 +1,547 @@
+{
+  "$comment": "JS<->Python builder schema parity fixture (Phase F of docs/BUILDER_REFACTOR_PLAN.md). Consumed by tests/builder-config-parity.test.js (vitest) and backend/tests/test_builder_config_parity.py (unittest). moduleConfigs.expected values are the sanitize_module_config outputs frozen as the contract; regenerate deliberately when the schema changes on purpose.",
+  "moduleTypes": [
+    "account",
+    "buttons",
+    "divider",
+    "email-signup",
+    "entry-gallery",
+    "feed",
+    "gallery",
+    "header",
+    "html",
+    "image",
+    "links-grid",
+    "media-gallery",
+    "promo",
+    "reader",
+    "social",
+    "spacer",
+    "text",
+    "video"
+  ],
+  "deviceIds": [
+    "desktop",
+    "tablet",
+    "mobile"
+  ],
+  "htmlAllowlists": {
+    "text": [
+      "a",
+      "b",
+      "blockquote",
+      "br",
+      "code",
+      "em",
+      "h2",
+      "h3",
+      "h4",
+      "i",
+      "li",
+      "ol",
+      "p",
+      "pre",
+      "s",
+      "strong",
+      "u",
+      "ul"
+    ],
+    "html": [
+      "a",
+      "article",
+      "b",
+      "blockquote",
+      "br",
+      "code",
+      "div",
+      "em",
+      "figcaption",
+      "figure",
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "hr",
+      "i",
+      "img",
+      "li",
+      "ol",
+      "p",
+      "pre",
+      "s",
+      "section",
+      "span",
+      "strong",
+      "u",
+      "ul"
+    ]
+  },
+  "htmlSamples": [
+    {
+      "name": "text formatting passes through",
+      "mode": "text",
+      "input": "<p>Hello <strong>world</strong> and <em>friends</em></p>",
+      "expected": "<p>Hello <strong>world</strong> and <em>friends</em></p>"
+    },
+    {
+      "name": "script tag and contents dropped",
+      "mode": "text",
+      "input": "<p>Hi</p><script>alert(1)</script>",
+      "expected": "<p>Hi</p>"
+    },
+    {
+      "name": "style tag and contents dropped",
+      "mode": "text",
+      "input": "<p>Before</p><style>p { color: red }</style><p>After</p>",
+      "expected": "<p>Before</p><p>After</p>"
+    },
+    {
+      "name": "disallowed inline tag unwraps to its text",
+      "mode": "text",
+      "input": "<p>a <span>b</span> c</p>",
+      "expected": "<p>a b c</p>"
+    },
+    {
+      "name": "event handler attributes stripped",
+      "mode": "text",
+      "input": "<a href=\"/comics.html\" onclick=\"steal()\">Read</a>",
+      "expected": "<a href=\"/comics.html\">Read</a>"
+    },
+    {
+      "name": "javascript URL neutralized",
+      "mode": "text",
+      "input": "<a href=\"javascript:alert(1)\">x</a>",
+      "expected": "<a>x</a>"
+    },
+    {
+      "name": "style attribute stripped, data attribute kept",
+      "mode": "text",
+      "input": "<p style=\"color:red\" data-note=\"ok\">x</p>",
+      "expected": "<p data-note=\"ok\">x</p>"
+    },
+    {
+      "name": "list structure preserved",
+      "mode": "text",
+      "input": "<ul><li>one</li><li>two</li></ul>",
+      "expected": "<ul><li>one</li><li>two</li></ul>"
+    },
+    {
+      "name": "anchor href kept with class sanitized",
+      "mode": "text",
+      "input": "<a href=\"https://example.com/page\" class=\"pb x!! y\">go</a>",
+      "expected": "<a href=\"https://example.com/page\" class=\"pb x y\">go</a>"
+    },
+    {
+      "name": "div unwraps in text mode",
+      "mode": "text",
+      "input": "<div>plain</div>",
+      "expected": "plain"
+    },
+    {
+      "name": "div allowed in html mode",
+      "mode": "html",
+      "input": "<div class=\"wrap\"><span>inner</span></div>",
+      "expected": "<div class=\"wrap\"><span>inner</span></div>"
+    },
+    {
+      "name": "img kept with sanitized src in html mode",
+      "mode": "html",
+      "input": "<img src=\"/uploads/x.png\" alt=\"Cover\">",
+      "expected": "<img src=\"/uploads/x.png\" alt=\"Cover\">"
+    },
+    {
+      "name": "img javascript src dropped in html mode",
+      "mode": "html",
+      "input": "<img src=\"javascript:alert(1)\" alt=\"x\">",
+      "expected": "<img alt=\"x\">"
+    },
+    {
+      "name": "iframe dropped entirely in html mode",
+      "mode": "html",
+      "input": "<div>ok</div><iframe src=\"https://evil.invalid\"></iframe>",
+      "expected": "<div>ok</div>"
+    },
+    {
+      "name": "protocol-relative href dropped",
+      "mode": "text",
+      "input": "<a href=\"//evil.invalid/x\">x</a>",
+      "expected": "<a>x</a>"
+    },
+    {
+      "name": "unclosed tag auto-closed",
+      "mode": "text",
+      "input": "<p>open",
+      "expected": "<p>open</p>"
+    },
+    {
+      "name": "heading levels gated by mode",
+      "mode": "text",
+      "input": "<h1>big</h1><h2>ok</h2>",
+      "expected": "big<h2>ok</h2>"
+    }
+  ],
+  "moduleConfigs": {
+    "account": {
+      "config": {
+        "iconColor": "#ffed00"
+      },
+      "expected": {
+        "iconColor": "#ffed00"
+      }
+    },
+    "buttons": {
+      "config": {
+        "buttons": [
+          {
+            "id": "b1",
+            "label": "Go",
+            "target": {
+              "kind": "url",
+              "url": "javascript:x()"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "buttons": [
+          {
+            "id": "b1",
+            "text": "Button",
+            "enabled": true,
+            "style": "primary",
+            "link": {
+              "kind": "url",
+              "pageSlug": "",
+              "url": "#",
+              "hash": "",
+              "openInNewTab": false
+            }
+          }
+        ]
+      }
+    },
+    "divider": {
+      "config": {
+        "style": "bogus",
+        "color": "#zzz"
+      },
+      "expected": {
+        "style": "solid",
+        "color": ""
+      }
+    },
+    "email-signup": {
+      "config": {
+        "heading": "Join",
+        "style": {
+          "headingColor": "#zzz",
+          "buttonColor": "#00d9ff"
+        }
+      },
+      "expected": {
+        "heading": "Join",
+        "subtext": "",
+        "placeholder": "your@email.com",
+        "buttonText": "Subscribe",
+        "style": {
+          "headingColor": "#ffffff",
+          "headingFont": "default",
+          "headingGlow": false,
+          "inputStyle": "bubble",
+          "buttonColor": "#00d9ff",
+          "buttonGlow": false
+        }
+      }
+    },
+    "entry-gallery": {
+      "config": {
+        "source": {
+          "mode": "specific-series",
+          "seriesId": "x<script>"
+        },
+        "columns": 0
+      },
+      "expected": {
+        "source": {
+          "mode": "specific-series",
+          "seriesId": "xscript"
+        },
+        "columns": 1,
+        "showLabels": true
+      }
+    },
+    "feed": {
+      "config": {
+        "heading": "Feed",
+        "limit": 99999,
+        "style": {
+          "headingBgColor": "red"
+        },
+        "layout": {
+          "widthMode": "percent",
+          "width": 5000
+        }
+      },
+      "expected": {
+        "source": {
+          "mode": "site"
+        },
+        "limit": 25,
+        "heading": "Feed",
+        "author": "",
+        "showAuthor": true,
+        "showDropdown": true,
+        "feedLabel": "Open feed",
+        "feedHref": "feed.html",
+        "showMediaButton": true,
+        "mediaLabel": "Media",
+        "mediaHref": "media.html",
+        "style": {
+          "headingBgColor": "red",
+          "headingTextColor": "#0a0a12",
+          "authorColor": "#7ef5e3",
+          "buttonBgColor": "#00d9ff",
+          "buttonTextColor": "#0a0a12",
+          "itemTitleColor": "#ffed00",
+          "itemDateColor": "#00d9ff",
+          "itemBorderColor": "#00d9ff",
+          "borderColor": "#ffed00"
+        },
+        "layout": {
+          "widthMode": "percent",
+          "width": 100
+        }
+      }
+    },
+    "gallery": {
+      "config": {
+        "images": [
+          {
+            "src": "/uploads/a.png",
+            "caption": "x"
+          }
+        ],
+        "columns": 99
+      },
+      "expected": {
+        "images": [
+          {
+            "src": "/uploads/a.png",
+            "alt": ""
+          }
+        ],
+        "columns": 6
+      }
+    },
+    "header": {
+      "config": {
+        "title": "Title <script>x()</script>",
+        "subtitle": "Sub"
+      },
+      "expected": {
+        "title": "Title <script>x()</script>",
+        "subtitle": "Sub"
+      }
+    },
+    "html": {
+      "config": {
+        "code": "<script>alert(1)</script><div onclick=\"x()\">hi</div>"
+      },
+      "expected": {
+        "code": "<div>hi</div>"
+      }
+    },
+    "image": {
+      "config": {
+        "src": "javascript:alert(1)",
+        "alt": "Alt text",
+        "caption": "Cap"
+      },
+      "expected": {
+        "src": "",
+        "alt": "Alt text",
+        "caption": "Cap"
+      }
+    },
+    "links-grid": {
+      "config": {
+        "iconColor": "nope"
+      },
+      "expected": {
+        "iconColor": "nope"
+      }
+    },
+    "media-gallery": {
+      "config": {
+        "columns": 99,
+        "limit": -3,
+        "includePremium": "yes"
+      },
+      "expected": {
+        "source": {
+          "mode": "site"
+        },
+        "columns": 6,
+        "limit": 1,
+        "showCaptions": true,
+        "includePremium": true
+      }
+    },
+    "promo": {
+      "config": {
+        "items": [
+          {
+            "id": "p1",
+            "image": "/uploads/p.png",
+            "linkUrl": "javascript:x()",
+            "topText": "Top",
+            "style": {
+              "backgroundOpacity": 99
+            }
+          }
+        ],
+        "interval": -5,
+        "height": 999999
+      },
+      "expected": {
+        "items": [
+          {
+            "image": "/uploads/p.png",
+            "topText": "Top",
+            "bottomText": "",
+            "linkUrl": "",
+            "textPosition": "overlay",
+            "imageFit": "cover",
+            "style": {
+              "topTextColor": "#ffed00",
+              "topTextFont": "default",
+              "topTextGlow": false,
+              "topTextGlowColor": "#ffed00",
+              "bottomTextColor": "#ffffff",
+              "bottomTextFont": "default",
+              "bottomTextGlow": false,
+              "bottomTextGlowColor": "#00d9ff",
+              "backgroundColor": "transparent",
+              "backgroundOpacity": 1.0,
+              "backgroundBlur": false,
+              "backgroundGlow": false,
+              "imageBorder": false,
+              "imageBorderColor": "#00d9ff",
+              "imageGlow": false,
+              "imageGlowColor": "#00d9ff",
+              "imageGlowIntensity": 0.5
+            }
+          }
+        ],
+        "height": 1200,
+        "showNavigation": true,
+        "showIndicators": true,
+        "autoRotate": true,
+        "interval": 1000,
+        "transition": "fade"
+      }
+    },
+    "reader": {
+      "config": {
+        "source": {
+          "mode": "weird"
+        },
+        "controls": {
+          "placement": "nope"
+        },
+        "stage": {
+          "fit": "bogus",
+          "maxWidth": 99999
+        }
+      },
+      "expected": {
+        "source": {
+          "mode": "active-page-series"
+        },
+        "displayMode": "paged",
+        "showPanels": true,
+        "showComments": true,
+        "controls": {
+          "placement": "below",
+          "size": "medium",
+          "style": {}
+        },
+        "stage": {
+          "fit": "dynamic-frame",
+          "frameFill": "hug",
+          "pageGap": 8,
+          "frameBorder": true,
+          "maxWidth": 2400
+        },
+        "endOfEntry": {
+          "enabled": true,
+          "title": "",
+          "body": ""
+        }
+      }
+    },
+    "social": {
+      "config": {
+        "buttons": [
+          {
+            "id": "s1",
+            "icon": "/icons/x.png",
+            "text": "T",
+            "url": "javascript:x()",
+            "style": {
+              "bgColor": "not a color!"
+            }
+          }
+        ]
+      },
+      "expected": {
+        "buttons": [
+          {
+            "id": "s1",
+            "icon": "/icons/x.png",
+            "text": "T",
+            "url": "#",
+            "style": {
+              "bgColor": "#00d9ff",
+              "bgOpacity": 1.0,
+              "textColor": "#ffffff",
+              "borderWidth": 2,
+              "borderColor": "#00d9ff",
+              "borderOpacity": 1.0,
+              "borderRadius": 8
+            }
+          }
+        ]
+      }
+    },
+    "spacer": {
+      "config": {
+        "height": -50
+      },
+      "expected": {
+        "height": 0
+      }
+    },
+    "text": {
+      "config": {
+        "content": "<p>ok</p><script>bad()</script>",
+        "alignment": "bogus"
+      },
+      "expected": {
+        "content": "<p>ok</p>",
+        "alignment": "left"
+      }
+    },
+    "video": {
+      "config": {
+        "url": "https://evil.invalid/video",
+        "autoplay": true
+      },
+      "expected": {
+        "url": ""
+      }
+    }
+  }
+}

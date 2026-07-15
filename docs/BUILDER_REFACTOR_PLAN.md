@@ -1,7 +1,7 @@
 # Builder Refactor Plan — Structural Cleanup of the Page Builder
 
-Status: **Phases A–E applied in the working tree (uncommitted, 2026-07-14/15); F–G not
-started** (audit recorded 2026-07-14).
+Status: **Phases A–E committed (84a5a1c); Phase F applied in the working tree
+(uncommitted, 2026-07-15); G not started** (audit recorded 2026-07-14).
 
 - Phase A note: the store was added as a plain object (open question 1's proposed default);
   `previewWidth`, `selectedTarget`, `builderOpen`, and `linkablePages` are computed getters on
@@ -45,12 +45,26 @@ started** (audit recorded 2026-07-14).
   playwright tests) against the running backend. Other docs' file references to
   `admin/page-builder/<kernel file>` paths (e.g. the polish backlog's reading map) are
   now stale — re-verify per those docs' own instructions.
-Created: 2026-07-14
-Branch context: audit performed on `builder-incremental-improvement` with the Builder
-Customization Roadmap closeout work still uncommitted in the working tree. **Every phase here
-assumes that work lands first** and starts from a clean committed baseline on its own branch.
-Cited line numbers were verified 2026-07-14 against the working tree; re-verify at
-implementation time.
+- Phase F note: `builder_security` is now a nine-module package (primitives, links, html,
+  appearance, reader, responsive, structure, header, modules — a verified DAG; the split
+  moved `sanitize_section_responsive` into structure and `sanitize_module_responsive` into
+  modules to break two cycles) whose `__init__` re-exports every prior name, so no importer
+  changed. `reader_bindings.py` owns the page-scope/binding-role vocabulary,
+  `PageBuilderValidationError`, and the reader-binding invariants; `page_store.py`
+  (1,168 → 985 lines) re-exports them. The parity fixture is a single file,
+  `tests/fixtures/builder-config-parity.json` (not a directory as planned): 18 module-config
+  cases with Python-sanitized expected outputs, 17 HTML sanitizer samples byte-identical
+  across both implementations (one entity-re-escaping sample dropped — happy-dom's
+  innerHTML serializer under-escapes text nodes; real browsers match Python), plus the
+  module-type/device-id/HTML-allowlist contracts. `shared/page-builder/sanitize.js` now
+  exports its tag sets for the JS test. Verified: 131 backend tests, 665 vitest tests,
+  lint, API container restarted and healthy.
+  Created: 2026-07-14
+  Branch context: audit performed on `builder-incremental-improvement` with the Builder
+  Customization Roadmap closeout work still uncommitted in the working tree. **Every phase here
+  assumes that work lands first** and starts from a clean committed baseline on its own branch.
+  Cited line numbers were verified 2026-07-14 against the working tree; re-verify at
+  implementation time.
 
 Phases are **lettered (A–G)** to avoid collision with the numbered phases in
 `docs/POLISH_BACKLOG_PLAN.md` — "refactor Phase B" and "polish Phase 2" are different things.
@@ -84,20 +98,20 @@ layered with no cycles, `module-descriptors.js` is a real registry (18 module ty
 `shared-renderers.js` renders identically for admin preview and the live reader, and parity is
 test-enforced. The debt is concentrated:
 
-| # | Finding                                                                                    | Phase |
-| - | ------------------------------------------------------------------------------------------ | ----- |
-| 1 | `createPageBuilder` god closure: ~45 mutable closure vars, ~120 inner functions, and seven hand-rolled `getState` bags (one per factory) that drift when state is added | A, C |
-| 2 | Draft management split-brain: `draft-manager.js` exists, but the shell still owns snapshots, dirty tracking, undo/redo, and five separate `active*Draft` vars | B |
-| 3 | `module-editor.js` (1,747 lines): editor-registry migration stopped halfway — 18-case switch remains, and promo/social bind functions are stranded outside their editor files | D |
-| 4 | Shared kernel lives under `admin/`: the reader imports 7 builder modules (13 with transitive deps) from `../admin/page-builder/` with nothing marking the boundary | E |
-| 5 | `backend/app/builder_security.py` (1,761 lines, ~90 sanitizers) mirrors the JS config schemas with no cross-language parity test; HTML allowlists duplicated in `sanitize.js` can drift silently | F |
-| 6 | Smaller: dual command entry points, pure header-placement model mixed into a DOM module, reader-binding invariants buried in `page_store.py`, phase-named test describes, pending legacy-header retirement | F, G |
+| #   | Finding                                                                                                                                                                                                    | Phase |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| 1   | `createPageBuilder` god closure: ~45 mutable closure vars, ~120 inner functions, and seven hand-rolled `getState` bags (one per factory) that drift when state is added                                    | A, C  |
+| 2   | Draft management split-brain: `draft-manager.js` exists, but the shell still owns snapshots, dirty tracking, undo/redo, and five separate `active*Draft` vars                                              | B     |
+| 3   | `module-editor.js` (1,747 lines): editor-registry migration stopped halfway — 18-case switch remains, and promo/social bind functions are stranded outside their editor files                              | D     |
+| 4   | Shared kernel lives under `admin/`: the reader imports 7 builder modules (13 with transitive deps) from `../admin/page-builder/` with nothing marking the boundary                                         | E     |
+| 5   | `backend/app/builder_security.py` (1,761 lines, ~90 sanitizers) mirrors the JS config schemas with no cross-language parity test; HTML allowlists duplicated in `sanitize.js` can drift silently           | F     |
+| 6   | Smaller: dual command entry points, pure header-placement model mixed into a DOM module, reader-binding invariants buried in `page_store.py`, phase-named test describes, pending legacy-header retirement | F, G  |
 
 ## Confirmed decisions
 
-| Date       | Decision                                                                                   |
-| ---------- | ------------------------------------------------------------------------------------------ |
-| 2026-07-14 | Proposed default, unconfirmed: **no schema codegen** for the JS↔Python config duplication — a shared JSON parity fixture (Phase F) catches drift at a fraction of the cost. |
+| Date       | Decision                                                                                                                                                                                               |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 2026-07-14 | Proposed default, unconfirmed: **no schema codegen** for the JS↔Python config duplication — a shared JSON parity fixture (Phase F) catches drift at a fraction of the cost.                            |
 | 2026-07-14 | Proposed default, unconfirmed: the Phase A store is a **plain object + explicit update helper**, not a framework or a pub/sub system — the factories already receive render callbacks; keep that flow. |
 
 ## Compatibility rules (apply to every phase)
@@ -126,18 +140,18 @@ test-enforced. The debt is concentrated:
 
 ## Reading map
 
-| Area                        | Files                                                                                       |
-| --------------------------- | ------------------------------------------------------------------------------------------- |
-| Shell closure + wiring      | `admin/page-builder.js` (state vars 108–154, factory wiring 170–728)                        |
-| Draft lifecycle             | `admin/page-builder/draft-manager.js`, shell draft/undo functions `admin/page-builder.js:950-1166`, `admin/page-builder/undo-stack.js` |
-| Feature slices to extract   | inline edit `admin/page-builder.js:1168-1365`, chrome/preview mode `:1739-1876`, section settings `:1922-2317`, selection `:2318-2596` |
+| Area                        | Files                                                                                                                                                                                                                                                                                      |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Shell closure + wiring      | `admin/page-builder.js` (state vars 108–154, factory wiring 170–728)                                                                                                                                                                                                                       |
+| Draft lifecycle             | `admin/page-builder/draft-manager.js`, shell draft/undo functions `admin/page-builder.js:950-1166`, `admin/page-builder/undo-stack.js`                                                                                                                                                     |
+| Feature slices to extract   | inline edit `admin/page-builder.js:1168-1365`, chrome/preview mode `:1739-1876`, section settings `:1922-2317`, selection `:2318-2596`                                                                                                                                                     |
 | Module editor registry      | `admin/page-builder/module-descriptors.js`, `admin/page-builder/module-editor.js:948` (switch), per-module editors (`button-editor.js`, `promo-editor.js`, `social-editor.js`, `reader-editor.js`, `gallery-editor.js`, `divider-editor.js`, `video-editor.js`, `entry-gallery-editor.js`) |
-| Shared kernel (reader-used) | `shared-renderers.js`, `helpers.js`, `header-config.js`, `appearance-utils.js`, `reader-config.js`, `responsive-overrides.js`, `responsive-css.js` + transitive: `layout-utils.js`, `link-utils.js`, `promo-renderer.js`, `sanitize.js`, `module-descriptors.js`, `preview-contract.js` |
-| Command layer               | `admin/page-builder/commands.js`, `structural-commands.js`, fallback at `admin/page-builder.js:156-168` |
-| Header placement model      | `admin/page-builder/header-editor.js` (pure fns at 33, 515, 529, 543; DOM at 461, 605)      |
-| Backend validation          | `backend/app/builder_security.py`, `admin/page-builder/sanitize.js` (allowlists both sides)  |
-| Backend store               | `backend/app/page_store.py` (reader-binding invariants ~253–390)                            |
-| Test harness                | `tests/admin-page-builder-shell.test.js`, `tests/helpers/admin-fixture.js`, `tests/helpers/contracts.js` |
+| Shared kernel (reader-used) | `shared-renderers.js`, `helpers.js`, `header-config.js`, `appearance-utils.js`, `reader-config.js`, `responsive-overrides.js`, `responsive-css.js` + transitive: `layout-utils.js`, `link-utils.js`, `promo-renderer.js`, `sanitize.js`, `module-descriptors.js`, `preview-contract.js`    |
+| Command layer               | `admin/page-builder/commands.js`, `structural-commands.js`, fallback at `admin/page-builder.js:156-168`                                                                                                                                                                                    |
+| Header placement model      | `admin/page-builder/header-editor.js` (pure fns at 33, 515, 529, 543; DOM at 461, 605)                                                                                                                                                                                                     |
+| Backend validation          | `backend/app/builder_security.py`, `admin/page-builder/sanitize.js` (allowlists both sides)                                                                                                                                                                                                |
+| Backend store               | `backend/app/page_store.py` (reader-binding invariants ~253–390)                                                                                                                                                                                                                           |
+| Test harness                | `tests/admin-page-builder-shell.test.js`, `tests/helpers/admin-fixture.js`, `tests/helpers/contracts.js`                                                                                                                                                                                   |
 
 ---
 
@@ -261,7 +275,7 @@ pattern with its `MODULE_RENDERERS` map.
 **Approach.**
 
 1. Define an editor-registry map (`editorKind` → `{ renderContent, bindEvents, renderStyle?,
-   bindStyle? }`), either attached to descriptors or as a sibling registry keyed the same way.
+bindStyle? }`), either attached to descriptors or as a sibling registry keyed the same way.
 2. Move each inlined case into its own editor file (`header`, `text`, `image`, `spacer`,
    `email-signup`, `feed`, `html`, plus any generic fallback), reusing the shared cards
    (`renderSectionCard`, `collectGenericModuleDraft`, `inspector-sections.js`).

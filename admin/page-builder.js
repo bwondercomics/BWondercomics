@@ -185,18 +185,15 @@ function createPageBuilder({
   let commandRegistry = null;
   let keymapManager = null;
 
+  // Every command — structural ones included — routes through the registry; the
+  // structural adapter is registered into it as a manager during wiring.
   function runCommand(commandId, payload = {}) {
-    if (commandRegistry) return commandRegistry.runCommand(commandId, payload);
-    if (structuralCommands) return structuralCommands.runCommand(commandId, payload);
-    return { ok: false, status: 'Builder commands unavailable.' };
+    if (!commandRegistry) return { ok: false, status: 'Builder commands unavailable.' };
+    return commandRegistry.runCommand(commandId, payload);
   }
 
   function canRunCommand(commandId, payload = {}) {
     return commandRegistry?.canRunCommand(commandId, payload) !== false;
-  }
-
-  function runStructuralCommand(commandId, payload = {}) {
-    return runCommand(commandId, payload);
   }
 
   const draftManager = createDraftManager({
@@ -393,11 +390,11 @@ function createPageBuilder({
     getState: () => state,
     actions: {
       insertSectionAt: (insertIndex) =>
-        runStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.INSERT_SECTION, {
+        runCommand(BUILDER_STRUCTURAL_COMMANDS.INSERT_SECTION, {
           sectionIndex: insertIndex,
         }),
       reorderSectionToIndex: (sectionId, insertIndex) =>
-        runStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.MOVE_SECTION, {
+        runCommand(BUILDER_STRUCTURAL_COMMANDS.MOVE_SECTION, {
           sectionId,
           placement: { sectionIndex: insertIndex },
         }),
@@ -416,12 +413,12 @@ function createPageBuilder({
         state.draggedModuleId = moduleId;
       },
       moveModuleToTarget: (moduleId, sectionId, columnIndex, insertIndex) =>
-        runStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.MOVE, {
+        runCommand(BUILDER_STRUCTURAL_COMMANDS.MOVE, {
           moduleId,
           placement: { sectionId, columnIndex, insertIndex },
         }),
       insertModuleAt: (sectionId, columnIndex, insertIndex, moduleType) =>
-        runStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.INSERT, {
+        runCommand(BUILDER_STRUCTURAL_COMMANDS.INSERT, {
           moduleType,
           placement: { sectionId, columnIndex, insertIndex },
         }),
@@ -429,7 +426,8 @@ function createPageBuilder({
       selectPageHeaderFromCanvas: () => selection.selectPageHeaderFromCanvas(),
       selectPageSettingsFromCanvas: () => selection.selectPageSettingsFromCanvas(),
       selectModule: (moduleId, options) => selection.selectModule(moduleId, options),
-      selectColumn: (sectionId, columnIndex) => selection.selectColumnFromCanvas(sectionId, columnIndex),
+      selectColumn: (sectionId, columnIndex) =>
+        selection.selectColumnFromCanvas(sectionId, columnIndex),
       updateActivePageSettingsDraftField: (key, value) => {
         if (!state.activePageSettingsDraft) return;
         state.activePageSettingsDraft[key] = value;
@@ -439,11 +437,11 @@ function createPageBuilder({
       saveActivePageSettingsDraft: draftManager.saveActivePageSettingsDraft,
       discardActivePageSettingsDraft: draftManager.discardActivePageSettingsDraft,
       deleteModuleFromCanvas: (moduleId) =>
-        runStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.DELETE_SELECTED, {
+        runCommand(BUILDER_STRUCTURAL_COMMANDS.DELETE_SELECTED, {
           target: { kind: 'module', moduleId },
         }),
       deleteSectionFromCanvas: (sectionId) =>
-        runStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.DELETE_SELECTED, {
+        runCommand(BUILDER_STRUCTURAL_COMMANDS.DELETE_SELECTED, {
           target: { kind: 'section', sectionId },
         }),
     },
@@ -463,7 +461,7 @@ function createPageBuilder({
           state.draggedModuleId = moduleId;
         },
         runCommand,
-        runStructuralCommand,
+        runStructuralCommand: runCommand,
         selectPageHeader: () => {
           selection.selectPageHeaderFromCanvas();
           showSidePanelTab('settings');
@@ -586,7 +584,7 @@ function createPageBuilder({
       selectCanvasTarget: (target) => selection.selectCanvasTarget(target),
       renderEditorPanel: () => renderEditorPanel(),
       runCommand,
-      runStructuralCommand,
+      runStructuralCommand: runCommand,
     },
     deps: {
       getSeriesId,
@@ -691,7 +689,8 @@ function createPageBuilder({
       setActiveInsertTarget: (target) => {
         state.activeInsertTarget = target ? cloneValue(target) : null;
       },
-      createPendingInsertTarget: (target, position) => selection.createPendingInsertTarget(target, position),
+      createPendingInsertTarget: (target, position) =>
+        selection.createPendingInsertTarget(target, position),
       setCanvasStatus,
       renderCanvas: () => renderCanvas(),
       insertModuleAt: canvasMutations.insertModuleAt,
@@ -968,7 +967,8 @@ function createPageBuilder({
 
     const footerScope = footer.dataset.scope;
     const isDirty =
-      state.dirtyScope === footerScope || (state.dirtyScope === 'structure' && footerScope === 'module');
+      state.dirtyScope === footerScope ||
+      (state.dirtyScope === 'structure' && footerScope === 'module');
     const statusEl = footer.querySelector('[data-editor-status]');
     const saveBtn = footer.querySelector('[data-action="save-current"]');
     const discardBtn = footer.querySelector('[data-action="discard-current"]');
@@ -1008,7 +1008,8 @@ function createPageBuilder({
         message = state.editorStatus.message;
         type = 'danger';
       } else if (isDirty) {
-        message = dirtyMessages[state.dirtyScope] || dirtyMessages[footerScope] || dirtyMessages.module;
+        message =
+          dirtyMessages[state.dirtyScope] || dirtyMessages[footerScope] || dirtyMessages.module;
         type = 'warning';
       } else if (state.editorStatus.message) {
         message = state.editorStatus.message;
@@ -1165,7 +1166,9 @@ function createPageBuilder({
   function syncPageSummary(page) {
     if (!page?.id) return;
     state.pages = state.pages.map((item) => (item.id === page.id ? { ...item, ...page } : item));
-    state.linkPages = state.linkPages.map((item) => (item.id === page.id ? { ...item, ...page } : item));
+    state.linkPages = state.linkPages.map((item) =>
+      item.id === page.id ? { ...item, ...page } : item
+    );
     if (state.currentPage?.id === page.id) {
       state.currentPage = {
         ...state.currentPage,
@@ -1255,7 +1258,10 @@ function createPageBuilder({
     return `../index.html?${params.toString()}`;
   }
 
-  function buildNormalizedPageHeader(page = state.currentPage, draftState = state.activeHeaderDraft) {
+  function buildNormalizedPageHeader(
+    page = state.currentPage,
+    draftState = state.activeHeaderDraft
+  ) {
     if (draftState?.header || draftState?.copy) {
       return createPageHeaderMeta(draftState?.header, draftState?.copy, normalizeHeaderNavItems, {
         page,
