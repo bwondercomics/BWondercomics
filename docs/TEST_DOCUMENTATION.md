@@ -51,7 +51,7 @@ On Linux hosts that are missing Chromium runtime libraries such as `libasound.so
 `npx playwright install-deps chromium` with system package privileges before running the visual
 suite.
 
-Quality gates used for the `0.7.9` to `1.0.0` hardening pass:
+Quality gates used for the `0.8.5` to `1.0.0` hardening pass:
 
 ```bash
 npm run lint
@@ -116,11 +116,32 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - `tests/admin-page-builder-canvas-mutations.test.js`: structural mutation behavior for module duplication, including exact adjacency, independent cloned config, persisted reload order, compensating delete after reorder failure, authoritative page reconciliation, and fail-visible recovery when cleanup/reload both fail
 - `tests/admin-page-builder-reader-binding-validation.test.js`: reader-binding lifecycle validation helpers, including missing/duplicate/hidden/wrong-source warning codes, bound-page detection, module-delete/section-delete blocking warnings, and non-default device hide advisory warnings
 - `tests/admin-page-builder-structural-commands.test.js`: live structural command integration, including final-drop revalidation, authoritative duplicate eligibility without trusting target module type, Comic Reader rejection, missing-module rejection, and duplicated-target selection
-- `tests/admin-page-builder-shell.test.js`: `admin/page-builder.js` shell/layout behavior, selection and publish flows, scoped page creation, reader-binding save preflight and backend error surfacing, bound-reader delete/hide warnings, default landing on the page-settings surface in normal builder mode, page-settings save flow, sidebar page reorder success/rollback, section settings save/discard, canvas delete cleanup, page-header editing, default module config wiring, live iframe preview state for exact Desktop/Tablet/Phone presets, chrome-collapsed Preview restore, explicit page-end and invalid-space live drag/drop, eligible module duplicate/rollback and singleton/section guards, command/keymap guards, local draft undo, inline text editing, preview snapshot metadata, saved-vs-working dirty draft labels, and theme reset/discard preview snapshot source transitions
+- `tests/admin-page-builder-shell.test.js`: the remaining compact shell smoke/boot contract.
+- `tests/admin-page-builder-command-shell.test.js`, `draft-preview-shell.test.js`,
+  `header-shell.test.js`, `inline-edit-shell.test.js`, `preview-shell.test.js`,
+  `section-shell.test.js`, and `structure-shell.test.js`: behavior-focused slices of the shared
+  page-builder shell fixture covering commands/keymaps, manager-owned draft/undo state, header
+  canvas editing, stale-safe inline editing, exact preview/chrome behavior, section/device settings,
+  and structural mutations/placements.
+- `tests/helpers/admin-page-builder-shell.js`: the shared shell harness used by those behavior suites;
+  it is test infrastructure, not another production-state owner.
 - `tests/admin-page-builder-preview.test.js`: `admin/page-builder/module-editor.js` save/delete flows, structured editor draft updates (including reader customization and gallery asset-picker regression coverage), and `admin/page-builder/preview-renderers.js` preview contracts, including assertions that dedicated-binder modules no longer render a misleading generic raw-config fallback card
-- `tests/admin-page-builder-preview-contract.test.js`: `admin/page-builder/preview-contract.js` viewport registry, snapshot version, source validation, fallback viewport selection, preview status copy, full `BUILDER_PREVIEW_MESSAGE_TYPES` registry (`REQUEST_SNAPSHOT`, `SNAPSHOT`, `ACK`, `ERROR`), page-end surface validation, `isPreviewMessageType(...)` gate, `buildPreviewSnapshotMessage(...)` / `buildPreviewControlMessage(...)` envelope shapes, `validatePreviewSnapshotPayload(...)` identity and shape checks, and `validatePreviewEnvelope(...)` session/type/identity validation
-- `tests/admin-page-builder-audit.test.js`: `admin/page-builder/header-config.js` fallback-audit helpers, including Phase 8 retirement acceptance, series-level removal readiness, the `missingPublishedReaderPage` gate, per-page legacy header dependency buckets, and the rule that inert legacy header modules stop blocking once canonical V3 page-header metadata exists
-- `tests/shared-renderers-parity.test.js`: parity tests for `admin/page-builder/shared-renderers.js` — verifies that `createRenderers()` produces equivalent structure for reader and preview option sets, correct mount-placeholder behavior, reader mount data attributes, image URL resolution per resolver, and button link resolution via `getSeriesId`
+- `tests/admin-page-builder-preview-contract.test.js`: `shared/page-builder/preview-contract.js`
+  viewport/message/identity validation, including metrics, target traffic, inline-edit envelopes, and
+  exact Desktop/Tablet/Phone presets.
+- `tests/admin-page-builder-audit.test.js`: `shared/page-builder/header-config.js` fallback-audit
+  helpers, including Phase 8 retirement acceptance and canonical V3 readiness.
+- `tests/shared-renderers-parity.test.js`: parity tests for
+  `shared/page-builder/shared-renderers.js`, including builder markers, panel/column ownership,
+  reader mounts, responsive CSS, Feed layout, and reader/public option sets.
+- `tests/shared-kernel-boundary.test.js`: prevents `shared/page-builder/` from importing admin or
+  reader code, prevents reader code from importing admin modules, and locks the Caddy shared-kernel
+  source route.
+- `tests/builder-config-parity.test.js` and `tests/fixtures/builder-config-parity.json`: the JS half
+  of the frozen JS/Python module schema and HTML sanitizer parity contract.
+- `tests/responsive-overrides.test.js`, `tests/reader-config.test.js`, and
+  `tests/reader-user-settings.test.js`: responsive normalization/emission, reader config/mount data,
+  and scoped reader preference behavior.
 - `tests/admin-designer.test.js`: admin shell cleanup after removing the legacy designer iframe host
 - `tests/media-branding.test.js`: media/admin branding rules
 - `tests/diagnostics-snapshot.test.js`: diagnostics UI snapshot and legacy fallback behavior
@@ -140,6 +161,13 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - `backend/tests/test_comments_routes.py`: comment auth, moderation, duplicate/rate-limit, and censored-phrase handling
 - `backend/tests/test_files_routes.py`: page-config/media index contracts, protected asset access, and virtual save behavior
 - `backend/tests/test_page_builder_routes.py`: page-builder admin CRUD, slug uniqueness, homepage exclusivity, reader-binding module validation, invalid bound-reader publish blocking, effective-homepage public/admin endpoint resolution, header-nav style sanitization, section/module move-reorder, atomic rejection of composite invalid module updates, and public published-page access
+- `backend/tests/test_builder_security.py`: focused coverage for the split builder sanitizer package,
+  responsive allowlists, appearance/header contracts, reader config, and destructive column-shrink
+  rejection.
+- `backend/tests/test_builder_config_parity.py`: the Python half of the shared schema/HTML sanitizer
+  parity fixture.
+- `backend/tests/test_migrate_panel_settings.py` and `test_migrate_panel_toggles.py`: idempotent,
+  conflict-safe panel metadata migrations into column ownership and ratio-driven panel existence.
 - `backend/tests/test_backfill_page_headers.py`: dry-run and write-mode coverage for canonical V3 header backfill, no-op behavior on already-clean V3 pages, legacy copy import, nav-style preservation, hidden-block persistence after override cleanup, additive `pageReports`, published-`reader` readiness blocking, and sanitized header/nav appearance preservation
 
 ## Phase 8 Runtime Fallback Retirement Coverage

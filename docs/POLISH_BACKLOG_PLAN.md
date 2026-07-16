@@ -1,7 +1,7 @@
 # Polish Backlog Plan — Tweaks, Fixes, and Small Features
 
 Status: **Proposed — not started** (recorded 2026-07-14; requests 10–12 added same day;
-request 13 added 2026-07-16).
+requests 13–15 added 2026-07-16).
 Created: 2026-07-14
 Branch context: `builder-incremental-improvement`; the Builder Customization Roadmap and Builder
 Refactor Plan are finished. This backlog starts from the post-refactor `shared/page-builder/`
@@ -19,11 +19,12 @@ Related docs:
 
 ## Purpose
 
-Turn a 13-item backlog of user-requested tweaks and fixes into independently executable
+Turn a 15-item backlog of user-requested tweaks and fixes into independently executable
 phases. Each phase stands alone (no phase depends on another unless stated), ordered quick
-wins → features. The backlog spans seven surfaces: the reader feed (static right panel + the
+wins → features. The backlog spans eight surfaces: the reader feed (static right panel + the
 builder `feed` module), builder inspector chrome, the builder canvas/preview, the admin asset
-library, the media page, the reader's touch navigation, and header styling.
+library, the media page, reader page sizing/fullscreen behavior, the reader's touch navigation,
+and header styling.
 
 ## Traceability: request → phase
 
@@ -42,11 +43,14 @@ library, the media page, the reader's touch navigation, and header styling.
 | 11  | Column height actually editable; selection should wrap the whole column, border and all     | 11    | M    |
 | 12  | Scrolling the page on phone must not also change the comic page (tablet fine, phone broken) | 12    | S–M  |
 | 13  | Add controlled glow authoring for the top bar and each header block                         | 13    | M    |
+| 14  | Rook the Rabbit's different page ratio must fit the reader container on phone               | 14    | S–M  |
+| 15  | Leaving fullscreen must fit pages back to the reader container                              | 15    | S    |
 
 Suggested batching: Phases 1 and 12 first (both are daily-use bugs). Phases 2–5 are one feed
 cluster and can ship as a group. Phases 6–11 are independent in any order; Phases 10–11 are
 both builder-canvas work and pair well together. Phases 6 and 13 share glow-control UX ideas but
-must keep separate panel and header schemas.
+must keep separate panel and header schemas. Phases 14 and 15 both exercise reader sizing and can
+share a phone/fullscreen regression pass.
 
 ## Confirmed decisions
 
@@ -62,6 +66,8 @@ must keep separate panel and header schemas.
 | 2026-07-14 | Phase 8: hero ordering via **up/down** buttons — no drag-and-drop for now.                                                                                                       |
 | 2026-07-14 | Phase 9: the share control is **a button in the reader controls bar** only.                                                                                                      |
 | 2026-07-16 | Phase 13: use a header-only **Default / Off / Custom** glow contract for the top bar and five header blocks; do not add arbitrary shadow fields to the shared appearance schema. |
+| 2026-07-16 | Phase 14: fix the **Phone** sizing path for unusual page ratios; preserve the already-correct Desktop and Tablet rendering.                                                      |
+| 2026-07-16 | Phase 15: fullscreen zoom/pan does **not** persist after exit; restore the normal fitted, centered on-page view automatically.                                                   |
 
 ## Compatibility rules (apply to every phase)
 
@@ -82,20 +88,21 @@ must keep separate panel and header schemas.
 
 ## Reading map
 
-| Area                        | Files                                                                                                                                                         |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Feed CSS                    | `assets/css/main.core.10b-right-panel-feed.css`, `assets/css/main.responsive.css`                                                                             |
-| Feed markup + behavior      | `shared/page-builder/shared-renderers.js` (feed renderer), `reader/feed-panel.js`, `reader/latest.js`                                                         |
-| Feed module config          | `admin/page-builder/module-descriptors.js:230-264`, feed editor in `admin/page-builder/module-editor.js`                                                      |
-| Column/panel chrome         | `assets/css/main.core.09-side-panels.css`, column inspector in `admin/page-builder/editor-panel.js`, `reader/data.js`                                         |
-| Builder inspector controls  | `admin/css/page-builder/controls.css`, `admin/css/page-builder/inspector.css`                                                                                 |
-| Asset library               | `admin/image-picker.js`, `admin/page-builder/data.js:209`, `backend/app/routes/files.py:494-605`                                                              |
-| Builder preview + selection | `admin/page-builder/preview-contract.js`, `admin/page-builder/preview-manager.js`, `admin/css/page-builder/canvas.css`, `reader/preview-bridge.js`            |
-| Reader touch navigation     | `reader/pointer.js`, `reader/config.js`, `reader/app.js` (edge-zone clicks), `assets/css/main.core.11-viewport.css`, `assets/css/main.core.14-edge-zones.css` |
-| Media page                  | `media.html`, `backend/app/models.py:201` (`MediaItem`), `backend/app/content_store.py`, `admin/media.js`                                                     |
-| Reader URL/state            | `reader/series.js`, `reader/app.js`, `reader/gallery.js`, `reader/controls.js`                                                                                |
-| Header config + authoring   | `shared/page-builder/header-config.js`, `admin/page-builder/header-editor.js`, `backend/app/builder_security/header.py`                                       |
-| Header rendering + chrome   | `reader/header-layout.js`, `assets/css/main.core.04-header.css`, `assets/css/main.core.05-entry-select.css`, `assets/css/main.core.02-animations.css`         |
+| Area                        | Files                                                                                                                                                                                  |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Feed CSS                    | `assets/css/main.core.10b-right-panel-feed.css`, `assets/css/main.responsive.css`                                                                                                      |
+| Feed markup + behavior      | `shared/page-builder/shared-renderers.js` (feed renderer), `reader/feed-panel.js`, `reader/latest.js`                                                                                  |
+| Feed module config          | `shared/page-builder/module-descriptors.js`, feed editor in `admin/page-builder/feed-editor.js`                                                                                        |
+| Column/panel chrome         | `assets/css/main.core.09-side-panels.css`, column inspector in `admin/page-builder/editor-panel.js`, `reader/data.js`                                                                  |
+| Builder inspector controls  | `admin/css/page-builder/controls.css`, `admin/css/page-builder/inspector.css`                                                                                                          |
+| Asset library               | `admin/image-picker.js`, `admin/page-builder/data.js:209`, `backend/app/routes/files.py:494-605`                                                                                       |
+| Builder preview + selection | `shared/page-builder/preview-contract.js`, `admin/page-builder/preview-manager.js`, `admin/css/page-builder/canvas.css`, `reader/preview-bridge.js`                                    |
+| Reader touch navigation     | `reader/pointer.js`, `reader/config.js`, `reader/app.js` (edge-zone clicks), `assets/css/main.core.11-viewport.css`, `assets/css/main.core.14-edge-zones.css`                          |
+| Media page                  | `media.html`, `backend/app/models.py:201` (`MediaItem`), `backend/app/content_store.py`, `admin/media.js`                                                                              |
+| Reader URL/state            | `reader/series.js`, `reader/app.js`, `reader/gallery.js`, `reader/controls.js`                                                                                                         |
+| Reader sizing + fullscreen  | `reader/transform.js`, `reader/fullscreen.js`, `reader/render.js`, `assets/css/main.core.11-viewport.css`, `assets/css/main.core.12-stage-pages.css`, `assets/css/main.responsive.css` |
+| Header config + authoring   | `shared/page-builder/header-config.js`, `admin/page-builder/header-editor.js`, `backend/app/builder_security/header.py`                                                                |
+| Header rendering + chrome   | `reader/header-layout.js`, `assets/css/main.core.04-header.css`, `assets/css/main.core.05-entry-select.css`, `assets/css/main.core.02-animations.css`                                  |
 
 ---
 
@@ -288,8 +295,8 @@ Precedent for a paired opacity control: the panel background image opacity
 3. Wire the new fields into the feed editor (`module-editor.js`, `feed-style` appearance
    sector, `module-descriptors.js:261`).
 
-**Files.** `admin/page-builder/module-descriptors.js`, `admin/page-builder/module-editor.js`,
-`admin/page-builder/shared-renderers.js`, `reader/feed-panel.js`,
+**Files.** `shared/page-builder/module-descriptors.js`, `admin/page-builder/feed-editor.js`,
+`shared/page-builder/shared-renderers.js`, `reader/feed-panel.js`,
 `assets/css/main.core.10b-right-panel-feed.css`.
 
 **Acceptance criteria.**
@@ -339,7 +346,7 @@ through the column/panel inspector (`editor-panel.js`, e.g. background path at l
 **Files.** `admin/page-builder/editor-panel.js` (column inspector),
 `admin/page-builder/appearance-editor.js` / `appearance-utils.js` (if the shared schema hosts
 it), `reader/data.js`, `assets/css/main.core.09-side-panels.css`,
-`admin/page-builder/shared-renderers.js` or preview equivalent.
+`shared/page-builder/shared-renderers.js` or preview equivalent.
 
 **Acceptance criteria.**
 
@@ -496,7 +503,7 @@ included). Size: **M**.
 whole webpage instead of rendering in the middle of the page.
 
 **Current state.** All three preview viewports are fixed device rects — desktop is
-1920×1080 (`admin/page-builder/preview-contract.js:1-8`). The preview frame is sized to those
+1920×1080 (`shared/page-builder/preview-contract.js`). The preview frame is sized to those
 exact pixels (`preview-manager.js:309-330`) and then scaled down to fit the canvas area
 (`calculatePreviewScale` / `applyPreviewFrameScale`, `preview-manager.js:363-408`), inside
 `.pb-preview-container`'s 20px padding (`admin/css/page-builder/canvas.css:146-152`). Net
@@ -528,9 +535,9 @@ with builder chrome (sidebar, inspector, toolbar) still around it. Existing hook
    consumer, including the debug/target overlays and `applyPreviewIframeSize` at 411).
 5. Responsive-override bindings key off `deviceId`, not pixel width — confirm the
    `desktop` binding still resolves identically (`tests/admin-page-builder-preview.test.js`,
-   `admin/page-builder/responsive-overrides.js`).
+   `shared/page-builder/responsive-overrides.js`).
 
-**Files.** `admin/page-builder/preview-contract.js`, `admin/page-builder/preview-manager.js`,
+**Files.** `shared/page-builder/preview-contract.js`, `admin/page-builder/preview-manager.js`,
 `admin/css/page-builder/canvas.css`, possibly the chrome-mode toggle in
 `admin/page-builder.js`.
 
@@ -767,6 +774,109 @@ animation, page switch, save/reload, and keyboard focus. Size: **M**.
 
 ---
 
+## Phase 14 — Unusual page ratios must fit the phone reader (bug fix)
+
+**Request 14.** The Rook the Rabbit entry uses a different page-size ratio from the other entries.
+It fits correctly on Desktop and Tablet, but on Phone the page does not fit its reader container.
+
+**Current state.** The exact Rook the Rabbit page asset is not checked into the repository, so its
+live natural dimensions must be recorded during reproduction. The tracked sizing paths still expose
+a Phone-only gap that matches the report:
+
+- Desktop uses `fitOnPageFrame()` to calculate a frame from each visible image's cached
+  `naturalWidth`/`naturalHeight` (`reader/transform.js`), so page-ratio changes are accounted for.
+- Stacked layouts intentionally skip that JavaScript frame calculation and use responsive CSS.
+  Tablet portrait (`min-width: 481px`) explicitly makes a dynamic-frame page and image fill the
+  available width (`assets/css/main.responsive.css`), which explains why Tablet remains correct.
+- Phone (`max-width: 480px`) does not receive that width-fit rule. It falls back to the generic
+  `.page img` intrinsic sizing plus a viewport-height cap, while `.stage`, `.page`, and the image
+  participate in nested flex sizing (`main.core.12-stage-pages.css`). An unusual intrinsic ratio can
+  therefore size differently from the common entry ratio instead of being constrained by the Phone
+  container width.
+
+**Approach.**
+
+1. Reproduce on the affected Rook the Rabbit entry at the actual failing Phone width and record the
+   image's natural dimensions, rendered bounds, viewport bounds, and effective `stage.fit`. Add those
+   exact dimensions to a regression fixture rather than assuming the page is a standard portrait.
+2. Make the Phone dynamic-frame path ratio-agnostic: constrain the stage, page wrapper, and image to
+   the reader's available inline size (`min-width: 0` / `max-width: 100%` as appropriate), and use
+   width-preserving `height: auto` containment for the image. Keep the page centered and preserve the
+   existing stable-viewport-height cap where it still prevents an overly tall page.
+3. Scope the CSS to paged `dynamic-frame` rendering on Phone. Do not change authored `width`,
+   `height`, or `natural` stage-fit modes, and do not alter vertical-scroll rendering.
+4. Verify the fix with both the Rook ratio and a current standard entry ratio so solving the outlier
+   cannot regress the common path. Desktop dynamic-frame calculation and the existing Tablet width
+   rule stay authoritative and visually unchanged.
+
+**Files.** `assets/css/main.responsive.css`, possibly
+`assets/css/main.core.12-stage-pages.css` if the safe flex-item constraint belongs in the shared
+base; `tests/on-page-frame.test.js` or a focused browser sizing test, plus a visual fixture only if
+CSS layout cannot be proved reliably in happy-dom.
+
+**Acceptance criteria.**
+
+- Every Rook the Rabbit page is fully contained and centered inside the Phone reader viewport with
+  its natural aspect ratio preserved; there is no horizontal clipping, overflow, or forced crop.
+- A normal-ratio entry still fits on Phone exactly as before. Desktop and Tablet output remain
+  unchanged for both ratios.
+- Paged navigation, single-page/two-page selection, zoom, fullscreen, and authored stage-fit modes
+  remain unchanged outside the corrected Phone dynamic-frame path.
+
+**Test plan.** Add the captured Rook dimensions to a focused sizing/browser regression at Phone
+width and compare the rendered page bounds with the viewport bounds; retain a standard-ratio control
+case. Run `npm test`, `npm run lint`, and the relevant Phone visual workflow. Manually verify the
+live Rook the Rabbit entry on a real phone plus one Desktop and one Tablet viewport. Size: **S–M**.
+
+---
+
+## Phase 15 — Refit pages after leaving fullscreen (bug fix)
+
+**Request 15.** When fullscreen closes, fit the comic pages back to the normal reader container
+instead of leaving them enlarged and requiring a manual **Fit** action.
+
+**Current state.** Fullscreen entry calls `fitHeightFullscreen()`, which writes a fullscreen base
+scale, resets pan, and applies a transform (`reader/transform.js`). The reader can then accumulate
+additional fullscreen zoom and pan. On exit, `onFullscreenChange()` removes fullscreen chrome,
+restores the transform origin, resets only `fullscreenBaseScale`, and calls `fitOnPageFrame()`
+(`reader/fullscreen.js`). `fitOnPageFrame()` recalculates the container dimensions but does not reset
+`state.scale` or `state.pan`, so the fullscreen transform survives inside the smaller on-page frame.
+The existing non-fullscreen `fitToScreen()` path already performs the intended operation:
+`resetView()` followed by `fitOnPageFrame()`.
+
+**Approach.**
+
+1. Route fullscreen exit through the existing non-fullscreen fit contract (or the same shared
+   helper): restore `scale = 1`, `pan = { x: 0, y: 0 }`, apply the centered transform, then refit the
+   on-page frame after fullscreen CSS/layout has settled.
+2. Keep enter behavior unchanged. Guard any deferred exit callback so a rapid re-entry cannot apply
+   an on-page reset while fullscreen is active again.
+3. Preserve the authored stage-fit behavior: dynamic-frame recalculates its frame, while Phone's
+   responsive stacked path and explicit `width`/`height`/`natural` modes retain their normal CSS
+   sizing after the transform reset.
+4. Cover both exits: the reader's **EXIT** button and browser/Escape-driven `fullscreenchange` use
+   the same handler and must produce the same fitted result.
+
+**Files.** `reader/fullscreen.js`, `reader/transform.js` only if a small shared exit-fit helper is
+needed, and `tests/reader-fullscreen.test.js`.
+
+**Acceptance criteria.**
+
+- After zooming and panning in fullscreen, leaving fullscreen automatically returns the visible
+  page or spread to a centered fit inside the normal reader container; no manual **Fit** click is
+  needed.
+- Exit through the reader control and through Escape/browser chrome behaves identically.
+- Entering fullscreen still fits to the fullscreen viewport, and normal non-fullscreen zoom, pan,
+  page navigation, and responsive stage-fit modes remain unchanged.
+
+**Test plan.** Extend `tests/reader-fullscreen.test.js` to start with non-default scale/pan, simulate
+fullscreen exit, and assert the shared non-fullscreen fit/reset path runs after transform-origin
+restoration; cover stale deferred work after rapid re-entry. Run `npm test` and `npm run lint`;
+manually zoom/pan, exit via both control and Escape, and verify Phone, Tablet, and Desktop. Size:
+**S**.
+
+---
+
 ## Verification gates (per phase)
 
 - Frontend: `npm test` (vitest), `npm run lint`; visual passes via `npm run test:visual` where
@@ -775,13 +885,13 @@ animation, page switch, save/reload, and keyboard focus. Size: **M**.
   changes (`docker restart bwondercomics-bwondercomics-api-1`).
 - Cross-cutting: the pre-commit checklist in `docs/DEVELOPER_QUICK_REFERENCE.md` when a phase
   is committed.
-- Every phase: manual before/after on one published page (`battle-bros` or `prisonplanet`) to
-  prove the no-default-change rule.
+- Every phase: manual before/after on the relevant published page (for example `battle-bros`,
+  `prisonplanet`, Pyre, or the affected Rook the Rabbit entry) to prove the no-default-change rule.
 
 ## Open questions
 
-None — the 2026-07-14 answers resolved all of them; see **Confirmed decisions** and the dated
-notes inside each phase. One standing default worth restating: Phase 6's glow controls apply
-to the shell panels first (they're the only columns with stock glow); the same schema can
-extend to inner section columns later if wanted. Phase 13 deliberately uses a separate
-header-only Default / Off / Custom contract and does not broaden the shared appearance schema.
+None — the 2026-07-14 and 2026-07-16 decisions resolved them; see **Confirmed decisions** and the
+dated notes inside each phase. One standing default worth restating: Phase 6's glow controls apply
+to the shell panels first (they're the only columns with stock glow); the same schema can extend to
+inner section columns later if wanted. Phase 13 deliberately uses a separate header-only Default /
+Off / Custom contract and does not broaden the shared appearance schema.

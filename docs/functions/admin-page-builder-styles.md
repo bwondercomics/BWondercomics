@@ -123,7 +123,10 @@ The right-side properties panel responding dynamically to the active section/mod
   fields.
 - **Footer Status**: Updates `.pb-editor-footer-status` with dataset states (`success`, `warning`, `danger`) to report API save failures or drafted states.
 - **Empty & Feedback States**: Uses customized `.pb-editor-empty-card` for messaging when no modules are selected.
-- **Structurals**: Features accordion blocks (`.pb-editor-accordion`), draggable sort-blocks (`.pb-header-block`), and the header **placement board** (`.pb-header-layout-grid` → `.pb-header-layout-row` → `.pb-header-region--board` → two-line `.pb-header-layout-card`), whose region grid is single-column at rail width and splits into columns via a container query when space allows.
+- **Structurals**: Features accordion blocks (`.pb-editor-accordion`) and compact Header Parts
+  visibility rows (`.pb-header-toggle-list` / `.pb-header-toggle-row`). The abstract placement board
+  is retired; selected rows can mirror live-canvas selection, while placement controls render in the
+  preview overlay/toolbar rather than the inspector layout.
 
 ---
 

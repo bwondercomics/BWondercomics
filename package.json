@@ -1,7 +1,7 @@
 {
   "name": "bwondercomics",
-  "version": "0.8.2",
-  "description": "BWonderComics comic site baseline",
+  "version": "0.8.5",
+  "description": "BWonderComics comic reader and live page builder",
   "type": "module",
   "scripts": {
     "dev": "node ./node_modules/vite/bin/vite.js",

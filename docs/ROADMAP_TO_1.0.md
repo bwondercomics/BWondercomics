@@ -1,9 +1,10 @@
-# BWonderComics 0.8.2 → 1.0.0 — Audit & Roadmap
+# BWonderComics 0.8.5 → 1.0.0 — Audit & Roadmap
 
 Status: Audit complete; roadmap active
 Created: 2026-07-07 (repo-only + live-host audit at commit `cdc84f8`, branch `builder-incremental-improvement`)
-Updated: 2026-07-14 after the 0.8.5 responsive authoring contract repair; original evidence
-anchors still point at the audit commit unless a later note says otherwise.
+Updated: 2026-07-16 for the completed 0.8.5 authenticated QA, builder refactor, and merge-ready
+documentation/version pass. Original evidence anchors still point at the audit commit unless a
+later note says otherwise.
 
 Labels used throughout: **[C:code]** confirmed from code/docs · **[C:live]** confirmed on this host ·
 **[I]** inferred · **[V]** needs live/admin verification.
@@ -20,11 +21,12 @@ systemd/docker/backup state directly). The only outstanding items marked **[V]**
 
 ## 1. Executive summary
 
-**Release readiness: ~75%.** The core is in better shape than most pre-1.0 solo projects: the
-builder architecture is genuinely solid (shared renderers, sanitize-on-save _and_ on-read,
-same-origin preview contract, published-only public endpoints), test coverage is real (627
-frontend + 112 backend + 20 visual, all passing on audit day [C:live]), and auth/comments/premium
-gating are competently hardened.
+**Release readiness:** the 0.8.5 builder baseline is complete, while the store, recovery safety net,
+ops hardening, and broader 1.0 checks remain. The builder architecture is genuinely solid (shared
+renderers, sanitize-on-save _and_ on-read, same-origin preview contract, published-only public
+endpoints), and the completed builder closeout records 667 frontend tests, 131 backend tests, and 21
+visual workflows across its final phase gates. Auth/comments/premium gating remain competently
+hardened.
 
 **Biggest blockers to 1.0.0, in order:**
 
@@ -34,27 +36,26 @@ gating are competently hardened.
 2. **The 1.0.0 definition says "subscriptions"; the store plan explicitly excludes them.** This is
    the single scope decision that most changes the schedule (see §2.2 — recommendation: ship
    one-time purchases + the existing premium-code system as the subscription bridge).
-3. **Builder 0.8.5 release QA is still open** — the responsive save/public contract is repaired
-   and regression-tested, but authenticated Pyre save/reload checks and the header-glow follow-up
-   remain before merge (details §2.1).
-4. **Operational trust is currently broken in three places** [C:live]: all backups live on the
-   same disk as the database (the 916G archive drive is mounted and _empty_), the diagnostics
+3. **Operational trust was broken in three places at the audit snapshot** [C:live]: all backups
+   lived on the same disk as the database (the 916G archive drive was mounted and _empty_), the diagnostics
    snapshot is a month stale (June 4) because the refresh timer was never installed, and the ops
-   worker isn't running (queued commands would sit forever). None of these are feature work;
-   together they're roughly a day.
-5. **Release process risk:** production serves this working tree on
-   `builder-incremental-improvement`, 15 commits ahead of `main`, and the live DB was already
-   migrated to match the branch [C:live]. Nothing is wrong today, but "main" is currently a
-   fiction — merge before store work starts.
+   worker was not running (queued commands would sit forever). Re-verify this host state before
+   acting; none of these are feature work and together they were roughly a day.
+4. **Live-page recovery remains thin:** builder drafts have local undo, but there is no per-save
+   page revision/snapshot restore model (details §2.1).
+5. **Release process risk:** the complete 0.8.5 builder branch is still awaiting merge into `main`.
+   The branch-local implementation, QA corrections, refactor, plan archive, and version metadata
+   now agree; merge it before store work starts.
 
 **Biggest risks:** payment-flow mistakes (mitigated by the plan's hosted-Checkout approach — keep
 it), single-disk data loss, and scope creep in the builder (Phases 5–7 are where "close to done"
 can quietly become two more months).
 
-**Shortest credible path:** finish the builder's authenticated 0.8.5 QA, header glow, and safety
-net work → merge to main + one-day ops hardening → Stripe-Checkout-only store per the existing
-plan → freeze everything else at "verify + polish" level. Media redesign, PayPal, and social
-expansion all land post-1.0.
+**Shortest credible path:** merge the completed 0.8.5 builder baseline → add the page-revision
+safety net + one-day ops hardening → build the Stripe-Checkout-only store per the existing plan →
+freeze everything else at "verify + polish" level. Header glow and other small requests remain in
+the polish backlog and are not 0.8.5 merge gates. Media redesign, PayPal, and social expansion all
+land post-1.0.
 
 ---
 
@@ -68,9 +69,9 @@ verified (panel/column consolidation closed, panel widths, module layout card, r
 bar + end-of-entry popup, header edit-in-place with the placement board retired, header/logo and
 entry-picker customization, and account/links shell chrome as placeable blocks) [C:code+docs].
 Deferred stragglers: universal module appearance (Phase 2), drag-resize gutters (Phase 1,
-optional), and the 0.8.5 header-glow follow-up.
+optional), and header-glow authoring (`docs/POLISH_BACKLOG_PLAN.md` Phase 13).
 
-**0.8.5 corrective pass (implemented; final manual release QA pending).** The builder's focused
+**0.8.5 corrective pass (implemented and manually closed 2026-07-16).** The builder's focused
 responsive/public contract now covers reader-control default/primary/bar appearance and padding,
 plus Feed wrapper size/alignment, with sparse Tablet/Phone branches rendered as public device CSS
 from one ratio-banded media contract. Reader-panel `Hidden` collapses the real side shell;
@@ -83,15 +84,24 @@ appearance/padding have save/refetch plus preview/public coverage. Authoring use
 for each Desktop, Tablet, and Phone branch. Portrait Tablet/Phone readers stay on stable width
 containment; rotating past the established `7/5` aspect-ratio boundary returns to Desktop layout
 and its bounded-parent dynamic frame. This deliberately does **not** claim generic responsive
-support for every future module field. Header glow remains the separate follow-up.
+support for every future module field. Authenticated Pyre save/reload, panel hide/unhide, reader
+border, arrow Save/Discard, Save Page, Publish/Unpublish, physical Phone/Tablet portrait, and
+rotation checks all passed. Header glow remains a separate optional follow-up.
+
+**0.8.5 structural closeout (implemented).** Refactor Phases A–G moved draft, section, selection,
+inline-edit, and chrome state into focused owners; split module editors behind a registry; moved the
+dual-use dependency closure into `shared/page-builder/`; split backend validation into the
+`backend/app/builder_security/` package plus `reader_bindings.py`; added JS/Python schema parity and
+shared-boundary tests; and divided the shell fixture into behavior-focused suites. The refactor is
+behavior-preserving and has no remaining phase work.
 
 **What works — and is worth trusting:**
 
 - One shared render path for admin preview and public output
-  (`admin/page-builder/shared-renderers.js`), consumed by both `reader/page-renderer.js` and the
+  (`shared/page-builder/shared-renderers.js`), consumed by both `reader/page-renderer.js` and the
   preview. Escaping is consistent; the audit found no XSS hole in any module renderer [C:code].
-- Dual sanitization: allowlist DOM sanitizer client-side (`admin/page-builder/sanitize.js`)
-  mirrored by the authoritative server sanitizer (`backend/app/builder_security.py`) — tags, URLs
+- Dual sanitization: allowlist DOM sanitizer client-side (`shared/page-builder/sanitize.js`)
+  mirrored by the authoritative server sanitizer package (`backend/app/builder_security/`) — tags, URLs
   (scheme+host checks, `youtube`/`vimeo` only for video), colors, keywords, clamped numbers. The
   `html` module is properly fenced on both sides [C:code].
 - Preview channel validates `origin` and `source` on both ends (`reader/preview-bridge.js:84`,
@@ -111,42 +121,37 @@ support for every future module field. Header glow remains the separate follow-u
    the builder now blocks saves when `/api/admin/page-builder/runtime` is incompatible. **[C:code]**
 2. **No safety net on live pages.** There is no page revision/version model
    (`backend/app/models.py:483-618` — nothing but the four builder tables), saves write directly
-   to the published record, and module/section deletes are permanent behind a `confirm()`
-   (`admin/page-builder.js:2558-2613`); undo covers _unsaved drafts only_
-   (`admin/page-builder/undo-stack.js`) [C:code]. With nightly-only DB dumps, a mis-click on the
+   to the published record, and confirmed page/module/section deletes through `page-actions.js` and
+   `canvas-mutations.js` are permanent; `undo-stack.js` covers _unsaved drafts only_ [C:code]. With
+   nightly-only DB dumps, a mis-click on the
    live homepage can cost up to a day of authoring. A lightweight per-save JSON snapshot (last N
    per page) would close this cheaply.
-3. **Unknown `page.meta` keys persist unsanitized** (`backend/app/builder_security.py:969-981`) —
+3. **Unknown `page.meta` keys persist unsanitized**
+   (`backend/app/builder_security/header.py:sanitize_page_meta`) —
    tolerated by design, admin-only writes, and nothing renders them today, so it's not currently
    exploitable [C:code]. It's a standing footgun: any future reader code consuming a new meta key
    must add sanitization first. Worth a code comment and a line in the docs, not a rewrite.
-4. **Manual QA debt:** Phase 0's interactive builder pass ("open a Pyre reader page, click each
-   panel/column, change each control, save, verify published") was handed back and never done;
-   Phase 4's drag-feel QA likewise
-   (`docs/completed-builder-plans/BUILDER_CUSTOMIZATION_ROADMAP.md` completion notes)
-   **[V — needs a human, ~30 min]**.
-5. **Fast Start presets / palette still live** (`admin/page-builder/theme-editor.js:60-70`) —
-   intentionally retained after the 2026-07-07 scope revision. The remaining Phase 7 work is to
-   guard and explain element-over-palette precedence.
-
-**What's missing** (from the roadmap, verified against code): authenticated Pyre
-Desktop/Tablet/Phone closeout QA for 0.8.5, header glow, per-save page snapshots, and the earlier
-manual drag/authoring passes.
+4. **Broader manual regression debt:** the authenticated 0.8.5 corrective matrix is complete, but
+   the unchecked optional flows in `docs/READER_BUILDER_QA.md` remain useful before 1.0.0. They are
+   no longer blockers for merging this builder baseline.
+   **What's missing** (verified against code): per-save page snapshots and the optional polish backlog,
+   including header glow. The authenticated 0.8.5 responsive/manual closeout is complete.
 
 **1.0.0 scope recommendation:**
 
-- **In:** finish the 0.8.5 authenticated responsive QA and header-glow follow-up; per-save page
-  snapshots (S-sized safety net); the two pending manual QA passes.
+- **In:** merge the completed 0.8.5 baseline; per-save page snapshots (S-sized safety net); the
+  broader reader/builder worksheet before 1.0.0.
 - **Defer/cut:** universal module appearance (needs the per-type audit; button/promo/email already
   have their own styling), drag-resize gutters, any new module types before the store's.
-- **Blockers/dependencies:** none external. Merge to `main` before starting store work.
+- **Blockers/dependencies:** none external. Merge to `main` before starting store work. Header glow
+  is not a merge dependency.
 - **Tests/QA:** keep backend update/refetch, builder save/reload, negative dropped-branch, and
   preview/public real-width coverage aligned with every newly allowed responsive field. Keep the
-  visual suite mandatory for responsive and header work. Manual: the handed-back Pyre pass; one
-  full authoring session per series on a phone.
+  visual suite mandatory for responsive and header work. The authenticated Pyre corrective pass is
+  complete; run one broader authoring session per series on a phone before 1.0.0.
 - **Definition of done:** every control visible in the inspector provably changes the _published_
-  page (the Phase-0 matrix philosophy, extended to modules); Phases 3/5/7 closed with completion
-  notes; no dead controls; snapshots restorable from the admin; all gates green.
+  page (the Phase-0 matrix philosophy, extended to modules); the completed Phases 3/5/7 remain
+  regression-free; no dead controls; snapshots restorable from the admin; all gates green.
 
 ### 2.2 Store (priority 2)
 
@@ -236,7 +241,8 @@ _Orders, fulfillment, admin_
 _Builder & reader integration_
 
 - [ ] `store-grid` / `product-card` module configs store IDs only; registered in
-      `builder_security.py` (the "silently dropped otherwise" rule is a feature here)
+      `backend/app/builder_security/modules.py` (the "silently dropped otherwise" rule is a feature
+      here)
 - [ ] Preview mode: buy buttons inert, no session creation, no external navigation (reuse the
       existing side-effect suppression contract)
 - [ ] Success/cancel pages are builder pages (global scope) rendering sanitized session status;
@@ -425,12 +431,12 @@ compete with feature time meaningfully.
 
 **NOW — finish before moving on**
 
-1. _Builder:_ complete authenticated Pyre responsive save/reload/public-width QA and header glow.
-2. _Builder:_ per-save page JSON snapshots + restore (safety net for live editing).
-3. _Builder:_ complete the remaining manual authoring/header-drag QA.
-4. _Process:_ merge `builder-incremental-improvement` → `main`; adopt "main = deployed" from here
+1. _Process:_ merge the completed `builder-incremental-improvement` 0.8.5 baseline → `main`; adopt
+   "main = deployed" from here
    on.
-5. _Ops track (parallel, ~1 day):_ point nightly backups (DB dump + weekly `backup-files`) at
+2. _Builder safety:_ per-save page JSON snapshots + restore (safety net for live editing).
+3. _Ops track (parallel, ~1 day):_ re-verify the audit-day host findings, point nightly backups (DB
+   dump + weekly `backup-files`) at
    `/mnt/archive`; run one **restore drill** into a scratch Postgres and write down the steps;
    install diagnostics-refresh timer + ops worker (or disable ops deliberately); pin `umami`
    image; add Caddy security headers (HSTS, `X-Content-Type-Options`, `Referrer-Policy`,
@@ -438,17 +444,16 @@ compete with feature time meaningfully.
 
 **NEXT — required for 1.0.0**
 
-6. _Store:_ Stripe-Checkout-only build per the plan's Phases 1→7, with the checklist in §2.2
+4. _Store:_ Stripe-Checkout-only build per the plan's Phases 1→7, with the checklist in §2.2
    (provider-neutral order columns; subscriptions bridged via premium codes). This is the
    schedule's center of mass.
-7. _Users:_ password change + admin password set; `/api/email/subscribe` hardening.
-8. _Analytics:_ visitor-session retention job; `/api/track/visitor` rate limit; one
+5. _Users:_ password change + admin password set; `/api/email/subscribe` hardening.
+6. _Analytics:_ visitor-session retention job; `/api/track/visitor` rate limit; one
    metrics-correctness pass; `store_checkout_start` event.
-9. _Diagnostics:_ snapshot-age banner; hide Preview Changes tab.
-10. _Polish (the 0.8.5 items, last):_ entry/chapter terminology sweep, new-reader "start here"
-    flow, one real mobile pass of reader + daily-use admin flows, media.html token alignment
-    (direction A).
-11. _Release:_ full DoD gate (§4), tag `1.0.0`.
+7. _Diagnostics:_ snapshot-age banner; hide Preview Changes tab.
+8. _Polish backlog:_ prioritize release-relevant items from `docs/POLISH_BACKLOG_PLAN.md` without
+   reopening the completed 0.8.5 builder roadmap; keep optional visual features behind hardening.
+9. _Release:_ full DoD gate (§4), tag `1.0.0`.
 
 **LATER — post-1.0.0**
 
@@ -530,9 +535,9 @@ visibility/config only per what ships; single-server deployment; Umami analytics
 
 **Builder/content**
 
-- [ ] Any new module type or meta key registered in `builder_security.py` before it renders
-      (standing rule — the unknown-meta passthrough at `backend/app/builder_security.py:969` makes
-      this non-optional)
+- [ ] Any new module type or meta key registered in the appropriate
+      `backend/app/builder_security/` module before it renders (standing rule — the unknown-meta
+      passthrough in `header.py:sanitize_page_meta` makes this non-optional)
 - [ ] Preview side-effect suppression re-verified when store modules land (checkout is the one
       side effect that costs money)
 
@@ -594,5 +599,7 @@ Only things that change the plan:
 
 ## Immediate next steps
 
-In priority order: answer open questions 1–3, close the authenticated builder 0.8.5 QA and header
-glow, then add page snapshots, with the backup retarget as the parallel one-hour ops fix.
+In priority order: merge the completed 0.8.5 builder baseline, answer open questions 1–3, then add
+page snapshots, with backup/ops re-verification and hardening as the parallel track. Header glow and
+the remaining small requests stay prioritized through `docs/POLISH_BACKLOG_PLAN.md`, not as merge
+blockers.

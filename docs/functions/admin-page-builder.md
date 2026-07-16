@@ -1,6 +1,7 @@
 # Admin Page Builder Logic
 
-This document describes the current builder runtime under `admin/page-builder/` and `admin/page-builder.js`.
+This document describes the admin orchestration under `admin/page-builder/` and
+`admin/page-builder.js` plus the dual-use contracts under `shared/page-builder/`.
 
 ## Table of Contents
 
@@ -19,6 +20,7 @@ This document describes the current builder runtime under `admin/page-builder/` 
 - [🕹️ Structural Commands (structural-commands.js)](#️-structural-commands-structural-commandsjs)
 - [📍 Live Drop Placement (live-drop-placement.js)](#-live-drop-placement-live-drop-placementjs)
 - [👁️ Preview Manager (preview-manager.js)](#️-preview-manager-preview-managerjs)
+- [🧭 Focused Shell Controllers](#-focused-shell-controllers)
 - [💾 Data API (data.js)](#-data-api-datajs)
 - [🚦 Fallback Retirement Gate (fallback-retirement-gate.js)](#-fallback-retirement-gate-fallback-retirement-gatejs)
 - [🏗️ Header Configuration (header-config.js)](#️-header-configuration-header-configjs)
@@ -31,6 +33,7 @@ This document describes the current builder runtime under `admin/page-builder/` 
 - [🖌️ Canvas Renderer (canvas-renderer.js)](#️-canvas-renderer-canvas-rendererjs)
 - [🖱️ Canvas Events (canvas-events.js)](#️-canvas-events-canvas-eventsjs)
 - [🧩 Base Module Editor (module-editor.js)](#-base-module-editor-module-editorjs)
+- [🗂️ Module Editor Registry and Per-Type Editors](#️-module-editor-registry-and-per-type-editors)
 - [🧾 Appearance Editor (appearance-editor.js)](#-appearance-editor-appearance-editorjs)
 - [🔘 Button Editor (button-editor.js)](#-button-editor-button-editorjs)
 - [➖ Divider Editor (divider-editor.js)](#-divider-editor-divider-editorjs)
@@ -44,9 +47,12 @@ This document describes the current builder runtime under `admin/page-builder/` 
 - [🧾 Preview Contract (preview-contract.js)](#-preview-contract-preview-contractjs)
 - [🎡 Promo Renderer (promo-renderer.js)](#-promo-renderer-promo-rendererjs)
 - [🧩 Module Descriptors (module-descriptors.js)](#-module-descriptors-module-descriptorsjs)
+- [✅ Module Eligibility (module-eligibility.js)](#-module-eligibility-module-eligibilityjs)
 - [🔢 Constants Registry (constants.js)](#-constants-registry-constantsjs)
 - [🛠️ Shared Helpers (helpers.js)](#️-shared-helpers-helpersjs)
+- [🎨 Appearance Utilities (appearance-utils.js)](#-appearance-utilities-appearance-utilsjs)
 - [🛡️ Sanitization Layer (sanitize.js)](#️-sanitization-layer-sanitizejs)
+- [📐 Reader Config and Responsive CSS](#-reader-config-and-responsive-css)
 - [🔗 Link Utilities (link-utils.js)](#-link-utilities-link-utilsjs)
 - [📖 Current Module Catalog](#-current-module-catalog)
 - [📜 Important Accuracy Notes](#-important-accuracy-notes)
@@ -59,6 +65,10 @@ The builder is the admin authoring surface for scoped builder pages backed by `B
 `BuilderSection`, `BuilderModule`, and series route-role `BuilderPageBinding` records. It is not a
 freeform visual editor. The builder works with explicit page, section, and module records plus
 page-level metadata in `page.meta`.
+
+Ownership rule: admin-only controllers/editors live under `admin/page-builder/`; contracts imported
+by both admin and reader live under `shared/page-builder/`. `tests/shared-kernel-boundary.test.js`
+enforces that shared code imports neither side and that reader code does not import admin modules.
 
 ### Canonical Entry
 
@@ -100,9 +110,9 @@ branch); it never carries width. Device track count/ratio rides
 `settings.responsive[device].layout`, is limited to the global structural column count, and reflows
 the stable global column nodes without changing `module.columnIndex`. Reader side-panel surface
 fields also live here as `panelBackground` and `panelGap` on the first/last reader-section columns.
-When a saved global layout shrinks, modules already in the last surviving column stay first,
-orphaned modules append by original column/sort order, and the merged destination order is
-resequenced contiguously in the same transaction.
+When a saved global layout shrinks, the backend rejects the change if any removed column still owns
+modules. The author must move or delete those modules first; once the removed columns are empty, the
+shrink succeeds without silently rehoming content or losing column-owned panel surface settings.
 
 Panel precedence: reader side panels are mapped from the reader section's first and last columns.
 Column styling and panel surface fields use the `settings.columns[]` contract. Legacy
@@ -152,22 +162,31 @@ only contain `showPanels` keep that flag for compatibility, while explicit
     the active module draft, sync the side panel, and persist only through the normal Save command.
 12. User actions call `data.js` mutators, update local state, then rerender affected surfaces.
 
-There is no separate long-lived client-side draft store in `data.js`. `admin/page-builder.js` still owns the top-level mutable builder state and composition root, while focused factories now own specific workflows: `commands.js` centralizes editor intent and availability checks, `keymaps.js` guards admin-only shortcuts, `undo-stack.js` tracks local unsaved draft snapshots keyed by draft target plus responsive edit scope/device where applicable, `draft-manager.js` handles draft normalization/save-discard flows, `page-actions.js` handles page lifecycle actions, `canvas-mutations.js` handles structural section/module mutations, `structural-commands.js` routes live structural intent, and `preview-manager.js` handles the iframe preview handshake/render path.
+There is no separate long-lived client-side draft store in `data.js`. `admin/page-builder.js` is the
+composition root around a plain state object with computed getters. `draft-manager.js` owns the five
+explicit drafts, active draft identifiers, dirty scope, page-wide structure draft, and the undo
+stack. Focused factories own section settings, selection, inline editing, chrome mode, page actions,
+structural mutations/commands, and iframe preview synchronization.
 
 Fallback-retirement readiness is a separate developer workflow, not part of the normal editor boot path: the page list from `fetchPages(...)` is intentionally summary-only, so any runtime-fallback audit must hydrate each page with `fetchPage(...)` or use `loadFallbackRetirementGate(...)` before calling `auditPagesFallbacks(...)`.
 
 ## 🔌 Builder Orchestrator (admin/page-builder.js)
 
-This is the main coordinator. It owns the remaining top-level mutable builder state and wires together the rail, canvas, inspector, and extracted manager modules.
+This is the main coordinator. It creates the builder state object and wires together the rail,
+canvas, inspector, and extracted manager/controller modules.
 Its responsibilities include:
 
 - loading page lists and the active page
 - keeping the current series and selected page in sync with the route
 - tracking selected surface, selected module, active section, and insertion targets
-- storing the builder-wide state consumed by the extracted factories, including current page, selection state, dirty scope, canvas mode, and active preview width
+- storing the builder-wide state consumed by the extracted factories, including current page and
+  manager/controller-backed computed state
 - instantiating `createDraftManager(...)`, `createPageActions(...)`, `createCanvasMutations(...)`,
   `createStructuralCommandAdapter(...)`, `createBuilderCommandRegistry(...)`,
-  `createBuilderKeymapManager(...)`, `createDraftUndoStack(...)`, and `createPreviewManager(...)`
+  `createBuilderKeymapManager(...)`, `createSectionSettingsEditor(...)`,
+  `createInlineEditController(...)`, `createSelectionController(...)`,
+  `createChromeModeController(...)`, and `createPreviewManager(...)`; the draft manager constructs
+  and owns `createDraftUndoStack(...)` internally
 - `normalizeHeaderDraft` resolves normal headers with `pageConfig: null` and tags a `source` field (`page-meta-v3`, `page-meta-stale`, `legacy-import`) so migration-only badges can flag non-canonical header records
 - delegating draft saves/discards, publish/page actions, command/keymap handling, structural
   commands/mutations, and preview synchronization to those focused factories
@@ -227,8 +246,8 @@ Current responsibilities:
 
 ## 📱 Responsive Overrides (responsive-overrides.js)
 
-This helper owns the responsive override contract shared by builder-device rendering and public
-responsive CSS generation. It normalizes device ids from the preview contract, prunes empty
+This shared-kernel helper owns the responsive override contract used by builder-device rendering and
+public responsive CSS generation. It normalizes device ids from the preview contract, prunes empty
 responsive branches, exposes the per-module responsive field list from `module-descriptors.js`, and
 resolves effective section/module/column state for a specific device.
 
@@ -248,12 +267,15 @@ Current responsibilities:
 
 ## 📝 Draft Manager (draft-manager.js)
 
-This factory owns the explicit local-draft lifecycle for builder surfaces that save intentionally rather than immediately.
+This factory owns the explicit local-draft lifecycle for builder surfaces that save intentionally
+rather than immediately.
 
 Current responsibilities:
 
 - normalize theme and header draft state from the active page
-- initialize drafts for modules, theme, header, page settings, and section settings
+- initialize and own drafts for modules, theme, header, page settings, and section settings
+- own active draft identifiers, dirty scope, the page-wide structure draft, and the internally
+  constructed draft undo stack
 - clear selected module / active section draft state when selection changes
 - save and discard module drafts through `updateModule(...)`, returning truthful success/failure
   results to the command layer
@@ -261,7 +283,8 @@ Current responsibilities:
   truthful success/failure results to the command layer
 - reset theme drafts back to the default theme token set
 
-The draft manager does not own the canonical source of truth for builder state; it receives state and setters from `admin/page-builder.js` and mutates them through the injected action contract.
+Persisted API records remain canonical. The draft manager owns transient draft state and exposes
+read-only getters/actions through the shell's state composition contract.
 
 ## ⌨️ Command Registry (commands.js)
 
@@ -418,7 +441,8 @@ The snapshot merge path covers the dirty scopes owned by the explicit-save edito
 `module`, `theme`, `header`, `page-settings`, and `section`. It always works on a cloned page
 snapshot so previewing unsaved changes does not mutate `currentPage`.
 
-`admin/page-builder.js` still owns the top-level `canvasMode` and `previewWidth` state, but the preview handshake/render logic itself is no longer inlined there.
+`chrome-mode.js` owns `canvasMode`, editor chrome mode, and restore state; the preview manager owns
+the iframe handshake/render logic and reads the selected preview width through injected state.
 
 Reader module rendering uses the shared renderer contract: `.pb-reader-mount` includes normalized
 data attributes for source, display mode, controls placement/size, stage fit/gap/frame/max-width,
@@ -428,17 +452,34 @@ config before first render. Pages without an effective reader module publish an 
 render ordinary builder content without reader chrome. Active pages render ordinary sections before
 and after the reader into dedicated above/below surfaces.
 
+## 🧭 Focused Shell Controllers
+
+The Phase C controllers remove workflow state and DOM handling from the composition root:
+
+- `section-settings-editor.js` owns section draft rendering/binding, global and device ratios,
+  column settings, and section Save/Discard wiring.
+- `selection.js` owns selected page/header/section/column/module state, target normalization,
+  traversal, dirty guards, and live-canvas target selection.
+- `inline-edit.js` owns iframe text-edit lifecycle and stale-message protection; the DOM edit view
+  is never canonical and persists only through the module draft Save path.
+- `chrome-mode.js` owns live/Structure Debug canvas mode, chrome-collapsed Preview, device restore
+  state, and the Edit/Escape return path.
+
+Each controller exposes state through getters/actions injected into the shell. None creates a second
+persistence layer.
+
 ## 💾 Data API (data.js)
 
 This is the backend API layer for builder records. Current fetchers and mutators include:
 
-- `fetchPages(seriesId)`, `fetchPage(pageId)`
-- `fetchSeriesPages(seriesId)`, `fetchGlobalPages()`, `fetchPage(pageId)`
+- compatibility `fetchPages(seriesId)` plus explicit `fetchSeriesPages(seriesId)`,
+  `fetchGlobalPages()`, and `fetchPage(pageId)`
 - `createScopedPage(scope, seriesId, slug, title)`, `deletePage`, `reorderScopedPages`,
   `updatePage`
 - `fetchPageBindings(seriesId)`, `updatePageBindings(seriesId, bindings)`
+- `fetchPageBuilderRuntime()` for the authenticated responsive-capability/version contract
 - `addSection`, `updateSection`, `deleteSection`, `reorderSections`
-- `addModule`, `updateModule`, `moveModule`, `reorderModules`, `deleteModule`
+- `addModule`, `updateModule`, `moveModule`, `saveModulePlacements`, `reorderModules`, `deleteModule`
 - `fetchAssets`, `uploadAsset`
 
 Because page-list fetchers return page summaries without hydrated `sections`/`modules`, they are not
@@ -485,7 +526,9 @@ Appearance contract update:
 - a local `normalizeHeaderShellAppearance(...)` normalizes the three shared branches: `top`, `scrolled`, and `navItemDefaults`
 - `createPageHeaderMeta(...)` now persists normalized `appearance` into canonical V3 header metadata
 - `resolvePageHeaderState(...)` now preserves that same `appearance` data on both `meta` and normalized `header`
-- this is a data-contract pass only; no header editor UI or reader/admin header renderer consumes the new appearance fields yet
+- `header-editor.js` exposes shell/nav/block styling through the normal header draft, and
+  `reader/header-layout.js` applies the normalized shell and per-block appearance in both public and
+  live-preview rendering
 
 `resolvePageHeaderState(...)` is now the shared Step 5 seam for parity work:
 
@@ -529,6 +572,8 @@ Current editor responsibilities include:
 - **Style preset dropdown** per nav item: `Primary` (filled/neon) or `Secondary` (outline-only) — maps to the same variant model used by the `buttons` module
 - block visibility toggles (`renderPartsEditor()`): compact `.pb-field-row` rows, each the checkbox's own wrapping label with `aria-labelledby`/`aria-describedby` for a concise "Show {label} in header" accessible name
 - placement guidance for the live-canvas workflow; placement mutations live in `header-placement.js`
+- sparse Normal/Scrolled shell styling, header navigation defaults/item overrides, and independent
+  appearance groups for the five fixed header blocks
 
 Saving header changes writes back through `updatePage(..., { meta: nextMeta })` and clears any import/upgrade banners since the header is upgraded to canonical V3.
 
@@ -606,12 +651,21 @@ Coordinates all user interactions within the `#pbCanvas` through a factory patte
 
 ## 🧩 Base Module Editor (module-editor.js)
 
-This is the shared module inspector renderer and binder. Generic field rendering exists for modules that do not have a dedicated editor, and dedicated editors are delegated based on the descriptor `editorKind`. A raw JSON config card exists as a fallback.
+This is the shared module inspector dispatcher. It owns CMS source cards, shared Size & Alignment,
+responsive edit scope, descriptor-driven style sectors, and the safe generic binder/raw-card path.
+Per-type content/style rendering and dedicated binders are delegated by descriptor `editorKind`.
 
-The module editor also owns CMS source controls, responsive edit-scope cards, responsive module
-override controls, style-manager views for descriptor `appearanceSectors`, and draft event binding
-for text, image, spacer, HTML, email signup, feed, media gallery, entry gallery, promo, social,
-buttons, divider, gallery, and video modules.
+## 🗂️ Module Editor Registry and Per-Type Editors
+
+`module-editor-registry.js` maps all 18 descriptor `editorKind` values to focused editor entries.
+Adding a module type requires its descriptor, one editor entry, and one registry line; the dispatcher
+contains no per-type switch.
+
+Focused editor files cover header compatibility, text, image, gallery, video, social, email signup,
+promo, buttons, spacer, divider, reader, entry gallery, Feed, media gallery, HTML, account, and links
+grid. Each entry may render content/device/style sections and bind the matching draft events through
+the registry contract documented in `module-editor-registry.js`. Only editor entries that safely use
+the generic binder may retain the raw JSON card.
 
 ## 🧾 Appearance Editor (appearance-editor.js)
 
@@ -671,7 +725,9 @@ The most complex module, handling carousels, focal points, and rich CTA text. Ma
 
 ## 🏭 Shared Renderers (shared-renderers.js)
 
-This is the shared rendering core used by both admin preview output and the public reader. Factory outputs `renderModule`, `renderSection`, and `renderPage`. This establishes true structural parity between the admin canvas and live website.
+This `shared/page-builder/` rendering core is used by both admin preview output and the public reader.
+Factory outputs `renderModule`, `renderSection`, and `renderPage`. This establishes true structural
+parity between the admin canvas and live website.
 
 Section rendering always emits every global structural column in stable index order. Responsive
 layouts change only the CSS Grid track template, so module ownership and `data-builder-column-index`
@@ -788,7 +844,8 @@ Current semantics:
 
 - `border.radius` emits whenever it is explicitly set, even when no background or visible border is present
 - `border.width === 0` is treated as a meaningful override, survives merge/emptiness checks, and emits `border: none`
-- buttons now consume this helper end to end in both admin preview and reader rendering paths, while header-shell appearance remains a stored contract for later UI/rendering work
+- buttons and header shell/block/nav appearance consume this helper end to end in editor drafts,
+  admin preview, and reader rendering
 
 ## 🛡️ Sanitization Layer (sanitize.js)
 
@@ -796,8 +853,21 @@ The builder validation layer. Includes helpers for sanitizing builder HTML, proc
 
 Backend parity note:
 
-- the matching backend sanitizers now live in `backend/app/builder_security.py` as `sanitize_appearance(...)` and `sanitize_header_shell_appearance(...)`
+- the matching backend sanitizers live in the `backend/app/builder_security/` package;
+  `appearance.py` owns shared appearance leaves and `header.py` owns header-shell normalization
 - stored JSON omits empty `appearance` keys entirely instead of writing explicit `null`
+
+## 📐 Reader Config and Responsive CSS
+
+The shared kernel also owns two public/admin parity seams:
+
+- `reader-config.js` normalizes reader display mode, control placement/size/labels/appearance,
+  stage fit/frame/gap/max width, panels, comments, and safe responsive branches; it also emits the
+  reader-mount data attributes consumed by the public runtime.
+- `responsive-css.js` emits scoped ratio-banded CSS for sections/columns/panels, reader controls,
+  reader stage, Feed layout, and descriptor-backed module overrides. It shares device IDs and media
+  queries with `preview-contract.js`/`responsive-overrides.js`, so fixed builder presets and public
+  resize/orientation select the same sparse branches.
 
 ## 🔗 Link Utilities (link-utils.js)
 
@@ -815,7 +885,8 @@ A shared utility library for manipulating and normalizing links across the build
 ## 📖 Current Module Catalog
 
 The builder currently recognizes these module types:
-`header`, `text`, `image`, `gallery`, `video`, `social`, `email-signup`, `promo`, `buttons`, `spacer`, `divider`, `reader`, `entry-gallery`, `feed`, `media-gallery`, `html`.
+`header`, `text`, `image`, `gallery`, `video`, `social`, `email-signup`, `promo`, `buttons`, `spacer`,
+`divider`, `reader`, `entry-gallery`, `feed`, `media-gallery`, `html`, `account`, and `links-grid`.
 
 CMS-backed modules:
 
@@ -837,7 +908,9 @@ Again: `header` is compatibility-only in the catalog and is not part of the norm
 
 ## 📜 Important Accuracy Notes
 
-- The builder's mutable UI state is still primarily coordinated in `admin/page-builder.js`, not in `data.js`, but major workflow clusters now live in focused factories: `draft-manager.js`, `page-actions.js`, `canvas-mutations.js`, and `preview-manager.js`.
+- The builder shell is a composition root around manager/controller-owned state, not a second draft
+  store in `data.js`. Draft, section, selection, inline-edit, chrome, page-action, mutation, and
+  preview workflows live in focused factories.
 - Header editing is page-scoped through `page.meta.header`, not primarily through a normal `header` module.
 - The admin canvas is an editing surface with builder chrome. Live mode and chrome-collapsed Preview both render through the same real reader iframe (`index.html?builderPreview=1`) for full reader-shell parity, not through a constrained div or the direct `preview-renderers.js` path.
 - Shared renderer parity exists at the module/section/page HTML level through `shared-renderers.js`. The iframe preview approach means real viewport dimensions, real media queries, and real reader-side JavaScript all run in preview.
@@ -850,7 +923,7 @@ Again: `header` is compatibility-only in the catalog and is not part of the norm
 - Responsive parity instrumentation is also implemented: the iframe keeps exact preset dimensions, the admin preview scale shell can shrink the visible presentation without changing iframe pixels, and preview metrics verify breakpoint branches, two-page mode expectations, and horizontal overflow risks.
 - Section layouts support 1-6 structural columns with positive integer ratios. Responsive reflow
   never rewrites global module ownership, and sparse per-column styling/visibility applies in both
-  public output and admin preview.
+  public output and admin preview. Global shrink is rejected until removed columns are empty.
 - Module add/update/move/reorder routes validate the target column against the global layout.
   Composite module updates are validated/sanitized before SQLAlchemy mutation, and validation errors
   roll back the route session.
@@ -858,10 +931,10 @@ Again: `header` is compatibility-only in the catalog and is not part of the norm
 
 ## 🧭 Maintenance Rule
 
-Update this document when `admin/page-builder.js` changes orchestration ownership, a
-`admin/page-builder/*.js` module is added or removed, the descriptor catalog changes, the preview
-message contract changes, responsive override semantics change, or a builder module gains/removes
-public rendering, editing, source, style, or persistence behavior.
+Update this document when `admin/page-builder.js` changes orchestration ownership, an
+`admin/page-builder/*.js` or `shared/page-builder/*.js` module is added/removed, the descriptor
+catalog changes, the preview message contract changes, responsive override semantics change, or a
+builder module gains/removes public rendering, editing, source, style, or persistence behavior.
 
 ## 📚 Related Docs
 

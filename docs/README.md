@@ -1,11 +1,12 @@
-# Docs Index - 0.8.2 Reader Block and Layout Lock
+# Docs Index - 0.8.5 Builder Customization and Refactor Lock
 
 Last updated: 2026-07-16
 
 Current release focus:
 
-- `0.8.2` locks the full-page live builder plus reader-block/layout architecture that should carry
-  into `1.0.0`.
+- `0.8.5` closes the builder customization roadmap, its authenticated responsive QA corrections,
+  and the behavior-preserving builder refactor. The branch is the merge baseline for the remaining
+  `1.0.0` roadmap.
 - The live builder canvas is the real reader route in a same-origin iframe with validated snapshots,
   target overlays, live drag/drop, chrome-collapsed Preview, device modes, guarded commands/keymaps,
   local draft undo/redo, and text-module inline editing.
@@ -22,16 +23,22 @@ Current release focus:
   reflow, and stable global module ownership.
 - Desktop/Tablet/Phone preview dimensions are exact iframe CSS pixels (`1920x1080`, `768x1024`,
   `375x812`), with admin-only scaling for full-HD Desktop.
+- Panel visibility and reader-frame borders resolve on the real reader shells; reader controls and
+  Feed layout support sparse Tablet/Phone overrides with API capability and round-trip checks.
+- Shared builder/reader code now lives under `shared/page-builder/`, backend builder sanitization is
+  split under `backend/app/builder_security/`, and JS/Python parity fixtures guard both contracts.
 
 Recommended starting points:
 
 - `docs/SYSTEM_OVERVIEW.md` - how the frontend, backend, admin, reader, diagnostics, and ops pieces fit together.
 - `docs/ARCHITECTURE.md` - what runs where, including Caddy, FastAPI, static assets, analytics, and deployment boundaries.
 - `docs/ROADMAP.md` - release checklist through `1.0.0`.
-- `docs/READER_BUILDER_QA.md` - `0.8.0` manual QA worksheet for reader + page-builder lock.
+- `docs/READER_BUILDER_QA.md` - `0.8.5` reader + builder regression and merge-closeout worksheet.
 - `docs/completed-builder-plans/README.md` - index of finished builder architecture, preview,
   customization, inspector, layout, consolidation, incremental-improvement, and refactor plans.
 - `docs/BUILDER_STRIPE_STORE_PLAN.md` - follow-up plan for builder-authored one-time purchase store pages using Stripe-hosted Checkout.
+- `docs/POLISH_BACKLOG_PLAN.md` - post-0.8.5 fixes and small features; items there do not reopen the
+  completed builder roadmap unless explicitly promoted into a release gate.
 - `docs/admin-overview.md` - admin panel and page-builder behavior.
 - `docs/reader-overview.md` - reader runtime behavior and builder-page loading.
 - `docs/API_REFERENCE.md` - backend route reference.

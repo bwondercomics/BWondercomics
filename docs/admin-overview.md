@@ -1,6 +1,9 @@
 # BWonderComics Admin Overview
 
-This document covers the admin panel (content editor) architecture, data flow, and major features. Current code is being modularized; `admin/app.js` remains the primary entry point, with shared constants in `admin/config.js`, DOM references in `admin/dom.js`, and the page-builder workflow coordinated from `admin/page-builder.js`.
+This document covers the admin panel (content editor) architecture, data flow, and major features.
+The admin is modularized around `admin/app.js` as the primary entry point, shared constants in
+`admin/config.js`, DOM references in `admin/dom.js`, and the page-builder composition root in
+`admin/page-builder.js`.
 
 ## Entry Point and Shared Modules
 
@@ -9,7 +12,11 @@ This document covers the admin panel (content editor) architecture, data flow, a
 - `admin/dom.js` — Centralized DOM lookups for forms, buttons, lists, modals, and status elements.
 - `admin/admin.css` — Extracted styles from `admin/index.html`; this remains the single admin stylesheet entrypoint and imports the section-level CSS files.
 - `admin/page-builder.js` — Page-builder orchestrator for shared builder state, top-level routing/bootstrapping, and composition of the extracted builder managers.
-- `admin/page-builder/` — Focused builder modules for inspector rendering, canvas rendering, canvas event binding, sidebar rendering, data access, theme editing, module editing, header normalization/editing, shared link editing, and module-type-specific editors.
+- `admin/page-builder/` — Focused builder modules for inspector rendering, canvas/selection events,
+  sidebar rendering, data access, drafts, theme/header editing, structural commands, preview sync, and
+  module-type-specific editors.
+- `shared/page-builder/` — Dual-use builder/reader kernel for descriptors, rendering, sanitization,
+  header/reader config, responsive resolution/CSS, link/layout helpers, and the preview protocol.
 - `admin/css/admin.page-builder.css` — Stable page-builder stylesheet facade imported by `admin/admin.css`.
 - `admin/css/page-builder/` — Internal page-builder stylesheet split by ownership (`layout`, `sidebar`, `canvas`, `insertions`, `inspector`, `controls`, `theme`, `responsive`) so layout and inspector work can evolve without one monolithic CSS file.
 
@@ -28,15 +35,27 @@ This document covers the admin panel (content editor) architecture, data flow, a
 - Blog/updates: CRUD for posts via the DB-backed API (`/api/admin/posts`), with draft/scheduled/published and a “publish date/time” field.
 - Media library: Load/save `/media.json` (DB-backed); search/filter by tags/path; sync with disk via `/api/list-media`; apply media to posts; tag propagation from posts; per-item access (`public`/`premium`/`private`) and premium visibility (`blur`/`hidden`). Premium/private items are stored under `protected/media/`. Post images may be copied to `media/post-assets/` automatically; that folder is derived and excluded from media sync. Blurred previews live at `media/previews/` and are excluded from the admin list; the preview panel shows both the original and public preview.
 - Page builder: Structured page editing for landing/custom pages now opens as a full-page builder shell that hides the normal admin header/nav while active. A top toolbar owns page status/actions, Add Page, live/structure mode, exact Desktop / Tablet / Phone device controls, chrome-collapsed Preview, Save Draft, Publish, side-panel visibility, and Exit. A single side panel owns Pages, Blocks, Layers, Settings, and Styles; descriptor-backed blocks provide insertable module defaults, layers mirror page/header/section/column/module structure, and module fields, theme controls, section settings, page-header settings, and page metadata settings still use explicit local drafts with `Save`/`Discard`. Add Page templates for Blank, Reader, Feed, Media Gallery, and Entry Gallery create normal page/section/module records; the Reader template is series-only and only assigns the series reader binding when one is missing. Structural actions such as add, move, reorder, hide-on-device, and delete remain immediate and now route through the live structural command adapter from Blocks, Layers, the selected-target toolbar, and Structure Debug. The live same-origin iframe preview is the default canvas and loads `/index.html?...&builderPreview=1&previewSession=...` with viewport presets backed by the builder preview contract (1920x1080 / 768x1024 / 375x812). Live builder snapshots set `options.builderEditing: true`, which lets the iframe emit admin-only `data-builder-*` markers and live target geometry for hover/selection overlays and drag/drop placement without adding those markers to public reader output. Chrome-collapsed Preview reuses the same iframe and session with `builderEditing: false`, hides editor chrome except a small Edit restore button, and restores the selected device/target when editing resumes. The old structural canvas is retained as **Structure Debug** for diagnostic fallback and older visual workflows, but core structural mutations now happen on the live canvas.
-- Builder module layout: the inspector shell lives in `admin/page-builder/editor-panel.js`, snapshot-driven Structure Debug markup lives in `admin/page-builder/canvas-renderer.js`, canvas rebinding lives in `admin/page-builder/canvas-events.js`, and page/module rail rendering lives in `admin/page-builder/sidebar-panel.js`. The refactor also split draft lifecycle into `draft-manager.js`, structural section/module mutations into `canvas-mutations.js`, live structural intent into `structural-commands.js`, live drop ranking into `live-drop-placement.js`, page lifecycle actions into `page-actions.js`, iframe preview synchronization into `preview-manager.js`, and responsive shell math into `layout.js`. **Shared module HTML output still lives in `admin/page-builder/shared-renderers.js`** via a `createRenderers(options)` factory consumed by both the public reader (`reader/page-renderer.js`) and builder-owned render paths.
+- Builder module layout: the inspector shell lives in `admin/page-builder/editor-panel.js`, snapshot-driven Structure Debug markup lives in `admin/page-builder/canvas-renderer.js`, canvas rebinding lives in `admin/page-builder/canvas-events.js`, and page/module rail rendering lives in `admin/page-builder/sidebar-panel.js`. The refactor also split draft lifecycle into `draft-manager.js`, structural section/module mutations into `canvas-mutations.js`, live structural intent into `structural-commands.js`, live drop ranking into `live-drop-placement.js`, page lifecycle actions into `page-actions.js`, iframe preview synchronization into `preview-manager.js`, responsive shell math into `layout.js`, and selection/inline-edit/chrome/section workflows into their focused controllers. Shared module HTML output lives in `shared/page-builder/shared-renderers.js` via a `createRenderers(options)` factory consumed by both the public reader (`reader/page-renderer.js`) and builder-owned render paths.
 - Reader and layout authoring: Comic Reader modules expose paged/vertical display, controls
   placement/size/appearance, stage fit/gap/frame/max-width, panel visibility, comments, and safe
   device overrides. Sections expose 1-6 structural columns, width ratios, and sparse per-column
   appearance, padding, alignment, min-height, visibility, and responsive reflow. Bound reader pages
   can contain normal sections above or below the required reader module without invalidating the
   binding.
-- Page header editing: the header is edited from the canvas itself. Clicking the header preview opens plain-language sections for `Header Copy`, `Navigation Buttons`, `Header Parts`, and `Placement`; the old shared-header tab model is no longer the primary workflow.
-- Structured module editing: `gallery`, `video`, `divider`, `entry-gallery`, and `media-gallery` now use dedicated editors instead of JSON-only fallback controls. CMS-backed modules persist a sanitized optional `config.source` branch: reader modules use the active page series on series pages and a selected specific series on global pages, entry galleries can target active/specific/all series, and feed/media-gallery remain site-wide over the existing post and media indexes. The gallery editor uses the same asset picker flow as promo, social, and theme editing, including asset browsing/upload and draft updates through the shared picker contract. The generic raw JSON `Advanced` card is now limited to modules that still round-trip through the generic draft binder; dedicated-binder modules such as `promo`, `social`, and `buttons` no longer advertise a raw fallback they do not save.
+- Page header editing: the header is edited from the canvas itself. Clicking the header preview opens
+  plain-language sections for `Header Copy`, `Navigation Buttons`, `Header Parts`, and styling.
+  Header Parts exposes visibility rows; placement uses live-canvas selection, toolbar arrows, and
+  drag/drop. The abstract placement board is retired.
+- Structured module editing: all 18 descriptor editor kinds dispatch through
+  `module-editor-registry.js` to focused per-type editor entries; `module-editor.js` owns only shared
+  CMS source, layout/responsive/style cards, generic binding, and dispatch. CMS-backed modules
+  persist a sanitized optional `config.source` branch: reader modules use the active page series on
+  series pages and a selected specific series on global pages, entry galleries can target
+  active/specific/all series, and feed/media-gallery remain site-wide over the existing post and
+  media indexes. The gallery editor uses the same asset picker flow as promo, social, and theme
+  editing, including asset browsing/upload and draft updates through the shared picker contract.
+  The generic raw JSON `Advanced` card is limited to editor entries that safely round-trip through
+  the generic binder.
 - Internal builder-page links: header buttons and `buttons` modules can target a global builder page,
   a series builder page, a URL, or an anchor target. Series builder-page links persist the target
   `seriesId` when available; legacy links without `seriesId` continue to resolve against the active
@@ -59,7 +78,14 @@ This document covers the admin panel (content editor) architecture, data flow, a
   - Series index (DB): `/api/save` for `admin/series.json` writes to Postgres (no disk write).
   - Media (DB): `/api/save` for `media.json`
   - Posts (DB): `/api/admin/posts` (create/update/delete)
-  - Page builder (DB): `/api/admin/pages/global`, `/api/admin/pages/series/<series_id>`, `/api/admin/pages/<page_id>`, `/api/admin/page-bindings/<series_id>`, `/api/admin/pages/<page_id>/sections`, `/api/admin/pages/<page_id>/sections/reorder`, `/api/admin/sections/<section_id>`, `/api/admin/sections/<section_id>/modules`, `/api/admin/sections/<section_id>/modules/reorder`, `/api/admin/modules/<module_id>`, `/api/admin/modules/<module_id>/move`
+  - Page builder (DB): `/api/admin/page-builder/runtime`, `/api/admin/pages/global`,
+    `/api/admin/pages/series/<series_id>`, `/api/admin/pages/<page_id>`,
+    `/api/admin/page-bindings/<series_id>`, `/api/admin/pages/<page_id>/sections`,
+    `/api/admin/pages/<page_id>/sections/reorder`,
+    `/api/admin/pages/<page_id>/modules/placements`, `/api/admin/sections/<section_id>`,
+    `/api/admin/sections/<section_id>/modules`,
+    `/api/admin/sections/<section_id>/modules/reorder`, `/api/admin/modules/<module_id>`,
+    `/api/admin/modules/<module_id>/move`
   - Page-builder assets: `/api/admin/assets`, `/api/admin/assets/upload`
   - Files/folders: `/api/create-entry`, `/api/delete-image`, `/api/list-entry-images`, `/api/list-media`, `/api/move-path`, `/api/copy-path`
 - Local cache: `localStorage` (`STORAGE_KEY`) for draft entries/status, plus page-builder UI preferences such as `pb-editor-mode` and `pb-sidebar-mode`.
@@ -70,7 +96,7 @@ This document covers the admin panel (content editor) architecture, data flow, a
   `/api/admin/pages/home/<seriesId>`. Both resolve the page marked homepage first and then fall
   back to the series' explicit `reader` binding. Global pages use
   `/api/pages/global/by-slug/<slug>` and never shadow series routes.
-- Builder preview contract: `admin/page-builder/preview-contract.js` defines the preview viewport registry, snapshot version, source labels, side-effect policy, explicit responsive media-query map, optional `builderEditing` snapshot flag, and the full `postMessage` message-type registry (`REQUEST_SNAPSHOT`, `SNAPSHOT`, `ACK`, `ERROR`, `METRICS`, `TARGETS`, `TARGET_HOVER`, `TARGET_SELECT`, `TARGET_ACTION`, and internal text-module `INLINE_EDIT_*` messages) that the iframe preview bridge uses. The builder marks preview output as `saved` when it reflects the hydrated API page and `working` when an active dirty draft is merged into a cloned page snapshot for preview. Key helpers exported from the contract cover snapshot, metrics, target traffic, and inline edit traffic: `buildPreviewSnapshotMessage(...)`, `buildPreviewControlMessage(...)`, `buildPreviewMetricsMessage(...)`, `buildPreviewTargetMessage(...)`, `buildPreviewInlineEditMessage(...)`, `validatePreviewEnvelope(...)`, `validatePreviewSnapshotPayload(...)`, `validatePreviewMetricsPayload(...)`, and `isPreviewMessageType(...)`.
+- Builder preview contract: `shared/page-builder/preview-contract.js` defines the preview viewport registry, snapshot version, source labels, side-effect policy, explicit responsive media-query map, optional `builderEditing` snapshot flag, and the full `postMessage` message-type registry (`REQUEST_SNAPSHOT`, `SNAPSHOT`, `ACK`, `ERROR`, `METRICS`, `TARGETS`, `TARGET_HOVER`, `TARGET_SELECT`, `TARGET_ACTION`, and internal text-module `INLINE_EDIT_*` messages) that the iframe preview bridge uses. The builder marks preview output as `saved` when it reflects the hydrated API page and `working` when an active dirty draft is merged into a cloned page snapshot for preview. Key helpers exported from the contract cover snapshot, metrics, target traffic, and inline edit traffic: `buildPreviewSnapshotMessage(...)`, `buildPreviewControlMessage(...)`, `buildPreviewMetricsMessage(...)`, `buildPreviewTargetMessage(...)`, `buildPreviewInlineEditMessage(...)`, `validatePreviewEnvelope(...)`, `validatePreviewSnapshotPayload(...)`, `validatePreviewMetricsPayload(...)`, and `isPreviewMessageType(...)`.
 
 ## Runtime Flow (High Level)
 

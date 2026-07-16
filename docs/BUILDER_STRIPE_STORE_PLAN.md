@@ -55,7 +55,7 @@ Local source of truth:
 - `docs/completed-builder-plans/BUILDER_PLAN.md` - structured builder model and security principle:
   sanitize on save, store
   cleaned data, sanitize again on read, and reject invalid structural payloads.
-- `backend/app/builder_security.py` and `backend/app/page_store.py` - allowed module types, module
+- `backend/app/builder_security/` and `backend/app/page_store.py` - allowed module types, module
   config sanitization, source normalization, and section/module mutation paths.
 - `backend/requirements.txt` - current backend dependencies; no Stripe SDK is present today.
 

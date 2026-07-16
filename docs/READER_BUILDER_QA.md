@@ -1,8 +1,26 @@
-# Reader + Builder QA Worksheet (`0.8.2`)
+# Reader + Builder QA Worksheet (`0.8.5`)
 
-Use this worksheet for the current reader-block + live-builder lock pass. The goal is not to explore
-new features. The goal is to prove the shipped paged/vertical reader, removable reader shell,
-responsive layout authoring, and builder-first architecture are stable enough to carry into `1.0.0`.
+Use this worksheet for the reader, builder-customization, responsive-contract, and refactor lock.
+The goal is not to explore new features. The goal is to prove the shipped paged/vertical reader,
+removable reader shell, responsive layout authoring, and builder-first architecture remain stable
+after the 0.8.5 branch merges.
+
+## 0.8.5 Merge Closeout Evidence
+
+The targeted authenticated closeout was completed on Pyre on 2026-07-16 and is recorded in
+`docs/completed-builder-plans/BUILDER_CUSTOMIZATION_ROADMAP.md`:
+
+- [x] Panel hide/unhide collapses and restores the real shell.
+- [x] Reader-column borders target the outer reader frame and restore the stock frame when cleared.
+- [x] Distinct Tablet/Phone reader-control and Feed settings survive save, refetch, and public
+      rendering; portrait hardware and rotation back to Desktop layout were checked.
+- [x] Popup-arrow placement Save/Discard, Save Page, Publish, and confirmed Unpublish preserve their
+      documented persistence/publication boundaries.
+- [x] Builder refactor Phases A–G retain the same UI/runtime contracts under the split shell,
+      editor registry, shared kernel, backend sanitizer package, and behavior-focused test suites.
+
+The broader unchecked worksheet below remains useful regression coverage; it is not a claim that
+every optional 1.0 workflow was manually repeated during the 0.8.5 closeout.
 
 ## Prep
 
@@ -14,6 +32,7 @@ responsive layout authoring, and builder-first architecture are stable enough to
   - `npm run lint:py`
   - `npm run format:py:check`
   - `npm run build`
+  - `npm run test:visual`
 - Test with:
   - Guest session
   - Admin session
@@ -95,8 +114,10 @@ responsive layout authoring, and builder-first architecture are stable enough to
   - Exercise 1, 2, 3, and 4+ column layouts, edit ratios, and style individual columns.
   - Change Tablet/Phone reflow and column visibility while confirming module ownership remains in
     the original global columns.
-  - Shrink the global column count and confirm orphaned modules merge into the final surviving column
-    in stable order.
+  - Try to shrink the global column count while a removed column still owns modules and confirm the
+    save is rejected with instructions to move/delete them first.
+  - Clear the removed columns and confirm the same shrink then succeeds without dropping panel
+    settings or module placement silently.
 - [ ] Reader customization
   - Save controls placement/size/appearance, stage fit/gap/frame/max-width, panel visibility,
     comments visibility, and display mode.
@@ -129,11 +150,10 @@ responsive layout authoring, and builder-first architecture are stable enough to
   - Switch to another series.
   - Confirm page list, homepage state, and builder edits remain scoped to the active series only.
 - [ ] Inspector density & 280px rail
-  - Click the header surface and open the Placement editor at the full 280px rail.
-  - Confirm each block is a two-line card whose four icon move buttons (left/right/up/down) sit on one
-    line with no clipping, and whose label truncates with an ellipsis rather than wrapping.
-  - Reorder a block with the move buttons and by dragging the whole card between regions; confirm both
-    paths move it and the footer reports unsaved changes until saved.
+  - Click the header surface and confirm the retired placement board is absent. Header Parts should
+    show five compact visibility rows with copy directing placement edits to the live canvas.
+  - Select a header part in the preview, move it with the selected-target toolbar arrows or live
+    drag/drop, and confirm the footer reports unsaved changes until saved.
   - Check Pages, Blocks, and Layers tabs for compact rows, visible actions, preserved drag affordances,
     and ellipsis truncation on long page, block, or layer labels.
   - Check Page Settings, Section Settings, Header Settings, Module Settings, Styles, theme panel

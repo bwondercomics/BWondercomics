@@ -1,4 +1,4 @@
-# BWonderComics 0.8.2 - Live Builder Authoring Lock
+# BWonderComics 0.8.5 - Builder Customization and Refactor Lock
 
 BWonderComics is a plain HTML/CSS/JS comic reader and admin panel built with Vite, backed by a FastAPI/Postgres service for dynamic site behavior: auth, comments, posts, RSS, uploads, premium access, DB-backed series and entries, the page builder, diagnostics, ops, and the analytics proxy.
 
@@ -7,12 +7,17 @@ BWonderComics is a plain HTML/CSS/JS comic reader and admin panel built with Vit
 - The reader is builder-first. It loads DB-backed series/entry JSON plus the canonical builder page from `/api/pages/home/<seriesId>`, `/api/pages/<seriesId>/<slug>`, or `/api/pages/global/by-slug/<slug>` when `pageScope=global` is requested. Legacy `page-config.json` startup behavior is fallback-only and is no longer part of normal reader boot.
 - The page builder owns global and per-series pages, homepage selection, same-series reader bindings, draft/publish state, page-scoped V3 headers in `page.meta.header`, theme/panel shell state, sections, modules, and templates for Reader, Feed, Media Gallery, and Entry Gallery pages.
 - The builder now opens as a full-page authoring shell. The live canvas is the real reader route in a same-origin iframe, with blocks, layers, settings, styles, selected-target overlays, live drag/drop, chrome-collapsed Preview, guarded keymaps, local draft undo/redo, and text-module inline editing.
-- Builder preview is coordinated by `admin/page-builder/preview-manager.js` and `reader/preview-bridge.js`. Snapshots, control messages, target geometry, inline-edit messages, and responsive metrics are validated through `admin/page-builder/preview-contract.js`.
+- Builder preview is coordinated by `admin/page-builder/preview-manager.js` and `reader/preview-bridge.js`. Snapshots, control messages, target geometry, inline-edit messages, and responsive metrics are validated through `shared/page-builder/preview-contract.js`.
 - Desktop, Tablet, and Phone preview presets use exact iframe viewport dimensions from the shared preview contract: `1920x1080`, `768x1024`, and `375x812`. The full-HD Desktop iframe is visually scaled in the admin canvas without changing iframe CSS pixels.
-- Unsaved module, theme, header, page-settings, and section drafts are merged into cloned working snapshots for preview without mutating the saved page.
+- Unsaved module, theme, header, page-settings, section, and page-wide structure drafts are merged
+  into cloned working snapshots for preview without mutating the saved page.
 - Preview mode suppresses reader side effects that should not fire from an admin iframe, including analytics/tracking writes, email submission, comment mutations, chat SSO, safe-mode redirects, fullscreen changes, and external navigation clicks.
 - Header buttons and `buttons` modules share the same normalized link target model for builder pages, anchors, and external URLs. Header shell, navigation, panel buttons, and builder modules share structured appearance contracts between admin canvas, preview, and public reader.
 - CMS-backed builder modules are structured: `reader`, `entry-gallery`, `feed`, and `media-gallery` persist sanitized source config, while feed/media-gallery use existing site-wide post/media data and reader/entry modules remain series-aware.
+- The 0.8.5 builder closeout adds column-owned panel settings, explicit Desktop/Tablet/Phone
+  responsive authoring for reader controls and Feed layout, atomic structure placement saves,
+  publication-safe Save Page behavior, an editor registry, a dual-use `shared/page-builder/`
+  kernel, and cross-language builder-schema parity coverage.
 - Posts, media, series, entries, users, comments, page configs, and builder pages are DB-backed. Entry and media files live on disk under public or protected roots, with premium/private access enforced by the backend.
 - Media supports `public`, `premium`, and `private` access. Premium blur previews in `media/previews/` and public post image copies in `media/post-assets/` are derived output.
 - Public HTML shells and `manifest.json` can use admin-selected public media for the site OG image and favicon. FastAPI serves branded responses for the main public routes.
@@ -23,7 +28,10 @@ BWonderComics is a plain HTML/CSS/JS comic reader and admin panel built with Vit
 
 - `reader/` - public reader runtime, page loading, comments, tracking, preview bridge, and builder-page rendering.
 - `admin/` - admin dashboard, entries, posts, media, analytics, diagnostics, designer, and page-builder UI.
-- `admin/page-builder/` - page-builder managers, draft handling, preview contract/sync, shared renderers, module editors, and appearance utilities.
+- `admin/page-builder/` - admin-only page-builder orchestration, draft/controllers, preview sync,
+  selection, structural commands, and module editors.
+- `shared/page-builder/` - dual-use builder/reader contracts, renderers, sanitizers, descriptors,
+  responsive resolution/CSS, header config, and preview protocol.
 - `backend/app/` - FastAPI app, routes, DB stores, page-builder persistence, branding, diagnostics, ops, analytics, auth, and premium access.
 - `assets/` - public chrome, CSS, icons, banners, and static images used by the reader/admin shell.
 - `comics/`, `media/`, and `protected/` - public and access-controlled entry/media file roots used by the backend.
@@ -49,7 +57,8 @@ Public pages are served from `dist/`.
 - Build + snapshot: `./scripts/frontend-build.sh` (writes `dist/` and saves a tarball in `var/releases/`).
 - Caddy serves `dist/` for the public site, and `/admin/` directly from the repo (admin changes go live without rebuild).
 - If you change anything that affects the public runtime, rebuilding `dist/` is mandatory before you verify the fix in the browser.
-- This includes `reader/`, top-level public HTML, `assets/`, and shared builder modules imported by the reader bundle, even when those files live under `admin/`.
+- This includes `reader/`, top-level public HTML, `assets/`, and `shared/page-builder/` modules
+  imported by the reader bundle.
 - Passing tests against source files does not prove the live site changed until the new bundle has been built.
 
 ## Quality gates

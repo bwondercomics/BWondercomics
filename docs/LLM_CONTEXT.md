@@ -10,7 +10,9 @@ To maintain the long-term health of this project, all AI assistants MUST follow 
 2.  **Maintain Documentation Integrity**: Do not remove existing documentation unless the code it describes has been deleted.
 3.  **Audit Compliance**: If you are unsure of the current state of a feature, perform a brief audit and update the docs if they have drifted from the implementation.
 4.  **Rebuild Public Frontend Before Claiming Runtime Behavior Changed**: The public reader/site is served from `dist/`, not directly from source files. If you change anything that can affect the public runtime, you MUST rebuild `dist/` before saying the fix works.
-    - This includes changes in `reader/`, top-level public HTML, `assets/`, and any shared module imported by the public bundle, even if that shared file lives under `admin/` (for example `admin/page-builder/header-config.js`).
+    - This includes changes in `reader/`, top-level public HTML, `assets/`, and any module under
+      `shared/page-builder/` imported by the public bundle (for example
+      `shared/page-builder/header-config.js`).
     - For public/frontend work, prefer `./scripts/frontend-build.sh` because it rebuilds `dist/` and snapshots the release bundle. `npm run build` is the minimum acceptable fallback when the snapshot step is not needed.
     - Do not treat passing source-level tests as proof that the live site changed until the built assets have been regenerated.
 
@@ -20,6 +22,7 @@ To maintain the long-term health of this project, all AI assistants MUST follow 
 - Frontend sources:
   - Reader UI: `reader/` + `index.html` + `assets/css/main.css` + `assets/*`
   - Admin UI: `admin/` (`admin/index.html` + `admin/admin.css`)
+  - Shared builder/reader kernel: `shared/page-builder/`
   - CSS is split into core sections under `assets/css/main.core.*.css` and responsive overrides in `assets/css/main.responsive.css`.
     `assets/css/main.css` now only imports `main.core.css` + `main.responsive.css`.
 - Backend: `backend/` (FastAPI + SQLAlchemy)
@@ -60,9 +63,9 @@ Ports are configurable via env in `deploy/bwondercomics.env`. Example running ma
 - Caddy: `80/443`
 - Umami: host `3001` -> container `3000` (bound to localhost)
 
-### Current active services (as of 2026-01-17)
+### Expected compose services
 
-All services are running in the live stack:
+The main compose stack defines:
 
 - `bwondercomics-api`
 - `bwondercomics-db`
@@ -143,9 +146,10 @@ sudo ufw delete allow from 10.0.0.0/24 to any port 5173 proto tcp
 Vite proxies these to the API (so data.json/series.json work):
 `/api`, `/data.json`, `/series.json`, `/page-config.json`, `/media.json`, `/series/*`, `/analytics.js`.
 
-## Recent Builder and Reader Changes (updated 2026-06-18)
+## Recent Builder and Reader Changes (updated 2026-07-16)
 
-- Current project version is `0.8.2`, the live builder plus reader-block/layout lock.
+- Current project version is `0.8.5`, the builder customization, responsive-contract, and
+  structural-refactor lock.
 - Page Builder is a full-page admin shell. The default canvas is the real reader route in a
   same-origin iframe using `builderPreview=1`, `previewSession`, and exact Desktop/Tablet/Phone
   iframe presets: `1920x1080`, `768x1024`, and `375x812`. Desktop may be visually scaled by the
@@ -170,6 +174,19 @@ Vite proxies these to the API (so data.json/series.json work):
   are fed only from the reader module's own section.
 - Section layouts support 1-6 ratio-based structural columns with sparse per-column styling and
   responsive reflow that preserves global module ownership.
+- The authenticated 0.8.5 correction pass makes panel Hidden collapse the real shell, applies a
+  reader-column border to the outer frame, persists sparse Tablet/Phone reader-control and Feed
+  layout branches, batches popup-arrow moves through an atomic page placement save, and keeps Save
+  Page from changing publication state.
+- `admin/page-builder.js` is now a composition root around focused draft, section, selection,
+  inline-edit, chrome, page-action, structural, and preview controllers. Module editing dispatches
+  through `module-editor-registry.js` and per-type editor modules.
+- Dual-use renderer/config/sanitizer/responsive modules live under `shared/page-builder/`; a boundary
+  test prevents shared code from importing admin/reader code and prevents the reader from importing
+  admin code.
+- Backend builder validation is a re-exporting package under `backend/app/builder_security/`, with
+  `reader_bindings.py` owning reader-binding invariants and JS/Python parity fixtures guarding the
+  mirrored schema.
 - Public entry payloads omit drafts and withhold future scheduled pages while advertising Coming
   Soon. Authenticated admin payloads retain all entries and full pages; due schedules promote
   automatically.
@@ -212,8 +229,10 @@ Admin is currently served from `admin/` (repo source) via Caddy; rebuilding `dis
 
 Critical nuance:
 
-- Files under `admin/` are not automatically "admin-only". Some builder helpers are shared by the reader bundle.
-- If a change affects public reader behavior, rebuild `dist/` even when the edited file path starts with `admin/`.
+- Files under `shared/page-builder/` are deliberately dual-use and can affect both the source-served
+  admin and the public reader bundle.
+- Admin-only orchestration stays under `admin/page-builder/`; the shared-kernel boundary test should
+  fail if reader code starts importing it again.
 - Do not tell the user a public reader/header/builder fix is live until the rebuilt bundle exists.
 
 Avoid editing `dist/` directly. Treat it as build output only.

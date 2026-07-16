@@ -27,7 +27,7 @@ MAX_COLUMNS = 6
 
 
 # 100 so percent-style weight strings (e.g. "20-60-20") are valid; legacy small
-# ratios like "1-3-1" remain a strict subset. Mirrors admin/page-builder/layout-utils.js.
+# ratios like "1-3-1" remain a strict subset. Mirrors shared/page-builder/layout-utils.js.
 MAX_COLUMN_RATIO = 100
 
 

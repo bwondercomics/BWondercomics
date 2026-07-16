@@ -130,10 +130,12 @@ reference:
 Current BWonderComics source remains authoritative for persisted data, security, rendering, and
 runtime behavior:
 
-- `admin/page-builder/preview-contract.js`, `preview-manager.js`, and `commands.js`;
+- `shared/page-builder/preview-contract.js`, `admin/page-builder/preview-manager.js`, and
+  `admin/page-builder/commands.js`;
 - `reader/preview-bridge.js` and `reader/data.js`;
-- `admin/page-builder/module-descriptors.js`, `sidebar-panel.js`, and `canvas-mutations.js`;
-- `backend/app/page_store.py`, `builder_security.py`, and page-builder routes;
+- `shared/page-builder/module-descriptors.js`, `admin/page-builder/sidebar-panel.js`, and
+  `admin/page-builder/canvas-mutations.js`;
+- `backend/app/page_store.py`, the `backend/app/builder_security/` package, and page-builder routes;
 - current unit, backend, and Playwright builder tests.
 
 ## Current Contract Gaps

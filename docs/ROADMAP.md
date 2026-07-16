@@ -1,4 +1,4 @@
-# Roadmap: `0.7.9` Baseline to `1.0.0`
+# Roadmap: `0.8.5` Baseline to `1.0.0`
 
 This roadmap is scoped to the current codebase in `/srv/bw-quality`.
 It is a hardening roadmap for the live comic site, not a productization roadmap.
@@ -21,7 +21,7 @@ Out of scope for `1.0.0`:
 - Advanced analytics such as cohort, funnel, or retention features
 - Additional reader display modes beyond the shipped paged and vertical-scroll modes
 
-Last updated: 2026-06-18
+Last updated: 2026-07-16
 
 ## `0.7.9` Release Baseline
 
@@ -62,14 +62,27 @@ Goal: make the full-page live builder the canonical authoring surface.
 - [x] Close Phase 6 security, scheduling, atomic mutation, coverage, and public/admin visual parity
       gates.
 
-## `0.8.5` UX and Terminology Pass
+## `0.8.5` Builder Customization and Refactor Lock
 
-Goal: make the active UI feel intentionally finished.
+Goal: merge the completed builder customization, responsive-contract repair, and structural
+refactor as the stable baseline for the remaining 1.0 work.
 
-- [ ] Remove user-facing legacy `chapter` wording where `entry` or series-specific labels should appear.
-- [ ] Tighten navigation and “start here” flow for new readers.
-- [ ] Complete a real mobile pass for the reader and the key admin/page-builder flows used in normal work.
-- [ ] Fix obvious visual rough edges that make the site feel pre-release.
+- [x] Complete customization Phases 0–7, including panel/column ownership, module layout, reader
+      controls, header edit-in-place, header/logo/entry-picker styling, and placeable account/links
+      shell blocks.
+- [x] Close authenticated Pyre QA corrections for panel visibility, reader-frame borders,
+      narrow inspector padding controls, responsive reader-control/Feed authoring, atomic structure
+      saves, and publication-safe page saves.
+- [x] Verify Phone/Tablet portrait values and Desktop rotation fallback on physical devices; keep
+      header glow as a separate optional polish item rather than a roadmap completion gate.
+- [x] Refactor the builder through Phases A–G: focused shell controllers, module-editor registry,
+      shared builder/reader kernel, split backend sanitizer package, schema parity fixtures, and
+      behavior-focused shell suites.
+- [x] Archive completed builder plans and synchronize active documentation and version metadata.
+- [ ] Merge `builder-incremental-improvement` into `main` after final review.
+
+Follow-up terminology, onboarding, mobile edge cases, and visual polish are tracked independently in
+`docs/POLISH_BACKLOG_PLAN.md`; they do not hold the completed 0.8.5 builder lock open.
 
 ## `0.9.0` Admin/Ops Hardening
 

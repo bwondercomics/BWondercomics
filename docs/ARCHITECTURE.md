@@ -4,7 +4,8 @@ This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic p
 
 ## Components
 
-- Frontend (static): `index.html`, `feed.html`, `media.html`, `comics.html`, plus `reader/` + `admin/` JS modules.
+- Frontend (static): `index.html`, `feed.html`, `media.html`, `comics.html`, plus `reader/`,
+  `admin/`, and the dual-use `shared/page-builder/` JS modules.
 - Static assets (site chrome): `assets/` (icons, banners, UI images used by the site/theme).
 - Reverse proxy + file server: Caddy (see `deploy/Caddyfile`) serves `/` from `dist/`, `/admin/*` and `/shared/page-builder/*` from repo source, and proxies API routes.
 - Backend (dynamic): FastAPI app in `backend/` (Docker-friendly). Mostly API/JSON, but it also serves branded HTML for selected public routes and `manifest.json`.
@@ -44,6 +45,8 @@ This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic p
   - Effective series home/reader page: `GET /api/pages/home/{series_id}`
   - Admin page lists: `GET /api/admin/pages/series/{series_id}`, `GET /api/admin/pages/global`
   - Admin page records, sections, modules, reorders, and moves live under `/api/admin/pages/*`, `/api/admin/sections/*`, and `/api/admin/modules/*`
+  - Admin runtime capability contract: `GET /api/admin/page-builder/runtime`
+  - Atomic page-wide module placement save: `POST /api/admin/pages/{page_id}/modules/placements`
   - Admin reader bindings: `GET/PUT /api/admin/page-bindings/{series_id}`
 - Site branding:
   - `GET /page-config.json` returns the default page config, including optional `site.ogImagePath` and `site.faviconPath`
@@ -69,7 +72,7 @@ This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic p
 
 - The admin page builder is a full-page shell. The default canvas is the public reader route loaded
   in a same-origin iframe with `builderPreview=1` and a session token.
-- `admin/page-builder/preview-contract.js` validates snapshots, target geometry, inline-edit
+- `shared/page-builder/preview-contract.js` validates snapshots, target geometry, inline-edit
   messages, metrics, and control messages on both sides of the iframe boundary.
 - Desktop, Tablet, and Phone presets use exact iframe CSS pixels: `1920x1080`, `768x1024`, and
   `375x812`. The admin canvas may scale the full-HD Desktop frame visually, but reader media queries
@@ -77,6 +80,10 @@ This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic p
 - The builder owns structured pages, sections, modules, page headers, theme/panel settings, page
   scopes, templates, draft/preview merging, command/keymap routing, local draft undo/redo, live
   drag/drop, and text-module inline editing.
+- Admin-only controllers/editors live under `admin/page-builder/`; render/config/sanitize/responsive
+  contracts shared with the reader live under `shared/page-builder/`. Backend validation is split by
+  domain under `backend/app/builder_security/` while its package initializer preserves existing
+  imports.
 - Public reader output and admin preview share module HTML through the page-builder shared renderer
   path; the iframe DOM remains a view, while saved builder records remain canonical.
 - The effective Comic Reader module owns reader-shell visibility. Pages without one render ordinary

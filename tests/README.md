@@ -80,10 +80,24 @@ Install backend dev dependencies into the repo virtualenv:
 - `tests/admin-preview.test.js`: preview data contract loading and image rendering
 - `tests/admin-page-config.test.js`: page-config cache/save contract behavior
 - `tests/admin-page-builder-data.test.js`: page-builder data-layer fetch/create/update/delete wrappers
-- `tests/admin-page-builder-shell.test.js`: page-builder shell behavior including empty state, selection, canonical designer-route entry, publish state, section settings save/discard, canvas delete cleanup, page-header editing, default module config wiring, preview snapshot metadata, and saved-vs-working dirty draft labels
+- `tests/admin-page-builder-shell.test.js`: compact page-builder shell smoke/boot contract.
+- `tests/admin-page-builder-command-shell.test.js`, `draft-preview-shell.test.js`,
+  `header-shell.test.js`, `inline-edit-shell.test.js`, `preview-shell.test.js`,
+  `section-shell.test.js`, and `structure-shell.test.js`: behavior-focused shell coverage for
+  command routing, manager-owned drafts/undo, header canvas authoring, inline editing, exact preview
+  and chrome modes, section/device settings, and structural placements/mutations.
+- `tests/helpers/admin-page-builder-shell.js`: shared shell harness for those suites.
 - `tests/admin-page-builder-preview.test.js`: module-editor save/delete flows and preview renderer contracts
-- `tests/admin-page-builder-preview-contract.test.js`: builder preview viewport/source contract and status-copy helpers
+- `tests/admin-page-builder-preview-contract.test.js`: shared preview viewport, snapshot, metrics,
+  target, inline-edit, and identity/message contracts.
 - `tests/admin-page-builder-audit.test.js`: fallback-retirement audit coverage, including published-`reader` readiness and blocking bucket aggregation
+- `tests/shared-kernel-boundary.test.js`: dual-use shared-kernel and reader/admin import boundaries,
+  plus the Caddy `/shared/page-builder/*` source route.
+- `tests/builder-config-parity.test.js` + `tests/fixtures/builder-config-parity.json`: JS/Python
+  builder schema and HTML sanitizer parity.
+- `tests/responsive-overrides.test.js`, `tests/reader-config.test.js`, and
+  `tests/reader-user-settings.test.js`: public/preview responsive, reader-config, and reader-setting
+  contracts.
 - `tests/admin-designer.test.js`: admin-shell cleanup proving the legacy designer iframe host is gone
 - `tests/media-branding.test.js`: admin branding rules
 - `tests/diagnostics-snapshot.test.js`: diagnostics snapshot rendering and fallbacks
@@ -92,7 +106,12 @@ Install backend dev dependencies into the repo virtualenv:
 - `tests/visual/builder-preview-parity.spec.js`: Playwright screenshot parity and iframe metric coverage for the live builder preview against the public reader at Desktop, Tablet, and Mobile, including shared public/admin baselines for Phase 5 styled 1/2/3/4+ column layouts
 - `tests/visual/builder-authoring-workflows.spec.js`: Playwright Phase 12 browser workflow coverage for exact iframe dimensions, series reader bindings, chrome preview collapse/restore, side-panel save/reload, current-device override persistence, inline text Save/Discard, live block drag/drop persistence, and global Feed template page creation
 - `backend/tests/helpers.py`: shared backend route harness and contract seed helpers for series, builder pages, comments, premium codes, and visitor sessions
-- `backend/tests/test_*.py`: backend diagnostics/ops, branding, and core route contract behavior including page-builder, tracking, user flows, and page-header backfill/readiness coverage
+- `backend/tests/test_builder_security.py` and `test_builder_config_parity.py`: split sanitizer
+  package behavior and the Python half of the shared parity fixture.
+- `backend/tests/test_migrate_panel_settings.py` and `test_migrate_panel_toggles.py`: idempotent,
+  conflict-safe panel ownership migrations.
+- Remaining `backend/tests/test_*.py`: diagnostics/ops, branding, and core route contracts including
+  page-builder, tracking, user flows, and page-header backfill/readiness coverage.
 
 ## Notes
 
