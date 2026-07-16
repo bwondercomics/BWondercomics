@@ -39,6 +39,14 @@ describe('admin page-builder command registry', () => {
     });
   });
 
+  it('registers every structural command in the central registry', () => {
+    const registry = createBuilderCommandRegistry();
+
+    expect(registry.listCommands()).toEqual(
+      expect.arrayContaining(Object.values(BUILDER_STRUCTURAL_COMMANDS))
+    );
+  });
+
   it('uses enabled state for disabled commands', () => {
     const run = vi.fn(() => ({ ok: true }));
     const registry = createBuilderCommandRegistry({

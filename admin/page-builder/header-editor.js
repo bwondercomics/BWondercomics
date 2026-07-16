@@ -10,8 +10,6 @@ import {
 import { escapeAttr, escapeHtml } from '../../shared/page-builder/helpers.js';
 import {
   HEADER_BLOCK_DEFS,
-  HEADER_REGION_ORDER,
-  HEADER_ROW_ORDER,
   cloneValue,
   normalizeHeaderConfig,
   normalizeHeaderCopy,
@@ -29,17 +27,6 @@ import {
   normalizeBuilderDeviceId,
   pruneEmptyResponsiveOverrides,
 } from '../../shared/page-builder/responsive-overrides.js';
-
-export function findBlockPlacement(header, blockId) {
-  for (const rowId of HEADER_ROW_ORDER) {
-    for (const region of HEADER_REGION_ORDER) {
-      if ((header.layoutRows?.[rowId]?.[region] || []).includes(blockId)) {
-        return { rowId, region };
-      }
-    }
-  }
-  return { rowId: 'top', region: 'left' };
-}
 
 // Brand block content (Phase 5): custom logo letters or an image, plus logo styling.
 // Blank fields keep the built-in BWC logo untouched.
@@ -507,51 +494,6 @@ export function renderHeaderEditorContent({
     renderNavigationEditor(header, pages),
     renderShellAppearanceEditor(header),
   ].join('');
-}
-
-// Placement model API: these pure functions are the single mutation path for header block
-// placement. They are driven from the live canvas (toolbar arrows + on-canvas drag) via
-// page-builder.js; the old abstract placement board that used to call them is retired.
-export function moveBlockToPlacement(header, blockId, nextRowId, nextRegion) {
-  const nextHeader = normalizeHeaderConfig(cloneValue(header), normalizeHeaderNavItems);
-  HEADER_ROW_ORDER.forEach((rowId) => {
-    HEADER_REGION_ORDER.forEach((region) => {
-      nextHeader.layoutRows[rowId][region] = (nextHeader.layoutRows[rowId][region] || []).filter(
-        (id) => id !== blockId
-      );
-    });
-  });
-  nextHeader.layoutRows[nextRowId][nextRegion] = nextHeader.layoutRows[nextRowId][nextRegion] || [];
-  nextHeader.layoutRows[nextRowId][nextRegion].push(blockId);
-  return normalizeHeaderConfig(nextHeader, normalizeHeaderNavItems);
-}
-
-export function moveBlockAcrossRegions(header, blockId, direction) {
-  const placement = findBlockPlacement(
-    normalizeHeaderConfig(header, normalizeHeaderNavItems),
-    blockId
-  );
-  const currentIndex = HEADER_REGION_ORDER.indexOf(placement.region);
-  if (currentIndex === -1) {
-    return normalizeHeaderConfig(cloneValue(header), normalizeHeaderNavItems);
-  }
-  const nextRegion = HEADER_REGION_ORDER[currentIndex + direction];
-  if (!nextRegion) return normalizeHeaderConfig(cloneValue(header), normalizeHeaderNavItems);
-  return moveBlockToPlacement(header, blockId, placement.rowId, nextRegion);
-}
-
-export function moveBlockAcrossRows(header, blockId, direction) {
-  const placement = findBlockPlacement(
-    normalizeHeaderConfig(header, normalizeHeaderNavItems),
-    blockId
-  );
-  const currentIndex = HEADER_ROW_ORDER.indexOf(placement.rowId);
-  if (currentIndex === -1) {
-    return normalizeHeaderConfig(cloneValue(header), normalizeHeaderNavItems);
-  }
-  const nextRowId = HEADER_ROW_ORDER[currentIndex + direction];
-  if (!nextRowId) return normalizeHeaderConfig(cloneValue(header), normalizeHeaderNavItems);
-  return moveBlockToPlacement(header, blockId, nextRowId, placement.region);
 }
 
 function setCopyValue(state, key, value) {

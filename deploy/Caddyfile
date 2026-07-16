@@ -50,6 +50,13 @@ bwondercomics.com {
 		file_server
 	}
 
+	# The source-served admin imports the dual-use page-builder kernel directly.
+	handle /shared/page-builder/* {
+		header Cache-Control "no-cache, must-revalidate"
+		root * /srv/bwondercomics/root
+		file_server
+	}
+
 	@ops path /ops /ops/*
 	handle @ops {
 		@ops_allowed remote_ip {$CADDY_OPS_ALLOWED_IPS:127.255.255.255/32}

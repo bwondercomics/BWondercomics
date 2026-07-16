@@ -188,6 +188,7 @@ Vite proxies these to the API (so data.json/series.json work):
 - `/assets/*` from `dist/assets` (fallback to repo `/assets`)
 - `/media/*` and `/comics/*` from filesystem (`/chapters/*` is legacy)
 - `/admin/*` from repo root (`/srv/bwondercomics/root`) so admin uses source files
+- `/shared/page-builder/*` from repo root so the source-served admin can load its shared kernel
 - remaining public routes from `dist/`
 
 #### Protected assets:

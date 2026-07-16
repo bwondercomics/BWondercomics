@@ -50,4 +50,13 @@ describe('shared kernel boundary', () => {
     }
     expect(offenders).toEqual([]);
   });
+
+  it('production serves the shared kernel imported by source admin modules', () => {
+    const caddyfile = readFileSync('deploy/Caddyfile', 'utf8');
+
+    expect(caddyfile).toMatch(/handle \/shared\/page-builder\/\*/);
+    expect(caddyfile).toMatch(
+      /handle \/shared\/page-builder\/\* \{[\s\S]*?root \* \/srv\/bwondercomics\/root[\s\S]*?file_server[\s\S]*?\}/
+    );
+  });
 });

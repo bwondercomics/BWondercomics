@@ -6,7 +6,7 @@ This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic p
 
 - Frontend (static): `index.html`, `feed.html`, `media.html`, `comics.html`, plus `reader/` + `admin/` JS modules.
 - Static assets (site chrome): `assets/` (icons, banners, UI images used by the site/theme).
-- Reverse proxy + file server: Caddy (see `deploy/Caddyfile`) serves `/` from `dist/` and `/admin/*` from repo source, and proxies API routes.
+- Reverse proxy + file server: Caddy (see `deploy/Caddyfile`) serves `/` from `dist/`, `/admin/*` and `/shared/page-builder/*` from repo source, and proxies API routes.
 - Backend (dynamic): FastAPI app in `backend/` (Docker-friendly). Mostly API/JSON, but it also serves branded HTML for selected public routes and `manifest.json`.
 - Database: Postgres (recommended) for users, comments, posts, series, entries, media, builder pages, and builder-page bindings.
 

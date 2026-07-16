@@ -4,12 +4,14 @@ import { appearanceToInlineStyle } from '../shared/page-builder/appearance-utils
 import { renderCanvasSnapshot } from '../admin/page-builder/canvas-renderer.js';
 import {
   bindHeaderEditorEvents,
+  renderHeaderEditorContent,
+} from '../admin/page-builder/header-editor.js';
+import {
   findBlockPlacement,
   moveBlockAcrossRegions,
   moveBlockAcrossRows,
   moveBlockToPlacement,
-  renderHeaderEditorContent,
-} from '../admin/page-builder/header-editor.js';
+} from '../admin/page-builder/header-placement.js';
 import {
   createPageHeaderMeta,
   normalizeHeaderConfig,

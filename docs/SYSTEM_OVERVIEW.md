@@ -4,7 +4,7 @@ This repo serves a plain HTML/CSS/JS frontend, with a FastAPI backend adding dyn
 
 ## What runs where
 
-- **Static frontend** (served by Caddy in production): `index.html` (reader shell), `feed.html`, `media.html`, `comics.html`, plus JS modules under `reader/` and `admin/`. Public pages come from `dist/`; the admin UI is served from `/admin/*` (repo source) per the current Caddyfile.
+- **Static frontend** (served by Caddy in production): `index.html` (reader shell), `feed.html`, `media.html`, `comics.html`, plus JS modules under `reader/` and `admin/`. Public pages come from `dist/`; the admin UI and its `shared/page-builder/` kernel are served from repo source per the current Caddyfile.
 - **Static assets** (site chrome): `assets/` (icons, banners, UI images referenced by HTML and page configs).
 - **Reverse proxy + file server**: Caddy (see `deploy/Caddyfile`) serves static assets/files and proxies `/api/*`, DB-backed JSON endpoints, and exact public page routes used for dynamic branding to the API.
 - **Backend app**: `backend/app/main.py` primarily serves API routes and JSON views. It also serves branded HTML responses for `/`, `/index.html`, `/feed.html`, `/comics.html`, `/media.html`, plus `/manifest.json`, so crawlers receive the configured OG image and favicon.

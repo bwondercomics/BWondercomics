@@ -1,9 +1,10 @@
 # Builder Refactor Plan — Structural Cleanup of the Page Builder
 
-Status: **Phases A–E committed (84a5a1c); Phase F applied in the working tree
-(uncommitted, 2026-07-15); G not started** (audit recorded 2026-07-14).
+Status: **Implementation complete through Phase G** (updated 2026-07-16). Phases A–E are
+committed in `84a5a1c`, Phase F is committed in `e2f1dc9`, and the verified Phase G package is
+applied in the working tree pending commit.
 
-- Phase A note: the store was added as a plain object (open question 1's proposed default);
+- Phase A note: the store was added as the confirmed plain-object design;
   `previewWidth`, `selectedTarget`, `builderOpen`, and `linkablePages` are computed getters on
   the store; `editor-panel.js` now reads `state.linkablePages` where its bag previously
   supplied `pages`.
@@ -44,7 +45,10 @@ Status: **Phases A–E committed (84a5a1c); Phase F applied in the working tree
   Verified with the full vitest suite, `npm run build`, and both visual specs (21
   playwright tests) against the running backend. Other docs' file references to
   `admin/page-builder/<kernel file>` paths (e.g. the polish backlog's reading map) are
-  now stale — re-verify per those docs' own instructions.
+  now stale — re-verify per those docs' own instructions. Deployment correction
+  (2026-07-16): Caddy now serves `/shared/page-builder/*` from repo source so the source-served
+  admin can load the moved kernel; `tests/shared-kernel-boundary.test.js` guards that route, and a
+  live headless login smoke test confirmed the admin submits to `/api/login` again.
 - Phase F note: `builder_security` is now a nine-module package (primitives, links, html,
   appearance, reader, responsive, structure, header, modules — a verified DAG; the split
   moved `sanitize_section_responsive` into structure and `sanitize_module_responsive` into
@@ -59,12 +63,24 @@ Status: **Phases A–E committed (84a5a1c); Phase F applied in the working tree
   module-type/device-id/HTML-allowlist contracts. `shared/page-builder/sanitize.js` now
   exports its tag sets for the JS test. Verified: 131 backend tests, 665 vitest tests,
   lint, API container restarted and healthy.
-  Created: 2026-07-14
-  Branch context: audit performed on `builder-incremental-improvement` with the Builder
-  Customization Roadmap closeout work still uncommitted in the working tree. **Every phase here
-  assumes that work lands first** and starts from a clean committed baseline on its own branch.
-  Cited line numbers were verified 2026-07-14 against the working tree; re-verify at
-  implementation time.
+- Phase G note (2026-07-16): item 1 was already present at implementation time — the shell's
+  `runCommand` delegates only to `commandRegistry`, and all structural command IDs are registered
+  there as adapter-backed definitions. Item 2 moved the pure placement API to
+  `header-placement.js`; the DOM editor no longer exports model mutations. Item 3 moved the shared
+  shell harness to `tests/helpers/admin-page-builder-shell.js` and split all 116 unchanged tests
+  across eight behavior-focused shell suites; roadmap-phase describe names were replaced with
+  behavior names. The item 4 live audit was clean for `02`, `battle-bros`, and `prisonplanet`.
+  It also found an inactive series whose ID and title were literally `null`, containing only
+  isolated test data. After a fresh database backup, exact dependency-count preconditions, and a
+  comment/filesystem check, that series and its cascaded test records were permanently deleted;
+  post-delete verification left only the three real series. Normal reader startup fallback
+  branches were already retired by Builder Plan Phase 8, so the audit found no reader source
+  deletion remaining for this phase.
+  Verified: targeted Phase G suites (158 tests), full Vitest suite (666 passed, 1 skipped),
+  `npm run lint`, `npm run build`, targeted Prettier check, and `git diff --check`.
+  Created: 2026-07-14. Implemented on `builder-incremental-improvement`; cited discovery-time
+  line numbers below are retained as historical context, while the completion notes describe the
+  final file layout.
 
 Phases are **lettered (A–G)** to avoid collision with the numbered phases in
 `docs/POLISH_BACKLOG_PLAN.md` — "refactor Phase B" and "polish Phase 2" are different things.
@@ -109,10 +125,11 @@ test-enforced. The debt is concentrated:
 
 ## Confirmed decisions
 
-| Date       | Decision                                                                                                                                                                                               |
-| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 2026-07-14 | Proposed default, unconfirmed: **no schema codegen** for the JS↔Python config duplication — a shared JSON parity fixture (Phase F) catches drift at a fraction of the cost.                            |
-| 2026-07-14 | Proposed default, unconfirmed: the Phase A store is a **plain object + explicit update helper**, not a framework or a pub/sub system — the factories already receive render callbacks; keep that flow. |
+| Date       | Decision                                                                                                           |
+| ---------- | ------------------------------------------------------------------------------------------------------------------ |
+| 2026-07-14 | Phase F uses **no schema codegen** for JS↔Python config duplication; the shared JSON parity fixture catches drift. |
+| 2026-07-14 | Phase A uses a **plain object + explicit update helpers**, with no framework or pub/sub layer.                     |
+| 2026-07-15 | Phase E uses `shared/page-builder/` for the reader/admin shared kernel, enforced by a boundary test.               |
 
 ## Compatibility rules (apply to every phase)
 
@@ -147,11 +164,11 @@ test-enforced. The debt is concentrated:
 | Feature slices to extract   | inline edit `admin/page-builder.js:1168-1365`, chrome/preview mode `:1739-1876`, section settings `:1922-2317`, selection `:2318-2596`                                                                                                                                                     |
 | Module editor registry      | `admin/page-builder/module-descriptors.js`, `admin/page-builder/module-editor.js:948` (switch), per-module editors (`button-editor.js`, `promo-editor.js`, `social-editor.js`, `reader-editor.js`, `gallery-editor.js`, `divider-editor.js`, `video-editor.js`, `entry-gallery-editor.js`) |
 | Shared kernel (reader-used) | `shared-renderers.js`, `helpers.js`, `header-config.js`, `appearance-utils.js`, `reader-config.js`, `responsive-overrides.js`, `responsive-css.js` + transitive: `layout-utils.js`, `link-utils.js`, `promo-renderer.js`, `sanitize.js`, `module-descriptors.js`, `preview-contract.js`    |
-| Command layer               | `admin/page-builder/commands.js`, `structural-commands.js`, fallback at `admin/page-builder.js:156-168`                                                                                                                                                                                    |
-| Header placement model      | `admin/page-builder/header-editor.js` (pure fns at 33, 515, 529, 543; DOM at 461, 605)                                                                                                                                                                                                     |
+| Command layer               | `admin/page-builder/commands.js`, `structural-commands.js`, registry-only shell delegate in `admin/page-builder.js`                                                                                                                                                                        |
+| Header placement model      | `admin/page-builder/header-placement.js` (pure placement lookup/mutations); `admin/page-builder/header-editor.js` (DOM rendering/event binding)                                                                                                                                            |
 | Backend validation          | `backend/app/builder_security.py`, `admin/page-builder/sanitize.js` (allowlists both sides)                                                                                                                                                                                                |
 | Backend store               | `backend/app/page_store.py` (reader-binding invariants ~253–390)                                                                                                                                                                                                                           |
-| Test harness                | `tests/admin-page-builder-shell.test.js`, `tests/helpers/admin-fixture.js`, `tests/helpers/contracts.js`                                                                                                                                                                                   |
+| Test harness                | eight `tests/admin-page-builder-*-shell.test.js` suites, `tests/helpers/admin-page-builder-shell.js`, `tests/helpers/admin-fixture.js`, `tests/helpers/contracts.js`                                                                                                                       |
 
 ---
 
@@ -375,20 +392,38 @@ the builder against the running backend. Size: **M–L**. Independent.
 
 ## Phase G — Cleanups
 
-Small, independent items; each is its own commit.
+Small, independent cleanup items implemented as one verified Phase G working-tree package.
+
+**Completion note (2026-07-16).** All code work, the live audit, and the audited removal of the
+inactive `null` test series are complete. No operational follow-up remains. See the phase note at
+the top of this document for exact scope and verification.
 
 1. **Single command entry point.** `runCommand` (`admin/page-builder.js:156-168`) falls back
    from `commandRegistry` to `structuralCommands`. Make the registry the only entry, register
    structural commands into it during init, delete the fallback. Size: **S**.
+
+   **Outcome:** already satisfied at implementation time. The shell delegates only to
+   `commandRegistry`; all structural IDs are adapter-backed registry definitions. A focused test
+   now guards complete registration.
+
 2. **Header placement model split.** `header-editor.js` (929 lines) mixes pure placement
    functions (`findBlockPlacement:33`, `moveBlockToPlacement:515`,
    `moveBlockAcrossRegions:529`, `moveBlockAcrossRows:543` — imported directly by the shell)
    with DOM rendering (`renderHeaderEditorContent:461`, `bindHeaderEditorEvents:605`). Extract
    the pure model to `header-placement.js`. Size: **S**.
+
+   **Outcome:** complete. `header-placement.js` owns the four pure lookup/mutation functions;
+   `header-editor.js` owns DOM rendering and event binding.
+
 3. **Shell test split.** After Phase C, split `tests/admin-page-builder-shell.test.js`
    (7,076 lines) along the new feature seams, and rename the roadmap-phase describes
    ("Phase 6 Step 3 — …" at `:6512`, "Phase 10 — …" at `:6811`) to behavior names. No
    assertion changes. Size: **M**. Depends on **C**.
+
+   **Outcome:** complete. The unchanged 116 shell assertions are distributed across eight
+   behavior-focused suites backed by `tests/helpers/admin-page-builder-shell.js`; roadmap-phase
+   describe names were replaced with behavior names.
+
 4. **Legacy header retirement.** `fallback-retirement-gate.js` +
    `tests/admin-page-builder-audit.test.js` define when legacy header fallbacks may be
    deleted: every audit bucket at count 0 across all builder pages. Run `auditPagesFallbacks`
@@ -398,9 +433,15 @@ Small, independent items; each is its own commit.
    Negative-line-count refactoring, but gated on production data. Size: **S–M**, plus
    migration time if the audit is dirty.
 
+   **Outcome:** the live audit is complete. `02`, `battle-bros`, and `prisonplanet` are clean.
+   The separate inactive `null` series contained isolated test entries and a legacy reader page;
+   it was backed up, deleted with audited cascade preconditions, and verified absent afterward.
+   Reader startup fallback branches had already been retired by Builder Plan Phase 8, so no
+   additional reader code was eligible for deletion.
+
 ---
 
-## Suggested order
+## Historical implementation order
 
 ```
 Land builder-incremental-improvement
@@ -411,8 +452,8 @@ Land builder-incremental-improvement
   → G1, G2, G4 anytime
 ```
 
-A → B → C is the load-bearing sequence and each step leaves the tree shippable. D, F, and
-G1/G2/G4 don't depend on it. E last-ish, or in any window with no other builder branch open.
+A → B → C was the load-bearing sequence. D and F landed alongside that work, E moved the shared
+kernel after the main shell/editor refactors, and G closed the remaining independent cleanup.
 
 ## Verification gates (per phase)
 
@@ -427,13 +468,12 @@ G1/G2/G4 don't depend on it. E last-ish, or in any window with no other builder 
   phase.
 - Every phase: manual before/after on one published page (`battle-bros` or `prisonplanet`).
 
-## Open questions
+## Resolved decisions
 
-1. **Store shape (Phase A).** Proposed default: plain shared object + existing render
-   callbacks, no subscriptions. Confirm before A starts.
-2. **Schema codegen (Phase F).** Proposed default: parity fixture only, no codegen. Confirm —
-   this is the difference between an M–L phase and a multi-week one.
-3. **Kernel directory name (Phase E).** `shared/page-builder/` proposed; anything works as
-   long as it's outside `admin/` and the guard test exists.
-4. **Timing of G4** depends on the live-DB audit result — run the audit early (it's
-   read-only) so any page migrations can be planned rather than discovered.
+1. **Store shape (Phase A):** plain shared object with explicit update helpers and existing
+   render callbacks; no subscriptions.
+2. **Schema parity (Phase F):** shared JSON parity fixture; no schema code generation.
+3. **Kernel directory (Phase E):** `shared/page-builder/`, protected by the shared-kernel
+   boundary test.
+4. **Legacy-header audit (Phase G):** completed 2026-07-16. The three real series are clean; the
+   inactive `null` test series was removed after backup and dependency verification.

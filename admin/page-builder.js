@@ -32,7 +32,7 @@ import {
   moveBlockAcrossRegions,
   moveBlockAcrossRows,
   moveBlockToPlacement,
-} from './page-builder/header-editor.js';
+} from './page-builder/header-placement.js';
 import { createChromeModeController } from './page-builder/chrome-mode.js';
 import { createInlineEditController } from './page-builder/inline-edit.js';
 import { createBuilderKeymapManager } from './page-builder/keymaps.js';
