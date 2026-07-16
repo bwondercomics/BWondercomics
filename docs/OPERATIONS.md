@@ -82,6 +82,12 @@ Run:
 
 - `make backup` (writes to `var/backups/` by default)
 
+This is currently a local/manual convenience backup, not the completed production recovery gate.
+The selected `/mnt/archive` target, validated scheduled artifacts, and isolated restore drill are
+planned in `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`. As of 2026-07-16 the archive
+mount is read-only, and the checked-in systemd service still defaults to `var/backups/`; do not rely
+on it as an off-primary-disk backup until the hardening plan is implemented and verified.
+
 ### Restore (be careful)
 
 DB restore and file restore are destructive by nature.

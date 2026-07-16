@@ -5,8 +5,12 @@ Last updated: 2026-07-16
 Current release focus:
 
 - `0.8.5` closes the builder customization roadmap, its authenticated responsive QA corrections,
-  and the behavior-preserving builder refactor. The branch is the merge baseline for the remaining
-  `1.0.0` roadmap.
+  and the behavior-preserving builder refactor. That baseline is merged into `main` for the
+  remaining `1.0.0` roadmap.
+- The next recovery gate is
+  `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`: persisted builder-page history and
+  admin restore, validated database/file backups on `/mnt/archive`, and an isolated restore drill
+  before store implementation.
 - The live builder canvas is the real reader route in a same-origin iframe with validated snapshots,
   target overlays, live drag/drop, chrome-collapsed Preview, device modes, guarded commands/keymaps,
   local draft undo/redo, and text-module inline editing.
@@ -36,6 +40,8 @@ Recommended starting points:
 - `docs/READER_BUILDER_QA.md` - `0.8.5` reader + builder regression and merge-closeout worksheet.
 - `docs/completed-builder-plans/README.md` - index of finished builder architecture, preview,
   customization, inspector, layout, consolidation, incremental-improvement, and refactor plans.
+- `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md` - active prerequisite plan for
+  builder-page recovery and tested database/file disaster recovery.
 - `docs/BUILDER_STRIPE_STORE_PLAN.md` - follow-up plan for builder-authored one-time purchase store pages using Stripe-hosted Checkout.
 - `docs/POLISH_BACKLOG_PLAN.md` - post-0.8.5 fixes and small features; items there do not reopen the
   completed builder roadmap unless explicitly promoted into a release gate.

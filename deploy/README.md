@@ -152,35 +152,23 @@ If UFW is enabled, allow LAN access:
 sudo ufw allow from 10.0.0.0/24 to any port 8000 proto tcp
 ```
 
-## Nightly Backups (systemd timer)
+## Backup automation status
 
-This backs up the persistent data directory (by default, `/srv/bwondercomics/var/bwondercomics`) to your archive drive.
+The current checked-in backup entry points are not yet a production disaster-recovery system:
 
-1. Ensure the destination exists and is writable by the service user:
+- `make backup` writes manual database/file artifacts to `var/backups/` by default;
+- `deploy/bwondercomics-backup.service` currently calls `make backup-db` without overriding that
+  local destination;
+- the older deployment backup script uses a different file-only contract;
+- live read-only verification on 2026-07-16 found `/mnt/archive` mounted read-only with only stale
+  legacy archives.
 
-```bash
-sudo mkdir -p /mnt/archive/backups/bwondercomics
-sudo chown -R dbmelville:dbmelville /mnt/archive/backups/bwondercomics
-```
-
-2. Install + enable the timer:
-
-```bash
-sudo cp /srv/bw-quality/deploy/bwondercomics-backup.service /etc/systemd/system/bwondercomics-backup.service
-sudo cp /srv/bw-quality/deploy/bwondercomics-backup.timer /etc/systemd/system/bwondercomics-backup.timer
-sudo systemctl daemon-reload
-sudo systemctl enable --now bwondercomics-backup.timer
-```
-
-3. Run once immediately and check:
-
-```bash
-sudo systemctl start bwondercomics-backup.service
-sudo systemctl status bwondercomics-backup.service --no-pager
-systemctl list-timers | rg bwondercomics-backup || true
-```
-
-Backups land in `/mnt/archive/backups/bwondercomics/` and old backups are pruned after 30 days by default (edit the `RETENTION_DAYS` value in `deploy/bwondercomics-backup.service`).
+Do not install or describe the current timer as a verified `/mnt/archive` backup. Implement
+`docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md` first. Its production contract uses
+validated nightly database and weekly durable-file artifacts under
+`/mnt/archive/backups/bwondercomics`, fails closed when the archive mount is missing/read-only, and
+requires an isolated restore drill. Replace this status section with the verified installation and
+recovery commands when that plan closes.
 
 ## Diagnostics Snapshot Timer + Ops Worker
 

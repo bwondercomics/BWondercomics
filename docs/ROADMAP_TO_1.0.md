@@ -2,9 +2,9 @@
 
 Status: Audit complete; roadmap active
 Created: 2026-07-07 (repo-only + live-host audit at commit `cdc84f8`, branch `builder-incremental-improvement`)
-Updated: 2026-07-16 for the completed 0.8.5 authenticated QA, builder refactor, and merge-ready
-documentation/version pass. Original evidence anchors still point at the audit commit unless a
-later note says otherwise.
+Updated: 2026-07-16 for the merged 0.8.5 baseline, settled store/backup decisions, and the builder
+page snapshot plus backup/restore hardening plan. Original evidence anchors still point at the
+audit commit unless a later note says otherwise.
 
 Labels used throughout: **[C:code]** confirmed from code/docs · **[C:live]** confirmed on this host ·
 **[I]** inferred · **[V]** needs live/admin verification.
@@ -33,29 +33,29 @@ hardened.
 1. **The store doesn't exist yet** — zero payment code in the repo (no Stripe SDK, no store
    models/routes) [C:code: `backend/requirements.txt`, `backend/app/models.py`]. The plan doc is
    excellent and security-correct; it's pure build work. This is the long pole.
-2. **The 1.0.0 definition says "subscriptions"; the store plan explicitly excludes them.** This is
-   the single scope decision that most changes the schedule (see §2.2 — recommendation: ship
-   one-time purchases + the existing premium-code system as the subscription bridge).
-3. **Operational trust was broken in three places at the audit snapshot** [C:live]: all backups
-   lived on the same disk as the database (the 916G archive drive was mounted and _empty_), the diagnostics
-   snapshot is a month stale (June 4) because the refresh timer was never installed, and the ops
-   worker was not running (queued commands would sit forever). Re-verify this host state before
-   acting; none of these are feature work and together they were roughly a day.
-4. **Live-page recovery remains thin:** builder drafts have local undo, but there is no per-save
+2. **Operational trust was broken in three places at the audit snapshot** [C:live]: all backups
+   lived on the same disk as the database, the diagnostics snapshot was stale because the refresh
+   timer was never installed, and the ops worker was not running (queued commands would sit
+   forever). A 2026-07-16 recheck found the 916G `/mnt/archive` drive mounted read-only with only
+   three tiny legacy December 2025 archives, so the backup target is selected but not usable yet.
+   None of these are feature work and together they remain roughly a day.
+3. **Live-page recovery remains thin:** builder drafts have local undo, but there is no per-save
    page revision/snapshot restore model (details §2.1).
-5. **Release process risk:** the complete 0.8.5 builder branch is still awaiting merge into `main`.
-   The branch-local implementation, QA corrections, refactor, plan archive, and version metadata
-   now agree; merge it before store work starts.
+
+The former store scope fork is resolved: 1.0.0 ships one-time purchases with premium codes as the
+subscription bridge. The first product is physical and uses simple server-controlled regional
+flat-rate shipping. The completed 0.8.5 builder baseline is merged into `main`, which is now the
+deployed branch.
 
 **Biggest risks:** payment-flow mistakes (mitigated by the plan's hosted-Checkout approach — keep
 it), single-disk data loss, and scope creep in the builder (Phases 5–7 are where "close to done"
 can quietly become two more months).
 
-**Shortest credible path:** merge the completed 0.8.5 builder baseline → add the page-revision
-safety net + one-day ops hardening → build the Stripe-Checkout-only store per the existing plan →
-freeze everything else at "verify + polish" level. Header glow and other small requests remain in
-the polish backlog and are not 0.8.5 merge gates. Media redesign, PayPal, and social expansion all
-land post-1.0.
+**Shortest credible path:** implement
+`docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md` with the remaining one-day ops hardening
+in parallel → build the Stripe-Checkout-only store per the existing plan → freeze everything else
+at "verify + polish" level. Header glow and other small requests remain in the polish backlog.
+Media redesign, PayPal, and social expansion all land post-1.0.
 
 ---
 
@@ -124,8 +124,9 @@ behavior-preserving and has no remaining phase work.
    to the published record, and confirmed page/module/section deletes through `page-actions.js` and
    `canvas-mutations.js` are permanent; `undo-stack.js` covers _unsaved drafts only_ [C:code]. With
    nightly-only DB dumps, a mis-click on the
-   live homepage can cost up to a day of authoring. A lightweight per-save JSON snapshot (last N
-   per page) would close this cheaply.
+   live homepage can cost up to a day of authoring. The versioned, bounded recovery contract and
+   admin restore workflow are now planned in
+   `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`.
 3. **Unknown `page.meta` keys persist unsanitized**
    (`backend/app/builder_security/header.py:sanitize_page_meta`) —
    tolerated by design, admin-only writes, and nothing renders them today, so it's not currently
@@ -139,12 +140,12 @@ behavior-preserving and has no remaining phase work.
 
 **1.0.0 scope recommendation:**
 
-- **In:** merge the completed 0.8.5 baseline; per-save page snapshots (S-sized safety net); the
-  broader reader/builder worksheet before 1.0.0.
+- **In:** per-save page snapshots and admin restore; the broader reader/builder worksheet before
+  1.0.0. The completed 0.8.5 baseline is already merged.
 - **Defer/cut:** universal module appearance (needs the per-type audit; button/promo/email already
   have their own styling), drag-resize gutters, any new module types before the store's.
-- **Blockers/dependencies:** none external. Merge to `main` before starting store work. Header glow
-  is not a merge dependency.
+- **Blockers/dependencies:** finish the snapshot/restore and backup-hardening plan before starting
+  store work. Header glow is not a store dependency.
 - **Tests/QA:** keep backend update/refetch, builder save/reload, negative dropped-branch, and
   preview/public real-width coverage aligned with every newly allowed responsive field. Keep the
   visual suite mandatory for responsive and header work. The authenticated Pyre corrective pass is
@@ -161,7 +162,8 @@ external BigCartel URLs (`reader/app.js:900-906`), correctly suppressed in previ
 prerequisite reader/layout work the plan gates on is **done** [C:code+docs].
 `docs/BUILDER_STRIPE_STORE_PLAN.md` is current, and its security section is genuinely correct —
 server-side price authority, raw-body webhook verification, idempotent fulfillment, event-ID
-dedupe, PII minimization are all already specified.
+dedupe, PII minimization, and server-owned regional shipping rates are all already specified. The
+remaining recovery prerequisite is `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`.
 
 **The Stripe vs. PayPal call: ship Stripe Checkout only. Defer PayPal past 1.0.0.** This is the
 clear answer, not a coin flip:
@@ -177,13 +179,17 @@ clear answer, not a coin flip:
   provider-neutrally (`provider`, `provider_session_id`) instead of
   `stripeCheckoutSessionId`-only.
 
-**Subscriptions conflict (decision needed):** the 1.0.0 definition includes subscriptions; the
-plan excludes them. Recommendation: **1.0.0 = one-time purchases**, and bridge subscriptions with
+**Subscriptions decision (settled):** **1.0.0 = one-time purchases**. Bridge subscriptions with
 what already exists — the premium-code system (`backend/app/models.py:134-168`, redemption at
-`backend/app/routes/user.py:235`) allows selling "premium access" as a product fulfilled by
-issuing a code, manually or semi-automatically. Real recurring billing (Stripe Billing, customer
-portal, entitlement sync, dunning) is a phase of its own; folding it into 1.0.0 is the single most
-likely way this release slips a quarter.
+`backend/app/routes/user.py:235`) allows selling "premium access" as a product fulfilled by issuing
+a code, manually or semi-automatically. Real recurring billing (Stripe Billing, customer portal,
+entitlement sync, dunning) remains post-1.0.
+
+**Initial physical-product decision (settled):** collect shipping addresses in hosted Checkout and
+use server-owned flat shipping rates by supported country group. The client may choose only a safe
+region ID before the Checkout Session is created; the backend selects the matching Shipping Rate
+and allowed countries. This preserves simple approximately $5-6 US shipping without adding carrier
+quotes or embedded Checkout.
 
 **Security checklist for implementation** (the plan covers most; ⭐ = additions beyond the plan
 doc):
@@ -192,9 +198,10 @@ _Architecture & PCI_
 
 - [ ] Stripe-hosted Checkout only; no Payment Element, no card fields, no card data in any log
       (plan §Security)
-- [ ] Client may send only `variantId`, `quantity`, `sourcePageId`, `sourceModuleId`; server
-      rejects price/currency/priceId/fulfillment fields if present ⭐ _(reject, don't ignore —
-      catches tampering attempts loudly)_
+- [ ] Client may send only `variantId`, `quantity`, `shippingRegionId`, `sourcePageId`, and
+      `sourceModuleId`; server rejects product/shipping amounts, currency, Price/Shipping Rate IDs,
+      and fulfillment fields if present ⭐ _(reject, don't ignore — catches tampering attempts
+      loudly)_
 - [ ] Stripe Price ID is the payment authority; local `unitAmount` is display/reconciliation only
 - [ ] ⭐ Use a **restricted API key** (Checkout + Prices read + webhooks only), not the account
       secret key
@@ -218,8 +225,8 @@ _Secrets & environments_
 
 - [ ] `STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET` env-only, never logged, never in error
       responses; app boots cleanly without them (checkout disabled with a clear error)
-- [ ] Test and live keys never mixed; store the intended mode and refuse `price_` IDs from the
-      wrong mode ⭐ _(validate on admin save via a Stripe retrieve call)_
+- [ ] Test and live keys never mixed; store the intended mode and refuse `price_`/`shr_` IDs from
+      the wrong mode ⭐ _(validate on admin save via Stripe retrieve calls)_
 - [ ] ⭐ 2FA on the Stripe dashboard account
 - [ ] Local sandbox loop with Stripe CLI before any live key exists; live keys only after Stripe's
       go-live checklist
@@ -235,8 +242,8 @@ _Orders, fulfillment, admin_
       orders included in DB backups (automatic — same Postgres)
 - [ ] Admin order list/detail/fulfillment behind the existing `_require_admin`; fulfillment notes
       editable; filter by payment/fulfillment status
-- [ ] Physical variants without working shipping collection are blocked from checkout, not sold
-      blind
+- [ ] Physical variants without an active server-owned shipping profile/region are blocked from
+      checkout, not sold blind; selected regions map to one fixed rate and matching allowed countries
 
 _Builder & reader integration_
 
@@ -255,9 +262,9 @@ _Conversion tracking (minimum viable)_
       the orders table, not analytics ⭐ — resist funnel tooling in v1
 
 **Definition of done:** plan Phase 7's gate list, plus: a full sandbox purchase (card + a delayed
-method), a duplicate-webhook replay test, a tampered-payload test (client-sent price ignored _and_
-logged), refund reflected locally, and one real live-mode purchase of a cheap product before
-announcing.
+method), one physical purchase per launch shipping region, a duplicate-webhook replay test, a
+tampered-payload test (client-sent product/shipping amount rejected and logged), refund reflected
+locally, and one real live-mode purchase of a cheap product before announcing.
 
 ### 2.3 Analytics (priority 3)
 
@@ -429,31 +436,34 @@ Feature tracks follow the priority order strictly. The **Ops track** is parallel
 hours of work protecting everything else — it must not wait behind the store, and it doesn't
 compete with feature time meaningfully.
 
+**Completed process gate**
+
+- The completed `builder-incremental-improvement` 0.8.5 baseline is merged into `main`; use
+  "main = deployed" from here on.
+
 **NOW — finish before moving on**
 
-1. _Process:_ merge the completed `builder-incremental-improvement` 0.8.5 baseline → `main`; adopt
-   "main = deployed" from here
-   on.
-2. _Builder safety:_ per-save page JSON snapshots + restore (safety net for live editing).
-3. _Ops track (parallel, ~1 day):_ re-verify the audit-day host findings, point nightly backups (DB
-   dump + weekly `backup-files`) at
-   `/mnt/archive`; run one **restore drill** into a scratch Postgres and write down the steps;
-   install diagnostics-refresh timer + ops worker (or disable ops deliberately); pin `umami`
-   image; add Caddy security headers (HSTS, `X-Content-Type-Options`, `Referrer-Policy`,
-   `X-Frame-Options`/`frame-ancestors` — hold off on strict CSP, the builder emits inline styles).
+1. _Recovery safety:_ implement `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`: per-save
+   page JSON snapshots, admin restore, validated nightly DB and weekly file backups on
+   `/mnt/archive`, and an isolated restore drill. Resolve the current read-only archive mount before
+   enabling production timers.
+2. _Ops track (parallel, ~1 day):_ finish the non-recovery host items: install diagnostics-refresh
+   timer + ops worker (or disable ops deliberately); pin `umami` image; add Caddy security headers
+   (HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`/`frame-ancestors` — hold off
+   on strict CSP, the builder emits inline styles).
 
 **NEXT — required for 1.0.0**
 
-4. _Store:_ Stripe-Checkout-only build per the plan's Phases 1→7, with the checklist in §2.2
+3. _Store:_ Stripe-Checkout-only build per the plan's Phases 1→7, with the checklist in §2.2
    (provider-neutral order columns; subscriptions bridged via premium codes). This is the
    schedule's center of mass.
-5. _Users:_ password change + admin password set; `/api/email/subscribe` hardening.
-6. _Analytics:_ visitor-session retention job; `/api/track/visitor` rate limit; one
+4. _Users:_ password change + admin password set; `/api/email/subscribe` hardening.
+5. _Analytics:_ visitor-session retention job; `/api/track/visitor` rate limit; one
    metrics-correctness pass; `store_checkout_start` event.
-7. _Diagnostics:_ snapshot-age banner; hide Preview Changes tab.
-8. _Polish backlog:_ prioritize release-relevant items from `docs/POLISH_BACKLOG_PLAN.md` without
+6. _Diagnostics:_ snapshot-age banner; hide Preview Changes tab.
+7. _Polish backlog:_ prioritize release-relevant items from `docs/POLISH_BACKLOG_PLAN.md` without
    reopening the completed 0.8.5 builder roadmap; keep optional visual features behind hardening.
-9. _Release:_ full DoD gate (§4), tag `1.0.0`.
+8. _Release:_ full DoD gate (§4), tag `1.0.0`.
 
 **LATER — post-1.0.0**
 
@@ -526,8 +536,9 @@ visibility/config only per what ships; single-server deployment; Umami analytics
 
 **Data/backups**
 
-- [ ] Backups off the primary disk (`/mnt/archive` is mounted, 916G, empty [C:live]) — **the
-      single highest-value hour of work in this entire document**
+- [ ] Backups off the primary disk (`/mnt/archive` is mounted, 916G, but was read-only with only
+      three tiny December 2025 legacy archives on the 2026-07-16 recheck [C:live]) — **the single
+      highest-value hour of work in this entire document**
 - [ ] Restore drill performed and documented
 - [ ] `deploy/bwondercomics.env` stays 0600 + gitignored (verified [C:live]); never echoed into
       diagnostics config output **[V: skim `/api/admin/diagnostics/config` response once]**
@@ -572,34 +583,35 @@ Each of these is tempting and each costs weeks:
 
 ---
 
-## 7. Open questions
+## 7. Settled decisions and open questions
 
-Only things that change the plan:
+Settled on 2026-07-16:
 
-1. **Subscriptions in 1.0.0:** is "one-time purchases + premium codes" acceptable as the 1.0.0
-   story (recommended), or is real recurring billing a hard requirement? This is the biggest scope
-   fork.
-2. **First products:** physical (needs Stripe shipping collection — more checkout config) or
-   digital/codes only (simplest possible v1)? Decides how much of the plan's shipping machinery
-   ships in v1.
-3. **`/mnt/archive`:** still the intended backup destination? If yes the service change is two
-   lines; if the drive is earmarked for something else, another off-disk target is needed (even
-   rclone to cloud storage).
-4. **Ops surface:** are queued host commands from the browser actually wanted, or is SSH the real
+- **Subscriptions:** 1.0.0 ships one-time purchases plus manually issued premium codes. Real
+  recurring billing remains post-1.0.
+- **First product:** physical. Collect shipping addresses in Stripe Checkout and use simple
+  server-controlled flat shipping rates by supported region; dynamic carrier quoting is not needed
+  for v1.
+- **Backup destination:** `/mnt/archive`, after its current read-only mount state is corrected and
+  verified by the backup-hardening plan.
+
+Remaining questions that change the plan:
+
+1. **Ops surface:** are queued host commands from the browser actually wanted, or is SSH the real
    workflow? (Install the worker vs. disable the tab — both are fine, pick one.)
-5. **Env confirmations [V], names/modes only:** is `REGISTRATION_MODE` set (and to what), is
+2. **Env confirmations [V], names/modes only:** is `REGISTRATION_MODE` set (and to what), is
    `UMAMI_WEBSITE_ID` set (i.e., is Umami actually live in prod), and does `APP_SECRET` exist in
    the prod env file?
-6. **Preview Changes tab:** confirm it has no workflow the builder doesn't cover, so it can be
+3. **Preview Changes tab:** confirm it has no workflow the builder doesn't cover, so it can be
    hidden in 1.0.0.
-7. **Media page:** confirm direction A-now / C-later, or pick which direction 1.0.0 should
+4. **Media page:** confirm direction A-now / C-later, or pick which direction 1.0.0 should
    reflect.
 
 ---
 
 ## Immediate next steps
 
-In priority order: merge the completed 0.8.5 builder baseline, answer open questions 1–3, then add
-page snapshots, with backup/ops re-verification and hardening as the parallel track. Header glow and
-the remaining small requests stay prioritized through `docs/POLISH_BACKLOG_PLAN.md`, not as merge
-blockers.
+Implement `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md` first. Correct the read-only
+archive mount and complete the backup/restore phases in parallel with builder snapshot work. Then
+begin Store Phase 1. Header glow and the remaining small requests stay prioritized through
+`docs/POLISH_BACKLOG_PLAN.md`, not as recovery or store blockers.
