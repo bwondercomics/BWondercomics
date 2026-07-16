@@ -1,8 +1,9 @@
 # Builder Refactor Plan — Structural Cleanup of the Page Builder
 
-Status: **Implementation complete through Phase G** (updated 2026-07-16). Phases A–E are
-committed in `84a5a1c`, Phase F is committed in `e2f1dc9`, and the verified Phase G package is
-applied in the working tree pending commit.
+Status: **Finished — Phases A–G implemented, verified, and committed** (updated 2026-07-16).
+Phases A–E are committed in `84a5a1c`, Phase F is committed in `e2f1dc9`, and Phase G is
+committed in `8922a6c`. No implementation, correction, QA, or operational follow-up remains in
+this plan.
 
 - Phase A note: the store was added as the confirmed plain-object design;
   `previewWidth`, `selectedTarget`, `builderOpen`, and `linkablePages` are computed getters on
@@ -76,7 +77,7 @@ applied in the working tree pending commit.
   post-delete verification left only the three real series. Normal reader startup fallback
   branches were already retired by Builder Plan Phase 8, so the audit found no reader source
   deletion remaining for this phase.
-  Verified: targeted Phase G suites (158 tests), full Vitest suite (666 passed, 1 skipped),
+  Verified: targeted Phase G suites (158 tests), final full Vitest suite (667 passed, 1 skipped),
   `npm run lint`, `npm run build`, targeted Prettier check, and `git diff --check`.
   Created: 2026-07-14. Implemented on `builder-incremental-improvement`; cited discovery-time
   line numbers below are retained as historical context, while the completion notes describe the
@@ -100,7 +101,8 @@ Related docs:
 
 Behavior-preserving structural refactor of the page builder. **No user-visible changes in any
 phase.** The proof standard for the frontend phases is that the existing shell integration
-suite (`tests/admin-page-builder-shell.test.js`, 117 tests pinning behavior at the shell
+suite (`tests/admin-page-builder-shell.test.js` and its behavior-focused split suites, 116 tests
+pinning behavior at the shell
 boundary) passes unchanged — test edits limited to import paths are allowed, assertion changes
 are not (except where a phase explicitly says otherwise).
 
@@ -392,7 +394,7 @@ the builder against the running backend. Size: **M–L**. Independent.
 
 ## Phase G — Cleanups
 
-Small, independent cleanup items implemented as one verified Phase G working-tree package.
+Small, independent cleanup items implemented as one verified Phase G commit.
 
 **Completion note (2026-07-16).** All code work, the live audit, and the audited removal of the
 inactive `null` test series are complete. No operational follow-up remains. See the phase note at

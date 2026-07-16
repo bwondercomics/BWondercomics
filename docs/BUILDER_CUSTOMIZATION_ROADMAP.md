@@ -1,13 +1,13 @@
 # Builder Customization Roadmap
 
-Status: **Phases 0–7 implemented; 0.8.5 QA corrective closeout pending** (updated 2026-07-14).
-The six corrective contracts are implemented, but their release checkboxes remain open until the
-authenticated physical-device and published-page QA below passes. Header glow is a separate
-0.8.5 follow-up.
+Status: **Finished — Phases 0–7 and the 0.8.5 QA corrective closeout are complete** (updated
+2026-07-16). All six corrective contracts are implemented and the authenticated physical-device,
+save/reload, and published-page QA is complete. Header glow remains a separately deferred
+enhancement and is not a completion gate for this roadmap.
 Created: 2026-07-05
-Branch context: `builder-incremental-improvement` — the Panel/Column Settings Consolidation Plan
-(Phases 1–4) is implemented up to HEAD (`c82d986`), but its release gates (data migrations, manual
-QA) have not run. Phase 0 of this roadmap closes them out.
+Branch context: `builder-incremental-improvement` — roadmap implementation was committed through
+`e423f75`; the 0.8.5 corrective implementation followed in `0dadb22`, and final authenticated
+manual QA closed on 2026-07-16.
 
 Related docs:
 
@@ -207,9 +207,9 @@ width 0 means off.
 - [x] Run both migrations `--dry-run` then `--write` for **every** series with builder pages
       (battle-bros, prison planet, Pyre — confirm exact series ids from the admin series list),
       review flagged pages, restart the API container.
-- [ ] Perform the pending manual QA: the consolidation plan's Verification list plus the
-      incremental plan Item 3 step 6 (Pyre reader page). _(Remaining: interactive builder QA needs
-      an authenticated admin session — see completion note.)_
+- [x] Perform the consolidation plan's Verification list plus the incremental plan Item 3 step 6
+      on the Pyre reader page. Authenticated builder, save/reload, and published-page QA completed
+      during final closeout on 2026-07-16.
 - [x] Build and record a **six-control verification matrix**: {column count, layout ratio, module
       gap, column gap, section gap, alignment} × {normal multi-column section, reader section with
       panels} × {live builder preview, published page}. Append the pass/fail table to this phase's
@@ -246,7 +246,7 @@ alignment cases builder/public/empty-panel), `./.venv/bin/python -m unittest
 backend.tests.test_migrate_panel_settings backend.tests.test_migrate_panel_toggles`, full standard
 gate incl. `npm run test:visual`, manual matrix on one page per series.
 
-### Completed 2026-07-05 (one manual QA step handed back)
+### Completed 2026-07-05; final manual QA closed 2026-07-16
 
 **Migrations (live DB, backed up first to `var/backups/db-20260705-143558.sql`):**
 
@@ -298,10 +298,9 @@ public battle-bros API payload through `createRenderers()` (9/9 checks). One she
 assert the alignment control now **shows** for panels (was asserting the old exclusion); one new
 shell test covers the border master switch.
 
-**Handed back (needs an authenticated admin session):** the interactive builder QA pass — open the
-builder on a Pyre reader page, click each panel/column, change each control, save, reload the
-published page (the consolidation plan's manual Verification list). Everything automatable was
-automated; this last look is human.
+**Manual QA closeout (2026-07-16):** the authenticated interactive pass was completed on Pyre,
+including panel/column controls, save/reload behavior, and the published-page check. This closes
+the manual verification originally handed back on 2026-07-05.
 
 **Follow-up fix (2026-07-05, from user QA — "border draws a useless cube inside the panel"):**
 panel appearance was painting the inner column wrapper instead of the panel the user actually
@@ -773,8 +772,8 @@ gradient end-color and direction but render even when the background type is Sol
   edit-mode cell rendering test, and a rewritten Playwright workflow test that moves a block by
   arrows and by drag onto a revealed empty cell, then saves and checks `layoutRows`.
 - Verified: `npm test` (625 passed, 1 skipped), `npm run lint`, `npm run format:check`,
-  `npm run build`, `npm run test:visual` (20 passed). Manual QA on a real page (drag feel,
-  hidden-block behavior) is the user's follow-up.
+  `npm run build`, `npm run test:visual` (20 passed). Manual QA on a real page (drag feel and
+  hidden-block behavior) was completed as part of the 2026-07-16 closeout.
 
 ### Acceptance
 
@@ -945,8 +944,8 @@ blocks.
 - Verified: `npm test` (633 passed, 1 skipped), `npm run test:backend` (120), `npm run lint`,
   `npm run format:check`, `format:py`/`lint:py`, `npm run build`, `npm run test:visual` (20
   passed; one flaky parity run passed on retry), API container restarted + live sanitizer
-  smoke-checked. **Manual QA (user)**: place the gear in a panel, verify login + a settings
-  change through the module-rendered button on a live page.
+  smoke-checked. The live account-flow check through the module-rendered gear was completed as
+  part of the 2026-07-16 manual QA closeout.
 
 ### Acceptance
 
@@ -1042,30 +1041,30 @@ The new precedence regression test, `npm test`, standard gate (no visual-suite i
 
 ---
 
-## 0.8.5 QA corrective closeout (opened 2026-07-14)
+## 0.8.5 QA corrective closeout (completed 2026-07-16)
 
-Authenticated QA on Pyre found six corrective bugs/UX contract gaps. They are release-blocking
-corrections to the completed roadmap, not new product directions. Do not bump to `0.8.5` or merge
-this branch to `main` until every required checkbox is verified in the builder and public page.
+Authenticated QA on Pyre found six corrective bugs/UX contract gaps. They were release-blocking
+corrections to the completed roadmap, not new product directions. All six are implemented and
+verified in the builder and public page.
 
 ### Required corrections
 
-- [ ] **Panel Hidden hides the panel shell.** Effective reader-panel visibility applies to the
+- [x] **Panel Hidden hides the panel shell.** Effective reader-panel visibility applies to the
       owning `<aside>` and collapses its layout space. The builder/layers path remains available
       so the panel can be selected and restored.
-- [ ] **Reader-column border styles the reader frame.** The Comic Reader module's owning-column
+- [x] **Reader-column border styles the reader frame.** The Comic Reader module's owning-column
       border applies to the outer viewport. An authored border suppresses the stock page-frame
       border; clearing it restores `stage.frameBorder`. Column text/background do not style the
       reader stage.
-- [ ] **Column/Panel padding inputs stay readable.** Top, Right, Bottom, and Left use labelled
+- [x] **Column/Panel padding inputs stay readable.** Top, Right, Bottom, and Left use labelled
       two-column number inputs that preserve keyboard entry, bounds, and accessible names.
-- [ ] **Reader controls support sparse Tablet/Phone appearance and padding.** Device branches
+- [x] **Reader controls support sparse Tablet/Phone appearance and padding.** Device branches
       retain only `hidden` and the supported control-bar/default/primary appearance and button
       padding. Editor, client normalization, backend sanitation, preview merge, save response,
       page refetch, and public output must agree.
-- [ ] **Feed wrapper layout works per device and publicly.** Tablet/Phone branches may override
+- [x] **Feed wrapper layout works per device and publicly.** Tablet/Phone branches may override
       Feed width, max width, height, and alignment without changing the Desktop/global fallback.
-- [ ] **Arrow moves and publication actions have explicit persistence.** Popup-arrow module moves
+- [x] **Arrow moves and publication actions have explicit persistence.** Popup-arrow module moves
       remain in a page-wide structure draft until Save; Discard restores the captured placement
       set. The atomic placements endpoint validates the full page before updating. **Save Page**
       preserves publication state; only Publish or confirmed Unpublish changes visibility.
@@ -1092,11 +1091,12 @@ this branch to `main` until every required checkbox is verified in the builder a
 - Public page API responses use `Cache-Control: no-store`; `/admin/*` revalidates through Caddy so
   an old admin script or backend process cannot silently masquerade as the current contract.
 
-### Separate 0.8.5 follow-up
+### Deferred enhancement (not a roadmap completion gate)
 
-- [ ] **Add header glow authoring.** Add a small header-specific control for top-bar and individual
-      block glow, using controlled CSS variables and the stock glow as the unset default. Preserve
-      keyboard focus indication; do not expand this into a generic arbitrary-shadow editor.
+- **Header glow authoring:** a future small header-specific control for top-bar and individual
+  block glow, using controlled CSS variables and the stock glow as the unset default. Preserve
+  keyboard focus indication; do not expand this into a generic arbitrary-shadow editor. This did
+  not ship in this roadmap and does not hold its completed status open.
 
 ### Verification and closeout
 
@@ -1114,15 +1114,19 @@ this branch to `main` until every required checkbox is verified in the builder a
   verify the published Pyre page in portrait. Rotate each device and confirm it returns to Desktop
   layout. Navigate multiple comic pages and scroll for at least five seconds; the reader must fit
   the screen without progressive shrinkage or size changes caused by browser chrome.
-- Verify panel hide/unhide, reader border, arrow Save/Discard, Save Page, Publish/Unpublish, and
-  header glow on Pyre. Close each checkbox only after its corresponding manual check passes, then
-  refresh `docs/ROADMAP_TO_1.0.md` §2.1 before the version bump and merge.
+- Verify panel hide/unhide, reader border, arrow Save/Discard, Save Page, and Publish/Unpublish on
+  Pyre. Close each checkbox only after its corresponding manual check passes, then refresh
+  `docs/ROADMAP_TO_1.0.md` §2.1 before the version bump and merge. Header glow is deferred above
+  and is not part of this closeout gate.
 
 Automated verification on 2026-07-14: `npm run lint`, `npm test` (657 passed, 1 skipped),
 `npm run format:py:check`, `npm run lint:py`, `npm run test:backend` (125 passed), `npm run build`,
 and `npm run test:visual` (21 passed). `npm run format:check` checks every task file clean but remains
 blocked by the pre-existing untracked `docs/POLISH_BACKLOG_PLAN.md`, which this pass did not edit.
-The physical-device and authenticated Pyre checks above remain open.
+Final manual closeout on 2026-07-16 completed the authenticated Pyre save/reload and published-page
+checks, panel hide/unhide, reader border, arrow Save/Discard, Save Page, Publish/Unpublish, and the
+Phone/Tablet responsive and rotation checks. All required corrective and QA gates in this roadmap
+are closed.
 
 ---
 
