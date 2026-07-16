@@ -1,5 +1,7 @@
 # Reader Block and Layout Customization Plan
 
+Consolidated with completed builder plans: 2026-07-16.
+
 Status: Completed
 Created: 2026-06-06
 Completed: 2026-06-18

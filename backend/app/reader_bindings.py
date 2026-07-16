@@ -1,9 +1,10 @@
 """Page scope/binding primitives and the reader-binding invariants.
 
-Extracted from page_store (Phase F of docs/BUILDER_REFACTOR_PLAN.md). Owns the
-page-scope and binding-role vocabulary, the reader-binding warning codes, and the
-rules for when a page may hold the series reader binding; page_store re-exports
-these names so existing imports keep working.
+Extracted from page_store (Phase F of
+docs/completed-builder-plans/BUILDER_REFACTOR_PLAN.md). Owns the page-scope and
+binding-role vocabulary, the reader-binding warning codes, and the rules for when
+a page may hold the series reader binding; page_store re-exports these names so
+existing imports keep working.
 """
 
 from __future__ import annotations

@@ -1,5 +1,7 @@
 # Builder Customization Roadmap
 
+Consolidated with completed builder plans: 2026-07-16.
+
 Status: **Finished — Phases 0–7 and the 0.8.5 QA corrective closeout are complete** (updated
 2026-07-16). All six corrective contracts are implemented and the authenticated physical-device,
 save/reload, and published-page QA is complete. Header glow remains a separately deferred
@@ -11,8 +13,10 @@ manual QA closed on 2026-07-16.
 
 Related docs:
 
-- `docs/PANEL_COLUMN_SETTINGS_CONSOLIDATION_PLAN.md` — prerequisite; its closeout is Phase 0 here.
-- `docs/BUILDER_INCREMENTAL_IMPROVEMENT_PLAN.md` — complete; its drop-placement and
+- `docs/completed-builder-plans/PANEL_COLUMN_SETTINGS_CONSOLIDATION_PLAN.md` — prerequisite; its
+  closeout is Phase 0 here.
+- `docs/completed-builder-plans/BUILDER_INCREMENTAL_IMPROVEMENT_PLAN.md` — complete; its
+  drop-placement and
   droppable-panel work is assumed by Phases 2 and 4.
 - `docs/LIVE_CANVAS_EDITOR_CORRECTIVE_PLAN.md` — reference-only north star; this roadmap does not
   execute it.

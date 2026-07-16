@@ -1,6 +1,6 @@
 # Docs Index - 0.8.2 Reader Block and Layout Lock
 
-Last updated: 2026-06-18
+Last updated: 2026-07-16
 
 Current release focus:
 
@@ -29,13 +29,9 @@ Recommended starting points:
 - `docs/ARCHITECTURE.md` - what runs where, including Caddy, FastAPI, static assets, analytics, and deployment boundaries.
 - `docs/ROADMAP.md` - release checklist through `1.0.0`.
 - `docs/READER_BUILDER_QA.md` - `0.8.0` manual QA worksheet for reader + page-builder lock.
-- `docs/BUILDER_PLAN.md` - current page-builder architecture, shipped header workflow, appearance contract, and remaining builder risks.
-- `docs/BUILDER_PREVIEW_PARITY_PLAN.md` - dedicated plan for making the builder preview match the reader at desktop, tablet, and mobile viewport sizes.
-- `docs/INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md` and `docs/INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md` - completed full-page live builder phase plan.
-- `docs/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md` - completed implementation record for reader
-  shell ownership, reader customization, vertical mode, generalized columns, and Phase 6 gates.
+- `docs/completed-builder-plans/README.md` - index of finished builder architecture, preview,
+  customization, inspector, layout, consolidation, incremental-improvement, and refactor plans.
 - `docs/BUILDER_STRIPE_STORE_PLAN.md` - follow-up plan for builder-authored one-time purchase store pages using Stripe-hosted Checkout.
-- `docs/BUILDER_INSPECTOR_MENU_UI_PLAN.md` - GrapesJS-aligned plan to fix cramped/clipped inspector menus (notably the header Placement editor) in the 280px builder rail.
 - `docs/admin-overview.md` - admin panel and page-builder behavior.
 - `docs/reader-overview.md` - reader runtime behavior and builder-page loading.
 - `docs/API_REFERENCE.md` - backend route reference.

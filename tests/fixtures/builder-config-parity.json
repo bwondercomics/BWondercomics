@@ -1,5 +1,5 @@
 {
-  "$comment": "JS<->Python builder schema parity fixture (Phase F of docs/BUILDER_REFACTOR_PLAN.md). Consumed by tests/builder-config-parity.test.js (vitest) and backend/tests/test_builder_config_parity.py (unittest). moduleConfigs.expected values are the sanitize_module_config outputs frozen as the contract; regenerate deliberately when the schema changes on purpose.",
+  "$comment": "JS<->Python builder schema parity fixture (Phase F of docs/completed-builder-plans/BUILDER_REFACTOR_PLAN.md). Consumed by tests/builder-config-parity.test.js (vitest) and backend/tests/test_builder_config_parity.py (unittest). moduleConfigs.expected values are the sanitize_module_config outputs frozen as the contract; regenerate deliberately when the schema changes on purpose.",
   "moduleTypes": [
     "account",
     "buttons",

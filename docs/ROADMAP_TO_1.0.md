@@ -62,7 +62,8 @@ expansion all land post-1.0.
 
 ### 2.1 Page builder (priority 1)
 
-**Current state.** Phases 0–7 of `docs/BUILDER_CUSTOMIZATION_ROADMAP.md` are implemented and
+**Current state.** Phases 0–7 of
+`docs/completed-builder-plans/BUILDER_CUSTOMIZATION_ROADMAP.md` are implemented and
 verified (panel/column consolidation closed, panel widths, module layout card, reader controls
 bar + end-of-entry popup, header edit-in-place with the placement board retired, header/logo and
 entry-picker customization, and account/links shell chrome as placeable blocks) [C:code+docs].
@@ -121,7 +122,8 @@ support for every future module field. Header glow remains the separate follow-u
    must add sanitization first. Worth a code comment and a line in the docs, not a rewrite.
 4. **Manual QA debt:** Phase 0's interactive builder pass ("open a Pyre reader page, click each
    panel/column, change each control, save, verify published") was handed back and never done;
-   Phase 4's drag-feel QA likewise (`docs/BUILDER_CUSTOMIZATION_ROADMAP.md` completion notes)
+   Phase 4's drag-feel QA likewise
+   (`docs/completed-builder-plans/BUILDER_CUSTOMIZATION_ROADMAP.md` completion notes)
    **[V — needs a human, ~30 min]**.
 5. **Fast Start presets / palette still live** (`admin/page-builder/theme-editor.js:60-70`) —
    intentionally retained after the 2026-07-07 scope revision. The remaining Phase 7 work is to

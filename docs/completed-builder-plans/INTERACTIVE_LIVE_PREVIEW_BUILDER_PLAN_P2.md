@@ -1,5 +1,7 @@
 # Full-Page Live Builder Plan, Part 2 of 2
 
+Consolidated with completed builder plans: 2026-07-16.
+
 Status: Complete - Phases 6-12 implemented, audited, corrected, and release-gated
 Plan state: Completed continuation of [Part 1](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md). All
 scoped phases have dated completion or corrective notes; current source plus those notes are the
@@ -50,7 +52,8 @@ Part 2 contains:
 - Preserve custom CMS behavior while generalizing pages. Reader, feed, entry picker, media gallery,
   series bindings, permissions, and protected media behavior remain first-class requirements.
 - New post-0.8.2 reader/layout work belongs in the follow-up plan at
-  `docs/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md` unless the user explicitly asks for a
+  `docs/completed-builder-plans/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md` unless the user
+  explicitly asks for a
   corrective patch to this completed plan.
 
 ## Phase 6 - Drag, Drop, Move, and Inline Toolbar Actions
@@ -108,7 +111,7 @@ Trusted references:
   - live target refs, target geometry, and admin overlay behavior.
 - [Part 1 Phase 5](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md#phase-5---side-panel-as-blocks-layers-traits-and-styles)
   - descriptor-backed blocks, layers, traits, styles, and allowed drop behavior.
-- [Admin page builder docs](functions/admin-page-builder.md#-canvas-mutations-canvas-mutationsjs)
+- [Admin page builder docs](../functions/admin-page-builder.md#-canvas-mutations-canvas-mutationsjs)
   - current structural mutation owner.
 
 Important interface/type changes:
@@ -264,7 +267,7 @@ Trusted references:
   separate from page content and can be hidden without changing the rendered page.
 - [Builder Preview Parity Plan](BUILDER_PREVIEW_PARITY_PLAN.md) - current iframe preview contract,
   exact viewport sizing, side-effect guards, and metrics behavior.
-- [Admin overview](admin-overview.md#page-builder-workflow) - current Edit/Preview toggle,
+- [Admin overview](../admin-overview.md#page-builder-workflow) - current Edit/Preview toggle,
   `builderPreview=1`, snapshot bridge, and `.pb-canvas[data-mode='preview']` scroll behavior.
 - [Part 1 Target Experience](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md#target-experience) - preview
   hides editor chrome and exposes only a restore-menu button.
@@ -400,11 +403,11 @@ Trusted references:
   concept with custom UI expected around the API.
 - GrapesJS Components: https://grapesjs.com/docs/modules/Components.html - page content should
   remain model-backed, not DOM-derived.
-- [Admin page builder data model](functions/admin-page-builder.md#-current-data-model) - current
+- [Admin page builder data model](../functions/admin-page-builder.md#-current-data-model) - current
   `BuilderPage`, `BuilderSection`, and `BuilderModule` ownership.
 - [Builder plan audit](BUILDER_PLAN.md#audit-summary) - current strengths, series scoping, reader
   fallback retirement, and routing notes.
-- [Admin overview data paths](admin-overview.md#data-paths-and-persistence) - current admin and
+- [Admin overview data paths](../admin-overview.md#data-paths-and-persistence) - current admin and
   public page-builder routes.
 
 Important interface/type changes:
@@ -558,7 +561,7 @@ Trusted references:
   options belong in selected-module settings.
 - [Part 1 Phase 5](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md#phase-5---side-panel-as-blocks-layers-traits-and-styles)
   - descriptor registry, blocks, settings, and styles.
-- [Admin page builder module catalog](functions/admin-page-builder.md#-current-module-catalog) -
+- [Admin page builder module catalog](../functions/admin-page-builder.md#-current-module-catalog) -
   current modules and editor ownership.
 - [Builder plan updated priorities](BUILDER_PLAN.md#updated-priorities) - current module coverage,
   preview/live parity, and safety priorities.
@@ -706,7 +709,7 @@ Trusted references:
   stack with explicit start/stop/skip behavior.
 - [Part 1 Trusted References](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md#trusted-references) -
   earlier command/keymap/undo reference conclusions.
-- [Admin page builder docs](functions/admin-page-builder.md#-builder-orchestrator-adminpage-builderjs)
+- [Admin page builder docs](../functions/admin-page-builder.md#-builder-orchestrator-adminpage-builderjs)
   - current orchestration and extracted managers.
 
 Important interface/type changes:
@@ -975,9 +978,9 @@ Trusted references:
 
 - [Builder Preview Parity Plan](BUILDER_PREVIEW_PARITY_PLAN.md) - prior release-gate style,
   preview exactness definition, and visual verification expectations.
-- [Admin overview](admin-overview.md#page-builder-workflow) - current builder workflow and preview
+- [Admin overview](../admin-overview.md#page-builder-workflow) - current builder workflow and preview
   contract.
-- [Admin page builder docs](functions/admin-page-builder.md) - current module ownership and test
+- [Admin page builder docs](../functions/admin-page-builder.md) - current module ownership and test
   seams.
 - [Part 1 Developer and LLM Notes](INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md#developer-and-llm-notes)
   - phase completion notes must be concrete and evidence-backed.

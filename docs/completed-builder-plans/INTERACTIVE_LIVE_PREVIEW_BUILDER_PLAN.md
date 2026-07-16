@@ -1,5 +1,7 @@
 # Full-Page Live Builder Plan, Part 1 of 2
 
+Consolidated with completed builder plans: 2026-07-16.
+
 Status: Complete - Phases 1-5 implemented; companion Part 2 Phases 6-12 are also complete
 Plan state: This file is complete for its scoped phases. Phases 1, 2, 3, 4, and 5 have dated
 completion notes below and should be treated as current Part 1 behavior unless a later corrective
@@ -51,7 +53,8 @@ Part 2 contains:
   current source as the behavior record. Test plans and acceptance criteria in old phase bodies are
   implementation history, not proof that a gate passed on a later date.
 - For new implementation after the completed split plan, start from the current source and the
-  relevant follow-up plan, such as `docs/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md`, unless the
+  relevant follow-up plan, such as
+  `docs/completed-builder-plans/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md`, unless the
   user explicitly asks for an audit or corrective patch to an earlier phase.
 - Keep the saved builder records as the source of truth. Browser DOM, iframe output, and overlays
   are views or editing affordances only.
@@ -141,7 +144,8 @@ Current BWonderComics reference:
 - `docs/functions/admin-page-builder.md` - Current builder architecture, explicit draft lifecycle,
   preview handshake, live target overlays, shared renderers, responsive overrides, descriptor-backed
   blocks, layers, settings, styles, and module catalog.
-- `docs/BUILDER_PLAN.md` - Current implementation snapshot: pages are series-scoped, preview uses a
+- `docs/completed-builder-plans/BUILDER_PLAN.md` - Current implementation snapshot: pages are
+  series-scoped, preview uses a
   same-origin reader iframe, and the builder recognizes `reader`, `entry-gallery`, and `feed`
   modules.
 - `backend/app/models.py`, `backend/app/page_store.py`, and `backend/app/routes/page_builder.py` -
@@ -399,7 +403,7 @@ Summary:
 Trusted references:
 
 - Current preview architecture: `docs/functions/admin-page-builder.md`,
-  `docs/BUILDER_PREVIEW_PARITY_PLAN.md`, and `README.md`.
+  `docs/completed-builder-plans/BUILDER_PREVIEW_PARITY_PLAN.md`, and `docs/README.md`.
 - Current implementation entrypoints: `admin/page-builder.js`,
   `admin/page-builder/preview-manager.js`, `reader/app.js`, `reader/data.js`,
   `reader/header-layout.js`, and `admin/page-builder/shared-renderers.js`.

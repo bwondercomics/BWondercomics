@@ -1,9 +1,9 @@
 # Builder Plan
 
-Status note (`2026-06-06`): this remains a historical builder architecture plan, but the current
-project lock is `0.8.2` live builder authoring. For the shipped full-page builder behavior, read
-this alongside `docs/functions/admin-page-builder.md` and the completed interactive live preview
-builder plan.
+Status: Historical builder architecture plan; its implementation scope is complete. Consolidated
+with completed builder plans on 2026-07-16. For the shipped full-page builder behavior, read this
+alongside `docs/functions/admin-page-builder.md` and the completed interactive live preview builder
+plan.
 
 ## Product direction
 
@@ -331,7 +331,8 @@ It is weakest where authors have to fall back to raw JSON for common modules. Th
 Admin preview and live reader rendering share the module/page HTML factory, and Preview mode now
 loads the real reader route in an iframe.
 
-The dedicated parity work in `docs/BUILDER_PREVIEW_PARITY_PLAN.md` closed the earlier shell and
+The dedicated parity work in `docs/completed-builder-plans/BUILDER_PREVIEW_PARITY_PLAN.md` closed
+the earlier shell and
 viewport gaps: preview uses `builderPreview=1`, validated `postMessage` snapshots, exact iframe
 dimensions, reader-side side-effect guards, and responsive metrics for Desktop, Tablet, and Phone.
 
@@ -452,7 +453,7 @@ Deliberately not in this phase:
 - Added `admin/page-builder/preview-contract.js` with the versioned preview snapshot contract, source labels, side-effect policy, and iframe-ready viewport dimensions: Desktop `1920x1080`, Tablet `768x1024`, and Mobile `375x812`.
 - Preview mode now labels whether it is rendering the saved hydrated page or an unsaved working snapshot.
 - When the active dirty scope is `module`, `theme`, `header`, `page-settings`, or `section`, preview merges that local draft into a cloned page snapshot without mutating `currentPage`.
-- At that point the preview still used a clamped `.pb-preview-frame`; later Phase 3-5 parity work replaced that path with the current reader iframe, exact preset sizing, and preview metrics instrumentation tracked in `docs/BUILDER_PREVIEW_PARITY_PLAN.md`.
+- At that point the preview still used a clamped `.pb-preview-frame`; later Phase 3-5 parity work replaced that path with the current reader iframe, exact preset sizing, and preview metrics instrumentation tracked in `docs/completed-builder-plans/BUILDER_PREVIEW_PARITY_PLAN.md`.
 
 ### Phase 3 - Page management pass ✅
 

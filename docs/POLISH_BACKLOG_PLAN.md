@@ -1,71 +1,79 @@
 # Polish Backlog Plan — Tweaks, Fixes, and Small Features
 
-Status: **Proposed — not started** (recorded 2026-07-14; requests 10–12 added same day).
+Status: **Proposed — not started** (recorded 2026-07-14; requests 10–12 added same day;
+request 13 added 2026-07-16).
 Created: 2026-07-14
-Branch context: written on `builder-incremental-improvement` while the Builder Customization
-Roadmap closeout work is still uncommitted in the working tree. Phases here assume that work
-lands first; re-verify cited line numbers at implementation time.
+Branch context: `builder-incremental-improvement`; the Builder Customization Roadmap and Builder
+Refactor Plan are finished. This backlog starts from the post-refactor `shared/page-builder/`
+boundaries; re-verify cited line numbers at implementation time.
 
 Related docs:
 
-- `docs/BUILDER_CUSTOMIZATION_ROADMAP.md` — Phases 6 and 5 here extend its appearance-schema
-  work (column chrome, feed-style sector).
+- `docs/completed-builder-plans/BUILDER_CUSTOMIZATION_ROADMAP.md` — Phases 5 and 6 here extend its
+  appearance-schema
+  work (feed-style sector, column chrome); Phase 13 carries forward its explicitly deferred
+  header-glow enhancement.
 - `docs/ROADMAP_TO_1.0.md` — §2.5 chose "polish media.html in place" for 1.0; Phase 8 here is
   additive curation inside that direction. §2.1's builder UX goals cover Phase 1.
 - `docs/DEVELOPER_QUICK_REFERENCE.md` — pre-commit checklist; run the relevant gates per phase.
 
 ## Purpose
 
-Turn a 12-item backlog of user-requested tweaks and fixes into independently executable
+Turn a 13-item backlog of user-requested tweaks and fixes into independently executable
 phases. Each phase stands alone (no phase depends on another unless stated), ordered quick
-wins → features. The backlog spans six surfaces: the reader feed (static right panel + the
+wins → features. The backlog spans seven surfaces: the reader feed (static right panel + the
 builder `feed` module), builder inspector chrome, the builder canvas/preview, the admin asset
-library, the media page, and the reader's touch navigation.
+library, the media page, the reader's touch navigation, and header styling.
 
 ## Traceability: request → phase
 
-| # | Request                                                                                   | Phase | Size |
-| - | ----------------------------------------------------------------------------------------- | ----- | ---- |
-| 1 | Customizable/togglable glow columns                                                        | 6     | M    |
-| 2 | Option to change transparency for feed block elements                                      | 5     | M    |
-| 3 | Make the 2 feed buttons animated, and put a line between the 2 buttons                     | 2     | S    |
-| 4 | Make feed drop down fit better for tablet and phone                                        | 3     | S–M  |
-| 5 | When the feed is made shorter, shorten the post summary before clipping into elements      | 4     | M    |
-| 6 | Builder drop-down options unreadable unless hovered (blend into background)                | 1     | S    |
-| 7 | Make it possible to delete images uploaded for page builder use                            | 7     | M    |
-| 8 | Hero cards in media (larger tiles for the best images), organizable                        | 8     | M    |
-| 9 | Make it so an entry can be shared with a link                                              | 9     | M    |
-| 10 | Desktop builder preview should fill the whole webpage, not sit in the middle of the page  | 10    | S–M  |
-| 11 | Column height actually editable; selection should wrap the whole column, border and all   | 11    | M    |
-| 12 | Scrolling the page on phone must not also change the comic page (tablet fine, phone broken) | 12  | S–M  |
+| #   | Request                                                                                     | Phase | Size |
+| --- | ------------------------------------------------------------------------------------------- | ----- | ---- |
+| 1   | Customizable/togglable glow columns                                                         | 6     | M    |
+| 2   | Option to change transparency for feed block elements                                       | 5     | M    |
+| 3   | Make the 2 feed buttons animated, and put a line between the 2 buttons                      | 2     | S    |
+| 4   | Make feed drop down fit better for tablet and phone                                         | 3     | S–M  |
+| 5   | When the feed is made shorter, shorten the post summary before clipping into elements       | 4     | M    |
+| 6   | Builder drop-down options unreadable unless hovered (blend into background)                 | 1     | S    |
+| 7   | Make it possible to delete images uploaded for page builder use                             | 7     | M    |
+| 8   | Hero cards in media (larger tiles for the best images), organizable                         | 8     | M    |
+| 9   | Make it so an entry can be shared with a link                                               | 9     | M    |
+| 10  | Desktop builder preview should fill the whole webpage, not sit in the middle of the page    | 10    | S–M  |
+| 11  | Column height actually editable; selection should wrap the whole column, border and all     | 11    | M    |
+| 12  | Scrolling the page on phone must not also change the comic page (tablet fine, phone broken) | 12    | S–M  |
+| 13  | Add controlled glow authoring for the top bar and each header block                         | 13    | M    |
 
 Suggested batching: Phases 1 and 12 first (both are daily-use bugs). Phases 2–5 are one feed
 cluster and can ship as a group. Phases 6–11 are independent in any order; Phases 10–11 are
-both builder-canvas work and pair well together.
+both builder-canvas work and pair well together. Phases 6 and 13 share glow-control UX ideas but
+must keep separate panel and header schemas.
 
 ## Confirmed decisions
 
-| Date       | Decision                                                                                                             |
-| ---------- | --------------------------------------------------------------------------------------------------------------------- |
-| 2026-07-14 | Phase 11: **no new column height field** — fix the existing `minHeight` so it visibly sizes the bordered shell panel. |
-| 2026-07-14 | Phase 10: exit stays the existing top-left **Edit** button (`#pbRestorePreviewChrome`) — no new exit chrome; it must keep working when the preview fills the whole window. |
-| 2026-07-14 | Phase 2: the divider between the two feed buttons is a **transparent gap** — the background shows through; no colored line, no new config. |
-| 2026-07-14 | Phase 4: container-queries vs `ResizeObserver` is an in-phase implementation choice — identical visible behavior either way. |
-| 2026-07-14 | Phase 5: transparency sliders pair with every feed **background** and **border** color; text colors stay opaque. |
-| 2026-07-14 | Phase 6: glow supports **inside and/or outside** placement, with **intensity, spread, and color** controls. Scope stays shell panels first. |
-| 2026-07-14 | Phase 7: **usage tracking is in scope** — show where each asset is used in the picker, and list referencing pages on delete. |
-| 2026-07-14 | Phase 8: hero ordering via **up/down** buttons — no drag-and-drop for now. |
-| 2026-07-14 | Phase 9: the share control is **a button in the reader controls bar** only. |
+| Date       | Decision                                                                                                                                                                         |
+| ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-07-14 | Phase 11: **no new column height field** — fix the existing `minHeight` so it visibly sizes the bordered shell panel.                                                            |
+| 2026-07-14 | Phase 10: exit stays the existing top-left **Edit** button (`#pbRestorePreviewChrome`) — no new exit chrome; it must keep working when the preview fills the whole window.       |
+| 2026-07-14 | Phase 2: the divider between the two feed buttons is a **transparent gap** — the background shows through; no colored line, no new config.                                       |
+| 2026-07-14 | Phase 4: container-queries vs `ResizeObserver` is an in-phase implementation choice — identical visible behavior either way.                                                     |
+| 2026-07-14 | Phase 5: transparency sliders pair with every feed **background** and **border** color; text colors stay opaque.                                                                 |
+| 2026-07-14 | Phase 6: glow supports **inside and/or outside** placement, with **intensity, spread, and color** controls. Scope stays shell panels first.                                      |
+| 2026-07-14 | Phase 7: **usage tracking is in scope** — show where each asset is used in the picker, and list referencing pages on delete.                                                     |
+| 2026-07-14 | Phase 8: hero ordering via **up/down** buttons — no drag-and-drop for now.                                                                                                       |
+| 2026-07-14 | Phase 9: the share control is **a button in the reader controls bar** only.                                                                                                      |
+| 2026-07-16 | Phase 13: use a header-only **Default / Off / Custom** glow contract for the top bar and five header blocks; do not add arbitrary shadow fields to the shared appearance schema. |
 
 ## Compatibility rules (apply to every phase)
 
 - Published pages (`battle-bros`, `prisonplanet`, PYRE `02`) must render unchanged by default:
   every new config/appearance key is optional and its default reproduces today's rendering.
 - Feed CSS classes are shared between the legacy static right panel (`index.html` +
-  `reader/latest.js`) and the builder `feed` module (`admin/page-builder/shared-renderers.js`).
+  `reader/latest.js`) and the builder `feed` module (`shared/page-builder/shared-renderers.js`).
   Any change to those classes gets QA'd on **both** surfaces.
-- `shared-renderers.js` is the single source for feed markup in admin preview and reader — keep
-  parity (guarded by `tests/shared-renderers-parity.test.js`).
+- `shared/page-builder/shared-renderers.js` is the single source for feed markup in admin preview
+  and reader — keep parity (guarded by `tests/shared-renderers-parity.test.js`).
+- Header glow config is optional and sparse. An absent glow branch means **Default** and must leave
+  every current header shadow, animation, hover state, and focus indicator unchanged.
 - No DB schema changes except Phase 8, which must first confirm the repo's column-migration
   pattern.
 - Admin-only endpoints stay behind `_require_admin` + `safe_path`
@@ -74,18 +82,20 @@ both builder-canvas work and pair well together.
 
 ## Reading map
 
-| Area                         | Files                                                                                      |
-| ---------------------------- | ------------------------------------------------------------------------------------------ |
-| Feed CSS                     | `assets/css/main.core.10b-right-panel-feed.css`, `assets/css/main.responsive.css`          |
-| Feed markup + behavior       | `admin/page-builder/shared-renderers.js:485` (feed renderer), `reader/feed-panel.js`, `reader/latest.js` |
-| Feed module config           | `admin/page-builder/module-descriptors.js:230-264`, feed editor in `admin/page-builder/module-editor.js` |
-| Column/panel chrome          | `assets/css/main.core.09-side-panels.css`, column inspector in `admin/page-builder/editor-panel.js`, `reader/data.js` |
-| Builder inspector controls   | `admin/css/page-builder/controls.css`, `admin/css/page-builder/inspector.css`              |
-| Asset library                | `admin/image-picker.js`, `admin/page-builder/data.js:209`, `backend/app/routes/files.py:494-605` |
-| Builder preview + selection  | `admin/page-builder/preview-contract.js`, `admin/page-builder/preview-manager.js`, `admin/css/page-builder/canvas.css`, `reader/preview-bridge.js` |
-| Reader touch navigation      | `reader/pointer.js`, `reader/config.js`, `reader/app.js` (edge-zone clicks), `assets/css/main.core.11-viewport.css`, `assets/css/main.core.14-edge-zones.css` |
-| Media page                   | `media.html`, `backend/app/models.py:201` (`MediaItem`), `backend/app/content_store.py`, `admin/media.js` |
-| Reader URL/state             | `reader/series.js`, `reader/app.js`, `reader/gallery.js`, `reader/controls.js`             |
+| Area                        | Files                                                                                                                                                         |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Feed CSS                    | `assets/css/main.core.10b-right-panel-feed.css`, `assets/css/main.responsive.css`                                                                             |
+| Feed markup + behavior      | `shared/page-builder/shared-renderers.js` (feed renderer), `reader/feed-panel.js`, `reader/latest.js`                                                         |
+| Feed module config          | `admin/page-builder/module-descriptors.js:230-264`, feed editor in `admin/page-builder/module-editor.js`                                                      |
+| Column/panel chrome         | `assets/css/main.core.09-side-panels.css`, column inspector in `admin/page-builder/editor-panel.js`, `reader/data.js`                                         |
+| Builder inspector controls  | `admin/css/page-builder/controls.css`, `admin/css/page-builder/inspector.css`                                                                                 |
+| Asset library               | `admin/image-picker.js`, `admin/page-builder/data.js:209`, `backend/app/routes/files.py:494-605`                                                              |
+| Builder preview + selection | `admin/page-builder/preview-contract.js`, `admin/page-builder/preview-manager.js`, `admin/css/page-builder/canvas.css`, `reader/preview-bridge.js`            |
+| Reader touch navigation     | `reader/pointer.js`, `reader/config.js`, `reader/app.js` (edge-zone clicks), `assets/css/main.core.11-viewport.css`, `assets/css/main.core.14-edge-zones.css` |
+| Media page                  | `media.html`, `backend/app/models.py:201` (`MediaItem`), `backend/app/content_store.py`, `admin/media.js`                                                     |
+| Reader URL/state            | `reader/series.js`, `reader/app.js`, `reader/gallery.js`, `reader/controls.js`                                                                                |
+| Header config + authoring   | `shared/page-builder/header-config.js`, `admin/page-builder/header-editor.js`, `backend/app/builder_security/header.py`                                       |
+| Header rendering + chrome   | `reader/header-layout.js`, `assets/css/main.core.04-header.css`, `assets/css/main.core.05-entry-select.css`, `assets/css/main.core.02-animations.css`         |
 
 ---
 
@@ -95,7 +105,7 @@ both builder-canvas work and pair well together.
 text blends into the popup background.
 
 **Current state.** `.pb-editor-select` styles the closed control dark-translucent with light
-text (`admin/css/page-builder/controls.css:75-96`), but the *open* option list is native UA
+text (`admin/css/page-builder/controls.css:75-96`), but the _open_ option list is native UA
 chrome: no `option` styling exists and nothing in `admin/` declares `color-scheme` (verified
 2026-07-14). On dark OS/browser combinations the UA paints a light popup while the options
 inherit light text — unreadable until hover highlights a row.
@@ -107,7 +117,7 @@ inherit light text — unreadable until hover highlights a row.
    scrollbars, and form chrome render dark.
 2. Belt-and-braces explicit option styling: `select option { background-color: <dark>; color: <light>; }`
    for the browsers that honor it.
-3. Audit *all* selects in the admin (builder inspector, toolbar, and non-builder tabs — Posts,
+3. Audit _all_ selects in the admin (builder inspector, toolbar, and non-builder tabs — Posts,
    Media, Users use selects too), not just `.pb-editor-select`.
 
 **Files.** `admin/css/page-builder/theme.css` and/or `admin/css/page-builder/controls.css`;
@@ -258,7 +268,7 @@ helper if the JS route is taken; `npm test`. Size: **M**.
 **Current state.** The feed style schema is 9 opaque hex colors
 (`module-descriptors.js:247-257`) applied inline by the shared renderer
 (`shared-renderers.js:485-556`) and `reader/feed-panel.js` (e.g. `itemBorderColor`). Surface
-*backgrounds*, however, are hardcoded rgba in CSS: bar `rgba(10,10,18,0.78)` (`10b:202`),
+_backgrounds_, however, are hardcoded rgba in CSS: bar `rgba(10,10,18,0.78)` (`10b:202`),
 item `rgba(10,10,18,0.75)` (`10b:343`), expanded body `rgba(10,10,18,0.6)`, toggle
 `rgba(10,10,18,0.75)` (`10b:374-379`). Native `<input type="color">` can't express alpha.
 Precedent for a paired opacity control: the panel background image opacity
@@ -460,7 +470,7 @@ writes an entry URL param, and there's no share affordance. Entries are keyed by
    fallback, `navigator.share` when available (mobile), confirmed via the existing
    toast/status pattern. The button inherits the controls bar's builder styling (button
    shape/colors, glow toggle) like the existing controls.
-4. Note in docs: links carry the entry *name*; renaming an entry breaks old links (accepted for
+4. Note in docs: links carry the entry _name_; renaming an entry breaks old links (accepted for
    now — stable slugs are out of scope).
 
 **Files.** `reader/series.js`, `reader/app.js`, `reader/controls.js` + the controls-bar markup
@@ -541,7 +551,7 @@ verify overlays align. Size: **S–M**.
 ## Phase 11 — Column height editable; selection wraps the whole column
 
 **Request 11.** Make the height of a column actually editable. The selection logic treats the
-column as a box *inside* the column — the selection should go around the whole column, border
+column as a box _inside_ the column — the selection should go around the whole column, border
 and all.
 
 **Current state.** The user's diagnosis is literally how it's built:
@@ -570,14 +580,14 @@ and all.
    (`findTargetFromEventTarget`, `preview-bridge.js:295+`) so clicking the border/edge region
    of the shell selects the column instead of falling through to the section/page.
 2. **Height that works (decided 2026-07-14):** no new inspector field — fix the existing
-   `minHeight` so it drives the *visible* column. For reader-owned panels, forward the resolved
+   `minHeight` so it drives the _visible_ column. For reader-owned panels, forward the resolved
    column `minHeight` onto the `<aside>` shell (alongside `applyPanelShellAppearance`); an
    authored value then grows the bordered panel past its stock `height: 100%` (min-height wins
    over height). An empty value keeps today's stretch behavior exactly. In-phase check: verify
    the forwarded value composes with the section-min-height + column-alignment path from the
    consolidation plan ("panels shorter than the section") rather than fighting it.
 3. Keep the drop-placement and droppable-panel invariants intact (markers stay where the
-   structural commands expect them; only the *visual* resolution changes).
+   structural commands expect them; only the _visual_ resolution changes).
 4. Verify the responsive-override path (per-device column settings,
    `getEffectiveColumnSettings`) forwards the per-device `minHeight` to the shell too.
 
@@ -661,11 +671,107 @@ on-device pass on phone and tablet; `npm test`. Size: **S–M**.
 
 ---
 
+## Phase 13 — Header glow authoring
+
+**Request 13.** Add a small, controlled glow editor for the header top bar and each individual
+header block.
+
+**Current state.** Header configuration is canonical in `page.meta.header` version 3 and is
+normalized by `shared/page-builder/header-config.js`, sanitized by
+`backend/app/builder_security/header.py`, and rendered through `reader/header-layout.js` in both
+the public page and builder iframe. The five block IDs are `brand`, `patron`, `status`,
+`entryControls`, and `nav`; each already owns sparse per-block appearance under
+`header.blocks[blockId]`. Header glow is currently hardcoded across several selectors: the logo
+animation and title filter, welcome/status shadows, entry-picker chrome, and nav-link normal,
+hover, and active shadows. The top bar itself has state-dependent depth shadows but no authored
+neon control. The shared appearance schema intentionally has no arbitrary `box-shadow` field.
+
+**Data contract (decided 2026-07-16).** Keep glow header-specific and sparse:
+
+```json
+{
+  "header": {
+    "glow": { "mode": "custom", "color": "#00d9ff", "intensity": 35 },
+    "blocks": {
+      "status": { "enabled": true, "glow": { "mode": "off" } }
+    }
+  }
+}
+```
+
+- `header.glow` controls the top-bar shell; `header.blocks[blockId].glow` controls one of the five
+  known block wrappers. Do not add glow/shadow fields to the generic appearance schema.
+- `mode` is `default`, `off`, or `custom`. Omit the entire `glow` object for `default`; that means
+  preserve today's stock visual behavior exactly. `off` suppresses only the glow layers for that surface.
+  `custom` uses a sanitized hex `color` plus integer `intensity` from 0–100. No raw CSS shadow
+  strings are accepted or persisted.
+- Custom intensity has one deterministic mapping on every surface: blur is
+  `round(24 × intensity / 100)` pixels and alpha is `intensity / 200` (0–0.5). Custom glow has no
+  authored spread, inset, or animation; those remain outside this deliberately small control.
+- The initial phase is global across devices and scroll states. It does not add responsive glow
+  branches, separate top/scrolled values, or per-nav-item glow. No header-version bump or data
+  migration is needed because the fields are optional and sparse.
+
+**Approach.**
+
+1. Add one shared `normalizeHeaderGlow` helper in `header-config.js`. Apply it to the top-level
+   header and to each known block in `normalizeBlocks`; export a resolver so renderer and tests use
+   one contract. Mirror the exact allowlist, enum, color validation, integer coercion, and sparse
+   omission rules in `builder_security/header.py`.
+2. Add a compact **Glow** control to the global Header Shell card and each of the five existing
+   Parts style groups in `header-editor.js`: Default / Off / Custom, with Color and Intensity shown
+   only for Custom. Reuse the current draft lifecycle and dirty/save/discard path. Reset removes
+   the branch instead of writing default values.
+3. In `reader/header-layout.js`, clear then apply only controlled glow attributes and variables on
+   the top bar and collected block roots (for example `data-header-glow` plus
+   `--header-glow-color` / `--header-glow-intensity`). Page changes and draft discard must remove
+   stale values from both placed and stashed blocks. The builder preview gets parity automatically
+   because it calls the same shared header-layout renderer.
+4. Refactor the curated header CSS selectors to separate structural/depth shadows from neon glow
+   layers. Default mode retains the exact current declarations and animations; Off removes only
+   neon glow; Custom replaces the neon component with the controlled variables while keeping
+   border, depth, hover/active transforms, and normal focus treatment. Account explicitly for the
+   logo's `neonPulse` keyframes so animation cannot overwrite Off or Custom, and for nav-link
+   hover/active rules so they do not reintroduce stock glow.
+5. Keep accessibility non-negotiable: glow is decorative, so Off must not remove the global
+   `:focus-visible` outline or make selection state depend on shadow alone. Do not animate a new
+   property; any edited animation behavior continues to honor `prefers-reduced-motion`.
+
+**Files.** `shared/page-builder/header-config.js`, `admin/page-builder/header-editor.js`,
+`backend/app/builder_security/header.py`, `reader/header-layout.js`,
+`assets/css/main.core.04-header.css`, `assets/css/main.core.05-entry-select.css`,
+`assets/css/main.core.02-animations.css`, `tests/header-appearance.test.js`, and
+`backend/tests/test_builder_security.py`; update a visual builder workflow only if it is the
+smallest stable proof of preview/public parity.
+
+**Acceptance criteria.**
+
+- The top bar and each of the five header blocks expose independent Default / Off / Custom glow
+  controls; Custom exposes only color and intensity.
+- An untouched existing page has identical saved JSON and rendered header. Default restores every
+  stock normal/hover/active/animated state rather than approximating it.
+- Off removes the selected surface's neon glow without removing layout depth, borders, interaction
+  transforms, or keyboard focus indication. It does not affect any other header block.
+- Custom color/intensity survives save, API sanitation, page refetch, and builder reload, and the
+  builder iframe matches the published page.
+- Switching between pages, saving/discarding a header draft, and moving a block between cells does
+  not leak stale glow attributes, variables, or animation state.
+
+**Test plan.** Extend `tests/header-appearance.test.js` for normalization, editor binding,
+Default/Off/Custom rendering, clear-on-page-change, draft save/discard, and builder-preview parity.
+Extend `backend/tests/test_builder_security.py` for allowlisting, invalid mode/color/intensity,
+bounds, unknown block IDs, and sparse round-trip behavior. Run `npm run lint`, `npm test`,
+`npm run test:backend`, `npm run build`, and `npm run test:visual`; manually verify Default, Off,
+and Custom on the Pyre header at desktop and phone widths, including nav hover/active, logo
+animation, page switch, save/reload, and keyboard focus. Size: **M**.
+
+---
+
 ## Verification gates (per phase)
 
 - Frontend: `npm test` (vitest), `npm run lint`; visual passes via `npm run test:visual` where
   a spec exists.
-- Backend phases (7, 8): `npm run test:backend`; restart the API container after backend
+- Backend phases (7, 8, 13): `npm run test:backend`; restart the API container after backend
   changes (`docker restart bwondercomics-bwondercomics-api-1`).
 - Cross-cutting: the pre-commit checklist in `docs/DEVELOPER_QUICK_REFERENCE.md` when a phase
   is committed.
@@ -677,4 +783,5 @@ on-device pass on phone and tablet; `npm test`. Size: **S–M**.
 None — the 2026-07-14 answers resolved all of them; see **Confirmed decisions** and the dated
 notes inside each phase. One standing default worth restating: Phase 6's glow controls apply
 to the shell panels first (they're the only columns with stock glow); the same schema can
-extend to inner section columns later if wanted.
+extend to inner section columns later if wanted. Phase 13 deliberately uses a separate
+header-only Default / Off / Custom contract and does not broaden the shared appearance schema.

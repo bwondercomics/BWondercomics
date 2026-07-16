@@ -3,8 +3,9 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-// Phase E of docs/BUILDER_REFACTOR_PLAN.md: shared/page-builder is the dual-use kernel
-// rendered by both the admin builder and the live reader. This boundary is structural:
+// Phase E of docs/completed-builder-plans/BUILDER_REFACTOR_PLAN.md:
+// shared/page-builder is the dual-use kernel rendered by both the admin builder and
+// the live reader. This boundary is structural:
 // nothing under shared/ may depend on admin/ or reader/, and the reader must never
 // import admin code (an admin-only dependency added to a kernel module would silently
 // ship into — or break — the reader bundle).

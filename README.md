@@ -69,9 +69,7 @@ Public pages are served from `dist/`.
 - Overview: `docs/README.md`
 - Architecture: `docs/ARCHITECTURE.md`
 - Admin panel + page builder: `docs/admin-overview.md`
-- Builder preview parity: `docs/BUILDER_PREVIEW_PARITY_PLAN.md`
-- Live builder implementation plan: `docs/INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md` and `docs/INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md`
-- Reader block + layout customization plan: `docs/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md`
+- Completed builder plans: `docs/completed-builder-plans/README.md`
 - Operations: `docs/OPERATIONS.md`
 - Deployment: `deploy/README.md`
 - Release roadmap: `docs/ROADMAP.md`

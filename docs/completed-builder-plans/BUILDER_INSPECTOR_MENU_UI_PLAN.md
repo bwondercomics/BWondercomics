@@ -1,5 +1,7 @@
 # Builder Inspector Menu UI Plan (GrapesJS-Aligned Density)
 
+Consolidated with completed builder plans: 2026-07-16.
+
 Status: Phases 0–3 complete; Phase 3 (Deferred / optional) segmented-control conversions not taken on.
 Created: 2026-06-18
 

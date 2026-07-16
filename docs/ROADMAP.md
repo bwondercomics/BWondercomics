@@ -56,7 +56,7 @@ Goal: make the full-page live builder the canonical authoring surface.
 - [x] Lock Desktop/Tablet/Phone preview dimensions at `1920x1080`, `768x1024`, and `375x812`, with admin-only scaling for Desktop.
 - [x] Add Phase 12 browser workflow coverage and keep full release verification manual/local.
 - [x] Implement the reader-as-block/layout customization plan in
-      `docs/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md`.
+      `docs/completed-builder-plans/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md`.
 - [x] Support no-reader custom pages, strict bound-reader lifecycle validation, paged/vertical reader
       customization, authored sections above/below the reader, and responsive 1-6 column styling.
 - [x] Close Phase 6 security, scheduling, atomic mutation, coverage, and public/admin visual parity

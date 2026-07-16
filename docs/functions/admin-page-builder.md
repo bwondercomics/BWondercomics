@@ -865,7 +865,7 @@ public rendering, editing, source, style, or persistence behavior.
 
 ## 📚 Related Docs
 
-- [docs/BUILDER_PLAN.md](/srv/bw-quality/docs/BUILDER_PLAN.md)
+- [Completed Builder Plan](/srv/bw-quality/docs/completed-builder-plans/BUILDER_PLAN.md)
 - [docs/functions/admin-core.md](/srv/bw-quality/docs/functions/admin-core.md)
 - [docs/functions/admin-page-builder-styles.md](/srv/bw-quality/docs/functions/admin-page-builder-styles.md)
 - [docs/functions/reader-core.md](/srv/bw-quality/docs/functions/reader-core.md)

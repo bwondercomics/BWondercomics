@@ -1,8 +1,9 @@
 """Validation and sanitization helpers for page-builder payloads.
 
-Split by domain (Phase F of docs/BUILDER_REFACTOR_PLAN.md); this package
-re-exports every name the old single-module builder_security exposed, so
-existing imports keep working unchanged.
+Split by domain (Phase F of
+docs/completed-builder-plans/BUILDER_REFACTOR_PLAN.md); this package re-exports
+every name the old single-module builder_security exposed, so existing imports
+keep working unchanged.
 """
 
 from .appearance import (

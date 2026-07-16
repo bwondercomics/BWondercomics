@@ -45,13 +45,15 @@ Local source of truth:
 - `docs/ROADMAP_TO_1.0.md` (§2.2) - post-plan audit and decisions this plan follows: Stripe
   Checkout only for 1.0.0, provider-neutral order columns, the starred security-checklist
   additions, sequencing gates, and the expanded store definition of done.
-- `docs/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md` - completed prerequisite for builder/reader
+- `docs/completed-builder-plans/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md` - completed
+  prerequisite for builder/reader
   decoupling, reader module lifecycle, layout expansion, and preview side-effect rules.
 - `docs/functions/admin-page-builder.md` - builder records, live iframe authoring, module draft
   workflow, preview target markers, and data API ownership.
 - `docs/functions/reader-core.md` - public builder page loading, preview bridge, side-effect
   suppression, and current store-entry redirect behavior.
-- `docs/BUILDER_PLAN.md` - structured builder model and security principle: sanitize on save, store
+- `docs/completed-builder-plans/BUILDER_PLAN.md` - structured builder model and security principle:
+  sanitize on save, store
   cleaned data, sanitize again on read, and reject invalid structural payloads.
 - `backend/app/builder_security.py` and `backend/app/page_store.py` - allowed module types, module
   config sanitization, source normalization, and section/module mutation paths.

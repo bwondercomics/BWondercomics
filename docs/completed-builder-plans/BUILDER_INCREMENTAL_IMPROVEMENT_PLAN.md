@@ -1,13 +1,13 @@
 # Builder Incremental Improvement Plan
 
-Status: Active
+Status: Completed — Items 1–3 implemented and verified by 2026-06-24.
 Created: 2026-06-20
 Revised: 2026-06-20 (folded in contract-review findings on Items 1-3)
-Supersedes (as the operative plan): `LIVE_CANVAS_EDITOR_CORRECTIVE_PLAN.md`
+Supersedes (as the operative plan): `docs/LIVE_CANVAS_EDITOR_CORRECTIVE_PLAN.md`
 
 ## Why this plan exists
 
-The corrective plan (`LIVE_CANVAS_EDITOR_CORRECTIVE_PLAN.md`) is an accurate diagnosis but an
+The corrective plan (`docs/LIVE_CANVAS_EDITOR_CORRECTIVE_PLAN.md`) is an accurate diagnosis but an
 8-phase near-rewrite. We are not running it as a program. The current builder architecture — a
 typed page model (`BuilderPage`/`BuilderSection`/`BuilderModule`) rendered into an iframe with an
 editor overlay — is sound and worth building on.
@@ -298,7 +298,8 @@ No phase gates. One item, its targeted tests + the gate, ship.
 
 ## Relationship to the corrective plan
 
-`LIVE_CANVAS_EDITOR_CORRECTIVE_PLAN.md` stays in the repo as reference. Its diagnosis informed these
+`docs/LIVE_CANVAS_EDITOR_CORRECTIVE_PLAN.md` stays in the repo as reference. Its diagnosis informed
+these
 items. We are deliberately **not** executing its 8-phase program (canonical target tree rewrite,
 unified selection state, atomic mutation endpoint, structural undo/redo). If a future need justifies
 that scope — for example, an atomic backend mutation endpoint to unblock section duplicate — it can

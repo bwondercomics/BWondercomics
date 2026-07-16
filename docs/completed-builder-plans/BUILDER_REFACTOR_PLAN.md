@@ -1,5 +1,7 @@
 # Builder Refactor Plan — Structural Cleanup of the Page Builder
 
+Consolidated with completed builder plans: 2026-07-16.
+
 Status: **Finished — Phases A–G implemented, verified, and committed** (updated 2026-07-16).
 Phases A–E are committed in `84a5a1c`, Phase F is committed in `e2f1dc9`, and Phase G is
 committed in `8922a6c`. No implementation, correction, QA, or operational follow-up remains in
@@ -90,7 +92,8 @@ Related docs:
 
 - `docs/POLISH_BACKLOG_PLAN.md` — the feature/fix backlog. Polish phases may interleave with
   this plan; see **Sequencing against the polish backlog** below for conflict notes.
-- `docs/BUILDER_CUSTOMIZATION_ROADMAP.md` — completed roadmap whose phases produced today's
+- `docs/completed-builder-plans/BUILDER_CUSTOMIZATION_ROADMAP.md` — completed roadmap whose phases
+  produced today's
   file layout (descriptor registry, per-module editors, command layer). This plan finishes
   several migrations that roadmap started.
 - `docs/ROADMAP_TO_1.0.md` — §10 flags `admin/index.html` (~2,500 lines) as a candidate for a

@@ -37,8 +37,9 @@ authors expect from a real component editor:
 - saved output matches the editor after reload.
 
 This is a corrective replacement for the incomplete live-editor claims in
-`INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md` and
-`INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md`. Those documents remain implementation history, but
+`completed-builder-plans/INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN.md` and
+`completed-builder-plans/INTERACTIVE_LIVE_PREVIEW_BUILDER_PLAN_P2.md`. Those documents remain
+implementation history, but
 their completion notes are not sufficient evidence that the editor meets this plan's acceptance
 criteria.
 

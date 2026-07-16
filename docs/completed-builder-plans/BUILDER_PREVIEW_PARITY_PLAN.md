@@ -1,5 +1,7 @@
 # Builder Preview Parity Plan
 
+Consolidated with completed builder plans: 2026-07-16.
+
 Status: Complete through Phase 9 release-gate verification (`2026-05-14`). Phase 2 and Phase 3
 iframe preview synchronization landed on `2026-05-11`; Phase 3.5 refactor extraction, Phase 4
 parity hardening, Phase 5 responsive parity instrumentation, Phase 6 visual verification, Phase 7
@@ -23,7 +25,8 @@ The baseline code audit for this plan verified the original diagnosis:
 
 Phase 8 corrected the known stale documentation called out by that audit:
 
-- `docs/BUILDER_PLAN.md` now distinguishes the structural edit canvas from the current iframe
+- `docs/completed-builder-plans/BUILDER_PLAN.md` now distinguishes the structural edit canvas from
+  the current iframe
   preview path.
 - `docs/admin-overview.md` now describes the same-origin iframe preview, exact viewport presets,
   `postMessage` snapshot bridge, and responsive metrics rather than the old frame clamp.
@@ -523,7 +526,8 @@ module-renderer/admin-preview Vitest coverage.
 
 ### Phase 8 - Documentation And Cleanup
 
-1. Update `docs/BUILDER_PLAN.md` to replace the older preview-pass note with the new source of
+1. Update `docs/completed-builder-plans/BUILDER_PLAN.md` to replace the older preview-pass note
+   with the new source of
    truth once implemented.
 2. Update `docs/admin-overview.md` with the new iframe preview behavior.
 3. Update `docs/functions/admin-page-builder.md` for:
@@ -541,7 +545,8 @@ module-renderer/admin-preview Vitest coverage.
    - preview toggle is removed, if that is no longer true
    - `.pb-preview-frame` width switching is the intended long-term preview mechanism
 6. Specifically audit:
-   - the "visually identical to the reader" preview claim in `docs/BUILDER_PLAN.md`
+   - the "visually identical to the reader" preview claim in
+     `docs/completed-builder-plans/BUILDER_PLAN.md`
    - the `.pb-preview-frame` / no-rerender width-toggle description in `docs/admin-overview.md`
    - any compact context notes that still say the preview toggle was removed
 7. Remove the old div-based preview path after the iframe path is stable.
@@ -672,7 +677,7 @@ Verified test coverage:
 
 Updated docs:
 
-- `docs/BUILDER_PLAN.md`
+- `docs/completed-builder-plans/BUILDER_PLAN.md`
 - `docs/admin-overview.md`
 - `docs/functions/admin-page-builder.md`
 - `docs/functions/reader-core.md`
