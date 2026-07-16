@@ -3,7 +3,8 @@
 Status: Planned; reader/layout prerequisite completed
 Created: 2026-06-08
 Updated: 2026-07-16 - recorded the settled one-time/physical-product scope, regional flat-rate
-shipping contract, `/mnt/archive` decision, and recovery-plan prerequisite.
+shipping contract, `/mnt/archive` decision, recovery-plan prerequisite, and secondary store UI
+reference.
 
 ## Purpose
 
@@ -77,6 +78,32 @@ Stripe references to re-check at implementation time:
 - Address collection: https://docs.stripe.com/payments/collect-addresses
 - Fixed Checkout shipping rates: https://docs.stripe.com/payments/during-payment/charge-shipping
 - Dynamic shipping limitation: https://docs.stripe.com/payments/advanced/shipping
+
+Secondary UI reference, not an implementation authority:
+
+- Upstream repository:
+  https://github.com/Kuzma02/Electronics-eCommerce-Shop-With-Admin-Dashboard-NextJS-NodeJS
+- License: MIT. Preserve the upstream copyright and license notice if code or other substantial
+  portions are copied. The local ignored checkout under `docs/website-references/` is convenient for
+  inspection but is not the durable reference.
+- Borrow for Phase 3 public/store-module design: a responsive product grid that reflows from three
+  columns to two and then one, image-led cards with a clear title/price/action hierarchy, a useful
+  no-products state, and a featured product composition that keeps imagery and purchase controls
+  legible when stacked on narrow screens. Reimplement these patterns through BWonderComics shared
+  renderers and appearance contracts rather than copying Next.js/Tailwind components.
+- Borrow for Phase 6 admin operations: scannable product and order tables, thumbnail-plus-title
+  product identity, visible availability/payment/fulfillment badges, direct list-to-detail
+  navigation, grouped customer/shipping information, line-item summaries, totals, notes, and an
+  explicit fulfillment-status action. Adapt the forms to local product status, variants, Stripe
+  configuration health, shipping profiles, and archive-not-delete behavior.
+- Carry forward the interaction ideas, not the reference project's data or trust model: responsive
+  overflow, labeled controls, loading/empty/error states, disabled in-flight actions, confirmation
+  before destructive-looking actions, and clear separation between list, detail, and edit tasks.
+- Do not borrow its persistent cart, custom checkout form, client-supplied order total, merchant/user
+  system, product/order schema, API authorization model, payment-validation helpers, or manual
+  contact-for-payment flow. Those conflict with this plan's Stripe-hosted Checkout, server-owned
+  price/shipping authority, API-level admin authorization, provider-neutral orders, webhook
+  verification, and idempotent fulfillment contracts.
 
 As of this plan, the Stripe best-practices reference used for planning identifies
 `2026-02-25.clover` as the latest Stripe API version. Implementation must verify the current
