@@ -34,6 +34,9 @@ from .reader_bindings import (
     sanitize_binding_role,
     sanitize_page_scope,
 )
+from .reader_bindings import (
+    PageBuilderValidationError as PageBuilderValidationError,
+)
 from .series_store import DEFAULT_SERIES_ID, sanitize_series_id
 
 
