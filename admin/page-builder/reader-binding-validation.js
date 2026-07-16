@@ -1,4 +1,7 @@
-import { BUILDER_DEVICE_ORDER, getBuilderDevice } from '../../shared/page-builder/preview-contract.js';
+import {
+  BUILDER_DEVICE_ORDER,
+  getBuilderDevice,
+} from '../../shared/page-builder/preview-contract.js';
 import { isModuleHiddenForDevice } from '../../shared/page-builder/responsive-overrides.js';
 
 export const READER_BINDING_DEFAULT_DEVICE = BUILDER_DEVICE_ORDER[0];

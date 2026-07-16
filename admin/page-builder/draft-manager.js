@@ -195,15 +195,30 @@ export function createDraftManager({ getState, actions, deps }) {
   function markDirty(scope, options = {}) {
     dirtyScope = scope;
     if (scope === 'module') {
-      actions.setEditorStatus('Unsaved module changes. Save or discard before switching.', 'warning');
+      actions.setEditorStatus(
+        'Unsaved module changes. Save or discard before switching.',
+        'warning'
+      );
     } else if (scope === 'header') {
-      actions.setEditorStatus('Unsaved header changes. Save or discard before switching.', 'warning');
+      actions.setEditorStatus(
+        'Unsaved header changes. Save or discard before switching.',
+        'warning'
+      );
     } else if (scope === 'theme') {
-      actions.setEditorStatus('Unsaved theme changes. Save or discard before switching.', 'warning');
+      actions.setEditorStatus(
+        'Unsaved theme changes. Save or discard before switching.',
+        'warning'
+      );
     } else if (scope === 'page-settings') {
-      actions.setEditorStatus('Unsaved page settings. Save or discard before switching.', 'warning');
+      actions.setEditorStatus(
+        'Unsaved page settings. Save or discard before switching.',
+        'warning'
+      );
     } else if (scope === 'section') {
-      actions.setCanvasStatus?.('Unsaved section settings. Save or discard before switching.', 'warning');
+      actions.setCanvasStatus?.(
+        'Unsaved section settings. Save or discard before switching.',
+        'warning'
+      );
     } else if (scope === 'structure') {
       actions.setEditorStatus('Unsaved module moves. Save or discard before switching.', 'warning');
     }
@@ -218,7 +233,10 @@ export function createDraftManager({ getState, actions, deps }) {
       return;
     }
     const s = getState();
-    if (scope === 'module' && s.inlineEditState?.moduleId === (moduleDraftId || s.selectedModuleId)) {
+    if (
+      scope === 'module' &&
+      s.inlineEditState?.moduleId === (moduleDraftId || s.selectedModuleId)
+    ) {
       actions.syncInlineEditToPreview?.('side-panel');
       actions.refreshPreviewSnapshot?.();
       return;

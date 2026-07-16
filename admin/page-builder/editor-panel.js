@@ -1,5 +1,15 @@
-import { escapeAttr, escapeHtml, formatFocus, normalizeFit, parseFocus } from '../../shared/page-builder/helpers.js';
-import { COLUMN_ALIGNMENTS, MAX_COLUMNS, parseLayoutRatios } from '../../shared/page-builder/layout-utils.js';
+import {
+  escapeAttr,
+  escapeHtml,
+  formatFocus,
+  normalizeFit,
+  parseFocus,
+} from '../../shared/page-builder/helpers.js';
+import {
+  COLUMN_ALIGNMENTS,
+  MAX_COLUMNS,
+  parseLayoutRatios,
+} from '../../shared/page-builder/layout-utils.js';
 import {
   getAppearanceInputValue,
   getAppearanceLeaf,

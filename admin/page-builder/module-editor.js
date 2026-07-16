@@ -571,7 +571,13 @@ export function renderModuleEditorContent({
   }
 
   contentSections.push(
-    ...entry.renderContent({ config, currentPage, pages, moduleType, shared: SHARED_EDITOR_HELPERS })
+    ...entry.renderContent({
+      config,
+      currentPage,
+      pages,
+      moduleType,
+      shared: SHARED_EDITOR_HELPERS,
+    })
   );
 
   // Shared wrapper layout (config.layout): available on every structured module type.
@@ -634,7 +640,13 @@ export function renderModuleStyleEditorContent({
       : baseConfig;
 
   const sections = entry?.renderStyle
-    ? entry.renderStyle({ config, pages, activeDeviceId, styleScope, shared: SHARED_EDITOR_HELPERS })
+    ? entry.renderStyle({
+        config,
+        pages,
+        activeDeviceId,
+        styleScope,
+        shared: SHARED_EDITOR_HELPERS,
+      })
     : [];
 
   return sections.length

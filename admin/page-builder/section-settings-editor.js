@@ -1,5 +1,9 @@
 import { cloneValue } from '../../shared/page-builder/helpers.js';
-import { MAX_COLUMNS, parseLayoutRatios, ratiosToLayout } from '../../shared/page-builder/layout-utils.js';
+import {
+  MAX_COLUMNS,
+  parseLayoutRatios,
+  ratiosToLayout,
+} from '../../shared/page-builder/layout-utils.js';
 import {
   isSectionResponsiveField,
   pruneEmptyResponsiveOverrides,
