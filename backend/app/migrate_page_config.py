@@ -18,6 +18,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .builder_history import PAGE_CREATED, capture_page_snapshot
 from .db import SessionLocal
 from .models import BuilderModule, BuilderPage, BuilderSection, PageConfig, Series
 
@@ -249,6 +250,10 @@ def migrate_page_config_to_builder(db: Session, series_id: str, config: dict) ->
                 )
             )
 
+    # SessionLocal disables autoflush. Persist the complete migrated graph before
+    # recovery serialization, but leave commit ownership with run_migration().
+    db.flush()
+    capture_page_snapshot(db, page.id, PAGE_CREATED, actor_user_id=None)
     return page
 
 

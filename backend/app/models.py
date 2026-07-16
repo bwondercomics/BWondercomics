@@ -538,6 +538,52 @@ class BuilderPage(Base):
     )
 
 
+class BuilderPageSnapshot(Base):
+    """Versioned recovery document for one persisted builder page state."""
+
+    __tablename__ = "builder_page_snapshots"
+    __table_args__ = (
+        CheckConstraint("scope IN ('series', 'global')", name="ck_builder_page_snapshots_scope"),
+        CheckConstraint(
+            "(scope = 'global' AND series_id IS NULL) OR "
+            "(scope = 'series' AND series_id IS NOT NULL)",
+            name="ck_builder_page_snapshots_scope_series_id",
+        ),
+        CheckConstraint("payload_version > 0", name="ck_builder_page_snapshots_payload_version"),
+    )
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    # Deliberately not a foreign key: recovery history must survive page deletion.
+    page_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
+    scope: Mapped[str] = mapped_column(String(20), nullable=False)
+    series_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    slug: Mapped[str] = mapped_column(String(100), nullable=False)
+    action: Mapped[str] = mapped_column(String(40), nullable=False)
+    created_by_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    payload_version: Mapped[int] = mapped_column(Integer, nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False)
+    payload_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+Index(
+    "ix_builder_page_snapshots_page_created_at",
+    BuilderPageSnapshot.page_id,
+    BuilderPageSnapshot.created_at.desc(),
+)
+Index(
+    "ix_builder_page_snapshots_scope_series_created_at",
+    BuilderPageSnapshot.scope,
+    BuilderPageSnapshot.series_id,
+    BuilderPageSnapshot.created_at.desc(),
+)
+Index("ix_builder_page_snapshots_created_at", BuilderPageSnapshot.created_at)
+
+
 class BuilderPageBinding(Base):
     """Series route-role binding for a builder page."""
 

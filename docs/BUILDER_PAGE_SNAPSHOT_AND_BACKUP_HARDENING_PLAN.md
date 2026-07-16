@@ -457,6 +457,23 @@ Acceptance criteria:
 - Identical consecutive states do not consume retention slots.
 - Creating a page still returns the existing API response and changes no public behavior.
 
+Completion note (2026-07-16): Complete. Revision `0018_builder_page_snapshots` adds the non-cascading
+page-history record, actor `ON DELETE SET NULL` foreign key, scope/version checks, and descending
+history/discovery indexes. `backend/app/builder_history.py` now owns the strict version-1 recovery
+serializer, full server action vocabulary, stable content hash, consecutive deduplication, and
+in-transaction 30-row retention. All page-builder mutation routes pass the authenticated actor into
+keyword-only service arguments, while Phase 1 captures only transactional `page_created` baselines;
+authenticated admin-created pages retain the admin actor, while the supported legacy `PageConfig`
+CLI conversion flushes and captures its complete migrated graph with a null actor under the same
+caller-owned commit. Existing-page coverage, backfill, restore, APIs, and UI remain Phase 2-3 work.
+Admin and self-service user deletion explicitly clear snapshot actor IDs in addition to the database
+FK contract.
+
+Verification completed: isolated Alembic operations upgrade/downgrade schema inspection; a scratch
+PostgreSQL 16 drill through `0017 -> 0018 -> 0017 -> head` with the live table, checks, foreign key,
+and indexes inspected; `npm run format:check`; `npm run format:py:check`; `npm run lint:py`;
+`npm run test:backend` (140 passed); and `git diff --check`.
+
 ### Phase 2 - Complete mutation coverage and restore service
 
 Goal: guarantee that every committed builder-page mutation has a recoverable pre-state.

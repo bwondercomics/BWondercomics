@@ -138,9 +138,11 @@ Builder pages use explicit page-builder APIs rather than the legacy save-JSON pa
 - Backend runtime + routing: `backend/app/main.py`
 - Dynamic site-branding helpers/routes: `backend/app/site_branding.py`, `backend/app/routes/site_branding.py`
 - Series/entry JSON views and DB save logic: `backend/app/series_store.py`, `backend/app/routes/series_json.py`, `backend/app/routes/files.py`
-- Builder-page persistence and validation: `backend/app/page_store.py`, the
-  `backend/app/builder_security/` package, `backend/app/reader_bindings.py`, and page-builder routes
-  in `backend/app/routes/`
+- Builder-page persistence, validation, and recovery history: `backend/app/page_store.py`,
+  `backend/app/builder_history.py`, the `backend/app/builder_security/` package,
+  `backend/app/reader_bindings.py`, and page-builder routes in `backend/app/routes/`. New pages get
+  one transactional, server-owned baseline snapshot; complete mutation coverage and restore remain
+  later recovery work.
 - Reader boot + behavior: `reader/app.js`, `reader/data.js`, `reader/series.js`
 - Admin boot + behavior: `admin/app.js`, `admin/entries.js`, `admin/media.js`,
   `admin/page-config.js`, `admin/page-builder.js`, and `admin/page-builder/`

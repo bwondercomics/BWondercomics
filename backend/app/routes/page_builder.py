@@ -149,7 +149,8 @@ def api_create_global_page(
     db: Session = Depends(get_db),
 ):
     """Create a global page."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     try:
@@ -158,6 +159,7 @@ def api_create_global_page(
             PAGE_SCOPE_GLOBAL,
             None,
             payload.model_dump(by_alias=True, exclude_none=True),
+            actor_user_id=admin.id,
         )
         return {"page": page}
     except ValueError as e:
@@ -187,11 +189,12 @@ def api_reorder_global_pages(
     db: Session = Depends(get_db),
 ):
     """Reorder global pages."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     try:
-        reorder_scoped_pages(db, PAGE_SCOPE_GLOBAL, None, payload.page_ids)
+        reorder_scoped_pages(db, PAGE_SCOPE_GLOBAL, None, payload.page_ids, actor_user_id=admin.id)
         return {"status": "success"}
     except ValueError as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
@@ -221,7 +224,8 @@ def api_create_series_page(
     db: Session = Depends(get_db),
 ):
     """Create a page for a series."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     try:
@@ -230,6 +234,7 @@ def api_create_series_page(
             PAGE_SCOPE_SERIES,
             series_id,
             payload.model_dump(by_alias=True, exclude_none=True),
+            actor_user_id=admin.id,
         )
         return {"page": page}
     except ValueError as e:
@@ -264,11 +269,18 @@ def api_reorder_series_pages(
     db: Session = Depends(get_db),
 ):
     """Reorder pages for a series."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     try:
-        reorder_scoped_pages(db, PAGE_SCOPE_SERIES, series_id, payload.page_ids)
+        reorder_scoped_pages(
+            db,
+            PAGE_SCOPE_SERIES,
+            series_id,
+            payload.page_ids,
+            actor_user_id=admin.id,
+        )
         return {"status": "success"}
     except ValueError as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
@@ -298,11 +310,12 @@ def api_update_page_bindings(
     db: Session = Depends(get_db),
 ):
     """Update page route-role bindings for a series."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     try:
-        return update_page_bindings(db, series_id, payload.bindings)
+        return update_page_bindings(db, series_id, payload.bindings, actor_user_id=admin.id)
     except PageBuilderValidationError as e:
         db.rollback()
         return JSONResponse(
@@ -369,11 +382,17 @@ def api_create_page(
     db: Session = Depends(get_db),
 ):
     """Create a new page."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     try:
-        page = create_page(db, series_id, payload.model_dump(by_alias=True, exclude_none=True))
+        page = create_page(
+            db,
+            series_id,
+            payload.model_dump(by_alias=True, exclude_none=True),
+            actor_user_id=admin.id,
+        )
         return {"page": page}
     except ValueError as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
@@ -387,11 +406,17 @@ def api_update_page(
     db: Session = Depends(get_db),
 ):
     """Update page metadata."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     try:
-        page = update_page(db, page_id, payload.model_dump(by_alias=True, exclude_none=True))
+        page = update_page(
+            db,
+            page_id,
+            payload.model_dump(by_alias=True, exclude_none=True),
+            actor_user_id=admin.id,
+        )
         if not page:
             return JSONResponse(status_code=404, content={"error": "Page not found"})
         return {"page": page}
@@ -408,10 +433,11 @@ def api_update_page(
 @router.delete("/api/admin/pages/{page_id}")
 def api_delete_page(page_id: str, request: Request, db: Session = Depends(get_db)):
     """Delete a page and all its sections/modules."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    if delete_page(db, page_id):
+    if delete_page(db, page_id, actor_user_id=admin.id):
         return {"status": "success"}
     return JSONResponse(status_code=404, content={"error": "Page not found"})
 
@@ -424,11 +450,12 @@ def api_reorder_pages(
     db: Session = Depends(get_db),
 ):
     """Reorder pages."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     try:
-        reorder_pages(db, series_id, payload.page_ids)
+        reorder_pages(db, series_id, payload.page_ids, actor_user_id=admin.id)
         return {"status": "success"}
     except ValueError as e:
         return JSONResponse(status_code=400, content={"error": str(e)})
@@ -469,11 +496,17 @@ def api_add_section(
     db: Session = Depends(get_db),
 ):
     """Add a section to a page."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     try:
-        section = add_section(db, page_id, payload.model_dump(by_alias=True, exclude_none=True))
+        section = add_section(
+            db,
+            page_id,
+            payload.model_dump(by_alias=True, exclude_none=True),
+            actor_user_id=admin.id,
+        )
         if not section:
             return JSONResponse(status_code=404, content={"error": "Page not found"})
         return {"section": section}
@@ -489,12 +522,16 @@ def api_update_section(
     db: Session = Depends(get_db),
 ):
     """Update a section."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     try:
         section = update_section(
-            db, section_id, payload.model_dump(by_alias=True, exclude_none=True)
+            db,
+            section_id,
+            payload.model_dump(by_alias=True, exclude_none=True),
+            actor_user_id=admin.id,
         )
         if not section:
             return JSONResponse(status_code=404, content={"error": "Section not found"})
@@ -508,10 +545,11 @@ def api_update_section(
 @router.delete("/api/admin/sections/{section_id}")
 def api_delete_section(section_id: str, request: Request, db: Session = Depends(get_db)):
     """Delete a section and all its modules."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    if delete_section(db, section_id):
+    if delete_section(db, section_id, actor_user_id=admin.id):
         return {"status": "success"}
     return JSONResponse(status_code=404, content={"error": "Section not found"})
 
@@ -524,10 +562,11 @@ def api_reorder_sections(
     db: Session = Depends(get_db),
 ):
     """Reorder sections within a page."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    reorder_sections(db, page_id, payload.section_ids)
+    reorder_sections(db, page_id, payload.section_ids, actor_user_id=admin.id)
     return {"status": "success"}
 
 
@@ -588,11 +627,17 @@ def api_add_module(
     db: Session = Depends(get_db),
 ):
     """Add a module to a section."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     try:
-        module = add_module(db, section_id, payload.model_dump(by_alias=True, exclude_none=True))
+        module = add_module(
+            db,
+            section_id,
+            payload.model_dump(by_alias=True, exclude_none=True),
+            actor_user_id=admin.id,
+        )
         if not module:
             return JSONResponse(status_code=404, content={"error": "Section not found"})
         return {"module": module}
@@ -609,11 +654,17 @@ def api_update_module(
     db: Session = Depends(get_db),
 ):
     """Update a module's config."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     try:
-        module = update_module(db, module_id, payload.model_dump(by_alias=True, exclude_none=True))
+        module = update_module(
+            db,
+            module_id,
+            payload.model_dump(by_alias=True, exclude_none=True),
+            actor_user_id=admin.id,
+        )
         if not module:
             return JSONResponse(status_code=404, content={"error": "Module not found"})
         return {"module": module}
@@ -625,10 +676,11 @@ def api_update_module(
 @router.delete("/api/admin/modules/{module_id}")
 def api_delete_module(module_id: str, request: Request, db: Session = Depends(get_db)):
     """Delete a module."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    if delete_module(db, module_id):
+    if delete_module(db, module_id, actor_user_id=admin.id):
         return {"status": "success"}
     return JSONResponse(status_code=404, content={"error": "Module not found"})
 
@@ -641,12 +693,18 @@ def api_move_module(
     db: Session = Depends(get_db),
 ):
     """Move a module to a different section/column."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     try:
         module = move_module(
-            db, module_id, payload.target_section_id, payload.column_index, payload.sort_index
+            db,
+            module_id,
+            payload.target_section_id,
+            payload.column_index,
+            payload.sort_index,
+            actor_user_id=admin.id,
         )
         if not module:
             return JSONResponse(status_code=404, content={"error": "Module or section not found"})
@@ -664,11 +722,18 @@ def api_reorder_modules(
     db: Session = Depends(get_db),
 ):
     """Reorder modules within a section column."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     try:
-        reorder_modules(db, section_id, payload.column_index, payload.module_ids)
+        reorder_modules(
+            db,
+            section_id,
+            payload.column_index,
+            payload.module_ids,
+            actor_user_id=admin.id,
+        )
         return {"status": "success"}
     except ValueError as e:
         db.rollback()
@@ -683,7 +748,8 @@ def api_save_module_placements(
     db: Session = Depends(get_db),
 ):
     """Atomically save a full-page module-placement draft."""
-    if not _require_admin(request, db):
+    admin = _require_admin(request, db)
+    if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     try:
@@ -691,6 +757,7 @@ def api_save_module_placements(
             db,
             page_id,
             [placement.model_dump(by_alias=True) for placement in payload.placements],
+            actor_user_id=admin.id,
         )
         if not page:
             return JSONResponse(status_code=404, content={"error": "Page not found"})

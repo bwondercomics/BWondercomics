@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from ..db import get_db
 from ..models import (
+    BuilderPageSnapshot,
     Comment,
     EmailSubscriber,
     PremiumCode,
@@ -293,6 +294,11 @@ def delete_account(request: Request, db: Session = Depends(get_db)):
     db.execute(text("DELETE FROM visitor_events WHERE user_id = :uid"), {"uid": uid})
     db.execute(delete(VisitorSession).where(VisitorSession.user_id == user.id))
     db.execute(delete(PremiumCodeRedemption).where(PremiumCodeRedemption.user_id == user.id))
+    db.execute(
+        update(BuilderPageSnapshot)
+        .where(BuilderPageSnapshot.created_by_user_id == user.id)
+        .values(created_by_user_id=None)
+    )
     db.execute(
         update(PremiumCode)
         .where(PremiumCode.redeemed_by == user.id)

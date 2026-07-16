@@ -66,6 +66,18 @@ The builder is the admin authoring surface for scoped builder pages backed by `B
 freeform visual editor. The builder works with explicit page, section, and module records plus
 page-level metadata in `page.meta`.
 
+`BuilderPageSnapshot` is the separate server-owned recovery-history record. Authenticated admin
+page creation writes one versioned, sanitized baseline snapshot in the same database transaction as
+the page and attributes it to that admin. The supported legacy `PageConfig` conversion also writes
+the complete migrated page graph as one transactional baseline, with a null actor because the CLI
+has no authenticated user. Snapshot JSON preserves canonical page, section, module, and binding
+IDs, omits record timestamps, uses a stable content hash to skip consecutive duplicate states, and
+retains the newest 30 distinct states per page. The snapshot's `page_id` deliberately is not a
+foreign key, so history survives page deletion; its optional actor foreign key is nulled when the
+user is removed. Existing-page mutations, restore endpoints, history UI, and existing-page backfill
+remain deferred to later recovery phases, so local draft undo/redo is still the only user-facing
+recovery control.
+
 Ownership rule: admin-only controllers/editors live under `admin/page-builder/`; contracts imported
 by both admin and reader live under `shared/page-builder/`. `tests/shared-kernel-boundary.test.js`
 enforces that shared code imports neither side and that reader code does not import admin modules.

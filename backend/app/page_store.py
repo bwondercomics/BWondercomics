@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from .builder_history import PAGE_CREATED, capture_page_snapshot
 from .builder_security import (
     ALLOWED_MODULE_TYPES,
     layout_column_count,
@@ -331,6 +332,8 @@ def create_scoped_page(
     scope: str,
     series_id: str | None,
     data: dict[str, Any],
+    *,
+    actor_user_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     """Create a new page in an explicit scope."""
     safe_scope = sanitize_page_scope(scope)
@@ -365,18 +368,38 @@ def create_scoped_page(
     db.add(page)
     db.flush()
     _ensure_reader_binding_for_page(db, page)
+    capture_page_snapshot(db, page.id, PAGE_CREATED, actor_user_id)
     db.commit()
 
     return get_page(db, str(page.id)) or {}
 
 
-def create_page(db: Session, series_id: str | None, data: dict[str, Any]) -> dict[str, Any]:
+def create_page(
+    db: Session,
+    series_id: str | None,
+    data: dict[str, Any],
+    *,
+    actor_user_id: uuid.UUID | None = None,
+) -> dict[str, Any]:
     """Compatibility create for series pages."""
-    return create_scoped_page(db, PAGE_SCOPE_SERIES, series_id or DEFAULT_SERIES_ID, data)
+    return create_scoped_page(
+        db,
+        PAGE_SCOPE_SERIES,
+        series_id or DEFAULT_SERIES_ID,
+        data,
+        actor_user_id=actor_user_id,
+    )
 
 
-def update_page(db: Session, page_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
+def update_page(
+    db: Session,
+    page_id: str,
+    data: dict[str, Any],
+    *,
+    actor_user_id: uuid.UUID | None = None,
+) -> dict[str, Any] | None:
     """Update page metadata."""
+    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         pid = uuid.UUID(page_id)
     except ValueError:
@@ -418,8 +441,9 @@ def update_page(db: Session, page_id: str, data: dict[str, Any]) -> dict[str, An
     return get_page(db, page_id)
 
 
-def delete_page(db: Session, page_id: str) -> bool:
+def delete_page(db: Session, page_id: str, *, actor_user_id: uuid.UUID | None = None) -> bool:
     """Delete a page and all its sections/modules."""
+    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         pid = uuid.UUID(page_id)
     except ValueError:
@@ -440,8 +464,11 @@ def reorder_scoped_pages(
     scope: str,
     series_id: str | None,
     page_ids: list[str],
+    *,
+    actor_user_id: uuid.UUID | None = None,
 ) -> bool:
     """Reorder pages inside one page scope."""
+    del actor_user_id  # Snapshot capture begins in Phase 2.
     safe_scope = sanitize_page_scope(scope)
     sid = _require_series_id(series_id) if safe_scope == PAGE_SCOPE_SERIES else None
 
@@ -469,9 +496,21 @@ def reorder_scoped_pages(
     return True
 
 
-def reorder_pages(db: Session, series_id: str | None, page_ids: list[str]) -> bool:
+def reorder_pages(
+    db: Session,
+    series_id: str | None,
+    page_ids: list[str],
+    *,
+    actor_user_id: uuid.UUID | None = None,
+) -> bool:
     """Compatibility reorder for series pages."""
-    return reorder_scoped_pages(db, PAGE_SCOPE_SERIES, series_id or DEFAULT_SERIES_ID, page_ids)
+    return reorder_scoped_pages(
+        db,
+        PAGE_SCOPE_SERIES,
+        series_id or DEFAULT_SERIES_ID,
+        page_ids,
+        actor_user_id=actor_user_id,
+    )
 
 
 def get_page_bindings(db: Session, series_id: str | None) -> dict[str, Any]:
@@ -534,8 +573,11 @@ def update_page_bindings(
     db: Session,
     series_id: str | None,
     bindings: dict[str, str | None],
+    *,
+    actor_user_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     """Update page bindings for one series."""
+    del actor_user_id  # Snapshot capture begins in Phase 2.
     sid = _require_series_id(series_id)
     now = _now()
     for raw_role, raw_page_id in (bindings or {}).items():
@@ -580,8 +622,15 @@ def update_page_bindings(
 # Section operations
 
 
-def add_section(db: Session, page_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
+def add_section(
+    db: Session,
+    page_id: str,
+    data: dict[str, Any],
+    *,
+    actor_user_id: uuid.UUID | None = None,
+) -> dict[str, Any] | None:
     """Add a section to a page."""
+    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         pid = uuid.UUID(page_id)
     except ValueError:
@@ -622,8 +671,15 @@ def add_section(db: Session, page_id: str, data: dict[str, Any]) -> dict[str, An
     return _serialize_section(section)
 
 
-def update_section(db: Session, section_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
+def update_section(
+    db: Session,
+    section_id: str,
+    data: dict[str, Any],
+    *,
+    actor_user_id: uuid.UUID | None = None,
+) -> dict[str, Any] | None:
     """Update a section."""
+    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         sid = uuid.UUID(section_id)
     except ValueError:
@@ -673,8 +729,9 @@ def update_section(db: Session, section_id: str, data: dict[str, Any]) -> dict[s
     return _serialize_section(section)
 
 
-def delete_section(db: Session, section_id: str) -> bool:
+def delete_section(db: Session, section_id: str, *, actor_user_id: uuid.UUID | None = None) -> bool:
     """Delete a section and all its modules."""
+    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         sid = uuid.UUID(section_id)
     except ValueError:
@@ -693,8 +750,15 @@ def delete_section(db: Session, section_id: str) -> bool:
     return True
 
 
-def reorder_sections(db: Session, page_id: str, section_ids: list[str]) -> bool:
+def reorder_sections(
+    db: Session,
+    page_id: str,
+    section_ids: list[str],
+    *,
+    actor_user_id: uuid.UUID | None = None,
+) -> bool:
     """Reorder sections within a page."""
+    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         pid = uuid.UUID(page_id)
     except ValueError:
@@ -720,8 +784,15 @@ def reorder_sections(db: Session, page_id: str, section_ids: list[str]) -> bool:
 # Module operations
 
 
-def add_module(db: Session, section_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
+def add_module(
+    db: Session,
+    section_id: str,
+    data: dict[str, Any],
+    *,
+    actor_user_id: uuid.UUID | None = None,
+) -> dict[str, Any] | None:
     """Add a module to a section."""
+    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         sid = uuid.UUID(section_id)
     except ValueError:
@@ -766,8 +837,15 @@ def add_module(db: Session, section_id: str, data: dict[str, Any]) -> dict[str, 
     return _serialize_module(module, page)
 
 
-def update_module(db: Session, module_id: str, data: dict[str, Any]) -> dict[str, Any] | None:
+def update_module(
+    db: Session,
+    module_id: str,
+    data: dict[str, Any],
+    *,
+    actor_user_id: uuid.UUID | None = None,
+) -> dict[str, Any] | None:
     """Update a module's config."""
+    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         mid = uuid.UUID(module_id)
     except ValueError:
@@ -819,8 +897,9 @@ def update_module(db: Session, module_id: str, data: dict[str, Any]) -> dict[str
     return _serialize_module(module, page)
 
 
-def delete_module(db: Session, module_id: str) -> bool:
+def delete_module(db: Session, module_id: str, *, actor_user_id: uuid.UUID | None = None) -> bool:
     """Delete a module."""
+    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         mid = uuid.UUID(module_id)
     except ValueError:
@@ -842,9 +921,16 @@ def delete_module(db: Session, module_id: str) -> bool:
 
 
 def move_module(
-    db: Session, module_id: str, target_section_id: str, column_index: int, sort_index: int
+    db: Session,
+    module_id: str,
+    target_section_id: str,
+    column_index: int,
+    sort_index: int,
+    *,
+    actor_user_id: uuid.UUID | None = None,
 ) -> dict[str, Any] | None:
     """Move a module to a different section/column."""
+    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         mid = uuid.UUID(module_id)
         target_sid = uuid.UUID(target_section_id)
@@ -881,8 +967,16 @@ def move_module(
     return _serialize_module(module)
 
 
-def reorder_modules(db: Session, section_id: str, column_index: int, module_ids: list[str]) -> bool:
+def reorder_modules(
+    db: Session,
+    section_id: str,
+    column_index: int,
+    module_ids: list[str],
+    *,
+    actor_user_id: uuid.UUID | None = None,
+) -> bool:
     """Reorder modules within a section column."""
+    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         sid = uuid.UUID(section_id)
     except ValueError:
@@ -912,13 +1006,18 @@ def reorder_modules(db: Session, section_id: str, column_index: int, module_ids:
 
 
 def save_module_placements(
-    db: Session, page_id: str, placements: list[dict[str, Any]]
+    db: Session,
+    page_id: str,
+    placements: list[dict[str, Any]],
+    *,
+    actor_user_id: uuid.UUID | None = None,
 ) -> dict[str, Any] | None:
     """Atomically replace every module placement on one page.
 
     Validation is deliberately completed before any ORM fields change: a malformed batch
     cannot persist a partial arrow-move draft. The list must describe each current module once.
     """
+    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         pid = uuid.UUID(page_id)
     except ValueError:

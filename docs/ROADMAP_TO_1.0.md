@@ -119,10 +119,12 @@ behavior-preserving and has no remaining phase work.
    contract, preview, public emitter, and round-trip tests. Because the admin source and public
    bundle can update without reloading the FastAPI process, backend changes require an API restart;
    the builder now blocks saves when `/api/admin/page-builder/runtime` is incompatible. **[C:code]**
-2. **No safety net on live pages.** There is no page revision/version model
-   (`backend/app/models.py:483-618` — nothing but the four builder tables), saves write directly
-   to the published record, and confirmed page/module/section deletes through `page-actions.js` and
-   `canvas-mutations.js` are permanent; `undo-stack.js` covers _unsaved drafts only_ [C:code]. With
+2. **The page recovery foundation is not yet a complete safety net.** New pages now receive a
+   transactional, versioned `BuilderPageSnapshot` baseline through `backend/app/builder_history.py`,
+   but existing-page saves and deletes do not start full pre-mutation coverage until recovery Phase
+   2, and no restore API/UI exists until Phases 2-3. Confirmed page/module/section deletes through
+   `page-actions.js` and `canvas-mutations.js` therefore remain unrecoverable for existing pages;
+   `undo-stack.js` covers _unsaved drafts only_ [C:code]. With
    nightly-only DB dumps, a mis-click on the
    live homepage can cost up to a day of authoring. The versioned, bounded recovery contract and
    admin restore workflow are now planned in

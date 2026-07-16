@@ -14,6 +14,7 @@ from ..db import get_db
 from ..models import (
     AdminTodo,
     BannedIP,
+    BuilderPageSnapshot,
     CensoredWord,
     Comment,
     CommentLimit,
@@ -150,6 +151,11 @@ def admin_delete_user(user_id: str, request: Request, db: Session = Depends(get_
         update(VisitorSession).where(VisitorSession.user_id == target.id).values(user_id=None)
     )
     db.execute(update(AdminTodo).where(AdminTodo.created_by == target.id).values(created_by=None))
+    db.execute(
+        update(BuilderPageSnapshot)
+        .where(BuilderPageSnapshot.created_by_user_id == target.id)
+        .values(created_by_user_id=None)
+    )
     db.execute(
         text("DELETE FROM personal_feed_items WHERE user_id = :uid"), {"uid": str(target.id)}
     )
