@@ -8,7 +8,8 @@ This repo serves a plain HTML/CSS/JS frontend, with a FastAPI backend adding dyn
 - **Static assets** (site chrome): `assets/` (icons, banners, UI images referenced by HTML and page configs).
 - **Reverse proxy + file server**: Caddy (see `deploy/Caddyfile`) serves static assets/files and proxies `/api/*`, DB-backed JSON endpoints, and exact public page routes used for dynamic branding to the API.
 - **Backend app**: `backend/app/main.py` primarily serves API routes and JSON views. It also serves branded HTML responses for `/`, `/index.html`, `/feed.html`, `/comics.html`, `/media.html`, plus `/manifest.json`, so crawlers receive the configured OG image and favicon.
-- **Database**: Postgres (Docker Compose recommended) stores users/comments, posts, series, entries, media, builder pages, and page bindings.
+- **Database**: Postgres (Docker Compose recommended) stores users/comments, posts, series, entries,
+  media, builder pages/bindings, and retained builder recovery snapshots.
 
 ## Core data model
 
@@ -57,6 +58,9 @@ Builder pages use explicit page-builder APIs rather than the legacy save-JSON pa
 - Effective series root/home page: `/api/pages/home/<seriesId>`, falling back to the same-series reader binding when needed
 - Admin scoped lists and creates: `/api/admin/pages/series/<seriesId>` and `/api/admin/pages/global`
 - Admin page records, sections, modules, reorders, moves, and reader bindings: `/api/admin/pages/*`, `/api/admin/sections/*`, `/api/admin/modules/*`, and `/api/admin/page-bindings/<seriesId>`
+- Admin recovery history: `GET /api/admin/pages/<pageId>/snapshots`,
+  `GET /api/admin/page-snapshots/deleted`, `GET /api/admin/page-snapshots/<snapshotId>`, and
+  `POST /api/admin/page-snapshots/<snapshotId>/restore`
 
 ## Key user flows
 
@@ -114,6 +118,10 @@ Builder pages use explicit page-builder APIs rather than the legacy save-JSON pa
 8. The admin verifies `/api/admin/page-builder/runtime` before responsive module saves. Popup-arrow
    moves remain in a page-wide structure draft until the atomic placements save; Save Page preserves
    publication state, while Publish/confirmed Unpublish are the only visibility transitions.
+9. Every committed backend mutation records a distinct complete pre-state in the same transaction.
+   The admin-only recovery API can inspect those records, restore current content without changing
+   live routing/publication/bindings, or recover a deleted page as an appended unpublished and
+   unbound draft. The builder does not expose this API through a History UI until Phase 3.
 
 ### 3) Posts + RSS
 
@@ -141,8 +149,8 @@ Builder pages use explicit page-builder APIs rather than the legacy save-JSON pa
 - Builder-page persistence, validation, and recovery history: `backend/app/page_store.py`,
   `backend/app/builder_history.py`, the `backend/app/builder_security/` package,
   `backend/app/reader_bindings.py`, and page-builder routes in `backend/app/routes/`. New pages get
-  one transactional, server-owned baseline snapshot; complete mutation coverage and restore remain
-  later recovery work.
+  a server-owned baseline; later mutations retain their pre-states under deterministic page locks;
+  and validated current/deleted restore runs atomically through admin-only APIs.
 - Reader boot + behavior: `reader/app.js`, `reader/data.js`, `reader/series.js`
 - Admin boot + behavior: `admin/app.js`, `admin/entries.js`, `admin/media.js`,
   `admin/page-config.js`, `admin/page-builder.js`, and `admin/page-builder/`

@@ -350,6 +350,40 @@ Fetch a published global builder page requested with `?pageScope=global&page=<sl
   `POST /api/admin/sections/{sectionId}/modules`, and related `/api/admin/sections/*` /
   `/api/admin/modules/*` routes - mutate builder sections and modules.
 
+Every successful builder mutation retains its complete pre-state transactionally when either its
+canonical payload or server action differs from the newest event. Semantic no-ops with the same
+payload/action keep their existing success shape without changing timestamps or history. The newest
+30 events per page are retained.
+
+### Admin Builder Recovery Routes
+
+All recovery routes authenticate before lookup and return `Cache-Control: no-store` on success and
+error:
+
+- `GET /api/admin/pages/{pageId}/snapshots` returns
+  `{"snapshots": SnapshotSummary[]}` newest first.
+- `GET /api/admin/page-snapshots/deleted?scope=...&series_id=...` returns at most 100 newest
+  recoverable absent-page candidates.
+- `GET /api/admin/page-snapshots/{snapshotId}` returns
+  `{"snapshot": SnapshotDetail}` with validated recovery payload data.
+- `POST /api/admin/page-snapshots/{snapshotId}/restore` accepts no client replacement data and
+  returns `{"page": canonicalPage}`.
+
+Summaries expose snapshot/page identity, copied scope/series/slug metadata, server action,
+creation time, and the actor display name when retained. They do not expose actor email or payload
+hashes. Recovery errors use `{"error", "code", "path"?}` with `snapshot_not_found`,
+`invalid_snapshot_filter`, `snapshot_validation_failed`, `snapshot_incompatible`,
+`current_page_incompatible`, `snapshot_scope_conflict`, `snapshot_series_missing`,
+`snapshot_slug_conflict`, or `snapshot_identity_conflict`.
+
+Recovery validation paths use JSON-style field paths such as `page.id`, `page.sortIndex`,
+`page.sections[0].modules[1].config`, or `bindings[0].role`. Malformed/noncanonical JSON, payload
+hash failures, and copied row-metadata mismatches return `snapshot_validation_failed` with HTTP 400.
+Unsupported snapshot versions or retired sanitizer/type vocabulary return `snapshot_incompatible`
+with HTTP 409. If the current live graph cannot be serialized safely for the transactional
+`pre_restore` event, restore returns `current_page_incompatible` with HTTP 409. All three include
+the exact failing `path` and retain `Cache-Control: no-store`.
+
 Reader module configs accepted through these page-builder routes include sanitized
 `displayMode`, `controls`, `stage`, `panels`, `showPanels`, `showComments`, and responsive overrides.
 Both `paged` and `vertical-scroll` are active runtime modes. Section `layout` accepts 1-6 positive

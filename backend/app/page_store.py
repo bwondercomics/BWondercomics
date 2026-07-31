@@ -4,12 +4,31 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime, timezone
+from functools import wraps
 from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
-from .builder_history import PAGE_CREATED, capture_page_snapshot
+from .builder_history import (
+    BINDINGS_UPDATED,
+    MODULE_ADDED,
+    MODULE_DELETED,
+    MODULE_MOVED,
+    MODULE_PLACEMENTS_SAVED,
+    MODULE_UPDATED,
+    MODULES_REORDERED,
+    PAGE_CREATED,
+    PAGE_DELETED,
+    PAGE_REORDERED,
+    PAGE_UPDATED,
+    SECTION_ADDED,
+    SECTION_DELETED,
+    SECTION_UPDATED,
+    SECTIONS_REORDERED,
+    capture_page_snapshot,
+)
+from .builder_locking import lock_builder_page_scope
 from .builder_security import (
     ALLOWED_MODULE_TYPES,
     layout_column_count,
@@ -54,6 +73,77 @@ class ColumnShrinkConflictError(Exception):
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _rollback_on_error(function):
+    """Rollback the request-owned transaction whenever a mutation fails."""
+
+    @wraps(function)
+    def wrapped(db: Session, *args, **kwargs):
+        try:
+            return function(db, *args, **kwargs)
+        except Exception:
+            db.rollback()
+            raise
+
+    return wrapped
+
+
+def _lock_pages(db: Session, page_ids: list[uuid.UUID] | set[uuid.UUID]) -> list[BuilderPage]:
+    """Lock and fully load pages in deterministic UUID order."""
+    ordered_ids = sorted(set(page_ids), key=str)
+    if not ordered_ids:
+        return []
+    return list(
+        db.scalars(
+            select(BuilderPage)
+            .where(BuilderPage.id.in_(ordered_ids))
+            .order_by(BuilderPage.id.asc())
+            .with_for_update()
+            .execution_options(populate_existing=True)
+            .options(
+                selectinload(BuilderPage.sections).selectinload(BuilderSection.modules),
+                selectinload(BuilderPage.bindings),
+            )
+        ).all()
+    )
+
+
+def _capture_pages(
+    db: Session,
+    pages: list[BuilderPage],
+    action: str,
+    actor_user_id: uuid.UUID | None,
+) -> None:
+    for page in sorted(pages, key=lambda item: str(item.id)):
+        capture_page_snapshot(db, page.id, action, actor_user_id)
+
+
+def _lock_page_bindings(
+    db: Session,
+    *,
+    series_id: str | None = None,
+    page_ids: set[uuid.UUID] | None = None,
+) -> list[BuilderPageBinding]:
+    """Lock affected binding rows in stable series/role/UUID order."""
+    query = select(BuilderPageBinding)
+    if series_id is not None:
+        query = query.where(BuilderPageBinding.series_id == series_id)
+    if page_ids is not None:
+        if not page_ids:
+            return []
+        query = query.where(BuilderPageBinding.page_id.in_(page_ids))
+    return list(
+        db.scalars(
+            query.order_by(
+                BuilderPageBinding.series_id.asc(),
+                BuilderPageBinding.role.asc(),
+                BuilderPageBinding.id.asc(),
+            )
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).all()
+    )
 
 
 def _serialize_module(module: BuilderModule, page: BuilderPage | None = None) -> dict[str, Any]:
@@ -199,6 +289,32 @@ def _next_sort_index(db: Session, scope: str, series_id: str | None) -> int:
     ) + 1
 
 
+def _would_add_reader_binding(
+    db: Session,
+    page: BuilderPage,
+    *,
+    slug: str | None = None,
+    page_type: str | None = None,
+) -> bool:
+    if sanitize_page_scope(page.scope) != PAGE_SCOPE_SERIES or not page.series_id:
+        return False
+    if (slug if slug is not None else page.slug) != "reader" and (
+        page_type if page_type is not None else page.page_type
+    ) != "reader":
+        return False
+    if _reader_binding_module_warnings(page, page.series_id):
+        return False
+    return (
+        db.scalar(
+            select(BuilderPageBinding.id).where(
+                BuilderPageBinding.series_id == page.series_id,
+                BuilderPageBinding.role == BINDING_ROLE_READER,
+            )
+        )
+        is None
+    )
+
+
 def list_scoped_pages(
     db: Session,
     scope: str,
@@ -327,6 +443,7 @@ def get_homepage_page(
     return _serialize_page_with_sections(page, include_sort_index=False)
 
 
+@_rollback_on_error
 def create_scoped_page(
     db: Session,
     scope: str,
@@ -338,19 +455,39 @@ def create_scoped_page(
     """Create a new page in an explicit scope."""
     safe_scope = sanitize_page_scope(scope)
     sid = _require_series_id(series_id) if safe_scope == PAGE_SCOPE_SERIES else None
-    now = _now()
-
     slug = _normalize_slug(data.get("slug"))
-
-    if _find_page_by_slug(db, safe_scope, sid, slug):
-        raise ValueError(f"Page with slug '{slug}' already exists")
-
     title = str(data.get("title") or slug.replace("-", " ").title()).strip()[:200]
     page_type = str(data.get("pageType") or "custom").strip()[:30]
+    is_published = bool(data.get("isPublished", False))
     is_homepage = bool(data.get("isHomepage", False))
+    meta = sanitize_page_meta(data.get("meta") or {})
 
-    if is_homepage:
-        _unset_homepages(db, safe_scope, sid)
+    lock_builder_page_scope(db, safe_scope, sid)
+
+    scope_pages = list(
+        db.scalars(
+            select(BuilderPage)
+            .where(*_scope_filters(safe_scope, sid))
+            .order_by(BuilderPage.id.asc())
+            .with_for_update()
+            .execution_options(populate_existing=True)
+            .options(
+                selectinload(BuilderPage.sections).selectinload(BuilderSection.modules),
+                selectinload(BuilderPage.bindings),
+            )
+        ).all()
+    )
+    if sid is not None:
+        _lock_page_bindings(db, series_id=sid)
+    if any(page.slug == slug for page in scope_pages):
+        raise ValueError(f"Page with slug '{slug}' already exists")
+
+    now = _now()
+    displaced_homepages = [page for page in scope_pages if is_homepage and page.is_homepage]
+    _capture_pages(db, displaced_homepages, PAGE_UPDATED, actor_user_id)
+    for displaced in displaced_homepages:
+        displaced.is_homepage = False
+        displaced.updated_at = now
 
     page = BuilderPage(
         scope=safe_scope,
@@ -358,10 +495,10 @@ def create_scoped_page(
         slug=slug,
         title=title,
         page_type=page_type,
-        is_published=bool(data.get("isPublished", False)),
+        is_published=is_published,
         is_homepage=is_homepage,
         sort_index=_next_sort_index(db, safe_scope, sid),
-        meta=sanitize_page_meta(data.get("meta") or {}),
+        meta=meta,
         created_at=now,
         updated_at=now,
     )
@@ -391,6 +528,7 @@ def create_page(
     )
 
 
+@_rollback_on_error
 def update_page(
     db: Session,
     page_id: str,
@@ -399,41 +537,101 @@ def update_page(
     actor_user_id: uuid.UUID | None = None,
 ) -> dict[str, Any] | None:
     """Update page metadata."""
-    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         pid = uuid.UUID(page_id)
     except ValueError:
         return None
 
-    page = db.get(BuilderPage, pid)
+    sanitized_updates: dict[str, Any] = {}
+    if "title" in data:
+        sanitized_updates["title"] = str(data["title"]).strip()[:200]
+    if "slug" in data:
+        sanitized_updates["slug"] = _normalize_slug(data["slug"])
+    if "pageType" in data:
+        sanitized_updates["pageType"] = str(data["pageType"]).strip()[:30]
+    if "isPublished" in data:
+        sanitized_updates["isPublished"] = bool(data["isPublished"])
+    if "isHomepage" in data:
+        sanitized_updates["isHomepage"] = bool(data["isHomepage"])
+    if "meta" in data and isinstance(data["meta"], dict):
+        sanitized_updates["meta"] = sanitize_page_meta(data["meta"])
+
+    initial = db.get(BuilderPage, pid)
+    if not initial:
+        db.rollback()
+        return None
+    scope = sanitize_page_scope(initial.scope)
+    lock_builder_page_scope(db, scope, initial.series_id)
+    scope_pages = list(
+        db.scalars(
+            select(BuilderPage)
+            .where(*_scope_filters(scope, initial.series_id))
+            .order_by(BuilderPage.id.asc())
+            .with_for_update()
+            .execution_options(populate_existing=True)
+            .options(
+                selectinload(BuilderPage.sections).selectinload(BuilderSection.modules),
+                selectinload(BuilderPage.bindings),
+            )
+        ).all()
+    )
+    if initial.series_id is not None:
+        _lock_page_bindings(db, series_id=initial.series_id)
+    page = next((item for item in scope_pages if item.id == pid), None)
     if not page:
+        db.rollback()
         return None
 
-    now = _now()
-    scope = sanitize_page_scope(page.scope)
-
-    if data.get("isPublished") is True and _page_has_reader_binding(db, page):
+    if sanitized_updates.get("isPublished") is True and _page_has_reader_binding(db, page):
         _raise_for_invalid_reader_binding(page, _require_series_id(page.series_id))
 
-    if "title" in data:
-        page.title = str(data["title"]).strip()[:200]
-    if "slug" in data:
-        new_slug = _normalize_slug(data["slug"])
-        if new_slug and new_slug != page.slug:
-            if _find_page_by_slug(db, scope, page.series_id, new_slug, exclude_page_id=pid):
-                raise ValueError(f"Page with slug '{new_slug}' already exists")
-            page.slug = new_slug
-    if "pageType" in data:
-        page.page_type = str(data["pageType"]).strip()[:30]
-    if "isPublished" in data:
-        page.is_published = bool(data["isPublished"])
-    if "isHomepage" in data:
-        if data["isHomepage"] and not page.is_homepage:
-            _unset_homepages(db, scope, page.series_id, exclude_page_id=pid)
-        page.is_homepage = bool(data["isHomepage"])
-    if "meta" in data and isinstance(data["meta"], dict):
-        page.meta = sanitize_page_meta(data["meta"])
+    next_title = sanitized_updates.get("title", page.title)
+    next_slug = sanitized_updates.get("slug", page.slug)
+    if next_slug != page.slug and any(
+        item.id != pid and item.slug == next_slug for item in scope_pages
+    ):
+        raise ValueError(f"Page with slug '{next_slug}' already exists")
+    next_page_type = sanitized_updates.get("pageType", page.page_type)
+    next_published = sanitized_updates.get("isPublished", page.is_published)
+    next_homepage = sanitized_updates.get("isHomepage", page.is_homepage)
+    next_meta = sanitized_updates.get("meta", page.meta)
+    displaced_homepages = [
+        item
+        for item in scope_pages
+        if next_homepage and not page.is_homepage and item.id != pid and item.is_homepage
+    ]
+    page_changed = (
+        next_title != page.title
+        or next_slug != page.slug
+        or next_page_type != page.page_type
+        or next_published != page.is_published
+        or next_homepage != page.is_homepage
+        or next_meta != page.meta
+    )
+    binding_will_be_added = _would_add_reader_binding(
+        db,
+        page,
+        slug=next_slug,
+        page_type=next_page_type,
+    )
+    if not page_changed and not displaced_homepages and not binding_will_be_added:
+        response = get_page(db, page_id)
+        db.rollback()
+        return response
 
+    _capture_pages(db, [page], PAGE_UPDATED, actor_user_id)
+    _capture_pages(db, displaced_homepages, PAGE_UPDATED, actor_user_id)
+    now = _now()
+    for displaced in displaced_homepages:
+        displaced.is_homepage = False
+        displaced.updated_at = now
+
+    page.title = next_title
+    page.slug = next_slug
+    page.page_type = next_page_type
+    page.is_published = next_published
+    page.is_homepage = next_homepage
+    page.meta = next_meta
     page.updated_at = now
     _ensure_reader_binding_for_page(db, page)
     db.commit()
@@ -441,24 +639,34 @@ def update_page(
     return get_page(db, page_id)
 
 
+@_rollback_on_error
 def delete_page(db: Session, page_id: str, *, actor_user_id: uuid.UUID | None = None) -> bool:
     """Delete a page and all its sections/modules."""
-    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         pid = uuid.UUID(page_id)
     except ValueError:
         return False
 
-    page = db.get(BuilderPage, pid)
+    initial = db.get(BuilderPage, pid)
+    if not initial:
+        db.rollback()
+        return False
+    scope = sanitize_page_scope(initial.scope)
+    lock_builder_page_scope(db, scope, initial.series_id)
+    pages = _lock_pages(db, [pid])
+    page = pages[0] if pages else None
     if not page:
+        db.rollback()
         return False
 
-    db.query(BuilderPageBinding).filter(BuilderPageBinding.page_id == pid).delete()
+    _lock_page_bindings(db, page_ids={page.id})
+    capture_page_snapshot(db, page.id, PAGE_DELETED, actor_user_id)
     db.delete(page)
     db.commit()
     return True
 
 
+@_rollback_on_error
 def reorder_scoped_pages(
     db: Session,
     scope: str,
@@ -468,7 +676,6 @@ def reorder_scoped_pages(
     actor_user_id: uuid.UUID | None = None,
 ) -> bool:
     """Reorder pages inside one page scope."""
-    del actor_user_id  # Snapshot capture begins in Phase 2.
     safe_scope = sanitize_page_scope(scope)
     sid = _require_series_id(series_id) if safe_scope == PAGE_SCOPE_SERIES else None
 
@@ -484,13 +691,37 @@ def reorder_scoped_pages(
         seen_ids.add(pid)
         parsed_ids.append(pid)
 
-    pages = db.scalars(select(BuilderPage).where(*_scope_filters(safe_scope, sid))).all()
+    lock_builder_page_scope(db, safe_scope, sid)
+    pages = db.scalars(
+        select(BuilderPage)
+        .where(*_scope_filters(safe_scope, sid))
+        .order_by(BuilderPage.id.asc())
+        .with_for_update()
+        .execution_options(populate_existing=True)
+        .options(
+            selectinload(BuilderPage.sections).selectinload(BuilderSection.modules),
+            selectinload(BuilderPage.bindings),
+        )
+    ).all()
     pages_by_id = {page.id: page for page in pages}
     if set(parsed_ids) != set(pages_by_id):
         raise ValueError("Page reorder must include exactly the active scope pages")
 
+    changed_pages = [
+        pages_by_id[pid]
+        for index, pid in enumerate(parsed_ids)
+        if pages_by_id[pid].sort_index != index
+    ]
+    if not changed_pages:
+        db.rollback()
+        return True
+    _capture_pages(db, changed_pages, PAGE_REORDERED, actor_user_id)
+    now = _now()
     for index, pid in enumerate(parsed_ids):
-        pages_by_id[pid].sort_index = index
+        page = pages_by_id[pid]
+        if page.sort_index != index:
+            page.sort_index = index
+            page.updated_at = now
 
     db.commit()
     return True
@@ -569,6 +800,7 @@ def get_page_bindings(db: Session, series_id: str | None) -> dict[str, Any]:
     return {"seriesId": sid, "bindings": bindings, "warnings": warnings}
 
 
+@_rollback_on_error
 def update_page_bindings(
     db: Session,
     series_id: str | None,
@@ -577,39 +809,110 @@ def update_page_bindings(
     actor_user_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     """Update page bindings for one series."""
-    del actor_user_id  # Snapshot capture begins in Phase 2.
     sid = _require_series_id(series_id)
-    now = _now()
+    validated: dict[str, uuid.UUID | None] = {}
     for raw_role, raw_page_id in (bindings or {}).items():
         role = sanitize_binding_role(raw_role)
-        existing = db.scalar(
-            select(BuilderPageBinding).where(
-                BuilderPageBinding.series_id == sid,
-                BuilderPageBinding.role == role,
-            )
-        )
         if raw_page_id in (None, ""):
-            if existing:
-                db.delete(existing)
+            validated[role] = None
             continue
         try:
             pid = uuid.UUID(str(raw_page_id))
         except ValueError as exc:
             raise ValueError(f"Invalid page id for {role} binding") from exc
-        page = _load_page_model_with_content(db, pid)
+        validated[role] = pid
+
+    lock_builder_page_scope(db, PAGE_SCOPE_SERIES, sid)
+
+    initial_existing_rows = list(
+        db.scalars(
+            select(BuilderPageBinding)
+            .where(BuilderPageBinding.series_id == sid)
+            .order_by(BuilderPageBinding.role.asc())
+        ).all()
+    )
+    initial_existing_by_role = {row.role: row for row in initial_existing_rows}
+    affected_ids = {
+        row.page_id
+        for role, row in initial_existing_by_role.items()
+        if role in validated and validated[role] != row.page_id
+    }
+    affected_ids.update(
+        page_id
+        for role, page_id in validated.items()
+        if page_id is not None
+        and (
+            role not in initial_existing_by_role
+            or initial_existing_by_role[role].page_id != page_id
+        )
+    )
+    requested_ids = {page_id for page_id in validated.values() if page_id is not None}
+    locked_pages = _lock_pages(db, affected_ids | requested_ids)
+    pages_by_id = {page.id: page for page in locked_pages}
+    existing_rows = list(
+        db.scalars(
+            select(BuilderPageBinding)
+            .where(BuilderPageBinding.series_id == sid)
+            .order_by(BuilderPageBinding.role.asc())
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).all()
+    )
+    existing_by_role = {row.role: row for row in existing_rows}
+    affected_ids = {
+        row.page_id
+        for role, row in existing_by_role.items()
+        if role in validated and validated[role] != row.page_id
+    }
+    affected_ids.update(
+        page_id
+        for role, page_id in validated.items()
+        if page_id is not None
+        and (role not in existing_by_role or existing_by_role[role].page_id != page_id)
+    )
+
+    for role, pid in validated.items():
+        if pid is None:
+            continue
+        page = pages_by_id.get(pid)
         if not page or not _page_can_bind_to_series(page, sid, role):
             raise ValueError(f"Page cannot be used for {role} binding")
         if role == BINDING_ROLE_READER:
             _raise_for_invalid_reader_binding(page, sid)
+
+    changed_roles = [
+        role
+        for role, pid in validated.items()
+        if (existing_by_role.get(role).page_id if existing_by_role.get(role) else None) != pid
+    ]
+    if not changed_roles:
+        response = get_page_bindings(db, sid)
+        db.rollback()
+        return response
+
+    _capture_pages(
+        db,
+        [page for page in locked_pages if page.id in affected_ids],
+        BINDINGS_UPDATED,
+        actor_user_id,
+    )
+    now = _now()
+    for role in changed_roles:
+        pid = validated[role]
+        existing = existing_by_role.get(role)
+        if pid is None:
+            if existing:
+                db.delete(existing)
+            continue
         if existing:
-            existing.page_id = page.id
+            existing.page_id = pid
             existing.updated_at = now
         else:
             db.add(
                 BuilderPageBinding(
                     series_id=sid,
                     role=role,
-                    page_id=page.id,
+                    page_id=pid,
                     created_at=now,
                     updated_at=now,
                 )
@@ -622,6 +925,7 @@ def update_page_bindings(
 # Section operations
 
 
+@_rollback_on_error
 def add_section(
     db: Session,
     page_id: str,
@@ -630,13 +934,13 @@ def add_section(
     actor_user_id: uuid.UUID | None = None,
 ) -> dict[str, Any] | None:
     """Add a section to a page."""
-    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         pid = uuid.UUID(page_id)
     except ValueError:
         return None
 
-    page = db.get(BuilderPage, pid)
+    pages = _lock_pages(db, [pid])
+    page = pages[0] if pages else None
     if not page:
         return None
 
@@ -663,6 +967,7 @@ def add_section(
         settings=sanitize_section_settings(data.get("settings") or {}, layout),
         created_at=now,
     )
+    capture_page_snapshot(db, page.id, SECTION_ADDED, actor_user_id)
     db.add(section)
 
     page.updated_at = now
@@ -671,6 +976,7 @@ def add_section(
     return _serialize_section(section)
 
 
+@_rollback_on_error
 def update_section(
     db: Session,
     section_id: str,
@@ -679,17 +985,19 @@ def update_section(
     actor_user_id: uuid.UUID | None = None,
 ) -> dict[str, Any] | None:
     """Update a section."""
-    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         sid = uuid.UUID(section_id)
     except ValueError:
         return None
 
-    section = db.scalar(
-        select(BuilderSection)
-        .where(BuilderSection.id == sid)
-        .options(selectinload(BuilderSection.modules))
-    )
+    initial = db.get(BuilderSection, sid)
+    if not initial:
+        return None
+    pages = _lock_pages(db, [initial.page_id])
+    if not pages:
+        return None
+    page = pages[0]
+    section = next((item for item in page.sections if item.id == sid), None)
     if not section:
         return None
 
@@ -711,45 +1019,68 @@ def update_section(
                 "Cannot reduce the column count while a to-be-removed column still has "
                 "modules. Move or delete those modules first."
             )
-    if "sectionType" in data:
-        section.section_type = validate_section_type(data["sectionType"])
-    if "layout" in data:
-        section.layout = next_layout
-    if "sortIndex" in data:
-        section.sort_index = validate_sort_index(data["sortIndex"])
-    if "settings" in data and isinstance(data["settings"], dict):
-        section.settings = sanitize_section_settings(data["settings"], section.layout)
+    next_type = (
+        validate_section_type(data["sectionType"])
+        if "sectionType" in data
+        else validate_section_type(section.section_type)
+    )
+    next_sort_index = (
+        validate_sort_index(data["sortIndex"])
+        if "sortIndex" in data
+        else validate_sort_index(section.sort_index)
+    )
+    next_settings = (
+        sanitize_section_settings(data["settings"], next_layout)
+        if "settings" in data and isinstance(data["settings"], dict)
+        else sanitize_section_settings(section.settings, next_layout)
+    )
+    if (
+        next_type == section.section_type
+        and next_layout == section.layout
+        and next_sort_index == section.sort_index
+        and next_settings == section.settings
+    ):
+        return _serialize_section(section, page)
 
-    page = db.get(BuilderPage, section.page_id)
-    if page:
-        page.updated_at = _now()
+    capture_page_snapshot(db, page.id, SECTION_UPDATED, actor_user_id)
+    section.section_type = next_type
+    section.layout = next_layout
+    section.sort_index = next_sort_index
+    section.settings = next_settings
+    page.updated_at = _now()
 
     db.commit()
 
     return _serialize_section(section)
 
 
+@_rollback_on_error
 def delete_section(db: Session, section_id: str, *, actor_user_id: uuid.UUID | None = None) -> bool:
     """Delete a section and all its modules."""
-    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         sid = uuid.UUID(section_id)
     except ValueError:
         return False
 
-    section = db.get(BuilderSection, sid)
+    initial = db.get(BuilderSection, sid)
+    if not initial:
+        return False
+    pages = _lock_pages(db, [initial.page_id])
+    if not pages:
+        return False
+    page = pages[0]
+    section = next((item for item in page.sections if item.id == sid), None)
     if not section:
         return False
 
-    page = db.get(BuilderPage, section.page_id)
-    if page:
-        page.updated_at = _now()
-
+    capture_page_snapshot(db, page.id, SECTION_DELETED, actor_user_id)
+    page.updated_at = _now()
     db.delete(section)
     db.commit()
     return True
 
 
+@_rollback_on_error
 def reorder_sections(
     db: Session,
     page_id: str,
@@ -758,24 +1089,42 @@ def reorder_sections(
     actor_user_id: uuid.UUID | None = None,
 ) -> bool:
     """Reorder sections within a page."""
-    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         pid = uuid.UUID(page_id)
     except ValueError:
         return False
 
-    for index, section_id in enumerate(section_ids):
+    parsed_ids: list[uuid.UUID] = []
+    seen_ids: set[uuid.UUID] = set()
+    for section_id in section_ids:
         try:
             sid = uuid.UUID(section_id)
-        except ValueError:
-            continue
-        section = db.get(BuilderSection, sid)
-        if section and section.page_id == pid:
-            section.sort_index = index
+        except ValueError as exc:
+            raise ValueError("Section reorder contains an invalid section id") from exc
+        if sid in seen_ids:
+            raise ValueError("Section reorder contains duplicate section ids")
+        seen_ids.add(sid)
+        parsed_ids.append(sid)
 
-    page = db.get(BuilderPage, pid)
-    if page:
-        page.updated_at = _now()
+    pages = _lock_pages(db, [pid])
+    page = pages[0] if pages else None
+    if not page:
+        return False
+    sections_by_id = {section.id: section for section in page.sections}
+    if set(parsed_ids) != set(sections_by_id):
+        raise ValueError("Section reorder must include exactly the page sections")
+    changed = [
+        sections_by_id[sid]
+        for index, sid in enumerate(parsed_ids)
+        if sections_by_id[sid].sort_index != index
+    ]
+    if not changed:
+        return True
+
+    capture_page_snapshot(db, page.id, SECTIONS_REORDERED, actor_user_id)
+    for index, sid in enumerate(parsed_ids):
+        sections_by_id[sid].sort_index = index
+    page.updated_at = _now()
 
     db.commit()
     return True
@@ -784,6 +1133,7 @@ def reorder_sections(
 # Module operations
 
 
+@_rollback_on_error
 def add_module(
     db: Session,
     section_id: str,
@@ -792,16 +1142,21 @@ def add_module(
     actor_user_id: uuid.UUID | None = None,
 ) -> dict[str, Any] | None:
     """Add a module to a section."""
-    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         sid = uuid.UUID(section_id)
     except ValueError:
         return None
 
-    section = db.get(BuilderSection, sid)
+    initial = db.get(BuilderSection, sid)
+    if not initial:
+        return None
+    pages = _lock_pages(db, [initial.page_id])
+    if not pages:
+        return None
+    page = pages[0]
+    section = next((item for item in page.sections if item.id == sid), None)
     if not section:
         return None
-    page = db.get(BuilderPage, section.page_id)
 
     now = _now()
     layout = validate_layout(section.layout)
@@ -827,16 +1182,17 @@ def add_module(
         created_at=now,
         updated_at=now,
     )
+    capture_page_snapshot(db, page.id, MODULE_ADDED, actor_user_id)
     db.add(module)
 
-    if page:
-        page.updated_at = now
+    page.updated_at = now
 
     db.commit()
 
     return _serialize_module(module, page)
 
 
+@_rollback_on_error
 def update_module(
     db: Session,
     module_id: str,
@@ -845,21 +1201,29 @@ def update_module(
     actor_user_id: uuid.UUID | None = None,
 ) -> dict[str, Any] | None:
     """Update a module's config."""
-    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         mid = uuid.UUID(module_id)
     except ValueError:
         return None
 
-    module = db.get(BuilderModule, mid)
-    if not module:
+    initial = db.get(BuilderModule, mid)
+    if not initial:
         return None
-
-    now = _now()
-
-    section = db.get(BuilderSection, module.section_id)
-    page = db.get(BuilderPage, section.page_id) if section else None
-    layout = validate_layout(section.layout) if section else "1"
+    initial_section = db.get(BuilderSection, initial.section_id)
+    if not initial_section:
+        return None
+    pages = _lock_pages(db, [initial_section.page_id])
+    if not pages:
+        return None
+    page = pages[0]
+    section = next(
+        (item for item in page.sections if item.id == initial.section_id),
+        None,
+    )
+    module = next((item for item in section.modules if item.id == mid), None) if section else None
+    if not section or not module:
+        return None
+    layout = validate_layout(section.layout)
     next_type = (
         validate_module_type(data["moduleType"])
         if "moduleType" in data
@@ -882,6 +1246,16 @@ def update_module(
     )
     next_config = _sanitize_module_config_for_page(page, next_type, proposed_config)
 
+    if (
+        next_type == module.module_type
+        and next_column_index == module.column_index
+        and next_sort_index == module.sort_index
+        and next_config == module.config
+    ):
+        return _serialize_module(module, page)
+
+    capture_page_snapshot(db, page.id, MODULE_UPDATED, actor_user_id)
+    now = _now()
     module.module_type = next_type
     module.column_index = next_column_index
     module.sort_index = next_sort_index
@@ -889,37 +1263,44 @@ def update_module(
 
     module.updated_at = now
 
-    if page:
-        page.updated_at = now
+    page.updated_at = now
 
     db.commit()
 
     return _serialize_module(module, page)
 
 
+@_rollback_on_error
 def delete_module(db: Session, module_id: str, *, actor_user_id: uuid.UUID | None = None) -> bool:
     """Delete a module."""
-    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         mid = uuid.UUID(module_id)
     except ValueError:
         return False
 
-    module = db.get(BuilderModule, mid)
+    initial = db.get(BuilderModule, mid)
+    if not initial:
+        return False
+    initial_section = db.get(BuilderSection, initial.section_id)
+    if not initial_section:
+        return False
+    pages = _lock_pages(db, [initial_section.page_id])
+    if not pages:
+        return False
+    page = pages[0]
+    section = next((item for item in page.sections if item.id == initial.section_id), None)
+    module = next((item for item in section.modules if item.id == mid), None) if section else None
     if not module:
         return False
 
-    section = db.get(BuilderSection, module.section_id)
-    if section:
-        page = db.get(BuilderPage, section.page_id)
-        if page:
-            page.updated_at = _now()
-
+    capture_page_snapshot(db, page.id, MODULE_DELETED, actor_user_id)
+    page.updated_at = _now()
     db.delete(module)
     db.commit()
     return True
 
 
+@_rollback_on_error
 def move_module(
     db: Session,
     module_id: str,
@@ -930,43 +1311,65 @@ def move_module(
     actor_user_id: uuid.UUID | None = None,
 ) -> dict[str, Any] | None:
     """Move a module to a different section/column."""
-    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         mid = uuid.UUID(module_id)
         target_sid = uuid.UUID(target_section_id)
     except ValueError:
         return None
 
-    module = db.get(BuilderModule, mid)
-    if not module:
+    initial_module = db.get(BuilderModule, mid)
+    if not initial_module:
+        return None
+    source_section = db.get(BuilderSection, initial_module.section_id)
+    initial_target = db.get(BuilderSection, target_sid)
+    if not source_section or not initial_target:
+        return None
+    if source_section.page_id != initial_target.page_id:
+        raise ValueError("Modules can only move between sections on the same page")
+    pages = _lock_pages(db, [source_section.page_id])
+    if not pages:
+        return None
+    page = pages[0]
+    target_section = next((item for item in page.sections if item.id == target_sid), None)
+    source_section = next(
+        (item for item in page.sections if item.id == initial_module.section_id), None
+    )
+    module = (
+        next((item for item in source_section.modules if item.id == mid), None)
+        if source_section
+        else None
+    )
+    if not target_section or not module:
         return None
 
-    target_section = db.get(BuilderSection, target_sid)
-    if not target_section:
-        return None
-
-    now = _now()
     layout = validate_layout(target_section.layout)
 
     # Validate before mutating so a rejected column index cannot leave a
     # half-applied move (e.g. a changed section_id) on the session.
     next_column_index = validate_column_index(column_index, layout)
     next_sort_index = validate_sort_index(sort_index)
+    if (
+        module.section_id == target_sid
+        and module.column_index == next_column_index
+        and module.sort_index == next_sort_index
+    ):
+        return _serialize_module(module, page)
 
+    capture_page_snapshot(db, page.id, MODULE_MOVED, actor_user_id)
+    now = _now()
     module.section_id = target_sid
     module.column_index = next_column_index
     module.sort_index = next_sort_index
     module.updated_at = now
 
-    page = db.get(BuilderPage, target_section.page_id)
-    if page:
-        page.updated_at = now
+    page.updated_at = now
 
     db.commit()
 
-    return _serialize_module(module)
+    return _serialize_module(module, page)
 
 
+@_rollback_on_error
 def reorder_modules(
     db: Session,
     section_id: str,
@@ -976,35 +1379,52 @@ def reorder_modules(
     actor_user_id: uuid.UUID | None = None,
 ) -> bool:
     """Reorder modules within a section column."""
-    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         sid = uuid.UUID(section_id)
     except ValueError:
         return False
 
-    section = db.get(BuilderSection, sid)
+    initial = db.get(BuilderSection, sid)
+    if not initial:
+        return False
+    pages = _lock_pages(db, [initial.page_id])
+    if not pages:
+        return False
+    page = pages[0]
+    section = next((item for item in page.sections if item.id == sid), None)
     if not section:
         return False
     validate_column_index(column_index, validate_layout(section.layout))
 
-    for index, module_id in enumerate(module_ids):
+    parsed_ids: list[uuid.UUID] = []
+    seen_ids: set[uuid.UUID] = set()
+    for module_id in module_ids:
         try:
             mid = uuid.UUID(module_id)
-        except ValueError:
-            continue
-        module = db.get(BuilderModule, mid)
-        if module and module.section_id == sid and module.column_index == column_index:
-            module.sort_index = index
+        except ValueError as exc:
+            raise ValueError("Module reorder contains an invalid module id") from exc
+        if mid in seen_ids:
+            raise ValueError("Module reorder contains duplicate module ids")
+        seen_ids.add(mid)
+        parsed_ids.append(mid)
+    column_modules = [module for module in section.modules if module.column_index == column_index]
+    modules_by_id = {module.id: module for module in column_modules}
+    if set(parsed_ids) != set(modules_by_id):
+        raise ValueError("Module reorder must include exactly the section-column modules")
+    if all(modules_by_id[mid].sort_index == index for index, mid in enumerate(parsed_ids)):
+        return True
 
-    if section:
-        page = db.get(BuilderPage, section.page_id)
-        if page:
-            page.updated_at = _now()
+    capture_page_snapshot(db, page.id, MODULES_REORDERED, actor_user_id)
+    for index, mid in enumerate(parsed_ids):
+        modules_by_id[mid].sort_index = index
+        modules_by_id[mid].updated_at = _now()
+    page.updated_at = _now()
 
     db.commit()
     return True
 
 
+@_rollback_on_error
 def save_module_placements(
     db: Session,
     page_id: str,
@@ -1017,12 +1437,12 @@ def save_module_placements(
     Validation is deliberately completed before any ORM fields change: a malformed batch
     cannot persist a partial arrow-move draft. The list must describe each current module once.
     """
-    del actor_user_id  # Snapshot capture begins in Phase 2.
     try:
         pid = uuid.UUID(page_id)
     except ValueError:
         return None
-    page = _load_page_model_with_content(db, pid)
+    pages = _lock_pages(db, [pid])
+    page = pages[0] if pages else None
     if not page:
         return None
     if not isinstance(placements, list):
@@ -1066,6 +1486,16 @@ def save_module_placements(
     if seen_modules != set(modules_by_id):
         raise ValueError("Placements must include every page module exactly once")
 
+    changed = any(
+        module.section_id != section.id
+        or module.column_index != column_index
+        or module.sort_index != sort_index
+        for module, section, column_index, sort_index in validated
+    )
+    if not changed:
+        return _serialize_page_with_sections(page)
+
+    capture_page_snapshot(db, page.id, MODULE_PLACEMENTS_SAVED, actor_user_id)
     now = _now()
     for module, section, column_index, sort_index in validated:
         module.section_id = section.id

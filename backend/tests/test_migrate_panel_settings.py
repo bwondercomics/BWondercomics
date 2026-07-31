@@ -6,9 +6,19 @@ os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///tmp/bw-quality-route-t
 
 import uuid
 from datetime import datetime, timezone
+from unittest.mock import patch
 
+from sqlalchemy import select
+
+from backend.app.builder_history import PAGE_UPDATED
 from backend.app.migrate_panel_settings_to_columns import migrate_series_panel_settings
-from backend.app.models import BuilderModule, BuilderPage, BuilderSection, Series
+from backend.app.models import (
+    BuilderModule,
+    BuilderPage,
+    BuilderPageSnapshot,
+    BuilderSection,
+    Series,
+)
 from backend.tests.helpers import BackendRouteTestCase
 
 
@@ -95,6 +105,34 @@ class MigratePanelSettingsTests(BackendRouteTestCase):
         # Legacy meta keys fully migrated, so both are cleared.
         self.assertNotIn("panelBackgrounds", page.meta)
         self.assertNotIn("panelSpacing", page.meta)
+        snapshot = self.db.scalar(
+            select(BuilderPageSnapshot).where(BuilderPageSnapshot.page_id == page.id)
+        )
+        self.assertEqual(snapshot.action, PAGE_UPDATED)
+        self.assertIsNone(snapshot.created_by_user_id)
+        self.assertIn("panelBackgrounds", snapshot.payload["page"]["meta"])
+
+    def test_write_snapshot_failure_rolls_back_all_projected_changes(self):
+        page, section = self._seed_reader_page(
+            meta={"panelSpacing": {"left": 20}},
+        )
+        with (
+            patch(
+                "backend.app.migrate_panel_settings_to_columns.capture_page_snapshot",
+                side_effect=RuntimeError("forced panel snapshot failure"),
+            ),
+            self.assertRaisesRegex(RuntimeError, "forced panel snapshot failure"),
+        ):
+            migrate_series_panel_settings(self.db, "battle-bros", write=True)
+
+        self.db.refresh(page)
+        self.db.refresh(section)
+        self.assertEqual(page.meta, {"panelSpacing": {"left": 20}})
+        self.assertEqual(section.settings, {})
+        self.assertEqual(
+            self.db.scalars(select(BuilderPageSnapshot)).all(),
+            [],
+        )
 
     def test_existing_column_field_preserved_and_partial_migrates_the_rest(self):
         page, section = self._seed_reader_page(

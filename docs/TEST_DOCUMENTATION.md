@@ -161,6 +161,20 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - `backend/tests/test_comments_routes.py`: comment auth, moderation, duplicate/rate-limit, and censored-phrase handling
 - `backend/tests/test_files_routes.py`: page-config/media index contracts, protected asset access, and virtual save behavior
 - `backend/tests/test_page_builder_routes.py`: page-builder admin CRUD, slug uniqueness, homepage exclusivity, reader-binding module validation, invalid bound-reader publish blocking, effective-homepage public/admin endpoint resolution, header-nav style sanitization, section/module move-reorder, atomic rejection of composite invalid module updates, and public published-page access
+- `backend/tests/test_builder_history.py` and `test_builder_history_phase2.py`: recovery migration and
+  serialization contracts; exact actor-attributed mutation pre-state payload/hash/count coverage;
+  action-aware 30-event retention; strict typed UUID/tuple recovery validation; global, restore,
+  pruning, and outer-transaction rollback; fail-closed legacy hybrid detection; validated
+  current/deleted restore with stable IDs and reader-binding safeguards; and admin recovery API
+  shapes, actor propagation, authorization-before-service, no-store, non-disclosure, filter, and
+  body-rejection behavior.
+- `backend/tests/test_builder_history_postgres.py`: environment-gated PostgreSQL 16 concurrency
+  suite for mutation versus current-page restore, concurrent global homepage creates, concurrent
+  restores of the same deleted page, and different deleted pages restored into one series. Workers
+  publish `pg_backend_pid()` and an autocommit observer must see the waiter active on a lock with the
+  expected blocker in `pg_blocking_pids()` before release. The suite only accepts a database named
+  `builder_history_locking_drill`; the 2026-07-31 corrective drill ran all four scenarios
+  successfully.
 - `backend/tests/test_builder_security.py`: focused coverage for the split builder sanitizer package,
   responsive allowlists, appearance/header contracts, reader config, and destructive column-shrink
   rejection.

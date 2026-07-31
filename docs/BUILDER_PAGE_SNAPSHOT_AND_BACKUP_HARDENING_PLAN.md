@@ -193,8 +193,10 @@ Recommended indexes and constraints:
 - `(scope, series_id, created_at DESC)` for recently deleted discovery;
 - `payload_version > 0`;
 - an allowlisted action set enforced by service code;
-- default retention of the newest 30 distinct payloads per page, configurable with a conservative
-  bounded setting if operations later need a different value.
+- default retention of the newest 30 snapshot events per page. Only a consecutive event with both
+  the same canonical payload hash and the same server action is deduplicated; actor identity is not
+  part of that key. This preserves action/actor/timestamp evidence when, for example, an unchanged
+  created state is subsequently deleted.
 
 ### Version 1 recovery document
 
@@ -496,6 +498,53 @@ Acceptance criteria:
 - A deleted page can be recreated safely as an unpublished/unbound draft.
 - Restoring a current published page preserves its routing/publication state while recovering its
   saved content.
+
+Completion note (2026-07-29): Complete. Every page, binding, section, module, placement, delete,
+header-backfill, and panel-migration writer now validates first, locks affected pages in
+deterministic UUID order, captures each distinct complete pre-state with the authenticated actor
+when available, and commits or rolls back the snapshot and mutation together. Exact page/section/
+module membership is required for reorder operations, cross-page module moves are rejected, and
+semantic no-ops preserve timestamps and retention.
+
+`backend/app/builder_history.py` now validates stored integrity/version/action/metadata, sanitizer
+parity, UUID uniqueness, and structural ordering before inspection or restore. Current-page restore
+records `pre_restore`, reconciles content by stable ID, rechecks reader bindings, and preserves live
+routing/publication/bindings/creation time. Deleted-page restore serializes on retained history,
+checks series/slug/identity conflicts, and recreates original IDs as an appended unpublished,
+non-homepage, unbound draft. Admin-only list, deleted-candidate, detail, and no-body restore routes
+return structured errors with `Cache-Control: no-store`; actor email and payload hashes are not
+exposed. Phase 3 remains responsible for frontend data helpers, dirty-workspace protection,
+confirmation/status/focus UI, and preview refresh.
+
+Verification completed: focused history/page-builder/migration suites; `npm run test:backend`
+(158 passed, one environment-gated PostgreSQL drill skipped); the PostgreSQL 16 two-session drill
+(1 passed) proving restore waits for a concurrent mutation page lock; `npm run format:check`;
+`npm run format:py:check`; `npm run lint:py`; and `git diff --check`.
+
+Corrective completion addendum (2026-07-31): Phase 2 scope writers now serialize before re-reading
+mutable state: global scope uses the reserved PostgreSQL transaction advisory lock
+`pg_advisory_xact_lock(0x42574250, 1)` (`BWBP/global/v1`), while series scope uses the matching
+`Series` row lock. The protocol covers page create/update/delete/reorder, bindings, deleted-page
+restore, legacy conversion, and panel migration write modes; page-local section/module mutations
+and current-page restore continue to serialize on the page row. SQLite deliberately no-ops this
+scope helper for unit tests, and unsupported database dialects fail before writing.
+
+Retention is event-aware: only an identical consecutive payload-and-action pair deduplicates, and
+the newest 30 events are retained transactionally. Legacy `PageConfig` conversion now locks the
+series and fails closed when any builder page already exists, retaining the reader-specific skip
+and warning explicitly for other hybrid scopes. Stored recovery JSON validates into a frozen typed
+tree with UUID values and tuple collections; malformed/noncanonical/hash/metadata failures return
+`snapshot_validation_failed` (400), retired version/sanitizer/type contracts return
+`snapshot_incompatible` (409), and unsafe live-page serialization returns
+`current_page_incompatible` (409), each with the exact failing path.
+
+Corrective verification completed: focused history/page-builder/panel/header suites (77 passed);
+`npm run test:backend` (168 passed, four environment-gated PostgreSQL cases skipped in the normal
+SQLite run); and the guarded PostgreSQL 16 suite (4 passed) with an autocommit observer proving an
+active lock wait and exact `pg_blocking_pids()` relationship for mutation versus current restore,
+concurrent global homepage creation, duplicate deleted-page restore, and two deleted pages appended
+into one series. Formatting, Python formatting/lint, and `git diff --check` were rerun after the
+documentation closeout.
 
 ### Phase 3 - Admin history and recovery UI
 

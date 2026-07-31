@@ -43,6 +43,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from .builder_history import PAGE_UPDATED, capture_page_snapshot
+from .builder_locking import lock_builder_page_scope
 from .builder_security import _coerce_bool, layout_column_count, sanitize_section_settings
 from .db import SessionLocal
 from .models import BuilderModule, BuilderPage, BuilderSection
@@ -181,48 +183,73 @@ def _apply_projection(section: BuilderSection, projected: dict[str, Any]) -> Non
 
 
 def migrate_series_panel_toggles(db, series_id: str, *, write: bool = False) -> dict[str, Any]:
-    pages = db.scalars(
+    query = (
         select(BuilderPage)
         .where(BuilderPage.series_id == series_id)
-        .order_by(BuilderPage.sort_index.asc(), BuilderPage.created_at.asc())
         .options(selectinload(BuilderPage.sections).selectinload(BuilderSection.modules))
-    ).all()
+    )
+    query = (
+        query.order_by(BuilderPage.id.asc()).with_for_update()
+        if write
+        else query.order_by(BuilderPage.sort_index.asc(), BuilderPage.created_at.asc())
+    )
+    try:
+        if write:
+            lock_builder_page_scope(db, "series", series_id)
+        pages = db.scalars(query).all()
+    except Exception:
+        db.rollback()
+        raise
 
     changed_page_ids: list[str] = []
     flagged_page_ids: list[str] = []
     page_reports: list[dict[str, Any]] = []
+    projections: list[tuple[BuilderPage, dict[str, Any]]] = []
 
-    for page in pages:
-        projected = project_page_migration(page)
-        if projected is None:
-            continue
+    try:
+        for page in pages:
+            projected = project_page_migration(page)
+            if projected is None:
+                continue
 
-        page_reports.append(
-            {
-                "pageId": projected["pageId"],
-                "readerSectionId": projected["readerSectionId"],
-                "action": projected["action"],
-                "changedFields": projected["changedFields"],
-                "flags": projected["flags"],
-            }
-        )
+            page_reports.append(
+                {
+                    "pageId": projected["pageId"],
+                    "readerSectionId": projected["readerSectionId"],
+                    "action": projected["action"],
+                    "changedFields": projected["changedFields"],
+                    "flags": projected["flags"],
+                }
+            )
 
-        if projected["action"] == "flagged":
-            flagged_page_ids.append(projected["pageId"])
-            continue
+            if projected["action"] == "flagged":
+                flagged_page_ids.append(projected["pageId"])
+                continue
 
-        changed_page_ids.append(projected["pageId"])
-        if projected["flags"]:
-            flagged_page_ids.append(projected["pageId"])
+            projections.append((page, projected))
+            changed_page_ids.append(projected["pageId"])
+            if projected["flags"]:
+                flagged_page_ids.append(projected["pageId"])
         if write:
+            for page, _ in projections:
+                capture_page_snapshot(db, page.id, PAGE_UPDATED, None)
+        for page, projected in projections:
+            if not write:
+                continue
             section = next(
                 item for item in page.sections if str(item.id) == projected["readerSectionId"]
             )
             _apply_projection(section, projected)
 
-    # Single transaction for the whole series (all-or-nothing).
-    if write and changed_page_ids:
-        db.commit()
+        # Single transaction for the whole series (all-or-nothing).
+        if write:
+            if changed_page_ids:
+                db.commit()
+            else:
+                db.rollback()
+    except Exception:
+        db.rollback()
+        raise
 
     return {
         "seriesId": series_id,

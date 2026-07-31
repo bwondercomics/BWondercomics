@@ -1,16 +1,16 @@
 # Docs Index - 0.8.5 Builder Customization and Refactor Lock
 
-Last updated: 2026-07-16
+Last updated: 2026-07-29
 
 Current release focus:
 
 - `0.8.5` closes the builder customization roadmap, its authenticated responsive QA corrections,
   and the behavior-preserving builder refactor. That baseline is merged into `main` for the
   remaining `1.0.0` roadmap.
-- The next recovery gate is
-  `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`: persisted builder-page history and
-  admin restore, validated database/file backups on `/mnt/archive`, and an isolated restore drill
-  before store implementation.
+- Builder-page mutation history and the admin-only current/deleted restore APIs are complete.
+  `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md` now continues with the Phase 3 History
+  UI, then validated database/file backups on `/mnt/archive` and isolated restore drills before
+  store implementation.
 - The live builder canvas is the real reader route in a same-origin iframe with validated snapshots,
   target overlays, live drag/drop, chrome-collapsed Preview, device modes, guarded commands/keymaps,
   local draft undo/redo, and text-module inline editing.

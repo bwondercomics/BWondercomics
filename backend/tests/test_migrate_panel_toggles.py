@@ -6,9 +6,19 @@ os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///tmp/bw-quality-route-t
 
 import uuid
 from datetime import datetime, timezone
+from unittest.mock import patch
 
+from sqlalchemy import select
+
+from backend.app.builder_history import PAGE_UPDATED
 from backend.app.migrate_panel_toggles_to_ratio import migrate_series_panel_toggles
-from backend.app.models import BuilderModule, BuilderPage, BuilderSection, Series
+from backend.app.models import (
+    BuilderModule,
+    BuilderPage,
+    BuilderPageSnapshot,
+    BuilderSection,
+    Series,
+)
 from backend.tests.helpers import BackendRouteTestCase
 
 
@@ -105,6 +115,34 @@ class MigratePanelTogglesTests(BackendRouteTestCase):
             self.assertEqual(module.column_index, 0)
         # The inert toggle is cleared.
         self.assertNotIn("panelEnabled", section.settings)
+        snapshot = self.db.scalar(
+            select(BuilderPageSnapshot).where(BuilderPageSnapshot.page_id == section.page_id)
+        )
+        self.assertEqual(snapshot.action, PAGE_UPDATED)
+        self.assertIsNone(snapshot.created_by_user_id)
+        self.assertEqual(snapshot.payload["page"]["sections"][0]["layout"], "1-3-1")
+
+    def test_write_snapshot_failure_rolls_back_all_projected_changes(self):
+        _page, section = self._seed_reader_page(
+            layout="1-1",
+            settings={"panelEnabled": {"right": False}},
+        )
+        with (
+            patch(
+                "backend.app.migrate_panel_toggles_to_ratio.capture_page_snapshot",
+                side_effect=RuntimeError("forced toggle snapshot failure"),
+            ),
+            self.assertRaisesRegex(RuntimeError, "forced toggle snapshot failure"),
+        ):
+            migrate_series_panel_toggles(self.db, "battle-bros", write=True)
+
+        self.db.refresh(section)
+        self.assertEqual(section.layout, "1-1")
+        self.assertEqual(section.settings, {"panelEnabled": {"right": False}})
+        self.assertEqual(
+            self.db.scalars(select(BuilderPageSnapshot)).all(),
+            [],
+        )
 
     def test_collapses_two_column_disabled_via_reader_config(self):
         # The disable signal comes from the reader module's config.panels this time.

@@ -34,6 +34,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
+from .builder_history import PAGE_UPDATED, capture_page_snapshot
+from .builder_locking import lock_builder_page_scope
 from .builder_security import (
     layout_column_count,
     sanitize_page_meta,
@@ -178,29 +180,48 @@ def project_page_migration(page: BuilderPage) -> dict[str, Any] | None:
 
 
 def migrate_series_panel_settings(db, series_id: str, *, write: bool = False) -> dict[str, Any]:
-    pages = db.scalars(
+    query = (
         select(BuilderPage)
         .where(BuilderPage.series_id == series_id)
-        .order_by(BuilderPage.sort_index.asc(), BuilderPage.created_at.asc())
         .options(selectinload(BuilderPage.sections).selectinload(BuilderSection.modules))
-    ).all()
+    )
+    query = (
+        query.order_by(BuilderPage.id.asc()).with_for_update()
+        if write
+        else query.order_by(BuilderPage.sort_index.asc(), BuilderPage.created_at.asc())
+    )
+    try:
+        if write:
+            lock_builder_page_scope(db, "series", series_id)
+        pages = db.scalars(query).all()
+    except Exception:
+        db.rollback()
+        raise
 
     changed_page_ids: list[str] = []
     page_reports: list[dict[str, Any]] = []
+    projections: list[tuple[BuilderPage, dict[str, Any]]] = []
 
-    for page in pages:
-        projected = project_page_migration(page)
-        if projected is None:
-            continue
-        changed_page_ids.append(projected["pageId"])
-        page_reports.append(
-            {
-                "pageId": projected["pageId"],
-                "readerSectionId": projected["readerSectionId"],
-                "changedFields": projected["changedFields"],
-            }
-        )
+    try:
+        for page in pages:
+            projected = project_page_migration(page)
+            if projected is None:
+                continue
+            projections.append((page, projected))
+            changed_page_ids.append(projected["pageId"])
+            page_reports.append(
+                {
+                    "pageId": projected["pageId"],
+                    "readerSectionId": projected["readerSectionId"],
+                    "changedFields": projected["changedFields"],
+                }
+            )
         if write:
+            for page, _ in projections:
+                capture_page_snapshot(db, page.id, PAGE_UPDATED, None)
+        for page, projected in projections:
+            if not write:
+                continue
             reader_section = next(
                 section
                 for section in page.sections
@@ -209,9 +230,15 @@ def migrate_series_panel_settings(db, series_id: str, *, write: bool = False) ->
             reader_section.settings = projected["nextSettings"]
             page.meta = projected["nextMeta"]
 
-    # Single transaction for the whole series (all-or-nothing).
-    if write and changed_page_ids:
-        db.commit()
+        # Single transaction for the whole series (all-or-nothing).
+        if write:
+            if changed_page_ids:
+                db.commit()
+            else:
+                db.rollback()
+    except Exception:
+        db.rollback()
+        raise
 
     return {
         "seriesId": series_id,

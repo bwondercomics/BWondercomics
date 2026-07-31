@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .builder_history import PAGE_CREATED, capture_page_snapshot
+from .builder_locking import lock_builder_page_scope
 from .db import SessionLocal
 from .models import BuilderModule, BuilderPage, BuilderSection, PageConfig, Series
 
@@ -30,15 +31,23 @@ def _now() -> datetime:
 def migrate_page_config_to_builder(db: Session, series_id: str, config: dict) -> BuilderPage | None:
     """Convert a single PageConfig to page builder format."""
 
-    # Check if a "reader" page already exists for this series
-    existing = db.scalar(
-        select(BuilderPage).where(
-            BuilderPage.series_id == series_id,
-            BuilderPage.slug == "reader",
-        )
+    lock_builder_page_scope(db, "series", series_id)
+    existing_pages = list(
+        db.scalars(
+            select(BuilderPage)
+            .where(BuilderPage.series_id == series_id)
+            .order_by(BuilderPage.id.asc())
+            .with_for_update()
+        ).all()
     )
-    if existing:
+    if any(page.slug == "reader" for page in existing_pages):
         print(f"  Skipping {series_id}: reader page already exists")
+        return None
+    if existing_pages:
+        print(
+            f"  WARNING: Skipping {series_id}: builder pages already exist; "
+            "legacy conversion cannot safely merge a hybrid scope"
+        )
         return None
 
     now = _now()

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import os
+from datetime import datetime, timezone
 from unittest.mock import patch
 from uuid import UUID, uuid4
 
@@ -15,6 +16,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///tmp/bw-quality-route-t
 from backend.app import migrate_page_config, page_store
 from backend.app.builder_history import (
     PAGE_CREATED,
+    PAGE_DELETED,
     PAGE_UPDATED,
     SNAPSHOT_RETENTION,
     capture_page_snapshot,
@@ -27,6 +29,7 @@ from backend.app.models import (
     BuilderPageBinding,
     BuilderPageSnapshot,
     BuilderSection,
+    Series,
 )
 from backend.app.routes import admin, page_builder
 from backend.tests.helpers import BackendRouteTestCase, build_request
@@ -213,6 +216,9 @@ class BuilderHistoryTests(BackendRouteTestCase):
         page, _, _ = self._create_nested_page()
         first = capture_page_snapshot(self.db, page.id, PAGE_CREATED)
         self.assertIsNotNone(first)
+        second = capture_page_snapshot(self.db, page.id, PAGE_UPDATED)
+        self.assertIsNotNone(second)
+        self.assertEqual(second.payload_hash, first.payload_hash)
         self.assertIsNone(capture_page_snapshot(self.db, page.id, PAGE_UPDATED))
         with self.assertRaisesRegex(ValueError, "Unsupported builder snapshot action"):
             capture_page_snapshot(self.db, page.id, "client_supplied_action")
@@ -316,6 +322,65 @@ class BuilderHistoryTests(BackendRouteTestCase):
         self.assertEqual(self.db.scalars(select(BuilderPageSnapshot)).all(), [])
         self.assertEqual(len(self.db.scalars(select(BuilderPage)).all()), 1)
 
+    def test_legacy_conversion_fails_closed_for_hybrid_scope_but_other_series_remain_eligible(self):
+        self.seed_contract_series()
+        existing = BuilderPage(
+            id=uuid4(),
+            scope="series",
+            series_id="battle-bros",
+            slug="homepage",
+            title="Existing Homepage",
+            page_type="custom",
+            is_published=True,
+            is_homepage=True,
+            sort_index=0,
+            meta={},
+        )
+        now = datetime.now(timezone.utc)
+        self.db.add(existing)
+        self.db.add(
+            Series(
+                id="other-series",
+                title="Other Series",
+                description="",
+                status_message="",
+                active=True,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        self.db.commit()
+
+        with patch("builtins.print") as printed:
+            skipped = migrate_page_config.migrate_page_config_to_builder(
+                self.db,
+                "battle-bros",
+                self._legacy_page_config(),
+            )
+        self.assertIsNone(skipped)
+        self.assertTrue(
+            any("hybrid scope" in str(call) for call in printed.call_args_list),
+            printed.call_args_list,
+        )
+        self.assertTrue(existing.is_homepage)
+        self.assertEqual(self.db.scalars(select(BuilderPageSnapshot)).all(), [])
+
+        migrated = migrate_page_config.migrate_page_config_to_builder(
+            self.db,
+            "other-series",
+            self._legacy_page_config(),
+        )
+        self.assertIsNotNone(migrated)
+        self.assertEqual(migrated.series_id, "other-series")
+        self.assertIsNone(
+            self.db.scalar(
+                select(BuilderPage).where(
+                    BuilderPage.series_id == "battle-bros",
+                    BuilderPage.slug == "reader",
+                )
+            )
+        )
+
     def test_page_snapshot_survives_page_delete_and_actor_cleanup(self):
         self.seed_contract_series()
         deleting_admin = self.create_user(
@@ -331,12 +396,23 @@ class BuilderHistoryTests(BackendRouteTestCase):
         )
         page_id = UUID(created["id"])
 
-        self.assertTrue(page_store.delete_page(self.db, str(page_id)))
-        snapshot = self.db.scalar(
-            select(BuilderPageSnapshot).where(BuilderPageSnapshot.page_id == page_id)
+        self.assertTrue(
+            page_store.delete_page(
+                self.db,
+                str(page_id),
+                actor_user_id=executor.id,
+            )
         )
-        self.assertIsNotNone(snapshot)
-        self.assertEqual(snapshot.created_by_user_id, deleting_admin.id)
+        snapshots = list(
+            self.db.scalars(
+                select(BuilderPageSnapshot)
+                .where(BuilderPageSnapshot.page_id == page_id)
+                .order_by(BuilderPageSnapshot.created_at.asc(), BuilderPageSnapshot.id.asc())
+            ).all()
+        )
+        self.assertEqual([snapshot.action for snapshot in snapshots], [PAGE_CREATED, PAGE_DELETED])
+        self.assertEqual(snapshots[0].created_by_user_id, deleting_admin.id)
+        self.assertEqual(snapshots[1].created_by_user_id, executor.id)
 
         response = admin.admin_delete_user(
             str(deleting_admin.id),
@@ -348,8 +424,10 @@ class BuilderHistoryTests(BackendRouteTestCase):
             self.db,
         )
         self.assertEqual(response, {"status": "ok"})
-        self.db.refresh(snapshot)
-        self.assertIsNone(snapshot.created_by_user_id)
+        self.db.refresh(snapshots[0])
+        self.db.refresh(snapshots[1])
+        self.assertIsNone(snapshots[0].created_by_user_id)
+        self.assertEqual(snapshots[1].created_by_user_id, executor.id)
 
     def test_failed_create_transaction_can_roll_back_page_and_snapshot(self):
         self.seed_contract_series()

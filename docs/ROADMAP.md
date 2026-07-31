@@ -21,7 +21,7 @@ Out of scope for `1.0.0`:
 - Advanced analytics such as cohort, funnel, or retention features
 - Additional reader display modes beyond the shipped paged and vertical-scroll modes
 
-Last updated: 2026-07-16
+Last updated: 2026-07-29
 
 ## `0.7.9` Release Baseline
 
@@ -88,6 +88,9 @@ Follow-up terminology, onboarding, mobile edge cases, and visual polish are trac
 
 Goal: make maintenance trustworthy without terminal guesswork.
 
+- [x] Complete transactional builder mutation history plus validated current/deleted-page backend
+      restore APIs; keep the admin History UI and dirty-workspace recovery flow as the next recovery
+      phase.
 - [ ] Verify diagnostics snapshot refresh, queue/worker behavior, permissions, and core status reporting.
 - [ ] Confirm admin diagnostics stays read-only and `/ops/` remains the separate command surface.
 - [ ] Run a backup on disposable data and perform a restore drill with exact notes.

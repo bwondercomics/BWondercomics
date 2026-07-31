@@ -4,8 +4,11 @@ import os
 
 os.environ.setdefault("DATABASE_URL", "sqlite+pysqlite:///tmp/bw-quality-route-tests.db")
 
+from sqlalchemy import select
+
 from backend.app.backfill_page_headers import backfill_series_page_headers
-from backend.app.models import BuilderPage
+from backend.app.builder_history import PAGE_UPDATED
+from backend.app.models import BuilderPage, BuilderPageSnapshot
 from backend.tests.helpers import BackendRouteTestCase
 
 
@@ -123,6 +126,11 @@ class BackfillPageHeadersTests(BackendRouteTestCase):
         updated = self.db.get(BuilderPage, seeded["page"].id)
         self.assertEqual(updated.meta["header"]["version"], 3)
         self.assertEqual(updated.meta["header"]["copy"]["title"], "About")
+        snapshot = self.db.scalar(
+            select(BuilderPageSnapshot).where(BuilderPageSnapshot.page_id == seeded["page"].id)
+        )
+        self.assertEqual(snapshot.action, PAGE_UPDATED)
+        self.assertIsNone(snapshot.created_by_user_id)
         self.assertEqual(updated.meta["header"]["nav"]["items"][0]["style"], "primary")
         self.assertFalse(updated.meta["header"]["blocks"]["status"]["enabled"])
         self.assertNotIn("headerOverrides", updated.meta)

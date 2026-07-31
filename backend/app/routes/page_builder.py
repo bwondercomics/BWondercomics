@@ -10,6 +10,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import Session
 
+from ..builder_history import (
+    BuilderSnapshotError,
+    get_snapshot_detail,
+    list_deleted_page_candidates,
+    list_page_snapshots,
+    restore_page_snapshot,
+)
 from ..builder_security import (
     BUILDER_RESPONSIVE_CAPABILITIES,
     BUILDER_RESPONSIVE_CONTRACT_VERSION,
@@ -60,6 +67,31 @@ def _require_admin(request: Request, db: Session) -> User | None:
     if not user or not is_admin_role(user.role):
         return None
     return user
+
+
+def _snapshot_response(content: dict[str, Any], status_code: int = 200) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content=content,
+        headers={"Cache-Control": "no-store"},
+    )
+
+
+def _snapshot_error_response(error: BuilderSnapshotError) -> JSONResponse:
+    content: dict[str, Any] = {"error": str(error), "code": error.code}
+    if error.path:
+        content["path"] = error.path
+    return _snapshot_response(content, error.status_code)
+
+
+def _snapshot_admin(request: Request, db: Session) -> User | JSONResponse:
+    admin = _require_admin(request, db)
+    if admin:
+        return admin
+    return _snapshot_response(
+        {"error": "Admin access required", "code": "admin_access_required"},
+        403,
+    )
 
 
 # Page endpoints
@@ -326,6 +358,90 @@ def api_update_page_bindings(
         return JSONResponse(status_code=400, content={"error": str(e)})
 
 
+@router.get("/api/admin/pages/{page_id}/snapshots")
+def api_list_page_snapshots(
+    page_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """List newest-first recovery summaries for one current or deleted page."""
+    admin = _snapshot_admin(request, db)
+    if isinstance(admin, JSONResponse):
+        return admin
+    try:
+        return _snapshot_response({"snapshots": list_page_snapshots(db, page_id)})
+    except BuilderSnapshotError as error:
+        return _snapshot_error_response(error)
+
+
+@router.get("/api/admin/page-snapshots/deleted")
+def api_list_deleted_page_snapshots(
+    request: Request,
+    scope: str | None = None,
+    series_id: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """List the newest retained candidate for each absent page ID."""
+    admin = _snapshot_admin(request, db)
+    if isinstance(admin, JSONResponse):
+        return admin
+    try:
+        pages = list_deleted_page_candidates(db, scope, series_id)
+        return _snapshot_response({"pages": pages})
+    except BuilderSnapshotError as error:
+        return _snapshot_error_response(error)
+
+
+@router.get("/api/admin/page-snapshots/{snapshot_id}")
+def api_get_page_snapshot(
+    snapshot_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Return validated recovery data for confirmation and inspection."""
+    admin = _snapshot_admin(request, db)
+    if isinstance(admin, JSONResponse):
+        return admin
+    try:
+        return _snapshot_response({"snapshot": get_snapshot_detail(db, snapshot_id)})
+    except BuilderSnapshotError as error:
+        return _snapshot_error_response(error)
+
+
+@router.post("/api/admin/page-snapshots/{snapshot_id}/restore")
+async def api_restore_page_snapshot(
+    snapshot_id: str,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    """Restore a server-owned snapshot without accepting replacement content."""
+    admin = _snapshot_admin(request, db)
+    if isinstance(admin, JSONResponse):
+        return admin
+    if await request.body():
+        return _snapshot_response(
+            {
+                "error": "Restore does not accept client-supplied data",
+                "code": "snapshot_validation_failed",
+                "path": "body",
+            },
+            400,
+        )
+    try:
+        page_id = restore_page_snapshot(db, snapshot_id, admin.id)
+        page = get_page(db, str(page_id))
+        if not page:
+            raise BuilderSnapshotError(
+                "Restored page could not be loaded",
+                code="snapshot_identity_conflict",
+                status_code=409,
+                path="page.id",
+            )
+        return _snapshot_response({"page": page})
+    except BuilderSnapshotError as error:
+        return _snapshot_error_response(error)
+
+
 @router.get("/api/admin/pages/{page_id}")
 def api_get_page(page_id: str, request: Request, db: Session = Depends(get_db)):
     """Get a single page with all sections and modules."""
@@ -566,8 +682,12 @@ def api_reorder_sections(
     if not admin:
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
-    reorder_sections(db, page_id, payload.section_ids, actor_user_id=admin.id)
-    return {"status": "success"}
+    try:
+        if not reorder_sections(db, page_id, payload.section_ids, actor_user_id=admin.id):
+            return JSONResponse(status_code=404, content={"error": "Page not found"})
+        return {"status": "success"}
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": str(e)})
 
 
 # Module endpoints
@@ -727,13 +847,15 @@ def api_reorder_modules(
         return JSONResponse(status_code=403, content={"error": "Admin access required"})
 
     try:
-        reorder_modules(
+        reordered = reorder_modules(
             db,
             section_id,
             payload.column_index,
             payload.module_ids,
             actor_user_id=admin.id,
         )
+        if not reordered:
+            return JSONResponse(status_code=404, content={"error": "Section not found"})
         return {"status": "success"}
     except ValueError as e:
         db.rollback()

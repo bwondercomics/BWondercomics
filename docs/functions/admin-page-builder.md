@@ -71,12 +71,33 @@ page creation writes one versioned, sanitized baseline snapshot in the same data
 the page and attributes it to that admin. The supported legacy `PageConfig` conversion also writes
 the complete migrated page graph as one transactional baseline, with a null actor because the CLI
 has no authenticated user. Snapshot JSON preserves canonical page, section, module, and binding
-IDs, omits record timestamps, uses a stable content hash to skip consecutive duplicate states, and
-retains the newest 30 distinct states per page. The snapshot's `page_id` deliberately is not a
+IDs, omits record timestamps, and uses a stable content hash as the payload half of event-aware
+deduplication. It
+retains the newest 30 snapshot events per page. Deduplication requires both the same payload hash
+and server action; actor identity is intentionally not part of the key, so an unchanged
+`page_created` state followed by `page_deleted` still records the deletion event. The snapshot's
+`page_id` deliberately is not a
 foreign key, so history survives page deletion; its optional actor foreign key is nulled when the
-user is removed. Existing-page mutations, restore endpoints, history UI, and existing-page backfill
-remain deferred to later recovery phases, so local draft undo/redo is still the only user-facing
-recovery control.
+user is removed.
+
+Every scope-wide builder mutation first serializes its global scope with PostgreSQL's reserved
+`BWBP/global/v1` transaction advisory lock or its series scope with the matching `Series` row.
+It then locks affected page rows in deterministic UUID order, captures each qualifying complete
+pre-state event, applies the validated change, and commits once. Coverage
+includes page metadata/publication/homepage displacement, exact scope reorder, binding changes,
+section/module CRUD and strict reorder/move operations, full-page placements, deletion, V3 header
+backfill, and both panel migration write modes. Semantic no-ops retain their existing response
+without changing timestamps or retention.
+
+Admin-only backend history APIs list page snapshots, inspect validated snapshot payloads, discover
+deleted-page candidates, and restore a server-owned snapshot. Current-page restore preserves the
+live page's ID, routing, order, publication/homepage state, bindings, and creation time while
+reconciling saved content by stable nested ID and recording `pre_restore`. Deleted-page restore
+recreates original page/section/module IDs as an appended unpublished, non-homepage, unbound draft.
+Integrity, payload-version, sanitizer-drift, scope/series/slug, reader-binding, and identity failures
+reject the whole transaction with structured error codes. The History/deleted-page UI and its
+dirty-workspace/confirmation/preview-refresh behavior remain Phase 3, so local draft undo/redo is
+still the only recovery control exposed by the current builder UI.
 
 Ownership rule: admin-only controllers/editors live under `admin/page-builder/`; contracts imported
 by both admin and reader live under `shared/page-builder/`. `tests/shared-kernel-boundary.test.js`
