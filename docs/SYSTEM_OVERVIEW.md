@@ -119,9 +119,10 @@ Builder pages use explicit page-builder APIs rather than the legacy save-JSON pa
    moves remain in a page-wide structure draft until the atomic placements save; Save Page preserves
    publication state, while Publish/confirmed Unpublish are the only visibility transitions.
 9. Every committed backend mutation records a distinct complete pre-state in the same transaction.
-   The admin-only recovery API can inspect those records, restore current content without changing
-   live routing/publication/bindings, or recover a deleted page as an appended unpublished and
-   unbound draft. The builder does not expose this API through a History UI until Phase 3.
+   Toolbar **History** and Pages-scope **Deleted pages** use the admin-only recovery API to inspect
+   validated records, restore current content without changing live routing/publication/bindings,
+   or recover a deleted page as an appended unpublished and unbound draft. Restore is blocked by
+   dirty local work and resets drafts, undo history, and the iframe preview session after success.
 
 ### 3) Posts + RSS
 

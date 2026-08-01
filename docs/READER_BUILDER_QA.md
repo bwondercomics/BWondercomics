@@ -125,6 +125,15 @@ every optional 1.0 workflow was manually repeated during the 0.8.5 closeout.
 - [ ] Explicit-save editing
   - Modify a module, theme settings, and section settings.
   - Confirm dirty-state blocking works and `Save`/`Discard` do what they claim.
+- [ ] Saved history and deleted-page recovery
+  - Save two distinct versions, open **History**, inspect the older validated summary, and restore it.
+  - Confirm dirty module, section, theme, header, page-settings, and structure drafts disable restore.
+  - Reload and confirm restored content matches preview/public output while slug, scope, order,
+    publication/homepage state, and bindings remain unchanged; use `pre_restore` to undo once.
+  - Delete a page, open **Deleted pages** in the same scope, and recover it as the appended
+    unpublished, non-homepage, unbound draft described by the confirmation.
+  - Check initial/return focus, Escape/Close, narrow-screen dialog bounds, and the persistent success
+    status. Repeat deleted recovery in global scope.
 - [ ] Page header editing
   - Open both an existing page and a newly created page.
   - Click the header surface in the canvas and change the title, subtitle, and at least one navigation button.

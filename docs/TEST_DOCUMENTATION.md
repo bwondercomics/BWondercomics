@@ -131,6 +131,13 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
   exact Desktop/Tablet/Phone presets.
 - `tests/admin-page-builder-audit.test.js`: `shared/page-builder/header-config.js` fallback-audit
   helpers, including Phase 8 retirement acceptance and canonical V3 readiness.
+- `tests/admin-page-builder-data.test.js`, `tests/admin-page-builder-commands.test.js`, and
+  `tests/admin-page-builder-history-shell.test.js`: typed no-store recovery requests and structured
+  errors; strict bodyless restore; async command dirty/duplicate/conflict behavior; history and
+  deleted loading/empty/retry/detail/confirmation states; action/actor/time labels; accessible
+  focus/Escape; route/page/scope/series invalidation; committed-versus-refresh result boundaries;
+  refresh abortion and stale reconciliation rejection; post-commit reload-required handling;
+  canonical current restore with renewed preview state; and deleted-page recovery/Designer routing.
 - `tests/shared-renderers-parity.test.js`: parity tests for
   `shared/page-builder/shared-renderers.js`, including builder markers, panel/column ownership,
   reader mounts, responsive CSS, Feed layout, and reader/public option sets.
@@ -151,7 +158,12 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
 - `tests/reader-preview-bridge.test.js`: `reader/preview-bridge.js` handshake protocol and target geometry collection — `requestPreviewSnapshot(...)` resolves on valid `SNAPSHOT`, rejects on timeout or invalid envelope, sends correct `ACK`/`ERROR` control messages, collects the editor-only page-end target, and rejects cross-origin and cross-source events
 - `tests/reader-preview-side-effects.test.js`: end-to-end reader preview side-effect guards — verifies that `?builderPreview=1` suppresses analytics initialization, live tracking, email form submission, comment mutations, chat SSO, safe-mode redirect, user-settings overlay, fullscreen, and external navigation links while leaving read-only reader shell behavior intact
 - `tests/visual/builder-preview-parity.spec.js`: Playwright visual parity coverage for the admin builder preview iframe against the public reader route at Desktop, Tablet, and Phone, plus DOM/assertion coverage for no-reader pages and a customized paged reader route. Phase 5 styled 1/2/3/4+ column layouts capture both public output and the matching admin iframe against the same committed baselines.
-- `tests/visual/builder-authoring-workflows.spec.js`: Phase 12 Playwright authoring workflow coverage for the full-page builder shell. It uses stateful mocked builder/page endpoints and DOM/layout assertions for exact Desktop/Tablet/Phone iframe dimensions, bound series reader pages with authored content below the reader module, chrome collapse/restore, side-panel save/reload, current-device override persistence, inline text Save/Discard, live block drag/drop persistence, and global Feed template page creation.
+- `tests/visual/builder-authoring-workflows.spec.js`: stateful full-page authoring coverage including
+  exact preview dimensions, live edits, templates, current history restore surviving reload/public
+  verification, renewed preview sessions and cleared transient selection/draft/undo state, restored
+  iframe/public output, deleted recovery in series/global scopes, bodyless requests, dialog focus and
+  responsive bounds, 700px status/toolbar separation, toolbar fit, and the committed recovery
+  confirmation screenshot.
 
 ## Backend Test Files
 

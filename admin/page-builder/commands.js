@@ -19,6 +19,7 @@ export const BUILDER_COMMANDS = Object.freeze({
   INLINE_EDIT_CHANGE: 'builder:inline-edit-change',
   INLINE_EDIT_COMMIT: 'builder:inline-edit-commit',
   INLINE_EDIT_CANCEL: 'builder:inline-edit-cancel',
+  RESTORE_SNAPSHOT: 'builder:restore-snapshot',
 });
 
 function result(ok, details = {}) {
@@ -65,6 +66,160 @@ function createStructuralCommand(id) {
   };
 }
 
+function describeRestoreFailure(error) {
+  if (error?.status === 403) {
+    return 'Your admin session cannot restore this recovery point. Sign in again and retry.';
+  }
+  if (error?.status === 404 || error?.code === 'snapshot_not_found') {
+    return 'This recovery point is no longer available. Reload history and choose another.';
+  }
+  const conflicts = {
+    snapshot_slug_conflict:
+      'That page slug is now in use. Rename or remove the conflicting page before recovering this one.',
+    snapshot_scope_conflict:
+      'The live page moved to a different scope. Reload the builder before restoring.',
+    snapshot_series_missing:
+      'The original series no longer exists, so this deleted page cannot be recovered.',
+    snapshot_identity_conflict:
+      'Stored page or content identifiers are already in use. No canonical page data was changed.',
+    snapshot_incompatible: 'This recovery point is not compatible with the current builder format.',
+    current_page_incompatible:
+      'The live page could not be serialized safely, so no restore was attempted.',
+    snapshot_validation_failed:
+      'This recovery point did not pass validation and cannot be restored.',
+  };
+  if (error?.code && conflicts[error.code]) return conflicts[error.code];
+  if (error?.status === 409) {
+    return 'The recovery point conflicts with current saved data. Reload history and review it again.';
+  }
+  if (error?.status === 400) {
+    return 'The recovery request is invalid. Reload history and choose the recovery point again.';
+  }
+  return error?.message || 'The page could not be restored. Canonical saved data was not changed.';
+}
+
+function createRestoreSnapshotCommand() {
+  let pending = false;
+  return {
+    id: BUILDER_COMMANDS.RESTORE_SNAPSHOT,
+    enabled: ({ payload }) => !!payload?.snapshotId && !pending,
+    async run({ payload, actions, deps }) {
+      if (
+        actions.ensureCleanWorkspace?.(
+          'Save or discard every current draft before restoring page history.'
+        ) === false
+      ) {
+        return result(false, {
+          code: 'dirty_workspace',
+          committed: false,
+          contextChanged: false,
+          refreshWarning: '',
+          status: 'Restore is unavailable while the builder has unsaved changes.',
+        });
+      }
+
+      pending = true;
+      const recoveryContext = payload.context || actions.captureRecoveryContext?.() || null;
+      try {
+        const page = await deps.restorePageSnapshot?.(payload.snapshotId, {
+          signal: payload.signal,
+        });
+        if (!page?.id) {
+          return result(true, {
+            code: 'invalid_restore_response',
+            committed: true,
+            contextChanged: false,
+            refreshWarning: 'Reload the builder before making more changes.',
+            status:
+              'The restore completed, but the server did not return its canonical saved state. Reload the builder before making more changes.',
+          });
+        }
+        const successStatus = payload.deleted
+          ? 'Deleted page recovered as an unpublished, unbound draft.'
+          : 'Page restored from saved history.';
+
+        if (actions.isRecoveryContextCurrent?.(recoveryContext) === false) {
+          return result(true, {
+            page,
+            committed: true,
+            contextChanged: true,
+            refreshWarning: '',
+            status:
+              'The restore completed in the previous builder context. The current view was left unchanged.',
+          });
+        }
+
+        try {
+          actions.activateRestoredPage?.(page, { deleted: payload.deleted === true });
+        } catch (error) {
+          return result(true, {
+            page,
+            code: 'post_commit_client_failure',
+            committed: true,
+            contextChanged: false,
+            refreshWarning: 'Reload the builder before making more changes.',
+            status: `${successStatus} The local builder could not finish applying the canonical response; reload before making more changes.`,
+            error,
+          });
+        }
+
+        const refreshContext = actions.captureRecoveryContext?.() || recoveryContext;
+
+        Promise.resolve(
+          actions.refreshRestoredPage?.(page, {
+            context: refreshContext,
+            deleted: payload.deleted === true,
+          })
+        )
+          .then((reconciliation = {}) => {
+            if (!reconciliation.refreshWarning) return;
+            actions.setRecoveryStatus?.(
+              `${successStatus} ${reconciliation.refreshWarning}`,
+              'warning'
+            );
+          })
+          .catch((error) => {
+            console.error('restore snapshot refresh error:', error);
+            actions.setRecoveryStatus?.(
+              `${successStatus} Related page and binding data could not be refreshed.`,
+              'warning'
+            );
+          });
+
+        return result(true, {
+          page,
+          committed: true,
+          contextChanged: false,
+          refreshWarning: '',
+          status: successStatus,
+        });
+      } catch (error) {
+        if (error?.status === 200 || error?.code === 'invalid_recovery_response') {
+          return result(true, {
+            code: error?.code || 'invalid_restore_response',
+            committed: true,
+            contextChanged: false,
+            refreshWarning: 'Reload the builder before making more changes.',
+            status:
+              'The restore completed, but its canonical response could not be read. Reload the builder before making more changes.',
+            error,
+          });
+        }
+        return result(false, {
+          code: error?.code || 'snapshot_restore_failed',
+          committed: false,
+          contextChanged: false,
+          refreshWarning: '',
+          status: describeRestoreFailure(error),
+          error,
+        });
+      } finally {
+        pending = false;
+      }
+    },
+  };
+}
+
 function createDefaultCommands() {
   return [
     createStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.DRAG_START),
@@ -80,6 +235,7 @@ function createDefaultCommands() {
     createStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.DUPLICATE_SELECTED),
     createStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.MOVE_MODULE_STEP),
     createStructuralCommand(BUILDER_STRUCTURAL_COMMANDS.MOVE_HEADER_BLOCK),
+    createRestoreSnapshotCommand(),
     {
       id: BUILDER_COMMANDS.SELECT,
       enabled: ({ payload }) => !!payload?.target,

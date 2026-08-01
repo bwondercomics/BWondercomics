@@ -24,7 +24,7 @@ imports:
 
 `page-builder/layout.css`, `page-builder/sidebar.css`, `page-builder/canvas.css`,
 `page-builder/insertions.css`, `page-builder/inspector.css`, `page-builder/controls.css`,
-`page-builder/theme.css`, and `page-builder/responsive.css`.
+`page-builder/theme.css`, `page-builder/responsive.css`, and `page-builder/history.css`.
 
 ## 🎨 Design System & Tokens
 
@@ -83,6 +83,13 @@ Manages the persistent left-side panel for page navigation and the block/module 
   `.pb-block-group-grid` owns the live compact list layout. Each `.pb-module-type` remains draggable
   and keyed by `data-module-type`, but renders as an icon-left row with an ellipsis label instead of a
   tall centered tile.
+
+## 🕘 History and recovery (history.css)
+
+`history.css` owns the bounded native recovery dialog, timeline/detail/confirmation cards,
+persistent recovery live status, visible `:focus-visible` rings, and the narrow-screen one-column
+detail/item reflow. `sidebar.css` owns the full-width `.pb-deleted-pages-action` inside the two-column
+scope switcher so recovery remains reachable even when the active scope has no current pages.
 
 ---
 

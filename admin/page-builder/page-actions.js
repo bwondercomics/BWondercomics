@@ -1,7 +1,13 @@
 export function createPageActions({ el, getState, actions, deps }) {
+  let recoveryRefreshController = null;
+
   function syncPublicationActions() {
     const { currentPage } = getState();
     if (el.pbSaveDraft) el.pbSaveDraft.textContent = 'Save Page';
+    if (el.pbHistory) {
+      el.pbHistory.disabled = !currentPage;
+      el.pbHistory.title = currentPage ? 'Inspect saved page history' : 'Select a page first';
+    }
     if (!el.pbPublish) return;
     const isPublished = currentPage?.isPublished === true;
     el.pbPublish.textContent = isPublished ? 'Unpublish' : 'Publish';
@@ -10,7 +16,7 @@ export function createPageActions({ el, getState, actions, deps }) {
   }
 
   function setPageActionState(activeButton, busyText) {
-    const buttons = [el.pbSaveDraft, el.pbPublish].filter(Boolean);
+    const buttons = [el.pbSaveDraft, el.pbPublish, el.pbHistory].filter(Boolean);
     const original = new Map(buttons.map((button) => [button, button.textContent]));
     buttons.forEach((button) => {
       button.disabled = true;
@@ -132,6 +138,83 @@ export function createPageActions({ el, getState, actions, deps }) {
     return pages;
   }
 
+  function upsertPage(items, page) {
+    const list = Array.isArray(items) ? items : [];
+    const index = list.findIndex((item) => item?.id === page.id);
+    if (index === -1) return [...list, page];
+    return list.map((item, itemIndex) => (itemIndex === index ? page : item));
+  }
+
+  function activateRestoredPage(page) {
+    if (!page?.id) throw new Error('The restored page response was incomplete.');
+
+    // The restore response is canonical. Install it before any secondary request so a
+    // slow list/binding refresh cannot hold the committed restore UI open.
+    actions.setPages(upsertPage(getState().pages, page));
+    actions.setLinkPages(upsertPage(getState().linkPages, page));
+    // The restore response is the canonical source. Never merge stale nested content.
+    actions.setCurrentPage(page);
+    actions.resetBuilderState();
+    actions.resetPreviewSession?.();
+    actions.showPagesSurface?.();
+    actions.syncDesignerRoute?.('replace');
+    actions.renderPageList();
+    actions.renderLayerTree?.();
+    actions.renderCanvas();
+    actions.renderEditorPanel();
+    return { page };
+  }
+
+  function abortRecoveryRefresh() {
+    recoveryRefreshController?.abort();
+    recoveryRefreshController = null;
+  }
+
+  async function refreshRestoredPage(page, { context, deleted = false } = {}) {
+    abortRecoveryRefresh();
+    const controller = new AbortController();
+    recoveryRefreshController = controller;
+    const contextIsCurrent = () =>
+      actions.isRecoveryContextCurrent?.(context) !== false &&
+      getState().currentPage?.id === page?.id;
+
+    try {
+      const refreshed = await deps.refreshRecoveryState?.(
+        context?.scope || getState().activePageScope,
+        context?.seriesId || actions.getSeriesId(),
+        { signal: controller.signal }
+      );
+      if (controller.signal.aborted || !contextIsCurrent()) return { stale: true };
+
+      const refreshedPages = Array.isArray(refreshed?.pages) ? refreshed.pages : [];
+      const refreshWarning = refreshedPages.some((item) => item?.id === page.id)
+        ? ''
+        : 'The page list refresh was incomplete; the restored response is shown.';
+      actions.setPages(upsertPage(refreshedPages, page));
+      actions.setLinkPages(upsertPage(refreshed?.linkPages, page));
+      actions.setPageBindings(refreshed?.pageBindings);
+      actions.renderPageList();
+      if (deleted) {
+        window.setTimeout(
+          () =>
+            Array.from(el.pbPageList?.querySelectorAll('.pb-page-item') || [])
+              .find((item) => item.dataset.pageId === page.id)
+              ?.focus(),
+          0
+        );
+      }
+      return { refreshWarning };
+    } catch (error) {
+      if (error?.name === 'AbortError' || controller.signal.aborted || !contextIsCurrent()) {
+        return { stale: true };
+      }
+      console.error('refreshRestoredPage error:', error);
+      return { refreshWarning: 'Related page and binding data could not be refreshed.' };
+    } finally {
+      if (recoveryRefreshController === controller) recoveryRefreshController = null;
+    }
+  }
+
   async function createPageForActiveScope(slug, title) {
     const { activePageScope } = getState();
     return deps.createPage(activePageScope, actions.getSeriesId(), slug, title);
@@ -161,6 +244,7 @@ export function createPageActions({ el, getState, actions, deps }) {
     pageId,
     { surface = '', historyMode = 'replace', fallbackPage = null } = {}
   ) {
+    actions.invalidateRecoveryContext?.();
     const { currentPage } = getState();
     const page =
       currentPage?.id === pageId ? currentPage : (await deps.fetchPage(pageId)) || fallbackPage;
@@ -207,7 +291,7 @@ export function createPageActions({ el, getState, actions, deps }) {
     ) {
       return;
     }
-    if (!confirm('Delete this page? This cannot be undone.')) return;
+    if (!confirm('Delete this page? You can recover retained versions from Deleted pages.')) return;
 
     if (await deps.deletePage(pageId)) {
       await loadPages();
@@ -222,6 +306,9 @@ export function createPageActions({ el, getState, actions, deps }) {
             surface: activeDesignerSurface || 'header',
             historyMode: 'replace',
           });
+          actions.setRecoveryStatus?.(
+            'Page deleted. Retained versions are available in Deleted pages.'
+          );
           return;
         }
         actions.syncDesignerRoute('replace');
@@ -229,15 +316,21 @@ export function createPageActions({ el, getState, actions, deps }) {
       actions.renderPageList();
       actions.renderCanvas();
       actions.renderEditorPanel();
+      actions.setRecoveryStatus?.(
+        'Page deleted. Retained versions are available in Deleted pages.'
+      );
     }
   }
 
   return {
+    abortRecoveryRefresh,
     activatePage,
+    activateRestoredPage,
     createPageForActiveScope,
     deletePageFromSidebar,
     loadPages,
     reorderSidebarPages,
+    refreshRestoredPage,
     selectPage,
     updatePublishState,
     savePage,

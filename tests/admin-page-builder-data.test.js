@@ -11,6 +11,10 @@ import {
   fetchGlobalPages,
   fetchPage,
   fetchPageBuilderRuntime,
+  fetchPageSnapshots,
+  fetchDeletedPageSnapshots,
+  fetchPageSnapshot,
+  restorePageSnapshot,
   fetchPages,
   fetchPageBindings,
   fetchSeriesPages,
@@ -106,6 +110,112 @@ describe('admin page-builder data layer', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/admin/page-builder/runtime', {
       cache: 'no-store',
       credentials: 'same-origin',
+    });
+  });
+
+  it('loads typed recovery summaries and detail with encoded no-store requests', async () => {
+    const snapshots = [{ id: 'snapshot/one', pageId: 'page one' }];
+    const deleted = [{ pageId: 'deleted-one', latestSnapshotId: 'snapshot-two' }];
+    const detail = { id: 'snapshot/one', payload: { snapshotVersion: 1 } };
+    const controller = new AbortController();
+    const fetchMock = vi.fn(async (url) => {
+      if (url === '/api/admin/pages/page%20one%2F%C3%9F/snapshots') {
+        return jsonResponse({ snapshots });
+      }
+      if (
+        url === '/api/admin/page-snapshots/deleted?scope=series&series_id=battle+brothers%2F%C3%9F'
+      ) {
+        return jsonResponse({ pages: deleted });
+      }
+      if (url === '/api/admin/page-snapshots/snapshot%2Fone') {
+        return jsonResponse({ snapshot: detail });
+      }
+      throw new Error(`Unexpected fetch: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await fetchPageSnapshots('page one/ß', { signal: controller.signal })).toEqual(
+      snapshots
+    );
+    expect(
+      await fetchDeletedPageSnapshots({
+        scope: 'series',
+        seriesId: 'battle brothers/ß',
+        signal: controller.signal,
+      })
+    ).toEqual(deleted);
+    expect(await fetchPageSnapshot('snapshot/one', { signal: controller.signal })).toEqual(detail);
+
+    for (const [, options] of fetchMock.mock.calls) {
+      expect(options).toMatchObject({
+        cache: 'no-store',
+        credentials: 'same-origin',
+        signal: controller.signal,
+      });
+    }
+  });
+
+  it('sends snapshot restore as a bodyless POST and preserves structured errors', async () => {
+    const restoredPage = getContractFixture('builderPage');
+    const controller = new AbortController();
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse({ page: restoredPage }))
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            error: 'A nested snapshot ID belongs to another page',
+            code: 'snapshot_identity_conflict',
+            path: 'page.sections.0.id',
+          },
+          { status: 409, statusText: 'Conflict' }
+        )
+      );
+    vi.stubGlobal('fetch', fetchMock);
+
+    expect(await restorePageSnapshot('snapshot one', { signal: controller.signal })).toEqual(
+      restoredPage
+    );
+    const [url, options] = fetchMock.mock.calls[0];
+    expect(url).toBe('/api/admin/page-snapshots/snapshot%20one/restore');
+    expect(options).toEqual({
+      method: 'POST',
+      cache: 'no-store',
+      credentials: 'same-origin',
+      signal: controller.signal,
+    });
+    expect(options).not.toHaveProperty('body');
+    expect(options).not.toHaveProperty('headers');
+
+    await expect(fetchPageSnapshot('conflict')).rejects.toMatchObject({
+      message: 'A nested snapshot ID belongs to another page',
+      status: 409,
+      code: 'snapshot_identity_conflict',
+      path: 'page.sections.0.id',
+      payload: expect.objectContaining({ code: 'snapshot_identity_conflict' }),
+    });
+  });
+
+  it('forwards aborts and rejects malformed successful recovery responses', async () => {
+    const controller = new AbortController();
+    const fetchMock = vi.fn((_url, { signal }) => {
+      return new Promise((_resolve, reject) => {
+        signal.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')));
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const request = fetchPageSnapshots('page-one', { signal: controller.signal });
+    controller.abort();
+    await expect(request).rejects.toMatchObject({ name: 'AbortError' });
+
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => jsonResponse({ snapshots: null }))
+    );
+    await expect(fetchPageSnapshots('page-one')).rejects.toMatchObject({
+      status: 200,
+      code: 'invalid_recovery_response',
+      path: 'snapshots',
     });
   });
 

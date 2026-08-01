@@ -38,6 +38,7 @@ import { createInlineEditController } from './page-builder/inline-edit.js';
 import { createBuilderKeymapManager } from './page-builder/keymaps.js';
 import { normalizeHeaderNavItems } from '../shared/page-builder/link-utils.js';
 import { createPageActions } from './page-builder/page-actions.js';
+import { createHistoryPanel } from './page-builder/history-panel.js';
 import { createSelectionController } from './page-builder/selection.js';
 import { createPreviewManager } from './page-builder/preview-manager.js';
 import { createSidebarPanel } from './page-builder/sidebar-panel.js';
@@ -80,6 +81,10 @@ import {
   reorderModules,
   deleteModule,
   reorderScopedPages,
+  fetchPageSnapshots,
+  fetchDeletedPageSnapshots,
+  fetchPageSnapshot,
+  restorePageSnapshot,
 } from './page-builder/data.js';
 
 const PAGE_TEMPLATE_DEFS = Object.freeze({
@@ -184,6 +189,39 @@ function createPageBuilder({
   let structuralCommands = null;
   let commandRegistry = null;
   let keymapManager = null;
+  let historyPanel = null;
+  let recoveryContextGeneration = 0;
+
+  function captureRecoveryContext() {
+    return Object.freeze({
+      generation: recoveryContextGeneration,
+      pageId: state.currentPage?.id || '',
+      scope: state.activePageScope,
+      seriesId: getSeriesId(),
+      entrypoint: state.activeEntrypoint,
+      pageSlug: state.currentPage?.slug || '',
+      surface: state.activeDesignerSurface || '',
+    });
+  }
+
+  function isRecoveryContextCurrent(context) {
+    if (!context || context.generation !== recoveryContextGeneration) return false;
+    const current = captureRecoveryContext();
+    return (
+      context.pageId === current.pageId &&
+      context.scope === current.scope &&
+      context.seriesId === current.seriesId &&
+      context.entrypoint === current.entrypoint &&
+      context.pageSlug === current.pageSlug &&
+      context.surface === current.surface
+    );
+  }
+
+  function invalidateRecoveryContext() {
+    recoveryContextGeneration += 1;
+    pageActions?.abortRecoveryRefresh?.();
+    historyPanel?.close({ force: true, restoreFocus: false });
+  }
 
   // Every command — structural ones included — routes through the registry; the
   // structural adapter is registered into it as a manager during wiring.
@@ -457,6 +495,7 @@ function createPageBuilder({
         updateReaderBinding: async (pageId) => updateReaderBinding(pageId),
         deletePage: (pageId) => pageActions.deletePageFromSidebar(pageId),
         reorderSidebarPages: (pageIds) => pageActions.reorderSidebarPages(pageIds),
+        openDeletedHistory: (invoker) => historyPanel?.openDeleted(invoker),
         setDraggedModuleId: (moduleId) => {
           state.draggedModuleId = moduleId;
         },
@@ -543,7 +582,13 @@ function createPageBuilder({
       renderPageList: () => renderPageList(),
       renderCanvas: () => renderCanvas(),
       renderEditorPanel: () => renderEditorPanel(),
+      renderLayerTree: () => renderLayerTree(),
+      resetPreviewSession: () => previewManager.resetSession(),
+      showPagesSurface: () => showSidePanelTab('pages'),
+      setRecoveryStatus: (message, type) => historyPanel?.setStatus(message, type),
       syncDesignerRoute: (mode) => syncDesignerRoute(mode),
+      invalidateRecoveryContext,
+      isRecoveryContextCurrent,
     },
     deps: {
       fetchPages: (scope, seriesId) =>
@@ -561,6 +606,20 @@ function createPageBuilder({
       updatePage,
       getLastPageBuilderDataError,
       fetchPageBindings,
+      refreshRecoveryState: async (scope, seriesId, { signal } = {}) => {
+        const [seriesPages, globalPages, pageBindings] = await Promise.all([
+          fetchSeriesPages(seriesId, { throwOnError: true, signal }),
+          fetchGlobalPages({ throwOnError: true, signal }),
+          scope === 'series'
+            ? fetchPageBindings(seriesId, { throwOnError: true, signal })
+            : Promise.resolve({ bindings: {}, warnings: [] }),
+        ]);
+        return {
+          pages: scope === 'global' ? globalPages : seriesPages,
+          linkPages: [...seriesPages, ...globalPages],
+          pageBindings,
+        };
+      },
       updatePageBindings,
       uploadAsset,
       reorderPages: (scope, seriesId, pageIds) => reorderScopedPages(scope, seriesId, pageIds),
@@ -740,12 +799,34 @@ function createPageBuilder({
       cancelInlineEdit: inlineEdit.cancelInlineEdit,
       toggleMenus: chromeMode.toggleSidebarMode,
       undoDraft,
+      ensureCleanWorkspace,
+      activateRestoredPage: (page, options) => pageActions.activateRestoredPage(page, options),
+      refreshRestoredPage: (page, options) => pageActions.refreshRestoredPage(page, options),
+      captureRecoveryContext,
+      isRecoveryContextCurrent,
+      setRecoveryStatus: (message, type) => historyPanel?.setStatus(message, type),
     },
     managers: {
       structuralCommands,
     },
     deps: {
       confirm: (message) => confirm(message),
+      restorePageSnapshot,
+    },
+  });
+
+  historyPanel = createHistoryPanel({
+    el,
+    getState: () => state,
+    actions: {
+      getSeriesId,
+      runCommand,
+      captureRecoveryContext,
+    },
+    deps: {
+      fetchPageSnapshots,
+      fetchDeletedPageSnapshots,
+      fetchPageSnapshot,
     },
   });
 
@@ -1083,6 +1164,7 @@ function createPageBuilder({
     ) {
       return;
     }
+    invalidateRecoveryContext();
     state.activePageScope = safeScope;
     state.currentPage = null;
     resetBuilderState();
@@ -1517,6 +1599,7 @@ function createPageBuilder({
   // ==================== Public Methods ====================
 
   async function showPageBuilderSection(options = {}) {
+    invalidateRecoveryContext();
     const entrypoint = options.entrypoint === 'designer' ? 'designer' : state.activeEntrypoint;
     const historyMode = options.historyMode === 'push' ? 'push' : 'replace';
     const requestedPageSlug = String(options.pageSlug || '')
@@ -1578,6 +1661,7 @@ function createPageBuilder({
   function initPageBuilder() {
     chromeMode.applyEditorMode();
     previewManager.bindMessageHandler();
+    historyPanel?.bind();
 
     if (el.pbToggleSidebar) {
       el.pbToggleSidebar.addEventListener('click', () => {
@@ -1764,6 +1848,7 @@ function createPageBuilder({
   }
 
   function onSeriesChange() {
+    invalidateRecoveryContext();
     const nextPageSlug = isDesignerMode() ? state.currentPage?.slug || '' : '';
     state.currentPage = null;
     resetBuilderState();

@@ -144,6 +144,26 @@
   color: var(--bg-dark);
 }
 
+.pb-deleted-pages-action {
+  grid-column: 1 / -1;
+  padding: 6px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.78);
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.pb-deleted-pages-action:hover,
+.pb-deleted-pages-action:focus-visible {
+  border-color: var(--primary);
+  color: #fff;
+  outline: 2px solid rgba(0, 217, 255, 0.34);
+  outline-offset: 1px;
+}
+
 .pb-page-scope-warning {
   padding: 7px 8px;
   border: 1px solid rgba(255, 209, 102, 0.32);
@@ -172,6 +192,11 @@
 .pb-page-item:hover {
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.1);
+}
+
+.pb-page-item:focus-visible {
+  outline: 3px solid rgba(0, 217, 255, 0.72);
+  outline-offset: 2px;
 }
 
 .pb-page-item.active {

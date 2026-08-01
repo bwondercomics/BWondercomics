@@ -16,6 +16,114 @@ export function getLastPageBuilderDataError() {
   return lastPageBuilderDataError;
 }
 
+async function readRecoveryResponse(response, fallbackMessage) {
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload.error || fallbackMessage);
+    error.status = response.status;
+    error.code = payload.code || '';
+    error.path = payload.path || '';
+    error.payload = payload;
+    throw error;
+  }
+  return payload;
+}
+
+function invalidRecoveryResponse(message, path, payload) {
+  const error = new Error(message);
+  error.status = 200;
+  error.code = 'invalid_recovery_response';
+  error.path = path;
+  error.payload = payload;
+  return error;
+}
+
+/**
+ * Load newest-first saved recovery points for one page.
+ * @param {string} pageId
+ * @param {{signal?: AbortSignal}} options
+ */
+export async function fetchPageSnapshots(pageId, { signal } = {}) {
+  const response = await fetch(`/api/admin/pages/${encodeURIComponent(pageId)}/snapshots`, {
+    cache: 'no-store',
+    credentials: 'same-origin',
+    signal,
+  });
+  const payload = await readRecoveryResponse(response, 'Failed to load page history');
+  if (!Array.isArray(payload.snapshots)) {
+    throw invalidRecoveryResponse(
+      'Page history returned an invalid response',
+      'snapshots',
+      payload
+    );
+  }
+  return payload.snapshots;
+}
+
+/**
+ * Load recoverable deleted pages in the active builder scope.
+ * @param {{scope: 'series'|'global', seriesId?: string|null, signal?: AbortSignal}} options
+ */
+export async function fetchDeletedPageSnapshots({ scope, seriesId, signal } = {}) {
+  const safeScope = scope === 'global' ? 'global' : 'series';
+  const params = new URLSearchParams({ scope: safeScope });
+  if (safeScope === 'series') params.set('series_id', String(seriesId || ''));
+  const response = await fetch(`/api/admin/page-snapshots/deleted?${params.toString()}`, {
+    cache: 'no-store',
+    credentials: 'same-origin',
+    signal,
+  });
+  const payload = await readRecoveryResponse(response, 'Failed to load deleted pages');
+  if (!Array.isArray(payload.pages)) {
+    throw invalidRecoveryResponse('Deleted pages returned an invalid response', 'pages', payload);
+  }
+  return payload.pages;
+}
+
+/**
+ * Load and server-validate one recovery point before confirmation.
+ * @param {string} snapshotId
+ * @param {{signal?: AbortSignal}} options
+ */
+export async function fetchPageSnapshot(snapshotId, { signal } = {}) {
+  const response = await fetch(`/api/admin/page-snapshots/${encodeURIComponent(snapshotId)}`, {
+    cache: 'no-store',
+    credentials: 'same-origin',
+    signal,
+  });
+  const payload = await readRecoveryResponse(response, 'Failed to load recovery point');
+  if (!payload.snapshot || typeof payload.snapshot !== 'object') {
+    throw invalidRecoveryResponse(
+      'Recovery point returned an invalid response',
+      'snapshot',
+      payload
+    );
+  }
+  return payload.snapshot;
+}
+
+/**
+ * Restore a server-owned recovery point. The POST is intentionally bodyless.
+ * @param {string} snapshotId
+ * @param {{signal?: AbortSignal}} options
+ */
+export async function restorePageSnapshot(snapshotId, { signal } = {}) {
+  const response = await fetch(
+    `/api/admin/page-snapshots/${encodeURIComponent(snapshotId)}/restore`,
+    {
+      method: 'POST',
+      cache: 'no-store',
+      credentials: 'same-origin',
+      signal,
+    }
+  );
+  const payload = await readRecoveryResponse(response, 'Failed to restore recovery point');
+  if (!payload.page || typeof payload.page !== 'object') {
+    throw invalidRecoveryResponse('Restore returned an invalid page response', 'page', payload);
+  }
+  return payload.page;
+}
+
 export async function fetchPageBuilderRuntime() {
   try {
     const res = await fetch('/api/admin/page-builder/runtime', {
@@ -39,32 +147,36 @@ export async function fetchPages(seriesId) {
   return fetchSeriesPages(seriesId);
 }
 
-export async function fetchSeriesPages(seriesId) {
+export async function fetchSeriesPages(seriesId, { throwOnError = false, signal } = {}) {
   try {
     const res = await fetch(`/api/admin/pages/series/${encodeURIComponent(seriesId)}`, {
       cache: 'no-store',
       credentials: 'same-origin',
+      signal,
     });
     if (!res.ok) throw new Error('Failed to fetch pages');
     const data = await res.json();
     return data.pages || [];
   } catch (err) {
     console.error('fetchPages error:', err);
+    if (throwOnError) throw err;
     return [];
   }
 }
 
-export async function fetchGlobalPages() {
+export async function fetchGlobalPages({ throwOnError = false, signal } = {}) {
   try {
     const res = await fetch('/api/admin/pages/global', {
       cache: 'no-store',
       credentials: 'same-origin',
+      signal,
     });
     if (!res.ok) throw new Error('Failed to fetch global pages');
     const data = await res.json();
     return data.pages || [];
   } catch (err) {
     console.error('fetchGlobalPages error:', err);
+    if (throwOnError) throw err;
     return [];
   }
 }
@@ -146,16 +258,18 @@ export async function reorderScopedPages(scope, seriesId, pageIds) {
   }
 }
 
-export async function fetchPageBindings(seriesId) {
+export async function fetchPageBindings(seriesId, { throwOnError = false, signal } = {}) {
   try {
     const res = await fetch(`/api/admin/page-bindings/${encodeURIComponent(seriesId)}`, {
       cache: 'no-store',
       credentials: 'same-origin',
+      signal,
     });
     if (!res.ok) throw new Error('Failed to fetch page bindings');
     return await res.json();
   } catch (err) {
     console.error('fetchPageBindings error:', err);
+    if (throwOnError) throw err;
     return { seriesId, bindings: {}, warnings: [] };
   }
 }

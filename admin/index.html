@@ -927,6 +927,9 @@
                   <button type="button" class="btn-small btn-primary" id="pbPublish">
                     Publish
                   </button>
+                  <button type="button" class="btn-small btn-secondary" id="pbHistory" disabled>
+                    History
+                  </button>
                 </div>
                 <div class="page-builder-actions pb-builder-toolbar-group">
                   <button type="button" class="btn-small btn-secondary" id="pbExitBuilder">
@@ -935,6 +938,13 @@
                 </div>
               </div>
             </header>
+            <div
+              id="pbRecoveryStatus"
+              class="pb-recovery-status"
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+            ></div>
 
             <!-- Page Builder Layout -->
             <div class="page-builder-layout" data-editor-mode="collapsed">
@@ -2427,6 +2437,33 @@
     </div>
 
     <!-- ==================== PAGE BUILDER MODALS ==================== -->
+    <dialog
+      id="pbHistoryDialog"
+      class="pb-history-dialog"
+      aria-labelledby="pbHistoryDialogTitle"
+      aria-describedby="pbHistoryDialogDescription"
+    >
+      <div class="pb-history-dialog-panel">
+        <header class="pb-history-dialog-header">
+          <div>
+            <h2 id="pbHistoryDialogTitle" tabindex="-1">Page history</h2>
+            <p id="pbHistoryDialogDescription">
+              Inspect validated saved versions or recover a retained deleted page.
+            </p>
+          </div>
+          <button
+            type="button"
+            class="pb-history-close"
+            id="pbHistoryDialogClose"
+            aria-label="Close history"
+          >
+            &times;
+          </button>
+        </header>
+        <div id="pbHistoryDialogBody" class="pb-history-dialog-body"></div>
+      </div>
+    </dialog>
+
     <div id="pbAddPageModal" class="modal">
       <div class="modal-content">
         <div class="modal-header">

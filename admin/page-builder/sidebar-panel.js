@@ -48,6 +48,7 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
       <div class="pb-page-scope-controls" role="group" aria-label="Page scope">
         <button type="button" class="pb-page-scope-toggle ${activePageScope === 'series' ? 'active' : ''}" data-page-scope="series">Series Pages</button>
         <button type="button" class="pb-page-scope-toggle ${activePageScope === 'global' ? 'active' : ''}" data-page-scope="global">Global Pages</button>
+        <button type="button" class="pb-deleted-pages-action" data-history-view="deleted">Deleted pages</button>
       </div>
       ${warningHtml}
     `;
@@ -92,7 +93,7 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
       pages
         .map(
           (page) => `
-          <div class="pb-page-item ${currentPage?.id === page.id ? 'active' : ''}" data-page-id="${page.id}" draggable="true">
+          <div class="pb-page-item ${currentPage?.id === page.id ? 'active' : ''}" data-page-id="${page.id}" draggable="true" tabindex="-1">
             <div class="pb-page-item-main">
               <button type="button" class="pb-page-drag-handle" title="Move page" aria-label="Move page">\u22EE</button>
               <span class="pb-page-item-copy">
@@ -208,6 +209,9 @@ export function createSidebarPanel({ el, getState, actions, helpers }) {
       button.addEventListener('click', async () => {
         await actions.switchPageScope?.(button.dataset.pageScope);
       });
+    });
+    el.pbPageList?.querySelector('.pb-deleted-pages-action')?.addEventListener('click', (event) => {
+      actions.openDeletedHistory?.(event.currentTarget);
     });
   }
 

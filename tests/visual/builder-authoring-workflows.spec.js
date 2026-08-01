@@ -119,6 +119,10 @@ function createWorkflowState({ seriesPage = makeWorkflowPage() } = {}) {
     nextPageNumber: 1,
     nextSectionNumber: 1,
     nextModuleNumber: 1,
+    nextSnapshotNumber: 1,
+    snapshotsByPage: new Map(),
+    snapshotDetails: new Map(),
+    restoreRequestBodies: [],
   };
 
   state.allPages = () => [...state.seriesPages, ...state.globalPages];
@@ -144,6 +148,36 @@ function createWorkflowState({ seriesPage = makeWorkflowPage() } = {}) {
     return { page: null, section: null, module: null };
   };
   state.textModule = () => state.findModule(TEXT_MODULE_ID).module;
+  state.captureSnapshot = (page, action = 'page_updated') => {
+    const snapshotId = `10000000-0000-4000-8000-${String(state.nextSnapshotNumber++).padStart(12, '0')}`;
+    const createdAt = new Date(
+      Date.parse(FIXED_NOW) + state.nextSnapshotNumber * 1000
+    ).toISOString();
+    const summary = {
+      id: snapshotId,
+      pageId: page.id,
+      scope: page.scope,
+      seriesId: page.seriesId,
+      slug: page.slug,
+      action,
+      createdAt,
+      createdByDisplayName: action === 'page_created' ? null : 'Visual Test Admin',
+    };
+    const detail = {
+      ...summary,
+      payload: {
+        snapshotVersion: 1,
+        page: clone(page),
+        bindings: [],
+      },
+    };
+    const history = state.snapshotsByPage.get(page.id) || [];
+    history.unshift(summary);
+    state.snapshotsByPage.set(page.id, history);
+    state.snapshotDetails.set(snapshotId, detail);
+    return detail;
+  };
+  state.captureSnapshot(seriesPage, 'page_created');
   return state;
 }
 
@@ -377,6 +411,91 @@ async function installWorkflowRoutes(page, state) {
       }
     }
 
+    const historyMatch = pathname.match(/^\/api\/admin\/pages\/([^/]+)\/snapshots$/);
+    if (historyMatch && method === 'GET') {
+      const pageId = decodeURIComponent(historyMatch[1]);
+      await route.fulfill(json({ snapshots: state.snapshotsByPage.get(pageId) || [] }));
+      return;
+    }
+
+    if (pathname === '/api/admin/page-snapshots/deleted' && method === 'GET') {
+      const scope = url.searchParams.get('scope');
+      const seriesId = url.searchParams.get('series_id');
+      const existingIds = new Set(state.allPages().map((item) => item.id));
+      const pages = [];
+      for (const [pageId, history] of state.snapshotsByPage.entries()) {
+        const latest = history[0];
+        if (!latest || existingIds.has(pageId) || latest.scope !== scope) continue;
+        if (scope === 'series' && latest.seriesId !== seriesId) continue;
+        const detail = state.snapshotDetails.get(latest.id);
+        pages.push({
+          pageId,
+          scope: latest.scope,
+          seriesId: latest.seriesId,
+          slug: latest.slug,
+          title: detail.payload.page.title,
+          latestSnapshotId: latest.id,
+          latestSnapshotAt: latest.createdAt,
+        });
+      }
+      await route.fulfill(json({ pages }));
+      return;
+    }
+
+    const snapshotMatch = pathname.match(/^\/api\/admin\/page-snapshots\/([^/]+)$/);
+    if (snapshotMatch && method === 'GET') {
+      const detail = state.snapshotDetails.get(decodeURIComponent(snapshotMatch[1]));
+      await route.fulfill(
+        detail
+          ? json({ snapshot: detail })
+          : { status: 404, ...json({ error: 'missing snapshot', code: 'snapshot_not_found' }) }
+      );
+      return;
+    }
+
+    const restoreMatch = pathname.match(/^\/api\/admin\/page-snapshots\/([^/]+)\/restore$/);
+    if (restoreMatch && method === 'POST') {
+      state.restoreRequestBodies.push(request.postData());
+      const detail = state.snapshotDetails.get(decodeURIComponent(restoreMatch[1]));
+      if (!detail) {
+        await route.fulfill({
+          status: 404,
+          ...json({ error: 'missing snapshot', code: 'snapshot_not_found' }),
+        });
+        return;
+      }
+      const historical = clone(detail.payload.page);
+      const current = state.findPageById(historical.id);
+      let restored;
+      if (current) {
+        state.captureSnapshot(current, 'pre_restore');
+        restored = {
+          ...historical,
+          id: current.id,
+          scope: current.scope,
+          seriesId: current.seriesId,
+          slug: current.slug,
+          isPublished: current.isPublished,
+          isHomepage: current.isHomepage,
+          sortIndex: current.sortIndex,
+          createdAt: current.createdAt,
+        };
+        replacePage(state, restored);
+      } else {
+        restored = {
+          ...historical,
+          isPublished: false,
+          isHomepage: false,
+          sortIndex:
+            historical.scope === 'global' ? state.globalPages.length : state.seriesPages.length,
+        };
+        const collection = restored.scope === 'global' ? state.globalPages : state.seriesPages;
+        collection.push(restored);
+      }
+      await route.fulfill(json({ page: restored }));
+      return;
+    }
+
     const pageMatch = pathname.match(/^\/api\/admin\/pages\/([^/]+)$/);
     if (pageMatch) {
       const pageId = decodeURIComponent(pageMatch[1]);
@@ -391,12 +510,14 @@ async function installWorkflowRoutes(page, state) {
       }
       if (method === 'PUT') {
         const payload = await requestJson(request);
+        state.captureSnapshot(foundPage, 'page_updated');
         Object.assign(foundPage, clone(payload));
         replacePage(state, foundPage);
         await route.fulfill(json({ page: foundPage }));
         return;
       }
       if (method === 'DELETE') {
+        state.captureSnapshot(foundPage, 'page_deleted');
         state.seriesPages = state.seriesPages.filter((pageItem) => pageItem.id !== pageId);
         state.globalPages = state.globalPages.filter((pageItem) => pageItem.id !== pageId);
         await route.fulfill(json({ ok: true }));
@@ -935,6 +1056,200 @@ async function assertTruncates(page, selectors, label) {
 }
 
 test.describe('builder Phase 12 authoring workflows', () => {
+  test('history recovery restores canonical saved content and keeps the dialog accessible', async ({
+    page,
+  }, testInfo) => {
+    const state = createWorkflowState();
+    const original = clone(state.seriesPages[0]);
+    state.seriesPages[0].title = 'Changed after the creation baseline';
+    state.findModule(TEXT_MODULE_ID).module.config.content = '<p>Changed after baseline</p>';
+    const preserved = {
+      slug: state.seriesPages[0].slug,
+      scope: state.seriesPages[0].scope,
+      sortIndex: state.seriesPages[0].sortIndex,
+      isPublished: state.seriesPages[0].isPublished,
+      isHomepage: state.seriesPages[0].isHomepage,
+    };
+    await prepareWorkflowPage(page, state);
+    await openBuilder(page);
+    await selectTextModule(page);
+    const previewSessionBefore = await page
+      .locator('.pb-preview-frame')
+      .getAttribute('data-preview-session');
+    await expect(page.locator('.pb-preview-target-box--selected')).toBeVisible();
+
+    await page.locator('#pbHistory').click();
+    await expect(page.locator('#pbHistoryDialog')).toBeVisible();
+    await expect(page.locator('.pb-history-item')).toContainText('Creation baseline');
+    await expect(page.locator('[data-snapshot-id]')).toBeFocused();
+    await page.locator('[data-snapshot-id]').click();
+    await expect(page.locator('.pb-history-detail h3')).toContainText(original.title);
+
+    await page.setViewportSize({ width: 480, height: 820 });
+    const dialogBounds = await page.locator('#pbHistoryDialog').boundingBox();
+    expect(dialogBounds.x).toBeGreaterThanOrEqual(0);
+    expect(dialogBounds.y).toBeGreaterThanOrEqual(0);
+    expect(dialogBounds.x + dialogBounds.width).toBeLessThanOrEqual(480);
+    expect(dialogBounds.y + dialogBounds.height).toBeLessThanOrEqual(820);
+    const detailColumns = await page
+      .locator('.pb-history-summary')
+      .evaluate((summary) => getComputedStyle(summary).gridTemplateColumns.split(' ').length);
+    expect(detailColumns).toBe(1);
+
+    await page.setViewportSize({ width: 1920, height: 1300 });
+    await page.locator('[data-history-restore]').click();
+    await expect(page.locator('[data-confirm-cancel]')).toBeFocused();
+    await expect(page.locator('#pbHistoryDialog')).toHaveScreenshot(
+      'builder-history-confirmation.png'
+    );
+
+    await page.locator('[data-confirm-restore]').click();
+    await expect(page.locator('#pbHistoryDialog')).toBeHidden();
+    await expect(page.locator('.pb-page-item.active')).toContainText(original.title);
+    await expect(page.locator('#pbRecoveryStatus')).toContainText(
+      'Page restored from saved history'
+    );
+    expect(state.restoreRequestBodies).toEqual([null]);
+    expect(state.seriesPages[0]).toMatchObject({ ...preserved, title: original.title });
+    expect(state.seriesPages[0].sections).toEqual(original.sections);
+    await waitForPreviewReady(page);
+    const previewSessionAfter = await page
+      .locator('.pb-preview-frame')
+      .getAttribute('data-preview-session');
+    expect(previewSessionAfter).toBeTruthy();
+    expect(previewSessionAfter).not.toBe(previewSessionBefore);
+    await expect(page.locator('.pb-preview-target-box--selected')).toHaveCount(0);
+    expect(
+      await page
+        .locator('[data-action="undo-current"], [data-action="redo-current"]')
+        .evaluateAll((buttons) => buttons.every((button) => button.disabled))
+    ).toBe(true);
+    expect(
+      await page
+        .locator('.pb-editor-footer-status')
+        .evaluateAll((statuses) => statuses.every((status) => !/unsaved/i.test(status.textContent)))
+    ).toBe(true);
+
+    const restoredPreviewFrame = await getPreviewFrame(page);
+    const renderedModuleIds = original.sections.flatMap((section) =>
+      section.modules.filter((module) => module.moduleType !== 'reader').map((module) => module.id)
+    );
+    await expect(restoredPreviewFrame.locator('[data-builder-module-id]')).toHaveCount(
+      renderedModuleIds.length
+    );
+    for (const moduleId of renderedModuleIds) {
+      await expect(
+        restoredPreviewFrame.locator(`[data-builder-module-id="${moduleId}"]`)
+      ).toHaveCount(1);
+    }
+
+    const toolbarFits = await page.locator('#pbBuilderToolbar').evaluate((toolbar) => {
+      const actions = toolbar.querySelector('.pb-builder-toolbar-actions');
+      return actions.scrollWidth <= actions.clientWidth + 1;
+    });
+    expect(toolbarFits).toBe(true);
+
+    await page.setViewportSize({ width: 700, height: 1000 });
+    const recoveryGeometry = await page.evaluate(() => {
+      const toolbar = document.getElementById('pbBuilderToolbar')?.getBoundingClientRect();
+      const status = document.getElementById('pbRecoveryStatus');
+      const statusBox = status?.getBoundingClientRect();
+      return {
+        toolbarBottom: toolbar?.bottom || 0,
+        statusTop: statusBox?.top || 0,
+        pointerEvents: status ? getComputedStyle(status).pointerEvents : '',
+      };
+    });
+    expect(recoveryGeometry.statusTop).toBeGreaterThanOrEqual(recoveryGeometry.toolbarBottom);
+    expect(recoveryGeometry.pointerEvents).toBe('none');
+
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await expect(page.locator('.pb-page-item.active')).toContainText(original.title);
+    const publicPage = await page.evaluate(
+      async ({ seriesId, slug }) => {
+        const response = await fetch(`/api/pages/${seriesId}/${encodeURIComponent(slug)}`);
+        return response.json();
+      },
+      { seriesId: SERIES_ID, slug: preserved.slug }
+    );
+    expect(publicPage.page).toMatchObject({ ...preserved, title: original.title });
+
+    await gotoAppPage(page, `/index.html?series=${SERIES_ID}&page=${preserved.slug}`);
+    for (const moduleId of renderedModuleIds) {
+      await expect(page.locator(`.pb-module[data-module-id="${moduleId}"]`)).toHaveCount(1);
+    }
+
+    testInfo.attach('history-restore-state', {
+      body: JSON.stringify({ preserved, restoredTitle: state.seriesPages[0].title }, null, 2),
+      contentType: 'application/json',
+    });
+  });
+
+  test('deleted-page recovery recreates unpublished unbound drafts in series and global scopes', async ({
+    page,
+  }) => {
+    const state = createWorkflowState();
+    const deletedSeries = makeWorkflowPage({
+      ...clone(fixtures.builderPageDraft),
+      id: '20000000-0000-4000-8000-000000000001',
+      scope: 'series',
+      seriesId: SERIES_ID,
+      slug: 'deleted-series',
+      title: 'Deleted series page',
+      isPublished: true,
+      isHomepage: true,
+      sortIndex: 0,
+    });
+    const deletedGlobal = makeWorkflowPage({
+      ...clone(fixtures.builderPageDraft),
+      id: '20000000-0000-4000-8000-000000000002',
+      scope: 'global',
+      seriesId: null,
+      slug: 'deleted-global',
+      title: 'Deleted global page',
+      isPublished: true,
+      isHomepage: true,
+      sortIndex: 0,
+    });
+    state.captureSnapshot(deletedSeries, 'page_deleted');
+    state.captureSnapshot(deletedGlobal, 'page_deleted');
+    await prepareWorkflowPage(page, state);
+    await openBuilder(page);
+
+    await page.locator('.pb-deleted-pages-action').click();
+    await expect(page.locator('.pb-history-item')).toContainText('Deleted series page');
+    await page.locator('[data-snapshot-id]').click();
+    await page.locator('[data-history-restore]').click();
+    await expect(page.locator('.pb-history-warning')).toContainText(
+      'appended unpublished, non-homepage, unbound draft'
+    );
+    await page.locator('[data-confirm-restore]').click();
+    await expect(page.locator('#pbHistoryDialog')).toBeHidden();
+    await expect(page.locator(`.pb-page-item[data-page-id="${deletedSeries.id}"]`)).toBeFocused();
+    expect(state.findPageById(deletedSeries.id)).toMatchObject({
+      isPublished: false,
+      isHomepage: false,
+      sortIndex: state.seriesPages.length - 1,
+    });
+    expect(state.pageBindings.reader.pageId).not.toBe(deletedSeries.id);
+
+    await page.locator('[data-page-scope="global"]').click();
+    await page.locator('.pb-deleted-pages-action').click();
+    await expect(page.locator('.pb-history-item')).toContainText('Deleted global page');
+    await page.locator('[data-snapshot-id]').click();
+    await page.locator('[data-history-restore]').click();
+    await page.locator('[data-confirm-restore]').click();
+    await expect(page.locator('#pbHistoryDialog')).toBeHidden();
+    expect(state.findPageById(deletedGlobal.id)).toMatchObject({
+      scope: 'global',
+      seriesId: null,
+      isPublished: false,
+      isHomepage: false,
+      sortIndex: state.globalPages.length - 1,
+    });
+    expect(state.restoreRequestBodies).toEqual([null, null]);
+  });
+
   test('keeps Phase 2 header controls row-toggleable and dense below 720px', async ({ page }) => {
     const state = createWorkflowState();
     await prepareWorkflowPage(page, state);

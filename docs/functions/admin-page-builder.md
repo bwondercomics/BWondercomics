@@ -95,9 +95,32 @@ live page's ID, routing, order, publication/homepage state, bindings, and creati
 reconciling saved content by stable nested ID and recording `pre_restore`. Deleted-page restore
 recreates original page/section/module IDs as an appended unpublished, non-homepage, unbound draft.
 Integrity, payload-version, sanitizer-drift, scope/series/slug, reader-binding, and identity failures
-reject the whole transaction with structured error codes. The History/deleted-page UI and its
-dirty-workspace/confirmation/preview-refresh behavior remain Phase 3, so local draft undo/redo is
-still the only recovery control exposed by the current builder UI.
+reject the whole transaction with structured error codes. Local draft undo/redo remains scoped to
+unsaved work; saved and deleted state is recovered through the shipped History UI.
+
+### History and recovery controller
+
+`admin/page-builder/history-panel.js` owns one native `<dialog>` opened from toolbar **History** or
+the always-present Pages-scope **Deleted pages** action. It renders newest-first summaries, deleted
+candidates, loading/empty/retry/error states, validated compact detail, warnings, and explicit
+confirmation without displaying raw snapshot JSON. Every async list/detail request carries an
+`AbortSignal` and generation check so a closed or changed view cannot repaint stale data. Modal
+focus is trapped, Escape and Close return focus to the invoker, confirmation starts on Cancel, and
+deleted recovery can focus the newly active page. `#pbRecoveryStatus` is the persistent polite live
+region used after the dialog closes.
+
+The recovery helpers in `admin/page-builder/data.js` use encoded identifiers, no-store same-origin
+requests, and structured errors retaining `status`, `code`, `path`, and the server payload. Restore
+is a bodyless POST. `BUILDER_COMMANDS.RESTORE_SNAPSHOT` prevents duplicate commits, rechecks the
+single draft manager's module/section/theme/header/page-settings/structure dirty scope immediately
+before the POST, and maps authorization, missing-record, validation, incompatibility, scope, slug,
+series, and identity failures into actionable status.
+
+On success `page-actions.js` treats the returned full page as canonical instead of using the
+same-ID shortcut in ordinary activation. It refreshes the scoped and link lists plus bindings,
+retains/upserts the restore response if that secondary refresh is incomplete, calls
+`resetBuilderState()`, explicitly renews `previewManager.resetSession()`, returns to Pages, and
+rerenders the list, layers, editor, and live canvas.
 
 Ownership rule: admin-only controllers/editors live under `admin/page-builder/`; contracts imported
 by both admin and reader live under `shared/page-builder/`. `tests/shared-kernel-boundary.test.js`

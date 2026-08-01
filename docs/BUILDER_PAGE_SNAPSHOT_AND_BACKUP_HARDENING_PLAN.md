@@ -1,6 +1,6 @@
 # Builder Page Snapshot and Backup/Restore Hardening Plan
 
-Status: Planned; prerequisite to Stripe store implementation
+Status: In progress; builder recovery Phases 1-3 complete, backup Phases 4-5 pending
 Created: 2026-07-16
 Owner surfaces: builder persistence and admin recovery UI, database/file backup automation, restore
 verification, and operations documentation
@@ -77,12 +77,20 @@ databases should be analyzed before use.
 
 - Builder pages are normalized across `builder_pages`, `builder_sections`, `builder_modules`, and
   `builder_page_bindings`.
-- Each successful backend mutation commits directly. Page metadata saves, section/module CRUD,
-  placements, reorders, binding changes, and deletes do not share a persisted revision boundary.
-- Local builder undo/redo covers unsaved drafts only. It cannot recover a previously saved version
-  or a deleted record after reload.
-- Deleting a page cascades through its content and bindings. There is no surviving recovery record.
-- There is no admin API or UI for listing, inspecting, or restoring saved page versions.
+- `BuilderPageSnapshot` retains a versioned baseline and complete pre-state events for every
+  committed page, binding, section, module, placement, reorder, migration, and delete mutation.
+  Snapshot insert/prune and the owning mutation commit or roll back together.
+- Admin-only list, deleted-candidate, validated-detail, and bodyless restore APIs are shipped with
+  structured errors, authentication-before-lookup, and `Cache-Control: no-store`.
+- The builder toolbar exposes **History** for the active page, while Pages scope controls always
+  expose **Deleted pages**. The modal supports validated detail, dirty-workspace blocking,
+  confirmation, conflict/retry states, accessible focus, and a persistent success status.
+- Current restore replaces canonical saved content while preserving live routing, order,
+  publication/homepage state, and bindings. Deleted restore appends an unpublished, non-homepage,
+  unbound draft. Both reset local drafts/undo state and start a fresh preview session.
+- Local builder undo/redo remains intentionally limited to unsaved drafts. An untouched legacy page
+  can still have empty persisted history until its first covered mutation because Phase 2 uses lazy
+  coverage rather than a bulk backfill.
 
 ### Disaster recovery
 
@@ -513,8 +521,8 @@ routing/publication/bindings/creation time. Deleted-page restore serializes on r
 checks series/slug/identity conflicts, and recreates original IDs as an appended unpublished,
 non-homepage, unbound draft. Admin-only list, deleted-candidate, detail, and no-body restore routes
 return structured errors with `Cache-Control: no-store`; actor email and payload hashes are not
-exposed. Phase 3 remains responsible for frontend data helpers, dirty-workspace protection,
-confirmation/status/focus UI, and preview refresh.
+exposed. The Phase 3 completion note below records the subsequently delivered frontend data
+helpers, dirty-workspace protection, confirmation/status/focus UI, and preview refresh.
 
 Verification completed: focused history/page-builder/migration suites; `npm run test:backend`
 (158 passed, one environment-gated PostgreSQL drill skipped); the PostgreSQL 16 two-session drill
@@ -563,6 +571,55 @@ Acceptance criteria:
 - Non-admin and public requests cannot discover snapshot metadata.
 - Dirty local work cannot be discarded by initiating restore.
 - The live preview and saved/public page agree after reload.
+
+Completion note (2026-08-01): Complete. `admin/page-builder/history-panel.js` owns the native modal
+timeline/deleted-page views, abort and request-generation protection, server-detail validation,
+human event labels, actor fallback, accessible focus/close behavior, confirmation copy, and the
+persistent recovery status. Typed helpers in `data.js` preserve structured server errors and send a
+strictly bodyless restore POST. `BUILDER_COMMANDS.RESTORE_SNAPSHOT` rechecks the consolidated dirty
+workspace immediately before the request and serializes duplicate submissions.
+
+Restore success routes through a dedicated page lifecycle action: the full server page replaces
+`currentPage` without a stale nested merge, scoped/link pages and bindings refresh with canonical
+response fallback, every draft/selection/structure/inline/undo state resets, the preview session is
+explicitly renewed, and Pages/layers/editor/live canvas rerender. The deletion warning now points
+admins to retained Deleted pages recovery. Phase 4 backup artifact/scheduling work and Phase 5
+restore drills remain unchanged.
+
+Verification completed: recovery data/command/history-shell tests (28 passed); Phase 2 backend
+recovery tests (21 passed); `npm test` (680 passed, one skipped); `npm run test:backend` (168 passed,
+four environment-gated PostgreSQL cases skipped); formatting and JavaScript/Python lint gates;
+production build; `git diff --check`; and `npm run test:visual` (23 passed). The visual recovery
+workflows cover current restore reload/public checks, both deleted scopes, strict bodyless requests,
+responsive bounds, focus, toolbar fit, and the committed confirmation screenshot. The first full
+visual run exposed an empty live-status element occupying an unintended grid row; moving it to a
+non-layout overlay restored both Tablet parity baselines, and the complete rerun passed. The
+stateful Playwright routes exercise the requested save/restore/delete/recover semantics; no separate
+authenticated live-site manual recovery session was performed in this implementation run.
+
+Corrective addendum (2026-08-01): Restore now captures an immutable snapshot/context generation
+before the POST and invalidates History on builder/route loads, ordinary page activation, scope
+changes, and series changes. A committed response is applied only to its original context. Canonical
+state replacement, draft/selection/undo reset, preview-session renewal, Designer route replacement,
+and rendering complete before the modal closes; list/binding refresh then runs independently with an
+abort signal and stale-context guard. Malformed success responses or post-commit client failures are
+reported as committed/reload-required rather than retryable restore failures. The modal now gives
+each loading/detail/error/restoring transition an explicit focus target and `aria-busy` state,
+connects confirmation labels/descriptions, preserves Back/Cancel/recovered-row focus, and uses an
+atomic non-interactive status below the stacked toolbar at 760px. `current_page_incompatible` also
+has dedicated safe failure copy.
+
+Corrective verification completed: recovery data/command/history-shell tests (36 passed);
+`npm test` (688 passed, one skipped); `npm run test:backend` (168 passed, four environment-gated
+PostgreSQL cases skipped); formatting and JavaScript/Python lint gates; production build;
+`git diff --check`; and a complete `npm run test:visual` rerun (23 passed). The browser recovery
+workflow now proves renewed preview identity, cleared transient selection/draft/undo UI, restored
+iframe content before reload, rendered public output afterward, and non-overlap at 700px. The first
+complete corrective visual run exposed recovered-row focus being lost when the asynchronous refresh
+rerendered the page list; focus is now re-established on the refreshed row and both the focused and
+complete visual reruns passed. No authenticated live environment was available for a separate
+save-two/restore/`pre_restore`/delete/recover manual session, so that manual gate remains explicitly
+unverified.
 
 ### Phase 4 - Backup artifact and scheduling hardening
 

@@ -2,9 +2,9 @@
 
 Status: Audit complete; roadmap active
 Created: 2026-07-07 (repo-only + live-host audit at commit `cdc84f8`, branch `builder-incremental-improvement`)
-Updated: 2026-07-16 for the merged 0.8.5 baseline, settled store/backup decisions, and the builder
-page snapshot plus backup/restore hardening plan. Original evidence anchors still point at the
-audit commit unless a later note says otherwise.
+Updated: 2026-08-01 for the shipped builder page history/recovery UI and the remaining
+backup/restore-drill boundary. Original evidence anchors still point at the audit commit unless a
+later note says otherwise.
 
 Labels used throughout: **[C:code]** confirmed from code/docs · **[C:live]** confirmed on this host ·
 **[I]** inferred · **[V]** needs live/admin verification.
@@ -21,8 +21,8 @@ systemd/docker/backup state directly). The only outstanding items marked **[V]**
 
 ## 1. Executive summary
 
-**Release readiness:** the 0.8.5 builder baseline is complete, while the store, recovery safety net,
-ops hardening, and broader 1.0 checks remain. The builder architecture is genuinely solid (shared
+**Release readiness:** the 0.8.5 builder baseline and page-level recovery are complete, while the
+store, disaster-recovery safety net, ops hardening, and broader 1.0 checks remain. The builder architecture is genuinely solid (shared
 renderers, sanitize-on-save _and_ on-read, same-origin preview contract, published-only public
 endpoints), and the completed builder closeout records 667 frontend tests, 131 backend tests, and 21
 visual workflows across its final phase gates. Auth/comments/premium gating remain competently
@@ -39,8 +39,9 @@ hardened.
    forever). A 2026-07-16 recheck found the 916G `/mnt/archive` drive mounted read-only with only
    three tiny legacy December 2025 archives, so the backup target is selected but not usable yet.
    None of these are feature work and together they remain roughly a day.
-3. **Live-page recovery remains thin:** builder drafts have local undo, but there is no per-save
-   page revision/snapshot restore model (details §2.1).
+3. **Disaster recovery remains incomplete:** transactional page snapshots plus guarded current and
+   deleted-page recovery are shipped, but validated off-primary-disk backup scheduling and isolated
+   restore drills are still pending (details §2.1).
 
 The former store scope fork is resolved: 1.0.0 ships one-time purchases with premium codes as the
 subscription bridge. The first product is physical and uses simple server-controlled regional
@@ -119,15 +120,12 @@ behavior-preserving and has no remaining phase work.
    contract, preview, public emitter, and round-trip tests. Because the admin source and public
    bundle can update without reloading the FastAPI process, backend changes require an API restart;
    the builder now blocks saves when `/api/admin/page-builder/runtime` is incompatible. **[C:code]**
-2. **The page recovery foundation is not yet a complete safety net.** New pages now receive a
-   transactional, versioned `BuilderPageSnapshot` baseline through `backend/app/builder_history.py`,
-   but existing-page saves and deletes do not start full pre-mutation coverage until recovery Phase
-   2, and no restore API/UI exists until Phases 2-3. Confirmed page/module/section deletes through
-   `page-actions.js` and `canvas-mutations.js` therefore remain unrecoverable for existing pages;
-   `undo-stack.js` covers _unsaved drafts only_ [C:code]. With
-   nightly-only DB dumps, a mis-click on the
-   live homepage can cost up to a day of authoring. The versioned, bounded recovery contract and
-   admin restore workflow are now planned in
+2. **Page-level recovery is shipped; disaster recovery is still incomplete.** Transactional,
+   versioned `BuilderPageSnapshot` pre-states cover committed mutations and deletion, the admin-only
+   restore APIs validate and restore current/deleted pages, and the builder now exposes guarded
+   History and Deleted pages workflows [C:code]. Untouched legacy pages can have empty history until
+   their first covered mutation, and local undo still covers _unsaved drafts only_. The remaining
+   safety gap is the Phase 4-5 backup artifact/scheduling and isolated restore-drill work in
    `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`.
 3. **Unknown `page.meta` keys persist unsanitized**
    (`backend/app/builder_security/header.py:sanitize_page_meta`) —
@@ -137,13 +135,14 @@ behavior-preserving and has no remaining phase work.
 4. **Broader manual regression debt:** the authenticated 0.8.5 corrective matrix is complete, but
    the unchecked optional flows in `docs/READER_BUILDER_QA.md` remain useful before 1.0.0. They are
    no longer blockers for merging this builder baseline.
-   **What's missing** (verified against code): per-save page snapshots and the optional polish backlog,
-   including header glow. The authenticated 0.8.5 responsive/manual closeout is complete.
+   **What's missing** (verified against code): backup scheduling/restore-drill hardening and the
+   optional polish backlog, including header glow. Page snapshots and admin recovery are complete;
+   the authenticated 0.8.5 responsive/manual closeout is also complete.
 
 **1.0.0 scope recommendation:**
 
-- **In:** per-save page snapshots and admin restore; the broader reader/builder worksheet before
-  1.0.0. The completed 0.8.5 baseline is already merged.
+- **In:** finish backup/restore hardening and the broader reader/builder worksheet before 1.0.0.
+  Page snapshots/admin restore and the completed 0.8.5 baseline are already merged.
 - **Defer/cut:** universal module appearance (needs the per-type audit; button/promo/email already
   have their own styling), drag-resize gutters, any new module types before the store's.
 - **Blockers/dependencies:** finish the snapshot/restore and backup-hardening plan before starting

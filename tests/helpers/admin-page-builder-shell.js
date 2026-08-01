@@ -102,6 +102,10 @@ export async function setupPageBuilder({
   fetchGlobalPagesResults = [[]],
   fetchPageBindingsResult = { bindings: {}, warnings: [] },
   fetchPageResult = null,
+  fetchPageSnapshotsResult = [],
+  fetchDeletedPageSnapshotsResult = [],
+  fetchPageSnapshotResult = null,
+  restorePageSnapshotResult = null,
   createPageResult = null,
   deletePageResult = true,
   reorderPagesResult = true,
@@ -149,13 +153,37 @@ export async function setupPageBuilder({
   const fetchPage = vi.fn(async (...args) =>
     typeof fetchPageResult === 'function' ? fetchPageResult(...args) : fetchPageResult
   );
+  const fetchPageSnapshots = vi.fn(async (...args) =>
+    typeof fetchPageSnapshotsResult === 'function'
+      ? fetchPageSnapshotsResult(...args)
+      : fetchPageSnapshotsResult
+  );
+  const fetchDeletedPageSnapshots = vi.fn(async (...args) =>
+    typeof fetchDeletedPageSnapshotsResult === 'function'
+      ? fetchDeletedPageSnapshotsResult(...args)
+      : fetchDeletedPageSnapshotsResult
+  );
+  const fetchPageSnapshot = vi.fn(async (...args) =>
+    typeof fetchPageSnapshotResult === 'function'
+      ? fetchPageSnapshotResult(...args)
+      : fetchPageSnapshotResult
+  );
+  const restorePageSnapshot = vi.fn(async (...args) =>
+    typeof restorePageSnapshotResult === 'function'
+      ? restorePageSnapshotResult(...args)
+      : restorePageSnapshotResult
+  );
   const fetchPageBuilderRuntime = vi.fn(async () => pageBuilderRuntimeResult);
   const createPage = vi.fn(async () => createPageResult);
   const createScopedPage = vi.fn(async () => createPageResult);
   const deletePage = vi.fn(async () => deletePageResult);
   const reorderPages = vi.fn(async () => reorderPagesResult);
   const reorderScopedPages = vi.fn(async () => reorderPagesResult);
-  const fetchPageBindings = vi.fn(async () => fetchPageBindingsResult);
+  const fetchPageBindings = vi.fn(async (...args) =>
+    typeof fetchPageBindingsResult === 'function'
+      ? fetchPageBindingsResult(...args)
+      : fetchPageBindingsResult
+  );
   const updatePageBindings = vi.fn(async () =>
     updatePageBindingsResult === undefined ? fetchPageBindingsResult : updatePageBindingsResult
   );
@@ -216,6 +244,10 @@ export async function setupPageBuilder({
     fetchGlobalPages,
     fetchPage,
     fetchPageBuilderRuntime,
+    fetchPageSnapshots,
+    fetchDeletedPageSnapshots,
+    fetchPageSnapshot,
+    restorePageSnapshot,
     createPage,
     createScopedPage,
     deletePage,
@@ -283,6 +315,10 @@ export async function setupPageBuilder({
       deletePage,
       fetchPage,
       fetchPageBuilderRuntime,
+      fetchPageSnapshots,
+      fetchDeletedPageSnapshots,
+      fetchPageSnapshot,
+      restorePageSnapshot,
       fetchPages,
       fetchSeriesPages,
       fetchGlobalPages,

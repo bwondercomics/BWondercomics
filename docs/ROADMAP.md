@@ -88,9 +88,9 @@ Follow-up terminology, onboarding, mobile edge cases, and visual polish are trac
 
 Goal: make maintenance trustworthy without terminal guesswork.
 
-- [x] Complete transactional builder mutation history plus validated current/deleted-page backend
-      restore APIs; keep the admin History UI and dirty-workspace recovery flow as the next recovery
-      phase.
+- [x] Complete transactional builder mutation history, validated current/deleted-page backend
+      restore APIs, and the guarded admin History / Deleted pages recovery UI.
+- [ ] Complete validated database/file backup artifacts, scheduling, and isolated restore drills.
 - [ ] Verify diagnostics snapshot refresh, queue/worker behavior, permissions, and core status reporting.
 - [ ] Confirm admin diagnostics stays read-only and `/ops/` remains the separate command surface.
 - [ ] Run a backup on disposable data and perform a restore drill with exact notes.

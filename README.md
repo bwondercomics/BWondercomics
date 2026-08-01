@@ -11,6 +11,9 @@ BWonderComics is a plain HTML/CSS/JS comic reader and admin panel built with Vit
 - Desktop, Tablet, and Phone preview presets use exact iframe viewport dimensions from the shared preview contract: `1920x1080`, `768x1024`, and `375x812`. The full-HD Desktop iframe is visually scaled in the admin canvas without changing iframe CSS pixels.
 - Unsaved module, theme, header, page-settings, section, and page-wide structure drafts are merged
   into cloned working snapshots for preview without mutating the saved page.
+- Admin **History** and **Deleted pages** recovery use retained, validated server snapshots to restore
+  saved content or recreate an unpublished/unbound draft, with dirty-workspace protection and a
+  fresh canonical/preview state after success.
 - Preview mode suppresses reader side effects that should not fire from an admin iframe, including analytics/tracking writes, email submission, comment mutations, chat SSO, safe-mode redirects, fullscreen changes, and external navigation clicks.
 - Header buttons and `buttons` modules share the same normalized link target model for builder pages, anchors, and external URLs. Header shell, navigation, panel buttons, and builder modules share structured appearance contracts between admin canvas, preview, and public reader.
 - CMS-backed builder modules are structured: `reader`, `entry-gallery`, `feed`, and `media-gallery` persist sanitized source config, while feed/media-gallery use existing site-wide post/media data and reader/entry modules remain series-aware.
