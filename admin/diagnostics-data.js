@@ -108,34 +108,55 @@ function classifyBackup(name) {
 function normalizeLegacyBackups(backups) {
   const db = [];
   const files = [];
-  for (const item of Array.isArray(backups?.items) ? backups.items : []) {
-    const bucket = classifyBackup(item?.name);
+  const sourceItems =
+    Array.isArray(backups?.db) || Array.isArray(backups?.files)
+      ? [
+          ...(backups?.db || []).map((item) => ({ ...item, backupKind: 'db' })),
+          ...(backups?.files || []).map((item) => ({ ...item, backupKind: 'files' })),
+        ]
+      : Array.isArray(backups?.items)
+        ? backups.items
+        : [];
+  for (const item of sourceItems) {
+    const bucket = item?.backupKind || classifyBackup(item?.name);
     if (!bucket) continue;
+    const sizeBytes = Number(item?.sizeBytes ?? item?.size) || 0;
     const normalized = {
       name: item?.name || '',
       path: item?.path || '',
-      createdAt: item?.modifiedAt || null,
-      sizeBytes: Number(item?.size) || 0,
-      sizePretty: formatBytes(item?.size),
+      artifactId: item?.artifactId || '',
+      createdAt: item?.createdAt || item?.modifiedAt || null,
+      sizeBytes,
+      sizePretty: item?.sizePretty || formatBytes(sizeBytes),
+      validation: item?.validation || null,
     };
     if (bucket === 'db') db.push(normalized);
     if (bucket === 'files') files.push(normalized);
   }
 
-  const status = db.length && files.length ? 'ok' : db.length || files.length ? 'warning' : 'error';
+  const inferredStatus =
+    db.length && files.length ? 'ok' : db.length || files.length ? 'warning' : 'error';
+  const status = String(backups?.status || inferredStatus).toLowerCase();
   return {
     status,
     message:
-      status === 'error'
-        ? 'No DB or file backups found.'
-        : `DB backups: ${db.length}, file backups: ${files.length}`,
+      backups?.message ||
+      (status === 'error'
+        ? 'No validated DB or file backups found.'
+        : `Validated DB backups: ${db.length}, file backups: ${files.length}`),
+    source: backups?.source || 'legacy-files',
     root: backups?.backupDir || backups?.root || 'var/backups',
     db,
     files,
-    latest: {
-      db: db[0] || null,
-      files: files[0] || null,
+    latest: backups?.latest || { db: db[0] || null, files: files[0] || null },
+    jobs: backups?.jobs || {},
+    freshness: backups?.freshness || {},
+    validatedCounts: backups?.validatedCounts || {
+      db: db.length,
+      files: files.length,
+      total: db.length + files.length,
     },
+    integrity: backups?.integrity || {},
   };
 }
 

@@ -1,6 +1,7 @@
 # Builder Page Snapshot and Backup/Restore Hardening Plan
 
-Status: In progress; builder recovery Phases 1-3 complete, backup Phases 4-5 pending
+Status: In progress; builder recovery Phases 1-3 complete; Phase 4 implemented in this checkout but
+live migration/schedule evidence pending; Phase 5 pending
 Created: 2026-07-16
 Owner surfaces: builder persistence and admin recovery UI, database/file backup automation, restore
 verification, and operations documentation
@@ -53,9 +54,9 @@ Local source of truth:
   draft saves, immediate structural mutations, deletion flows, and canonical response handling.
 - `docs/functions/admin-page-builder.md` - current distinction between transient drafts and saved
   API records.
-- `Makefile`, `scripts/backup-db.sh`, `scripts/restore-db.sh`,
-  `deploy/bwondercomics-backup.*`, `docs/OPERATIONS.md`, and `deploy/README.md` - current overlapping
-  backup, restore, timer, and runbook surfaces that this plan consolidates.
+- `Makefile`, `scripts/backup_artifacts.py`, the compatibility and restore scripts,
+  `deploy/bwondercomics-backup-{db,files}.*`, `docs/OPERATIONS.md`, and `deploy/README.md` - canonical
+  backup, legacy restore, timer, and runbook surfaces.
 - `deploy/bwondercomics-compose.yml` - PostgreSQL 16 deployment and the mounted application-data
   paths that must be covered.
 
@@ -94,24 +95,25 @@ databases should be analyzed before use.
 
 ### Disaster recovery
 
-- `make backup-db`, the scripts under `scripts/`, and `deploy/bwondercomics-backup.sh` implement
-  different formats, destinations, and data coverage. There is no single authoritative production
-  path.
-- The checked-in systemd service runs `make backup-db`, whose default destination is
-  `var/backups/`; it does not satisfy the planned `/mnt/archive` production contract. The formerly
-  contradictory deployment instructions have been replaced with an explicit pending-hardening
-  warning.
+- `scripts/backup_artifacts.py` is now the single implementation behind Make, Ops, compatibility
+  scripts, and explicit database/file systemd units. Developer targets stay under `var/backups/`;
+  production targets hard-set `/mnt/archive/backups/bwondercomics` and fail closed.
+- Schema-v1 checksum/manifest-backed publication, mandatory production source/layout checks,
+  byte-verified retention, bounded status records, and mode-explicit freshness/error diagnostics are
+  implemented and tested. Production uses the pinned `.backup-venv`; local developer backups may
+  keep using `.venv`.
 - The current restore paths either load plain SQL into an existing database or destructively drop
   the named database. Neither path is the required isolated scratch restore drill.
-- Backup creation does not consistently use an atomic temporary file, archive validation, a
-  checksum/manifest, or fail-closed archive-mount checks.
-- File backup coverage differs between the Makefile and shell scripts. The environment file is
-  copied by `scripts/backup-full.sh`, which would place production secrets in an ordinary archive
-  without an encryption contract.
-- Live read-only verification on 2026-07-16 found `/mnt/archive` mounted from `/dev/sdb1`, but with
-  `ro` mount options. The visible archive contents were three small legacy `battlebros` archives
-  dated 2025-12-15 through 2025-12-17, not current BWonderComics database/file backups. The mount
-  must be made reliably writable before scheduling production backups.
+- Live host inspection on 2026-08-02 confirmed `/dev/sdb1` is a distinct ext4 filesystem mounted
+  read/write by the host with no recorded error-remount since boot. The remaining blocker is
+  permissions: `/mnt/archive/backups` is root-owned and the `dbmelville` service account cannot
+  create the canonical hierarchy. The old BWonderComics timer invokes the rewired compatibility
+  target and therefore produces local custom-format manifest-backed artifacts in `var/backups/`;
+  it is still the wrong schedule/destination. The stale BattleBros timer still fails; replacement
+  installation needs sudo.
+- The legacy environment copy was moved, without reading or deleting it, from ordinary backups to
+  `var/secret-recovery-quarantine/` with mode `0600`. Credential rotation remains a separate
+  security follow-up. All legacy DB/file dumps remain preserved for Phase 5.
 
 ## Scope
 
@@ -385,8 +387,9 @@ filesystem.
 
 ### File backup
 
-- Define one checked-in allowlist for durable public and protected inputs, including current comic
-  entry files, media, protected content, and page-config files that are still file-backed.
+- Use the checked-in allowlist for `comics/`, `protected/comics/`, original `media/`, original
+  `protected/media/`, and `assets/uploads/`. Page-config persistence is database-backed and is not
+  archived as a legacy file.
 - Explicitly classify rebuildable paths such as `dist/`, releases, post-asset copies, blurred
   previews, caches, logs, and test output rather than letting different scripts make different
   assumptions.
@@ -404,6 +407,9 @@ filesystem.
   Refuse to fall back to the primary disk when production archive mode is enabled.
 - Use nonzero exits for dump, validation, checksum, manifest, or mount failures so systemd and the
   diagnostics snapshot can report a real failure.
+- Reserve exit `75` for lock contention. The DB and file units wait 15,300 and 8,100 seconds,
+  respectively, and systemd retries only that status after 15 minutes; ordinary failures exit `1`
+  and do not auto-retry.
 - Keep only bounded logs without database contents, secrets, customer data, or raw SQL payloads.
 - Update diagnostics/ops backup age and artifact discovery if their current path assumptions change.
 
@@ -646,6 +652,25 @@ Acceptance criteria:
 - No ordinary artifact contains the production environment file or secrets.
 - Three consecutive nightly database backups and one weekly file backup are visible on
   `/mnt/archive` before live Stripe keys are allowed.
+
+Repository implementation note (`2026-08-02`): implemented in this checkout. The canonical engine
+now requires a pinned production runtime, all five real source roots, and real fixed archive
+directories on the archive device; rechecks the layout under the lock; records per-root file counts;
+parses checksum lines exactly; byte-hashes up to 60 sets before retention; and fails with
+`retention_integrity_failed` before any deletion when the available protected floor cannot be
+proved. Production/local diagnostics are explicit, status records are parsed independently of the
+optional catalog, and Admin/Ops show source, root, freshness, and attempts even with no artifacts.
+Lock contention exits `75` for the units' sole 15-minute retry path. The Ops worker acknowledges
+stale/interrupted `.working` markers without rerunning commands and retains them when the API is
+unavailable. Focused artifact, diagnostics, worker, frontend, and unit-contract tests cover the
+corrective behavior. Earlier host evidence remains useful: the fail-closed production command did
+not create or fall back from the unprovisioned archive root, and a disposable live-`0017` custom
+archive validated successfully before being removed. Phase 4 remains incomplete until an operator
+provisions the runtime/layout, installs the replacement timers disabled, restarts and verifies the
+worker identity, records a service-owned `0017_page_scope_bindings` artifact whose sole missing
+critical table is `builder_page_snapshots`, applies `0018_builder_page_snapshots`, records a head
+artifact with no missing critical tables, runs both hardened services successfully, enables the
+timers, and observes three scheduled DB sets plus one scheduled file set.
 
 ### Phase 5 - Restore drill and gate closeout
 

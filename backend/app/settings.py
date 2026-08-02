@@ -51,6 +51,7 @@ class Settings:
     admin_commands_enabled: bool
     ops_allowed_ips: tuple[str, ...]
     host_automation_token: str
+    backup_diagnostics_mode: str
     database_url: str
     umami_website_id: str
     umami_base_url: str
@@ -98,6 +99,11 @@ def load_settings() -> Settings:
     admin_commands_enabled = _env_bool("ADMIN_COMMANDS_ENABLED", default=False)
     ops_allowed_ips = _split_csv(os.environ.get("OPS_ALLOWED_IPS"))
     host_automation_token = (os.environ.get("HOST_AUTOMATION_TOKEN") or "").strip()
+    backup_diagnostics_mode = (
+        (os.environ.get("BWC_BACKUP_DIAGNOSTICS_MODE") or "local").strip().lower()
+    )
+    if backup_diagnostics_mode not in {"production", "local"}:
+        raise ValueError("BWC_BACKUP_DIAGNOSTICS_MODE must be either 'production' or 'local'")
 
     database_url = (os.environ.get("DATABASE_URL") or "").strip()
     if not database_url:
@@ -193,6 +199,7 @@ def load_settings() -> Settings:
         admin_commands_enabled=admin_commands_enabled,
         ops_allowed_ips=ops_allowed_ips,
         host_automation_token=host_automation_token,
+        backup_diagnostics_mode=backup_diagnostics_mode,
         database_url=database_url,
         umami_website_id=umami_website_id,
         umami_base_url=umami_base_url,

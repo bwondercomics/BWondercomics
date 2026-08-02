@@ -1,0 +1,10 @@
+[Unit]
+Description=Weekly BWonderComics validated durable-file backup
+
+[Timer]
+OnCalendar=Sun *-*-* 04:00:00 UTC
+Persistent=true
+Unit=bwondercomics-backup-files.service
+
+[Install]
+WantedBy=timers.target

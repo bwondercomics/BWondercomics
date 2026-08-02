@@ -126,10 +126,21 @@ describe('ops app', () => {
           return {
             ok: true,
             json: async () => ({
+              message: 'Latest backup attempt failed (database: dump_failed).',
+              source: 'production-status',
+              root: '/mnt/archive/backups/bwondercomics',
               db: [{ name: 'db.sql', createdAt: new Date().toISOString(), sizePretty: '1 KB' }],
               files: [
                 { name: 'files.tar.gz', createdAt: new Date().toISOString(), sizePretty: '2 KB' },
               ],
+              jobs: {
+                database: { lastAttempt: { status: 'error', errorCode: 'dump_failed' } },
+                files: { lastAttempt: { status: 'ok' } },
+              },
+              freshness: {
+                database: { status: 'ok' },
+                files: { status: 'warning' },
+              },
             }),
           };
         }
@@ -148,5 +159,51 @@ describe('ops app', () => {
     expect(document.getElementById('opsRuns').textContent).toContain('running');
     expect(document.getElementById('opsRuns').textContent).toContain('completed');
     expect(document.getElementById('opsRuns').textContent).toContain('failed');
+    expect(document.getElementById('opsBackups').textContent).toContain('dump_failed');
+    expect(document.getElementById('opsBackups').textContent).toContain('warning');
+    expect(document.getElementById('opsBackups').textContent).toContain(
+      '/mnt/archive/backups/bwondercomics'
+    );
+    expect(document.getElementById('opsBackups').textContent).toContain('production-status');
+  });
+
+  it('renders backup state metadata when no artifacts exist', async () => {
+    const originalFetch = globalThis.fetch;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url) => {
+        if (String(url).endsWith('/api/admin/ops/backups')) {
+          return {
+            ok: true,
+            json: async () => ({
+              status: 'error',
+              message: 'No production artifacts.',
+              source: 'production-status',
+              root: '/mnt/archive/backups/bwondercomics',
+              db: [],
+              files: [],
+              jobs: {
+                database: {
+                  lastAttempt: { status: 'error', errorCode: 'archive_layout_unsafe' },
+                },
+              },
+              freshness: {
+                database: { status: 'error' },
+                files: { status: 'error' },
+              },
+            }),
+          };
+        }
+        return originalFetch(url);
+      })
+    );
+    vi.resetModules();
+    await import('../ops/app.js');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const text = document.getElementById('opsBackups').textContent;
+    expect(text).toContain('No backups found');
+    expect(text).toContain('archive_layout_unsafe');
+    expect(text).toContain('production-status');
+    expect(text).toContain('/mnt/archive/backups/bwondercomics');
   });
 });

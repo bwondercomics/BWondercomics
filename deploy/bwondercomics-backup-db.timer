@@ -1,0 +1,10 @@
+[Unit]
+Description=Nightly BWonderComics validated database backup
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 UTC
+Persistent=true
+Unit=bwondercomics-backup-db.service
+
+[Install]
+WantedBy=timers.target

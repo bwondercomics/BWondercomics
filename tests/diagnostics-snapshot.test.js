@@ -55,12 +55,47 @@ function buildSnapshot(generatedAt) {
       releaseSnapshots: { count: 2, latest: { name: 'dist-20260101-010101.tar.gz' } },
     },
     backups: {
-      root: 'var/backups',
-      db: [{ name: 'db.sql', createdAt: generatedAt, sizePretty: '1 KB' }],
-      files: [{ name: 'files.tar.gz', createdAt: generatedAt, sizePretty: '2 KB' }],
+      status: 'error',
+      message: 'Latest backup attempt failed (database: dump_failed).',
+      source: 'production-status',
+      root: '/mnt/archive/backups/bwondercomics',
+      db: [
+        {
+          name: 'database.dump',
+          createdAt: generatedAt,
+          sizePretty: '1 KB',
+          validation: { method: 'pg_restore --list', result: 'ok' },
+        },
+      ],
+      files: [
+        {
+          name: 'files.tar.gz',
+          createdAt: generatedAt,
+          sizePretty: '2 KB',
+          validation: { method: 'tar member allowlist comparison', result: 'ok' },
+        },
+      ],
       latest: {
-        db: { name: 'db.sql', createdAt: generatedAt, sizePretty: '1 KB' },
-        files: { name: 'files.tar.gz', createdAt: generatedAt, sizePretty: '2 KB' },
+        db: {
+          name: 'database.dump',
+          createdAt: generatedAt,
+          sizePretty: '1 KB',
+          validation: { method: 'pg_restore --list', result: 'ok' },
+        },
+        files: {
+          name: 'files.tar.gz',
+          createdAt: generatedAt,
+          sizePretty: '2 KB',
+          validation: { method: 'tar member allowlist comparison', result: 'ok' },
+        },
+      },
+      jobs: {
+        database: { lastAttempt: { status: 'error', errorCode: 'dump_failed' } },
+        files: { lastAttempt: { status: 'ok' } },
+      },
+      freshness: {
+        database: { status: 'ok', ageHours: 1 },
+        files: { status: 'warning', ageHours: 200 },
       },
     },
     testStatus: {
@@ -179,6 +214,35 @@ describe('admin diagnostics snapshot', () => {
     expect(document.getElementById('diagnosticsBanner').textContent).toContain('stale');
     expect(document.getElementById('diagnosticsHealth').textContent).toContain('database');
     expect(document.getElementById('diagnosticsTests').textContent).toContain('Discovered tests');
+    expect(document.getElementById('diagnosticsBackups').textContent).toContain('Validated 1');
+    expect(document.getElementById('diagnosticsBackups').textContent).toContain('dump_failed');
+    expect(document.getElementById('diagnosticsBackups').textContent).toContain('warning');
+    expect(document.getElementById('diagnosticsBackups').textContent).toContain(
+      'pg_restore --list'
+    );
+    expect(document.getElementById('diagnosticsBackups').textContent).toContain(
+      'production-status'
+    );
+  });
+
+  it('renders source, root, freshness, and failed attempts with zero artifacts', async () => {
+    const snapshot = buildSnapshot(new Date().toISOString());
+    snapshot.backups.db = [];
+    snapshot.backups.files = [];
+    snapshot.backups.latest = { db: null, files: null };
+    snapshot.backups.validatedCounts = { db: 0, files: 0, total: 0 };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => ({ ok: true, json: async () => snapshot }))
+    );
+    vi.resetModules();
+    const { initDiagnostics } = await import('../admin/diagnostics.js');
+    await initDiagnostics();
+    const text = document.getElementById('diagnosticsBackups').textContent;
+    expect(text).toContain('production-status');
+    expect(text).toContain('/mnt/archive/backups/bwondercomics');
+    expect(text).toContain('Freshness: ok');
+    expect(text).toContain('dump_failed');
   });
 
   it('falls back to legacy diagnostics endpoints when snapshot routes are unavailable', async () => {

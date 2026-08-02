@@ -540,7 +540,8 @@ A defensive engineering pattern used when the centralized snapshot API is missin
 
 #### Structural Normalizers
 
-- **`normalizeLegacyBackups`**: Classifies disparate backup files into `database` vs `filesystem` categories based on filename heuristics and calculates "Pretty" size strings.
+- **`normalizeLegacyBackups`**: Preserves validated manifest/status metadata from the additive backup
+  endpoint. Filename heuristics remain only for compatibility with an older endpoint response.
 - **`mergeStatuses(...values)`**: A pure logic helper that determines the overall system health (e.g., if any sub-system is `error`, the entire snapshot is marked as `error`).
 
 ### DOM Dependencies
@@ -571,6 +572,9 @@ A frontend-exclusive health check. It calculates the delta between `Date.now()` 
 
 - **`renderDatabase`**: Performs complex flattening of user role counts, Alembic version metadata, and active connection metrics into a consolidated "Database Health" grid and table.
 - **`renderBanner`**: The "Global Health Card." It normalizes the overall system status into a color-coded banner (`ok`, `warning`, `error`).
+- **`renderBackups`**: Keeps the existing two-card layout while showing validated totals,
+  freshness, last-attempt failures, validation methods, source mode, and the authoritative backup
+  root even when no artifacts exist.
 
 ### DOM Dependencies
 

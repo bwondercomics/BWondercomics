@@ -266,24 +266,37 @@ function renderBackups(snapshot) {
   const fileBackups = backups.files || [];
   const latestDb = backups.latest?.db;
   const latestFiles = backups.latest?.files;
+  const jobs = backups.jobs || {};
+  const freshness = backups.freshness || {};
+  const counts = backups.validatedCounts || {};
 
-  const renderCard = (title, items, latest) => `
+  const renderCard = (title, kind, items, latest) => {
+    const attempt = jobs[kind]?.lastAttempt;
+    const freshnessState = freshness[kind];
+    const validation = latest?.validation;
+    return `
     <div class="backup-card">
       <div class="backup-title">${escapeHtml(title)}</div>
-      <div class="backup-count">Found ${items.length}</div>
+      <div class="backup-count">Validated ${Number(counts[kind === 'database' ? 'db' : 'files']) || items.length}</div>
       <div class="backup-meta-row">Latest: ${escapeHtml(latest?.name || 'None')}</div>
       <div class="backup-meta-row">${escapeHtml(latest?.createdAt ? formatDate(latest.createdAt) : 'No recent snapshot')}</div>
       <div class="backup-meta-row">${escapeHtml(latest?.sizePretty || '')}</div>
+      <div class="backup-meta-row">Freshness: ${escapeHtml(freshnessState?.status || 'unknown')}${freshnessState?.ageHours != null ? ` · ${escapeHtml(String(freshnessState.ageHours))}h old` : ''}</div>
+      <div class="backup-meta-row">Last attempt: ${escapeHtml(attempt?.status || 'unrecorded')}${attempt?.errorCode ? ` · ${escapeHtml(attempt.errorCode)}` : ''}</div>
+      <div class="backup-meta-row">Validation: ${escapeHtml(validation?.method || 'unavailable')}</div>
+      <div class="backup-meta-row">Source: ${escapeHtml(backups.source || 'unknown')}</div>
+      <div class="backup-meta-row">Root: ${escapeHtml(backups.root || 'unknown')}</div>
     </div>
   `;
+  };
 
   container.innerHTML = `
     <div class="backup-grid">
-      ${renderCard('Database backups', dbBackups, latestDb)}
-      ${renderCard('File backups', fileBackups, latestFiles)}
+      ${renderCard('Database backups', 'database', dbBackups, latestDb)}
+      ${renderCard('File backups', 'files', fileBackups, latestFiles)}
     </div>
     <div class="backup-note">
-      Ops handles creation, restores, and detailed backup history. Backup root: ${escapeHtml(backups.root || 'var/backups')}
+      ${escapeHtml(backups.message || '')} Ops handles creation and detailed backup history. Source: ${escapeHtml(backups.source || 'unknown')}. Backup root: ${escapeHtml(backups.root || 'unknown')}
     </div>
   `;
 }

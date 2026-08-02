@@ -82,8 +82,10 @@ The main compose stack defines:
 
 ## Optional Host Services
 
-- Systemd unit files exist in `deploy/` (usage may vary): `bwondercomics-api.service`, `bwondercomics-api.user.service`, `bwondercomics-backup.service`, `bwondercomics-backup.timer`
-- Backup script: `deploy/bwondercomics-backup.sh`
+- Systemd unit files exist in `deploy/` (usage may vary): `bwondercomics-api.service`, `bwondercomics-api.user.service`, `bwondercomics-backup-db.*`, `bwondercomics-backup-files.*`
+- Canonical backup engine: `scripts/backup_artifacts.py`; Make, Ops, and compatibility scripts
+  delegate to it. Production jobs use the pinned `.backup-venv` and fail closed on archive/source
+  layout violations; Compose sets `BWC_BACKUP_DIAGNOSTICS_MODE=production`.
 - DB-only compose file: `deploy/bwondercomics-db-compose.yml`
 - Fail2ban config lives in `deploy/fail2ban/`
 - Namecheap DDNS uses `deploy/namecheap-ddns.sh` with `deploy/namecheap-ddns.env*`; the installed `namecheap-ddns.timer` runs it 2 minutes after boot and then every 10 minutes.

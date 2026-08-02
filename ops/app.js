@@ -242,9 +242,11 @@ function renderBackups(backups) {
   if (!container) return;
   const dbBackups = backups?.db || [];
   const fileBackups = backups?.files || [];
-  const renderList = (items) =>
-    items.length
-      ? `<ul class="ops-backup-list">${items
+  const renderList = (kind, items) => {
+    const attempt = backups?.jobs?.[kind]?.lastAttempt;
+    const state = `<div class="ops-backup-meta">Freshness: ${escapeHtml(backups?.freshness?.[kind]?.status || 'unknown')} · Last attempt: ${escapeHtml(attempt?.status || 'unrecorded')}${attempt?.errorCode ? ` · ${escapeHtml(attempt.errorCode)}` : ''} · Source: ${escapeHtml(backups?.source || 'unknown')} · Root: ${escapeHtml(backups?.root || 'unknown')}</div>`;
+    return items.length
+      ? `${state}<ul class="ops-backup-list">${items
           .slice(0, 6)
           .map(
             (item) => `
@@ -255,19 +257,21 @@ function renderBackups(backups) {
             `
           )
           .join('')}</ul>`
-      : '<div class="ops-empty">No backups found.</div>';
+      : `${state}<div class="ops-empty">No backups found.</div>`;
+  };
 
   container.innerHTML = `
     <div class="ops-backup-grid">
       <div class="ops-backup-card">
         <div class="ops-command-title">Database Backups</div>
-        ${renderList(dbBackups)}
+        ${renderList('database', dbBackups)}
       </div>
       <div class="ops-backup-card">
         <div class="ops-command-title">File Backups</div>
-        ${renderList(fileBackups)}
+        ${renderList('files', fileBackups)}
       </div>
     </div>
+    <div class="ops-backup-meta">${escapeHtml(backups?.message || '')} Source: ${escapeHtml(backups?.source || 'unknown')}. Root: ${escapeHtml(backups?.root || 'unknown')}</div>
   `;
 }
 
@@ -374,8 +378,9 @@ function streamRun(runId) {
       if (run) {
         const meta = document.getElementById('opsRunMeta');
         const outputBox = document.getElementById('opsRunOutput');
-        if (meta)
+        if (meta) {
           meta.textContent = `${run.label} · ${run.status} · ${formatDate(run.finishedAt || run.startedAt)}`;
+        }
         if (outputBox) outputBox.textContent = run.output || outputBox.textContent;
       }
     } catch {

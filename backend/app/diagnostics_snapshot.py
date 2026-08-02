@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import platform
@@ -33,6 +34,12 @@ from .settings import settings
 
 APP_STARTED_AT = datetime.now(timezone.utc)
 SNAPSHOT_RETENTION_HOURS = 72
+BACKUP_SCHEMA_VERSION = 1
+BACKUP_CATALOG_LIMIT = 60
+BACKUP_FRESHNESS_HOURS = {
+    "database": {"warning": 36, "error": 48},
+    "files": {"warning": 8 * 24, "error": 14 * 24},
+}
 
 
 def _status_rank(value: str) -> int:
@@ -191,59 +198,293 @@ def _release_snapshot_info() -> dict:
     }
 
 
-def _classify_backup(path: Path) -> str | None:
-    name = path.name
-    if name.startswith("db-"):
-        return "db"
-    if name.startswith("files-"):
-        return "files"
-    return None
+def _read_json_object(path: Path) -> dict:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"{path.name} is not a JSON object")
+    return payload
 
 
-def collect_backup_summary() -> dict:
-    backup_dir = settings.base_dir / "var" / "backups"
-    grouped = {"db": [], "files": []}
-    if backup_dir.exists():
-        for path in sorted(
-            backup_dir.iterdir(), key=lambda item: item.stat().st_mtime, reverse=True
-        ):
-            if not path.is_file():
-                continue
-            bucket = _classify_backup(path)
-            if bucket is None:
-                continue
-            stat = path.stat()
-            grouped[bucket].append(
-                {
-                    "name": path.name,
-                    "path": str(path),
-                    "createdAt": iso_z(datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc)),
-                    "sizeBytes": int(stat.st_size),
-                    "sizePretty": _format_size(stat.st_size),
-                }
-            )
+def _parse_backup_time(value: object) -> datetime:
+    parsed = datetime.fromisoformat(str(value or "").replace("Z", "+00:00"))
+    if parsed.tzinfo is None:
+        raise ValueError("Backup timestamp is not timezone-aware")
+    return parsed.astimezone(timezone.utc)
 
-    latest_db = grouped["db"][0] if grouped["db"] else None
-    latest_files = grouped["files"][0] if grouped["files"] else None
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _safe_child(root: Path, relative: object) -> Path:
+    value = Path(str(relative or ""))
+    if value.is_absolute() or ".." in value.parts:
+        raise ValueError("Backup path is not relative")
+    resolved = (root / value).resolve(strict=False)
+    resolved.relative_to(root.resolve())
+    return resolved
+
+
+def _normalize_backup_item(item: dict, kind: str, root: Path) -> dict:
+    artifact_id = str(item.get("artifactId") or "")
+    relative_path = str(item.get("relativePath") or "")
+    suffix = ".dump" if kind == "database" else ".tar.gz"
+    expected_relative = f"{kind}/{artifact_id}{suffix}"
+    digest = str(item.get("sha256") or "")
+    if (
+        not artifact_id.startswith(f"{kind}-")
+        or relative_path != expected_relative
+        or len(digest) != 64
+        or any(character not in "0123456789abcdef" for character in digest)
+    ):
+        raise ValueError("Backup artifact identity does not match its kind")
+    created_at = iso_z(_parse_backup_time(item.get("createdAt") or item.get("completedAt")))
+    size_bytes = int(item.get("sizeBytes"))
+    validation = item.get("validation")
+    if size_bytes < 0 or not isinstance(validation, dict) or validation.get("result") != "ok":
+        raise ValueError("Backup validation metadata is invalid")
+    return {
+        "artifactId": artifact_id,
+        "name": Path(relative_path).name,
+        "path": str(root / relative_path),
+        "relativePath": relative_path,
+        "createdAt": created_at,
+        "sizeBytes": size_bytes,
+        "sizePretty": _format_size(size_bytes),
+        "sha256": digest,
+        "validation": validation,
+    }
+
+
+def _freshness(kind: str, latest: dict | None, now: datetime) -> dict:
+    thresholds = BACKUP_FRESHNESS_HOURS[kind]
+    if latest is None:
+        return {
+            "status": "error",
+            "ageHours": None,
+            "warningAfterHours": thresholds["warning"],
+            "errorAfterHours": thresholds["error"],
+        }
+    age_hours = max(0.0, (now - _parse_backup_time(latest["createdAt"])).total_seconds() / 3600)
     status = (
-        "ok" if latest_db and latest_files else "warning" if latest_db or latest_files else "error"
-    )
-    message = (
-        f"DB backups: {len(grouped['db'])}, file backups: {len(grouped['files'])}"
-        if status != "error"
-        else "No DB or file backups found."
+        "error"
+        if age_hours > thresholds["error"]
+        else "warning"
+        if age_hours > thresholds["warning"]
+        else "ok"
     )
     return {
         "status": status,
+        "ageHours": round(age_hours, 2),
+        "warningAfterHours": thresholds["warning"],
+        "errorAfterHours": thresholds["error"],
+    }
+
+
+def _summary_payload(
+    *,
+    source: str,
+    root: Path,
+    grouped: dict[str, list[dict]],
+    jobs: dict,
+    now: datetime,
+    forced_error: str = "",
+    validated_counts: dict | None = None,
+    integrity: dict | None = None,
+) -> dict:
+    latest_db = grouped["db"][0] if grouped["db"] else None
+    latest_files = grouped["files"][0] if grouped["files"] else None
+    freshness = {
+        "database": _freshness("database", latest_db, now),
+        "files": _freshness("files", latest_files, now),
+    }
+    statuses = [freshness["database"]["status"], freshness["files"]["status"]]
+    failed_jobs = []
+    for kind in ("database", "files"):
+        attempt = (jobs.get(kind) or {}).get("lastAttempt") or {}
+        if attempt.get("status") == "error":
+            statuses.append("error")
+            failed_jobs.append(f"{kind}: {attempt.get('errorCode') or 'backup_failed'}")
+    if forced_error:
+        statuses.append("error")
+    status = _merge_statuses(*statuses)
+    counts = validated_counts or {
+        "db": len(grouped["db"]),
+        "files": len(grouped["files"]),
+        "total": len(grouped["db"]) + len(grouped["files"]),
+    }
+    message = f"Validated DB backups: {counts['db']}, file backups: {counts['files']}."
+    if forced_error:
+        message = forced_error
+        if failed_jobs:
+            message += f" Latest backup attempt failed ({', '.join(failed_jobs)})."
+    elif failed_jobs:
+        message = f"Latest backup attempt failed ({', '.join(failed_jobs)})."
+    return {
+        "status": status,
         "message": message,
-        "root": str(backup_dir),
+        "source": source,
+        "root": str(root),
         "db": grouped["db"],
         "files": grouped["files"],
-        "latest": {
-            "db": latest_db,
-            "files": latest_files,
-        },
+        "latest": {"db": latest_db, "files": latest_files},
+        "jobs": jobs,
+        "freshness": freshness,
+        "validatedCounts": counts,
+        "integrity": integrity or {},
     }
+
+
+def _validate_backup_attempt(attempt: object, kind: str) -> dict:
+    if not isinstance(attempt, dict) or attempt.get("status") not in {"ok", "error"}:
+        raise ValueError(f"Missing or invalid {kind} backup attempt")
+    _parse_backup_time(attempt.get("startedAt"))
+    _parse_backup_time(attempt.get("finishedAt"))
+    if attempt.get("status") == "error" and not str(attempt.get("errorCode") or "").strip():
+        raise ValueError(f"Missing {kind} backup failure code")
+    artifact_id = str(attempt.get("artifactId") or "")
+    if artifact_id and not artifact_id.startswith(f"{kind}-"):
+        raise ValueError(f"Invalid {kind} attempt artifact identity")
+    return attempt
+
+
+def _normalize_backup_job(path: Path, kind: str, root: Path) -> dict:
+    job = _read_json_object(path)
+    if job.get("schemaVersion") != BACKUP_SCHEMA_VERSION or job.get("kind") != kind:
+        raise ValueError(f"Invalid {kind} backup status")
+    attempt = _validate_backup_attempt(job.get("lastAttempt"), kind)
+    history = job.get("history")
+    if not isinstance(history, list) or len(history) > 30:
+        raise ValueError(f"Invalid {kind} backup status history")
+    for history_attempt in history:
+        _validate_backup_attempt(history_attempt, kind)
+    last_success = job.get("lastSuccess")
+    if last_success is not None:
+        if not isinstance(last_success, dict):
+            raise ValueError(f"Invalid {kind} last-success status")
+        _normalize_backup_item(last_success, kind, root)
+    return {
+        "updatedAt": job.get("updatedAt"),
+        "lastAttempt": attempt,
+        "lastSuccess": last_success,
+    }
+
+
+def _production_backup_summary(status_dir: Path, now: datetime) -> dict:
+    paths = {
+        "catalog": status_dir / "catalog.json",
+        "database": status_dir / "database.json",
+        "files": status_dir / "files.json",
+    }
+    root = Path("/mnt/archive/backups/bwondercomics")
+    grouped = {"db": [], "files": []}
+    jobs: dict = {}
+    errors = []
+    validated_counts = {"db": 0, "files": 0, "total": 0}
+    integrity = {}
+
+    if paths["catalog"].exists():
+        try:
+            catalog = _read_json_object(paths["catalog"])
+            if catalog.get("schemaVersion") != BACKUP_SCHEMA_VERSION:
+                raise ValueError("Unsupported production backup catalog schema")
+            catalog_root = Path(str(catalog.get("root") or root))
+            if catalog_root != root:
+                raise ValueError("Production backup catalog root is not canonical")
+            catalog_counts = catalog.get("validatedCounts")
+            if not isinstance(catalog_counts, dict):
+                raise ValueError("Production backup catalog counts are missing")
+            for kind, bucket in (("database", "db"), ("files", "files")):
+                values = catalog.get(kind)
+                if not isinstance(values, list) or len(values) > BACKUP_CATALOG_LIMIT:
+                    raise ValueError(f"Invalid {kind} backup catalog")
+                grouped[bucket] = [_normalize_backup_item(item, kind, root) for item in values]
+                grouped[bucket].sort(key=lambda item: item["createdAt"], reverse=True)
+            validated_counts = {
+                "db": int(catalog_counts.get("database")),
+                "files": int(catalog_counts.get("files")),
+                "total": int(catalog_counts.get("total")),
+            }
+            if (
+                validated_counts["db"] < len(grouped["db"])
+                or validated_counts["files"] < len(grouped["files"])
+                or validated_counts["total"] != validated_counts["db"] + validated_counts["files"]
+            ):
+                raise ValueError("Production backup catalog counts are invalid")
+            catalog_integrity = catalog.get("integrity")
+            integrity = catalog_integrity if isinstance(catalog_integrity, dict) else {}
+        except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
+            grouped = {"db": [], "files": []}
+            validated_counts = {"db": 0, "files": 0, "total": 0}
+            errors.append(f"Production backup catalog is malformed: {exc}")
+
+    for kind in ("database", "files"):
+        try:
+            jobs[kind] = _normalize_backup_job(paths[kind], kind, root)
+        except FileNotFoundError:
+            errors.append(f"Production {kind} backup status is missing")
+        except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError) as exc:
+            errors.append(f"Production {kind} backup status is malformed: {exc}")
+
+    if not any(path.exists() for path in paths.values()):
+        errors = ["Production backup records are missing"]
+
+    return _summary_payload(
+        source="production-status",
+        root=root,
+        grouped=grouped,
+        jobs=jobs,
+        now=now,
+        forced_error="; ".join(errors),
+        validated_counts=validated_counts,
+        integrity=integrity,
+    )
+
+
+def _local_backup_summary(backup_dir: Path, now: datetime) -> dict:
+    grouped = {"db": [], "files": []}
+    manifests_dir = backup_dir / "manifests"
+    for manifest_path in sorted(manifests_dir.glob("*.json")) if manifests_dir.is_dir() else []:
+        try:
+            manifest = _read_json_object(manifest_path)
+            kind = str(manifest.get("artifactKind") or "")
+            if manifest.get("schemaVersion") != BACKUP_SCHEMA_VERSION or kind not in {
+                "database",
+                "files",
+            }:
+                continue
+            artifact_id = str(manifest.get("artifactId") or "")
+            if manifest_path.name != f"{artifact_id}.json":
+                continue
+            artifact = _safe_child(backup_dir, manifest.get("relativePath"))
+            checksum = _safe_child(backup_dir, manifest.get("checksumPath"))
+            digest = _sha256_file(artifact)
+            if digest != manifest.get("sha256"):
+                continue
+            if checksum.read_text(encoding="utf-8") != (f"{digest}  {manifest['relativePath']}\n"):
+                continue
+            item = _normalize_backup_item(manifest, kind, backup_dir)
+            grouped["db" if kind == "database" else "files"].append(item)
+        except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
+            continue
+    for values in grouped.values():
+        values.sort(key=lambda item: item["createdAt"], reverse=True)
+    return _summary_payload(
+        source="local-manifests", root=backup_dir, grouped=grouped, jobs={}, now=now
+    )
+
+
+def collect_backup_summary(now: datetime | None = None) -> dict:
+    current = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    if settings.backup_diagnostics_mode == "production":
+        return _production_backup_summary(
+            settings.base_dir / "var" / "diagnostics" / "backups", current
+        )
+    return _local_backup_summary(settings.base_dir / "var" / "backups", current)
 
 
 def collect_database_stats(db: Session) -> dict:
@@ -452,7 +693,7 @@ def collect_test_status(db: Session) -> dict:
     }
 
 
-def _health_checks(db: Session) -> dict:
+def _health_checks(db: Session, backups: dict | None = None) -> dict:
     database_status = {"status": "ok", "message": "Database connection successful."}
     try:
         db.execute(text("SELECT 1"))
@@ -469,10 +710,10 @@ def _health_checks(db: Session) -> dict:
         ),
     }
 
-    backups = collect_backup_summary()
+    backup_summary = backups if backups is not None else collect_backup_summary()
     backup_status = {
-        "status": backups["status"],
-        "message": backups["message"],
+        "status": backup_summary["status"],
+        "message": backup_summary["message"],
     }
 
     fail2ban = _fail2ban_status()
@@ -487,7 +728,8 @@ def _health_checks(db: Session) -> dict:
 
 def build_snapshot(db: Session, source: str = "manual") -> dict:
     now = datetime.now(timezone.utc)
-    health_checks = _health_checks(db)
+    backups = collect_backup_summary(now=now)
+    health_checks = _health_checks(db, backups=backups)
     overall_status = _merge_statuses(*(check["status"] for check in health_checks.values()))
     deploy_status = {
         "server": {
@@ -501,7 +743,6 @@ def build_snapshot(db: Session, source: str = "manual") -> dict:
         "dist": _dist_info(),
         "releaseSnapshots": _release_snapshot_info(),
     }
-    backups = collect_backup_summary()
     database_stats = collect_database_stats(db)
     database_overview = collect_database_overview(db)
     test_status = collect_test_status(db)

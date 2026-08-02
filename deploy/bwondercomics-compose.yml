@@ -29,6 +29,7 @@ services:
     environment:
       BWC_DB_HOST: bwondercomics-db
       BWC_DB_PORT: 5432
+      BWC_BACKUP_DIAGNOSTICS_MODE: production
       UMAMI_DB_PASSWORD: ${UMAMI_DB_PASSWORD:-}
       OIDC_LOGIN_PATH: ${OIDC_LOGIN_PATH:-/?openComments=1}
     ports:

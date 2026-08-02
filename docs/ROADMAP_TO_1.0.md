@@ -2,9 +2,15 @@
 
 Status: Audit complete; roadmap active
 Created: 2026-07-07 (repo-only + live-host audit at commit `cdc84f8`, branch `builder-incremental-improvement`)
-Updated: 2026-08-01 for the shipped builder page history/recovery UI and the remaining
-backup/restore-drill boundary. Original evidence anchors still point at the audit commit unless a
-later note says otherwise.
+Updated: 2026-08-02 for Phase 4 backup work implemented in this checkout and remaining live rollout,
+observation, and restore-drill boundary. Original evidence anchors still point at the audit commit
+unless a later note says otherwise.
+
+Recovery status (`2026-08-02`): Phase 4 backup artifact/scheduling hardening is implemented in this
+checkout, but the live pinned-runtime/layout provisioning, service-account ownership fix,
+pre-`0018` and post-`0018` service-owned artifacts, worker restart/identity check, replacement timer
+installation, and three-night/one-week observation window remain pending. Phase 5 isolated restore
+drills have not started; the recovery gate remains open.
 
 Labels used throughout: **[C:code]** confirmed from code/docs · **[C:live]** confirmed on this host ·
 **[I]** inferred · **[V]** needs live/admin verification.
@@ -135,9 +141,10 @@ behavior-preserving and has no remaining phase work.
 4. **Broader manual regression debt:** the authenticated 0.8.5 corrective matrix is complete, but
    the unchecked optional flows in `docs/READER_BUILDER_QA.md` remain useful before 1.0.0. They are
    no longer blockers for merging this builder baseline.
-   **What's missing** (verified against code): backup scheduling/restore-drill hardening and the
-   optional polish backlog, including header glow. Page snapshots and admin recovery are complete;
-   the authenticated 0.8.5 responsive/manual closeout is also complete.
+   **What's missing** (verified against code): the live Phase 4 rollout/observation gate, Phase 5
+   restore drills, and the optional polish backlog, including header glow. Phase 4 repository
+   hardening, page snapshots, and admin recovery are implemented; the authenticated 0.8.5
+   responsive/manual closeout is also complete.
 
 **1.0.0 scope recommendation:**
 
@@ -444,10 +451,11 @@ compete with feature time meaningfully.
 
 **NOW — finish before moving on**
 
-1. _Recovery safety:_ implement `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`: per-save
-   page JSON snapshots, admin restore, validated nightly DB and weekly file backups on
-   `/mnt/archive`, and an isolated restore drill. Resolve the current read-only archive mount before
-   enabling production timers.
+1. _Recovery safety:_ complete `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`: provision
+   the pinned runtime and service-owned archive layout; record the required `0017` artifact before
+   applying `0018` and the clean head artifact afterward; run both hardened services; then enable
+   validated nightly DB and weekly file backups on `/mnt/archive` and observe three DB sets plus one
+   file set. Perform the isolated restore drill separately in Phase 5.
 2. _Ops track (parallel, ~1 day):_ finish the non-recovery host items: install diagnostics-refresh
    timer + ops worker (or disable ops deliberately); pin `umami` image; add Caddy security headers
    (HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`/`frame-ancestors` — hold off

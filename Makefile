@@ -1,10 +1,15 @@
-.PHONY: help env check-env up down restart ps logs api-logs db-logs migrate api-sh psql backup backup-db backup-files restore-db restore-files up-analytics analytics-up analytics-stop analytics-logs chat-up chat-stop chat-logs
+.PHONY: help env check-env up down restart ps logs api-logs db-logs migrate api-sh psql backup-runtime backup backup-db backup-files backup-production backup-db-production backup-files-production restore-db restore-files up-analytics analytics-up analytics-stop analytics-logs chat-up chat-stop chat-logs
 
 ENV_FILE ?= deploy/bwondercomics.env
 COMPOSE_FILE ?= deploy/bwondercomics-compose.yml
 COMPOSE = docker compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE)
 
 BACKUP_DIR ?= var/backups
+BACKUP_ENGINE = ./.venv/bin/python scripts/backup_artifacts.py
+BACKUP_RUNTIME_DIR ?= .backup-venv
+override PRODUCTION_BACKUP_DIR := /mnt/archive/backups/bwondercomics
+override PRODUCTION_BACKUP_STATUS_DIR := /srv/bw-quality/var/diagnostics/backups
+override PRODUCTION_BACKUP_ENGINE := /srv/bw-quality/.backup-venv/bin/python /srv/bw-quality/scripts/backup_artifacts.py
 
 help:
 	@echo "BWonderComics shortcuts"
@@ -20,6 +25,8 @@ help:
 	@echo "  make ps              Show container status"
 	@echo ""
 	@echo "  make backup           Backup DB + files to $(BACKUP_DIR)/"
+	@echo "  make backup-runtime   Provision the pinned production backup Python runtime"
+	@echo "  make backup-production  Validated DB + files backup to /mnt/archive"
 	@echo "  make restore-db FILE=... CONFIRM=1"
 	@echo "  make restore-files FILE=... CONFIRM=1"
 	@echo ""
@@ -86,24 +93,27 @@ api-sh: check-env
 psql: check-env
 	$(COMPOSE) exec bwondercomics-db sh -c 'PGPASSWORD=$$POSTGRES_PASSWORD psql -h localhost -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
 
-backup: backup-db backup-files
+backup-runtime:
+	@test -x "$(BACKUP_RUNTIME_DIR)/bin/python" || python3 -m venv "$(BACKUP_RUNTIME_DIR)"
+	"$(BACKUP_RUNTIME_DIR)/bin/python" -m pip install --disable-pip-version-check --requirement scripts/backup-requirements.txt
+
+backup: check-env
+	BACKUP_DIR="$(BACKUP_DIR)" REQUIRE_ARCHIVE_MOUNT=0 ENV_FILE="$(abspath $(ENV_FILE))" COMPOSE_FILE="$(abspath $(COMPOSE_FILE))" $(BACKUP_ENGINE) all
 
 backup-db: check-env
-	@mkdir -p "$(BACKUP_DIR)"
-	@ts="$$(date +%Y%m%d-%H%M%S)"; \
-	out="$(BACKUP_DIR)/db-$$ts.sql"; \
-	echo "Writing $$out"; \
-	$(COMPOSE) exec -T bwondercomics-db sh -c 'PGPASSWORD=$$POSTGRES_PASSWORD pg_dump -h localhost -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"' > "$$out"
+	BACKUP_DIR="$(BACKUP_DIR)" REQUIRE_ARCHIVE_MOUNT=0 ENV_FILE="$(abspath $(ENV_FILE))" COMPOSE_FILE="$(abspath $(COMPOSE_FILE))" $(BACKUP_ENGINE) database
 
 backup-files:
-	@mkdir -p "$(BACKUP_DIR)"
-	@ts="$$(date +%Y%m%d-%H%M%S)"; \
-	out="$(BACKUP_DIR)/files-$$ts.tar.gz"; \
-	echo "Writing $$out"; \
-	files="chapters comics media admin/page-config.json"; \
-	# Include per-series page configs if present.
-	if ls admin/series/*/page-config.json >/dev/null 2>&1; then files="$$files admin/series/*/page-config.json"; fi; \
-	tar -czf "$$out" $$files
+	BACKUP_DIR="$(BACKUP_DIR)" REQUIRE_ARCHIVE_MOUNT=0 ENV_FILE="$(abspath $(ENV_FILE))" COMPOSE_FILE="$(abspath $(COMPOSE_FILE))" $(BACKUP_ENGINE) files
+
+backup-production: check-env
+	BWC_REPO_ROOT="$(CURDIR)" BACKUP_DIR="$(PRODUCTION_BACKUP_DIR)" REQUIRE_ARCHIVE_MOUNT=1 BACKUP_STATUS_DIR="$(PRODUCTION_BACKUP_STATUS_DIR)" ENV_FILE="$(abspath $(ENV_FILE))" COMPOSE_FILE="$(abspath $(COMPOSE_FILE))" $(PRODUCTION_BACKUP_ENGINE) all
+
+backup-db-production: check-env
+	BWC_REPO_ROOT="$(CURDIR)" BACKUP_DIR="$(PRODUCTION_BACKUP_DIR)" REQUIRE_ARCHIVE_MOUNT=1 BACKUP_STATUS_DIR="$(PRODUCTION_BACKUP_STATUS_DIR)" ENV_FILE="$(abspath $(ENV_FILE))" COMPOSE_FILE="$(abspath $(COMPOSE_FILE))" $(PRODUCTION_BACKUP_ENGINE) database
+
+backup-files-production:
+	BWC_REPO_ROOT="$(CURDIR)" BACKUP_DIR="$(PRODUCTION_BACKUP_DIR)" REQUIRE_ARCHIVE_MOUNT=1 BACKUP_STATUS_DIR="$(PRODUCTION_BACKUP_STATUS_DIR)" ENV_FILE="$(abspath $(ENV_FILE))" COMPOSE_FILE="$(abspath $(COMPOSE_FILE))" $(PRODUCTION_BACKUP_ENGINE) files
 
 restore-db: check-env
 	@test "$(CONFIRM)" = "1" || (echo "ERROR: Refusing to restore without CONFIRM=1"; exit 1)

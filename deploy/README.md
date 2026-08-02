@@ -152,23 +152,46 @@ If UFW is enabled, allow LAN access:
 sudo ufw allow from 10.0.0.0/24 to any port 8000 proto tcp
 ```
 
-## Backup automation status
+## Backup automation
 
-The current checked-in backup entry points are not yet a production disaster-recovery system:
+The canonical helper is `scripts/backup_artifacts.py`; Make, Ops, compatibility scripts, and the
+systemd services all delegate to it. Developer targets write validated manifest-backed sets under
+`var/backups/`. Browser Ops commands deliberately use the fail-closed production targets under
+`/mnt/archive/backups/bwondercomics`.
 
-- `make backup` writes manual database/file artifacts to `var/backups/` by default;
-- `deploy/bwondercomics-backup.service` currently calls `make backup-db` without overriding that
-  local destination;
-- the older deployment backup script uses a different file-only contract;
-- live read-only verification on 2026-07-16 found `/mnt/archive` mounted read-only with only stale
-  legacy archives.
+Production backup services require the pinned `.backup-venv`, every canonical archive/status
+directory owned by `dbmelville`, and all five real source roots. Follow the ordered migration-safe
+rollout in `docs/OPERATIONS.md`. In outline: provision first, install the units with both timers
+disabled, restart and verify the Ops worker identity, then create the service-owned pre-migration DB
+artifact:
 
-Do not install or describe the current timer as a verified `/mnt/archive` backup. Implement
-`docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md` first. Its production contract uses
-validated nightly database and weekly durable-file artifacts under
-`/mnt/archive/backups/bwondercomics`, fails closed when the archive mount is missing/read-only, and
-requires an isolated restore drill. Replace this status section with the verified installation and
-recovery commands when that plan closes.
+```bash
+cd /srv/bw-quality
+sudo -u dbmelville make backup-runtime
+sudo cp deploy/bwondercomics-backup-db.service deploy/bwondercomics-backup-db.timer \
+  deploy/bwondercomics-backup-files.service deploy/bwondercomics-backup-files.timer \
+  /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl disable --now bwondercomics-backup.timer battlebros-backup.timer
+sudo systemctl disable --now bwondercomics-backup-db.timer bwondercomics-backup-files.timer
+sudo systemctl restart bwondercomics-ops-worker.service
+systemctl show bwondercomics-ops-worker.service -p User -p Group -p MainPID
+sudo systemctl start bwondercomics-backup-db.service
+```
+
+Before migration, the manifest must report `0017_page_scope_bindings` with
+`builder_page_snapshots` as the sole missing critical table. Apply `0018_builder_page_snapshots`,
+start the DB service again, require head with no missing critical tables, then start the file service
+once. Enable the timers only after all three one-shot results pass. The DB job runs nightly at
+`03:00 UTC`; the file job runs Sundays at `04:00 UTC`; both are persistent. Each service runs as
+`dbmelville`, uses the pinned runtime, `RequiresMountsFor=/mnt/archive`, `UMask=0027`, a `6h30min`
+timeout, and write access only to archive/status destinations. Python checks—not
+`RequiresMountsFor`—are authoritative for directory/device safety. Only lock-contention exit `75`
+gets a 15-minute retry; ordinary failures do not auto-retry.
+
+Phase 4 is implemented in this checkout, but remains operationally pending until that rollout and
+three scheduled DB sets plus one scheduled file set are observed. Phase 5 restore drills remain
+separate.
 
 ## Diagnostics Snapshot Timer + Ops Worker
 
@@ -206,15 +229,25 @@ sudo systemctl enable --now diagnostics-refresh.timer
 Install the host ops worker:
 
 ```bash
+sudo install -d -m 0750 -o dbmelville -g dbmelville \
+  /srv/bw-quality/var/ops/queue /srv/bw-quality/var/ops/logs \
+  /srv/bw-quality/var/diagnostics/backups
 sudo cp /srv/bw-quality/deploy/ops/bwondercomics-ops-worker.service /etc/systemd/system/bwondercomics-ops-worker.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now bwondercomics-ops-worker.service
+sudo systemctl restart bwondercomics-ops-worker.service
+systemctl show bwondercomics-ops-worker.service -p User -p Group -p MainPID
 ```
 
 Notes:
 
 - Admin diagnostics reads the latest file in `var/diagnostics/admin/latest.json`.
-- The worker processes queue files from `var/ops/queue/` and writes run logs to `var/ops/logs/`.
+- The worker runs as `dbmelville`, processes queue files from `var/ops/queue/`, and writes run logs
+  to `var/ops/logs/`. This keeps browser-triggered production backup artifacts owned by the same
+  service account as scheduled/manual artifacts.
+- A valid stale `.working` marker is reported as `worker_interrupted` and deleted only after API
+  acknowledgement; it is never rerun. SIGTERM terminates the active child and leaves an
+  unacknowledged marker for startup recovery.
 - If `OPS_ALLOWED_IPS` or `CADDY_OPS_ALLOWED_IPS` is empty, `/ops/` stays disabled.
 - Ensure `var/diagnostics`, `var/diagnostics/admin`, `var/diagnostics/admin/history`, `var/ops/queue`, and `var/ops/logs` are writable by the API container user (`uid=1000` in the default compose setup), or diagnostics refreshes and queued ops jobs will fail with permission errors.
 

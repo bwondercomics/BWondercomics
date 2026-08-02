@@ -230,9 +230,22 @@ def diagnostics_backups(request: Request, db: Session = Depends(get_db)):
         "generatedAt": snapshot.get("generatedAt"),
         "backupDir": backups.get("root"),
         "root": backups.get("root"),
+        "status": backups.get("status"),
+        "message": backups.get("message"),
+        "source": backups.get("source"),
         "items": items,
         "db": backups.get("db") or [],
         "files": backups.get("files") or [],
+        "latest": backups.get("latest") or {"db": None, "files": None},
+        "jobs": backups.get("jobs") or {},
+        "freshness": backups.get("freshness") or {},
+        "validatedCounts": backups.get("validatedCounts")
+        or {
+            "db": 0,
+            "files": 0,
+            "total": 0,
+        },
+        "integrity": backups.get("integrity") or {},
     }
 
 

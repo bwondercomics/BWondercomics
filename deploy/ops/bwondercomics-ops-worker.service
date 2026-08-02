@@ -4,12 +4,15 @@ After=network.target
 
 [Service]
 Type=simple
+User=dbmelville
+Group=dbmelville
 WorkingDirectory=/srv/bw-quality
 Environment=BWC_BASE_DIR=/srv/bw-quality
 EnvironmentFile=/srv/bw-quality/deploy/bwondercomics.env
 ExecStart=/usr/bin/env python3 /srv/bw-quality/deploy/ops/ops_worker.py
 Restart=always
 RestartSec=2
+UMask=0027
 
 [Install]
 WantedBy=multi-user.target

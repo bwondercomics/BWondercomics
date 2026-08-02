@@ -3,6 +3,7 @@
 node_modules/
 __pycache__/
 .venv/
+.backup-venv/
 backend/.venv/
 
 # Remark42 comment system
