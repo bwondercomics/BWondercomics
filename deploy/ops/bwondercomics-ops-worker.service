@@ -1,6 +1,8 @@
 [Unit]
 Description=BWonderComics ops worker
 After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -10,9 +12,11 @@ WorkingDirectory=/srv/bw-quality
 Environment=BWC_BASE_DIR=/srv/bw-quality
 EnvironmentFile=/srv/bw-quality/deploy/bwondercomics.env
 ExecStart=/usr/bin/env python3 /srv/bw-quality/deploy/ops/ops_worker.py
-Restart=always
+Restart=on-failure
 RestartSec=2
+RestartPreventExitStatus=78
 UMask=0027
+NoNewPrivileges=true
 
 [Install]
 WantedBy=multi-user.target

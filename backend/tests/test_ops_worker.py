@@ -109,6 +109,27 @@ class OpsWorkerTests(unittest.TestCase):
             ops_worker.process_queue_file(queue_path, self.catalog)
         self.assertTrue(queue_path.with_suffix(".working").exists())
 
+    def test_catalog_drift_reports_command_unavailable_without_execution(self):
+        queue_path = self.marker(".json")
+        with (
+            patch.object(ops_worker, "finish_run") as finish,
+            patch.object(ops_worker.subprocess, "Popen") as popen,
+        ):
+            ops_worker.process_queue_file(queue_path, {})
+        finish.assert_called_once_with("run-1", "failed", None, "command_unavailable", False)
+        popen.assert_not_called()
+        self.assertFalse(queue_path.with_suffix(".working").exists())
+
+    def test_catalog_drift_retains_marker_when_callback_fails(self):
+        queue_path = self.marker(".json")
+        with patch.object(ops_worker, "finish_run", side_effect=OSError("api unavailable")):
+            ops_worker.process_queue_file(queue_path, {})
+        self.assertTrue(queue_path.with_suffix(".working").exists())
+
+    def test_missing_token_returns_configuration_exit_status(self):
+        with patch.object(ops_worker, "TOKEN", ""):
+            self.assertEqual(ops_worker.main(), 78)
+
 
 if __name__ == "__main__":
     unittest.main()

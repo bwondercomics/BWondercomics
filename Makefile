@@ -1,4 +1,4 @@
-.PHONY: help env check-env up down restart ps logs api-logs db-logs migrate api-sh psql backup-runtime backup backup-db backup-files backup-production backup-db-production backup-files-production restore-drill restore-db restore-files up-analytics analytics-up analytics-stop analytics-logs chat-up chat-stop chat-logs
+.PHONY: help env check-env up down restart ps logs api-logs db-logs migrate api-sh psql admin-ops-check backup-runtime backup backup-db backup-files backup-production backup-db-production backup-files-production restore-drill restore-db restore-files up-analytics analytics-up analytics-stop analytics-logs chat-up chat-stop chat-logs
 
 ENV_FILE ?= deploy/bwondercomics.env
 COMPOSE_FILE ?= deploy/bwondercomics-compose.yml
@@ -23,6 +23,7 @@ help:
 	@echo "  make analytics-logs   Tail Umami logs"
 	@echo "  make chat-logs        Tail Stoat chat logs"
 	@echo "  make ps              Show container status"
+	@echo "  make admin-ops-check Read-only Admin/Ops production acceptance check"
 	@echo ""
 	@echo "  make backup           Backup DB + files to $(BACKUP_DIR)/"
 	@echo "  make backup-runtime   Provision the pinned production backup Python runtime"
@@ -93,6 +94,9 @@ api-sh: check-env
 
 psql: check-env
 	$(COMPOSE) exec bwondercomics-db sh -c 'PGPASSWORD=$$POSTGRES_PASSWORD psql -h localhost -U "$$POSTGRES_USER" -d "$$POSTGRES_DB"'
+
+admin-ops-check: check-env
+	python3 scripts/admin_ops_check.py
 
 backup-runtime:
 	@test -x "$(BACKUP_RUNTIME_DIR)/bin/python" || python3 -m venv "$(BACKUP_RUNTIME_DIR)"

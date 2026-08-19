@@ -2,7 +2,7 @@
 
 Status: Audit complete; roadmap active
 Created: 2026-07-07 (repo-only + live-host audit at commit `cdc84f8`, branch `builder-incremental-improvement`)
-Updated: 2026-08-19 for the completed recovery/backup gate. Original
+Updated: 2026-08-19 for the completed recovery/backup and Admin/Ops hardening gates. Original
 evidence anchors still point at the audit commit unless a later note says otherwise.
 
 Recovery status (`2026-08-19`): Complete. The pinned runtime/service-owned archive layout,
@@ -10,6 +10,12 @@ migration-safe artifacts, replacement timers, eight consecutive nightly database
 weekly file set, authenticated admin recovery exercise, and snapshot-bearing PostgreSQL 16 plus
 temporary-tree restore drill all passed with recorded cleanup evidence. The completed plan is
 archived under `docs/completed-builder-plans/`.
+
+Admin/Ops status (`2026-08-19`): Complete. The loopback-only API, synchronized LAN allowlists,
+hardened worker and hourly diagnostics units, atomic queue, host-health payload, pinned Umami 3.0.3
+image, and per-host response headers passed repository and live acceptance. An authenticated
+`stack-logs` run completed with bounded output and no residual marker; analytics and same-origin
+builder-preview smoke tests passed.
 
 Labels used throughout: **[C:code]** confirmed from code/docs · **[C:live]** confirmed on this host ·
 **[I]** inferred · **[V]** needs live/admin verification.
@@ -26,8 +32,8 @@ systemd/docker/backup state directly). The only outstanding items marked **[V]**
 
 ## 1. Executive summary
 
-**Release readiness:** the 0.8.5 builder baseline, page-level recovery, and disaster-recovery
-safety net are complete, while the store, remaining ops hardening, and broader 1.0 checks remain.
+**Release readiness:** the 0.8.5 builder baseline, page-level recovery, disaster-recovery safety
+net, and Admin/Ops hardening are complete, while the store and broader 1.0 checks remain.
 The builder architecture is genuinely solid (shared
 renderers, sanitize-on-save _and_ on-read, same-origin preview contract, published-only public
 endpoints), and the completed builder closeout records 667 frontend tests, 131 backend tests, and 21
@@ -39,12 +45,10 @@ hardened.
 1. **The store doesn't exist yet** — zero payment code in the repo (no Stripe SDK, no store
    models/routes) [C:code: `backend/requirements.txt`, `backend/app/models.py`]. The plan doc is
    excellent and security-correct; it's pure build work. This is the long pole.
-2. **Operational trust was broken in three places at the audit snapshot** [C:live]: backups shared
-   the primary disk, diagnostics refresh was stale, and the Ops worker was not running. The backup
-   and worker portions are now repaired: `/mnt/archive` is writable and validated, recurring
-   schedules passed their observation window, and the worker runs under the service owner. The
-   remaining diagnostics/security-header checks stay in the parallel Ops track.
-3. **Disaster recovery is complete:** transactional page snapshots, guarded authenticated admin
+2. **Operational trust and disaster recovery are now complete:** `/mnt/archive` is writable and
+   validated, recurring backup schedules and restore drills passed, diagnostics is timer-sourced,
+   the service-owned worker completed an authenticated command with zero restarts, and public
+   response protections passed on both hosts [C:live]. Transactional page snapshots, guarded admin
    recovery, validated off-primary-disk artifacts, recurring schedules, and isolated database/file
    drills—including 33 readable snapshot payloads—passed (details §2.1).
 
@@ -57,8 +61,8 @@ deployed branch.
 it), the remaining same-host/off-site backup gap, and scope creep in the builder (Phases 5–7 are
 where "close to done" can quietly become two more months).
 
-**Shortest credible path:** complete the remaining parallel Ops hardening → build the
-Stripe-Checkout-only store per the existing plan → freeze everything else
+**Shortest credible path:** build the Stripe-Checkout-only store per the existing plan → close the
+remaining user/analytics hardening → freeze everything else
 at "verify + polish" level. Header glow and other small requests remain in the polish backlog.
 Media redesign, PayPal, and social expansion all land post-1.0.
 
@@ -289,13 +293,13 @@ panels (live, traffic, reader, reads-over-time, visitor-history — 2,433 lines 
 preview-mode suppression, and a sensible split — Umami for aggregates, local sessions for "who's
 on the site right now."
 
-**Broken/risky:**
+**Remaining risks:**
 
-- **Raw SQL against Umami's internal schema** (`website_event` joins at
-  `backend/app/routes/admin_analytics.py:185`, `:235`, `:474`, `:695`) while the Umami image
-  floats on `postgresql-latest` (`deploy/bwondercomics-compose.yml:59`) [C:code]. Umami's tables
-  are not a public API; any image pull can silently break four admin panels. **Pin the Umami image
-  now** (one line), and treat the direct-SQL panels as frozen legacy.
+- **Raw SQL against Umami's internal schema** (`website_event` joins in
+  `backend/app/routes/admin_analytics.py`) remains a coupling risk, but production is now pinned to
+  Umami 3.0.3 by immutable digest and the existing panels passed the 2026-08-19 smoke test
+  [C:code+live]. Treat upgrades as explicit database migrations and keep the direct-SQL panels
+  frozen legacy.
 - **`visitor_sessions` grows forever** — no retention job anywhere [C:code]; rows hold IP + user
   link + reading history. Add a monthly prune (e.g., keep 90 days; an ops-catalog command or a
   `DELETE` in the nightly backup service is fine). This is both a privacy posture and a
@@ -311,7 +315,7 @@ digest. Freeze: visitor-history detail (it's the panel most coupled to Umami int
 most privacy-heavy). Do **not** build: cohorts, funnels, retention (already excluded by
 `docs/ROADMAP.md`).
 
-**1.0.0:** pin image, add retention, rate-limit tracking, verify each displayed number once
+**1.0.0:** add retention, rate-limit tracking, verify each displayed number once
 against Umami's own UI, add the one store event. **Defer:** everything else. **DoD:** every
 visible metric either matches Umami or is documented as "local sessions, counts X"; no panel
 errors with Umami disabled (graceful "analytics off" state).
@@ -417,19 +421,20 @@ catalog + file queue + host worker + confirm flags (`backend/app/routes/admin_op
 (`backend/app/routes/admin_diagnostics.py:313`) [C:code]. The _design_ is right and unusually
 disciplined.
 
-**The problem is deployment, not code** [C:live]: `var/diagnostics/admin/latest.json` is dated
-**June 4** (refresh timer never installed), and the ops worker isn't running (empty queue/logs
-since March). So the tab currently shows month-old data and any queued command would hang —
-precisely the "can I trust this?" failure the 0.9.0 milestone targets.
+**Deployment closeout (2026-08-19)** [C:live]: the hourly timer publishes current mode-0640 host
+and combined snapshots; the service-owned worker is continuously active with zero restarts; API
+publication is atomic; and the browser-queued `stack-logs` command completed with exit 0, bounded
+output, and no leftover marker. Disk/archive, required containers, automation, backups, and TLS
+have no errors. The stopped optional `chat-legacy-ui` rollback container is intentionally a
+warning. Migration `0019_admin_ops_legacy_command` preserved early command history while repairing
+the legacy insert constraint found by the first live queue exercise.
 
 **Verdict: keep, simplify, and make it honest.**
 
-- **1.0.0:** install the diagnostics-refresh timer and ops worker per `deploy/README.md` (or
-  consciously decide the ops surface is out and disable it — either is fine; limbo is not); add a
-  prominent **snapshot age** banner in the tab so staleness is visible **[V: check whether
-  `generatedAt` is already displayed]**; verify the read-only boundary once by hand.
-- **Health checks that matter for 1.0:** API up, DB reachable, disk space, last backup age + size,
-  container status, cert expiry. Most already exist in `backend/app/diagnostics_snapshot.py`.
+- **1.0.0:** retain the shipped browser Ops runner and current snapshot-age banner; both the
+  read-only diagnostics boundary and separate mutation gate passed live acceptance.
+- **Health checks that matter for 1.0:** API, DB, root/archive, backup age/size, Compose, required
+  units, and certificate expiry now publish through the schema-v1 snapshot.
 - **Defer/cut:** logs-stream and in-admin test-running (developer conveniences; a terminal
   exists), the Inner-Net panel (fold into a link), and — separately — the **Preview Changes tab is
   a cut candidate**: it predates the live builder canvas, which now does its job better
@@ -449,25 +454,23 @@ compete with feature time meaningfully.
 - The completed `builder-incremental-improvement` 0.8.5 baseline is merged into `main`; use
   "main = deployed" from here on.
 
-**NOW — finish before moving on**
+**Completed parallel gate**
 
-1. _Ops track (parallel, ~1 day):_ finish the non-recovery host items: install diagnostics-refresh
-   timer + ops worker (or disable ops deliberately); pin `umami` image; add Caddy security headers
-   (HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`/`frame-ancestors` — hold off
-   on strict CSP, the builder emits inline styles).
+- _Ops track:_ diagnostics timer/worker, loopback API, queue reliability, host status, Umami pin,
+  and scoped Caddy headers passed live on 2026-08-19. Broader CSP remains deliberately deferred.
 
 **NEXT — required for 1.0.0**
 
-2. _Store:_ Stripe-Checkout-only build per the plan's Phases 1→7, with the checklist in §2.2
+1. _Store:_ Stripe-Checkout-only build per the plan's Phases 1→7, with the checklist in §2.2
    (provider-neutral order columns; subscriptions bridged via premium codes). This is the
    schedule's center of mass.
-3. _Users:_ password change + admin password set; `/api/email/subscribe` hardening.
-4. _Analytics:_ visitor-session retention job; `/api/track/visitor` rate limit; one
+2. _Users:_ password change + admin password set; `/api/email/subscribe` hardening.
+3. _Analytics:_ visitor-session retention job; `/api/track/visitor` rate limit; one
    metrics-correctness pass; `store_checkout_start` event.
-5. _Diagnostics:_ snapshot-age banner; hide Preview Changes tab.
-6. _Polish backlog:_ prioritize release-relevant items from `docs/POLISH_BACKLOG_PLAN.md` without
+4. _Diagnostics:_ hide the stale Preview Changes tab if the release worksheet confirms it is unused.
+5. _Polish backlog:_ prioritize release-relevant items from `docs/POLISH_BACKLOG_PLAN.md` without
    reopening the completed 0.8.5 builder roadmap; keep optional visual features behind hardening.
-7. _Release:_ full DoD gate (§4), tag `1.0.0`.
+6. _Release:_ full DoD gate (§4), tag `1.0.0`.
 
 **LATER — post-1.0.0**
 
@@ -534,9 +537,11 @@ visibility/config only per what ships; single-server deployment; Umami analytics
 
 **Transport/headers**
 
-- [ ] HSTS, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
-      `frame-ancestors 'self'` in Caddy (none exist today [C:code])
-- [ ] `/ops/` IP allowlists in Caddy and backend kept in sync (`deploy/README.md:161-165`)
+- [x] HSTS, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
+      `SAMEORIGIN`, and `frame-ancestors 'self'` pass on main/admin/Ops-denial/chat responses
+      (2026-08-19 [C:code+live]).
+- [x] `/ops/` IP allowlists in Caddy and backend are synchronized and enforced; public access is
+      denied while the allowlisted authenticated runner works (2026-08-19 [C:live]).
 
 **Data/backups**
 
@@ -544,8 +549,8 @@ visibility/config only per what ships; single-server deployment; Umami analytics
       the scheduled weekly file set passed with zero corrupt catalog sets (2026-08-19) [C:live].
 - [x] Isolated PostgreSQL 16 and temporary-tree restore drill performed and documented, including
       all 33 stored snapshot payloads (2026-08-19)
-- [ ] `deploy/bwondercomics.env` stays 0600 + gitignored (verified [C:live]); never echoed into
-      diagnostics config output **[V: skim `/api/admin/diagnostics/config` response once]**
+- [x] `deploy/bwondercomics.env` stays 0600 + gitignored; the acceptance helper and host payload
+      report presence/state without token values (2026-08-19 [C:code+live]).
 - [ ] Visitor session retention (§2.3); orders PII minimal (§2.2)
 
 **Builder/content**

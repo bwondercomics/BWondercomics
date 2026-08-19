@@ -402,8 +402,15 @@ validate schema-v1 manifests and must not be cited as recovery proof.
 
 ## Diagnostics + Ops
 
-- Admin diagnostics is read-only and backed by `var/diagnostics/admin/latest.json`.
-- The hourly refresh timer calls `deploy/host-status/diagnostics_refresh.py`.
+- Admin diagnostics is read-only with respect to host operations and is backed by
+  `var/diagnostics/admin/latest.json`. Manual refresh only regenerates that snapshot.
+- The hourly refresh timer calls `deploy/host-status/diagnostics_refresh.py`. The host collector
+  first writes non-secret, mode-0640 `var/diagnostics/host.json` atomically, then requests the
+  combined API snapshot.
+- Host diagnostics covers root/archive capacity and mount safety, Compose container health,
+  diagnostics/Ops/backup systemd units, and certificate expiry for the main and chat hosts. Disk
+  thresholds are 20% warning and 10% error; certificate thresholds are 30 and 7 days; host data
+  warns after 90 minutes and errors after two hours.
 - `/ops/` is a separate surface for queued commands, run output, and detailed backups.
 - `/ops/` uses the same admin account/session as `/admin/`; if the cookie is missing or expired, the page falls back to its own login form.
 - Protect `/ops/` with both `OPS_ALLOWED_IPS` (backend, comma-separated) and `CADDY_OPS_ALLOWED_IPS` (proxy, space-separated).
@@ -411,12 +418,65 @@ validate schema-v1 manifests and must not be cited as recovery proof.
   `OPS_ALLOWED_IPS=127.0.0.1/32,::1/128,10.0.0.0/24`
   `CADDY_OPS_ALLOWED_IPS=127.0.0.1/32 ::1/128 10.0.0.0/24`
 - If you change either allowlist in `deploy/bwondercomics.env`, recreate `bwondercomics-api` and `caddy`; restarting containers is not enough to reload env-file changes.
-- Keep `ADMIN_COMMANDS_ENABLED=false` unless you intentionally want host commands enabled.
+- Production intentionally uses `ADMIN_COMMANDS_ENABLED=true` with both LAN/local allowlists. Set it
+  false and disable the worker if browser-triggered commands are ever retired.
+- The API host port is bound to loopback. Do not re-expose it on `0.0.0.0`; doing so bypasses the
+  Caddy `/ops/` IP gate.
 - The host ops worker reads queue files from `var/ops/queue/` and writes logs to `var/ops/logs/`.
 - The worker must run as `dbmelville` so browser-triggered production backups share ownership with
   manual and scheduled artifacts.
 - Ensure `var/diagnostics/admin` and `var/ops/{queue,logs}` are writable by the API container user, or refresh/queue actions will fail with permission errors.
-- Install the timer and worker from `deploy/README.md`.
+- Queue publication is atomic and mode 0640. `queue_publish_failed`, `command_unavailable`, and
+  `worker_interrupted` are terminal failure codes; `run_create_failed` is returned when the
+  durable database row cannot be created. Stale work is never rerun automatically.
+- Apply Alembic head before starting the worker. Revision `0019_admin_ops_legacy_command`
+  non-destructively preserves early-installation command history while relaxing its obsolete
+  extra `command` column for catalog-based runs.
+- A missing `HOST_AUTOMATION_TOKEN` exits with configuration status 78. The worker does not restart
+  that status and rate-limits other startup failures.
+- Install the timer and worker from `deploy/README.md`, then run the read-only
+  `make admin-ops-check` acceptance command.
+
+### Admin/Ops acceptance
+
+After any environment, unit, Caddy, API-bind, or Umami-image change:
+
+```bash
+cd /srv/bw-quality
+make admin-ops-check
+
+systemctl show bwondercomics-ops-worker.service \
+  -p User -p Group -p MainPID -p ActiveState -p SubState -p NRestarts
+systemctl list-timers --all --no-pager diagnostics-refresh.timer
+
+stat -c '%U:%G %a %n' \
+  var/diagnostics/host.json \
+  var/diagnostics/admin/latest.json \
+  var/ops/queue \
+  var/ops/logs
+```
+
+From an authenticated, allowlisted `/ops/` session, queue `stack-logs` as the non-disruptive worker
+smoke test. Require `queued` → `running` → `completed`, bounded output, no leftover `.json` or
+`.working` marker, and no increase in the worker restart count. Confirm `/ops/` remains 403 from a
+non-allowlisted client.
+
+The public Caddy contract is one-year per-host HSTS without `includeSubDomains` or preload, nosniff,
+`strict-origin-when-cross-origin`, `SAMEORIGIN`, and CSP `frame-ancestors 'self'`. A broader CSP is
+deliberately deferred because the builder emits inline styles.
+
+Umami is pinned to version `3.0.3` at digest
+`sha256:28f263fe06f79ebffa5a6a6e9bd33b7a278e9342a88e0bdac812416c9f9e4361`. Upgrade it only as a
+separate migration with an Umami database backup and raw-SQL analytics-panel validation.
+
+Live acceptance completed on 2026-08-19: the final `make admin-ops-check` requires current
+Alembic head in addition to the configuration, unit, host-health, bind, image, and header checks.
+The allowlisted `stack-logs` run completed with exit 0, bounded output, mode-0640 service-owned
+logging, no queue markers, and zero worker restarts. Main/admin/Ops-denial/chat responses carried
+the required headers; Umami 3.0.3 heartbeat and existing analytics panels passed; the MechMoms
+`test` builder preview rendered under the same-origin frame policy. Host status retains one
+expected warning for the stopped optional `chat-legacy-ui` rollback container (`stoat-web`);
+required and actively deployed containers have no errors.
 
 ## Common issues
 

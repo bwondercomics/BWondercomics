@@ -93,10 +93,19 @@ Goal: make maintenance trustworthy without terminal guesswork.
 - [x] Close the backup schedule window after eight consecutive timer-created DB sets and the weekly
       file set; validated artifacts, schedules, authenticated recovery, and isolated restore drills
       pass.
-- [ ] Verify diagnostics snapshot refresh, queue/worker behavior, permissions, and core status reporting.
-- [ ] Confirm admin diagnostics stays read-only and `/ops/` remains the separate command surface.
+- [x] Verify diagnostics snapshot refresh, queue/worker behavior, permissions, and core status
+      reporting; the 2026-08-19 live gate passed with timer-sourced mode-0640 snapshots, a completed
+      `stack-logs` run, an empty queue, and zero worker restarts.
+- [x] Confirm admin diagnostics stays read-only and `/ops/` remains the separate command surface;
+      loopback-only API binding, synchronized LAN allowlists, and public `/ops/` denial passed.
 - [x] Run validated database/file artifacts and isolated restore drills with exact non-secret notes.
 - [x] Update the recovery runbook for repeatable drills and authorized production disaster restore.
+
+Admin/Ops closeout (2026-08-19): host disk/archive, Compose, systemd, backup, and certificate
+health are published hourly; Umami is pinned to 3.0.3; public security headers pass on main,
+admin, Ops denial, and chat responses; analytics and same-origin builder preview smoke tests pass.
+The sole host warning is the stopped optional `chat-legacy-ui` rollback container, not a required
+or currently deployed service.
 
 ## `0.9.5` Freeze and Polish
 

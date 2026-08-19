@@ -22,6 +22,7 @@ POLL_SECONDS = float(os.environ.get("OPS_WORKER_POLL_SECONDS", "2"))
 MAX_LOG_BYTES = int(os.environ.get("OPS_WORKER_MAX_LOG_BYTES", "200000"))
 ACTIVE_PROCESS: subprocess.Popen | None = None
 SHUTDOWN_REQUESTED = False
+CONFIG_ERROR_EXIT = 78
 
 
 def load_catalog() -> dict[str, dict]:
@@ -74,11 +75,11 @@ def finish_run(
     )
 
 
-def _load_marker(path: Path, catalog: dict[str, dict]) -> tuple[str, str]:
+def _load_marker(path: Path) -> tuple[str, str]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     run_id = str(payload.get("runId") or "").strip()
     command_id = str(payload.get("commandId") or "").strip()
-    if not run_id or command_id not in catalog:
+    if not run_id or not command_id:
         raise ValueError("Invalid queue payload")
     return run_id, command_id
 
@@ -86,7 +87,7 @@ def _load_marker(path: Path, catalog: dict[str, dict]) -> tuple[str, str]:
 def recover_stale_markers(catalog: dict[str, dict]) -> None:
     for working_path in sorted(QUEUE_DIR.glob("*.working")):
         try:
-            run_id, _command_id = _load_marker(working_path, catalog)
+            run_id, _command_id = _load_marker(working_path)
         except (OSError, ValueError, TypeError, json.JSONDecodeError) as exc:
             print(
                 f"ops_worker: retained invalid stale marker {working_path.name}: {exc}",
@@ -126,7 +127,12 @@ def process_queue_file(path: Path, catalog: dict[str, dict]) -> None:
     run_id = ""
     remove_marker = False
     try:
-        run_id, command_id = _load_marker(working_path, catalog)
+        run_id, command_id = _load_marker(working_path)
+
+        if command_id not in catalog:
+            finish_run(run_id, "failed", None, "command_unavailable", False)
+            remove_marker = True
+            return
 
         LOG_DIR.mkdir(parents=True, exist_ok=True)
         log_path = LOG_DIR / f"{run_id}.log"
@@ -188,7 +194,7 @@ def process_queue_file(path: Path, catalog: dict[str, dict]) -> None:
 def main() -> int:
     if not TOKEN:
         print("ops_worker: HOST_AUTOMATION_TOKEN is required", file=sys.stderr)
-        return 1
+        return CONFIG_ERROR_EXIT
 
     QUEUE_DIR.mkdir(parents=True, exist_ok=True)
     LOG_DIR.mkdir(parents=True, exist_ok=True)

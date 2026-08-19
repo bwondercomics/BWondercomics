@@ -751,6 +751,18 @@ class BackupArtifactTests(unittest.TestCase):
         self.assertIn("User=dbmelville", worker_unit)
         self.assertIn("Group=dbmelville", worker_unit)
         self.assertIn("UMask=0027", worker_unit)
+        self.assertIn("Restart=on-failure", worker_unit)
+        self.assertIn("RestartPreventExitStatus=78", worker_unit)
+        self.assertIn("StartLimitBurst=5", worker_unit)
+        self.assertIn("NoNewPrivileges=true", worker_unit)
+
+        diagnostics_unit = (
+            PROJECT_ROOT / "deploy" / "host-status" / "diagnostics-refresh.service"
+        ).read_text(encoding="utf-8")
+        self.assertIn("User=dbmelville", diagnostics_unit)
+        self.assertIn("Group=dbmelville", diagnostics_unit)
+        self.assertIn("UMask=0027", diagnostics_unit)
+        self.assertIn("NoNewPrivileges=true", diagnostics_unit)
 
         requirements = (PROJECT_ROOT / "scripts" / "backup-requirements.txt").read_text(
             encoding="utf-8"
@@ -783,6 +795,8 @@ class BackupArtifactTests(unittest.TestCase):
             PROJECT_ROOT / "deploy" / "bwondercomics-backup-files.service",
             PROJECT_ROOT / "deploy" / "bwondercomics-backup-files.timer",
             PROJECT_ROOT / "deploy" / "ops" / "bwondercomics-ops-worker.service",
+            PROJECT_ROOT / "deploy" / "host-status" / "diagnostics-refresh.service",
+            PROJECT_ROOT / "deploy" / "host-status" / "diagnostics-refresh.timer",
         ]
         subprocess.run([analyzer, "verify", *(str(path) for path in units)], check=True)
         for expression in ("*-*-* 03:00:00 UTC", "Sun *-*-* 04:00:00 UTC"):

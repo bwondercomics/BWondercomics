@@ -4,7 +4,11 @@ After=network.target
 
 [Service]
 Type=oneshot
+User=dbmelville
+Group=dbmelville
 WorkingDirectory=/srv/bw-quality
 Environment=BWC_BASE_DIR=/srv/bw-quality
 EnvironmentFile=/srv/bw-quality/deploy/bwondercomics.env
 ExecStart=/usr/bin/env python3 /srv/bw-quality/deploy/host-status/diagnostics_refresh.py
+UMask=0027
+NoNewPrivileges=true

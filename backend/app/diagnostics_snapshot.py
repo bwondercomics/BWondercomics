@@ -8,6 +8,7 @@ import subprocess
 from contextlib import contextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from uuid import uuid4
 
 try:
     import fcntl
@@ -34,6 +35,8 @@ from .settings import settings
 
 APP_STARTED_AT = datetime.now(timezone.utc)
 SNAPSHOT_RETENTION_HOURS = 72
+HOST_STATUS_WARNING_SECONDS = 90 * 60
+HOST_STATUS_ERROR_SECONDS = 2 * 60 * 60
 BACKUP_SCHEMA_VERSION = 1
 BACKUP_CATALOG_LIMIT = 60
 BACKUP_FRESHNESS_HOURS = {
@@ -141,6 +144,75 @@ def _fail2ban_status() -> dict:
         "totalBanned": int(payload.get("totalBanned") or 0),
         "jailBreakdown": payload.get("jailBreakdown") or "",
     }
+
+
+def _host_status(now: datetime | None = None) -> dict:
+    current = now or datetime.now(timezone.utc)
+    path = settings.base_dir / "var" / "diagnostics" / "host.json"
+    if not path.exists():
+        return {
+            "schemaVersion": 1,
+            "generatedAt": None,
+            "ageSeconds": None,
+            "status": "error",
+            "message": "Host status snapshot is missing.",
+            "disks": {"status": "error", "message": "Disk status unavailable.", "items": []},
+            "containers": {
+                "status": "error",
+                "message": "Container status unavailable.",
+                "items": [],
+            },
+            "units": {"status": "error", "message": "Automation status unavailable.", "items": []},
+            "certificates": {
+                "status": "error",
+                "message": "Certificate status unavailable.",
+                "items": [],
+            },
+        }
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict) or payload.get("schemaVersion") != 1:
+            raise ValueError("unsupported host status schema")
+        generated_at = datetime.fromisoformat(str(payload["generatedAt"]).replace("Z", "+00:00"))
+        if generated_at.tzinfo is None:
+            generated_at = generated_at.replace(tzinfo=timezone.utc)
+        age_seconds = max(0, int((current - generated_at.astimezone(timezone.utc)).total_seconds()))
+        sections = [
+            payload.get("disks") or {},
+            payload.get("containers") or {},
+            payload.get("units") or {},
+            payload.get("certificates") or {},
+        ]
+        status = _merge_statuses(*(str(section.get("status") or "error") for section in sections))
+        if age_seconds > HOST_STATUS_ERROR_SECONDS:
+            status = "error"
+            age_message = f"Host status snapshot is stale ({age_seconds // 60} minutes old)."
+        elif age_seconds > HOST_STATUS_WARNING_SECONDS:
+            status = _merge_statuses(status, "warning")
+            age_message = f"Host status snapshot is aging ({age_seconds // 60} minutes old)."
+        else:
+            age_message = f"Host status snapshot is current ({age_seconds // 60} minutes old)."
+        return {**payload, "ageSeconds": age_seconds, "status": status, "message": age_message}
+    except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
+        return {
+            "schemaVersion": 1,
+            "generatedAt": None,
+            "ageSeconds": None,
+            "status": "error",
+            "message": "Host status snapshot is invalid.",
+            "disks": {"status": "error", "message": "Disk status unavailable.", "items": []},
+            "containers": {
+                "status": "error",
+                "message": "Container status unavailable.",
+                "items": [],
+            },
+            "units": {"status": "error", "message": "Automation status unavailable.", "items": []},
+            "certificates": {
+                "status": "error",
+                "message": "Certificate status unavailable.",
+                "items": [],
+            },
+        }
 
 
 def _dist_info() -> dict:
@@ -693,7 +765,9 @@ def collect_test_status(db: Session) -> dict:
     }
 
 
-def _health_checks(db: Session, backups: dict | None = None) -> dict:
+def _health_checks(
+    db: Session, backups: dict | None = None, host_status: dict | None = None
+) -> dict:
     database_status = {"status": "ok", "message": "Database connection successful."}
     try:
         db.execute(text("SELECT 1"))
@@ -717,19 +791,40 @@ def _health_checks(db: Session, backups: dict | None = None) -> dict:
     }
 
     fail2ban = _fail2ban_status()
+    host = host_status if host_status is not None else _host_status()
 
     return {
         "database": database_status,
         "dist": dist_status,
         "backups": backup_status,
         "fail2ban": fail2ban,
+        "hostSnapshot": {"status": host["status"], "message": host["message"]},
+        "disk": {
+            "status": (host.get("disks") or {}).get("status") or "error",
+            "message": (host.get("disks") or {}).get("message") or "Disk status unavailable.",
+        },
+        "containers": {
+            "status": (host.get("containers") or {}).get("status") or "error",
+            "message": (host.get("containers") or {}).get("message")
+            or "Container status unavailable.",
+        },
+        "automation": {
+            "status": (host.get("units") or {}).get("status") or "error",
+            "message": (host.get("units") or {}).get("message") or "Automation status unavailable.",
+        },
+        "certificates": {
+            "status": (host.get("certificates") or {}).get("status") or "error",
+            "message": (host.get("certificates") or {}).get("message")
+            or "Certificate status unavailable.",
+        },
     }
 
 
 def build_snapshot(db: Session, source: str = "manual") -> dict:
     now = datetime.now(timezone.utc)
     backups = collect_backup_summary(now=now)
-    health_checks = _health_checks(db, backups=backups)
+    host_status = _host_status(now=now)
+    health_checks = _health_checks(db, backups=backups, host_status=host_status)
     overall_status = _merge_statuses(*(check["status"] for check in health_checks.values()))
     deploy_status = {
         "server": {
@@ -783,6 +878,34 @@ def build_snapshot(db: Session, source: str = "manual") -> dict:
                 "summary": health_checks["fail2ban"]["message"],
                 "details": health_checks["fail2ban"].get("jailBreakdown") or "No jail details",
             },
+            {
+                "id": "host-disks",
+                "label": "Host Disks",
+                "status": health_checks["disk"]["status"],
+                "summary": health_checks["disk"]["message"],
+                "details": "/ and /mnt/archive",
+            },
+            {
+                "id": "containers",
+                "label": "Containers",
+                "status": health_checks["containers"]["status"],
+                "summary": health_checks["containers"]["message"],
+                "details": "Docker Compose project state",
+            },
+            {
+                "id": "automation",
+                "label": "Automation",
+                "status": health_checks["automation"]["status"],
+                "summary": health_checks["automation"]["message"],
+                "details": "Diagnostics, Ops, and backup units",
+            },
+            {
+                "id": "certificates",
+                "label": "TLS Certificates",
+                "status": health_checks["certificates"]["status"],
+                "summary": health_checks["certificates"]["message"],
+                "details": "Main and chat HTTPS endpoints",
+            },
         ]
     }
     return {
@@ -800,6 +923,7 @@ def build_snapshot(db: Session, source: str = "manual") -> dict:
         "backups": backups,
         "serviceStatus": service_status,
         "testStatus": test_status,
+        "hostStatus": host_status,
     }
 
 
@@ -850,6 +974,29 @@ def prune_snapshot_history() -> None:
             continue
 
 
+def _write_snapshot_file(path: Path, payload: str) -> None:
+    temporary = path.parent / f".{path.name}.{uuid4().hex}.tmp"
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o640)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            descriptor = None
+            handle.write(payload)
+            handle.write("\n")
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+        directory_fd = os.open(path.parent, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        temporary.unlink(missing_ok=True)
+
+
 def write_snapshot(snapshot: dict) -> dict:
     with _snapshot_lock():
         root = _snapshot_root()
@@ -858,9 +1005,9 @@ def write_snapshot(snapshot: dict) -> dict:
         history.mkdir(parents=True, exist_ok=True)
         payload = json.dumps(snapshot, ensure_ascii=True, indent=2, sort_keys=True)
         latest = latest_snapshot_path()
-        latest.write_text(payload, encoding="utf-8")
+        _write_snapshot_file(latest, payload)
         timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-        (history / f"{timestamp}.json").write_text(payload, encoding="utf-8")
+        _write_snapshot_file(history / f"{timestamp}.json", payload)
         prune_snapshot_history()
     return snapshot
 

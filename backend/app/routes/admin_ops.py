@@ -9,15 +9,17 @@ surface to run approved maintenance jobs.
 from __future__ import annotations
 
 import json
+import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Query, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from ..db import SessionLocal, get_db
@@ -49,6 +51,14 @@ class FinishRunRequest(BaseModel):
     output_truncated: bool = Field(default=False, alias="outputTruncated")
 
 
+class QueuePublishError(RuntimeError):
+    """Raised when a run record exists but its queue marker could not be published."""
+
+
+class RunCreateError(RuntimeError):
+    """Raised when the durable run record could not be created."""
+
+
 def _ops_root() -> Path:
     return settings.base_dir / "var" / "ops"
 
@@ -72,6 +82,31 @@ def queue_file_path(run_id: str) -> Path:
 
 def log_file_path(run_id: str) -> Path:
     return _logs_dir() / f"{run_id}.log"
+
+
+def _publish_queue_payload(run_id: str, payload: dict) -> None:
+    queue_dir = _queue_dir()
+    queue_path = queue_file_path(run_id)
+    temporary_path = queue_dir / f".{run_id}.{uuid4().hex}.tmp"
+    encoded = json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True).encode("utf-8")
+    descriptor: int | None = None
+    try:
+        descriptor = os.open(temporary_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o640)
+        with os.fdopen(descriptor, "wb") as handle:
+            descriptor = None
+            handle.write(encoded)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, queue_path)
+        directory_fd = os.open(queue_dir, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
+    finally:
+        if descriptor is not None:
+            os.close(descriptor)
+        temporary_path.unlink(missing_ok=True)
 
 
 def _describe_command(command_id: str) -> dict | None:
@@ -145,7 +180,11 @@ def enqueue_ops_command(command_id: str, user_email: str | None, db: Session) ->
         disrupts_api=bool(command["disruptsApi"]),
     )
     db.add(run)
-    db.commit()
+    try:
+        db.commit()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise RunCreateError("Unable to create the Ops run") from exc
     db.refresh(run)
 
     payload = {
@@ -155,10 +194,18 @@ def enqueue_ops_command(command_id: str, user_email: str | None, db: Session) ->
         "queuedAt": iso_z(now),
         "userEmail": user_email or "",
     }
-    queue_file_path(str(run.id)).write_text(
-        json.dumps(payload, ensure_ascii=True, indent=2, sort_keys=True),
-        encoding="utf-8",
-    )
+    try:
+        _publish_queue_payload(str(run.id), payload)
+    except OSError as exc:
+        finished_at = datetime.now(timezone.utc)
+        run.status = "failed"
+        run.finished_at = finished_at
+        run.duration_seconds = max(0, int((finished_at - now).total_seconds()))
+        run.error_message = "queue_publish_failed"
+        db.add(run)
+        db.commit()
+        db.refresh(run)
+        raise QueuePublishError("Unable to publish the Ops queue item") from exc
     return run
 
 
@@ -229,7 +276,18 @@ def _queue_requested_command(
             "command": _describe_command(command_id),
         }, 409
 
-    run = enqueue_ops_command(command_id, admin.email, db)
+    try:
+        run = enqueue_ops_command(command_id, admin.email, db)
+    except RunCreateError:
+        return {
+            "error": "Unable to create Ops run",
+            "errorCode": "run_create_failed",
+        }, 503
+    except QueuePublishError:
+        return {
+            "error": "Unable to publish Ops queue item",
+            "errorCode": "queue_publish_failed",
+        }, 503
     return {"run": _serialize_run(run)}, 200
 
 
@@ -289,7 +347,11 @@ def run_command_stream(payload: RunCommandRequest, request: Request, db: Session
 @router.get("/api/admin/ops-history")
 @router.get("/api/admin/ops/history")
 @router.get("/api/admin/diagnostics/ops-history")
-def ops_history(request: Request, db: Session = Depends(get_db), limit: int = 50):
+def ops_history(
+    request: Request,
+    db: Session = Depends(get_db),
+    limit: int = Query(default=50, ge=1, le=100),
+):
     admin, error = require_ops_access(request, db)
     if not admin:
         return JSONResponse(status_code=403, content={"error": error or "Ops access denied"})

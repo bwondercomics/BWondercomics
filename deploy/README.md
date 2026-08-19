@@ -199,7 +199,10 @@ including all 33 stored snapshot payloads in the final drill; use the fixed-dest
 
 ## Diagnostics Snapshot Timer + Ops Worker
 
-The admin **Diagnostics** tab is now snapshot-backed and read-only. The separate `/ops/` surface handles queued commands, run output, and backup actions.
+The admin **Diagnostics** tab is snapshot-backed and read-only with respect to host operations. Its
+manual refresh only rewrites diagnostics JSON. The separately gated `/ops/` surface handles queued
+commands, run output, and backup actions. The FastAPI host port is loopback-only; public and LAN
+traffic must pass through Caddy so the proxy and backend IP gates cannot be bypassed.
 
 Set these in `deploy/bwondercomics.env`:
 
@@ -220,32 +223,65 @@ Notes:
 - Caddy and the backend do not parse allowlists the same way, so keep `OPS_ALLOWED_IPS` and `CADDY_OPS_ALLOWED_IPS` in sync using the formats above.
 - If you change either allowlist in `deploy/bwondercomics.env`, recreate `bwondercomics-api` and `caddy`; a plain container restart will not reload updated env-file values.
 - `/ops/` is intended for LAN/local access. If you browse the public site through a VPN or public egress IP, Caddy will still deny `/ops/` unless that network is explicitly allowlisted.
+- A missing `HOST_AUTOMATION_TOKEN` is a permanent configuration error (exit 78). The worker unit
+  does not restart that status, and its start-rate limit prevents other repeated failures from
+  flooding the journal.
 
-Install the hourly diagnostics refresh timer:
+If an older worker is already restarting because the token is absent, stop it before provisioning:
+
+```bash
+sudo systemctl stop bwondercomics-ops-worker.service
+```
+
+Generate the shared token without printing it, add it to the mode-0600 environment file, and
+recreate the API so the container receives the new value. Do not put the token in shell history,
+logs, commits, screenshots, or diagnostics output.
+
+Provision the writable runtime directories:
+
+```bash
+sudo install -d -m 0750 -o dbmelville -g dbmelville \
+  /srv/bw-quality/var/diagnostics/admin \
+  /srv/bw-quality/var/diagnostics/admin/history \
+  /srv/bw-quality/var/diagnostics/backups \
+  /srv/bw-quality/var/ops/queue \
+  /srv/bw-quality/var/ops/logs
+
+# Uses the latest validated scheduled database artifact as the rollback point.
+# Revision 0019 only relaxes an obsolete column on legacy Ops installations.
+make migrate
+
+docker compose --env-file deploy/bwondercomics.env \
+  -f deploy/bwondercomics-compose.yml \
+  up -d --force-recreate bwondercomics-api
+```
+
+Install the hourly diagnostics refresh timer and hardened worker together:
 
 ```bash
 sudo cp /srv/bw-quality/deploy/host-status/diagnostics-refresh.service /etc/systemd/system/diagnostics-refresh.service
 sudo cp /srv/bw-quality/deploy/host-status/diagnostics-refresh.timer /etc/systemd/system/diagnostics-refresh.timer
-sudo systemctl daemon-reload
-sudo systemctl enable --now diagnostics-refresh.timer
-```
-
-Install the host ops worker:
-
-```bash
-sudo install -d -m 0750 -o dbmelville -g dbmelville \
-  /srv/bw-quality/var/ops/queue /srv/bw-quality/var/ops/logs \
-  /srv/bw-quality/var/diagnostics/backups
 sudo cp /srv/bw-quality/deploy/ops/bwondercomics-ops-worker.service /etc/systemd/system/bwondercomics-ops-worker.service
 sudo systemctl daemon-reload
-sudo systemctl enable --now bwondercomics-ops-worker.service
-sudo systemctl restart bwondercomics-ops-worker.service
-systemctl show bwondercomics-ops-worker.service -p User -p Group -p MainPID
+sudo systemctl reset-failed bwondercomics-ops-worker.service
+sudo systemctl enable --now diagnostics-refresh.timer bwondercomics-ops-worker.service
+sudo systemctl start diagnostics-refresh.service
+
+systemctl show bwondercomics-ops-worker.service \
+  -p User -p Group -p MainPID -p ActiveState -p SubState -p NRestarts
+systemctl list-timers --all --no-pager diagnostics-refresh.timer
+make admin-ops-check
 ```
 
 Notes:
 
 - Admin diagnostics reads the latest file in `var/diagnostics/admin/latest.json`.
+- The hourly host collector atomically writes non-secret mode-0640 state to
+  `var/diagnostics/host.json`, then asks the API to produce the combined snapshot. It checks `/` and
+  `/mnt/archive`, Compose containers, required systemd units, and TLS expiry for the main and chat
+  hosts.
+- Disk space warns below 20% free and errors below 10%. Certificates warn below 30 days and error
+  below 7. Host data warns after 90 minutes and errors when missing, invalid, or over two hours old.
 - The worker runs as `dbmelville`, processes queue files from `var/ops/queue/`, and writes run logs
   to `var/ops/logs/`. This keeps browser-triggered production backup artifacts owned by the same
   service account as scheduled/manual artifacts.
@@ -254,10 +290,21 @@ Notes:
   unacknowledged marker for startup recovery.
 - If `OPS_ALLOWED_IPS` or `CADDY_OPS_ALLOWED_IPS` is empty, `/ops/` stays disabled.
 - Ensure `var/diagnostics`, `var/diagnostics/admin`, `var/diagnostics/admin/history`, `var/ops/queue`, and `var/ops/logs` are writable by the API container user (`uid=1000` in the default compose setup), or diagnostics refreshes and queued ops jobs will fail with permission errors.
+- Queue files are published by an atomic mode-0640 rename. Publication failure records
+  `queue_publish_failed`; a command removed from the catalog before execution records
+  `command_unavailable` rather than remaining queued.
+- Production installations that predate Alembic's Ops table retain an extra `command` column.
+  Migration `0019_admin_ops_legacy_command` preserves its historical values and makes it nullable
+  so current catalog-based runs can be inserted. A durable run insert failure returns
+  `run_create_failed` instead of an unhandled 500.
 
 ## Analytics (Umami)
 
 Umami is an optional part of the Docker stack (compose profile: `analytics`). The FastAPI backend proxies Umami under `/umami/` and serves `/analytics.js` to inject the tracker into the main site pages.
+
+Production is intentionally pinned to Umami `3.0.3` and its immutable multi-platform digest. Treat
+an Umami upgrade as a separate migration: back up its database, run the upstream migration, and
+verify every admin analytics panel that queries Umami tables directly.
 
 1. Set the Umami secrets in `deploy/bwondercomics.env`:
 

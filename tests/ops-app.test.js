@@ -155,6 +155,8 @@ describe('ops app', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(document.getElementById('opsCommands').textContent).toContain('Run Frontend Tests');
+    expect(document.querySelector('.ops-command-run').disabled).toBe(true);
+    expect(document.getElementById('opsNotice').textContent).toContain('Command runner disabled');
     expect(document.getElementById('opsRuns').textContent).toContain('queued');
     expect(document.getElementById('opsRuns').textContent).toContain('running');
     expect(document.getElementById('opsRuns').textContent).toContain('completed');
@@ -205,5 +207,87 @@ describe('ops app', () => {
     expect(text).toContain('archive_layout_unsafe');
     expect(text).toContain('production-status');
     expect(text).toContain('/mnt/archive/backups/bwondercomics');
+  });
+
+  it('does not queue a confirmed command when confirmation is cancelled', async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchSpy = vi.fn(async (url, options = {}) => {
+      if (String(url).endsWith('/api/admin/ops')) {
+        return {
+          ok: true,
+          json: async () => ({
+            enabled: true,
+            commands: [
+              {
+                id: 'restart',
+                label: 'Restart Stack',
+                requiresConfirm: true,
+              },
+            ],
+          }),
+        };
+      }
+      return originalFetch(url, options);
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+    vi.stubGlobal(
+      'confirm',
+      vi.fn(() => false)
+    );
+    vi.resetModules();
+    await import('../ops/app.js');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    document.querySelector('.ops-command-run').click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(globalThis.confirm).toHaveBeenCalledOnce();
+    expect(fetchSpy.mock.calls.some(([url]) => String(url).endsWith('/api/admin/ops/run'))).toBe(
+      false
+    );
+  });
+
+  it('queues an enabled non-disruptive command', async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchSpy = vi.fn(async (url, options = {}) => {
+      const path = String(url);
+      if (path.endsWith('/api/admin/ops')) {
+        return {
+          ok: true,
+          json: async () => ({
+            enabled: true,
+            commands: [{ id: 'stack-logs', label: 'Capture Stack Logs', requiresConfirm: false }],
+          }),
+        };
+      }
+      if (path.endsWith('/api/admin/ops/run')) {
+        return {
+          ok: true,
+          json: async () => ({
+            run: { id: 'run-1', label: 'Capture Stack Logs', status: 'queued' },
+          }),
+        };
+      }
+      if (path.endsWith('/api/admin/ops/runs/run-1')) {
+        return {
+          ok: true,
+          json: async () => ({
+            run: { id: 'run-1', label: 'Capture Stack Logs', status: 'queued', output: '' },
+          }),
+        };
+      }
+      return originalFetch(url, options);
+    });
+    vi.stubGlobal('fetch', fetchSpy);
+    vi.resetModules();
+    await import('../ops/app.js');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    document.querySelector('.ops-command-run').click();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const runCall = fetchSpy.mock.calls.find(([url]) => String(url).endsWith('/api/admin/ops/run'));
+    expect(runCall?.[1]?.method).toBe('POST');
+    expect(document.getElementById('opsNotice').textContent).toContain('Queued Capture Stack Logs');
   });
 });

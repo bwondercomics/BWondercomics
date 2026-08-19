@@ -60,4 +60,25 @@ describe('shared kernel boundary', () => {
       /handle \/shared\/page-builder\/\* \{[\s\S]*?root \* \/srv\/bwondercomics\/root[\s\S]*?file_server[\s\S]*?\}/
     );
   });
+
+  it('production ingress applies the conservative security header contract', () => {
+    const caddyfile = readFileSync('deploy/Caddyfile', 'utf8');
+    expect(caddyfile).toContain('Strict-Transport-Security "max-age=31536000"');
+    expect(caddyfile).not.toContain('includeSubDomains');
+    expect(caddyfile).not.toContain('preload');
+    expect(caddyfile).toContain('X-Content-Type-Options "nosniff"');
+    expect(caddyfile).toContain('Referrer-Policy "strict-origin-when-cross-origin"');
+    expect(caddyfile).toContain('X-Frame-Options "SAMEORIGIN"');
+    expect(caddyfile).toContain('Content-Security-Policy "frame-ancestors \'self\'"');
+    expect(caddyfile.match(/import security_headers/g)).toHaveLength(2);
+  });
+
+  it('production binds the API to loopback and pins the deployed Umami release', () => {
+    const compose = readFileSync('deploy/bwondercomics-compose.yml', 'utf8');
+    expect(compose).toContain('127.0.0.1:${BWC_API_PORT:-8000}:8000');
+    expect(compose).toContain(
+      'ghcr.io/umami-software/umami:3.0.3@sha256:28f263fe06f79ebffa5a6a6e9bd33b7a278e9342a88e0bdac812416c9f9e4361'
+    );
+    expect(compose).not.toContain('umami:postgresql-latest');
+  });
 });
