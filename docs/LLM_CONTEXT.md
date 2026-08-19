@@ -86,6 +86,11 @@ The main compose stack defines:
 - Canonical backup engine: `scripts/backup_artifacts.py`; Make, Ops, and compatibility scripts
   delegate to it. Production jobs use the pinned `.backup-venv` and fail closed on archive/source
   layout violations; Compose sets `BWC_BACKUP_DIAGNOSTICS_MODE=production`.
+- Isolated recovery proof: `scripts/restore_drill.py` and `make restore-drill` validate committed
+  manifests/checksums, restore custom archives into a network-isolated PostgreSQL 16 scratch
+  container, verify critical counts/builder history, extract files only into a temporary tree, and
+  record bounded non-secret logs under the archive disk. The command accepts artifact IDs, never a
+  production database target.
 - DB-only compose file: `deploy/bwondercomics-db-compose.yml`
 - Fail2ban config lives in `deploy/fail2ban/`
 - Namecheap DDNS uses `deploy/namecheap-ddns.sh` with `deploy/namecheap-ddns.env*`; the installed `namecheap-ddns.timer` runs it 2 minutes after boot and then every 10 minutes.

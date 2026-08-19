@@ -231,9 +231,12 @@ jq . var/diagnostics/backups/files.json
 jq . var/diagnostics/backups/catalog.json
 ```
 
-Keep Phase 4 open until the enabled schedules—not manual starts or systemd retries—produce three
-consecutive nightly database sets and one weekly file set. Record their artifact IDs, timestamps,
-owners, and status/catalog results. Phase 5 owns the isolated database and file restore drills.
+The Phase 4 observation gate closed on 2026-08-19. The timer produced eight consecutive nightly
+database sets from `database-20260812T030002Z-ca4baefae23f` through
+`database-20260819T030002Z-bac87e071852`, plus scheduled weekly file set
+`files-20260816T040001Z-db28719014b0`. All attempts and manifests validated; the catalog reported
+zero corrupt sets. Continue treating enabled schedules—not manual starts or systemd retries—as the
+recurring-health evidence.
 
 #### Verify and retain artifacts
 
@@ -277,11 +280,105 @@ The legacy environment copy formerly under ordinary backups was quarantined with
 2026-08-02. Rotate credentials as a separate security task. Maintain an encrypted/offline secret
 recovery procedure; ordinary backups intentionally cannot recreate production secrets.
 
-### Restore (legacy only; be careful)
+### Isolated restore drill
 
-The current Make restore commands accept legacy plain-SQL/tar inputs and are destructive. They are
-legacy-only; do not use them as proof that a schema-v1 custom archive is recoverable. Isolated
-custom-archive and temporary-tree restore drills are Phase 5.
+`scripts/restore_drill.py` proves recoverability without accepting a production database target.
+Select committed schema-v1 database and file artifact IDs, then run:
+
+```bash
+cd /srv/bw-quality
+make restore-drill \
+  DATABASE_ARTIFACT_ID=database-YYYYMMDDTHHMMSSZ-xxxxxxxxxxxx \
+  FILE_ARTIFACT_ID=files-YYYYMMDDTHHMMSSZ-xxxxxxxxxxxx
+```
+
+The helper re-hashes each artifact and validates its exact manifest/checksum contract before doing
+anything else. The database drill starts the locally available `postgres:16-alpine` image with no
+network, creates a fixed scratch database from `template0`, streams the custom archive through
+`pg_restore --exit-on-error --single-transaction --no-owner --no-privileges --no-tablespaces`,
+runs `ANALYZE`, and compares Alembic state plus every critical-table row count with the manifest. It
+also loads a bounded ordered builder graph and verifies snapshot constraints, indexes, and every
+stored versioned payload. The container and its anonymous storage volume are removed on success or
+failure.
+
+The file drill manually extracts only regular allowlisted members into a newly created temporary
+directory. It rejects absolute/traversal, duplicate, non-file, out-of-root, and sensitive paths;
+then compares file counts, per-root counts, and uncompressed bytes with the manifest before removing
+the temporary tree. Neither drill writes into the repository data roots. A mode-`0640` non-secret
+success or failure record is written under `/mnt/archive/backups/bwondercomics/drill-logs/`.
+
+#### Recorded drill: 2026-08-12
+
+- Database artifact `database-20260812T001940Z-03c34abf4194`, SHA-256
+  `30d3e811f3b230762134dbed26e576320f99a8cc27973888fb90cc6d5c3502ac`, restored and verified in
+  4.252 seconds. PostgreSQL major 16, Alembic `0018_builder_page_snapshots`, all 12 critical table
+  counts, builder graph, snapshot schema, and cleanup passed. The new snapshot table contained zero
+  rows, matching the immediate post-migration manifest, so there was no stored payload to inspect in
+  this first drill.
+- File artifact `files-20260812T002104Z-4e3e93cdaa70`, SHA-256
+  `6f6fd092b97b293e91e0405e1885db47ac03009df3a2ee2ba23c41a86ecc2b21`, restored and verified in
+  4.923 seconds. All 286 allowlisted files (575,861,942 uncompressed bytes) matched the five
+  per-root counts; sensitive-path rejection and temporary-tree cleanup passed.
+- Combined record:
+  `drill-logs/restore-drill-20260812T003924Z-15fb10d6d61e.json` (10.498 seconds total). Two earlier
+  failure records demonstrate fail-closed cleanup while correcting the helper; neither touched the
+  production database or live file roots.
+
+#### Final snapshot-bearing drill: 2026-08-19
+
+- Database artifact `database-20260819T050323Z-ee1c072fb897`, SHA-256
+  `49b1a3363cf5f7fea29e81198b207daa613c927cc56f933cacf1f92fdcd81424`, restored and verified in
+  4.506 seconds. PostgreSQL major 16, Alembic `0018_builder_page_snapshots`, all 12 critical table
+  counts, the builder graph, snapshot schema, and all 33 stored snapshot payloads passed. The
+  isolated container and anonymous volume were removed.
+- Scheduled file artifact `files-20260816T040001Z-db28719014b0`, SHA-256
+  `3a08acf149a5b26243c5a77ec4b24578598a23f8d0dc0ca76bf372b0c0262a4f`, restored and verified in
+  4.980 seconds. All 286 allowlisted files (575,861,942 uncompressed bytes), the five per-root
+  counts, sensitive-path checks, and temporary-tree cleanup passed.
+- Combined record:
+  `drill-logs/restore-drill-20260819T050339Z-f78438f7dd32.json` (11.208 seconds total). This drill
+  followed the authenticated `mechamoms/test` save-two/restore/delete/recover exercise, closing the
+  first drill's zero-snapshot limitation without touching production data during restoration.
+
+### Production disaster recovery (destructive; authorization required)
+
+The isolated drill above is the normal verification command. A production restore is a separate,
+deliberately manual incident procedure. It must have an identified incident owner, a second-person
+review when available, exact artifact IDs/checksums, an announced maintenance window, and a written
+rollback decision before any destructive command runs.
+
+1. Confirm the failure domain and preserve evidence. Do not replace a healthy database merely to
+   test a backup. Record service state, logs, current Alembic revision, target artifact IDs, and why
+   repair in place is unsafe.
+2. If the current database is readable, run `bwondercomics-backup-db.service` once and verify the
+   new safety artifact before proceeding. Preserve the current durable-file roots separately if
+   corruption is not already present.
+3. Verify the selected database/file manifests and checksums, run the isolated `make restore-drill`
+   command against those exact IDs, and require a successful drill log. Never restore from a bare
+   archive that lacks its committed manifest and checksum.
+4. Put the site into the announced maintenance state, stop `bwondercomics-api`, and stop the backup
+   timers for the incident. Keep PostgreSQL available only to the recovery operator. Confirm the
+   Compose project, volume, database name, and artifact paths a second time.
+5. Recreate the named application database from `template0`, then stream the selected custom
+   archive through PostgreSQL 16 `pg_restore` with `--exit-on-error --single-transaction`. Apply
+   scratch-tested owner/ACL handling deliberately; do not accept ignored restore errors. Run
+   `ANALYZE` afterward.
+6. If file recovery is required, extract into a new staging directory first. Compare the extracted
+   roots and counts with the manifest, retain or snapshot the current live roots, and only then
+   synchronize the five allowlisted roots (`comics/`, `protected/comics/`, `media/`,
+   `protected/media/`, and `assets/uploads/`). Ordinary artifacts intentionally contain no
+   environment file or secrets; restore those through the separate encrypted secret procedure.
+7. Run migrations only when the restored artifact revision is older than the deployed code. Verify
+   Alembic state, critical row counts, builder pages/snapshots, representative public/protected
+   media, authentication, and admin/public health before restarting normal traffic.
+8. Restart the API, remove maintenance mode, re-enable both backup timers, and record start/end
+   times plus validation results. If any verification fails, stop traffic again and restore the
+   pre-incident safety artifact or escalate; do not improvise partial table/file merges.
+
+### Legacy restore commands (not drill evidence)
+
+The existing Make commands accept legacy plain-SQL/tar inputs and are destructive. They do not
+validate schema-v1 manifests and must not be cited as recovery proof.
 
 - Restore DB: `make restore-db FILE=var/backups/db-YYYYMMDD-HHMMSS.sql CONFIRM=1`
 - Restore files: `make restore-files FILE=var/backups/files-YYYYMMDD-HHMMSS.tar.gz CONFIRM=1`

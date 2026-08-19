@@ -187,6 +187,14 @@ The Python quality-gate scripts assume Ruff is installed in `./.venv/`, and the 
   expected blocker in `pg_blocking_pids()` before release. The suite only accepts a database named
   `builder_history_locking_drill`; the 2026-07-31 corrective drill ran all four scenarios
   successfully.
+- `backend/tests/test_backup_artifacts.py`, `test_backup_diagnostics.py`, and `test_ops_worker.py`:
+  manifest-last database/file backup publication, exact durable-file allowlists, production
+  mount/layout failure, integrity-aware retention, fixed service/Make/Ops entry points, status and
+  catalog diagnostics, and interrupted worker ownership/acknowledgement behavior.
+- `backend/tests/test_restore_drill.py`: manifest/checksum tamper rejection, safe temporary-tree
+  extraction, traversal rejection, PostgreSQL 16 scratch command isolation, fail-fast restore and
+  row-count mismatch handling, container/volume cleanup, bounded drill logs, and rejection of any
+  production database-target argument.
 - `backend/tests/test_builder_security.py`: focused coverage for the split builder sanitizer package,
   responsive allowlists, appearance/header contracts, reader config, and destructive column-shrink
   rejection.

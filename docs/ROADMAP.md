@@ -21,7 +21,7 @@ Out of scope for `1.0.0`:
 - Advanced analytics such as cohort, funnel, or retention features
 - Additional reader display modes beyond the shipped paged and vertical-scroll modes
 
-Last updated: 2026-07-29
+Last updated: 2026-08-19
 
 ## `0.7.9` Release Baseline
 
@@ -90,11 +90,13 @@ Goal: make maintenance trustworthy without terminal guesswork.
 
 - [x] Complete transactional builder mutation history, validated current/deleted-page backend
       restore APIs, and the guarded admin History / Deleted pages recovery UI.
-- [ ] Complete validated database/file backup artifacts, scheduling, and isolated restore drills.
+- [x] Close the backup schedule window after eight consecutive timer-created DB sets and the weekly
+      file set; validated artifacts, schedules, authenticated recovery, and isolated restore drills
+      pass.
 - [ ] Verify diagnostics snapshot refresh, queue/worker behavior, permissions, and core status reporting.
 - [ ] Confirm admin diagnostics stays read-only and `/ops/` remains the separate command surface.
-- [ ] Run a backup on disposable data and perform a restore drill with exact notes.
-- [ ] Update runbook steps anywhere the real recovery or ops flow differs from the docs.
+- [x] Run validated database/file artifacts and isolated restore drills with exact non-secret notes.
+- [x] Update the recovery runbook for repeatable drills and authorized production disaster restore.
 
 ## `0.9.5` Freeze and Polish
 

@@ -1,16 +1,16 @@
 # Docs Index - 0.8.5 Builder Customization and Refactor Lock
 
-Last updated: 2026-08-01
+Last updated: 2026-08-19
 
 Current release focus:
 
 - `0.8.5` closes the builder customization roadmap, its authenticated responsive QA corrections,
   and the behavior-preserving builder refactor. That baseline is merged into `main` for the
   remaining `1.0.0` roadmap.
-- Builder-page mutation history, admin-only current/deleted restore APIs, and the guarded History /
-  Deleted pages recovery UI are complete. `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`
-  now continues with validated database/file backups on `/mnt/archive` and isolated restore drills
-  before store implementation.
+- Builder-page mutation history, admin-only current/deleted restore APIs, the guarded History /
+  Deleted pages UI, validated off-primary-disk backups, recurring schedules, authenticated recovery
+  exercise, and snapshot-bearing restore drill are complete. The finished recovery plan is retained
+  under `docs/completed-builder-plans/`.
 - The live builder canvas is the real reader route in a same-origin iframe with validated snapshots,
   target overlays, live drag/drop, chrome-collapsed Preview, device modes, guarded commands/keymaps,
   local draft undo/redo, and text-module inline editing.
@@ -39,9 +39,10 @@ Recommended starting points:
 - `docs/ROADMAP.md` - release checklist through `1.0.0`.
 - `docs/READER_BUILDER_QA.md` - `0.8.5` reader + builder regression and merge-closeout worksheet.
 - `docs/completed-builder-plans/README.md` - index of finished builder architecture, preview,
-  customization, inspector, layout, consolidation, incremental-improvement, and refactor plans.
-- `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md` - active prerequisite plan for
-  builder-page recovery and tested database/file disaster recovery.
+  customization, recovery, backup/restore, inspector, layout, consolidation,
+  incremental-improvement, and refactor plans.
+- `docs/completed-builder-plans/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md` - completed
+  builder recovery, off-primary-disk backup, schedule-observation, and restore-drill evidence.
 - `docs/BUILDER_STRIPE_STORE_PLAN.md` - follow-up plan for builder-authored one-time purchase store pages using Stripe-hosted Checkout.
 - `docs/POLISH_BACKLOG_PLAN.md` - post-0.8.5 fixes and small features; items there do not reopen the
   completed builder roadmap unless explicitly promoted into a release gate.

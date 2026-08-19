@@ -189,9 +189,13 @@ timeout, and write access only to archive/status destinations. Python checks—n
 `RequiresMountsFor`—are authoritative for directory/device safety. Only lock-contention exit `75`
 gets a 15-minute retry; ordinary failures do not auto-retry.
 
-Phase 4 is implemented in this checkout, but remains operationally pending until that rollout and
-three scheduled DB sets plus one scheduled file set are observed. Phase 5 restore drills remain
-separate.
+The live rollout completed on 2026-08-12: migration-safe pre/post-`0018` DB artifacts and the first
+file artifact passed, obsolete timers were disabled, and the replacement timers became active. The
+observation gate closed on 2026-08-19 after eight consecutive timer-created DB sets and the Sunday
+file set passed. Phase 5's isolated PostgreSQL 16 and temporary-tree restore drills also pass,
+including all 33 stored snapshot payloads in the final drill; use the fixed-destination
+`make restore-drill DATABASE_ARTIFACT_ID=... FILE_ARTIFACT_ID=...` procedure in
+`docs/OPERATIONS.md`.
 
 ## Diagnostics Snapshot Timer + Ops Worker
 

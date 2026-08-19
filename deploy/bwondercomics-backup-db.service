@@ -14,6 +14,7 @@ Environment=BACKUP_STATUS_DIR=/srv/bw-quality/var/diagnostics/backups
 Environment=REQUIRE_ARCHIVE_MOUNT=1
 Environment=ENV_FILE=/srv/bw-quality/deploy/bwondercomics.env
 Environment=COMPOSE_FILE=/srv/bw-quality/deploy/bwondercomics-compose.yml
+Environment=DOCKER_CONFIG=/tmp/bwondercomics-docker
 Environment=BACKUP_LOCK_TIMEOUT_SECONDS=15300
 ExecStartPre=/usr/bin/test -x /srv/bw-quality/.backup-venv/bin/python
 ExecStart=/usr/bin/env /srv/bw-quality/.backup-venv/bin/python /srv/bw-quality/scripts/backup_artifacts.py database

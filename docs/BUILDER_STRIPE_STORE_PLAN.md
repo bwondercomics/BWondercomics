@@ -1,10 +1,9 @@
 # Builder Stripe Store Plan
 
-Status: Planned; reader/layout prerequisite completed
+Status: Planned; reader/layout and recovery prerequisites completed
 Created: 2026-06-08
-Updated: 2026-07-16 - recorded the settled one-time/physical-product scope, regional flat-rate
-shipping contract, `/mnt/archive` decision, recovery-plan prerequisite, and secondary store UI
-reference.
+Updated: 2026-08-19 - recovery prerequisite completed; one-time/physical-product scope, regional
+flat-rate shipping contract, and secondary store UI reference remain current.
 
 ## Purpose
 
@@ -20,12 +19,13 @@ special modules, responsive column styling, preview redirect suppression, and sh
 rendering parity.
 
 The completed `builder-incremental-improvement` baseline is now merged into `main`, with
-"main = deployed" adopted. Before store implementation starts, finish
-`docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`: per-save page snapshots, admin restore,
-validated database/file backups on `/mnt/archive`, and an isolated restore drill. Finish the
-roadmap's remaining parallel ops-hardening day as well. Live Stripe keys additionally require three
-consecutive nightly database backups and a current weekly file backup, because orders make the
-database revenue data.
+"main = deployed" adopted. The recovery prerequisite in
+`docs/completed-builder-plans/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md` is complete: page
+snapshots, authenticated admin restore, validated database/file artifacts and schedules on
+`/mnt/archive`, the eight-night/one-week observation window, and the isolated PostgreSQL 16/file
+restore drill all passed. Finish the roadmap's remaining parallel ops-hardening day as well. Live
+Stripe keys continue to require healthy nightly database backups and a current weekly file backup,
+because orders make the database revenue data.
 
 Out of scope for v1:
 
@@ -52,8 +52,8 @@ Local source of truth:
 - `docs/ROADMAP_TO_1.0.md` (§2.2) - post-plan audit and decisions this plan follows: Stripe
   Checkout only for 1.0.0, provider-neutral order columns, the starred security-checklist
   additions, sequencing gates, and the expanded store definition of done.
-- `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md` - required page-level recovery,
-  off-primary-disk backup, and restore-drill gate before store/order implementation.
+- `docs/completed-builder-plans/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md` - completed
+  page-level recovery, off-primary-disk backup, schedule-observation, and restore-drill gate.
 - `docs/completed-builder-plans/READER_BLOCK_AND_LAYOUT_CUSTOMIZATION_PLAN.md` - completed
   prerequisite for builder/reader
   decoupling, reader module lifecycle, layout expansion, and preview side-effect rules.
@@ -411,8 +411,9 @@ Goal: prepare the repo for a Stripe-backed store without changing public behavio
 Implementation:
 
 - Re-audit the reader block/layout completion state and confirm the merged `main` baseline,
-  `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`, and remaining ops-hardening gates are
-  complete; only begin store implementation after those are complete or explicitly blocked.
+  `docs/completed-builder-plans/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`, and remaining
+  ops-hardening gates are complete; only begin store implementation after those are complete or
+  explicitly blocked.
 - Add the Stripe Python SDK to `backend/requirements.txt`, pinning the latest compatible version at
   implementation time. Pin `STRIPE_API_VERSION` as well; both are upgraded deliberately, never
   floating.

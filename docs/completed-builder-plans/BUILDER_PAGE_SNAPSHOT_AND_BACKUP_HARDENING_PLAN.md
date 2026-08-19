@@ -1,7 +1,6 @@
 # Builder Page Snapshot and Backup/Restore Hardening Plan
 
-Status: In progress; builder recovery Phases 1-3 complete; Phase 4 implemented in this checkout but
-live migration/schedule evidence pending; Phase 5 pending
+Status: Complete (2026-08-19)
 Created: 2026-07-16
 Owner surfaces: builder persistence and admin recovery UI, database/file backup automation, restore
 verification, and operations documentation
@@ -102,18 +101,19 @@ databases should be analyzed before use.
   byte-verified retention, bounded status records, and mode-explicit freshness/error diagnostics are
   implemented and tested. Production uses the pinned `.backup-venv`; local developer backups may
   keep using `.venv`.
-- The current restore paths either load plain SQL into an existing database or destructively drop
-  the named database. Neither path is the required isolated scratch restore drill.
-- Live host inspection on 2026-08-02 confirmed `/dev/sdb1` is a distinct ext4 filesystem mounted
-  read/write by the host with no recorded error-remount since boot. The remaining blocker is
-  permissions: `/mnt/archive/backups` is root-owned and the `dbmelville` service account cannot
-  create the canonical hierarchy. The old BWonderComics timer invokes the rewired compatibility
-  target and therefore produces local custom-format manifest-backed artifacts in `var/backups/`;
-  it is still the wrong schedule/destination. The stale BattleBros timer still fails; replacement
-  installation needs sudo.
+- `/dev/sdb1` is the distinct ext4 `/mnt/archive` filesystem. On 2026-08-12 the host reported it
+  clean and read/write; the pinned runtime and service-owned canonical hierarchy were provisioned,
+  obsolete timers were disabled, the Ops worker was restarted under `dbmelville`, and the explicit
+  nightly database/weekly file timers were installed and enabled.
+- The migration-safe rollout produced a validated service-owned `0017_page_scope_bindings` archive,
+  applied `0018_builder_page_snapshots`, then produced a clean head archive plus a 286-member file
+  archive. Eight consecutive timer-created nightly database sets from August 12 through August 19
+  and the August 16 timer-created weekly file set all validated. A final snapshot-bearing database
+  artifact and the scheduled file artifact also passed the isolated PostgreSQL 16/temporary-tree
+  restore drill.
 - The legacy environment copy was moved, without reading or deleting it, from ordinary backups to
   `var/secret-recovery-quarantine/` with mode `0600`. Credential rotation remains a separate
-  security follow-up. All legacy DB/file dumps remain preserved for Phase 5.
+  security follow-up. All legacy DB/file dumps remain preserved for disaster recovery.
 
 ## Scope
 
@@ -672,6 +672,25 @@ critical table is `builder_page_snapshots`, applies `0018_builder_page_snapshots
 artifact with no missing critical tables, runs both hardened services successfully, enables the
 timers, and observes three scheduled DB sets plus one scheduled file set.
 
+Live rollout addendum (`2026-08-12`): the archive filesystem reported clean/read-write and the
+canonical runtime/layout was provisioned with `dbmelville:dbmelville` ownership. The replacement
+units were installed, their per-user Docker-config dependency was removed with a private
+`DOCKER_CONFIG`, obsolete timers were disabled, and the Ops worker was verified active under
+`dbmelville`. Service-owned artifact `database-20260812T001646Z-9cbea7282a66` captured
+`0017_page_scope_bindings` with `builder_page_snapshots` as its sole missing critical table. After
+`0018_builder_page_snapshots`, artifact `database-20260812T001940Z-03c34abf4194` reported no missing
+critical tables, and `files-20260812T002104Z-4e3e93cdaa70` captured 286 allowlisted files with all
+five root counts. Manifests, checksums, `0640` modes, and service ownership passed. Both new timers
+are enabled/active; close Phase 4 only after the scheduled three-night/one-week observation window.
+
+Observation completion addendum (`2026-08-19`): Complete. The timer published eight consecutive
+nightly database sets from `database-20260812T030002Z-ca4baefae23f` through
+`database-20260819T030002Z-bac87e071852` and the scheduled weekly file set
+`files-20260816T040001Z-db28719014b0`. The first three nightly sets already satisfied the
+consecutive-run requirement; the remaining daily successes extended the evidence window. Catalog
+verification reported 11 database sets and two file sets after the final manual acceptance
+artifact, with zero corrupt sets and no deletions. The scheduled observation gate is closed.
+
 ### Phase 5 - Restore drill and gate closeout
 
 Goal: prove the artifacts are recoverable and make the procedure repeatable.
@@ -693,6 +712,47 @@ Acceptance criteria:
 - The drill is repeatable from checked-in instructions.
 - The roadmap recovery gate is closed before Store Phase 1 begins; live Stripe keys remain gated on
   the consecutive-backup window and documented drill evidence.
+
+Completion note (`2026-08-12`): Complete. `scripts/restore_drill.py` and the fixed-destination
+`make restore-drill` target validate schema-v1 manifests/checksums before use and expose no
+production database target. The database path uses a network-isolated `postgres:16-alpine`
+container, creates a fixed scratch database from `template0`, restores with fail-fast single-
+transaction ownership/ACL/tablespace controls, runs `ANALYZE`, and checks manifest Alembic state,
+all 12 critical table counts, builder graph loading, snapshot constraints/indexes, and every stored
+versioned payload. The container and anonymous volume are removed on success or failure. The file
+path manually extracts only regular safe allowlist members into a new temporary tree, compares
+member/per-root counts and bytes, rejects sensitive/traversal paths, and removes the tree. Bounded
+mode-`0640` success/failure logs make the procedure repeatable without secrets or database content.
+
+Live verification used database artifact `database-20260812T001940Z-03c34abf4194` (SHA-256
+`30d3e811f3b230762134dbed26e576320f99a8cc27973888fb90cc6d5c3502ac`) and file artifact
+`files-20260812T002104Z-4e3e93cdaa70` (SHA-256
+`6f6fd092b97b293e91e0405e1885db47ac03009df3a2ee2ba23c41a86ecc2b21`). PostgreSQL restoration and
+verification took 4.252 seconds; file restoration/verification took 4.923 seconds; combined record
+`restore-drill-20260812T003924Z-15fb10d6d61e` reports 10.498 seconds and complete cleanup. The
+database artifact contained zero snapshot rows immediately after migration, so snapshot schema and
+the exact zero manifest count passed while stored-payload readability had no nonempty sample.
+Focused backup/restore coverage passed 38 tests, including checksum tampering, unsafe members,
+production-target rejection, fail-fast cleanup, row-count mismatch, and log contracts. The final
+broad gate also passed: Prettier and Python formatting checks, JavaScript and Python lint, 690
+frontend/unit tests (one skipped), 226 backend tests (four skipped), the production build, and
+`git diff --check`. No visual surfaces changed in this pass, so the already-recorded Phase 3
+Playwright gate was not repeated.
+
+Final acceptance addendum (`2026-08-19`): an authenticated admin exercised the complete recovery
+flow on series page `mechamoms/test`: two distinct versions were saved, the older version was
+restored and checked after reload in preview/public output, the page was deleted, and **Deleted
+pages** recovered it as an unpublished, non-homepage draft. Persisted evidence includes two
+`page_updated` snapshots, `pre_restore`, and `page_deleted`, alongside the surrounding page/module
+mutation history. A final production database artifact,
+`database-20260819T050323Z-ee1c072fb897` (SHA-256
+`49b1a3363cf5f7fea29e81198b207daa613c927cc56f933cacf1f92fdcd81424`), captured all 33 snapshot
+payloads. The isolated drill validated all 33 as readable in 4.506 seconds and removed its container
+and volume. It paired that database with scheduled file artifact
+`files-20260816T040001Z-db28719014b0` (SHA-256
+`3a08acf149a5b26243c5a77ec4b24578598a23f8d0dc0ca76bf372b0c0262a4f`), revalidated all 286 files
+in 4.980 seconds, removed the temporary tree, and completed in 11.208 seconds. Audit record:
+`drill-logs/restore-drill-20260819T050339Z-f78438f7dd32.json`.
 
 ## Required Tests
 
@@ -745,15 +805,29 @@ Implementation phases use targeted tests while developing, then the final closeo
 - three consecutive scheduled DB artifacts plus one scheduled file artifact on `/mnt/archive`
 - one isolated DB restore drill and one temporary-tree file restore drill with recorded evidence
 
-## Completion Record
+Current gate status (`2026-08-19`): Complete. The automated gate, authenticated admin recovery
+flow, scheduled artifact observation, and snapshot-bearing isolated database/file drill all passed
+and are recorded here and in `docs/OPERATIONS.md`.
 
-When all phases are complete, add a dated closeout note containing:
+## Completion Record (`2026-08-19`)
 
-- migration and recovery-contract version;
-- snapshot retention and mutation coverage;
-- admin restore behavior, including deleted-page safeguards;
-- canonical backup destinations, schedules, retention, and secret exclusions;
-- archive checksums/artifact dates used by the drill;
-- scratch restore duration and verification summary;
-- exact automated and manual gates run;
-- any residual limitation, especially that `/mnt/archive` is off the primary disk but not off-site.
+- Migration/recovery contract: Alembic `0018_builder_page_snapshots`; payload version 1; bounded,
+  transaction-owned pre-state snapshots across page, binding, section, module, placement, reorder,
+  migration, restore, and deletion mutations.
+- Admin recovery: admin-only, bodyless validated restores with dirty-workspace/stale-context guards;
+  current restore preserves routing/publication/bindings, while deleted recovery creates an
+  unpublished, non-homepage, unbound draft. The authenticated `mechamoms/test` flow passed.
+- Production backup destination: `/mnt/archive/backups/bwondercomics`; database nightly at 03:00
+  UTC and files Sundays at 04:00 UTC. Retention protects at least 30 verified database and eight
+  verified file sets and excludes environment files, credentials, derived files, and secrets.
+- Observation: eight consecutive scheduled database artifacts and one scheduled weekly file
+  artifact passed. The final drill used the exact artifacts/checksums recorded above and verified
+  PostgreSQL 16, Alembic head, 12 critical table counts, the builder graph, all 33 snapshot payloads,
+  286 allowlisted files, sensitive-path absence, and cleanup.
+- Automated gates: formatting and Python formatting, JavaScript and Python lint, 690 frontend/unit
+  tests (one skipped), 226 backend tests (four skipped), production build, and `git diff --check`.
+  Phase 3's visual gate remains the recorded 23-test Playwright pass because this closeout changed
+  no visual surface.
+- Residual limitation: `/mnt/archive` is a separate disk, not an off-site or encrypted remote copy.
+  Production secrets remain intentionally excluded and require a separate encrypted/offline
+  recovery procedure.

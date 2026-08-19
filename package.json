@@ -17,11 +17,11 @@
     "test:coverage": "node ./node_modules/vitest/vitest.mjs run --coverage",
     "lint": "eslint reader/ admin/ shared/",
     "lint:fix": "eslint --fix reader/ admin/",
-    "lint:py": "./.venv/bin/python -m ruff check backend/app backend/alembic scripts/backup_artifacts.py deploy/ops/ops_worker.py",
+    "lint:py": "./.venv/bin/python -m ruff check backend/app backend/alembic scripts/backup_artifacts.py scripts/restore_drill.py deploy/ops/ops_worker.py",
     "format": "node ./node_modules/prettier/bin/prettier.cjs --write '**/*.{js,html,css,md}'",
     "format:check": "node ./node_modules/prettier/bin/prettier.cjs --check '**/*.{js,html,css,md}'",
-    "format:py": "./.venv/bin/python -m ruff format backend/app backend/alembic scripts/backup_artifacts.py deploy/ops/ops_worker.py",
-    "format:py:check": "./.venv/bin/python -m ruff format --check backend/app backend/alembic scripts/backup_artifacts.py deploy/ops/ops_worker.py"
+    "format:py": "./.venv/bin/python -m ruff format backend/app backend/alembic scripts/backup_artifacts.py scripts/restore_drill.py deploy/ops/ops_worker.py",
+    "format:py:check": "./.venv/bin/python -m ruff format --check backend/app backend/alembic scripts/backup_artifacts.py scripts/restore_drill.py deploy/ops/ops_worker.py"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",

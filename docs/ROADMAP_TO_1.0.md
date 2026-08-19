@@ -2,15 +2,14 @@
 
 Status: Audit complete; roadmap active
 Created: 2026-07-07 (repo-only + live-host audit at commit `cdc84f8`, branch `builder-incremental-improvement`)
-Updated: 2026-08-02 for Phase 4 backup work implemented in this checkout and remaining live rollout,
-observation, and restore-drill boundary. Original evidence anchors still point at the audit commit
-unless a later note says otherwise.
+Updated: 2026-08-19 for the completed recovery/backup gate. Original
+evidence anchors still point at the audit commit unless a later note says otherwise.
 
-Recovery status (`2026-08-02`): Phase 4 backup artifact/scheduling hardening is implemented in this
-checkout, but the live pinned-runtime/layout provisioning, service-account ownership fix,
-pre-`0018` and post-`0018` service-owned artifacts, worker restart/identity check, replacement timer
-installation, and three-night/one-week observation window remain pending. Phase 5 isolated restore
-drills have not started; the recovery gate remains open.
+Recovery status (`2026-08-19`): Complete. The pinned runtime/service-owned archive layout,
+migration-safe artifacts, replacement timers, eight consecutive nightly database sets, scheduled
+weekly file set, authenticated admin recovery exercise, and snapshot-bearing PostgreSQL 16 plus
+temporary-tree restore drill all passed with recorded cleanup evidence. The completed plan is
+archived under `docs/completed-builder-plans/`.
 
 Labels used throughout: **[C:code]** confirmed from code/docs · **[C:live]** confirmed on this host ·
 **[I]** inferred · **[V]** needs live/admin verification.
@@ -27,8 +26,9 @@ systemd/docker/backup state directly). The only outstanding items marked **[V]**
 
 ## 1. Executive summary
 
-**Release readiness:** the 0.8.5 builder baseline and page-level recovery are complete, while the
-store, disaster-recovery safety net, ops hardening, and broader 1.0 checks remain. The builder architecture is genuinely solid (shared
+**Release readiness:** the 0.8.5 builder baseline, page-level recovery, and disaster-recovery
+safety net are complete, while the store, remaining ops hardening, and broader 1.0 checks remain.
+The builder architecture is genuinely solid (shared
 renderers, sanitize-on-save _and_ on-read, same-origin preview contract, published-only public
 endpoints), and the completed builder closeout records 667 frontend tests, 131 backend tests, and 21
 visual workflows across its final phase gates. Auth/comments/premium gating remain competently
@@ -39,15 +39,14 @@ hardened.
 1. **The store doesn't exist yet** — zero payment code in the repo (no Stripe SDK, no store
    models/routes) [C:code: `backend/requirements.txt`, `backend/app/models.py`]. The plan doc is
    excellent and security-correct; it's pure build work. This is the long pole.
-2. **Operational trust was broken in three places at the audit snapshot** [C:live]: all backups
-   lived on the same disk as the database, the diagnostics snapshot was stale because the refresh
-   timer was never installed, and the ops worker was not running (queued commands would sit
-   forever). A 2026-07-16 recheck found the 916G `/mnt/archive` drive mounted read-only with only
-   three tiny legacy December 2025 archives, so the backup target is selected but not usable yet.
-   None of these are feature work and together they remain roughly a day.
-3. **Disaster recovery remains incomplete:** transactional page snapshots plus guarded current and
-   deleted-page recovery are shipped, but validated off-primary-disk backup scheduling and isolated
-   restore drills are still pending (details §2.1).
+2. **Operational trust was broken in three places at the audit snapshot** [C:live]: backups shared
+   the primary disk, diagnostics refresh was stale, and the Ops worker was not running. The backup
+   and worker portions are now repaired: `/mnt/archive` is writable and validated, recurring
+   schedules passed their observation window, and the worker runs under the service owner. The
+   remaining diagnostics/security-header checks stay in the parallel Ops track.
+3. **Disaster recovery is complete:** transactional page snapshots, guarded authenticated admin
+   recovery, validated off-primary-disk artifacts, recurring schedules, and isolated database/file
+   drills—including 33 readable snapshot payloads—passed (details §2.1).
 
 The former store scope fork is resolved: 1.0.0 ships one-time purchases with premium codes as the
 subscription bridge. The first product is physical and uses simple server-controlled regional
@@ -58,9 +57,8 @@ deployed branch.
 it), single-disk data loss, and scope creep in the builder (Phases 5–7 are where "close to done"
 can quietly become two more months).
 
-**Shortest credible path:** implement
-`docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md` with the remaining one-day ops hardening
-in parallel → build the Stripe-Checkout-only store per the existing plan → freeze everything else
+**Shortest credible path:** complete the remaining parallel Ops hardening → build the
+Stripe-Checkout-only store per the existing plan → freeze everything else
 at "verify + polish" level. Header glow and other small requests remain in the polish backlog.
 Media redesign, PayPal, and social expansion all land post-1.0.
 
@@ -126,13 +124,15 @@ behavior-preserving and has no remaining phase work.
    contract, preview, public emitter, and round-trip tests. Because the admin source and public
    bundle can update without reloading the FastAPI process, backend changes require an API restart;
    the builder now blocks saves when `/api/admin/page-builder/runtime` is incompatible. **[C:code]**
-2. **Page-level recovery is shipped; disaster recovery is still incomplete.** Transactional,
+2. **Page-level and disaster recovery are complete.** Transactional,
    versioned `BuilderPageSnapshot` pre-states cover committed mutations and deletion, the admin-only
    restore APIs validate and restore current/deleted pages, and the builder now exposes guarded
    History and Deleted pages workflows [C:code]. Untouched legacy pages can have empty history until
-   their first covered mutation, and local undo still covers _unsaved drafts only_. The remaining
-   safety gap is the Phase 4-5 backup artifact/scheduling and isolated restore-drill work in
-   `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`.
+   their first covered mutation, and local undo still covers _unsaved drafts only_. The
+   authenticated save-two/restore/delete/recover flow, eight consecutive timer-created nightly
+   database sets, the scheduled weekly file set, and the final snapshot-bearing PostgreSQL
+   16/temporary-tree drill all passed [C:live]. The completion record is in
+   `docs/completed-builder-plans/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`.
 3. **Unknown `page.meta` keys persist unsanitized**
    (`backend/app/builder_security/header.py:sanitize_page_meta`) —
    tolerated by design, admin-only writes, and nothing renders them today, so it's not currently
@@ -141,19 +141,18 @@ behavior-preserving and has no remaining phase work.
 4. **Broader manual regression debt:** the authenticated 0.8.5 corrective matrix is complete, but
    the unchecked optional flows in `docs/READER_BUILDER_QA.md` remain useful before 1.0.0. They are
    no longer blockers for merging this builder baseline.
-   **What's missing** (verified against code): the live Phase 4 rollout/observation gate, Phase 5
-   restore drills, and the optional polish backlog, including header glow. Phase 4 repository
-   hardening, page snapshots, and admin recovery are implemented; the authenticated 0.8.5
-   responsive/manual closeout is also complete.
+   **What's missing** (verified against code/live evidence): the optional polish backlog, including
+   header glow, plus the broader release worksheet. Recovery Phases 1–5 and the authenticated 0.8.5
+   responsive/manual closeout are complete.
 
 **1.0.0 scope recommendation:**
 
-- **In:** finish backup/restore hardening and the broader reader/builder worksheet before 1.0.0.
-  Page snapshots/admin restore and the completed 0.8.5 baseline are already merged.
+- **In:** finish the broader reader/builder worksheet before 1.0.0. Page snapshots/admin restore,
+  backup/restore hardening, and the completed 0.8.5 baseline are already complete.
 - **Defer/cut:** universal module appearance (needs the per-type audit; button/promo/email already
   have their own styling), drag-resize gutters, any new module types before the store's.
-- **Blockers/dependencies:** finish the snapshot/restore and backup-hardening plan before starting
-  store work. Header glow is not a store dependency.
+- **Blockers/dependencies:** recovery and backup hardening no longer block store work. Header glow
+  is not a store dependency.
 - **Tests/QA:** keep backend update/refetch, builder save/reload, negative dropped-branch, and
   preview/public real-width coverage aligned with every newly allowed responsive field. Keep the
   visual suite mandatory for responsive and header work. The authenticated Pyre corrective pass is
@@ -171,7 +170,8 @@ prerequisite reader/layout work the plan gates on is **done** [C:code+docs].
 `docs/BUILDER_STRIPE_STORE_PLAN.md` is current, and its security section is genuinely correct —
 server-side price authority, raw-body webhook verification, idempotent fulfillment, event-ID
 dedupe, PII minimization, and server-owned regional shipping rates are all already specified. The
-remaining recovery prerequisite is `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`.
+recovery prerequisite is complete in
+`docs/completed-builder-plans/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`.
 
 **The Stripe vs. PayPal call: ship Stripe Checkout only. Defer PayPal past 1.0.0.** This is the
 clear answer, not a coin flip:
@@ -451,28 +451,23 @@ compete with feature time meaningfully.
 
 **NOW — finish before moving on**
 
-1. _Recovery safety:_ complete `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`: provision
-   the pinned runtime and service-owned archive layout; record the required `0017` artifact before
-   applying `0018` and the clean head artifact afterward; run both hardened services; then enable
-   validated nightly DB and weekly file backups on `/mnt/archive` and observe three DB sets plus one
-   file set. Perform the isolated restore drill separately in Phase 5.
-2. _Ops track (parallel, ~1 day):_ finish the non-recovery host items: install diagnostics-refresh
+1. _Ops track (parallel, ~1 day):_ finish the non-recovery host items: install diagnostics-refresh
    timer + ops worker (or disable ops deliberately); pin `umami` image; add Caddy security headers
    (HSTS, `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`/`frame-ancestors` — hold off
    on strict CSP, the builder emits inline styles).
 
 **NEXT — required for 1.0.0**
 
-3. _Store:_ Stripe-Checkout-only build per the plan's Phases 1→7, with the checklist in §2.2
+2. _Store:_ Stripe-Checkout-only build per the plan's Phases 1→7, with the checklist in §2.2
    (provider-neutral order columns; subscriptions bridged via premium codes). This is the
    schedule's center of mass.
-4. _Users:_ password change + admin password set; `/api/email/subscribe` hardening.
-5. _Analytics:_ visitor-session retention job; `/api/track/visitor` rate limit; one
+3. _Users:_ password change + admin password set; `/api/email/subscribe` hardening.
+4. _Analytics:_ visitor-session retention job; `/api/track/visitor` rate limit; one
    metrics-correctness pass; `store_checkout_start` event.
-6. _Diagnostics:_ snapshot-age banner; hide Preview Changes tab.
-7. _Polish backlog:_ prioritize release-relevant items from `docs/POLISH_BACKLOG_PLAN.md` without
+5. _Diagnostics:_ snapshot-age banner; hide Preview Changes tab.
+6. _Polish backlog:_ prioritize release-relevant items from `docs/POLISH_BACKLOG_PLAN.md` without
    reopening the completed 0.8.5 builder roadmap; keep optional visual features behind hardening.
-8. _Release:_ full DoD gate (§4), tag `1.0.0`.
+7. _Release:_ full DoD gate (§4), tag `1.0.0`.
 
 **LATER — post-1.0.0**
 
@@ -545,10 +540,10 @@ visibility/config only per what ships; single-server deployment; Umami analytics
 
 **Data/backups**
 
-- [ ] Backups off the primary disk (`/mnt/archive` is mounted, 916G, but was read-only with only
-      three tiny December 2025 legacy archives on the 2026-07-16 recheck [C:live]) — **the single
-      highest-value hour of work in this entire document**
-- [ ] Restore drill performed and documented
+- [x] Backups off the primary disk: `/mnt/archive` is clean/read-write; eight nightly timer sets and
+      the scheduled weekly file set passed with zero corrupt catalog sets (2026-08-19) [C:live].
+- [x] Isolated PostgreSQL 16 and temporary-tree restore drill performed and documented, including
+      all 33 stored snapshot payloads (2026-08-19)
 - [ ] `deploy/bwondercomics.env` stays 0600 + gitignored (verified [C:live]); never echoed into
       diagnostics config output **[V: skim `/api/admin/diagnostics/config` response once]**
 - [ ] Visitor session retention (§2.3); orders PII minimal (§2.2)
@@ -620,7 +615,7 @@ Remaining questions that change the plan:
 
 ## Immediate next steps
 
-Implement `docs/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md` first. Correct the read-only
-archive mount and complete the backup/restore phases in parallel with builder snapshot work. Then
-begin Store Phase 1. Header glow and the remaining small requests stay prioritized through
-`docs/POLISH_BACKLOG_PLAN.md`, not as recovery or store blockers.
+Recovery and backup hardening are complete in
+`docs/completed-builder-plans/BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md`. Finish the
+remaining Ops hardening, then begin Store Phase 1. Header glow and the remaining small requests
+stay prioritized through `docs/POLISH_BACKLOG_PLAN.md`, not as recovery or store blockers.

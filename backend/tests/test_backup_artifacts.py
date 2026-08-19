@@ -728,6 +728,23 @@ class BackupArtifactTests(unittest.TestCase):
         self.assertIn("/srv/bw-quality/.backup-venv/bin/python", dry_run)
         self.assertNotIn('BACKUP_DIR="var/backups"', dry_run)
 
+        restore_dry_run = subprocess.run(
+            [
+                "make",
+                "-n",
+                "restore-drill",
+                "DATABASE_ARTIFACT_ID=database-test",
+                "FILE_ARTIFACT_ID=files-test",
+            ],
+            cwd=PROJECT_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout
+        self.assertIn("scripts/restore_drill.py all", restore_dry_run)
+        self.assertIn('/mnt/archive/backups/bwondercomics"', restore_dry_run)
+        self.assertNotIn("BWC_DB_NAME", restore_dry_run)
+
         worker_unit = (
             PROJECT_ROOT / "deploy" / "ops" / "bwondercomics-ops-worker.service"
         ).read_text(encoding="utf-8")
@@ -748,6 +765,7 @@ class BackupArtifactTests(unittest.TestCase):
             self.assertIn("Group=dbmelville", unit)
             self.assertIn(".backup-venv/bin/python", unit)
             self.assertIn("BACKUP_DIR=/mnt/archive/backups/bwondercomics", unit)
+            self.assertIn("DOCKER_CONFIG=/tmp/bwondercomics-docker", unit)
             self.assertIn(f"BACKUP_LOCK_TIMEOUT_SECONDS={timeout}", unit)
             self.assertIn("TimeoutStartSec=6h30min", unit)
             self.assertIn("Restart=no", unit)

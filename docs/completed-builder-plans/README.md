@@ -23,6 +23,9 @@ Completed plans:
 - [Builder Customization Roadmap](BUILDER_CUSTOMIZATION_ROADMAP.md) — customization Phases 0–7 and
   the 0.8.5 corrective QA closeout.
 - [Builder Refactor Plan](BUILDER_REFACTOR_PLAN.md) — completed structural cleanup Phases A–G.
+- [Builder Page Snapshot and Backup/Restore Hardening Plan](BUILDER_PAGE_SNAPSHOT_AND_BACKUP_HARDENING_PLAN.md)
+  — transactional page recovery, validated off-primary-disk artifacts, schedules, and isolated
+  restore-drill closeout.
 
 Active or proposed builder work stays in the parent `docs/` directory, including the
 [Polish Backlog](../POLISH_BACKLOG_PLAN.md), [Builder Stripe Store Plan](../BUILDER_STRIPE_STORE_PLAN.md),
