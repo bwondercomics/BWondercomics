@@ -771,6 +771,30 @@ docker compose exec backend alembic upgrade head
 docker compose down
 ```
 
+### **Backup and recovery**
+
+```bash
+# Local developer artifacts under var/backups/
+make backup
+make backup-db
+make backup-files
+
+# Fail-closed production artifacts under /mnt/archive/backups/bwondercomics
+make backup-db-production
+make backup-files-production
+
+# Isolated proof using committed artifact IDs; never accepts a production database target
+make restore-drill \
+  DATABASE_ARTIFACT_ID=database-YYYYMMDDTHHMMSSZ-xxxxxxxxxxxx \
+  FILE_ARTIFACT_ID=files-YYYYMMDDTHHMMSSZ-xxxxxxxxxxxx
+```
+
+Production backup jobs use the pinned `.backup-venv`, matching manifests/checksums, and separate
+nightly database/weekly file systemd timers. The restore drill creates disposable PostgreSQL 16 and
+temporary-file resources, verifies all critical counts and snapshot payloads, and cleans up. Legacy
+`make restore-db` / `make restore-files` are destructive incident tools and do not count as drill
+evidence. See `docs/OPERATIONS.md` before production backup or recovery work.
+
 ---
 
 ## ✅ Definition of Done

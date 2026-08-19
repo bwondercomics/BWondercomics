@@ -54,8 +54,8 @@ flat-rate shipping. The completed 0.8.5 builder baseline is merged into `main`, 
 deployed branch.
 
 **Biggest risks:** payment-flow mistakes (mitigated by the plan's hosted-Checkout approach — keep
-it), single-disk data loss, and scope creep in the builder (Phases 5–7 are where "close to done"
-can quietly become two more months).
+it), the remaining same-host/off-site backup gap, and scope creep in the builder (Phases 5–7 are
+where "close to done" can quietly become two more months).
 
 **Shortest credible path:** complete the remaining parallel Ops hardening → build the
 Stripe-Checkout-only store per the existing plan → freeze everything else
@@ -596,8 +596,8 @@ Settled on 2026-07-16:
 - **First product:** physical. Collect shipping addresses in Stripe Checkout and use simple
   server-controlled flat shipping rates by supported region; dynamic carrier quoting is not needed
   for v1.
-- **Backup destination:** `/mnt/archive`, after its current read-only mount state is corrected and
-  verified by the backup-hardening plan.
+- **Backup destination:** `/mnt/archive`; the separate filesystem is clean/read-write, validated,
+  scheduled, and restore-drilled. Off-site/encrypted replication remains a separate follow-up.
 
 Remaining questions that change the plan:
 

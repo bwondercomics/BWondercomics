@@ -10,6 +10,10 @@ This repo serves a plain HTML/CSS/JS frontend, with a FastAPI backend adding dyn
 - **Backend app**: `backend/app/main.py` primarily serves API routes and JSON views. It also serves branded HTML responses for `/`, `/index.html`, `/feed.html`, `/comics.html`, `/media.html`, plus `/manifest.json`, so crawlers receive the configured OG image and favicon.
 - **Database**: Postgres (Docker Compose recommended) stores users/comments, posts, series, entries,
   media, builder pages/bindings, and retained builder recovery snapshots.
+- **Backup/recovery services**: separate nightly database and weekly durable-file systemd jobs call
+  `scripts/backup_artifacts.py` and publish validated sets to `/mnt/archive`. The checked-in
+  `scripts/restore_drill.py` proves selected artifacts in disposable resources, outside the web/API
+  request path.
 
 ## Core data model
 
@@ -142,6 +146,20 @@ Builder pages use explicit page-builder APIs rather than the legacy save-JSON pa
 
 - `/series/<id>/` redirects to `/index.html?series=<id>` so you can link cleanly.
 
+### 6) Backup and recovery operations
+
+1. Developer backup targets write manifest/checksum-backed sets under `var/backups/`; production
+   targets and deployed timers fail closed at `/mnt/archive/backups/bwondercomics`.
+2. The database job publishes PostgreSQL 16 custom dumps nightly. The weekly file job includes only
+   original public/protected comic and media roots plus `assets/uploads`; secrets and derived output
+   are excluded.
+3. Operators choose committed database/file artifact IDs and run `make restore-drill`. The helper
+   re-hashes both sets, restores the database into a network-isolated disposable PostgreSQL 16
+   container, extracts files into a new temporary tree, verifies counts/schema/snapshot payloads,
+   and removes all scratch resources.
+4. A real production restore is a distinct, destructive incident procedure requiring explicit
+   authorization. See `docs/OPERATIONS.md`; the legacy Make restore commands are not drill evidence.
+
 ## Where to read code (entry points)
 
 - Backend runtime + routing: `backend/app/main.py`
@@ -156,3 +174,7 @@ Builder pages use explicit page-builder APIs rather than the legacy save-JSON pa
 - Admin boot + behavior: `admin/app.js`, `admin/entries.js`, `admin/media.js`,
   `admin/page-config.js`, `admin/page-builder.js`, and `admin/page-builder/`
 - Shared builder/reader contracts and rendering: `shared/page-builder/`
+- Backup publication, retention, and diagnostics records: `scripts/backup_artifacts.py`
+- Isolated database/file recovery proof: `scripts/restore_drill.py`
+- Production provisioning, schedules, drills, and destructive-restore runbook:
+  `docs/OPERATIONS.md` and `deploy/README.md`

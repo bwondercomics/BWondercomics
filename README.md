@@ -14,6 +14,10 @@ BWonderComics is a plain HTML/CSS/JS comic reader and admin panel built with Vit
 - Admin **History** and **Deleted pages** recovery use retained, validated server snapshots to restore
   saved content or recreate an unpublished/unbound draft, with dirty-workspace protection and a
   fresh canonical/preview state after success.
+- Production database and durable-file backups publish validated manifest/checksum sets to the
+  separate `/mnt/archive` filesystem on nightly/weekly systemd schedules. `make restore-drill`
+  revalidates selected artifact IDs in isolated PostgreSQL 16 and temporary-file resources without
+  accepting a production restore target.
 - Preview mode suppresses reader side effects that should not fire from an admin iframe, including analytics/tracking writes, email submission, comment mutations, chat SSO, safe-mode redirects, fullscreen changes, and external navigation clicks.
 - Header buttons and `buttons` modules share the same normalized link target model for builder pages, anchors, and external URLs. Header shell, navigation, panel buttons, and builder modules share structured appearance contracts between admin canvas, preview, and public reader.
 - CMS-backed builder modules are structured: `reader`, `entry-gallery`, `feed`, and `media-gallery` persist sanitized source config, while feed/media-gallery use existing site-wide post/media data and reader/entry modules remain series-aware.
@@ -36,6 +40,8 @@ BWonderComics is a plain HTML/CSS/JS comic reader and admin panel built with Vit
 - `shared/page-builder/` - dual-use builder/reader contracts, renderers, sanitizers, descriptors,
   responsive resolution/CSS, header config, and preview protocol.
 - `backend/app/` - FastAPI app, routes, DB stores, page-builder persistence, branding, diagnostics, ops, analytics, auth, and premium access.
+- `scripts/backup_artifacts.py` and `scripts/restore_drill.py` - canonical validated backup
+  publication and isolated recovery proof.
 - `assets/` - public chrome, CSS, icons, banners, and static images used by the reader/admin shell.
 - `comics/`, `media/`, and `protected/` - public and access-controlled entry/media file roots used by the backend.
 - `tests/`, `backend/tests/`, and `tests/visual/` - Vitest, unittest, and Playwright coverage.
@@ -75,6 +81,16 @@ Public pages are served from `dist/`.
 - Python format check: `npm run format:py:check`
 - Production build: `npm run build`
 - Full JS + backend test shortcut: `npm run test:all`
+
+## Recovery operations
+
+- Developer backups: `make backup`, `make backup-db`, or `make backup-files` under `var/backups/`.
+- Production jobs: `make backup-db-production` and `make backup-files-production`; deployed timers
+  run the same canonical implementation against `/mnt/archive/backups/bwondercomics`.
+- Isolated recovery proof:
+  `make restore-drill DATABASE_ARTIFACT_ID=... FILE_ARTIFACT_ID=...`.
+- See `docs/OPERATIONS.md` for provisioning, artifact verification, recorded drills, and the
+  separately authorized destructive-disaster-recovery procedure.
 
 ## Docs
 

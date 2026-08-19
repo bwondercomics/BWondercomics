@@ -9,7 +9,10 @@ This repo serves a plain HTML/CSS/JS site with a backend that adds the dynamic p
 - Static assets (site chrome): `assets/` (icons, banners, UI images used by the site/theme).
 - Reverse proxy + file server: Caddy (see `deploy/Caddyfile`) serves `/` from `dist/`, `/admin/*` and `/shared/page-builder/*` from repo source, and proxies API routes.
 - Backend (dynamic): FastAPI app in `backend/` (Docker-friendly). Mostly API/JSON, but it also serves branded HTML for selected public routes and `manifest.json`.
-- Database: Postgres (recommended) for users, comments, posts, series, entries, media, builder pages, and builder-page bindings.
+- Database: Postgres (recommended) for users, comments, posts, series, entries, media, builder pages,
+  builder-page bindings, and retained builder recovery snapshots.
+- Backup/recovery automation: `scripts/backup_artifacts.py`, explicit database/file systemd units,
+  and `scripts/restore_drill.py` publish and prove validated artifacts independently of the web app.
 
 ## Data sources
 
@@ -108,6 +111,27 @@ Entries:
 - `status=scheduled` + future `publishAt` → listed as Coming Soon with pages withheld
 - due scheduled entries are promoted to `published` before payload generation
 - `status=published` with a future date normalizes to `scheduled`
+
+## Backup and recovery architecture
+
+- `scripts/backup_artifacts.py` is the single implementation behind Make, Ops, compatibility
+  wrappers, and the deployed systemd services. Local developer artifacts stay under `var/backups/`;
+  production is fixed at `/mnt/archive/backups/bwondercomics` and fails closed when the separate
+  mount, ownership, source roots, or archive layout are invalid.
+- Database artifacts are PostgreSQL 16 custom-format dumps. Durable-file artifacts include only the
+  five allowlisted roots (`comics`, `protected/comics`, `media`, `protected/media`, and
+  `assets/uploads`) and exclude builds, derived media, diagnostics, environment files, and secrets.
+  Artifact bytes, manifests, checksums, validation results, and retention integrity are one
+  committed set.
+- The deployed database timer runs nightly at 03:00 UTC and the file timer runs Sundays at 04:00
+  UTC. Status and bounded catalog records live under `var/diagnostics/backups/`; artifact data and
+  non-secret drill logs live on the archive disk.
+- `scripts/restore_drill.py` accepts artifact IDs rather than production database/container paths.
+  It restores into a network-isolated disposable PostgreSQL 16 container, verifies Alembic state,
+  critical counts, builder graph/schema, and every snapshot payload, then removes the container and
+  volume. Files are manually extracted and recounted in a new temporary tree that is always removed.
+- `/mnt/archive` protects against primary-disk loss but remains on the same host; off-site/encrypted
+  replication and production-secret recovery are separate operational responsibilities.
 
 ## Analytics
 
